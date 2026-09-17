@@ -500,29 +500,60 @@
                 </div>
             </div>
             @else
+            @php
+                $genderLabels = ['male' => 'Boys', 'female' => 'Girls', 'open' => 'Open'];
+                $comboGroups = collect($championship)
+                    ->groupBy(fn (array $row) => $row['category_key'].'|'.$row['gender_key'])
+                    ->map(fn ($rows, $key) => [
+                        'group' => $key,
+                        'label' => ($rows->first()['category'] ?? '').' · '.($genderLabels[$rows->first()['gender_key']] ?? $rows->first()['gender']),
+                    ])
+                    ->values();
+                $firstGroup = $comboGroups->first()['group'] ?? null;
+            @endphp
             <div class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden overflow-x-auto">
                 <div class="px-4 py-3 bg-white/5 border-b border-slate-800">
                     <h2 class="font-bold text-white">Championship Standings</h2>
-                    <p class="text-xs text-white/40">Cumulative individual championship points across the whole meet, per student — not the same as the Individual tab's per-result list.</p>
+                    <p class="text-xs text-white/40">Individual championship points, ranked within each category &amp; gender{{ ($championshipCombinesPhases ?? false) ? ' — combined across every published phase' : '' }}. Not the same as the Individual tab's per-result list.</p>
                 </div>
+
+                @if($comboGroups->count() > 1)
+                <div id="championship-group-nav" class="flex gap-2 overflow-x-auto p-3 border-b border-slate-800" aria-label="Category and gender">
+                    @foreach($comboGroups as $combo)
+                    <button type="button" data-group="{{ $combo['group'] }}"
+                            class="championship-group-tab shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold border {{ $combo['group'] === $firstGroup ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-amber-500' }}">{{ $combo['label'] }}</button>
+                    @endforeach
+                </div>
+                @endif
+
                 <table class="w-full text-sm">
                     <thead class="bg-white/5 text-left text-xs uppercase text-white/40">
                         <tr><th class="p-3">Rank</th><th class="p-3">Student</th><th class="p-3">School</th><th class="p-3">Category</th><th class="p-3">Gender</th><th class="p-3 text-right">Points</th><th class="p-3 w-10"></th></tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-800">
+                    <tbody id="championship-rows" class="divide-y divide-slate-800">
                         @foreach($championship as $row)
-                            <tr>
+                            @php $rowGroup = $row['category_key'].'|'.$row['gender_key']; @endphp
+                            <tr data-group="{{ $rowGroup }}" @if($comboGroups->count() > 1 && $rowGroup !== $firstGroup) hidden @endif>
                                 <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td>
-                                <td class="p-3 font-semibold text-white uppercase">{{ $row['student'] }}</td>
+                                <td class="p-3 font-semibold text-white uppercase">
+                                    <div class="flex items-center gap-2">
+                                        @if($row['photo'])
+                                        <img src="{{ $row['photo'] }}" alt="" class="w-7 h-7 rounded-full object-cover object-top border border-slate-700 shrink-0">
+                                        @else
+                                        <span class="w-7 h-7 rounded-full bg-amber-500/15 text-amber-300 flex items-center justify-center text-[10px] font-bold shrink-0" aria-hidden="true">{{ strtoupper(substr($row['student'] ?? '?', 0, 1)) }}</span>
+                                        @endif
+                                        <span>{{ $row['student'] }}</span>
+                                    </div>
+                                </td>
                                 <td class="p-3 text-white/70 uppercase">{{ $row['school'] }}</td>
                                 <td class="p-3 text-white/70">{{ $row['category'] }}</td>
-                                <td class="p-3 text-white/70">{{ $row['gender'] }}</td>
+                                <td class="p-3 text-white/70">{{ $genderLabels[$row['gender_key']] ?? $row['gender'] }}</td>
                                 <td class="p-3 text-right font-mono text-white">{{ $row['points'] }}</td>
                                 <td class="p-3 text-right">
                                     @if($row['ref'])
                                     <a href="{{ route('tenant.fest.participant', [$event->id, $row['ref']]) }}"
                                        class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-700 text-white/50 hover:text-white hover:border-slate-500 transition"
-                                       title="View this student's full results">
+                                       title="View this student's item results">
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
@@ -535,6 +566,29 @@
                     </tbody>
                 </table>
             </div>
+            <script>
+            (() => {
+                const nav = document.getElementById('championship-group-nav');
+                if (!nav) return;
+                const tabs = [...nav.querySelectorAll('.championship-group-tab')];
+                const rows = [...document.querySelectorAll('#championship-rows tr[data-group]')];
+                nav.addEventListener('click', (e) => {
+                    const btn = e.target.closest('.championship-group-tab');
+                    if (!btn) return;
+                    const group = btn.dataset.group;
+                    tabs.forEach(t => {
+                        const active = t === btn;
+                        t.classList.toggle('bg-amber-500', active);
+                        t.classList.toggle('text-slate-950', active);
+                        t.classList.toggle('border-amber-500', active);
+                        t.classList.toggle('bg-slate-800', !active);
+                        t.classList.toggle('text-slate-300', !active);
+                        t.classList.toggle('border-slate-700', !active);
+                    });
+                    rows.forEach(r => { r.hidden = r.dataset.group !== group; });
+                });
+            })();
+            </script>
             @endif
         @endif
     </div>

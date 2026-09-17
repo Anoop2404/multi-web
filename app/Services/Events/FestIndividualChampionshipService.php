@@ -66,6 +66,7 @@ class FestIndividualChampionshipService
                     'id'     => $row->student_id,
                     'name'   => $row->student?->name,
                     'reg_no' => $row->student?->reg_no,
+                    'photo'  => $row->student?->photoDataUri(),
                 ],
                 'school' => $school?->name,
             ];

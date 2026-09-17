@@ -8,7 +8,6 @@ use App\Models\FestAthleticRecord;
 use App\Models\FestEvent;
 use App\Models\FestEventPhase;
 use App\Models\FestEventItem;
-use App\Models\FestIndividualChampionshipPoint;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestRecordBreak;
@@ -257,22 +256,40 @@ class FestPortalController extends Controller
         // unlike the school scoreboard there's no "provisional, published-items-only"
         // variant to fall back to, so the whole tab stays empty until the event's
         // official publish has actually run (matches how $overallBoard/$categoryBoards
-        // being empty pre-publish is already handled further down).
-        $championshipEventId = $selectedScope['event_id'] ?: $event->id;
-        $championshipRows = $isPublished
-            ? FestIndividualChampionshipPoint::where('event_id', $championshipEventId)
-                ->with(['student'])
-                ->orderByDesc('points')
-                ->orderByDesc('group_points')
-                ->orderBy('student_id')
-                ->get()
-            : collect();
-        $championshipSchools = Tenant::whereIn('id', $championshipRows->pluck('student.tenant_id')->filter()->unique())
-            ->pluck('name', 'id');
+        // being empty pre-publish is already handled further down). Ranked within
+        // category AND gender (FestIndividualChampionshipService::rankAndFormat()) — boys
+        // and girls in the same category get separate #1s, not one mixed ranking — and,
+        // when this hub uses phases, combined across every phase the viewer can actually
+        // see (same per-leaf visibility gate crossPhaseScoreboard() uses for the school
+        // board, so an unpublished sibling phase can't leak its points into the total).
+        $championshipRoot = $event->rootEvent();
+        $championshipUsesPhases = $championshipRoot->usesPhasedRegionalBilling();
+        $championshipRows = collect();
+        if ($isPublished) {
+            if ($championshipUsesPhases) {
+                $visibleLeafIds = collect();
+                foreach (FestEventPhase::where('event_id', $championshipRoot->id)->get() as $phase) {
+                    $leaves = FestEvent::where('parent_event_id', $championshipRoot->id)->where('source_phase_id', $phase->id)->get();
+                    foreach ($leaves as $leaf) {
+                        if ($this->operationalEvents->directScope($leaf)['results_published'] || $this->isAuthorizedAdminPreview($request, $leaf)) {
+                            $visibleLeafIds->push($leaf->id);
+                        }
+                    }
+                }
+                $championshipRows = $this->individualChampionship->crossPhaseStandingForVisibleLeaves($championshipRoot, $visibleLeafIds);
+            } else {
+                $championshipRows = $this->individualChampionship->leaderboardForEvent($event);
+            }
+        }
+
         // Link each championship row through the same typed participant reference used
-        // by search, avoiding collisions between numeric chest and registration numbers.
+        // by search, avoiding collisions between numeric chest and registration numbers —
+        // scoped to this one leaf event, so a student only appearing in a different phase
+        // (cross-phase view) simply has no link, same graceful degrade the view already
+        // handles for a row with no published result at all.
+        $championshipEventId = $selectedScope['event_id'] ?: $event->id;
         $championshipRefs = FestParticipant::whereHas('registration', fn ($q) => $q->where('event_id', $championshipEventId))
-            ->whereIn('student_id', $championshipRows->pluck('student_id')->filter()->unique())
+            ->whereIn('student_id', $championshipRows->pluck('student.id')->filter()->unique())
             ->orderBy('id')
             ->get()
             ->unique('student_id')
@@ -284,20 +301,21 @@ class FestPortalController extends Controller
         // INDIVIDUAL_CATEGORY_KEYS), regardless of event_type — the same keys
         // FestClassGroupScheme::labels() resolves for Kalolsavam class categories, so it
         // doubles as the label source here too instead of showing the raw "lp"/"hs" slug.
-        $championshipCategoryLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
+        $championshipCategoryLabels = FestClassGroupScheme::labels(null, $championshipRoot);
         $championship = $championshipRows
-            ->map(function (FestIndividualChampionshipPoint $row, int $index) use ($championshipSchools, $championshipCategoryLabels, $championshipRefs) {
-
+            ->map(function (array $row) use ($championshipCategoryLabels, $championshipRefs) {
                 return [
-                    'rank' => $index + 1,
-                    'points' => $row->points,
-                    'category' => $championshipCategoryLabels[$row->category] ?? $row->category,
-                    'gender' => \App\Support\FestSportsAgeGroup::genderLabel($row->gender) ?? $row->gender,
-                    'student' => $row->student?->name,
-                    'photo' => $row->student?->photoDataUri(),
-                    'reg_no' => $row->student?->reg_no,
-                    'school' => $championshipSchools[$row->student?->tenant_id] ?? null,
-                    'ref' => $championshipRefs[$row->student_id] ?? null,
+                    'rank' => $row['rank'],
+                    'points' => $row['points'],
+                    'category' => $championshipCategoryLabels[$row['category']] ?? $row['category'],
+                    'category_key' => $row['category'],
+                    'gender_key' => $row['gender'],
+                    'gender' => \App\Support\FestSportsAgeGroup::genderLabel($row['gender']) ?? $row['gender'],
+                    'student' => $row['student']['name'],
+                    'photo' => $row['student']['photo'],
+                    'reg_no' => $row['student']['reg_no'],
+                    'school' => $row['school'],
+                    'ref' => $championshipRefs[$row['student']['id']] ?? null,
                 ];
             })
             ->values()
@@ -499,6 +517,7 @@ class FestPortalController extends Controller
             'itemResultsByCategory' => $itemResultsByCategory,
             'individualResults' => $individualResults,
             'championship' => $championship,
+            'championshipCombinesPhases' => $championshipUsesPhases,
             'publishedAt' => $publishedAt,
             'scopes' => $scopes,
             'selectedScope' => $selectedScope,
@@ -913,65 +932,6 @@ public function scoreboardData(Request $request, int $eventId)
         'contentHtml' => view('public.fest.partials.scoreboard-content', $dynamic + compact('event', 'isPublished', 'category', 'isAdminPreview'))->render(),
         'refreshedAt' => now()->toIso8601String(),
     ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-}
-
-/**
- * Public individual (student) championship leaderboard — category+gender ranked,
- * combined across every visible phase of the hub. No separate "publish championship"
- * step: visibility rides entirely on the same results_published/admin-preview gate
- * scoreboard() already uses, same as the rest of the public portal. Admin's own
- * Championship page (FestChampionshipController) is never gated by this at all —
- * it's always visible there regardless of publish state.
- */
-public function champions(Request $request, int $eventId)
-{
-    $tenant = $this->resolveTenant();
-    $event = $this->findEvent($tenant->id, $eventId);
-    $selectedScope = $this->operationalEvents->directScope($event);
-
-    $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
-    $isPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
-
-    $root = $event->rootEvent();
-    $usesPhases = $root->usesPhasedRegionalBilling();
-    $categoryLabels = FestClassGroupScheme::labels(null, $root);
-
-    $leaderboard = collect();
-    $cumulativeLeaderboard = collect();
-    if ($isPublished) {
-        $leaderboard = $this->individualChampionship->leaderboardForEvent($event);
-
-        if ($usesPhases) {
-            // Same per-leaf visibility gate crossPhaseScoreboard() uses for the school
-            // board — a phase whose own results aren't public yet (or previewable by
-            // this admin) must not leak its points into the combined total just because
-            // a sibling phase already is.
-            $phases = FestEventPhase::where('event_id', $root->id)->get();
-            $visibleLeafIds = collect();
-            foreach ($phases as $phase) {
-                $leaves = FestEvent::where('parent_event_id', $root->id)->where('source_phase_id', $phase->id)->get();
-                foreach ($leaves as $leaf) {
-                    if ($this->operationalEvents->directScope($leaf)['results_published'] || $this->isAuthorizedAdminPreview($request, $leaf)) {
-                        $visibleLeafIds->push($leaf->id);
-                    }
-                }
-            }
-            $cumulativeLeaderboard = $this->individualChampionship->crossPhaseStandingForVisibleLeaves($root, $visibleLeafIds);
-        }
-    }
-
-    return $this->renderPublic('public.fest.champions', $tenant, [
-        'event' => $event,
-        'selectedScope' => $selectedScope,
-        'isPublished' => $isPublished,
-        'isAdminPreview' => $isAdminPreview,
-        'leaderboard' => $leaderboard,
-        'cumulativeLeaderboard' => $cumulativeLeaderboard,
-        'usesPhases' => $usesPhases,
-        'categoryLabels' => $categoryLabels,
-        'eventContext' => $this->operationalEvents->publicContext($event),
-        'pageSeo' => ['title' => $event->title.' — Individual Champions'],
-    ]);
 }
 
 /**

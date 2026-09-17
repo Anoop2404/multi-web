@@ -44,7 +44,7 @@
                     @if($isPublished)
                     <div class="flex flex-wrap gap-2 justify-start lg:justify-end">
                         <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => 'toppers']) }}" class="inline-flex text-xs font-extrabold bg-amber-500 hover:bg-amber-400 text-slate-950 px-4 py-2.5 rounded-xl transition">View topper highlights →</a>
-                        <a href="{{ route('tenant.fest.champions', ['event' => $event->id]) }}" class="inline-flex text-xs font-extrabold bg-slate-800 border border-slate-700 hover:border-amber-500 text-white px-4 py-2.5 rounded-xl transition">🏅 Individual Champions →</a>
+                        <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => 'championship']) }}" class="inline-flex text-xs font-extrabold bg-slate-800 border border-slate-700 hover:border-amber-500 text-white px-4 py-2.5 rounded-xl transition">🏅 Individual Champions →</a>
                     </div>
                     @endif
                 </div>
