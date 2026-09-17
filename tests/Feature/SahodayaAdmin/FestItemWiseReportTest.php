@@ -7,6 +7,7 @@ use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestEventPhase;
 use App\Models\FestEventStaff;
+use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\SahodayaProfile;
@@ -223,6 +224,96 @@ class FestItemWiseReportTest extends TestCase
         ]));
         $pdfResponse->assertOk();
         $this->assertSame('application/pdf', $pdfResponse->headers->get('content-type'));
+    }
+
+    /**
+     * A judge can enter a mark well before an admin publishes that item's results — the
+     * school-admin item-wise report/download must not leak grade/rank/score to the
+     * school until the item is actually published, same gate
+     * FestPortalController::schoolResultsRoster() already enforces for the public
+     * roster. A Sahodaya-admin call (no school_id) is unaffected — admins need to see
+     * marked-but-unpublished rows to track mark-entry progress.
+     */
+    public function test_school_item_wise_report_masks_grade_and_score_until_the_item_is_published(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'Publish Gate Sahodaya',
+            'domain' => Str::uuid().'.test',
+            'is_active' => true,
+        ]);
+        SahodayaProfile::create([
+            'tenant_id' => $sahodaya->id,
+            'prefix' => 'PG',
+            'student_data_mode' => 'counts_only',
+        ]);
+
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'school', 'name' => 'Publish Gate School',
+            'parent_id' => $sahodaya->id, 'membership_status' => 'approved', 'is_active' => true,
+        ]);
+
+        $event = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Publish Gate Kalotsav', 'event_type' => 'kalolsavam',
+            'level_round' => 'sahodaya', 'status' => 'registration_open',
+        ]);
+
+        $item = FestEventItem::create([
+            'event_id' => $event->id, 'title' => 'Recitation-Malayalam', 'item_code' => '101',
+            'stage_type' => 'on_stage', 'participant_type' => 'individual', 'category' => 'music',
+            'class_group' => 'hs', 'is_enabled' => true,
+        ]);
+
+        $class = SchoolClass::create(['tenant_id' => $school->id, 'name' => '10']);
+        $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $class->id, 'name' => 'Test Student', 'reg_no' => 'STU/1']);
+        $reg = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+        $participant = FestParticipant::create(['registration_id' => $reg->id, 'student_id' => $student->id, 'participant_type' => 'student', 'event_id' => $event->id]);
+        FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'position' => 1, 'grade' => 'A', 'score' => 95]);
+
+        $schoolAdmin = User::factory()->create(['tenant_id' => $school->id, 'email_verified_at' => now()]);
+        $schoolAdmin->assignRole('school_admin');
+
+        $response = $this->actingAs($schoolAdmin)->get(route('school.kalotsav.reports.item-wise', [
+            'tenantId' => $school->id,
+            'event' => $event->id,
+        ]));
+        $response->assertOk();
+        $row = collect($response->viewData('page')['props']['rows'])->first();
+
+        $this->assertNull($row['grade'], 'grade must stay hidden from the school before the item is published');
+        $this->assertNull($row['position'], 'position must stay hidden from the school before the item is published');
+        $this->assertNull($row['score'], 'score must stay hidden from the school before the item is published');
+
+        $item->update(['results_published_at' => now()]);
+
+        $publishedResponse = $this->actingAs($schoolAdmin)->get(route('school.kalotsav.reports.item-wise', [
+            'tenantId' => $school->id,
+            'event' => $event->id,
+        ]));
+        $publishedRow = collect($publishedResponse->viewData('page')['props']['rows'])->first();
+
+        $this->assertSame('A', $publishedRow['grade'], 'grade must show once the item is published');
+        $this->assertSame(1, $publishedRow['position']);
+        $this->assertEquals(95, $publishedRow['score']);
+
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('event_admin');
+        $admin->givePermissionTo(\App\Support\TenantUserCatalog::defaultPermissionsForRole('event_admin'));
+        FestEventStaff::create(['event_id' => $event->id, 'user_id' => $admin->id, 'duty' => 'event_admin']);
+
+        $item->update(['results_published_at' => null]);
+
+        $adminResponse = $this->actingAs($admin)->get(route('sahodaya.events.reports.item-wise', [
+            'tenantId' => $sahodaya->id,
+            'event' => $event->id,
+        ]));
+        $adminResponse->assertOk();
+        $adminRow = collect($adminResponse->viewData('page')['props']['rows'])->first();
+
+        $this->assertSame('A', $adminRow['grade'], 'a Sahodaya-admin call must still see marked-but-unpublished rows');
     }
 
     /**

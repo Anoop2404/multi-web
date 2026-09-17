@@ -1983,7 +1983,7 @@ class FestEventReportAnalyticsService
                 'teacher:id,name,reg_no',
                 'registration:id,event_id,item_id,school_id,status',
                 'registration.school:id,name',
-                'registration.item:id,title,item_code,category,stage_type,participant_type,class_group',
+                'registration.item:id,title,item_code,category,stage_type,participant_type,class_group,results_published_at,results_hidden',
                 'registration.event:id,source_phase_id,region_id',
                 'registration.event.sourcePhase:id,name',
                 'registration.event.region:id,name,code',
@@ -1991,10 +1991,22 @@ class FestEventReportAnalyticsService
             ])
             ->get()
             ->filter(fn (FestParticipant $p) => $p->registration && $p->registration->item)
-            ->map(function (FestParticipant $p) use ($classGroupLabels, $usesPhasedRegionalBilling) {
+            ->map(function (FestParticipant $p) use ($classGroupLabels, $usesPhasedRegionalBilling, $schoolId) {
                 $registration = $p->registration;
                 $item = $registration->item;
                 $event = $registration->event;
+
+                // A school-scoped caller (the school-admin item-wise report/download) must
+                // never see a grade/rank/score before that item's results are officially
+                // published — a judge can enter marks well before an admin publishes them,
+                // and this method has no other gate to stop those from leaking early. Same
+                // published_at + not-hidden gate FestPortalController::schoolResultsRoster()
+                // already enforces for the PUBLIC roster. Sahodaya-admin callers pass
+                // $schoolId=null and keep seeing everything — they need pending/ungraded
+                // rows too (see the $markStatus 'pending' filter below, an admin-only
+                // mark-entry-progress view).
+                $itemPublished = $item->results_published_at !== null && ! $item->results_hidden;
+                $showMark = $schoolId === null || $itemPublished;
 
                 return [
                     'id'              => $p->id,
@@ -2016,9 +2028,9 @@ class FestEventReportAnalyticsService
                     'item_reg'        => $p->item_registration_number,
                     'chest_no'        => $p->chest_no,
                     'status'          => $registration->status,
-                    'grade'           => $p->mark?->grade,
-                    'position'        => $p->mark?->position,
-                    'score'           => $p->mark?->score,
+                    'grade'           => $showMark ? $p->mark?->grade : null,
+                    'position'        => $showMark ? $p->mark?->position : null,
+                    'score'           => $showMark ? $p->mark?->score : null,
                 ];
             });
 
