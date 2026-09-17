@@ -166,11 +166,21 @@ class FestChampionshipController extends SahodayaAdminController
                 // would otherwise reject it.
                 $merged = $categoryMap[$rawClassGroup] ?? $categoryMap[$canonicalCategory] ?? $canonicalCategory;
                 $category = in_array($merged, self::INDIVIDUAL_CATEGORY_KEYS, true) ? $merged : $canonicalCategory;
+                // Individual championship is always shown split Boys/Girls — there is no
+                // correct way to guess which bucket a student with gender 'other' or no
+                // gender on file at all belongs in, so rather than inventing a third
+                // "Open" bucket (or silently mislabeling them into one binary bucket) they
+                // are simply left out of the individual championship until their profile
+                // has male/female set. This does not affect the school-level scoreboard —
+                // only this student-level table.
                 $gender = match ($student->gender) {
                     'male'   => 'male',
                     'female' => 'female',
-                    default  => 'open',
+                    default  => null,
                 };
+                if ($gender === null) {
+                    return;
+                }
 
                 if (! isset($aggregated[$student->id])) {
                     $aggregated[$student->id] = [
