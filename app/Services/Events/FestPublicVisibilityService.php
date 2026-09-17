@@ -226,9 +226,45 @@ class FestPublicVisibilityService
      *
      * @return list<array<string, mixed>>
      */
-    public function publicParticipantItems(FestEvent $event, FestParticipant $participant, bool $isAdminPreview = false): array
+    /**
+     * $acrossPhases: when true and $event's hub uses phases, this student/teacher's
+     * items are pulled from EVERY phase leaf under the hub, not just $event — the
+     * public participant page (and the individual championship's eye-icon link into
+     * it, since that leaderboard is itself combined across phases) should show a
+     * student's full participation across the whole fest, not just whichever one
+     * phase happened to be in the URL. Each entry is visibility-checked against ITS
+     * OWN leaf event (a phase can be published independently of its siblings), not
+     * against $event.
+     */
+    public function publicParticipantItems(FestEvent $event, FestParticipant $participant, bool $isAdminPreview = false, bool $acrossPhases = false): array
     {
-        $entries = FestParticipant::where('event_id', $participant->event_id)
+        $eventsById = collect([$event->id => $event]);
+        // fest_participants.event_id is sometimes null on older/imported rows even
+        // though the row is very much real — its registration's event_id is the
+        // authoritative source and always set (that's how $participant was resolved
+        // in the first place, via findParticipantByRef()'s registration join).
+        $eventIds = [$participant->registration?->event_id ?? $participant->event_id ?? $event->id];
+
+        if ($acrossPhases) {
+            $hub = $event->rootEvent();
+            if ($hub->usesPhasedRegionalBilling()) {
+                $phaseIds = \App\Models\FestEventPhase::where('event_id', $hub->id)->pluck('id');
+                $leaves = \App\Models\FestEvent::where('parent_event_id', $hub->id)
+                    ->whereIn('source_phase_id', $phaseIds)
+                    ->get()
+                    ->keyBy('id');
+                if ($leaves->isNotEmpty()) {
+                    $eventsById = $leaves;
+                    $eventIds = $leaves->keys()->all();
+                }
+            }
+        }
+
+        // Matched through the registration's event_id, not the participant row's own
+        // event_id column — that column is null on some rows even though the
+        // participant is real and correctly tied to an event via its registration
+        // (same authoritative source findParticipantByRef() itself joins through).
+        $entries = FestParticipant::whereHas('registration', fn ($q) => $q->whereIn('event_id', $eventIds))
             ->where('participant_role', '!=', 'standby')
             ->when($participant->student_id, fn ($q) => $q->where('student_id', $participant->student_id))
             ->when(! $participant->student_id, fn ($q) => $q->where('teacher_id', $participant->teacher_id))
@@ -243,23 +279,30 @@ class FestPublicVisibilityService
         $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
 
         return $entries
-            ->map(function (FestParticipant $p) use ($event, $marksByParticipant, $isAdminPreview, $classGroupLabels) {
+            ->map(function (FestParticipant $p) use ($eventsById, $event, $marksByParticipant, $isAdminPreview, $classGroupLabels) {
                 $item = $p->registration?->item;
                 if (! $item) {
                     return null;
                 }
 
+                // This entry's OWN leaf event, not necessarily $event — a sibling phase
+                // can be published/admin-previewable independently of the one the
+                // participant page itself was opened from. Resolved through the
+                // registration (authoritative), not $p->event_id (sometimes null).
+                $itemEvent = $eventsById->get($p->registration?->event_id ?? $p->event_id) ?? $event;
+
                 // Computed per-item, not once for the whole list — this participant can be
                 // registered for several items with different individual publish states,
                 // and a global $showMarks would have shown/hidden every one of them
                 // identically regardless of which items had actually been published.
-                $showMarks = $this->showIndividualMarks($event, $isAdminPreview, $item);
-                $itemVisible = $isAdminPreview || app(FestItemResultsService::class)->isItemVisible($item, $event);
+                $showMarks = $this->showIndividualMarks($itemEvent, $isAdminPreview, $item);
+                $itemVisible = $isAdminPreview || app(FestItemResultsService::class)->isItemVisible($item, $itemEvent);
                 $mark = $marksByParticipant->get($p->id);
 
                 return [
                     'item_id'          => $item->id,
                     'item_title'       => $item->title,
+                    'event_title'      => $itemEvent->id !== $event->id ? $itemEvent->title : null,
                     'category_label'   => FestItemCategoryLabel::resolve($item, $classGroupLabels, config('fest_item_taxonomy.arts_category', [])),
                     'gender_label'     => \App\Support\FestSportsAgeGroup::genderLabel($item->gender),
                     'participant_type' => $item->participant_type ?: 'individual',
@@ -268,7 +311,7 @@ class FestPublicVisibilityService
                     'grade'            => $showMarks ? $mark?->grade : null,
                     'result'           => $showMarks ? trim(($mark?->measurement_value ?? '').' '.($mark?->measurement_unit ?? '')) : null,
                     'disqualified'     => (bool) $p->disqualified_at,
-                    'results_url'      => $itemVisible ? route('tenant.fest.item-results', [$event->id, $item->id]) : null,
+                    'results_url'      => $itemVisible ? route('tenant.fest.item-results', [$itemEvent->id, $item->id]) : null,
                 ];
             })
             ->filter()

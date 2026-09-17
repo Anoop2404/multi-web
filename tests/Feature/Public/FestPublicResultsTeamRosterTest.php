@@ -4,7 +4,6 @@ namespace Tests\Feature\Public;
 
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
-use App\Models\FestIndividualChampionshipPoint;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
@@ -146,19 +145,14 @@ class FestPublicResultsTeamRosterTest extends TestCase
 
     public function test_championship_tab_shows_humanized_category_and_a_link_to_the_students_page(): void
     {
+        // The individual championship is computed live off Anu Krishna's existing mark
+        // from setUp() (Solo Song, hs, published) — just needs a gender on file to be
+        // included at all (see FestIndividualChampionshipService::pointsForEvent()).
         $student = Student::where('name', 'Anu Krishna')->firstOrFail();
+        $student->update(['gender' => 'female']);
         FestParticipant::whereHas('student', fn ($q) => $q->where('name', 'Anu Krishna'))
             ->update(['level_registration_number' => 'CHAMP-REF-1']);
         $participant = FestParticipant::whereHas('student', fn ($q) => $q->where('name', 'Anu Krishna'))->firstOrFail();
-
-        FestIndividualChampionshipPoint::create([
-            'event_id' => $this->event->id,
-            'student_id' => $student->id,
-            'category' => 'hs',
-            'gender' => 'female',
-            'points' => 42,
-            'group_points' => 0,
-        ]);
 
         $response = $this->get("http://roster-test.test/fest/{$this->event->id}/results?tab=championship");
 

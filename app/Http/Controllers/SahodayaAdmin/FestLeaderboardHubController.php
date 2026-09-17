@@ -5,14 +5,13 @@ namespace App\Http\Controllers\SahodayaAdmin;
 use App\Support\FestPageActivity;
 use App\Models\FestAthleticRecord;
 use App\Models\FestEvent;
-use App\Models\FestIndividualChampionshipPoint;
 use App\Models\FestRecordBreak;
-use App\Models\Tenant;
 use App\Services\Events\EventContext;
+use App\Services\Events\FestIndividualChampionshipService;
 
 class FestLeaderboardHubController extends SahodayaAdminController
 {
-    public function index(string $tenantId, FestEvent $event)
+    public function index(string $tenantId, FestEvent $event, FestIndividualChampionshipService $championshipService)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
@@ -21,22 +20,21 @@ class FestLeaderboardHubController extends SahodayaAdminController
         $schoolBoard = array_slice($ctx->scoreboardBySchool(), 0, 10);
         $houseBoard = array_slice($ctx->scoreboardByHouse(), 0, 10);
 
-        $championship = FestIndividualChampionshipPoint::where('event_id', $event->id)
-            ->with('student')
-            ->orderByDesc('points')
-            ->limit(10)
-            ->get()
-            ->map(function ($row, $i) {
-                $school = Tenant::find($row->student?->tenant_id);
-
-                return [
-                    'rank'    => $i + 1,
-                    'name'    => $row->student?->name,
-                    'school'  => $school?->name,
-                    'points'  => $row->points,
-                    'category'=> $row->category,
-                ];
-            });
+        // Live-computed (FestIndividualChampionshipService), same as the Championship
+        // page itself — sorted here by overall_rank (not the category+gender-scoped
+        // `rank` the service's own default order uses) since this is a flat top-10
+        // teaser across every category/gender, not the full grouped leaderboard.
+        $championship = $championshipService->leaderboardForEvent($event)
+            ->sortBy('overall_rank')
+            ->take(10)
+            ->values()
+            ->map(fn (array $row) => [
+                'rank'     => $row['overall_rank'],
+                'name'     => $row['student']['name'],
+                'school'   => $row['school'],
+                'points'   => $row['points'],
+                'category' => $row['category'],
+            ]);
 
         $recordBreaks = FestRecordBreak::where('event_id', $event->id)
             ->with(['item', 'participant.student'])

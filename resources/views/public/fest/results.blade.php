@@ -536,11 +536,11 @@
                             <tr data-group="{{ $rowGroup }}" @if($comboGroups->count() > 1 && $rowGroup !== $firstGroup) hidden @endif>
                                 <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td>
                                 <td class="p-3 font-semibold text-white uppercase">
-                                    <div class="flex items-center gap-2">
+                                    <div class="flex items-center gap-3">
                                         @if($row['photo'])
-                                        <img src="{{ $row['photo'] }}" alt="" class="w-7 h-7 rounded-full object-cover object-top border border-slate-700 shrink-0">
+                                        <img src="{{ $row['photo'] }}" alt="" class="w-10 h-10 rounded-full object-cover object-top border border-slate-700 shrink-0">
                                         @else
-                                        <span class="w-7 h-7 rounded-full bg-amber-500/15 text-amber-300 flex items-center justify-center text-[10px] font-bold shrink-0" aria-hidden="true">{{ strtoupper(substr($row['student'] ?? '?', 0, 1)) }}</span>
+                                        <span class="w-10 h-10 rounded-full bg-amber-500/15 text-amber-300 flex items-center justify-center text-sm font-bold shrink-0" aria-hidden="true">{{ strtoupper(substr($row['student'] ?? '?', 0, 1)) }}</span>
                                         @endif
                                         <span>{{ $row['student'] }}</span>
                                     </div>

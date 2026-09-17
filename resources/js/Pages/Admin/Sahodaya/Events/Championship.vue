@@ -24,9 +24,8 @@
 
         <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
             <p class="text-sm text-gray-600">
-                {{ scope === 'cumulative' ? 'Summed across every phase\'s own published leaderboard for this hub.' : 'IC points leaderboard from published marks.' }}
+                {{ scope === 'cumulative' ? 'Summed live across every phase of this hub, straight off published item results.' : 'Computed live from this phase\'s published item results — no recalculation needed, just refresh.' }}
             </p>
-            <button v-if="scope === 'phase'" @click="recalculate" class="btn-primary text-xs">Recalculate from marks</button>
         </div>
 
         <div v-if="usesPhases" class="flex gap-2 mb-4">
@@ -248,8 +247,4 @@ const filteredLeaderboard = computed(() => {
     }
     return list;
 });
-
-function recalculate() {
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/championship/recalculate`, {}, { preserveScroll: true });
-}
 </script>

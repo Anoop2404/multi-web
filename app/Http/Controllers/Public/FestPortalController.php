@@ -1727,7 +1727,11 @@ public function tv(Request $request, int $eventId)
         $schedule = FestSchedule::where('participant_id', $participant->id)->first();
 
         $public = $this->visibility->formatPublicParticipant($event, $participant, $schedule, $mark, $isAdminPreview);
-        $items = $this->visibility->publicParticipantItems($event, $participant, $isAdminPreview);
+        // Cross-phase: a championship/results page linking here already shows this
+        // student's combined standing across every phase, so their own page should
+        // list every item across those same phases too, not just the one leaf $event
+        // happened to be reached through.
+        $items = $this->visibility->publicParticipantItems($event, $participant, $isAdminPreview, acrossPhases: true);
 
         return $this->renderPublic('public.fest.participant', $tenant, compact(
             'event', 'public', 'participant', 'schedule', 'mark', 'items'

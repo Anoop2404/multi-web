@@ -15,6 +15,7 @@ use App\Models\FestRegistration;
 use App\Models\FestSchedule;
 use App\Models\Student;
 use App\Models\Tenant;
+use App\Services\Events\FestIndividualChampionshipService;
 use App\Support\ExcelExport;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestItemCategoryLabel;
@@ -586,6 +587,8 @@ class FestReportService
             'overall-ranking' => $this->overallRankingPdf(),
             'category-item-matrix-xls' => $this->categoryItemMatrixXls($analytics()),
             'category-item-matrix-pdf' => $this->categoryItemMatrixPdf($analytics()),
+            'individual-championship-xls' => $this->individualChampionshipXls(),
+            'individual-championship-pdf' => $this->individualChampionshipPdf(),
             'house-wise' => $this->houseWisePdf(),
             'item-list' => $this->itemListPdf(),
             'item-wise' => $this->itemWisePdf($request),
@@ -650,7 +653,12 @@ class FestReportService
 
     private function slug(): string
     {
-        return str($this->event->title)->slug()->limit(40)->toString();
+        return $this->slugFor($this->event);
+    }
+
+    private function slugFor(FestEvent $event): string
+    {
+        return str($event->title)->slug()->limit(40)->toString();
     }
 
     /**
@@ -937,6 +945,79 @@ class FestReportService
             'analytics'  => $analytics,
             ...$this->brandingData(),
         ], $this->slug().'-category-item-matrix.pdf', true);
+    }
+
+    /**
+     * Same source and ranking as the admin Championship page and the public Results
+     * "Championship" tab (FestIndividualChampionshipService) — combined across every
+     * phase when this hub uses phases, since a printed/exported report is meant to be
+     * the definitive final standing, not one phase's isolated slice. Unlike the public
+     * tab, this is a staff report: no per-leaf visibility gating — an admin can already
+     * see every phase's numbers regardless of publish state on the Championship page
+     * itself, so the export matches that.
+     *
+     * @return array{rows: Collection<int, array<string, mixed>>, combined: bool, displayEvent: FestEvent}
+     */
+    private function individualChampionshipData(): array
+    {
+        $service = app(FestIndividualChampionshipService::class);
+        $root = $this->event->rootEvent();
+        $combined = $root->usesPhasedRegionalBilling();
+
+        return [
+            'rows' => $combined ? $service->crossPhaseStanding($root) : $service->leaderboardForEvent($this->event),
+            'combined' => $combined,
+            // A combined report is the hub's definitive standing, not one phase's own —
+            // its title should say so (the hub's name), not name whichever single leaf
+            // the export happened to be requested from.
+            'displayEvent' => $combined ? $root : $this->event,
+        ];
+    }
+
+    private function individualChampionshipXls(): StreamedResponse
+    {
+        $data = $this->individualChampionshipData();
+        $categoryLabels = FestClassGroupScheme::labels(null, $this->event->rootEvent());
+        $genderLabels = ['male' => 'Boys', 'female' => 'Girls'];
+
+        $headers = ['Rank', 'Student', 'School', 'Category', 'Gender', 'Points'];
+        $rows = $data['rows']->map(fn (array $row) => [
+            $row['rank'],
+            strtoupper((string) $row['student']['name']),
+            strtoupper((string) $row['school']),
+            $categoryLabels[$row['category']] ?? $row['category'],
+            $genderLabels[$row['gender']] ?? $row['gender'],
+            $row['points'],
+        ]);
+
+        return ExcelExport::download(
+            $this->slugFor($data['displayEvent']).'-individual-championship',
+            $headers,
+            $rows,
+            ExcelExport::generatedOnNote()
+        );
+    }
+
+    private function individualChampionshipPdf(): \Symfony\Component\HttpFoundation\Response
+    {
+        $data = $this->individualChampionshipData();
+        $categoryLabels = FestClassGroupScheme::labels(null, $this->event->rootEvent());
+        $genderLabels = ['male' => 'Boys', 'female' => 'Girls'];
+
+        $groups = $data['rows']
+            ->groupBy(fn (array $row) => $row['category'].'|'.$row['gender'])
+            ->map(fn ($rows, string $key) => [
+                'label' => ($categoryLabels[$rows->first()['category']] ?? $rows->first()['category']).' · '.($genderLabels[$rows->first()['gender']] ?? $rows->first()['gender']),
+                'rows'  => $rows,
+            ])
+            ->values();
+
+        return $this->renderPdf('fest.reports.individual-championship', [
+            'event'    => $data['displayEvent'],
+            'combined' => $data['combined'],
+            'groups'   => $groups,
+            ...$this->brandingData(),
+        ], $this->slugFor($data['displayEvent']).'-individual-championship.pdf');
     }
 
     private function houseWisePdf(): \Symfony\Component\HttpFoundation\Response

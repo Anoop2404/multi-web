@@ -4,7 +4,6 @@ namespace Tests\Feature\SahodayaAdmin;
 
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
-use App\Models\FestIndividualChampionshipPoint;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
@@ -16,7 +15,6 @@ use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
-use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 /**
@@ -24,8 +22,9 @@ use Tests\TestCase;
  * reader (FestCumulativeChampionshipService::championshipCategoryKey(), reading
  * aggregation_config.championship_category_map) used only by the school/team cumulative
  * scoreboard. This adds the first UI/endpoint to write that map, and wires the same map
- * into the individual championship (FestChampionshipController::recalculate()) too --
- * constrained there to the five-value DB enum (lp/up/hs/hss/open) it's stuck with.
+ * into the individual championship (FestIndividualChampionshipService::pointsForEvent(),
+ * computed live on every read) too -- constrained there to the five-value DB enum
+ * (lp/up/hs/hss/open) it's stuck with.
  */
 class FestChampionshipCategoryMergeTest extends TestCase
 {
@@ -80,40 +79,38 @@ class FestChampionshipCategoryMergeTest extends TestCase
         $this->assertSame(['hs' => 'open'], $event->fresh()->aggregation_config['championship_category_map']);
     }
 
-    public function test_recalculate_applies_the_merge_to_the_individual_championship_category(): void
+    /**
+     * The individual championship is computed live (FestIndividualChampionshipService::
+     * pointsForEvent(), no more admin "Recalculate" button or stored snapshot) — so the
+     * category merge just needs to be reflected the moment it's saved, on the very next
+     * read, with no separate trigger step.
+     */
+    public function test_saving_the_merge_applies_immediately_to_the_individual_championship_category(): void
     {
         ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event, 'student' => $student] = $this->makeFixture('hs');
 
         $event->update(['aggregation_config' => ['championship_category_map' => ['hs' => 'open']]]);
 
-        $this->actingAs($admin)->post(route('sahodaya.events.championship.recalculate', [
-            'tenantId' => $sahodaya->id, 'event' => $event->id,
-        ]))->assertRedirect();
+        $rows = app(\App\Services\Events\FestIndividualChampionshipService::class)->pointsForEvent($event->fresh());
 
-        $this->assertDatabaseHas('fest_individual_championship_points', [
-            'event_id' => $event->id, 'student_id' => $student->id, 'category' => 'open',
-        ]);
+        $this->assertSame('open', $rows->firstWhere('student_id', $student->id)?->category);
     }
 
     /**
      * The DB enum backing fest_individual_championship_points.category only accepts
      * lp/up/hs/hss/open — a merge target outside that set must be silently skipped for
-     * the individual table (not crash, not violate the constraint), even though the
+     * the individual leaderboard (not crash, not violate the constraint), even though the
      * exact same map is fully honored by the unconstrained school/team scoreboard.
      */
     public function test_a_merge_target_outside_the_individual_enum_is_ignored_for_that_table(): void
     {
-        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event, 'student' => $student] = $this->makeFixture('hs');
+        ['event' => $event, 'student' => $student] = $this->makeFixture('hs');
 
         $event->update(['aggregation_config' => ['championship_category_map' => ['hs' => 'category_custom_bucket']]]);
 
-        $this->actingAs($admin)->post(route('sahodaya.events.championship.recalculate', [
-            'tenantId' => $sahodaya->id, 'event' => $event->id,
-        ]))->assertRedirect();
+        $rows = app(\App\Services\Events\FestIndividualChampionshipService::class)->pointsForEvent($event->fresh());
 
-        $this->assertDatabaseHas('fest_individual_championship_points', [
-            'event_id' => $event->id, 'student_id' => $student->id, 'category' => 'hs',
-        ]);
+        $this->assertSame('hs', $rows->firstWhere('student_id', $student->id)?->category);
     }
 
     /**
@@ -121,37 +118,45 @@ class FestChampionshipCategoryMergeTest extends TestCase
      * combined, so a school's "HS champion" (rank #1 among HS students) could show up
      * as rank #47 the moment the page was filtered to just HS -- there was no real
      * category-wise ranking, only a category-blind list with a category label on it.
+     *
+     * Ranking (rankAndFormat()) is pure — feed it hand-built rows directly rather than
+     * re-deriving 30/20/5-point marks through grade-point config, which would make this
+     * test depend on grading presets that have nothing to do with what it's actually
+     * verifying: category-scoped ranking, not point computation.
      */
     public function test_leaderboard_ranks_students_within_their_own_category_not_globally(): void
     {
-        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event] = $this->makeFixture();
-        $school = Tenant::where('parent_id', $sahodaya->id)->firstOrFail();
+        $mkStudent = fn (string $name) => new class($name) {
+            public ?string $tenant_id = null;
 
-        // HS: two students, 30 then 20 points. LP: one student with only 5 points, but
-        // since LP has just one entrant they must still be LP's #1 -- not buried behind
-        // HS's two higher-scoring students in a single global ranking.
-        $hsTop = Student::create(['tenant_id' => $school->id, 'school_class_id' => SchoolClass::create(['tenant_id' => $school->id, 'name' => 'C9', 'class_number' => 9])->id, 'name' => 'HS Top', 'status' => 'active', 'verification_status' => 'verified', 'eligible_kalolsav' => true]);
-        $hsSecond = Student::create(['tenant_id' => $school->id, 'school_class_id' => $hsTop->school_class_id, 'name' => 'HS Second', 'status' => 'active', 'verification_status' => 'verified', 'eligible_kalolsav' => true]);
-        $lpOnly = Student::create(['tenant_id' => $school->id, 'school_class_id' => $hsTop->school_class_id, 'name' => 'LP Only', 'status' => 'active', 'verification_status' => 'verified', 'eligible_kalolsav' => true]);
+            public ?string $reg_no = null;
 
-        FestIndividualChampionshipPoint::create(['event_id' => $event->id, 'student_id' => $hsTop->id, 'category' => 'hs', 'gender' => 'open', 'points' => 30, 'group_points' => 0]);
-        FestIndividualChampionshipPoint::create(['event_id' => $event->id, 'student_id' => $hsSecond->id, 'category' => 'hs', 'gender' => 'open', 'points' => 20, 'group_points' => 0]);
-        FestIndividualChampionshipPoint::create(['event_id' => $event->id, 'student_id' => $lpOnly->id, 'category' => 'lp', 'gender' => 'open', 'points' => 5, 'group_points' => 0]);
+            public function __construct(public string $name) {}
 
-        $this->actingAs($admin)
-            ->get(route('sahodaya.events.championship.index', ['tenantId' => $sahodaya->id, 'event' => $event->id]))
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('Sahodaya/Events/Championship', false)
-                // Sorted by category key ("hs" before "lp"), then rank within it.
-                ->where('leaderboard.0.student.id', $hsTop->id)
-                ->where('leaderboard.0.rank', 1)
-                ->where('leaderboard.0.overall_rank', 1)
-                ->where('leaderboard.1.student.id', $hsSecond->id)
-                ->where('leaderboard.1.rank', 2)
-                ->where('leaderboard.1.overall_rank', 2)
-                ->where('leaderboard.2.student.id', $lpOnly->id)
-                ->where('leaderboard.2.rank', 1)
-                ->where('leaderboard.2.overall_rank', 3));
+            public function photoDataUri(): ?string
+            {
+                return null;
+            }
+        };
+        $hsTop = (object) ['student_id' => 1, 'student' => $mkStudent('HS Top'), 'category' => 'hs', 'gender' => 'open', 'points' => 30, 'group_points' => 0];
+        $hsSecond = (object) ['student_id' => 2, 'student' => $mkStudent('HS Second'), 'category' => 'hs', 'gender' => 'open', 'points' => 20, 'group_points' => 0];
+        // LP has just one entrant -- they must still be LP's #1, not buried behind HS's
+        // two higher-scoring students in a single global ranking.
+        $lpOnly = (object) ['student_id' => 3, 'student' => $mkStudent('LP Only'), 'category' => 'lp', 'gender' => 'open', 'points' => 5, 'group_points' => 0];
+
+        $rows = app(\App\Services\Events\FestIndividualChampionshipService::class)
+            ->rankAndFormat(collect([$hsTop, $hsSecond, $lpOnly]));
+
+        // Sorted by category key ("hs" before "lp"), then rank within it.
+        $this->assertSame($hsTop->student_id, $rows[0]['student']['id']);
+        $this->assertSame(1, $rows[0]['rank']);
+        $this->assertSame(1, $rows[0]['overall_rank']);
+        $this->assertSame($hsSecond->student_id, $rows[1]['student']['id']);
+        $this->assertSame(2, $rows[1]['rank']);
+        $this->assertSame(2, $rows[1]['overall_rank']);
+        $this->assertSame($lpOnly->student_id, $rows[2]['student']['id']);
+        $this->assertSame(1, $rows[2]['rank']);
+        $this->assertSame(3, $rows[2]['overall_rank']);
     }
 
     public function test_a_source_category_cannot_be_merged_into_two_different_targets(): void

@@ -4,30 +4,37 @@ namespace App\Services\Events;
 
 use App\Models\FestEvent;
 use App\Models\FestEventPhase;
-use App\Models\FestIndividualChampionshipPoint;
+use App\Models\FestMark;
 use App\Models\Tenant;
+use App\Support\FestCategoryMerge;
+use App\Support\FestClassGroupScheme;
+use App\Support\FestTeamSquadRules;
 use Illuminate\Support\Collection;
 
 /**
- * Ranking/formatting for the individual (student) championship leaderboard —
- * shared between the Sahodaya admin's Championship page (FestChampionshipController)
- * and the public portal's Champions page (FestPortalController::champions()), so
- * both read the exact same category+gender ranking and cross-phase combine instead
- * of two copies drifting apart.
+ * Individual (student) championship leaderboard — computed live, straight off
+ * published marks, every time it's read. No "Recalculate" button or stored
+ * snapshot to go stale: enter marks anywhere under the hub and every phase's
+ * Championship page (and the public Results "Championship" tab, and the
+ * Individual Championship export) reflects it immediately, summed automatically
+ * across whichever phase leaf events actually have marks. Shared by the admin
+ * Championship page (FestChampionshipController), the public portal
+ * (FestPortalController::results()), and the report export
+ * (FestReportService), so all three always agree.
  */
 class FestIndividualChampionshipService
 {
+    /** The only categories this leaderboard may ever bucket a student into. */
+    private const INDIVIDUAL_CATEGORY_KEYS = ['lp', 'up', 'hs', 'hss', 'open'];
+
+    public function __construct(
+        private FestGradePointService $gradePoints,
+    ) {}
+
     /** @return Collection<int, array<string, mixed>> */
     public function leaderboardForEvent(FestEvent $event): Collection
     {
-        $allRows = FestIndividualChampionshipPoint::where('event_id', $event->id)
-            ->with(['student'])
-            ->orderByDesc('points')
-            ->orderByDesc('group_points')
-            ->orderBy('student_id')
-            ->get();
-
-        return $this->rankAndFormat($allRows);
+        return $this->rankAndFormat($this->pointsForEvent($event));
     }
 
     /**
@@ -44,6 +51,22 @@ class FestIndividualChampionshipService
      */
     public function rankAndFormat(Collection $allRows): Collection
     {
+        // Ranking (both the category+gender rank and overall_rank below) depends on
+        // row order — sort explicitly rather than trusting the caller's collection
+        // order, so every caller (a single event's live points, or leaves summed
+        // together) gets the same stable points/group_points/student_id tiebreak chain.
+        // Primarily by individual points; a tie is broken by group points (a student
+        // whose group/team results also outscore the other's ranks higher), then by
+        // student_id only to keep the order fully deterministic.
+        // NOTE: Collection::sortBy()'s [ [callback, direction], ... ] array form only
+        // honors 'desc' for a plain string key — with a Closure key it silently sorts
+        // ascending regardless of the direction given, so this uses an explicit
+        // comparator instead (verified against Laravel's actual behavior, not assumed).
+        $allRows = $allRows->sort(function ($a, $b) {
+            return [$b->points, $b->group_points, $a->student_id]
+                <=> [$a->points, $a->group_points, $b->student_id];
+        })->values();
+
         $rankedByCategoryAndGender = $allRows->groupBy(fn ($row) => $row->category.'|'.$row->gender)
             ->flatMap(function ($groupRows) {
                 return $groupRows->values()->map(fn ($row, int $index) => [$row, $index + 1]);
@@ -78,33 +101,23 @@ class FestIndividualChampionshipService
     }
 
     /**
-     * A hub's individual championship needs a student's total across every phase, the
-     * same "sum the isolated per-phase numbers" principle FestPhaseScoreboardService
-     * applies for schools (see its class docblock) — except here there's no
-     * isolated-vs-cumulative distinction to worry about at all: FestChampionshipController
-     * ::recalculate() already writes one FestIndividualChampionshipPoint row per (phase
-     * leaf event, student), each already isolated to that one phase, so this just sums
-     * those existing rows per student across every phase leaf under the hub.
-     *
-     * Deliberately NOT gated on any phase-level "published" flag — recalculate() is a
-     * manual, admin-triggered snapshot, so a phase simply having no rows yet (nobody has
-     * clicked Recalculate for it) naturally contributes zero. The public-facing caller is
-     * responsible for its own event-level publish gate before calling this at all.
+     * A hub's individual championship is every student's total across every phase —
+     * live-sums pointsForEvent() over each phase leaf under the hub, the same
+     * "sum the isolated per-phase numbers" principle FestPhaseScoreboardService
+     * applies for schools (see its class docblock).
      *
      * @return Collection<int, array<string, mixed>>
      */
     public function crossPhaseStanding(FestEvent $hub): Collection
     {
-        return $this->sumAcrossLeaves($this->allPhaseLeafIds($hub));
+        return $this->rankAndFormat($this->sumAcrossLeaves($this->allPhaseLeaves($hub)));
     }
 
     /**
      * Same combine as crossPhaseStanding(), restricted to $visibleLeafIds — the public
      * portal must not let an unpublished phase's contribution leak into the combined
-     * total just because a sibling phase is already published (recalculate() is a
-     * manual admin action, un-gated by any publish flag, so a not-yet-public phase can
-     * easily already have real rows sitting in the table). Callers decide "visible" the
-     * same way FestPortalController::crossPhaseScoreboard() already does for the
+     * total just because a sibling phase is already published. Callers decide "visible"
+     * the same way FestPortalController::crossPhaseScoreboard() already does for the
      * school-level board: each leaf's own results_published (or an authorized admin
      * preview of it).
      *
@@ -113,11 +126,13 @@ class FestIndividualChampionshipService
      */
     public function crossPhaseStandingForVisibleLeaves(FestEvent $hub, Collection $visibleLeafIds): Collection
     {
-        return $this->sumAcrossLeaves($this->allPhaseLeafIds($hub)->intersect($visibleLeafIds));
+        $visible = $this->allPhaseLeaves($hub)->filter(fn (FestEvent $leaf) => $visibleLeafIds->contains($leaf->id));
+
+        return $this->rankAndFormat($this->sumAcrossLeaves($visible));
     }
 
-    /** @return Collection<int, int> */
-    private function allPhaseLeafIds(FestEvent $hub): Collection
+    /** @return Collection<int, FestEvent> */
+    private function allPhaseLeaves(FestEvent $hub): Collection
     {
         $phaseIds = FestEventPhase::where('event_id', $hub->id)->pluck('id');
         if ($phaseIds->isEmpty()) {
@@ -126,24 +141,23 @@ class FestIndividualChampionshipService
 
         return FestEvent::where('parent_event_id', $hub->id)
             ->whereIn('source_phase_id', $phaseIds)
-            ->pluck('id');
+            ->get();
     }
 
     /**
-     * @param  Collection<int, int>  $leafIds
-     * @return Collection<int, array<string, mixed>>
+     * @param  Collection<int, FestEvent>  $leaves
+     * @return Collection<int, object>
      */
-    private function sumAcrossLeaves(Collection $leafIds): Collection
+    private function sumAcrossLeaves(Collection $leaves): Collection
     {
-        if ($leafIds->isEmpty()) {
+        if ($leaves->isEmpty()) {
             return collect();
         }
 
-        $summed = FestIndividualChampionshipPoint::whereIn('event_id', $leafIds)
-            ->with('student')
-            ->get()
+        return $leaves
+            ->flatMap(fn (FestEvent $leaf) => $this->pointsForEvent($leaf))
             ->groupBy('student_id')
-            ->map(function ($studentRows) {
+            ->map(function (Collection $studentRows) {
                 $first = $studentRows->first();
 
                 // A student's category/gender shouldn't change phase to phase (same
@@ -158,13 +172,95 @@ class FestIndividualChampionshipService
                     'group_points' => $studentRows->sum('group_points'),
                 ];
             })
-            ->sortBy([
-                [fn ($r) => $r->points, 'desc'],
-                [fn ($r) => $r->group_points, 'desc'],
-                [fn ($r) => $r->student_id, 'asc'],
-            ])
             ->values();
+    }
 
-        return $this->rankAndFormat($summed);
+    /**
+     * Live aggregate of one event's own published marks into per-student championship
+     * points — the computation FestChampionshipController::recalculate() used to run
+     * on demand and cache into fest_individual_championship_points; now run fresh on
+     * every read instead, so there is nothing to go stale and nothing an admin needs
+     * to remember to click.
+     *
+     * @return Collection<int, object>
+     */
+    public function pointsForEvent(FestEvent $event): Collection
+    {
+        $categoryMap = FestCategoryMerge::map($event->rootEvent());
+        $aggregated = [];
+
+        // Only counts a mark once its own item has actually published results — same
+        // rule the public scoreboard's "Latest Item Winners" widget and tv() use
+        // (FestPortalController::scoreboardDynamicData()'s $winnerMarks query). A mark
+        // just sitting entered-but-unpublished must not move the championship standing;
+        // this is the live replacement for the old admin "Recalculate" button, so it
+        // needs the same publish discipline that button's manual timing used to provide.
+        FestMark::where('event_id', $event->id)
+            ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
+            ->with(['participant.student', 'participant.registration.item'])
+            ->each(function (FestMark $mark) use ($event, $categoryMap, &$aggregated) {
+                $student = $mark->participant?->student;
+                if (! $student) {
+                    return;
+                }
+
+                $item = $mark->participant->registration?->item;
+                $points = $this->gradePoints->pointsForMark($event, $mark);
+                // fest_individual_championship_points.category is constrained to
+                // lp/up/hs/hss/open — but English Fest / Kalotsav-style events store
+                // class_group in a different scheme (category_1, category_2, ...).
+                // canonicalKey() maps every known alias onto the constrained scheme;
+                // anything it doesn't recognize falls back to 'open' rather than
+                // violating the DB check constraint outright.
+                $rawClassGroup = $item?->class_group ?: 'open';
+                $canonicalCategory = FestClassGroupScheme::canonicalKey($rawClassGroup);
+                $canonicalCategory = in_array($canonicalCategory, self::INDIVIDUAL_CATEGORY_KEYS, true) ? $canonicalCategory : 'open';
+                // Admin-configured category merge (e.g. fold "Category 3" into "Open") —
+                // same aggregation_config.championship_category_map the school/team
+                // cumulative scoreboard already reads, and the same source keys the merge
+                // settings UI offers (the event's real scheme keys, tried before falling
+                // back to the canonical lp/up/hs/hss/open bucket). Only honored when the
+                // mapped target is itself one of the five allowed values.
+                $merged = $categoryMap[$rawClassGroup] ?? $categoryMap[$canonicalCategory] ?? $canonicalCategory;
+                $category = in_array($merged, self::INDIVIDUAL_CATEGORY_KEYS, true) ? $merged : $canonicalCategory;
+                // Individual championship is always shown split Boys/Girls — there is no
+                // correct way to guess which bucket a student with gender 'other' or no
+                // gender on file at all belongs in, so rather than inventing a third
+                // "Open" bucket (or silently mislabeling them into one binary bucket) they
+                // are simply left out of the individual championship until their profile
+                // has male/female set. This does not affect the school-level scoreboard.
+                $gender = match ($student->gender) {
+                    'male'   => 'male',
+                    'female' => 'female',
+                    default  => null,
+                };
+                if ($gender === null) {
+                    return;
+                }
+
+                if (! isset($aggregated[$student->id])) {
+                    $aggregated[$student->id] = (object) [
+                        'student_id'   => $student->id,
+                        'student'      => $student,
+                        'points'       => 0,
+                        'group_points' => 0,
+                        'category'     => $category,
+                        'gender'       => $gender,
+                    ];
+                }
+
+                // Pair/trio/group/team items save one FestMark row per teammate with the
+                // same position/points — crediting the full value to every member's
+                // individual total would let an 11-person group's 1st place outweigh a
+                // genuine solo achievement. Group results are tracked separately and only
+                // used as a tiebreak, never added to the primary `points` total.
+                if ($item && FestTeamSquadRules::isMultiPerson($item->participant_type)) {
+                    $aggregated[$student->id]->group_points += $points;
+                } else {
+                    $aggregated[$student->id]->points += $points;
+                }
+            });
+
+        return collect(array_values($aggregated));
     }
 }
