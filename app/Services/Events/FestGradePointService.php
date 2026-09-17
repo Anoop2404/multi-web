@@ -30,6 +30,7 @@ class FestGradePointService
     private array $pointRulesByEvent = [];
     private array $gradeConfigsByEvent = [];
     private array $itemById = [];
+    private array $eventById = [];
 
     private function pointRulesForEvent(int $eventId): Collection
     {
@@ -48,6 +49,15 @@ class FestGradePointService
         }
 
         return $this->itemById[$itemId];
+    }
+
+    private function eventById(int $eventId): ?FestEvent
+    {
+        if (! array_key_exists($eventId, $this->eventById)) {
+            $this->eventById[$eventId] = FestEvent::find($eventId);
+        }
+
+        return $this->eventById[$eventId];
     }
 
     public function pointsForMark(FestEvent $event, FestMark $mark): int
@@ -223,6 +233,18 @@ class FestGradePointService
         // $item lets a caller that already has the model in hand (pointsForMark(), a
         // save() already holding the item) skip the itemById() query entirely.
         $itemModel = $item ?? ($itemId ? $this->itemById($itemId) : null);
+
+        // A combined participation certificate spanning every phase/region of one event
+        // (see FestCertificateService::generateParticipationForEvent()'s hub-level path)
+        // passes the HUB as $event, but grade bands and scoring presets are configured
+        // per phase — pushed to each region via an explicit "sync" button, not live-
+        // shared — so an item graded under Region 2 must resolve against Region 2's own
+        // config, not the hub's. Falls back to the passed $event if the item's own event
+        // can't be loaded (e.g. a deleted event) rather than failing outright.
+        if ($itemModel && $itemModel->event_id !== $event->id) {
+            $event = $this->eventById($itemModel->event_id) ?? $event;
+        }
+
         $maxPossibleMarks = (float) ($itemModel?->total_marks ?? 100.0);
 
         $configs = $this->gradeConfigsForEvent($event->id)

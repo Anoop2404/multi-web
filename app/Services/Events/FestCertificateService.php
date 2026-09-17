@@ -181,7 +181,21 @@ class FestCertificateService
     public function generateParticipationForEvent(FestEvent $event): array
     {
         if ($event->usesPhasedRegionalBilling()) {
-            abort_if(! $event->parent_event_id || ! $event->source_phase_id, 422, 'Generate certificates from a published operational phase/region event.');
+            // A participation certificate just lists what someone took part in — unlike
+            // winner certs (still strictly per-phase; a "First Prize" only means something
+            // within its own region's ranking), it's fine for one combined certificate to
+            // span every phase/region a person entered. Calling this with the HUB itself as
+            // $event does exactly that: reportableEventIds() on a hub already walks every
+            // phase/region + grandchild beneath it, so eligibleParticipantsForEvent()'s
+            // queries naturally aggregate across all of them with no other change needed
+            // here — see FestGradePointService::resolveGradeFromScore()'s own fix for the
+            // one place that DOES need to resolve per-item rather than blindly using $event.
+            if ($event->parent_event_id) {
+                abort_unless($event->source_phase_id, 422, 'Generate certificates from a published operational phase/region event.');
+            }
+            // Only true for the hub once every phase/region beneath it has actually
+            // published (FestPhasePublicationService::publishResults() sets it there
+            // automatically at that point) — so this same check gates both cases correctly.
             abort_unless($event->results_published, 422, 'Publish this phase/region before generating certificates.');
         }
 
