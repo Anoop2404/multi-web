@@ -125,7 +125,17 @@
                                 <tr v-for="(p, idx) in participants" :key="p.id" class="border-t"
                                     :class="p.chest_no ? 'hover:bg-slate-50' : 'bg-amber-50/60 hover:bg-amber-50'">
                                     <td class="p-3 text-gray-500">{{ idx + 1 }}</td>
-                                    <td class="p-3 font-mono font-bold">{{ p.chest_no ?? '—' }}</td>
+                                    <td class="p-3 font-mono font-bold">
+                                        <div class="flex items-center gap-1">
+                                            <span>{{ p.chest_no ?? '—' }}</span>
+                                            <input type="number" min="1"
+                                                   v-model="chestEdits[p.id]"
+                                                   placeholder="set #"
+                                                   class="w-16 rounded border px-1 py-0.5 text-xs font-mono font-normal" />
+                                            <button v-if="chestEdits[p.id]" @click="saveChest(p.id)"
+                                                    class="text-emerald-600 text-xs font-normal">Set</button>
+                                        </div>
+                                    </td>
                                     <td class="p-3">
                                         <SearchableSelect :model-value="p.order_no ?? ''"
                                                 :options="orderOptionsFor(p.id).map((n) => ({ value: n, label: String(n) }))"
@@ -222,6 +232,7 @@ import ReportHeadItemNavigator from '@/Components/reports/ReportHeadItemNavigato
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import Modal from '@/Components/ui/Modal.vue';
 import { useConfirm } from '@/composables/useConfirm';
+import { useSweetAlert } from '@/composables/useSweetAlert';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -273,6 +284,7 @@ const csvUrl = computed(() =>
 );
 
 const { confirm } = useConfirm();
+const { showAlert } = useSweetAlert();
 
 // preserveState: true on every action below (bulk and per-row) so this component
 // instance survives each round trip instead of being torn down and remounted — that's
@@ -347,6 +359,29 @@ function saveOrderNo(id, value) {
         { order_no: orderNo },
         { preserveScroll: true, preserveState: true },
     );
+}
+
+// Manual chest-number override, alongside the auto-assign buttons above — for matching
+// a number already printed on a badge, or any other one-off exception. Kept as a plain
+// per-row draft (not synced to p.chest_no) so a half-typed number never gets submitted
+// by accident; the backend (FestChestNumberService::setChest()) rejects a value already
+// held by someone else in the same chest-numbering scope.
+const chestEdits = reactive({});
+function saveChest(id) {
+    const raw = chestEdits[id];
+    const chestNo = Number(raw);
+    if (!raw || !Number.isInteger(chestNo) || chestNo < 1) return;
+
+    router.post(`${base.value}/${id}/set`, { chest_no: chestNo }, {
+        preserveScroll: true,
+        preserveState: true,
+        onSuccess: () => { delete chestEdits[id]; },
+        onError: (errors) => {
+            if (errors.chest_no) {
+                showAlert({ title: 'Could not set chest number', text: errors.chest_no, icon: 'error' });
+            }
+        },
+    });
 }
 
 // Per-item / bulk "starting number" popups — a quicker alternative to the full table

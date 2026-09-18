@@ -4,8 +4,10 @@ namespace App\Services\Events;
 
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
+use App\Models\FestGroup;
 use App\Models\FestParticipant;
 use App\Models\FestSchedule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class FestChestNumberService
@@ -111,6 +113,83 @@ class FestChestNumberService
             });
 
         return $revealed;
+    }
+
+    /**
+     * Manually override a participant's (or their team's) chest number to an exact
+     * value an admin chose — e.g. matching a number already printed on a badge.
+     * Mirrors clearChest()'s scoping: a group item's number lives on the FestGroup and
+     * covers the whole squad, an individual's is shared across every sibling item
+     * registration for the same student/teacher within the head scope. Throws 422 if
+     * the number collides with anyone else already holding it in that scope.
+     */
+    public function setChest(FestParticipant $participant, int $chestNo): void
+    {
+        $participant->loadMissing('registration.event', 'registration.item', 'group');
+        $event = $participant->registration?->event;
+        $item = $participant->registration?->item;
+        abort_unless($event && $item, 404);
+
+        $numbering = app(FestNumberingService::class);
+        $headScope = $numbering->chestHeadScope($event, $item);
+        $eventIds = $event->reportableEventIds();
+        $itemIds = $event->reportableItemIds([$item->id]);
+
+        if ($participant->group_id && $participant->group && $numbering->isGroupItem($item)) {
+            $group = $participant->group;
+
+            $taken = FestGroup::whereIn('event_id', $eventIds)
+                ->whereHas('registration', fn ($q) => $q->whereIn('item_id', $itemIds))
+                ->where('chest_no', $chestNo)
+                ->where('id', '!=', $group->id)
+                ->exists();
+
+            if ($taken) {
+                throw ValidationException::withMessages(['chest_no' => "Chest number {$chestNo} is already in use."]);
+            }
+
+            $group->update(['chest_no' => $chestNo]);
+
+            return;
+        }
+
+        $eventId = $event->id;
+
+        // Only rows that already carry a chest_no are checked for a collision — and per
+        // assignMissingChestNumbers()'s convention, event_id is always backfilled onto a
+        // row in the same write that gives it a chest_no, so the denormalized column is
+        // reliable here.
+        $taken = FestParticipant::query()
+            ->where('event_id', $eventId)
+            ->where('chest_head_id', $headScope)
+            ->where('chest_no', $chestNo)
+            ->where('id', '!=', $participant->id)
+            ->exists();
+
+        if ($taken) {
+            throw ValidationException::withMessages(['chest_no' => "Chest number {$chestNo} is already in use."]);
+        }
+
+        // A participant who has never been auto-assigned still carries event_id = null
+        // and chest_head_id = 0 (its un-backfilled defaults — see assignMissingChestNumbers()
+        // above), so neither can be trusted to locate THIS row; scope through the reliable
+        // registration->event_id instead, and match this exact row by id regardless of its
+        // stale chest_head_id. The `chest_head_id = $headScope` arm still catches sibling
+        // item registrations for the same student/teacher that already share this head
+        // scope. Every matched row gets event_id + chest_head_id backfilled along with
+        // chest_no, same as assignMissingChestNumbers() does.
+        $query = FestParticipant::whereHas('registration', fn ($q) => $q->where('event_id', $eventId))
+            ->where(fn ($q) => $q->where('chest_head_id', $headScope)->orWhere('id', $participant->id));
+
+        if ($participant->student_id) {
+            $query->where('student_id', $participant->student_id);
+        } elseif ($participant->teacher_id) {
+            $query->where('teacher_id', $participant->teacher_id);
+        } else {
+            $query->where('id', $participant->id);
+        }
+
+        $query->update(['event_id' => $eventId, 'chest_head_id' => $headScope, 'chest_no' => $chestNo]);
     }
 
     public function clearChest(FestParticipant $participant): void

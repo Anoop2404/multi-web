@@ -175,6 +175,25 @@ class FestChestNumberController extends SahodayaAdminController
         return back()->with('success', "Assigned {$count} missing chest number(s) {$scopeLabel}.");
     }
 
+    public function setChest(Request $request, string $tenantId, FestEvent $event, FestParticipant $participant, FestChestNumberService $service, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($participant->registration->event_id !== $event->id, 403);
+
+        $data = $request->validate([
+            'chest_no' => 'required|integer|min:1',
+        ]);
+
+        $service->setChest($participant, $data['chest_no']);
+
+        $audit->festEvent($event, FestPageActivity::CHEST_NUMBERS, 'fest.chest_number.set', "Chest number manually set to {$data['chest_no']}", [
+            'participant_id' => $participant->id,
+            'chest_no'       => $data['chest_no'],
+        ]);
+
+        return back()->with('success', "Chest number set to {$data['chest_no']}.");
+    }
+
     public function clearChest(string $tenantId, FestEvent $event, FestParticipant $participant, FestChestNumberService $service, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
