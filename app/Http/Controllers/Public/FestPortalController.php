@@ -209,6 +209,15 @@ class FestPortalController extends Controller
             ->distinct()
             ->pluck('item_id');
 
+        // An item can be flagged results_published_at without a single mark ever having
+        // been entered for it (published too early, or a no-show item) — the Results
+        // button must not render as a normal, inviting link into a page that can only
+        // ever say "No published results for this item." in that case.
+        $resultedItemIds = FestMark::where('event_id', $targetEvent->id)
+            ->whereIn('item_id', $allItems->pluck('id'))
+            ->distinct()
+            ->pluck('item_id');
+
         $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
 
         $itemCategoryKeys = $allItems
@@ -226,6 +235,7 @@ class FestPortalController extends Controller
             'isAdminPreview' => $isAdminPreview,
             'scopeSchedulePublished' => (bool) $selectedScope['schedule_published'],
             'scheduledItemIds' => $scheduledItemIds,
+            'resultedItemIds' => $resultedItemIds,
             'pageSeo' => ['title' => 'Item Finder — '.$event->title.' — '.$tenant->name],
         ]);
     }
