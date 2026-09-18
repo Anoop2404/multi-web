@@ -131,9 +131,10 @@
                                                    v-model="chestDraft"
                                                    @keydown.enter="confirmSetChest(p)"
                                                    @keydown.escape="cancelChestEdit"
+                                                   @blur="autoSaveChest(p)"
                                                    class="w-20 rounded border-2 border-indigo-400 px-2 py-1 text-sm font-mono font-normal focus:outline-none focus:ring-2 focus:ring-indigo-100" />
-                                            <button @click="confirmSetChest(p)" title="Save" class="text-emerald-600 hover:text-emerald-700 font-normal">✓</button>
-                                            <button @click="cancelChestEdit" title="Cancel" class="text-slate-400 hover:text-slate-600 font-normal">✕</button>
+                                            <button @mousedown.prevent @click="confirmSetChest(p)" title="Save" class="text-emerald-600 hover:text-emerald-700 font-normal">✓</button>
+                                            <button @mousedown.prevent @click="cancelChestEdit" title="Cancel" class="text-slate-400 hover:text-slate-600 font-normal">✕</button>
                                             <p v-if="chestError" class="absolute mt-9 text-[11px] font-normal text-red-600 bg-white border border-red-200 rounded px-2 py-1 shadow-sm">{{ chestError }}</p>
                                         </div>
                                         <div v-else class="flex items-center gap-1.5">
@@ -392,6 +393,26 @@ function cancelChestEdit() {
     editingChestId.value = null;
     chestDraft.value = '';
     chestError.value = '';
+}
+
+// Blur (clicking anywhere else) auto-saves a real edit — the Save/Cancel buttons are
+// still there for anyone who wants to be explicit, and both use @mousedown.prevent so
+// clicking them never steals focus first and fires this blur handler behind their back.
+// Escape already exits editing (and clears editingChestId) before blur lands, so the
+// early return below is what makes Escape a true cancel rather than a save.
+function autoSaveChest(participant) {
+    if (editingChestId.value !== participant.id) {
+        return;
+    }
+
+    const raw = chestDraft.value?.toString().trim();
+    const currentValue = participant.chest_no ? String(participant.chest_no) : '';
+    if (!raw || raw === currentValue) {
+        cancelChestEdit();
+        return;
+    }
+
+    confirmSetChest(participant);
 }
 
 function confirmSetChest(participant) {
