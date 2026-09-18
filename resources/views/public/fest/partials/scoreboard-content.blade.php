@@ -72,7 +72,11 @@
         <div class="flex items-center justify-between"><h2 id="latest-winners-title" class="text-lg font-extrabold text-white">Latest Item Winners</h2><span class="text-xs text-amber-400 font-semibold">Recent results</span></div>
         <div class="space-y-3 max-h-[44rem] overflow-y-auto pr-1">
             @forelse($latestWinners ?? [] as $itemGroup)
-                @include('public.fest.partials.fest-winner-item-card')
+                {{-- rosterLimit: unlike the TV slideshow, this page has no per-slide space
+                     constraint, but a squad item's roster can still run 25+ members, each
+                     with a base64 photo — capping it keeps this poll-every-30s payload
+                     bounded instead of re-transferring every teammate's photo each time. --}}
+                @include('public.fest.partials.fest-winner-item-card', ['rosterLimit' => 12])
             @empty
             <div class="rounded-2xl bg-slate-900 border border-slate-800 text-slate-400 text-center py-12">No winners announced yet.</div>
             @endforelse
