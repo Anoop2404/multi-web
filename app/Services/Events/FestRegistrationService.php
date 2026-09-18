@@ -272,12 +272,18 @@ class FestRegistrationService
                 ?? FestGroup::create(['registration_id' => $registration->id])->id;
         } else {
             // Individual items carry no FestTeamSquadRules (validateSquadCount() is always a
-            // no-op for them) — cap manually at 1 performer + 2 standbys, matching the existing
-            // "Standbys (optional, max 2)" convention already enforced client-side in the
-            // Register-on-behalf form (Registrations.vue).
+            // no-op for them) — the performer cap is item->max_per_school (defaults to 1),
+            // the same setting FestRegistrationCreateService::createForSchool() already
+            // honors for the school's own self-registration flow (and that this admin
+            // "Manage participants" modal's own frontend already mirrors — see
+            // Registrations.vue's addParticipantMaxSelected). This used to hardcode 1
+            // regardless of max_per_school, silently rejecting a 2nd performer an admin
+            // added by hand even when the item is configured to allow one.
             if ($role === 'performer') {
-                abort_if($registration->participants->where('participant_role', '!=', 'standby')->isNotEmpty(), 422,
-                    'This item only allows one performer — remove the current performer first, or add this student as a standby.');
+                $maxAllowed = (int) ($item?->max_per_school ?? 1);
+                $performerCount = $registration->participants->where('participant_role', '!=', 'standby')->count();
+                abort_if($performerCount + 1 > $maxAllowed, 422,
+                    "This item allows at most {$maxAllowed} performer".($maxAllowed === 1 ? '' : 's').' — remove an existing performer first, or add this student as a standby.');
             } else {
                 abort_if($registration->participants->where('participant_role', 'standby')->count() >= 2, 422, 'At most 2 standbys are allowed.');
             }

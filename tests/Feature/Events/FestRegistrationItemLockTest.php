@@ -171,6 +171,48 @@ class FestRegistrationItemLockTest extends TestCase
         $this->assertDatabaseHas('fest_participants', ['id' => $participant->id, 'registration_id' => $f['registration']->id]);
     }
 
+    /**
+     * Regression test: this individual item's performer cap used to be hardcoded to 1
+     * regardless of item->max_per_school, so an admin adding a 2nd performer by hand
+     * through "Manage participants" got rejected even when the item was explicitly
+     * configured (e.g. max_per_school = 2) to allow it — silently diverging from
+     * FestRegistrationCreateService::createForSchool(), which already honored
+     * max_per_school for the school's own self-registration flow, and from this same
+     * modal's own frontend (Registrations.vue's addParticipantMaxSelected).
+     */
+    public function test_add_participant_as_performer_respects_item_max_per_school_for_individual_items(): void
+    {
+        $f = $this->fixture();
+        $schoolClass = SchoolClass::create(['tenant_id' => $f['school']->id, 'name' => 'Class 9']);
+        $secondStudent = Student::create(['name' => 'Second Performer', 'tenant_id' => $f['school']->id, 'school_class_id' => $schoolClass->id]);
+
+        // Default (no max_per_school configured): still capped at 1 performer.
+        $this->expectException(HttpException::class);
+        $this->expectExceptionMessage('This item allows at most 1 performer');
+
+        app(FestRegistrationService::class)->addParticipant($f['registration']->fresh(), $f['event'], $secondStudent, 'performer');
+    }
+
+    public function test_add_participant_as_performer_allows_a_second_when_item_max_per_school_is_two(): void
+    {
+        $f = $this->fixture();
+        $f['item']->update(['max_per_school' => 2]);
+        $schoolClass = SchoolClass::create(['tenant_id' => $f['school']->id, 'name' => 'Class 9']);
+        $secondStudent = Student::create(['name' => 'Second Performer', 'tenant_id' => $f['school']->id, 'school_class_id' => $schoolClass->id]);
+
+        $participant = app(FestRegistrationService::class)->addParticipant($f['registration']->fresh(), $f['event'], $secondStudent, 'performer');
+
+        $this->assertSame('performer', $participant->participant_role);
+        $this->assertDatabaseHas('fest_participants', ['id' => $participant->id, 'registration_id' => $f['registration']->id]);
+
+        // A 3rd performer must still be rejected — the cap is exactly max_per_school, not unlimited.
+        $thirdStudent = Student::create(['name' => 'Third Performer', 'tenant_id' => $f['school']->id, 'school_class_id' => $schoolClass->id]);
+        $this->expectException(HttpException::class);
+        $this->expectExceptionMessage('This item allows at most 2 performers');
+
+        app(FestRegistrationService::class)->addParticipant($f['registration']->fresh(), $f['event'], $thirdStudent, 'performer');
+    }
+
     public function test_remove_participant_aborts_once_the_items_results_are_published(): void
     {
         $f = $this->fixture();
