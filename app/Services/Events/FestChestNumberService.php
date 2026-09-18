@@ -167,12 +167,18 @@ class FestChestNumberService
         // Only rows that already carry a chest_no are checked for a collision — and per
         // assignMissingChestNumbers()'s convention, event_id is always backfilled onto a
         // row in the same write that gives it a chest_no, so the denormalized column is
-        // reliable here.
+        // reliable here. Excludes rejected/withdrawn registrations' participants — a real
+        // production bug: a student who withdrew and later re-registered for the same
+        // item can have TWO participant rows sharing this exact chest_head_id (the old
+        // withdrawn one, the new active one), and without this exclusion a stray chest_no
+        // left on the withdrawn row (e.g. from before FestRegistrationService::cancel()
+        // reliably cleared it) blocked assignment for a number nobody currently holds.
         $taken = FestParticipant::query()
             ->where('event_id', $eventId)
             ->where('chest_head_id', $headScope)
             ->where('chest_no', $chestNo)
             ->where('id', '!=', $participant->id)
+            ->whereHas('registration', fn ($q) => $q->whereNotIn('status', ['rejected', 'withdrawn']))
             ->exists();
 
         if ($taken) {
@@ -187,7 +193,18 @@ class FestChestNumberService
         // item registrations for the same student/teacher that already share this head
         // scope. Every matched row gets event_id + chest_head_id backfilled along with
         // chest_no, same as assignMissingChestNumbers() does.
-        $query = FestParticipant::whereHas('registration', fn ($q) => $q->where('event_id', $eventId))
+        //
+        // Excludes rejected/withdrawn registrations for the same reason as the $taken
+        // check above — without it, a student with an old withdrawn registration for
+        // this same item alongside their current active one gets BOTH rows matched by
+        // the student_id condition below, and the update tries to write the SAME new
+        // chest_no onto both simultaneously — violating
+        // fest_participants_event_head_chest_unique itself (two rows can't share one
+        // number) even though no other row was ever holding that number to begin with.
+        // Reproduced live: setting ANY chest number for a participant in this situation
+        // failed, because every attempt re-created this exact self-collision.
+        $query = FestParticipant::whereHas('registration', fn ($q) => $q->where('event_id', $eventId)
+                ->whereNotIn('status', ['rejected', 'withdrawn']))
             ->where(fn ($q) => $q->where('chest_head_id', $headScope)->orWhere('id', $participant->id));
 
         if ($participant->student_id) {

@@ -132,4 +132,37 @@ class FestChestNumberSetTest extends TestCase
 
         $response->assertForbidden();
     }
+
+    /**
+     * Reproduces a real production bug: a student withdrew from an item and later
+     * re-registered for the SAME item, leaving two FestParticipant rows sharing the
+     * same chest_head_id (item id) — the old withdrawn one and the new active one.
+     * setChest()'s sibling-sync update matched both rows and tried to write the same
+     * new chest_no onto both in one statement, self-violating
+     * fest_participants_event_head_chest_unique for ANY chosen number.
+     */
+    public function test_admin_can_set_a_chest_number_when_student_has_a_stale_withdrawn_registration_for_the_same_item(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event, 'item' => $item, 'participant' => $participant] = $this->fixture();
+
+        $withdrawnRegistration = FestRegistration::create([
+            'event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $participant->registration->school_id,
+            'status' => 'withdrawn', 'submitted_at' => now(),
+        ]);
+        FestParticipant::create([
+            'registration_id' => $withdrawnRegistration->id, 'student_id' => $participant->student_id,
+            'participant_type' => 'student', 'participant_role' => 'performer',
+            'chest_head_id' => $item->id, 'event_id' => $event->id,
+        ]);
+
+        $response = $this->actingAs($admin)->post(route('sahodaya.events.chest-numbers.set', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id, 'participant' => $participant->id,
+        ]), ['chest_no' => 777]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect();
+
+        $participant->refresh();
+        $this->assertSame(777, $participant->chest_no);
+    }
 }
