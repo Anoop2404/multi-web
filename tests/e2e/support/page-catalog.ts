@@ -42,7 +42,7 @@ export const sahodayaEventPages = (tenantId: string, eventId: string | number): 
     { path: `/sahodaya-admin/${tenantId}/events/${eventId}/leaderboard`, label: 'Leaderboard' },
     { path: `/sahodaya-admin/${tenantId}/events/${eventId}/food-coupons`, label: 'Food coupons' },
     { path: `/sahodaya-admin/${tenantId}/events/${eventId}/athletic-records`, label: 'Athletic records' },
-    { path: `/sahodaya-admin/${tenantId}/events/${eventId}/championship`, label: 'Championship' },
+    { path: `/sahodaya-admin/${tenantId}/events/${eventId}/championship`, label: 'Individual Championship' },
     { path: `/sahodaya-admin/${tenantId}/events/${eventId}/marks`, label: 'Mark entry' },
     { path: `/sahodaya-admin/${tenantId}/events/${eventId}/marks/import`, label: 'Mark import' },
     { path: `/sahodaya-admin/${tenantId}/events/${eventId}/results`, label: 'Results' },

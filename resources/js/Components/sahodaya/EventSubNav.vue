@@ -62,7 +62,7 @@ const tabs = computed(() => {
         { key: 'grade-master', label: 'Grade Master', icon: '🎓', href: `${base.value}/grade-master`, permissions: FEST_SETTINGS },
         { key: 'rank-points', label: resolvedEventType.value === 'sports' ? 'Rank Points' : 'Grade Points Master', icon: '🏅', href: `${base.value}/rank-points`, permissions: FEST_SETTINGS },
         { key: 'results', label: 'Results', icon: '🥇', href: `${base.value}/results`, permissions: FEST_RESULTS },
-        { key: 'championship', label: 'Championship', icon: '👑', href: `${base.value}/championship`, permissions: FEST_RESULTS },
+        { key: 'championship', label: 'Individual Championship', icon: '👑', href: `${base.value}/championship`, permissions: FEST_RESULTS },
         { key: 'activity', label: 'Log', icon: '🕒', href: `${base.value}/activity`, permissions: FEST_VIEW },
     ];
 

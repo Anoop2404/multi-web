@@ -170,7 +170,7 @@ class FestPublicResultsTeamRosterTest extends TestCase
         $response = $this->get("http://roster-test.test/fest/{$this->event->id}/results?tab=championship");
 
         $response->assertOk()
-            ->assertSee('No championship standing is published')
+            ->assertSee('No individual championship standing is published')
             ->assertSee('Browse item results')
             ->assertSee('School results')
             ->assertDontSee('<table', false);

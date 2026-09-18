@@ -148,7 +148,7 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
     ];
 
     if (caps.championship) {
-        competitionItems.push({ label: 'Championship', href: `${base}/championship`, icon: 'star', permissions: FEST_RESULTS });
+        competitionItems.push({ label: 'Individual Championship', href: `${base}/championship`, icon: 'star', permissions: FEST_RESULTS });
     }
 
     groups.push({ section: 'Competition', items: competitionItems });

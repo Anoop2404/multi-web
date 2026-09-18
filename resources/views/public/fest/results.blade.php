@@ -8,7 +8,7 @@
         'category' => 'Category-wise',
         'item' => 'Item-wise',
         'individual' => 'Individual',
-        'championship' => 'Championship',
+        'championship' => 'Individual Championship',
     ];
 @endphp
 
@@ -492,7 +492,7 @@
         @else
             @if(empty($championship))
             <div class="rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-8 sm:p-10 text-center">
-                <h2 class="font-bold text-white">No championship standing is published</h2>
+                <h2 class="font-bold text-white">No individual championship standing is published</h2>
                 <p class="text-sm text-white/45 mt-2 max-w-xl mx-auto">{{ $event->status === 'completed' ? 'This event has ended without a published individual championship table.' : 'The championship table will appear here if the event committee publishes cumulative individual points.' }}</p>
                 <div class="flex flex-wrap justify-center gap-3 mt-5">
                     <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => 'item']) }}" class="rounded-xl bg-amber-500 px-4 py-2 text-sm font-bold text-slate-950 hover:bg-amber-400">Browse item results</a>
@@ -513,7 +513,7 @@
             @endphp
             <div class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden overflow-x-auto">
                 <div class="px-4 py-3 bg-white/5 border-b border-slate-800">
-                    <h2 class="font-bold text-white">Championship Standings</h2>
+                    <h2 class="font-bold text-white">Individual Championship Standings</h2>
                     <p class="text-xs text-white/40">Individual championship points, ranked within each category &amp; gender{{ ($championshipCombinesPhases ?? false) ? ' — combined across every published phase' : '' }}. Not the same as the Individual tab's per-result list.</p>
                 </div>
 
