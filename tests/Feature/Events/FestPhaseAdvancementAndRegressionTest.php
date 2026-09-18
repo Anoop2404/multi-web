@@ -165,6 +165,32 @@ class FestPhaseAdvancementAndRegressionTest extends TestCase
         $this->assertEmpty($afterHide, 'An item explicitly hidden after publishing must not contribute either.');
     }
 
+    /**
+     * EventContext::scoreboardByPhase()'s $category filter did a plain exact match on
+     * class_group, never expanding a merge TARGET (aggregation_config.
+     * championship_category_map) back to its source categories via FestCategoryMerge::
+     * sourceKeysFor() — the same expansion PublicFestScoreboardService::scoreboard()'s
+     * category branch already does. A phased event's category-filtered board (and the
+     * public school-detail page's cross-phase total built on it) silently dropped a
+     * merged-away source category's points.
+     */
+    public function test_phase_scoreboard_category_filter_includes_a_merged_source_category(): void
+    {
+        [$root, $regions, $phases] = $this->fourPhaseFixture();
+        $school = $this->makeSchool($root->tenant_id);
+
+        $root->update(['aggregation_config' => ['championship_category_map' => ['category_5' => 'category_3']]]);
+
+        $reg = $this->registerAndScoreOneStudent($root, $phases['DIGI'], $school, null, position: 1);
+        FestEventItem::where('id', $reg->item_id)->update(['class_group' => 'category_5']);
+
+        app(FestPhasePublicationService::class)->publishResults($this->leafFor($root, $phases['DIGI'], null));
+
+        $board = app(FestPhaseScoreboardService::class)->phaseScoreboard($phases['DIGI'], 'category_3');
+        $this->assertNotEmpty($board, "A merged source category's marks must count under the merge target's own board.");
+        $this->assertGreaterThan(0, $board[0]['total_points'] ?? 0);
+    }
+
     public function test_disabling_a_region_after_publication_does_not_erase_its_points(): void
     {
         [$root, $regions, $phases] = $this->fourPhaseFixture();

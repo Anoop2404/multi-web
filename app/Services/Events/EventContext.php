@@ -10,6 +10,7 @@ use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestResult;
 use App\Models\Tenant;
+use App\Support\FestCategoryMerge;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestOverallCategoryExclusion;
 use App\Support\FestSportsAgeGroup;
@@ -217,13 +218,21 @@ class EventContext
         // phased-event path never got: a phased event's public School-wise total was
         // silently including marks from items nobody had published yet, or that were
         // later hidden, the moment the phase itself was marked published.
+        // $category may itself be a merge TARGET (aggregation_config.
+        // championship_category_map, e.g. "category_5" merged into "category_3") —
+        // sourceKeysFor() expands it back to every raw category that now counts toward
+        // it, same as PublicFestScoreboardService::scoreboard()'s category branch
+        // already does. A plain exact match here left a merged source category's marks
+        // out of the target's own phase board/total.
+        $sourceCategoryKeys = $category ? FestCategoryMerge::sourceKeysFor($this->event->rootEvent(), $category) : null;
+
         $marks = FestMark::where('event_id', $this->event->id)
-            ->whereHas('item', function ($q) use ($phaseId, $category, $categoryColumn, $excludedCategories) {
+            ->whereHas('item', function ($q) use ($phaseId, $sourceCategoryKeys, $categoryColumn, $excludedCategories) {
                 $q->where('phase_id', $phaseId)
                     ->whereNotNull('results_published_at')
                     ->where('results_hidden', false);
-                if ($category) {
-                    $q->where($categoryColumn, $category);
+                if ($sourceCategoryKeys) {
+                    $q->whereIn($categoryColumn, $sourceCategoryKeys);
                 }
                 if ($excludedCategories) {
                     $q->whereNotIn($categoryColumn, $excludedCategories);

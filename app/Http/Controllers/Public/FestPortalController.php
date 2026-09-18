@@ -27,6 +27,7 @@ use App\Services\Events\FestPublicVisibilityService;
 use App\Services\Events\FestWinnerPosterService;
 use App\Services\Events\PublicFestScoreboardService;
 use App\Services\Events\PublicOperationalEventService;
+use App\Support\FestCategoryMerge;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestItemCategoryLabel;
 use App\Support\FestOverallCategoryExclusion;
@@ -707,8 +708,17 @@ class FestPortalController extends Controller
             ->whereHas('item', fn ($q) => $q->where('results_hidden', false))
             // Only set when schoolResults() was reached from a category-filtered
             // scoreboard — narrows the roster to that one category instead of the
-            // school's full cross-category report.
-            ->when($category, fn ($query) => $query->whereHas('item', fn ($q) => $q->where($categoryColumn, $category)))
+            // school's full cross-category report. $category may itself be a merge
+            // TARGET (aggregation_config.championship_category_map, e.g. "category_5"
+            // merged into "category_3") — sourceKeysFor() expands it back to every raw
+            // category that now counts toward it, same as PublicFestScoreboardService::
+            // scoreboard()'s category branch already does. A plain exact match here
+            // left a merged source category's items missing from the target's own
+            // roster page, even though the scoreboard total correctly combined them.
+            ->when($category, fn ($query) => $query->whereHas(
+                'item',
+                fn ($q) => $q->whereIn($categoryColumn, FestCategoryMerge::sourceKeysFor($event->rootEvent(), $category))
+            ))
             ->when($excludedCategories, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotIn($categoryColumn, $excludedCategories)))
             ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school'])
             ->get();

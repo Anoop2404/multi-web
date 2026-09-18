@@ -520,6 +520,52 @@ class FestPublicScoreboardTest extends TestCase
         $unfiltered->assertDontSee('View full roster (all categories)', false);
     }
 
+    /**
+     * schoolResultsRoster()'s $category filter did a plain exact match on class_group,
+     * never expanding a merge TARGET (aggregation_config.championship_category_map) back
+     * to its source categories via FestCategoryMerge::sourceKeysFor() — the same
+     * expansion PublicFestScoreboardService::scoreboard()'s category branch already
+     * does. A merged-away source category's items were missing from the target
+     * category's own roster page, even though the scoreboard total already combined
+     * them under the target.
+     */
+    public function test_school_detail_page_category_filter_includes_a_merged_source_category(): void
+    {
+        $this->hub->update(['aggregation_config' => array_merge(
+            $this->hub->aggregation_config ?? [],
+            ['championship_category_map' => ['lp' => 'hs']],
+        )]);
+
+        // 'hs' item, tagged directly as the merge target.
+        $this->markCategoryWinner($this->north, $this->northSchool, 'North Poetry');
+
+        // 'lp' item, merged INTO 'hs' — must show up under ?category=hs too.
+        $lpItem = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'Merged LP Item', 'category' => 'literary',
+            'class_group' => 'lp', 'participant_type' => 'individual', 'is_enabled' => true,
+            'results_published_at' => now(),
+        ]);
+        $registration = FestRegistration::create([
+            'event_id' => $this->north->id, 'item_id' => $lpItem->id,
+            'school_id' => $this->northSchool->id, 'status' => 'approved',
+        ]);
+        $participant = FestParticipant::create([
+            'registration_id' => $registration->id, 'event_id' => $this->north->id, 'participant_type' => 'student',
+        ]);
+        FestMark::create([
+            'event_id' => $this->north->id, 'item_id' => $lpItem->id, 'participant_id' => $participant->id,
+            'grade' => 'A', 'position' => 1, 'score' => 80,
+        ]);
+
+        $response = $this->get(
+            "http://public-scoreboard.test/fest/{$this->north->id}/results/schools/{$this->northSchool->id}?category=hs"
+        );
+
+        $response->assertOk();
+        $response->assertSee('North Poetry');
+        $response->assertSee('Merged LP Item');
+    }
+
     public function test_school_detail_page_404s_for_an_unrecognized_category(): void
     {
         $this->markCategoryWinner($this->north, $this->northSchool, 'North Poetry');
