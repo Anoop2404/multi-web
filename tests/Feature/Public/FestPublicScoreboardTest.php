@@ -1154,6 +1154,188 @@ class FestPublicScoreboardTest extends TestCase
     }
 
     /**
+     * A squad/team item's roster can run to several members, so 2+ winning positions
+     * sharing one TV slide side by side squeezed each team into a fraction of the
+     * width and shrank its photos — cramped, and at large enough rosters the tiles
+     * could even overlap (fest-winner-item-card-tv.blade.php's grid track squeeze).
+     * tv() now splits such an item's winners across one slide per position instead, so
+     * each team gets the whole slide's width. Individual items are unaffected.
+     */
+    public function test_tv_splits_a_team_items_multiple_winning_positions_across_separate_slides(): void
+    {
+        $item = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'Group Dance', 'category' => 'performing',
+            'class_group' => 'hs', 'participant_type' => 'team', 'is_enabled' => true,
+            'results_published_at' => now(),
+        ]);
+        $schoolClass = SchoolClass::create(['tenant_id' => $this->northSchool->id, 'name' => '9']);
+
+        $goldReg = FestRegistration::create(['event_id' => $this->north->id, 'item_id' => $item->id, 'school_id' => $this->northSchool->id, 'status' => 'approved']);
+        $goldStudent = Student::create(['tenant_id' => $this->northSchool->id, 'school_class_id' => $schoolClass->id, 'name' => 'Gold Team Member']);
+        $goldParticipant = FestParticipant::create(['registration_id' => $goldReg->id, 'event_id' => $this->north->id, 'participant_type' => 'student', 'participant_role' => 'performer', 'student_id' => $goldStudent->id]);
+        FestMark::create(['event_id' => $this->north->id, 'item_id' => $item->id, 'participant_id' => $goldParticipant->id, 'grade' => 'A', 'position' => 1, 'score' => 90]);
+
+        $silverReg = FestRegistration::create(['event_id' => $this->north->id, 'item_id' => $item->id, 'school_id' => $this->southSchool->id, 'status' => 'approved']);
+        $silverStudent = Student::create(['tenant_id' => $this->southSchool->id, 'school_class_id' => SchoolClass::create(['tenant_id' => $this->southSchool->id, 'name' => '9'])->id, 'name' => 'Silver Team Member']);
+        $silverParticipant = FestParticipant::create(['registration_id' => $silverReg->id, 'event_id' => $this->north->id, 'participant_type' => 'student', 'participant_role' => 'performer', 'student_id' => $silverStudent->id]);
+        FestMark::create(['event_id' => $this->north->id, 'item_id' => $item->id, 'participant_id' => $silverParticipant->id, 'grade' => 'A', 'position' => 2, 'score' => 80]);
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/tv");
+        $html = $response->getContent();
+
+        // Names render visually uppercase via CSS (text-transform), not server-side —
+        // the raw HTML keeps the stored mixed case.
+        $response->assertOk()
+            ->assertSee('Gold Team Member')
+            ->assertSee('Silver Team Member');
+        $this->assertSame(1, substr_count($html, 'Gold Team Member'));
+        $this->assertSame(1, substr_count($html, 'Silver Team Member'));
+        $response->assertSee('Result 1 of 2')->assertSee('Result 2 of 2');
+
+        // Each slide starts at its own <section data-tv-slide> — the gold and silver
+        // teams must land in DIFFERENT ones, not share a slide.
+        $goldSlideStart = strrpos(substr($html, 0, strpos($html, 'Gold Team Member')), '<section data-tv-slide');
+        $silverSlideStart = strrpos(substr($html, 0, strpos($html, 'Silver Team Member')), '<section data-tv-slide');
+        $this->assertNotSame($goldSlideStart, $silverSlideStart, 'Gold and silver teams must be on separate slides, not squeezed onto one.');
+
+        $goldSlide = substr($html, $goldSlideStart, $silverSlideStart - $goldSlideStart);
+        $this->assertStringNotContainsString('Silver Team Member', $goldSlide, "The gold team's own slide must not also show the silver team.");
+    }
+
+    /**
+     * A band item's roster can run to 25 members (a duet or small team stays at 2-12) —
+     * far more than one slide can show without the old "+N more" tile hiding most of
+     * the roster. tv() now paginates a single position's oversized roster across
+     * multiple slides ($rosterPerPage=12) instead of truncating it, so every member
+     * still gets shown — just across a couple of clearly-labeled extra slides.
+     */
+    public function test_tv_splits_a_large_bands_roster_across_multiple_slides_without_truncating(): void
+    {
+        $item = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'School Band', 'category' => 'performing',
+            'class_group' => 'hs', 'participant_type' => 'group', 'is_enabled' => true,
+            'results_published_at' => now(),
+        ]);
+        $registration = FestRegistration::create(['event_id' => $this->north->id, 'item_id' => $item->id, 'school_id' => $this->northSchool->id, 'status' => 'approved']);
+        $schoolClass = SchoolClass::create(['tenant_id' => $this->northSchool->id, 'name' => '9']);
+
+        $lastParticipant = null;
+        for ($i = 1; $i <= 25; $i++) {
+            $student = Student::create(['tenant_id' => $this->northSchool->id, 'school_class_id' => $schoolClass->id, 'name' => "Band Member {$i}"]);
+            $lastParticipant = FestParticipant::create(['registration_id' => $registration->id, 'event_id' => $this->north->id, 'participant_type' => 'student', 'participant_role' => 'performer', 'student_id' => $student->id]);
+        }
+        FestMark::create(['event_id' => $this->north->id, 'item_id' => $item->id, 'participant_id' => $lastParticipant->id, 'grade' => 'A', 'position' => 1, 'score' => 90]);
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/tv");
+        $html = $response->getContent();
+
+        $response->assertOk();
+        for ($i = 1; $i <= 25; $i++) {
+            $this->assertSame(1, substr_count($html, "Band Member {$i}<"), "Band Member {$i} must appear exactly once — never dropped behind a \"+N more\" tile.");
+        }
+        $this->assertStringNotContainsString('more</span>', $html, 'A "+N more" truncation tile must never appear — a large roster pages instead of truncating.');
+
+        // 25 members / 12 per slide = 3 slides (12 + 12 + 1).
+        $response->assertSee('Result 1 of 3')->assertSee('Result 2 of 3')->assertSee('Result 3 of 3');
+
+        // Member 1 (first slide) and Member 25 (last slide) must land on different slides.
+        $firstMemberSlideStart = strrpos(substr($html, 0, strpos($html, 'Band Member 1<')), '<section data-tv-slide');
+        $lastMemberSlideStart = strrpos(substr($html, 0, strpos($html, 'Band Member 25<')), '<section data-tv-slide');
+        $this->assertNotSame($firstMemberSlideStart, $lastMemberSlideStart, "The band's roster must span multiple slides, not one overflowing slide.");
+    }
+
+    /**
+     * "Latest Item Winners" used to show EVERY published item, which on a busy event
+     * (50+ items) meant many minutes of rotation before the TV ever cycled back to a
+     * standings board. tv() now caps this to the 10 most recently published items —
+     * $dynamic['latestWinners'] is already sorted most-recently-updated-item-first, so
+     * this is genuinely "what just got published", not an arbitrary cut.
+     */
+    public function test_tv_latest_item_winners_caps_to_ten_most_recent_items(): void
+    {
+        for ($i = 1; $i <= 13; $i++) {
+            $item = FestEventItem::create([
+                'event_id' => $this->north->id, 'title' => "Recent Item {$i}", 'category' => 'literary',
+                'class_group' => 'hs', 'participant_type' => 'individual', 'is_enabled' => true,
+                // Staggered timestamps so item 13 is the most recently published and
+                // item 1 the oldest — ordering must be deterministic for this test.
+                'results_published_at' => now()->addSeconds($i),
+            ]);
+            $registration = FestRegistration::create(['event_id' => $this->north->id, 'item_id' => $item->id, 'school_id' => $this->northSchool->id, 'status' => 'approved']);
+            $participant = FestParticipant::create(['registration_id' => $registration->id, 'event_id' => $this->north->id, 'participant_type' => 'student']);
+            $mark = FestMark::create(['event_id' => $this->north->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'grade' => 'A', 'position' => 1, 'score' => 90]);
+            // FestMark.updated_at (what $dynamic['latestWinners'] actually sorts by) is
+            // stamped at create() time regardless of the item's own results_published_at
+            // set above — force it to match so ordering follows publish order.
+            $mark->forceFill(['updated_at' => now()->addSeconds($i)])->save();
+        }
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/tv");
+        $html = $response->getContent();
+
+        $response->assertOk();
+        foreach (range(4, 13) as $i) {
+            $this->assertStringContainsString("Recent Item {$i}", $html, "Recent Item {$i} is among the 10 most recent and must appear.");
+        }
+        foreach (range(1, 3) as $i) {
+            $this->assertStringNotContainsString("Recent Item {$i}<", $html, "Recent Item {$i} is older than the 10 most recent and must not appear.");
+        }
+    }
+
+    /**
+     * A category board can run to 20-30+ schools on a busy event, and cycling through
+     * every one of them for every category ate into how often the TV got back to the
+     * boards people actually care about (Overall Standings, Latest Item Winners). Each
+     * category board is now capped to the top 2 pages (top 10 schools at
+     * $boardsPerPage=5) — the Overall Standings board is uncapped, since "everyone
+     * deserves to see their own row" applies there but not to a per-category breakdown.
+     */
+    public function test_tv_category_board_caps_to_top_ten_schools(): void
+    {
+        // 12 schools, each with its own 'hs' item so every school's rank is deterministic
+        // (position 1 in every item, but a descending score re-derives to descending
+        // grade points — see markCategoryWinner()'s own comment on this).
+        for ($i = 1; $i <= 12; $i++) {
+            $school = $this->school("Category Cap School {$i}");
+            $item = FestEventItem::create([
+                'event_id' => $this->north->id, 'title' => "Category Cap Item {$i}", 'category' => 'literary',
+                'class_group' => 'hs', 'participant_type' => 'individual', 'is_enabled' => true,
+                'results_published_at' => now(),
+            ]);
+            $registration = FestRegistration::create(['event_id' => $this->north->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+            $participant = FestParticipant::create(['registration_id' => $registration->id, 'event_id' => $this->north->id, 'participant_type' => 'student']);
+            FestMark::create(['event_id' => $this->north->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'grade' => 'A', 'position' => 1, 'score' => 100 - $i]);
+        }
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/tv");
+        $html = $response->getContent();
+        $response->assertOk();
+
+        // The category board's own slides are whichever come after its "... Standings"
+        // title through the end of the document (nothing else follows them) — isolates
+        // this assertion to just the category board, not the uncapped Overall Standings
+        // slides earlier on the same page. Names/labels render visually uppercase via
+        // CSS (text-transform), not server-side — the raw HTML keeps the stored case.
+        // 'hs' resolves to "Category 3 — Classes 8, 9 & 10" under this fixture's default
+        // class-group scheme (not a literal "HS" label) — every item's own winner card
+        // also shows that same string as its category_label, so searching for the board
+        // TITLE specifically (with its " Standings" suffix and HTML-escaped "&") is what
+        // isolates the actual board section, not just the first winner card mentioning
+        // the category.
+        $categoryBoardStart = strpos($html, 'Category 3 — Classes 8, 9 &amp; 10 Standings');
+        $this->assertNotFalse($categoryBoardStart, "Expected the 'hs' category board (Category 3) to render.");
+        $categoryBoardHtml = substr($html, $categoryBoardStart);
+
+        // All 12 schools tie at the same points here (position=1, same grade — the
+        // grade/position pair is what actually drives points, not the score value used
+        // above only to keep marks distinguishable), so which 10 schools land on the
+        // capped board isn't deterministic — only the COUNT is what this test checks.
+        preg_match_all('/title="(Category Cap School \d+)"/', $categoryBoardHtml, $matches);
+        $this->assertCount(10, array_unique($matches[1]), 'Exactly 10 schools (the 2-page cap at 5/page) must appear on the category board, not all 12.');
+        $this->assertStringNotContainsString('Page 3 of', $categoryBoardHtml, 'Must never paginate past the 2-page cap.');
+    }
+
+    /**
      * Regression test: the event landing page's "Event item finder" grid used to render
      * items in plain display_order/title order regardless of publish state, so on an
      * event with a handful of published items scattered among many still-unpublished

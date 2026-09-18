@@ -31,6 +31,7 @@ use App\Support\FestCategoryMerge;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestItemCategoryLabel;
 use App\Support\FestOverallCategoryExclusion;
+use App\Support\FestTeamSquadRules;
 use App\Support\TenantBranding;
 use App\Support\TenantStorage;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -1161,9 +1162,7 @@ public function tv(Request $request, int $eventId)
     // 2-position row-mate, so a page's height was driven by whichever item happened
     // to share its row — measured a page hit 1555px in a 1080px viewport this way.
     // One item per page removes the row-mate entirely, so each slide is exactly its
-    // own item's height. A single item with 3+ awarded positions and a large roster
-    // can still exceed one screen on its own; left as a rare residual case rather
-    // than building full dynamic height-measured pagination for it.
+    // own item's height.
     // fest-medal-board.blade.php's rows were enlarged for venue-distance legibility
     // (the previous sizing — 11px/9px header labels, 14-16px row text — was unreadable
     // from more than a couple of meters away). At that larger size each row measures
@@ -1175,12 +1174,80 @@ public function tv(Request $request, int $eventId)
     $winnersPerPage = 1;
     $slides = [];
 
+    // The TV rotates through "Latest Item Winners" before standings — dozens of
+    // published items (a full event can publish 50+) meant it could take many minutes
+    // of rotation just to cycle the winners slides once before ever reaching a
+    // standings board. $dynamic['latestWinners'] is already sorted most-recently-
+    // updated-item-first, so the newest 10 are exactly "what just got published" —
+    // the thing people at the venue actually want to see; older results are still on
+    // the school/item pages, just not worth this screen's limited rotation time.
+    $recentItemsForTv = 10;
+
+    // A squad/team item's roster can run anywhere from 2 (a duet) to 25+ (a band), and
+    // 2-3 winning positions sharing one slide side by side (fest-winner-item-card-tv.
+    // blade.php's flex-wrap columns) squeezes each team into a fraction of the width —
+    // cramped and, at large enough rosters, tiles could even overflow their column.
+    // Split such an item's winners across one slide per position, AND split any single
+    // position's own roster into pages of $rosterPerPage, so nobody's photo is ever
+    // dropped behind a "+N more" tile — a large team just takes a couple of extra,
+    // clearly-labeled slides instead. Individual items (a roster of one) never hit
+    // either path and render exactly as before.
+    $rosterPerPage = 12;
+
+    $tvWinnerItems = collect($dynamic['latestWinners'])
+        ->take($recentItemsForTv)
+        ->flatMap(function (array $itemGroup) use ($rosterPerPage) {
+            $isSquadItem = FestTeamSquadRules::isMultiPerson($itemGroup['participant_type'] ?? null);
+            if (! $isSquadItem) {
+                return [$itemGroup];
+            }
+
+            // Expand each winning position into one slide per $rosterPerPage-sized
+            // chunk of its roster — a position whose roster already fits on one slide
+            // expands to exactly one entry, so a normal 2-12 member team is completely
+            // unaffected by this step.
+            $slidesForItem = collect($itemGroup['winners'])
+                ->flatMap(function (array $winner) use ($rosterPerPage) {
+                    $team = $winner['team'] ?? null;
+                    if (! $team || count($team) <= $rosterPerPage) {
+                        return [$winner];
+                    }
+
+                    return collect(array_chunk($team, $rosterPerPage))
+                        ->map(fn (array $chunk) => ['team' => $chunk] + $winner)
+                        ->all();
+                })
+                ->values();
+
+            // Nothing needed splitting (one position, roster fit on one slide) — same
+            // shape as an individual item, no "Result 1 of 1" clutter.
+            if ($slidesForItem->count() <= 1) {
+                return [$itemGroup];
+            }
+
+            $total = $slidesForItem->count();
+
+            // split_position/split_total tell the card it's one of several consecutive
+            // slides for the same item, so it can show "Result 2 of 3" — without this a
+            // viewer had no way to know two slides in a row sharing a title were related,
+            // rather than, say, a coincidence or a glitch.
+            return $slidesForItem
+                ->map(fn (array $winner, int $i) => [
+                    'winners' => [$winner],
+                    'split_position' => $i + 1,
+                    'split_total' => $total,
+                ] + $itemGroup)
+                ->all();
+        })
+        ->values()
+        ->all();
+
     // Order: latest results first, then standings — a result that just got published
     // is the thing people at the venue actually want to see right away (who just won
     // the item that was on stage a minute ago), not buried behind however many
     // standings pages happen to exist. $dynamic['latestWinners'] is already sorted
     // most-recently-updated-item-first, so the very first slide is the newest result.
-    $winnerPages = array_chunk($dynamic['latestWinners'], $winnersPerPage);
+    $winnerPages = array_chunk($tvWinnerItems, $winnersPerPage);
     foreach ($winnerPages as $i => $page) {
         $slides[] = [
             'type' => 'winners',
@@ -1207,8 +1274,16 @@ public function tv(Request $request, int $eventId)
         }
     }
 
+    // Capped to the top 2 pages (top 10 schools at $boardsPerPage=5) — a category board
+    // can run to 20-30+ schools on a busy event, and cycling through every one of them
+    // for every category ate into how often the TV got back to the boards people
+    // actually care about (Overall Standings, Latest Item Winners). The top 10 is what a
+    // category board is really for; unlike Overall Standings there's no "everyone
+    // deserves to see their own row" expectation here.
+    $categoryBoardPageCap = 2;
+
     foreach ($categoryBoards as $board) {
-        $categoryPages = array_chunk($board['rows'], $boardsPerPage);
+        $categoryPages = array_slice(array_chunk($board['rows'], $boardsPerPage), 0, $categoryBoardPageCap);
         foreach ($categoryPages as $i => $page) {
             $slides[] = [
                 'type' => 'board',

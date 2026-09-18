@@ -4,7 +4,16 @@
      affected by TV-specific sizing changes. --}}
 <article class="rounded-2xl bg-slate-900 border border-slate-800 shadow-md overflow-hidden">
     <div class="px-6 py-4 bg-white/5 border-b border-slate-800">
-        <p class="font-bold text-white text-2xl uppercase">{{ $itemGroup['item'] }}</p>
+        <div class="flex items-start justify-between gap-4">
+            <p class="font-bold text-white text-2xl uppercase">{{ $itemGroup['item'] }}</p>
+            {{-- Set by FestPortalController::tv() when a large team roster and/or
+                 multiple winning positions needed more than one slide for this item —
+                 without this, a viewer has no way to tell two consecutive slides
+                 sharing a title are part of the same result rather than a coincidence. --}}
+            @if(($itemGroup['split_total'] ?? 1) > 1)
+            <span class="shrink-0 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-sm font-bold uppercase tracking-wide px-3 py-1">Result {{ $itemGroup['split_position'] }} of {{ $itemGroup['split_total'] }}</span>
+            @endif
+        </div>
         {{-- Category + gender disambiguate items that share the same title across
              different categories/genders (e.g. "Extempore - English" run separately for
              Category 1 Boys and Category 3 Girls). --}}
@@ -15,17 +24,18 @@
     </div>
     {{-- flex-wrap, not divide-y: multiple awarded positions for the same item sit side by
          side in one row (wrapping only if there's genuinely no room), instead of stacking
-         each position's whole block underneath the last. --}}
+         each position's whole block underneath the last. In practice this only ever
+         renders one winner per slide once split_total > 1 — tv() has already broken a
+         multi-position or oversized-roster item into separate slides by then — but stays
+         multi-capable so a 2-3 position item whose rosters are small still renders
+         exactly as it always has, side by side on one slide. --}}
     <div class="flex flex-wrap">
         @foreach($itemGroup['winners'] as $winner)
         @php
+            // tv() pre-chunks any roster larger than its own per-slide cap before this
+            // partial ever sees it, so $roster here is always small enough to render in
+            // full — no "+N more" truncation tile needed.
             $roster = ($winner['team'] ?? []) ?: [['name' => $winner['participant'], 'photo' => $winner['photo'] ?? null]];
-            // The "+K more" tile below takes one of the $rosterLimit slots itself, so a
-            // truncated roster shows rosterLimit-1 real members + 1 indicator — exactly
-            // rosterLimit tiles total, not rosterLimit+1 (which would silently wrap to a
-            // second row and defeat the whole point of capping).
-            $hiddenCount = (isset($rosterLimit) && count($roster) > $rosterLimit) ? count($roster) - ($rosterLimit - 1) : 0;
-            $visibleRoster = $hiddenCount ? array_slice($roster, 0, $rosterLimit - 1) : $roster;
         @endphp
         <div class="flex gap-4 p-5 flex-1 min-w-[22rem] border-l border-slate-800 first:border-l-0">
             <div class="shrink-0">
@@ -46,7 +56,7 @@
                      rows) rather than shrinking columns below that floor — it can never
                      overlap, only take more vertical space. --}}
                 <div class="grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-3">
-                    @foreach($visibleRoster as $member)
+                    @foreach($roster as $member)
                     <div class="flex flex-col items-center gap-1.5 w-24">
                         @if($member['photo'] ?? null)
                         <img src="{{ $member['photo'] }}" alt="" class="w-24 h-24 rounded-xl object-cover object-top border-2 border-slate-700/60 shadow-md shadow-black/30">
@@ -56,12 +66,6 @@
                         <span class="text-base font-semibold leading-tight text-white/90 text-center uppercase break-words">{{ $member['name'] ?? '—' }}</span>
                     </div>
                     @endforeach
-                    @if($hiddenCount)
-                    <div class="flex flex-col items-center gap-1.5 w-24">
-                        <span class="w-24 h-24 rounded-xl bg-slate-800/60 border-2 border-dashed border-slate-700 flex items-center justify-center text-slate-300 font-extrabold text-xl">+{{ $hiddenCount }}</span>
-                        <span class="text-base font-semibold leading-tight text-white/50 text-center">more</span>
-                    </div>
-                    @endif
                 </div>
                 <p class="text-base text-slate-400 mt-3 uppercase">{{ $winner['school'] }}</p>
             </div>

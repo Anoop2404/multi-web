@@ -47,11 +47,12 @@
             @elseif($slide['type'] === 'winners')
             <div class="grid grid-cols-1 gap-4">
                 @foreach($slide['items'] as $itemGroup)
-                    {{-- Lower than the desktop scoreboard's own rosterLimit (14) — each
-                         tile is much larger here for venue-distance legibility, so fewer
-                         fit before a "+N more" tile is the better tradeoff, especially
-                         with 2-3 winning positions (each its own team) sharing the row. --}}
-                    @include('public.fest.partials.fest-winner-item-card-tv', ['rosterLimit' => 8])
+                    {{-- tv() has already split any item whose winners+rosters wouldn't
+                         fit on one slide (multiple positions, or a single position's
+                         roster over $rosterPerPage) across separate slides — this
+                         partial just renders whatever it's handed, no size cap needed
+                         here. --}}
+                    @include('public.fest.partials.fest-winner-item-card-tv')
                 @endforeach
             </div>
             @else
