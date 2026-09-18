@@ -1090,19 +1090,30 @@ public function tv(Request $request, int $eventId)
     // own item's height. A single item with 3+ awarded positions and a large roster
     // can still exceed one screen on its own; left as a rare residual case rather
     // than building full dynamic height-measured pagination for it.
-    // Rows were bumped from a TV-legible size to a much larger, bolder one so the
-    // board reads from across a room on a big outdoor LED wall too (the original
-    // text-sm/text-[11px] sizing was fine on a living-room TV but illegible on a
-    // large-pitch LED panel viewed from a distance) — 6 rows/page keeps that larger
-    // row height fitting a 720p venue display with the header, slide title and
-    // controls visible, the same way 9 rows did at the old smaller size.
-    $boardsPerPage = 6;
+    // Rows were bumped well past a TV-legible size (large-pitch outdoor LED walls are
+    // read from much further away than a living-room TV, per photos from an actual
+    // venue) — 4 rows/page keeps that much larger row height fitting a 720p venue
+    // display with the header, slide title and controls visible, the same way 9 rows
+    // did at the original small size.
+    $boardsPerPage = 4;
     $winnersPerPage = 1;
     $slides = [];
 
-    // Order: overall school ranking, then each category's ranking, then results —
-    // standings open the rotation so the "big picture" leads, results follow as the
-    // detail underneath it.
+    // Order: latest results first, then standings — a result that just got published
+    // is the thing people at the venue actually want to see right away (who just won
+    // the item that was on stage a minute ago), not buried behind however many
+    // standings pages happen to exist. $dynamic['latestWinners'] is already sorted
+    // most-recently-updated-item-first, so the very first slide is the newest result.
+    $winnerPages = array_chunk($dynamic['latestWinners'], $winnersPerPage);
+    foreach ($winnerPages as $i => $page) {
+        $slides[] = [
+            'type' => 'winners',
+            'title' => 'Latest Item Winners',
+            'subtitle' => count($winnerPages) > 1 ? 'Page '.($i + 1).' of '.count($winnerPages) : null,
+            'items' => $page,
+        ];
+    }
+
     $provisionalSuffix = $isPublished ? '' : ' · Provisional';
 
     // tv_show_overall_standings only hides the fest-wide slide — category-wise boards
@@ -1130,16 +1141,6 @@ public function tv(Request $request, int $eventId)
                 'rows' => $page,
             ];
         }
-    }
-
-    $winnerPages = array_chunk($dynamic['latestWinners'], $winnersPerPage);
-    foreach ($winnerPages as $i => $page) {
-        $slides[] = [
-            'type' => 'winners',
-            'title' => 'Latest Item Winners',
-            'subtitle' => count($winnerPages) > 1 ? 'Page '.($i + 1).' of '.count($winnerPages) : null,
-            'items' => $page,
-        ];
     }
 
     // Only fall back to a schools-only roster when there's truly nothing published

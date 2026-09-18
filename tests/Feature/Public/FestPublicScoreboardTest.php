@@ -970,7 +970,7 @@ class FestPublicScoreboardTest extends TestCase
         $this->assertStringContainsString('no-store', $data->headers->get('Cache-Control'));
     }
 
-    public function test_tv_paginates_nine_school_rows_and_exposes_display_controls(): void
+    public function test_tv_paginates_ten_school_rows_and_exposes_display_controls(): void
     {
         foreach (range(2, 10) as $rank) {
             $school = $this->school("TV School {$rank}");
@@ -986,15 +986,19 @@ class FestPublicScoreboardTest extends TestCase
         $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/tv");
         $html = $response->getContent();
 
+        // 10 rows / 4 per page (see FestPortalController::tv()'s $boardsPerPage —
+        // deliberately small so the much-larger LED-wall-legible row height still
+        // fits one screen) = 3 pages: 4 + 4 + 2.
         $response->assertOk()
             ->assertSee('Results Display')
-            ->assertSee('Page 1 of 2')
-            ->assertSee('Page 2 of 2')
+            ->assertSee('Page 1 of 3')
+            ->assertSee('Page 2 of 3')
+            ->assertSee('Page 3 of 3')
             ->assertSee('data-tv-pause', false)
             ->assertSee('data-tv-fullscreen', false)
             ->assertSee('data-tv-prev', false)
             ->assertSee('data-tv-next', false);
-        $this->assertSame(2, substr_count($html, '<section data-tv-slide'));
+        $this->assertSame(3, substr_count($html, '<section data-tv-slide'));
     }
 
     /**
