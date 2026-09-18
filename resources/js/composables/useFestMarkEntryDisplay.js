@@ -106,7 +106,13 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
     }
 
     function attendanceStatus(participant, item) {
-        return props.attendance?.[attendanceKey(participant, item)]?.status ?? '';
+        // Unmarked shows as "Present" by default — most participants who show up never
+        // get an explicit attendance click at all (only the exceptional absentee does),
+        // so defaulting the display to present matches the common case instead of
+        // leaving every un-clicked row looking unmarked. This is display-only: it
+        // doesn't write an attendance record — markAttendance() (triggered by actually
+        // changing the dropdown) is still the only thing that persists one.
+        return props.attendance?.[attendanceKey(participant, item)]?.status ?? 'present';
     }
 
     function isAbsent(participant, item) {
