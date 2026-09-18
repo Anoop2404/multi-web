@@ -86,6 +86,85 @@ class FestPhaseAdvancementAndRegressionTest extends TestCase
         $this->assertGreaterThan(0, $combined[0]['total_points'] ?? 0, 'combinedScoreboard()/scoreboardBySchool() must not drop non-regional phase points.');
     }
 
+    /**
+     * FestOverallCategoryExclusion (aggregation_config.excluded_overall_categories) lets
+     * an admin leave a category's points out of the combined "All Categories" school
+     * total -- already honored by EventContext::recalculateSchoolPoints() (non-phased
+     * events) and PublicFestScoreboardService::provisionalScoreboard(), but
+     * EventContext::scoreboardByPhase() -- the query FestPhaseScoreboardService::
+     * phaseScoreboard()/cumulativeOverall() actually run for a PHASED event -- never
+     * checked it at all, so a phased event's public School-wise total ignored the
+     * configured exclusion entirely.
+     */
+    public function test_cumulative_school_total_excludes_configured_categories_for_a_phased_event(): void
+    {
+        [$root, $regions, $phases] = $this->fourPhaseFixture();
+        $school = $this->makeSchool($root->tenant_id);
+
+        $reg = $this->registerAndScoreOneStudent($root, $phases['DIGI'], $school, null, position: 1);
+        FestEventItem::where('id', $reg->item_id)->update(['class_group' => 'excluded_cat']);
+
+        app(FestPhasePublicationService::class)->publishResults($this->leafFor($root, $phases['DIGI'], null));
+
+        $before = app(FestPhaseScoreboardService::class)->phaseScoreboard($phases['DIGI']);
+        $this->assertNotEmpty($before, 'Sanity: without an exclusion configured, the phase board must show the points.');
+        $this->assertGreaterThan(0, $before[0]['total_points'] ?? 0);
+
+        $root->update(['aggregation_config' => ['excluded_overall_categories' => ['excluded_cat']]]);
+
+        $afterPhase = app(FestPhaseScoreboardService::class)->phaseScoreboard($phases['DIGI']);
+        $this->assertEmpty($afterPhase, 'The combined per-phase total must exclude the configured category entirely.');
+
+        $cumulative = app(FestPhaseScoreboardService::class)->cumulativeOverall($root->fresh());
+        $this->assertEmpty($cumulative, 'The cumulative-overall total across phases must also exclude the configured category.');
+
+        $ownCategoryBoard = app(FestPhaseScoreboardService::class)->phaseScoreboard($phases['DIGI'], 'excluded_cat');
+        $this->assertNotEmpty($ownCategoryBoard, "A category's own board must still show its points -- only the combined total skips it.");
+        $this->assertGreaterThan(0, $ownCategoryBoard[0]['total_points'] ?? 0);
+    }
+
+    /**
+     * EventContext::scoreboardByPhase() never checked item.results_published_at (or
+     * results_hidden) at all — unlike recalculateSchoolPoints() and
+     * PublicFestScoreboardService::scoreboard()'s category branch, which both gate on
+     * exactly this. A phased event's public School-wise total (FestPhaseScoreboardService
+     * -> phaseScoreboard()/cumulativeOverall(), both built on scoreboardByPhase())
+     * therefore counted a mark the moment the whole PHASE was published, even for an
+     * item nobody had individually published results for yet, or one later explicitly
+     * hidden after publishing.
+     */
+    public function test_phase_scoreboard_excludes_marks_for_items_not_individually_published(): void
+    {
+        [$root, $regions, $phases] = $this->fourPhaseFixture();
+        $school = $this->makeSchool($root->tenant_id);
+
+        $reg = $this->registerAndScoreOneStudent($root, $phases['DIGI'], $school, null, position: 1);
+
+        // Simulate "never individually published" — registerAndScoreOneStudent() sets
+        // this by default (see its own comment) to match the real order of operations;
+        // undo it here to isolate this one item as the unpublished case.
+        FestEventItem::where('id', $reg->item_id)->update(['results_published_at' => null]);
+
+        app(FestPhasePublicationService::class)->publishResults($this->leafFor($root, $phases['DIGI'], null));
+
+        $board = app(FestPhaseScoreboardService::class)->phaseScoreboard($phases['DIGI']);
+        $this->assertEmpty($board, 'An item with no individually-published results must not contribute to the phase scoreboard.');
+
+        $cumulative = app(FestPhaseScoreboardService::class)->cumulativeOverall($root->fresh());
+        $this->assertEmpty($cumulative, 'Nor to the cumulative-overall total across phases.');
+
+        // Publishing the item (without touching the phase again) must make it count.
+        FestEventItem::where('id', $reg->item_id)->update(['results_published_at' => now()]);
+        $afterPublish = app(FestPhaseScoreboardService::class)->phaseScoreboard($phases['DIGI']);
+        $this->assertNotEmpty($afterPublish, 'Once the item itself is published, its marks must count.');
+
+        // Explicitly hidden after publishing must exclude it again, same as everywhere
+        // else results_hidden is checked (see FestItemResultsService::unpublishItem()).
+        FestEventItem::where('id', $reg->item_id)->update(['results_hidden' => true]);
+        $afterHide = app(FestPhaseScoreboardService::class)->phaseScoreboard($phases['DIGI']);
+        $this->assertEmpty($afterHide, 'An item explicitly hidden after publishing must not contribute either.');
+    }
+
     public function test_disabling_a_region_after_publication_does_not_erase_its_points(): void
     {
         [$root, $regions, $phases] = $this->fourPhaseFixture();
@@ -282,6 +361,13 @@ class FestPhaseAdvancementAndRegressionTest extends TestCase
             'event_id' => $registration->event_id, 'item_id' => $registration->item_id,
             'participant_id' => $participant->id, 'grade' => 'A', 'position' => $position, 'score' => 90,
         ]);
+
+        // A mark only counts toward any scoreboard once its own item has published
+        // results (EventContext::scoreboardByPhase()/recalculateSchoolPoints()'s
+        // whereNotNull('results_published_at') gate) — real per-item publishing always
+        // happens before the phase-level publish this fixture goes on to call, so this
+        // matches the real order of operations rather than being a test-only shortcut.
+        FestEventItem::where('id', $registration->item_id)->update(['results_published_at' => now()]);
 
         return $registration;
     }

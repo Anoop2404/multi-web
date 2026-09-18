@@ -195,14 +195,38 @@ class EventContext
     public function scoreboardByPhase(int $phaseId, ?string $category = null): array
     {
         $gradePointService = app(FestGradePointService::class);
+        $categoryColumn = $this->event->event_type === 'sports' ? 'age_group' : 'class_group';
+        // Only the combined "All Categories" total (no specific $category requested)
+        // honors excluded_overall_categories — same rule as scoreboardBySchoolForEvent()'s
+        // snapshot (recalculateSchoolPoints()) and provisionalScoreboard(): a category's
+        // own board still counts its points, only the combined phase/cumulative total
+        // skips it. This is the phased-event path (FestPhaseScoreboardService ->
+        // phaseScoreboard()/cumulativeOverall()), which previously never checked the
+        // exclusion at all — a phased event's public School-wise total ignored an
+        // admin's configured exclusions entirely, unlike a non-phased event's.
+        $excludedCategories = $category ? [] : FestOverallCategoryExclusion::excluded($this->event->rootEvent());
 
         // Same dedupe as scoreboardByCategory() above — one FestMark per teammate on
         // pair/group items must not multiply a team's points by its squad size.
+        //
+        // Also, unlike scoreboardByCategory() above, this filters to items that have
+        // actually published their own results (and aren't later explicitly hidden) —
+        // mirrors the fix already applied to PublicFestScoreboardService::scoreboard()'s
+        // category branch (the "item only counts once its own results have been
+        // published" comment there) and recalculateSchoolPoints() below, which this
+        // phased-event path never got: a phased event's public School-wise total was
+        // silently including marks from items nobody had published yet, or that were
+        // later hidden, the moment the phase itself was marked published.
         $marks = FestMark::where('event_id', $this->event->id)
-            ->whereHas('item', function ($q) use ($phaseId, $category) {
-                $q->where('phase_id', $phaseId);
+            ->whereHas('item', function ($q) use ($phaseId, $category, $categoryColumn, $excludedCategories) {
+                $q->where('phase_id', $phaseId)
+                    ->whereNotNull('results_published_at')
+                    ->where('results_hidden', false);
                 if ($category) {
-                    $q->where($this->event->event_type === 'sports' ? 'age_group' : 'class_group', $category);
+                    $q->where($categoryColumn, $category);
+                }
+                if ($excludedCategories) {
+                    $q->whereNotIn($categoryColumn, $excludedCategories);
                 }
             })
             ->with(['participant.registration', 'item'])
