@@ -213,7 +213,7 @@ class FestIndividualChampionshipService
         // needs the same publish discipline that button's manual timing used to provide.
         FestMark::where('event_id', $event->id)
             ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
-            ->with(['participant.student', 'participant.registration.item'])
+            ->with(['item', 'participant.student', 'participant.registration.item'])
             ->each(function (FestMark $mark) use ($event, $categoryMap, &$aggregated) {
                 $student = $mark->participant?->student;
                 if (! $student) {
