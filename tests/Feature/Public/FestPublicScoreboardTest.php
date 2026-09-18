@@ -891,6 +891,29 @@ class FestPublicScoreboardTest extends TestCase
         $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
     }
 
+    /**
+     * schoolMedalTally() (feeds /live's combined board) never checked
+     * excluded_overall_categories at all — an excluded category's podium finish still
+     * counted in gold/silver/bronze even though that same combined board's Total Points
+     * correctly left it out.
+     */
+    public function test_live_medal_tally_excludes_an_admin_excluded_category(): void
+    {
+        $this->hub->update(['aggregation_config' => array_merge(
+            $this->hub->aggregation_config ?? [],
+            ['excluded_overall_categories' => ['hs']],
+        )]);
+
+        $this->markCategoryWinner($this->north, $this->northSchool, 'Excluded HS Winner');
+
+        $response = $this->getJson("http://public-scoreboard.test/fest/{$this->north->id}/live/data");
+
+        $response->assertOk();
+        $row = collect($response->json('scoreboard'))->firstWhere('school_id', $this->northSchool->id);
+        $this->assertNotNull($row, 'North Star School must still appear on the combined board.');
+        $this->assertSame(0, $row['gold'], 'The excluded category\'s gold finish must not be tallied.');
+    }
+
     public function test_unpublished_child_does_not_leak_when_hub_is_published(): void
     {
         $this->north->update(['results_published' => false, 'status' => 'ongoing']);
@@ -1206,6 +1229,54 @@ class FestPublicScoreboardTest extends TestCase
         $row = substr($html, strpos($html, 'Cross Phase School'));
         $this->assertMatchesRegularExpression('/text-amber-300 text-sm">10</', $row);
         $this->assertMatchesRegularExpression('/text-sky-300 text-sm">0</', $row);
+    }
+
+    /**
+     * tv()'s per-category medal tally filtered $marks with a plain `=== $key` equality
+     * on class_group, never expanding a merge TARGET (aggregation_config.
+     * championship_category_map) back to its source categories via FestCategoryMerge::
+     * sourceKeysFor() — so a merged-away source category's medal never showed up in the
+     * merge target's own board, even though that board's Total Points (from
+     * resolveScoreboard()) already correctly folded it in.
+     */
+    public function test_tv_medal_tally_includes_a_merged_source_categorys_medal(): void
+    {
+        $this->hub->update(['aggregation_config' => array_merge(
+            $this->hub->aggregation_config ?? [],
+            ['championship_category_map' => ['category_5' => 'category_3']],
+        )]);
+
+        $item = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'Merged Source Item', 'category' => 'literary',
+            'class_group' => 'category_5', 'participant_type' => 'individual', 'is_enabled' => true,
+            'results_published_at' => now(),
+        ]);
+        $registration = FestRegistration::create([
+            'event_id' => $this->north->id, 'item_id' => $item->id,
+            'school_id' => $this->northSchool->id, 'status' => 'approved',
+        ]);
+        $participant = FestParticipant::create([
+            'registration_id' => $registration->id, 'event_id' => $this->north->id, 'participant_type' => 'student',
+        ]);
+        FestMark::create([
+            'event_id' => $this->north->id, 'item_id' => $item->id, 'participant_id' => $participant->id,
+            'grade' => 'A', 'position' => 1, 'score' => 90,
+        ]);
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/tv");
+        $html = $response->getContent();
+
+        $response->assertOk();
+
+        // North Star School appears on the Overall board first, then the (only)
+        // category board — 'category_5' collapses into 'category_3', so there is
+        // exactly one category board, which is the merge target's own. The LAST
+        // occurrence isolates that category board's row.
+        $row = substr($html, strrpos($html, 'North Star School'));
+        $this->assertDoesNotMatchRegularExpression(
+            '/text-amber-300 text-sm">0</', $row,
+            "The merged source category's gold medal must count toward the target category's own board."
+        );
     }
 
     /**

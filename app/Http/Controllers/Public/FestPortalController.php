@@ -510,8 +510,18 @@ class FestPortalController extends Controller
         // registration first — pair/group items save one FestMark per teammate, so an
         // 11-person choir's single silver would otherwise tally as 11 silvers for its
         // school (same root cause as the scoring-dedup note on EventContext).
+        //
+        // This only ever feeds $schoolBoard (the combined "All Categories" board) —
+        // $categoryBoards above already gets its own rows straight from
+        // resolveScoreboard(), unaffected by this — so it must honor
+        // excluded_overall_categories the same way that combined total does, or an
+        // excluded category's podium finishes would still show up in gold/silver/bronze
+        // next to a Total Points that correctly leaves them out.
+        $excludedCategoriesForMedals = FestOverallCategoryExclusion::excluded($event->rootEvent());
         $medalTally = $marks
             ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
+            ->filter(fn (FestMark $m) => ! $excludedCategoriesForMedals
+                || ! in_array(FestOverallCategoryExclusion::categoryKeyForItem($event, $m->item), $excludedCategoriesForMedals, true))
             ->unique(fn (FestMark $m) => $m->deduplicationKey())
             ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
             ->map(fn ($group) => [
@@ -1099,10 +1109,19 @@ public function tv(Request $request, int $eventId)
             $overallScoreboard = $crossPhaseOverall;
         }
     }
-    $overallBoard = $withMedals($overallScoreboard, $medalTallyFor($marks));
+    // Same "only the combined total honors this" rule as everywhere else
+    // excluded_overall_categories is checked — the overall board's medal columns must
+    // leave an excluded category's podium finishes out too, or gold/silver/bronze would
+    // sum to more than the (correctly-excluding) Total Points next to them.
+    $root = $event->rootEvent();
+    $excludedCategories = FestOverallCategoryExclusion::excluded($root);
+    $overallMedalMarks = $excludedCategories
+        ? $marks->filter(fn (FestMark $m) => ! in_array(FestOverallCategoryExclusion::categoryKeyForItem($event, $m->item), $excludedCategories, true))
+        : $marks;
+    $overallBoard = $withMedals($overallScoreboard, $medalTallyFor($overallMedalMarks));
 
     $categoryBoards = collect($categories)
-        ->map(function (string $key) use ($event, $selectedScope, $isPublished, $isAdminPreview, $marks, $categoryColumn, $withMedals, $medalTallyFor, $request) {
+        ->map(function (string $key) use ($event, $root, $selectedScope, $isPublished, $isAdminPreview, $marks, $categoryColumn, $withMedals, $medalTallyFor, $request) {
             [$scoreboard, $cumulativeStanding] = $this->resolveScoreboard($event, $selectedScope, $key, $isPublished, $isAdminPreview);
             if ($cumulativeStanding === null) {
                 $crossPhaseBoard = $this->crossPhaseScoreboard($event, $key, $request);
@@ -1111,12 +1130,21 @@ public function tv(Request $request, int $eventId)
                 }
             }
 
+            // $key may itself be a merge TARGET (aggregation_config.
+            // championship_category_map) — expand it back to every raw category that
+            // now counts toward it, same as PublicFestScoreboardService::scoreboard()'s
+            // category branch. A plain `=== $key` equality here left a merged source
+            // category's podium points out of the target category's own medal columns,
+            // even though that board's Total Points (from resolveScoreboard) already
+            // correctly folds them together.
+            $sourceKeys = FestCategoryMerge::sourceKeysFor($root, $key);
+
             return [
                 'key' => $key,
                 'label' => $this->scoreboards->categoryLabel($event, $key),
                 'rows' => $withMedals(
                     $scoreboard,
-                    $medalTallyFor($marks->filter(fn (FestMark $m) => ($m->item?->{$categoryColumn}) === $key))
+                    $medalTallyFor($marks->filter(fn (FestMark $m) => in_array($m->item?->{$categoryColumn}, $sourceKeys, true)))
                 ),
             ];
         })
@@ -1368,7 +1396,7 @@ public function tv(Request $request, int $eventId)
                 $cumulativeStanding !== null => $this->cumulativeChampionshipEventIds($event) ?? $selectedScope['event_ids'],
                 default => $this->crossPhaseVisibleEventIds($event, $request) ?? $selectedScope['event_ids'],
             };
-            $medalTally = $this->schoolMedalTally($medalEventIds);
+            $medalTally = $this->schoolMedalTally($event, $medalEventIds);
             $scoreboard = collect($rawScoreboard)
                 ->map(fn (array $row) => $row + [
                     'gold' => $medalTally[$row['school_id']]['gold'] ?? 0,
@@ -1480,10 +1508,16 @@ public function tv(Request $request, int $eventId)
      * Gold/silver/bronze win-counts per school, keyed by school_id — same source marks
      * tv() uses for its medal columns (top-3 marks, scoped to published items), pulled
      * out here so livePayload() can show the same breakdown without duplicating the
-     * query inline a second time.
+     * query inline a second time. Always feeds the combined "All Categories" board (the
+     * only board /live shows), so it honors excluded_overall_categories the same way
+     * that combined total already does — without this, an excluded category's podium
+     * finishes still showed up in gold/silver/bronze next to a Total Points that
+     * correctly left them out.
      */
-    private function schoolMedalTally(array $eventIds): Collection
+    private function schoolMedalTally(FestEvent $event, array $eventIds): Collection
     {
+        $excludedCategories = FestOverallCategoryExclusion::excluded($event->rootEvent());
+
         return FestMark::whereIn('event_id', $eventIds)
             ->whereIn('position', [1, 2, 3])
             ->with(['participant.registration.item', 'item'])
@@ -1493,6 +1527,8 @@ public function tv(Request $request, int $eventId)
             ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
             ->get()
             ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
+            ->filter(fn (FestMark $m) => ! $excludedCategories
+                || ! in_array(FestOverallCategoryExclusion::categoryKeyForItem($event, $m->item), $excludedCategories, true))
             ->unique(fn (FestMark $m) => $m->deduplicationKey())
             ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
             ->map(fn ($group) => [
