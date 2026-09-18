@@ -36,11 +36,16 @@
                 @endif
             </div>
             <div class="min-w-0 flex-1">
-                {{-- Capped at 4 columns (not auto-fill) so a large team wraps into more
-                     rows rather than stretching this card wider — keeps 3 simultaneous
-                     winning positions (each its own team) from squeezing each other off
-                     the visible canvas. --}}
-                <div class="grid grid-cols-4 gap-3">
+                {{-- auto-fill, not a fixed column count: a fixed grid-cols-4 computes each
+                     track as (available width / 4) regardless of how narrow that leaves
+                     it — with 3 winning positions (each its own team) squeezed side by
+                     side, that track can end up narrower than a tile's own fixed w-24,
+                     so tiles/names overflow their track and overlap the next one into an
+                     unreadable mess. auto-fill instead always gives every column at least
+                     minmax's 96px floor, reducing the column COUNT (wrapping to more
+                     rows) rather than shrinking columns below that floor — it can never
+                     overlap, only take more vertical space. --}}
+                <div class="grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-3">
                     @foreach($visibleRoster as $member)
                     <div class="flex flex-col items-center gap-1.5 w-24">
                         @if($member['photo'] ?? null)
