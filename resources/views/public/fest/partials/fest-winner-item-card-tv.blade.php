@@ -49,21 +49,29 @@
                 {{-- auto-fill, not a fixed column count: a fixed grid-cols-4 computes each
                      track as (available width / 4) regardless of how narrow that leaves
                      it — with 3 winning positions (each its own team) squeezed side by
-                     side, that track can end up narrower than a tile's own fixed w-24,
-                     so tiles/names overflow their track and overlap the next one into an
-                     unreadable mess. auto-fill instead always gives every column at least
-                     minmax's 96px floor, reducing the column COUNT (wrapping to more
-                     rows) rather than shrinking columns below that floor — it can never
-                     overlap, only take more vertical space. --}}
-                <div class="grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-3">
+                     side, that track can end up narrower than a tile — auto-fill instead
+                     always gives every column at least minmax's floor, reducing the
+                     column COUNT (wrapping to more rows) rather than shrinking columns
+                     below it.
+                     That floor MUST be in the same unit (rem) as the tile's own w-24
+                     below, not a hardcoded px value — this page's root font-size is
+                     scaled up for venue-distance legibility (see layouts/public-event-
+                     tv.blade.php), so w-24 (6rem) renders at 156px here, not the 96px a
+                     plain "96px" floor assumed. A px floor smaller than the tile's real
+                     rem-based width let tiles render wider than their own grid track,
+                     visually spilling each name into the next tile's space (rendered as
+                     "INIKA JOEEPHERTEENA" on screen) — the grid math itself was correct,
+                     the two sizes just disagreed once root font-size entered the
+                     picture. --}}
+                <div class="grid grid-cols-[repeat(auto-fill,minmax(6rem,1fr))] gap-3">
                     @foreach($roster as $member)
-                    <div class="flex flex-col items-center gap-1.5 w-24">
+                    <div class="flex flex-col items-center gap-1.5 w-24 min-w-0">
                         @if($member['photo'] ?? null)
                         <img src="{{ $member['photo'] }}" alt="" class="w-24 h-24 rounded-xl object-cover object-top border-2 border-slate-700/60 shadow-md shadow-black/30">
                         @else
                         <span class="w-24 h-24 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold text-2xl border-2 border-slate-700/60 shadow-md shadow-black/30">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
                         @endif
-                        <span class="text-base font-semibold leading-tight text-white/90 text-center uppercase break-words">{{ $member['name'] ?? '—' }}</span>
+                        <span class="text-base font-semibold leading-tight text-white/90 text-center uppercase break-words w-full">{{ $member['name'] ?? '—' }}</span>
                     </div>
                     @endforeach
                 </div>
