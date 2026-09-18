@@ -990,7 +990,10 @@ public function tv(Request $request, int $eventId)
     $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
     $isPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
 
-    abort_unless($isPublished || $this->hasPublishedItems($selectedScope['event_ids']), 403, 'Public scoreboard is disabled for this event.');
+    // Unlike results()/itemResults()/scoreboard(), the TV board is meant to run
+    // continuously at the venue regardless of publish state — it already has a
+    // graceful "nothing published yet" fallback (the schools-only roster further
+    // below) instead of needing to be blocked off, so it never 403s here.
     $categories = $this->scoreboards->categories($event, $selectedScope);
 
     $marks = FestMark::whereIn('event_id', $selectedScope['event_ids'])

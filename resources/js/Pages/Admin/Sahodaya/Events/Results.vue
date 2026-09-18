@@ -77,7 +77,15 @@
 
                     <div class="flex flex-wrap gap-2">
                         <Link :href="marksUrl(selectedItem ?? item)" class="btn-secondary text-sm">Edit marks</Link>
-                        <a v-if="selectedItem" :href="downloadResultsUrl(selectedItem)" target="_blank" class="btn-secondary text-sm">⬇️ Download results (rank order)</a>
+                        <span v-if="selectedItem" class="inline-flex rounded-lg overflow-hidden border border-slate-300">
+                            <a :href="downloadResultsUrl(selectedItem)" target="_blank" class="px-3 py-2 text-sm bg-white hover:bg-slate-50 text-slate-700">⬇️ Download results</a>
+                            <a :href="downloadResultsUrl(selectedItem, true)" target="_blank" class="px-3 py-2 text-sm bg-white hover:bg-slate-50 text-slate-500 border-l border-slate-300" title="Preview in browser">👁️</a>
+                        </span>
+                        <span v-if="selectedItem" class="inline-flex rounded-lg overflow-hidden border border-amber-300">
+                            <a :href="downloadWinnersUrl(selectedItem)" target="_blank" class="px-3 py-2 text-sm bg-amber-50 hover:bg-amber-100 text-amber-900 font-medium">🏆 Winner sheet (Top 3)</a>
+                            <a :href="downloadWinnersUrl(selectedItem, true)" target="_blank" class="px-3 py-2 text-sm bg-amber-50 hover:bg-amber-100 text-amber-700 border-l border-amber-300" title="Preview in browser">👁️</a>
+                        </span>
+                        <a v-if="selectedItem" :href="downloadWinnersUrl(selectedItem, false, true)" target="_blank" class="btn-secondary text-sm" title="Printable blank sheet for judges to fill in by hand before marks are entered">📝 Blank winner sheet</a>
                         <button v-if="selectedItem && !selectedItem.results_published && selectedItem.marks_ready"
                                 type="button"
                                 class="btn-primary text-sm"
@@ -486,9 +494,18 @@ function marksUrl(row) {
     return `${props.marksBaseUrl}?${q.toString()}`;
 }
 
-function downloadResultsUrl(row) {
+function downloadResultsUrl(row, preview = false) {
     const itemId = row?.item_id ?? row?.id;
-    return `${props.resultsBaseUrl}/items/${itemId}/download`;
+    return `${props.resultsBaseUrl}/items/${itemId}/download${preview ? '?preview=1' : ''}`;
+}
+
+function downloadWinnersUrl(row, preview = false, blank = false) {
+    const itemId = row?.item_id ?? row?.id;
+    const q = new URLSearchParams();
+    if (preview) q.set('preview', '1');
+    if (blank) q.set('blank', '1');
+    const qs = q.toString();
+    return `${props.resultsBaseUrl}/items/${itemId}/winners${qs ? `?${qs}` : ''}`;
 }
 
 function formatWindow(row) {

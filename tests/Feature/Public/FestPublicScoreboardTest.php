@@ -997,6 +997,43 @@ class FestPublicScoreboardTest extends TestCase
         $this->assertSame(2, substr_count($html, '<section data-tv-slide'));
     }
 
+    /**
+     * The TV board is meant to run continuously at the venue, unlike results()/
+     * itemResults()/scoreboard() which stay 403'd until something is published — it
+     * already had a graceful "nothing published yet" fallback (a schools-only roster)
+     * built for exactly this case, so gating it behind publish status on top of that
+     * only broke the venue display for no benefit.
+     */
+    public function test_tv_screen_never_403s_even_when_nothing_is_published_yet(): void
+    {
+        $freshEvent = FestEvent::create([
+            'tenant_id' => $this->sahodaya->id,
+            'title' => 'Fresh Unpublished Fest',
+            'event_type' => 'kalotsav',
+            'status' => 'ongoing',
+            'schedule_published' => true,
+            'results_published' => false,
+        ]);
+
+        $school = $this->school('Unpublished Fest School');
+        $item = FestEventItem::create([
+            'event_id' => $freshEvent->id,
+            'title' => 'Solo Song',
+            'participant_type' => 'individual',
+            'is_enabled' => true,
+        ]);
+        FestRegistration::create([
+            'event_id' => $freshEvent->id,
+            'item_id' => $item->id,
+            'school_id' => $school->id,
+            'status' => 'approved',
+        ]);
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$freshEvent->id}/tv");
+
+        $response->assertOk()->assertSee('Participating Schools');
+    }
+
     private function school(string $name): Tenant
     {
         return Tenant::create([

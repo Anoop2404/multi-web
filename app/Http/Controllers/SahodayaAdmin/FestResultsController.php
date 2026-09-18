@@ -139,6 +139,73 @@ class FestResultsController extends SahodayaAdminController
         return \App\Support\PdfGenerator::download($html, $filename, $preview);
     }
 
+    /**
+     * Top-3 "winner sheet" for one item, as a PDF — same underlying rows as
+     * downloadItemResults() (so it works pre-publish, scoped to whatever item is open),
+     * filtered down to rows with a judge-entered position of 1st/2nd/3rd. Ties (two
+     * participants both marked position 2, say) are kept, since both genuinely hold
+     * that rank; items with no position entered at all (grade-only marking) yield an
+     * empty sheet rather than guessing a rank from grade.
+     *
+     * ?blank=1 skips the participant lookup entirely and renders 3 empty rank rows with
+     * hand-writable blank cells instead — for printing before the event, so judges can
+     * pencil in the winners on paper at the venue ahead of any mark entry.
+     */
+    public function downloadItemWinners(Request $request, string $tenantId, FestEvent $event, FestEventItem $item)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($item->event_id !== $event->id, 404);
+
+        $event = $this->regionAwareTargetEvent($request, $event);
+
+        $blank = $request->boolean('blank');
+        $rows = [];
+        if (! $blank) {
+            $rows = app(FestItemResultsService::class)->resultRowsForItem($event, $item->id);
+            $rows = array_values(array_filter($rows, fn ($row) => in_array($row['position'] ?? null, [1, 2, 3], true)));
+            usort($rows, fn ($a, $b) => $a['position'] <=> $b['position']);
+        }
+
+        $itemCategory = null;
+        if ($item->class_group && $item->class_group !== 'open') {
+            $itemCategory = \App\Support\FestClassGroupScheme::resolveItemLabel(
+                \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent()),
+                $item->class_group,
+            );
+        }
+
+        $html = view('fest.reports.item-winners', [
+            'event'        => $event,
+            'item'         => $item,
+            'itemCategory' => $itemCategory,
+            'rows'         => $rows,
+            'blank'        => $blank,
+            'orgName'      => $this->sahodaya->name,
+            'logoSrc'      => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+            'medalSrcs'    => [1 => $this->medalEmbedSrc(1), 2 => $this->medalEmbedSrc(2), 3 => $this->medalEmbedSrc(3)],
+        ])->render();
+
+        $filename = str($event->title.'-'.$item->title)->slug()->limit(60)->toString().($blank ? '-winners-blank.pdf' : '-winners.pdf');
+        $preview = $request->boolean('preview') || $request->boolean('inline');
+
+        return \App\Support\PdfGenerator::download($html, $filename, $preview);
+    }
+
+    /**
+     * Base64 data URI for a rank-1/2/3 medal image — dompdf (the PDF backend used here)
+     * often refuses a bare local file path under its chroot check, so images need to be
+     * embedded inline the same way TenantBranding::logoEmbedSrc() does for the org logo.
+     */
+    private function medalEmbedSrc(int $rank): ?string
+    {
+        $path = public_path("images/fest/medals/rank-{$rank}.webp");
+        if (! is_file($path)) {
+            return null;
+        }
+
+        return 'data:image/webp;base64,'.base64_encode((string) file_get_contents($path));
+    }
+
     /** @param list<array<string, mixed>> $groups */
     private function enrichHeadGroupsWithPublishStatus(array $groups, Collection $summaryByItem): array
     {
