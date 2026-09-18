@@ -181,7 +181,15 @@ class FestCumulativeChampionshipService
             ]);
 
         $column = $root->event_type === 'sports' ? 'age_group' : 'class_group';
+        // The 'overall' row above already inherits recalculateSchoolPoints()'s own
+        // publish-status gate via the FestResult snapshot it reuses; this loop builds
+        // the PER-CATEGORY breakdown separately (championship_category_key != 'overall'),
+        // read whenever a specific category is requested (publicStanding($category)) —
+        // it needs the same gate applied directly, or an item nobody had individually
+        // published results for yet (or one later hidden) would still contribute to that
+        // category's own locked/cumulative standing.
         $marks = FestMark::where('event_id', $event->id)
+            ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
             ->with(['item', 'participant.registration.item'])
             ->get()->unique(fn (FestMark $mark) => $mark->deduplicationKey());
         $appealPoolIds = Tenant::appealPoolSchoolIds();

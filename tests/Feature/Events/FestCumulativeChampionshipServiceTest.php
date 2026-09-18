@@ -234,5 +234,11 @@ class FestCumulativeChampionshipServiceTest extends TestCase
             'position' => 1,
             'score' => 80,
         ]);
+
+        // A mark only counts toward the championship-category breakdown once its own
+        // item has published results (eventContributionRows()'s
+        // whereNotNull('results_published_at') gate) — matches the real order of
+        // operations, same as FestPhaseAdvancementAndRegressionTest's own fixture fix.
+        $item->update(['results_published_at' => now()]);
     }
 }

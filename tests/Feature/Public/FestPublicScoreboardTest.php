@@ -425,6 +425,47 @@ class FestPublicScoreboardTest extends TestCase
         $response->assertSee('id="school-roster-load"', false);
     }
 
+    /**
+     * schoolResultsRoster() already excluded unpublished/hidden items but never checked
+     * aggregation_config.excluded_overall_categories at all -- an admin-excluded category
+     * still leaked onto a school's own roster page (and into its point total there), even
+     * though the main scoreboard's combined total already correctly left it out.
+     */
+    public function test_school_detail_page_roster_and_total_exclude_an_admin_excluded_category(): void
+    {
+        $this->hub->update(['aggregation_config' => array_merge(
+            $this->hub->aggregation_config ?? [],
+            ['excluded_overall_categories' => ['hs']],
+        )]);
+
+        // 'hs' -- excluded -- must not appear on the roster or count toward the total.
+        $this->markCategoryWinner($this->north, $this->northSchool, 'Excluded HS Item');
+
+        // 'lp' -- not excluded -- must still show and count normally.
+        $lpItem = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'Included LP Item', 'category' => 'literary',
+            'class_group' => 'lp', 'participant_type' => 'individual', 'is_enabled' => true,
+            'results_published_at' => now(),
+        ]);
+        $registration = FestRegistration::create([
+            'event_id' => $this->north->id, 'item_id' => $lpItem->id,
+            'school_id' => $this->northSchool->id, 'status' => 'approved',
+        ]);
+        $participant = FestParticipant::create([
+            'registration_id' => $registration->id, 'event_id' => $this->north->id, 'participant_type' => 'student',
+        ]);
+        FestMark::create([
+            'event_id' => $this->north->id, 'item_id' => $lpItem->id, 'participant_id' => $participant->id,
+            'grade' => 'A', 'position' => 1, 'score' => 80,
+        ]);
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results/schools/{$this->northSchool->id}");
+
+        $response->assertOk();
+        $response->assertSee('Included LP Item');
+        $response->assertDontSee('Excluded HS Item');
+    }
+
     public function test_school_detail_page_404s_for_a_school_with_no_results(): void
     {
         $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results/schools/{$this->southSchool->id}");

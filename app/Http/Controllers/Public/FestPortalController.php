@@ -29,6 +29,7 @@ use App\Services\Events\PublicFestScoreboardService;
 use App\Services\Events\PublicOperationalEventService;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestItemCategoryLabel;
+use App\Support\FestOverallCategoryExclusion;
 use App\Support\TenantBranding;
 use App\Support\TenantStorage;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -681,6 +682,13 @@ class FestPortalController extends Controller
     {
         $categoryColumn = $event->event_type === 'sports' ? 'age_group' : 'class_group';
         $participantTypeLabels = ['pair' => 'Pair', 'trio' => 'Trio', 'group' => 'Group', 'team' => 'Team'];
+        // Only the full cross-category roster (no specific $category requested) honors
+        // excluded_overall_categories — same rule as everywhere else this exclusion is
+        // checked: a category's own filtered view still shows its own items, only the
+        // combined roster/total skips it. Without this, a school's excluded-category
+        // items (and their points, via $rosterTotalPoints below) still leaked onto this
+        // page even though the main scoreboard's combined total already left them out.
+        $excludedCategories = $category ? [] : FestOverallCategoryExclusion::excluded($event->rootEvent());
 
         // Deliberately a separate query from results()'s own $marks (which stays
         // top-3-only — it also feeds the item/individual/medal-tally tabs, where
@@ -701,6 +709,7 @@ class FestPortalController extends Controller
             // scoreboard — narrows the roster to that one category instead of the
             // school's full cross-category report.
             ->when($category, fn ($query) => $query->whereHas('item', fn ($q) => $q->where($categoryColumn, $category)))
+            ->when($excludedCategories, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotIn($categoryColumn, $excludedCategories)))
             ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school'])
             ->get();
 
