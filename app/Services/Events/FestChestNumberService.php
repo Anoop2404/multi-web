@@ -148,7 +148,16 @@ class FestChestNumberService
                 throw ValidationException::withMessages(['chest_no' => "Chest number {$chestNo} is already in use."]);
             }
 
-            $group->update(['chest_no' => $chestNo]);
+            try {
+                $group->update(['chest_no' => $chestNo]);
+            } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+                // The exists() check above has a genuine TOCTOU gap — two admins (or one
+                // admin double-submitting) assigning the same number to two different
+                // squads within the same instant can both pass it before either commits.
+                // The DB's own unique constraint is the real backstop; this just turns its
+                // raw 500 into the same friendly message the pre-check already gives.
+                throw ValidationException::withMessages(['chest_no' => "Chest number {$chestNo} is already in use."]);
+            }
 
             return;
         }
@@ -189,7 +198,19 @@ class FestChestNumberService
             $query->where('id', $participant->id);
         }
 
-        $query->update(['event_id' => $eventId, 'chest_head_id' => $headScope, 'chest_no' => $chestNo]);
+        try {
+            $query->update(['event_id' => $eventId, 'chest_head_id' => $headScope, 'chest_no' => $chestNo]);
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            // Same TOCTOU gap as the group branch above: the exists() check at line 162
+            // and this write aren't atomic, so two near-simultaneous assignments of the
+            // same number can both pass the check before either commits — the second to
+            // actually write trips fest_participants_event_head_chest_unique. Convert the
+            // DB's own 500 into the same validation message the pre-check already
+            // produces for the (much more common) non-race case, instead of an admin
+            // seeing a raw Internal Server Error page for what is, from their side, just
+            // "that number's taken."
+            throw ValidationException::withMessages(['chest_no' => "Chest number {$chestNo} is already in use."]);
+        }
     }
 
     public function clearChest(FestParticipant $participant): void
