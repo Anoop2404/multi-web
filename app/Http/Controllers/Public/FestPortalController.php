@@ -1014,7 +1014,16 @@ public function tv(Request $request, int $eventId)
     // below) instead of needing to be blocked off, so it never 403s here.
     $categories = $this->scoreboards->categories($event, $selectedScope);
 
-    $marks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
+    // When this event's hub has other phases visible too, the boards below show each
+    // school's CROSS-PHASE combined total_points (see crossPhaseScoreboard()) — the
+    // medal tally must be scoped to those same combined events, or a medal earned in a
+    // different phase silently drops out of gold/silver/bronze and gets swept into the
+    // catch-all "Grade" column instead (grade_points = total - gold - silver - bronze),
+    // even though the total itself correctly includes it. Falls back to just this
+    // event's own scope when there's no phase combining to do.
+    $crossPhaseEventIds = $this->crossPhaseVisibleEventIds($event, $request);
+
+    $marks = FestMark::whereIn('event_id', $crossPhaseEventIds ?? $selectedScope['event_ids'])
         ->whereIn('position', [1, 2, 3])
         ->with(['item', 'participant.registration.school'])
         // Unconditional, regardless of $isPublished: an item's own results_published_at
@@ -1550,6 +1559,39 @@ public function tv(Request $request, int $eventId)
         }
 
         return $rows;
+    }
+
+    /**
+     * The event_ids of every leaf across every VISIBLE phase of $event's hub — the same
+     * phase/leaf-visibility gating crossPhaseScoreboard() uses to decide whether to sum
+     * points across phases, exposed separately so callers that need to scope a raw
+     * FestMark/FestRegistration query (rather than a pre-aggregated scoreboard) can stay
+     * consistent with whatever total crossPhaseScoreboard() is showing. Returns null on
+     * the same conditions crossPhaseScoreboard() would return null (no phases, or none
+     * visible) — callers should fall back to their own single-event scope in that case.
+     *
+     * @return list<int>|null
+     */
+    private function crossPhaseVisibleEventIds(FestEvent $event, Request $request): ?array
+    {
+        $hub = $event->rootEvent();
+        $phases = FestEventPhase::where('event_id', $hub->id)->get();
+        if ($phases->isEmpty()) {
+            return null;
+        }
+
+        $eventIds = [];
+        foreach ($phases as $phase) {
+            $leaves = FestEvent::where('parent_event_id', $hub->id)->where('source_phase_id', $phase->id)->get();
+            $visibleLeaves = $leaves->filter(fn (FestEvent $leaf) => $this->operationalEvents->directScope($leaf)['results_published']
+                || $this->isAuthorizedAdminPreview($request, $leaf));
+
+            foreach ($visibleLeaves as $leaf) {
+                $eventIds[] = $leaf->id;
+            }
+        }
+
+        return $eventIds ?: null;
     }
 
     private function scoreboardDynamicData(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished, bool $isAdminPreview = false, ?Request $request = null): array

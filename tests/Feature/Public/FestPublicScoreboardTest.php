@@ -4,6 +4,7 @@ namespace Tests\Feature\Public;
 
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
+use App\Models\FestEventPhase;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
@@ -1058,6 +1059,65 @@ class FestPublicScoreboardTest extends TestCase
         $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}");
 
         $response->assertOk()->assertSeeInOrder(['Zzz Published Item', 'Aaa Unpublished Item']);
+    }
+
+    /**
+     * Regression test for a real production bug: when a phase's leaf event's TV board
+     * shows the CROSS-PHASE combined total (via crossPhaseScoreboard(), once another
+     * phase becomes publicly visible too), the gold/silver/bronze medal tally used to
+     * stay scoped to only the CURRENT phase's own FestMark rows — so a medal earned in
+     * an earlier phase silently dropped out of the medal columns and got swept into the
+     * catch-all "Grade" column instead, even though total_points correctly included it.
+     */
+    public function test_tv_medal_tally_includes_medals_from_other_visible_phases_in_combined_total(): void
+    {
+        $hub = FestEvent::create([
+            'tenant_id' => $this->sahodaya->id, 'title' => 'Phased Kalotsav', 'event_type' => 'kalolsavam',
+            'status' => 'ongoing', 'schedule_published' => true,
+        ]);
+        $hubPhase1 = FestEventPhase::create(['event_id' => $hub->id, 'name' => 'Phase 1', 'code' => 'P1', 'sort_order' => 1]);
+        $hubPhase2 = FestEventPhase::create(['event_id' => $hub->id, 'name' => 'Phase 2', 'code' => 'P2', 'sort_order' => 2]);
+
+        $leaf1 = FestEvent::create([
+            'tenant_id' => $this->sahodaya->id, 'title' => 'Phased Kalotsav - Phase 1', 'event_type' => 'kalolsavam',
+            'parent_event_id' => $hub->id, 'source_phase_id' => $hubPhase1->id,
+            'status' => 'ongoing', 'schedule_published' => true, 'results_published' => true,
+        ]);
+        $leaf1Phase = FestEventPhase::create(['event_id' => $leaf1->id, 'source_phase_id' => $hubPhase1->id, 'name' => 'Phase 1', 'code' => 'P1', 'sort_order' => 1]);
+
+        $leaf2 = FestEvent::create([
+            'tenant_id' => $this->sahodaya->id, 'title' => 'Phased Kalotsav - Phase 2', 'event_type' => 'kalolsavam',
+            'parent_event_id' => $hub->id, 'source_phase_id' => $hubPhase2->id,
+            'status' => 'ongoing', 'schedule_published' => true, 'results_published' => true,
+        ]);
+        FestEventPhase::create(['event_id' => $leaf2->id, 'source_phase_id' => $hubPhase2->id, 'name' => 'Phase 2', 'code' => 'P2', 'sort_order' => 1]);
+
+        $school = $this->school('Cross Phase School');
+
+        // The school's only medal is earned in Phase 1 — a genuine 1st place, worth
+        // real gold points, not grade-only points.
+        $item = FestEventItem::create([
+            'event_id' => $leaf1->id, 'title' => 'Phase 1 Item', 'phase_id' => $leaf1Phase->id,
+            'category' => 'literary', 'class_group' => 'hs', 'participant_type' => 'individual',
+            'is_enabled' => true, 'results_published_at' => now(),
+        ]);
+        $registration = FestRegistration::create(['event_id' => $leaf1->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+        $participant = FestParticipant::create(['registration_id' => $registration->id, 'event_id' => $leaf1->id, 'participant_type' => 'student']);
+        FestMark::create(['event_id' => $leaf1->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'grade' => 'A', 'position' => 1, 'score' => 90]);
+
+        // View Phase 2's own TV screen — its combined "Overall Standings" board must
+        // show this school's Phase-1 gold medal, not fold it into "Grade".
+        $response = $this->get("http://public-scoreboard.test/fest/{$leaf2->id}/tv");
+        $html = $response->getContent();
+
+        $response->assertOk()->assertSee('Cross Phase School');
+
+        // Row order: rank badge, school name, gold, silver, bronze, grade, total —
+        // gold must carry the Phase 1 medal's points (10), not 0 with everything
+        // dumped into the grade column instead.
+        $row = substr($html, strpos($html, 'Cross Phase School'));
+        $this->assertMatchesRegularExpression('/text-amber-300 text-sm">10</', $row);
+        $this->assertMatchesRegularExpression('/text-sky-300 text-sm">0</', $row);
     }
 
     private function school(string $name): Tenant
