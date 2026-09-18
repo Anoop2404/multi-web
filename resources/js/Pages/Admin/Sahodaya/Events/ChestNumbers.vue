@@ -125,17 +125,7 @@
                                 <tr v-for="(p, idx) in participants" :key="p.id" class="border-t"
                                     :class="p.chest_no ? 'hover:bg-slate-50' : 'bg-amber-50/60 hover:bg-amber-50'">
                                     <td class="p-3 text-gray-500">{{ idx + 1 }}</td>
-                                    <td class="p-3 font-mono font-bold">
-                                        <div class="flex items-center gap-1">
-                                            <span>{{ p.chest_no ?? '—' }}</span>
-                                            <input type="number" min="1"
-                                                   v-model="chestEdits[p.id]"
-                                                   placeholder="set #"
-                                                   class="w-16 rounded border px-1 py-0.5 text-xs font-mono font-normal" />
-                                            <button v-if="chestEdits[p.id]" @click="saveChest(p.id)"
-                                                    class="text-emerald-600 text-xs font-normal">Set</button>
-                                        </div>
-                                    </td>
+                                    <td class="p-3 font-mono font-bold">{{ p.chest_no ?? '—' }}</td>
                                     <td class="p-3">
                                         <SearchableSelect :model-value="p.order_no ?? ''"
                                                 :options="orderOptionsFor(p.id).map((n) => ({ value: n, label: String(n) }))"
@@ -154,6 +144,7 @@
                                     <td class="p-3 text-xs" :class="p.reg_status === 'approved' ? 'text-emerald-700' : 'text-amber-700'">{{ p.reg_status }}</td>
                                     <td class="p-3 text-xs">{{ p.group ?? '—' }}</td>
                                     <td class="p-3 text-right whitespace-nowrap">
+                                        <button @click="promptSetChest(p)" class="text-emerald-700 text-xs mr-2">Set #</button>
                                         <button v-if="p.chest_no" @click="clearChest(p.id)" class="text-red-600 text-xs mr-2">Clear</button>
                                         <button v-if="event.chest_reveal_mode === 'stage_entry' && !p.chest_revealed_at" @click="reveal(p.id)"
                                                 class="text-indigo-600 text-xs">Reveal</button>
@@ -283,7 +274,7 @@ const csvUrl = computed(() =>
     props.selectedItemId ? `${base.value}/csv?item_id=${props.selectedItemId}` : `${base.value}/csv`,
 );
 
-const { confirm } = useConfirm();
+const { confirm, prompt } = useConfirm();
 const { showAlert } = useSweetAlert();
 
 // preserveState: true on every action below (bulk and per-row) so this component
@@ -362,20 +353,25 @@ function saveOrderNo(id, value) {
 }
 
 // Manual chest-number override, alongside the auto-assign buttons above — for matching
-// a number already printed on a badge, or any other one-off exception. Kept as a plain
-// per-row draft (not synced to p.chest_no) so a half-typed number never gets submitted
-// by accident; the backend (FestChestNumberService::setChest()) rejects a value already
-// held by someone else in the same chest-numbering scope.
-const chestEdits = reactive({});
-function saveChest(id) {
-    const raw = chestEdits[id];
-    const chestNo = Number(raw);
-    if (!raw || !Number.isInteger(chestNo) || chestNo < 1) return;
+// a number already printed on a badge, or any other one-off exception. Uses the shared
+// prompt() dialog rather than an always-on inline input in the table — a per-row input
+// box for every participant (sometimes hundreds) cluttered the CHEST column and, at the
+// width that column needs, clipped its own placeholder text.
+async function promptSetChest(participant) {
+    const value = await prompt({
+        title: 'Set chest number',
+        message: `${participant.name}${participant.school ? ' — ' + participant.school : ''}`,
+        inputLabel: 'Chest number',
+        inputPlaceholder: 'e.g. 105',
+        inputValue: participant.chest_no ? String(participant.chest_no) : '',
+    });
 
-    router.post(`${base.value}/${id}/set`, { chest_no: chestNo }, {
+    const chestNo = Number(value);
+    if (!value || !Number.isInteger(chestNo) || chestNo < 1) return;
+
+    router.post(`${base.value}/${participant.id}/set`, { chest_no: chestNo }, {
         preserveScroll: true,
         preserveState: true,
-        onSuccess: () => { delete chestEdits[id]; },
         onError: (errors) => {
             if (errors.chest_no) {
                 showAlert({ title: 'Could not set chest number', text: errors.chest_no, icon: 'error' });
