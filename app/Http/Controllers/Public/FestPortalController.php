@@ -1321,12 +1321,22 @@ public function tv(Request $request, int $eventId)
 
         $scoreboard = [];
         if ($isPublished) {
-            $rawScoreboard = $this->cumulativeChampionship->publicStanding($event)['rows']
+            $cumulativeStanding = $this->cumulativeChampionship->publicStanding($event);
+            $rawScoreboard = $cumulativeStanding['rows']
                 ?? ($selectedScope['results_published']
                     ? $this->scoreboards->scoreboard($event, $selectedScope)
                     : $this->scoreboards->provisionalScoreboard($event, $selectedScope));
 
-            $medalTally = $this->schoolMedalTally($selectedScope['event_ids']);
+            // Same class of bug as tv()'s $marks scoping: when publicStanding() returns a
+            // real cumulative-championship row, its total_points already carries forward
+            // every earlier phase's points (FestPhaseScoreSnapshot.opening_points) — the
+            // medal tally needs the same combined scope, or an earlier phase's medal
+            // silently disappears from gold/silver/bronze here even though it's still
+            // counted in the total.
+            $medalEventIds = $cumulativeStanding !== null
+                ? ($this->cumulativeChampionshipEventIds($event) ?? $selectedScope['event_ids'])
+                : $selectedScope['event_ids'];
+            $medalTally = $this->schoolMedalTally($medalEventIds);
             $scoreboard = collect($rawScoreboard)
                 ->map(fn (array $row) => $row + [
                     'gold' => $medalTally[$row['school_id']]['gold'] ?? 0,
@@ -1587,6 +1597,46 @@ public function tv(Request $request, int $eventId)
                 || $this->isAuthorizedAdminPreview($request, $leaf));
 
             foreach ($visibleLeaves as $leaf) {
+                $eventIds[] = $leaf->id;
+            }
+        }
+
+        return $eventIds ?: null;
+    }
+
+    /**
+     * The event_ids of every leaf across every phase up to and including $event's own
+     * phase (by sort_order) — the scope that FestCumulativeChampionshipService's
+     * FestPhaseScoreSnapshot.closing_points was built from (opening_points carries
+     * every earlier phase's total forward; see FestCumulativeChampionshipService::
+     * publicStanding()'s row mapping). Unlike crossPhaseVisibleEventIds(), this
+     * deliberately does NOT re-check each leaf's own results_published — the snapshot
+     * is an already-computed admin artifact, not something recomputed live per
+     * request, so matching its own scope means including every phase it drew from
+     * regardless of that phase's current public-visibility flag. Returns null when
+     * $event isn't a phase leaf at all.
+     *
+     * @return list<int>|null
+     */
+    private function cumulativeChampionshipEventIds(FestEvent $event): ?array
+    {
+        if (! $event->parent_event_id || ! $event->source_phase_id) {
+            return null;
+        }
+
+        $currentPhase = FestEventPhase::find($event->source_phase_id);
+        if (! $currentPhase) {
+            return null;
+        }
+
+        $hub = $event->rootEvent();
+        $phasesUpToCurrent = FestEventPhase::where('event_id', $hub->id)
+            ->where('sort_order', '<=', $currentPhase->sort_order)
+            ->get();
+
+        $eventIds = [];
+        foreach ($phasesUpToCurrent as $phase) {
+            foreach (FestEvent::where('parent_event_id', $hub->id)->where('source_phase_id', $phase->id)->get() as $leaf) {
                 $eventIds[] = $leaf->id;
             }
         }

@@ -7,6 +7,7 @@ use App\Models\FestEventItem;
 use App\Models\FestEventPhase;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
+use App\Models\FestPhaseScoreSnapshot;
 use App\Models\FestRegistration;
 use App\Models\FestResult;
 use App\Models\SchoolClass;
@@ -1118,6 +1119,64 @@ class FestPublicScoreboardTest extends TestCase
         $row = substr($html, strpos($html, 'Cross Phase School'));
         $this->assertMatchesRegularExpression('/text-amber-300 text-sm">10</', $row);
         $this->assertMatchesRegularExpression('/text-sky-300 text-sm">0</', $row);
+    }
+
+    /**
+     * Same bug class as the TV regression test above, but for the /live page's
+     * cumulative-championship path (FestCumulativeChampionshipService::publicStanding(),
+     * a precomputed FestPhaseScoreSnapshot rather than crossPhaseScoreboard()'s live sum)
+     * — schoolMedalTally() stayed scoped to only the current phase's own marks even when
+     * the total_points shown already carries an earlier phase's points forward via
+     * opening_points, so an earlier-phase medal silently dropped out of gold/silver/bronze.
+     */
+    public function test_live_medal_tally_includes_medals_from_earlier_phase_in_cumulative_total(): void
+    {
+        $hub = FestEvent::create([
+            'tenant_id' => $this->sahodaya->id, 'title' => 'Phased Kalotsav Live', 'event_type' => 'kalolsavam',
+            'status' => 'ongoing', 'schedule_published' => true,
+        ]);
+        $hubPhase1 = FestEventPhase::create(['event_id' => $hub->id, 'name' => 'Phase 1', 'code' => 'P1', 'sort_order' => 1]);
+        $hubPhase2 = FestEventPhase::create(['event_id' => $hub->id, 'name' => 'Phase 2', 'code' => 'P2', 'sort_order' => 2]);
+
+        $leaf1 = FestEvent::create([
+            'tenant_id' => $this->sahodaya->id, 'title' => 'Phased Kalotsav Live - Phase 1', 'event_type' => 'kalolsavam',
+            'parent_event_id' => $hub->id, 'source_phase_id' => $hubPhase1->id,
+            'status' => 'ongoing', 'schedule_published' => true, 'results_published' => true,
+        ]);
+        $leaf2 = FestEvent::create([
+            'tenant_id' => $this->sahodaya->id, 'title' => 'Phased Kalotsav Live - Phase 2', 'event_type' => 'kalolsavam',
+            'parent_event_id' => $hub->id, 'source_phase_id' => $hubPhase2->id,
+            'status' => 'ongoing', 'schedule_published' => true, 'results_published' => true,
+        ]);
+
+        $school = $this->school('Cumulative Cross Phase School');
+
+        // The school's only medal is earned in Phase 1.
+        $item = FestEventItem::create([
+            'event_id' => $leaf1->id, 'title' => 'Phase 1 Item', 'category' => 'literary', 'class_group' => 'hs',
+            'participant_type' => 'individual', 'is_enabled' => true, 'results_published_at' => now(),
+        ]);
+        $registration = FestRegistration::create(['event_id' => $leaf1->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+        $participant = FestParticipant::create(['registration_id' => $registration->id, 'event_id' => $leaf1->id, 'participant_type' => 'student']);
+        FestMark::create(['event_id' => $leaf1->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'grade' => 'A', 'position' => 1, 'score' => 90]);
+
+        // A closed Phase 1 -> Phase 2 cumulative snapshot: the school's Phase 1 medal
+        // already carried forward into Phase 2's opening_points/closing_points.
+        FestPhaseScoreSnapshot::create([
+            'root_event_id' => $hub->id, 'phase_id' => $hubPhase2->id, 'school_id' => $school->id,
+            'championship_category_key' => 'overall', 'version' => 1,
+            'opening_points' => 10, 'current_points' => 0, 'closing_points' => 10, 'rank' => 1,
+            'locked_at' => now(),
+        ]);
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$leaf2->id}/live");
+        $html = $response->getContent();
+
+        $response->assertOk()->assertSee('Cumulative Cross Phase School');
+
+        $row = substr($html, strpos($html, 'Cumulative Cross Phase School'));
+        $this->assertDoesNotMatchRegularExpression('/text-amber-300 text-sm">0</', $row, 'gold must not be 0 — the Phase 1 medal must be counted, not dropped.');
+        $this->assertMatchesRegularExpression('/text-amber-300 text-sm">\d+</', $row);
     }
 
     private function school(string $name): Tenant
