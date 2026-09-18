@@ -1327,15 +1327,28 @@ public function tv(Request $request, int $eventId)
                     ? $this->scoreboards->scoreboard($event, $selectedScope)
                     : $this->scoreboards->provisionalScoreboard($event, $selectedScope));
 
-            // Same class of bug as tv()'s $marks scoping: when publicStanding() returns a
-            // real cumulative-championship row, its total_points already carries forward
-            // every earlier phase's points (FestPhaseScoreSnapshot.opening_points) — the
-            // medal tally needs the same combined scope, or an earlier phase's medal
-            // silently disappears from gold/silver/bronze here even though it's still
-            // counted in the total.
-            $medalEventIds = $cumulativeStanding !== null
-                ? ($this->cumulativeChampionshipEventIds($event) ?? $selectedScope['event_ids'])
-                : $selectedScope['event_ids'];
+            // Same "this phase/region's own board is isolated to just that scope" gap
+            // that tv()/scoreboardDynamicData() already close via crossPhaseScoreboard()
+            // — without this, /live silently stayed single-phase even once another phase
+            // became visible, while /tv and /scoreboard (same event) showed the real
+            // cross-phase combined total. Same school, three pages, three different
+            // numbers, with nothing on screen explaining why.
+            if ($cumulativeStanding === null) {
+                $crossPhaseBoard = $this->crossPhaseScoreboard($event, null, $request);
+                if ($crossPhaseBoard !== null) {
+                    $rawScoreboard = $crossPhaseBoard;
+                }
+            }
+
+            // Same class of bug as tv()'s $marks scoping: when the board above reflects a
+            // combined (cumulative-championship or cross-phase) total, the medal tally
+            // needs the same combined scope, or a medal earned outside this one phase
+            // silently disappears from gold/silver/bronze even though it's still counted
+            // in the total.
+            $medalEventIds = match (true) {
+                $cumulativeStanding !== null => $this->cumulativeChampionshipEventIds($event) ?? $selectedScope['event_ids'],
+                default => $this->crossPhaseVisibleEventIds($event, $request) ?? $selectedScope['event_ids'],
+            };
             $medalTally = $this->schoolMedalTally($medalEventIds);
             $scoreboard = collect($rawScoreboard)
                 ->map(fn (array $row) => $row + [

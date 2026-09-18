@@ -1179,6 +1179,59 @@ class FestPublicScoreboardTest extends TestCase
         $this->assertMatchesRegularExpression('/text-amber-300 text-sm">\d+</', $row);
     }
 
+    /**
+     * Regression test: /live's livePayload() built its own scoreboard-fetching logic
+     * (cumulativeChampionship snapshot, else plain single-scope scoreboard()) and never
+     * got the crossPhaseScoreboard() fallback that tv()/scoreboardDynamicData() already
+     * have — so a school viewing /live on a phase leaf saw only that ONE phase's
+     * isolated total (here: 0, no marks of its own), while /tv and /scoreboard for the
+     * exact same event correctly showed the cross-phase combined total. Same school,
+     * different pages, different numbers, no visible reason why.
+     */
+    public function test_live_shows_cross_phase_combined_total_not_just_this_phase_alone(): void
+    {
+        $hub = FestEvent::create([
+            'tenant_id' => $this->sahodaya->id, 'title' => 'Phased Kalotsav Live Merge', 'event_type' => 'kalolsavam',
+            'status' => 'ongoing', 'schedule_published' => true,
+        ]);
+        $hubPhase1 = FestEventPhase::create(['event_id' => $hub->id, 'name' => 'Phase 1', 'code' => 'P1', 'sort_order' => 1]);
+        $hubPhase2 = FestEventPhase::create(['event_id' => $hub->id, 'name' => 'Phase 2', 'code' => 'P2', 'sort_order' => 2]);
+
+        $leaf1 = FestEvent::create([
+            'tenant_id' => $this->sahodaya->id, 'title' => 'Phased Kalotsav Live Merge - Phase 1', 'event_type' => 'kalolsavam',
+            'parent_event_id' => $hub->id, 'source_phase_id' => $hubPhase1->id,
+            'status' => 'ongoing', 'schedule_published' => true, 'results_published' => true,
+        ]);
+        $leaf1Phase = FestEventPhase::create(['event_id' => $leaf1->id, 'source_phase_id' => $hubPhase1->id, 'name' => 'Phase 1', 'code' => 'P1', 'sort_order' => 1]);
+
+        $leaf2 = FestEvent::create([
+            'tenant_id' => $this->sahodaya->id, 'title' => 'Phased Kalotsav Live Merge - Phase 2', 'event_type' => 'kalolsavam',
+            'parent_event_id' => $hub->id, 'source_phase_id' => $hubPhase2->id,
+            'status' => 'ongoing', 'schedule_published' => true, 'results_published' => true,
+        ]);
+        FestEventPhase::create(['event_id' => $leaf2->id, 'source_phase_id' => $hubPhase2->id, 'name' => 'Phase 2', 'code' => 'P2', 'sort_order' => 1]);
+
+        $school = $this->school('Live Merge School');
+
+        // All of this school's points come from Phase 1 — Phase 2 (leaf2) itself has
+        // no items or marks for this school at all.
+        $item = FestEventItem::create([
+            'event_id' => $leaf1->id, 'title' => 'Phase 1 Item', 'phase_id' => $leaf1Phase->id,
+            'category' => 'literary', 'class_group' => 'hs', 'participant_type' => 'individual',
+            'is_enabled' => true, 'results_published_at' => now(),
+        ]);
+        $registration = FestRegistration::create(['event_id' => $leaf1->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+        $participant = FestParticipant::create(['registration_id' => $registration->id, 'event_id' => $leaf1->id, 'participant_type' => 'student']);
+        FestMark::create(['event_id' => $leaf1->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'grade' => 'A', 'position' => 1, 'score' => 90]);
+
+        // Viewing Phase 2's own /live page must still show this school (its combined
+        // total is > 0, carried from Phase 1) — not omit it as if it scored nothing in
+        // the hub at all.
+        $response = $this->get("http://public-scoreboard.test/fest/{$leaf2->id}/live");
+
+        $response->assertOk()->assertSee('Live Merge School');
+    }
+
     private function school(string $name): Tenant
     {
         return Tenant::create([
