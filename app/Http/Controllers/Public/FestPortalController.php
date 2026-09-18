@@ -1108,12 +1108,9 @@ public function tv(Request $request, int $eventId)
     // own item's height. A single item with 3+ awarded positions and a large roster
     // can still exceed one screen on its own; left as a rare residual case rather
     // than building full dynamic height-measured pagination for it.
-    // Rows were bumped well past a TV-legible size (large-pitch outdoor LED walls are
-    // read from much further away than a living-room TV, per photos from an actual
-    // venue) — 4 rows/page keeps that much larger row height fitting a 720p venue
-    // display with the header, slide title and controls visible, the same way 9 rows
-    // did at the original small size.
-    $boardsPerPage = 4;
+    // Nine rows reliably fit a 720p venue display with the header, slide title and
+    // controls visible. Twelve rows clipped the bottom schools at common TV sizes.
+    $boardsPerPage = 9;
     $winnersPerPage = 1;
     $slides = [];
 

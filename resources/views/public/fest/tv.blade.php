@@ -14,19 +14,19 @@
     @media (max-height: 800px) {
         #tv-root { padding-top: .75rem; padding-bottom: .75rem; }
         [data-tv-header] { margin-bottom: .75rem; padding-bottom: .5rem; }
-        [data-tv-title] { font-size: 3rem; margin-top: .125rem; }
+        [data-tv-title] { font-size: 1.5rem; margin-top: .125rem; }
         [data-tv-controls] { margin-top: .5rem; }
     }
 </style>
 <div class="px-10 py-5 h-full flex flex-col" id="tv-root" data-interval-ms="8000">
     <header data-tv-header class="flex items-start justify-between gap-8 mb-5 pb-4 border-b border-slate-800 shrink-0">
         <div class="min-w-0">
-            <p class="text-amber-400 font-extrabold uppercase tracking-widest text-xl">{{ $tenant->name ?? 'Sahodaya' }} · Results Display</p>
-            <h1 data-tv-title class="text-6xl font-extrabold font-heading text-white mt-1 leading-tight line-clamp-2">{{ $event->title }}</h1>
+            <p class="text-amber-400 font-extrabold uppercase tracking-widest text-sm">{{ $tenant->name ?? 'Sahodaya' }} · Results Display</p>
+            <h1 data-tv-title class="text-3xl font-extrabold font-heading text-white mt-1 leading-tight line-clamp-2">{{ $event->title }}</h1>
         </div>
         <div class="text-right shrink-0">
-            <div id="tv-clock" class="text-5xl font-mono font-extrabold text-amber-400 tracking-wider">--:--:--</div>
-            <p class="text-xl text-slate-400 mt-1">{{ $event->status === 'completed' ? 'Final results' : ($isPublished ? 'Published results' : 'Provisional — not yet published') }}</p>
+            <div id="tv-clock" class="text-2xl font-mono font-extrabold text-amber-400 tracking-wider">--:--:--</div>
+            <p class="text-sm text-slate-400 mt-1">{{ $event->status === 'completed' ? 'Final results' : ($isPublished ? 'Published results' : 'Provisional — not yet published') }}</p>
         </div>
     </header>
 
@@ -35,8 +35,8 @@
         <section data-tv-slide aria-hidden="{{ $index === 0 ? 'false' : 'true' }}" style="transform: translateX({{ $index * 100 }}%)">
             @if($slide['type'] !== 'waiting')
             <div class="flex items-baseline justify-between gap-4 mb-4">
-                <h2 class="text-5xl font-extrabold text-white">{{ $slide['title'] }}</h2>
-                @if($slide['subtitle'])<span class="text-xl text-slate-400 font-semibold shrink-0">{{ $slide['subtitle'] }}</span>@endif
+                <h2 class="text-2xl font-extrabold text-white">{{ $slide['title'] }}</h2>
+                @if($slide['subtitle'])<span class="text-sm text-slate-400 font-semibold shrink-0">{{ $slide['subtitle'] }}</span>@endif
             </div>
             @endif
 
@@ -47,12 +47,7 @@
             @elseif($slide['type'] === 'winners')
             <div class="grid grid-cols-1 gap-4">
                 @foreach($slide['items'] as $itemGroup)
-                    {{-- Large-format variant: the shared fest-winner-item-card partial (also
-                         used by the normal public /scoreboard page) is sized for a laptop/
-                         phone screen — using it here made the venue LED-wall display legible
-                         but blew up the regular scoreboard page's cards to the same oversized
-                         scale. This copy carries the TV/LED sizing on its own. --}}
-                    @include('public.fest.partials.fest-winner-item-card-tv', ['rosterLimit' => 14])
+                    @include('public.fest.partials.fest-winner-item-card', ['rosterLimit' => 14])
                 @endforeach
             </div>
             @else
