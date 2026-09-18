@@ -1190,7 +1190,7 @@ class FestPublicScoreboardTest extends TestCase
             ->assertSee('Silver Team Member');
         $this->assertSame(1, substr_count($html, 'Gold Team Member'));
         $this->assertSame(1, substr_count($html, 'Silver Team Member'));
-        $response->assertSee('Result 1 of 2')->assertSee('Result 2 of 2');
+        $response->assertSee('Slide 1 of 2')->assertSee('Slide 2 of 2');
 
         // Each slide starts at its own <section data-tv-slide> — the gold and silver
         // teams must land in DIFFERENT ones, not share a slide.
@@ -1238,7 +1238,7 @@ class FestPublicScoreboardTest extends TestCase
         $this->assertStringNotContainsString('more</span>', $html, 'A "+N more" truncation tile must never appear — a large roster pages instead of truncating.');
 
         // 25 members / 12 per slide = 3 slides (12 + 12 + 1).
-        $response->assertSee('Result 1 of 3')->assertSee('Result 2 of 3')->assertSee('Result 3 of 3');
+        $response->assertSee('Slide 1 of 3')->assertSee('Slide 2 of 3')->assertSee('Slide 3 of 3');
 
         // Member 1 (first slide) and Member 25 (last slide) must land on different slides.
         $firstMemberSlideStart = strrpos(substr($html, 0, strpos($html, 'Band Member 1<')), '<section data-tv-slide');
@@ -1280,12 +1280,60 @@ class FestPublicScoreboardTest extends TestCase
         }
 
         // 12 members / 9 per slide = 2 slides (9 + 3) — never one slide of 12.
-        $response->assertSee('Result 1 of 2')->assertSee('Result 2 of 2');
-        $response->assertDontSee('Result 1 of 1');
+        $response->assertSee('Slide 1 of 2')->assertSee('Slide 2 of 2');
+        $response->assertDontSee('Slide 1 of 1');
+
+        // Each slide only ever shows part of the 12-member roster — "Members 1-9 of 12"
+        // says so explicitly, rather than 9 photos with no hint a 10th-12th exist.
+        $response->assertSee('Members 1–9 of 12', false)->assertSee('Members 10–12 of 12', false);
 
         $member1SlideStart = strrpos(substr($html, 0, strpos($html, 'Kolkali Member 1<')), '<section data-tv-slide');
         $member12SlideStart = strrpos(substr($html, 0, strpos($html, 'Kolkali Member 12<')), '<section data-tv-slide');
         $this->assertNotSame($member1SlideStart, $member12SlideStart, 'Members 1 and 12 must land on different slides — a single slide of 12 wraps to an overflowing second row.');
+    }
+
+    /**
+     * A team small enough that its roster never needs paginating still benefits from
+     * an explicit member count — a viewer catching the slide for a couple of seconds
+     * can't reliably count photos themselves. An individual item (a "team" of one)
+     * gets no such badge; it adds nothing when the participant's own name is already
+     * the whole card.
+     */
+    public function test_tv_shows_a_plain_member_count_for_a_small_team_and_none_for_an_individual(): void
+    {
+        $teamItem = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'Duet Song', 'category' => 'performing',
+            'class_group' => 'hs', 'participant_type' => 'pair', 'is_enabled' => true,
+            'results_published_at' => now(),
+        ]);
+        $teamRegistration = FestRegistration::create(['event_id' => $this->north->id, 'item_id' => $teamItem->id, 'school_id' => $this->northSchool->id, 'status' => 'approved']);
+        $schoolClass = SchoolClass::create(['tenant_id' => $this->northSchool->id, 'name' => '9']);
+        $lastParticipant = null;
+        foreach (['Duet Member One', 'Duet Member Two'] as $name) {
+            $student = Student::create(['tenant_id' => $this->northSchool->id, 'school_class_id' => $schoolClass->id, 'name' => $name]);
+            $lastParticipant = FestParticipant::create(['registration_id' => $teamRegistration->id, 'event_id' => $this->north->id, 'participant_type' => 'student', 'participant_role' => 'performer', 'student_id' => $student->id]);
+        }
+        FestMark::create(['event_id' => $this->north->id, 'item_id' => $teamItem->id, 'participant_id' => $lastParticipant->id, 'grade' => 'A', 'position' => 1, 'score' => 90]);
+
+        $soloItem = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'Solo Song', 'category' => 'performing',
+            'class_group' => 'hs', 'participant_type' => 'individual', 'is_enabled' => true,
+            'results_published_at' => now(),
+        ]);
+        $soloRegistration = FestRegistration::create(['event_id' => $this->north->id, 'item_id' => $soloItem->id, 'school_id' => $this->northSchool->id, 'status' => 'approved']);
+        $soloStudent = Student::create(['tenant_id' => $this->northSchool->id, 'school_class_id' => $schoolClass->id, 'name' => 'Solo Singer']);
+        $soloParticipant = FestParticipant::create(['registration_id' => $soloRegistration->id, 'event_id' => $this->north->id, 'participant_type' => 'student', 'participant_role' => 'performer', 'student_id' => $soloStudent->id]);
+        FestMark::create(['event_id' => $this->north->id, 'item_id' => $soloItem->id, 'participant_id' => $soloParticipant->id, 'grade' => 'A', 'position' => 1, 'score' => 90]);
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/tv");
+        $html = $response->getContent();
+
+        $response->assertOk()->assertSee('2 members');
+
+        $soloSlideStart = strrpos(substr($html, 0, strpos($html, 'Solo Singer')), '<section data-tv-slide');
+        $soloSlideEnd = strpos($html, '<section data-tv-slide', $soloSlideStart + 1) ?: strlen($html);
+        $soloSlide = substr($html, $soloSlideStart, $soloSlideEnd - $soloSlideStart);
+        $this->assertStringNotContainsString('members', $soloSlide, 'An individual item must not show a member-count badge.');
     }
 
     /**

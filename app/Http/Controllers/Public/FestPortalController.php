@@ -1213,24 +1213,42 @@ public function tv(Request $request, int $eventId)
             // Expand each winning position into one slide per $rosterPerPage-sized
             // chunk of its roster — a position whose roster already fits on one slide
             // expands to exactly one entry, so a normal 2-12 member team is completely
-            // unaffected by this step.
+            // unaffected by this step. roster_total/roster_range travel with every
+            // chunk so the card can say "Members 1-9 of 12" instead of just showing 9
+            // photos with no indication there's a 10th, 11th, 12th anywhere — "Result 5
+            // of 6" alone doesn't tell a viewer whether 6 means six winning positions or
+            // six roster pages of one team.
             $slidesForItem = collect($itemGroup['winners'])
                 ->flatMap(function (array $winner) use ($rosterPerPage) {
                     $team = $winner['team'] ?? null;
-                    if (! $team || count($team) <= $rosterPerPage) {
-                        return [$winner];
+                    $rosterTotal = $team ? count($team) : null;
+
+                    if (! $team || $rosterTotal <= $rosterPerPage) {
+                        return [['roster_total' => $rosterTotal, 'roster_pages' => 1] + $winner];
                     }
 
-                    return collect(array_chunk($team, $rosterPerPage))
-                        ->map(fn (array $chunk) => ['team' => $chunk] + $winner)
+                    $chunks = array_chunk($team, $rosterPerPage);
+
+                    return collect($chunks)
+                        ->map(fn (array $chunk, int $i) => [
+                            'team' => $chunk,
+                            'roster_total' => $rosterTotal,
+                            'roster_pages' => count($chunks),
+                            // Precomputed here (not in the view) because it needs
+                            // $rosterPerPage, which the view has no business knowing —
+                            // it's a display-count concern, not the card's to decide.
+                            'roster_range' => [$i * $rosterPerPage + 1, $i * $rosterPerPage + count($chunk)],
+                        ] + $winner)
                         ->all();
                 })
                 ->values();
 
             // Nothing needed splitting (one position, roster fit on one slide) — same
-            // shape as an individual item, no "Result 1 of 1" clutter.
+            // shape as an individual item, no "Result 1 of 1" clutter. roster_total is
+            // still attached to the single winner so the card can show a plain "N
+            // members" badge even when nothing was split.
             if ($slidesForItem->count() <= 1) {
-                return [$itemGroup];
+                return [['winners' => $slidesForItem->all()] + $itemGroup];
             }
 
             $total = $slidesForItem->count();

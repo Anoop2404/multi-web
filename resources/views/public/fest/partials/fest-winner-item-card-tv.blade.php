@@ -9,9 +9,14 @@
             {{-- Set by FestPortalController::tv() when a large team roster and/or
                  multiple winning positions needed more than one slide for this item —
                  without this, a viewer has no way to tell two consecutive slides
-                 sharing a title are part of the same result rather than a coincidence. --}}
+                 sharing a title are part of the same result rather than a coincidence.
+                 Labeled "Slide", not "Result": split_total counts every SLIDE this item
+                 needed (each roster page counts too), not how many positions were
+                 awarded — "Result 5 of 6" next to a single bronze medal icon reads as
+                 "6 results?", when the medal icon already says which placement this is
+                 and the "Members X of Y" badge below says which roster page. --}}
             @if(($itemGroup['split_total'] ?? 1) > 1)
-            <span class="shrink-0 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-sm font-bold uppercase tracking-wide px-3 py-1">Result {{ $itemGroup['split_position'] }} of {{ $itemGroup['split_total'] }}</span>
+            <span class="shrink-0 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-sm font-bold uppercase tracking-wide px-3 py-1">Slide {{ $itemGroup['split_position'] }} of {{ $itemGroup['split_total'] }}</span>
             @endif
         </div>
         {{-- Category + gender disambiguate items that share the same title across
@@ -75,7 +80,27 @@
                     </div>
                     @endforeach
                 </div>
-                <p class="text-base text-slate-400 mt-3 uppercase">{{ $winner['school'] }}</p>
+                <div class="flex items-center gap-3 mt-3">
+                    <p class="text-base text-slate-400 uppercase">{{ $winner['school'] }}</p>
+                    {{-- roster_total is only set for a squad/team item's winner (see tv()) —
+                         null for an individual item, where a member count adds nothing.
+                         roster_pages > 1 means THIS slide only shows part of the full
+                         roster (tv() paginates an oversized team, see roster_range's own
+                         comment) — "Members 1-9 of 12" says so explicitly, rather than
+                         showing 9 photos with no hint that a 10th, 11th, 12th exist. When
+                         nothing needed splitting, a plain "12 members" still answers "how
+                         big is this team" for a viewer who only caught this slide for a
+                         few seconds. --}}
+                    @if(($winner['roster_total'] ?? null) > 1)
+                    <span class="shrink-0 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-sm font-bold px-3 py-1">
+                        @if(($winner['roster_pages'] ?? 1) > 1)
+                            Members {{ $winner['roster_range'][0] }}–{{ $winner['roster_range'][1] }} of {{ $winner['roster_total'] }}
+                        @else
+                            {{ $winner['roster_total'] }} members
+                        @endif
+                    </span>
+                    @endif
+                </div>
             </div>
         </div>
         @endforeach
