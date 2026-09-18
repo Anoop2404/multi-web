@@ -281,9 +281,9 @@ class EventLifecycleGate
         }
     }
 
-    public static function allowPublicSchedule(FestEvent $event): void
+    public static function allowPublicSchedule(FestEvent $event, bool $isAdminPreview = false): void
     {
-        if (! $event->schedule_published) {
+        if (! $event->schedule_published && ! $isAdminPreview) {
             throw new HttpException(404, 'Schedule is not published yet.');
         }
     }

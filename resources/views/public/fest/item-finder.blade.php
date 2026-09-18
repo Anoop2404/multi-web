@@ -47,7 +47,13 @@
                         <span class="rounded-full border border-slate-700 px-2 py-1">{{ $item->stage_type === 'on_stage' ? '🎤 On stage' : ($item->stage_type === 'off_stage' ? '📝 Off stage' : 'Stage') }}</span>
                     </div>
                     @php
-                        $resultsPublished = ($item->results_published_at || ($isAdminPreview ?? false)) && !$item->results_hidden;
+                        // Matches FestItemResultsService::isItemVisible() exactly (computed
+                        // once in the controller as $visibleResultItemIds) — the event-wide
+                        // results_published flag is a hard requirement there, not a
+                        // fallback, even when this item's own results_published_at is set
+                        // ahead of the event-wide publish. Showing this as a normal,
+                        // clickable link before that gate passes just leads to a 403.
+                        $resultsPublished = $visibleResultItemIds->contains($item->id);
                         // A published item with zero marks recorded (published too early,
                         // or a no-show item) leads to a dead-end "No published results for
                         // this item" page — don't render that as a normal, inviting link.

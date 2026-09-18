@@ -220,6 +220,16 @@ class FestPortalController extends Controller
 
         $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
 
+        // itemResults() itself requires the EVENT-wide results_published flag as a hard
+        // gate (FestItemResultsService::isItemVisible()) — an item's own
+        // results_published_at is not enough on its own, ever, even if it's set ahead of
+        // the event-wide publish. The button must not show as a normal, clickable link
+        // into a page that will just 403 the moment the event itself isn't published yet.
+        $itemResultsService = app(FestItemResultsService::class);
+        $visibleResultItemIds = $allItems
+            ->filter(fn (FestEventItem $item) => $isAdminPreview || $itemResultsService->isItemVisible($item, $event))
+            ->pluck('id');
+
         $itemCategoryKeys = $allItems
             ->map(fn ($item) => $item->class_group ?: $item->age_group ?: $item->category)
             ->filter()->unique()->values();
@@ -236,6 +246,7 @@ class FestPortalController extends Controller
             'scopeSchedulePublished' => (bool) $selectedScope['schedule_published'],
             'scheduledItemIds' => $scheduledItemIds,
             'resultedItemIds' => $resultedItemIds,
+            'visibleResultItemIds' => $visibleResultItemIds,
             'pageSeo' => ['title' => 'Item Finder — '.$event->title.' — '.$tenant->name],
         ]);
     }
@@ -735,10 +746,14 @@ class FestPortalController extends Controller
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
-        EventLifecycleGate::allowPublicSchedule($event);
+        $isAdminPreview = $this->isAuthorizedAdminPreview($request, $event);
+        // allowPublicSchedule() used to throw its 404 unconditionally before this
+        // method ever got a chance to compute $isAdminPreview — the admin-preview
+        // bypass just below it was dead code, permanently unreachable, since this gate
+        // ran first with no exception of its own.
+        EventLifecycleGate::allowPublicSchedule($event, $isAdminPreview);
         $selectedScope = $this->operationalEvents->directScope($event);
 
-        $isAdminPreview = $this->isAuthorizedAdminPreview($request, $event);
         abort_unless($selectedScope['schedule_published'] || $isAdminPreview, 404);
         $scopes = [$selectedScope];
 
@@ -754,9 +769,9 @@ class FestPortalController extends Controller
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
         abort_unless((int) $item->event_id === (int) $event->id, 404);
-        EventLifecycleGate::allowPublicSchedule($event);
-
         $isAdminPreview = $this->isAuthorizedAdminPreview($request, $event);
+        EventLifecycleGate::allowPublicSchedule($event, $isAdminPreview);
+
         $schedules = $this->mapScheduleRows($event, $item->id, [$event->id], $isAdminPreview);
         $categoryLabel = FestItemCategoryLabel::resolve($item, FestClassGroupScheme::labels(null, $event->rootEvent()), config('fest_item_taxonomy.arts_category', []));
         $genderLabel = \App\Support\FestSportsAgeGroup::genderLabel($item->gender);
