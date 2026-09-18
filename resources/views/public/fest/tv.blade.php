@@ -47,7 +47,12 @@
             @elseif($slide['type'] === 'winners')
             <div class="grid grid-cols-1 gap-4">
                 @foreach($slide['items'] as $itemGroup)
-                    @include('public.fest.partials.fest-winner-item-card', ['rosterLimit' => 14])
+                    {{-- Large-format variant: the shared fest-winner-item-card partial (also
+                         used by the normal public /scoreboard page) is sized for a laptop/
+                         phone screen — using it here made the venue LED-wall display legible
+                         but blew up the regular scoreboard page's cards to the same oversized
+                         scale. This copy carries the TV/LED sizing on its own. --}}
+                    @include('public.fest.partials.fest-winner-item-card-tv', ['rosterLimit' => 14])
                 @endforeach
             </div>
             @else
