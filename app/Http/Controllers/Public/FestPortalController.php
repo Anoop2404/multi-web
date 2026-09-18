@@ -84,6 +84,18 @@ class FestPortalController extends Controller
 
         $items = \App\Services\Events\FestHeadItemNavigationService::filterToOwnPhase($rawItems, $event);
 
+        $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
+        $isResultsPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
+
+        // Items whose results are actually out (the same condition the view's own
+        // "Results" button renders on, see show.blade.php) float to the top of the item
+        // finder grid, so a grid mostly full of "Not yet published" cards doesn't bury
+        // the handful that are actually ready. sortByDesc() is a stable sort, so within
+        // each of the two groups items keep their original display_order/title ordering.
+        $items = $items->sortByDesc(
+            fn (FestEventItem $item) => (($item->results_published_at || $isAdminPreview) && ! $item->results_hidden) ? 1 : 0
+        )->values();
+
         $itemGroups = $items->groupBy('event_id')
             ->map(fn ($groupItems) => [
                 'label' => $event->title,
@@ -101,9 +113,6 @@ class FestPortalController extends Controller
             ->whereNotNull('item_id')
             ->distinct()
             ->pluck('item_id');
-
-        $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
-        $isResultsPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
 
         $recentResults = collect();
         $publishedItemCount = 0;
@@ -229,6 +238,15 @@ class FestPortalController extends Controller
         $visibleResultItemIds = $allItems
             ->filter(fn (FestEventItem $item) => $isAdminPreview || $itemResultsService->isItemVisible($item, $event))
             ->pluck('id');
+
+        // Items whose results are actually out (the same "Results" button condition the
+        // view itself renders on — visible AND has recorded marks) float to the top, so a
+        // grid mostly full of "Not yet published" cards doesn't bury the handful that are
+        // actually ready. Collection::sortByDesc() is a stable sort, so within each of the
+        // two groups items keep their original display_order/title ordering.
+        $allItems = $allItems
+            ->sortByDesc(fn (FestEventItem $item) => ($visibleResultItemIds->contains($item->id) && $resultedItemIds->contains($item->id)) ? 1 : 0)
+            ->values();
 
         $itemCategoryKeys = $allItems
             ->map(fn ($item) => $item->class_group ?: $item->age_group ?: $item->category)

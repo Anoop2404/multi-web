@@ -1038,6 +1038,32 @@ class FestPublicScoreboardTest extends TestCase
         $response->assertOk()->assertSee('Participating Schools');
     }
 
+    /**
+     * Regression test: the event landing page's "Event item finder" grid used to render
+     * items in plain display_order/title order regardless of publish state, so on an
+     * event with a handful of published items scattered among many still-unpublished
+     * ones, the grid was mostly "Not yet published" cards with the actually-useful
+     * Results links buried wherever their title happened to sort. Items whose Results
+     * button actually shows (results_published_at set, not results_hidden) now sort
+     * first.
+     */
+    public function test_event_item_finder_sorts_published_results_before_unpublished_items(): void
+    {
+        FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'Aaa Unpublished Item',
+            'participant_type' => 'individual', 'is_enabled' => true,
+        ]);
+        FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'Zzz Published Item',
+            'participant_type' => 'individual', 'is_enabled' => true,
+            'results_published_at' => now(), 'results_hidden' => false,
+        ]);
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}");
+
+        $response->assertOk()->assertSeeInOrder(['Zzz Published Item', 'Aaa Unpublished Item']);
+    }
+
     private function school(string $name): Tenant
     {
         return Tenant::create([
