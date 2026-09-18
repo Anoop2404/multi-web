@@ -951,8 +951,13 @@ const selectedItem = computed(() =>
     props.eventItems.find(i => String(i.id) === String(onBehalfForm.item_id)) ?? null,
 );
 
+// An item explicitly marked 'individual' is never a squad, even if it carries a
+// stray min_group_size/max_group_size value (e.g. a leftover default of 1) — matches
+// the backend's exclusion in FestTeamSquadRules::hasSquadRules(). Without this guard,
+// an individual item like "Guitar (Western)" with such a leftover value would
+// incorrectly force a Team name field and cap selection at that stray count.
 const selectedItemIsGroup = computed(() =>
-    selectedItem.value && (
+    selectedItem.value && selectedItem.value.participant_type !== 'individual' && (
         ['team', 'group', 'pair', 'trio'].includes(selectedItem.value.participant_type)
         || Boolean(selectedItem.value.min_group_size)
         || Boolean(selectedItem.value.max_group_size)
@@ -1258,9 +1263,13 @@ const addParticipantMaxSelected = computed(() => {
     const currentPerformersCount = (manageReg.value.participants || [])
         .filter(p => p.participant_role !== 'standby').length;
 
-    const isGroup = ['team', 'group', 'pair', 'trio'].includes(item.participant_type)
+    // Same 'individual' exclusion as selectedItemIsGroup above — a stray leftover
+    // min/max_group_size value must not cap an individual item's selection.
+    const isGroup = item.participant_type !== 'individual' && (
+        ['team', 'group', 'pair', 'trio'].includes(item.participant_type)
         || Boolean(item.min_group_size)
-        || Boolean(item.max_group_size);
+        || Boolean(item.max_group_size)
+    );
 
     if (isGroup) {
         const maxSquad = item.max_group_size
