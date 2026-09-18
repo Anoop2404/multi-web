@@ -346,6 +346,38 @@ class FestRegistrationItemLockTest extends TestCase
     }
 
     /**
+     * Same regression as canSchoolCancel()/canSchoolEditRoster() above, for
+     * allowRegistrationReview() — it was the one guard left still checking the
+     * event-wide results_published flag on top of the item-level one, so flipping on
+     * the lightweight "Publish results, scores & rankings" toggle (which does not set
+     * status to 'completed') blocked admins from approving/rejecting ANY still-pending
+     * registration, including ones for items with no results at all. Also made
+     * FestRegistrationBulkService::approveMany()/rejectMany()'s own per-item skip loop
+     * unreachable, since their initial allowRegistrationReview() call (no $item) threw
+     * before that loop ever ran.
+     */
+    public function test_allow_registration_review_succeeds_when_the_event_is_published_but_this_item_is_not(): void
+    {
+        $f = $this->fixture();
+        $f['event']->update(['results_published' => true]);
+
+        EventLifecycleGate::allowRegistrationReview($f['event']->fresh(), false, $f['item']->fresh());
+
+        $this->assertTrue(true);
+    }
+
+    public function test_allow_registration_review_still_aborts_once_the_event_is_completed(): void
+    {
+        $f = $this->fixture();
+        $f['event']->update(['status' => 'completed']);
+
+        $this->expectException(HttpException::class);
+        $this->expectExceptionMessage('Registration review is closed after results are published.');
+
+        EventLifecycleGate::allowRegistrationReview($f['event']->fresh(), false, $f['item']->fresh());
+    }
+
+    /**
      * approveMany()/rejectMany() are shared by three separate controllers (sahodaya-admin,
      * the fest-ops Portal, and the REST API) and iterate registrations that can each belong
      * to a different item — so the item-level freeze can't be a single check up front like

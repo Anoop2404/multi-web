@@ -113,6 +113,21 @@ class EventLifecycleGate
      * below: an admin who's already consciously opting out of lifecycle checks for one
      * late correction shouldn't then be blocked by a second, narrower check inside the
      * same method.
+     *
+     * Deliberately does NOT gate on $event->results_published: that flag is the
+     * lightweight "Publish results, scores & rankings on public portal" toggle (Event
+     * Settings), which an admin can flip on mid-event just to let the public see
+     * provisional standings while plenty of items still have nothing marked or
+     * submitted yet — it does not mean "the whole event is over." Treating it as such
+     * blocked review of every still-pending registration the moment that toggle went
+     * on, including for items with no results at all, and made
+     * FestRegistrationBulkService::approveMany()/rejectMany()'s own careful per-item
+     * skip logic unreachable (their initial allowRegistrationReview() call — with no
+     * $item — aborted the whole batch before that per-registration loop ever ran).
+     * $event->status === 'completed' is the real "this event is over" signal (only set
+     * by the full publish() workflow, which also cascades to child events) and still
+     * blocks review outright; per-item freshness is left entirely to
+     * assertItemRosterNotFrozen() below.
      */
     public static function allowRegistrationReview(FestEvent $event, bool $override = false, ?FestEventItem $item = null): void
     {
@@ -124,7 +139,7 @@ class EventLifecycleGate
             throw new HttpException(422, 'Registration is locked. Use override to approve late entries.');
         }
 
-        if ($event->results_published || $event->status === 'completed') {
+        if ($event->status === 'completed') {
             throw new HttpException(422, 'Registration review is closed after results are published.');
         }
 
