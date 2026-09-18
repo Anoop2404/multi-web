@@ -165,8 +165,6 @@
                         <th class="p-3">Category</th>
                         <th class="p-3">Status</th>
                         <th class="p-3">Participants</th>
-                        <th class="p-3">Added</th>
-                        <th class="p-3">Updated</th>
                         <th class="p-3"></th>
                     </tr>
                 </thead>
@@ -204,9 +202,11 @@
                                     <div v-if="reg.status === 'approved' && standbyCount(reg)" class="mt-1">
                                         <button type="button" class="text-indigo-600 font-semibold" @click="openSubstitute(reg)">Substitute</button>
                                     </div>
+                                    <div class="mt-1.5 pt-1.5 border-t border-gray-100 text-[10px] text-gray-400 space-y-0.5">
+                                        <div>Added: {{ formatDateTimeAmPm(reg.created_at) }}</div>
+                                        <div>Updated: {{ formatDateTimeAmPm(reg.updated_at) }}</div>
+                                    </div>
                                 </td>
-                        <td class="p-3 text-xs text-gray-500 whitespace-nowrap">{{ formatDateTimeAmPm(reg.created_at) }}</td>
-                        <td class="p-3 text-xs text-gray-500 whitespace-nowrap">{{ formatDateTimeAmPm(reg.updated_at) }}</td>
                         <td class="p-3 text-right space-x-2">
                             <template v-if="reg.status === 'submitted'">
                                 <button @click="approve(reg.id)" class="text-green-600 text-xs font-semibold">Approve</button>
@@ -237,7 +237,7 @@
                         </td>
                     </tr>
                     <tr v-if="!registrationsList.length">
-                        <td colspan="9" class="p-0">
+                        <td colspan="7" class="p-0">
                             <EmptyState title="No registrations match your filters"
                                 description="Try a different school, status, or item filter, or clear the search box above." icon="📋" class="py-8" />
                         </td>
