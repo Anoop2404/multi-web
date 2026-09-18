@@ -534,7 +534,16 @@
                         @foreach($championship as $row)
                             @php $rowGroup = $row['category_key'].'|'.$row['gender_key']; @endphp
                             <tr data-group="{{ $rowGroup }}" @if($comboGroups->count() > 1 && $rowGroup !== $firstGroup) hidden @endif>
-                                <td class="p-3 font-bold text-amber-400">#{{ $row['rank'] }}</td>
+                                <td class="p-3 font-bold text-amber-400">
+                                    @if($row['rank'] <= 3)
+                                    <div class="flex items-center gap-1.5">
+                                        <img src="{{ asset('images/fest/medals/rank-'.$row['rank'].'.webp') }}" alt="Rank {{ $row['rank'] }}" class="w-6 h-6 shrink-0">
+                                        <span>#{{ $row['rank'] }}</span>
+                                    </div>
+                                    @else
+                                    #{{ $row['rank'] }}
+                                    @endif
+                                </td>
                                 <td class="p-3 font-semibold text-white uppercase">
                                     <div class="flex items-center gap-3">
                                         @if($row['photo'])
