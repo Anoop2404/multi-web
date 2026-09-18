@@ -74,7 +74,12 @@ Route::middleware([
         Route::get('/{event}/results', [FestPortalController::class, 'results'])->name('results');
         Route::get('/{event}/item-finder', [FestPortalController::class, 'itemFinder'])->name('item-finder');
         Route::get('/{event}/results/schools/{school}', [FestPortalController::class, 'schoolResults'])->name('results.school');
-        Route::get('/{event}/items/{item}', [FestPortalController::class, 'itemSchedule'])->name('item-schedule');
+        // /schedule suffix (not the bare /{event}/items/{item}) deliberately matches the
+        // same two-segment-after-items shape as item-results below — some hosts' nginx
+        // config has a location rule that 404s a bare one-segment /items/{id} path at the
+        // web server level (never reaching Laravel) while a deeper path passes through
+        // fine; this sidesteps that without needing access to that server's config.
+        Route::get('/{event}/items/{item}/schedule', [FestPortalController::class, 'itemSchedule'])->name('item-schedule');
         Route::get('/{event}/items/{item}/results', [FestPortalController::class, 'itemResults'])->name('item-results');
         Route::get('/{event}/items/{item}/results.pdf', [FestPortalController::class, 'itemResultsPdf'])->name('item-results.pdf');
         Route::get('/{event}/items/{item}/winners/{mark}/poster.svg', [FestPortalController::class, 'winnerPoster'])->name('winner-poster');

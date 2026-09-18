@@ -59,7 +59,7 @@
                         @if($resultsPublished && $resultsHaveData)
                         <a href="{{ route('tenant.fest.item-results', [$event->id, $item->id]) }}" class="flex-1 rounded-xl bg-amber-500 px-3 py-2 text-center text-xs font-bold text-slate-950 hover:bg-amber-400">Results</a>
                         @elseif($resultsPublished)
-                        <span class="flex-1 rounded-xl border border-dashed border-slate-700 px-3 py-2 text-center text-xs font-semibold text-white/30" title="Published, but no marks recorded yet">No results recorded</span>
+                        <span class="flex-1 rounded-xl border border-dashed border-slate-700 px-3 py-2 text-center text-xs font-semibold text-white/30" title="Published, but no marks recorded yet">Not published</span>
                         @endif
                         @if(!$scheduleShown && !$resultsPublished)
                         <span class="flex-1 rounded-xl border border-dashed border-slate-700 px-3 py-2 text-center text-xs font-semibold text-white/30">Not yet published</span>
