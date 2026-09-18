@@ -13,7 +13,7 @@
         <table class="w-full min-w-[640px] text-sm">
             <thead class="bg-white/5 text-left text-xs uppercase text-white/40">
                 <tr>
-                    <th class="p-3">Order</th>
+                    <th class="p-3">#</th>
                     <th class="p-3">Time</th>
                     <th class="p-3">Item</th>
                     <th class="p-3">Participant</th>
@@ -21,10 +21,10 @@
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-800">
-            @forelse($schedules as $row)
+            @forelse($schedules as $index => $row)
             <tr>
-                <td class="p-3 font-mono text-xs text-white/50">{{ $row['sort_order'] ?? '—' }}</td>
-                <td class="p-3 text-white/80">{{ $row['scheduled_at']?->format('H:i') ?? '—' }}</td>
+                <td class="p-3 font-mono text-xs text-white/50">{{ $index + 1 }}</td>
+                <td class="p-3 text-white/80">{{ $row['scheduled_at']?->format('h:i A') ?? '—' }}</td>
                 <td class="p-3">
                     @if($row['item_id'] && $row['item_title'])
                     <a href="{{ route('tenant.fest.item-schedule', [$event->id, $row['item_id']]) }}" class="text-amber-400 hover:underline">{{ $row['item_title'] }}</a>

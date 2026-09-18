@@ -1984,7 +1984,15 @@ class FestEventReportAnalyticsService
                 'teacher:id,name,reg_no',
                 'registration:id,event_id,item_id,school_id,status',
                 'registration.school:id,name',
-                'registration.item:id,title,item_code,category,stage_type,participant_type,class_group,results_published_at,results_hidden',
+                // event_id is required even though the row never displays it —
+                // FestGradePointService::resolveGradeFromScore() below compares
+                // $item->event_id against the phase event to decide whether to re-resolve
+                // grade bands for a different phase/region's config; omitting it here
+                // silently loads null, and passing null to FestGradePointService's strict
+                // int-typed eventById() throws a TypeError the moment score-based grading
+                // needs it (a combined participation-certificate/hub-level view is exactly
+                // when $item->event_id genuinely differs from $event->id).
+                'registration.item:id,event_id,title,item_code,category,stage_type,participant_type,class_group,results_published_at,results_hidden',
                 'registration.event:id,source_phase_id,region_id',
                 'registration.event.sourcePhase:id,name',
                 'registration.event.region:id,name,code',

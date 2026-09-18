@@ -240,8 +240,12 @@ class FestGradePointService
         // per phase — pushed to each region via an explicit "sync" button, not live-
         // shared — so an item graded under Region 2 must resolve against Region 2's own
         // config, not the hub's. Falls back to the passed $event if the item's own event
-        // can't be loaded (e.g. a deleted event) rather than failing outright.
-        if ($itemModel && $itemModel->event_id !== $event->id) {
+        // can't be loaded (e.g. a deleted event) rather than failing outright. Guarded on
+        // event_id actually being set: a caller can hand in $itemModel loaded through a
+        // partial column select that dropped event_id (a recurring gotcha in this
+        // codebase) — eventById() is strictly int-typed and would throw, when falling
+        // back to the passed $event is exactly the documented degrade already.
+        if ($itemModel && $itemModel->event_id && $itemModel->event_id !== $event->id) {
             $event = $this->eventById($itemModel->event_id) ?? $event;
         }
 
