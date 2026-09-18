@@ -1192,7 +1192,15 @@ public function tv(Request $request, int $eventId)
     // dropped behind a "+N more" tile — a large team just takes a couple of extra,
     // clearly-labeled slides instead. Individual items (a roster of one) never hit
     // either path and render exactly as before.
-    $rosterPerPage = 12;
+    //
+    // 9, not a rounder number: fest-winner-item-card-tv.blade.php's roster tiles are
+    // w-24 (6rem), which at this page's 26px root font-size render at 156px — at that
+    // size, exactly 9 fit across one row of the available width (measured directly
+    // against the compiled CSS, not estimated). A 10th tile wraps to a second row, and
+    // a second row of tiles NEVER fits the remaining vertical space on the fixed
+    // 1920x1080 canvas (overflows by ~190px, not a close call) — so this cap must keep
+    // every roster page to a single row, not just "small enough to usually fit".
+    $rosterPerPage = 9;
 
     $tvWinnerItems = collect($dynamic['latestWinners'])
         ->take($recentItemsForTv)

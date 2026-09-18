@@ -1206,8 +1206,10 @@ class FestPublicScoreboardTest extends TestCase
      * A band item's roster can run to 25 members (a duet or small team stays at 2-12) —
      * far more than one slide can show without the old "+N more" tile hiding most of
      * the roster. tv() now paginates a single position's oversized roster across
-     * multiple slides ($rosterPerPage=12) instead of truncating it, so every member
-     * still gets shown — just across a couple of clearly-labeled extra slides.
+     * multiple slides ($rosterPerPage=9 — every roster tile at this page's font-size
+     * fits 9 across one row of the canvas; a 10th forces a second row that never fits
+     * the remaining vertical space) instead of truncating it, so every member still
+     * gets shown — just across a couple of clearly-labeled extra slides.
      */
     public function test_tv_splits_a_large_bands_roster_across_multiple_slides_without_truncating(): void
     {
@@ -1242,6 +1244,48 @@ class FestPublicScoreboardTest extends TestCase
         $firstMemberSlideStart = strrpos(substr($html, 0, strpos($html, 'Band Member 1<')), '<section data-tv-slide');
         $lastMemberSlideStart = strrpos(substr($html, 0, strpos($html, 'Band Member 25<')), '<section data-tv-slide');
         $this->assertNotSame($firstMemberSlideStart, $lastMemberSlideStart, "The band's roster must span multiple slides, not one overflowing slide.");
+    }
+
+    /**
+     * Real production bug: a 12-member team (e.g. a Kolkali group) rendered on one
+     * slide at 9 tiles/row wraps to a second row — and a second row of roster tiles
+     * never fits the remaining vertical space on the fixed 1920x1080 canvas (overflows
+     * by ~190px, measured directly against the compiled CSS). $rosterPerPage=9 keeps
+     * every roster page to a single row, so 12 members must split into two slides
+     * (9 + 3) rather than one overflowing slide of 12.
+     */
+    public function test_tv_splits_a_twelve_member_roster_that_would_wrap_to_a_second_row(): void
+    {
+        $item = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'Kolkali', 'category' => 'performing',
+            'class_group' => 'hs', 'participant_type' => 'group', 'is_enabled' => true,
+            'results_published_at' => now(),
+        ]);
+        $registration = FestRegistration::create(['event_id' => $this->north->id, 'item_id' => $item->id, 'school_id' => $this->northSchool->id, 'status' => 'approved']);
+        $schoolClass = SchoolClass::create(['tenant_id' => $this->northSchool->id, 'name' => '9']);
+
+        $lastParticipant = null;
+        for ($i = 1; $i <= 12; $i++) {
+            $student = Student::create(['tenant_id' => $this->northSchool->id, 'school_class_id' => $schoolClass->id, 'name' => "Kolkali Member {$i}"]);
+            $lastParticipant = FestParticipant::create(['registration_id' => $registration->id, 'event_id' => $this->north->id, 'participant_type' => 'student', 'participant_role' => 'performer', 'student_id' => $student->id]);
+        }
+        FestMark::create(['event_id' => $this->north->id, 'item_id' => $item->id, 'participant_id' => $lastParticipant->id, 'grade' => 'A', 'position' => 1, 'score' => 90]);
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/tv");
+        $html = $response->getContent();
+
+        $response->assertOk();
+        for ($i = 1; $i <= 12; $i++) {
+            $this->assertSame(1, substr_count($html, "Kolkali Member {$i}<"), "Kolkali Member {$i} must appear exactly once.");
+        }
+
+        // 12 members / 9 per slide = 2 slides (9 + 3) — never one slide of 12.
+        $response->assertSee('Result 1 of 2')->assertSee('Result 2 of 2');
+        $response->assertDontSee('Result 1 of 1');
+
+        $member1SlideStart = strrpos(substr($html, 0, strpos($html, 'Kolkali Member 1<')), '<section data-tv-slide');
+        $member12SlideStart = strrpos(substr($html, 0, strpos($html, 'Kolkali Member 12<')), '<section data-tv-slide');
+        $this->assertNotSame($member1SlideStart, $member12SlideStart, 'Members 1 and 12 must land on different slides — a single slide of 12 wraps to an overflowing second row.');
     }
 
     /**
