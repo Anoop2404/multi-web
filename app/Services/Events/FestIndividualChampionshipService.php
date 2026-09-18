@@ -67,9 +67,25 @@ class FestIndividualChampionshipService
                 <=> [$a->points, $a->group_points, $b->student_id];
         })->values();
 
+        // Dense ("1, 2, 2, 3") ranking within each category+gender group: students
+        // tied on both points and group_points share the same rank, and the next
+        // distinct total continues from there rather than skipping ranks for however
+        // many students just tied (that "1, 2, 2, 4" skip-style would misrepresent how
+        // many students are genuinely ahead of a given rank).
         $rankedByCategoryAndGender = $allRows->groupBy(fn ($row) => $row->category.'|'.$row->gender)
             ->flatMap(function ($groupRows) {
-                return $groupRows->values()->map(fn ($row, int $index) => [$row, $index + 1]);
+                $rank = 0;
+                $previousKey = null;
+
+                return $groupRows->values()->map(function ($row) use (&$rank, &$previousKey) {
+                    $key = $row->points.'|'.$row->group_points;
+                    if ($key !== $previousKey) {
+                        $rank++;
+                        $previousKey = $key;
+                    }
+
+                    return [$row, $rank];
+                });
             });
 
         $overallRankByStudent = $allRows->values()->mapWithKeys(fn ($row, int $index) => [$row->student_id => $index + 1]);
