@@ -4,6 +4,7 @@ namespace App\Services\Events;
 
 use App\Models\FestEvent;
 use App\Models\FestFeeCredit;
+use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestSchoolEventFee;
 use App\Services\Audit\PlatformAuditLogger;
@@ -163,6 +164,14 @@ class FestRegistrationBulkService
                     'rejected_at'          => now(),
                     'rejected_by_user_id'  => auth()->id(),
                 ]);
+
+                // Free up any chest number already assigned before rejection — same fix as
+                // FestRegistrationReviewController::reject()'s single-registration path and
+                // FestRegistrationService::cancel(); without it the number stays occupied
+                // (fest_participants_event_head_chest_unique still enforces it) even though
+                // the Chest Numbers admin list hides rejected registrations, so it looks
+                // free on screen but can't actually be reassigned.
+                FestParticipant::whereIn('id', $registration->participants->pluck('id'))->update(['chest_no' => null]);
 
                 // Free up the per-student registration fee if this was the student's last
                 // active item — must run BEFORE recalculate() so the composite fee model sees

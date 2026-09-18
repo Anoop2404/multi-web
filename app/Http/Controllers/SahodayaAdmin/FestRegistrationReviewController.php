@@ -485,6 +485,16 @@ class FestRegistrationReviewController extends SahodayaAdminController
             'rejected_by_user_id' => $request->user()->id,
         ]);
 
+        // Free up any chest number already assigned before this registration got
+        // rejected (e.g. manually set/imported on this still-'submitted' registration
+        // before someone noticed it needed rejecting instead of approving) — mirrors
+        // FestRegistrationService::cancel()'s equivalent clear. Without this, the
+        // number stays occupied in the DB (fest_participants_event_head_chest_unique
+        // still enforces it) even though the Chest Numbers admin list filters out
+        // rejected registrations — so it looks free on screen but can't be reused,
+        // and assigning it elsewhere 500s on the raw constraint violation.
+        FestParticipant::whereIn('id', $registration->participants->pluck('id'))->update(['chest_no' => null]);
+
         // Free up the per-student registration fee if this was the student's last active
         // item — must run BEFORE recalculate() so the composite fee model sees it. See
         // FestLevelRegistrationService::deactivateIfNoActiveItems(). Mirrors the same fix in
