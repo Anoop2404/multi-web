@@ -150,6 +150,31 @@ class FestChestNumberController extends SahodayaAdminController
         return back()->with('success', "Assigned {$count} item registration ID(s) for {$item->title}.");
     }
 
+    /**
+     * Same nullable-item scope as clearAll() below — no item_id assigns every item in
+     * the event (this phase, since $event is already the phase-scoped leaf event a
+     * multi-phase hub resolves per phase) that's still missing a chest number, not just
+     * the one item currently open.
+     */
+    public function assignMissingAll(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $itemId = $request->integer('item_id') ?: null;
+        $item = $itemId ? FestEventItem::where('event_id', $event->id)->find($itemId) : null;
+
+        $count = app(FestNumberingService::class)->assignMissingChestNumbers($event, $item);
+
+        $scopeLabel = $item ? "for item '{$item->title}'" : "for the entire event '{$event->title}'";
+
+        $audit->festEvent($event, FestPageActivity::CHEST_NUMBERS, 'fest.chest_numbers.assigned_missing_all', "Assigned {$count} missing chest number(s) {$scopeLabel}", [
+            'count'   => $count,
+            'item_id' => $item?->id,
+        ]);
+
+        return back()->with('success', "Assigned {$count} missing chest number(s) {$scopeLabel}.");
+    }
+
     public function clearChest(string $tenantId, FestEvent $event, FestParticipant $participant, FestChestNumberService $service, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

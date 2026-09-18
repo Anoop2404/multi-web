@@ -10,6 +10,9 @@
                             ? 'Pick an item — each student keeps a single chest number across the sports event.'
                             : 'Pick an item — view or assign chest numbers per competition item.')">
             <template #actions>
+                <button type="button" class="btn-primary text-sm" @click="assignAllMissingForEvent">
+                    Assign all missing chest numbers (this phase)
+                </button>
                 <Link :href="numberingUrl" class="btn-secondary text-sm">Numbering settings</Link>
             </template>
         </PageHeader>
@@ -282,6 +285,13 @@ function postAction(path) {
 }
 function generate() { postAction(`${base.value}/generate`); }
 function assignItemReg() { postAction(`${base.value}/assign-item-ids`); }
+// Whole-event/whole-phase version of "Assign missing chest" above — no item_id, so it
+// assigns every item still missing chest numbers, not just whichever one is currently
+// open. Purely additive (never touches an already-assigned number), so no confirm
+// dialog, matching the same no-confirm per-item "Assign missing chest" button.
+function assignAllMissingForEvent() {
+    router.post(`${base.value}/assign-missing-all`, {}, { preserveScroll: true, preserveState: true });
+}
 async function clearEntireEventChests() {
     let message = `Are you sure you want to reset and clear ALL chest numbers across the ENTIRE event "${props.event.title}"?\n\nThis will wipe chest numbers for all items so numbering starts back at 100.`;
     if (props.eventHasMarksOrAttendance) {
