@@ -1164,9 +1164,14 @@ public function tv(Request $request, int $eventId)
     // own item's height. A single item with 3+ awarded positions and a large roster
     // can still exceed one screen on its own; left as a rare residual case rather
     // than building full dynamic height-measured pagination for it.
-    // Nine rows reliably fit a 720p venue display with the header, slide title and
-    // controls visible. Twelve rows clipped the bottom schools at common TV sizes.
-    $boardsPerPage = 9;
+    // fest-medal-board.blade.php's rows were enlarged for venue-distance legibility
+    // (the previous sizing — 11px/9px header labels, 14-16px row text — was unreadable
+    // from more than a couple of meters away). At that larger size each row measures
+    // ~91px tall on the fixed 1920x1080 canvas; 9 rows (the old count, calibrated for
+    // the smaller text) now overflows past the visible canvas and clips the bottom
+    // schools entirely. 5 rows is what the enlarged rows actually fit, measured against
+    // the canvas's fixed height minus the header/title/controls chrome.
+    $boardsPerPage = 5;
     $winnersPerPage = 1;
     $slides = [];
 

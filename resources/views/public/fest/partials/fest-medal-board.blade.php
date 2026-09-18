@@ -1,16 +1,16 @@
 <div class="rounded-2xl border border-slate-800 bg-slate-900 overflow-hidden">
-    <div class="grid grid-cols-[3.25rem_1fr_repeat(4,3.75rem)_5.5rem] gap-2 px-4 py-2 bg-white/5 border-b border-slate-800 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+    <div class="grid grid-cols-[4.5rem_1fr_repeat(4,5rem)_7rem] gap-2 px-5 py-2 bg-white/5 border-b border-slate-800 text-sm font-extrabold uppercase tracking-wider text-slate-400">
         <span>Rank</span>
         <span>School</span>
         {{-- Points earned from that rank specifically (see FestPortalController::tv()'s
              $medalTallyFor), not a count of how many times the school placed there. --}}
-        <span class="flex flex-col items-center justify-center gap-0.5"><img src="{{ asset('images/fest/medals/rank-1.webp') }}" alt="Points from 1st place" class="w-5 h-5"><span class="normal-case text-[9px] font-semibold tracking-normal text-slate-500">pts</span></span>
-        <span class="flex flex-col items-center justify-center gap-0.5"><img src="{{ asset('images/fest/medals/rank-2.webp') }}" alt="Points from 2nd place" class="w-5 h-5"><span class="normal-case text-[9px] font-semibold tracking-normal text-slate-500">pts</span></span>
-        <span class="flex flex-col items-center justify-center gap-0.5"><img src="{{ asset('images/fest/medals/rank-3.webp') }}" alt="Points from 3rd place" class="w-5 h-5"><span class="normal-case text-[9px] font-semibold tracking-normal text-slate-500">pts</span></span>
+        <span class="flex flex-col items-center justify-center gap-0.5"><img src="{{ asset('images/fest/medals/rank-1.webp') }}" alt="Points from 1st place" class="w-8 h-8"><span class="normal-case text-xs font-semibold tracking-normal text-slate-500">pts</span></span>
+        <span class="flex flex-col items-center justify-center gap-0.5"><img src="{{ asset('images/fest/medals/rank-2.webp') }}" alt="Points from 2nd place" class="w-8 h-8"><span class="normal-case text-xs font-semibold tracking-normal text-slate-500">pts</span></span>
+        <span class="flex flex-col items-center justify-center gap-0.5"><img src="{{ asset('images/fest/medals/rank-3.webp') }}" alt="Points from 3rd place" class="w-8 h-8"><span class="normal-case text-xs font-semibold tracking-normal text-slate-500">pts</span></span>
         {{-- Grade points earned off the podium (e.g. Grade A with no 1st/2nd/3rd finish) —
              without this column Total Points had no visible source when gold/silver/bronze
              were all zero. --}}
-        <span class="flex flex-col items-center justify-center gap-0.5"><span>Grade</span><span class="normal-case text-[9px] font-semibold tracking-normal text-slate-500">pts</span></span>
+        <span class="flex flex-col items-center justify-center gap-0.5"><span>Grade</span><span class="normal-case text-xs font-semibold tracking-normal text-slate-500">pts</span></span>
         <span class="text-right">Total Points</span>
     </div>
     <div class="divide-y divide-slate-800/80">
@@ -24,26 +24,26 @@
                 default => '',
             } : '';
         @endphp
-        <div class="grid grid-cols-[3.25rem_1fr_repeat(4,3.75rem)_5.5rem] gap-2 items-center px-4 py-2 {{ $rankClass }}">
+        <div class="grid grid-cols-[4.5rem_1fr_repeat(4,5rem)_7rem] gap-2 items-center px-5 py-2 {{ $rankClass }}">
             <span class="flex items-center">
                 {{-- Medal icons imply an actual result — only show them once there's a real
                      ranking. A pre-results roster (everyone at 0) uses plain numbers even
                      for rows 1-3, so it can't be misread as "already won something." --}}
                 @if($showMedalRank && $row['rank'] <= 3)
-                <img src="{{ asset('images/fest/medals/rank-'.$row['rank'].'.webp') }}" alt="Rank {{ $row['rank'] }}" class="w-7 h-7">
+                <img src="{{ asset('images/fest/medals/rank-'.$row['rank'].'.webp') }}" alt="Rank {{ $row['rank'] }}" class="w-10 h-10">
                 @else
-                <span class="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 flex items-center justify-center text-xs font-extrabold">{{ $row['rank'] }}</span>
+                <span class="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 flex items-center justify-center text-base font-extrabold">{{ $row['rank'] }}</span>
                 @endif
             </span>
-            <span class="font-bold text-white text-sm uppercase truncate" title="{{ $row['school_name'] }}">{{ $row['school_name'] }}</span>
-            <span class="text-center font-mono font-bold tabular-nums text-amber-300 text-sm">{{ $row['gold'] }}</span>
-            <span class="text-center font-mono font-bold tabular-nums text-slate-300 text-sm">{{ $row['silver'] }}</span>
-            <span class="text-center font-mono font-bold tabular-nums text-amber-600 text-sm">{{ $row['bronze'] }}</span>
-            <span class="text-center font-mono font-bold tabular-nums text-sky-300 text-sm">{{ $row['grade_points'] ?? 0 }}</span>
-            <span class="text-right font-mono font-extrabold tabular-nums text-amber-400 text-base">{{ $row['total_points'] }}</span>
+            <span class="font-bold text-white text-lg uppercase truncate" title="{{ $row['school_name'] }}">{{ $row['school_name'] }}</span>
+            <span class="text-center font-mono font-bold tabular-nums text-amber-300 text-lg">{{ $row['gold'] }}</span>
+            <span class="text-center font-mono font-bold tabular-nums text-slate-300 text-lg">{{ $row['silver'] }}</span>
+            <span class="text-center font-mono font-bold tabular-nums text-amber-600 text-lg">{{ $row['bronze'] }}</span>
+            <span class="text-center font-mono font-bold tabular-nums text-sky-300 text-lg">{{ $row['grade_points'] ?? 0 }}</span>
+            <span class="text-right font-mono font-extrabold tabular-nums text-amber-400 text-2xl">{{ $row['total_points'] }}</span>
         </div>
         @empty
-        <div class="text-slate-400 text-center py-12">No standings yet.</div>
+        <div class="text-slate-400 text-center py-12 text-lg">No standings yet.</div>
         @endforelse
     </div>
 </div>

@@ -21,12 +21,12 @@
 <div class="px-10 py-5 h-full flex flex-col" id="tv-root" data-interval-ms="8000">
     <header data-tv-header class="flex items-start justify-between gap-8 mb-5 pb-4 border-b border-slate-800 shrink-0">
         <div class="min-w-0">
-            <p class="text-amber-400 font-extrabold uppercase tracking-widest text-sm">{{ $tenant->name ?? 'Sahodaya' }} · Results Display</p>
-            <h1 data-tv-title class="text-3xl font-extrabold font-heading text-white mt-1 leading-tight line-clamp-2">{{ $event->title }}</h1>
+            <p class="text-amber-400 font-extrabold uppercase tracking-widest text-lg">{{ $tenant->name ?? 'Sahodaya' }} · Results Display</p>
+            <h1 data-tv-title class="text-4xl font-extrabold font-heading text-white mt-1 leading-tight line-clamp-2">{{ $event->title }}</h1>
         </div>
         <div class="text-right shrink-0">
-            <div id="tv-clock" class="text-2xl font-mono font-extrabold text-amber-400 tracking-wider">--:--:--</div>
-            <p class="text-sm text-slate-400 mt-1">{{ $event->status === 'completed' ? 'Final results' : ($isPublished ? 'Published results' : 'Provisional — not yet published') }}</p>
+            <div id="tv-clock" class="text-4xl font-mono font-extrabold text-amber-400 tracking-wider">--:--:--</div>
+            <p class="text-lg text-slate-400 mt-1">{{ $event->status === 'completed' ? 'Final results' : ($isPublished ? 'Published results' : 'Provisional — not yet published') }}</p>
         </div>
     </header>
 
@@ -35,8 +35,8 @@
         <section data-tv-slide aria-hidden="{{ $index === 0 ? 'false' : 'true' }}" style="transform: translateX({{ $index * 100 }}%)">
             @if($slide['type'] !== 'waiting')
             <div class="flex items-baseline justify-between gap-4 mb-4">
-                <h2 class="text-2xl font-extrabold text-white">{{ $slide['title'] }}</h2>
-                @if($slide['subtitle'])<span class="text-sm text-slate-400 font-semibold shrink-0">{{ $slide['subtitle'] }}</span>@endif
+                <h2 class="text-3xl font-extrabold text-white">{{ $slide['title'] }}</h2>
+                @if($slide['subtitle'])<span class="text-lg text-slate-400 font-semibold shrink-0">{{ $slide['subtitle'] }}</span>@endif
             </div>
             @endif
 
@@ -47,14 +47,18 @@
             @elseif($slide['type'] === 'winners')
             <div class="grid grid-cols-1 gap-4">
                 @foreach($slide['items'] as $itemGroup)
-                    @include('public.fest.partials.fest-winner-item-card', ['rosterLimit' => 14])
+                    {{-- Lower than the desktop scoreboard's own rosterLimit (14) — each
+                         tile is much larger here for venue-distance legibility, so fewer
+                         fit before a "+N more" tile is the better tradeoff, especially
+                         with 2-3 winning positions (each its own team) sharing the row. --}}
+                    @include('public.fest.partials.fest-winner-item-card-tv', ['rosterLimit' => 8])
                 @endforeach
             </div>
             @else
             <div class="rounded-3xl bg-slate-900 border border-slate-800 p-14 text-center shadow-xl">
-                <span class="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 mx-auto mb-4 flex items-center justify-center text-sm font-extrabold text-amber-300" aria-hidden="true">WAIT</span>
-                <h2 class="text-xl font-bold text-white">Results Coming Soon</h2>
-                <p class="text-sm text-slate-400 mt-2 max-w-md mx-auto">Standings and winners will appear here as soon as the event committee publishes results.</p>
+                <span class="w-20 h-20 rounded-2xl bg-amber-500/10 border border-amber-500/20 mx-auto mb-4 flex items-center justify-center text-base font-extrabold text-amber-300" aria-hidden="true">WAIT</span>
+                <h2 class="text-3xl font-bold text-white">Results Coming Soon</h2>
+                <p class="text-lg text-slate-400 mt-2 max-w-md mx-auto">Standings and winners will appear here as soon as the event committee publishes results.</p>
             </div>
             @endif
         </section>
@@ -63,13 +67,13 @@
 
     <div data-tv-controls class="flex items-center justify-center gap-3 mt-4 shrink-0" aria-label="Display controls">
         @if(count($slides) > 1)
-        <button type="button" data-tv-prev class="w-9 h-9 rounded-xl border border-slate-700 bg-slate-900 text-white/70 hover:text-white hover:border-amber-500/50" aria-label="Previous slide">←</button>
-        <span id="tv-slide-count" class="min-w-20 text-center text-xs font-mono font-bold text-slate-400">1 / {{ count($slides) }}</span>
-        <button type="button" data-tv-pause class="min-w-24 h-9 rounded-xl border border-slate-700 bg-slate-900 px-3 text-xs font-bold text-white/70 hover:text-white hover:border-amber-500/50" aria-pressed="false">Pause</button>
+        <button type="button" data-tv-prev class="w-11 h-11 rounded-xl border border-slate-700 bg-slate-900 text-white/70 hover:text-white hover:border-amber-500/50 text-lg" aria-label="Previous slide">←</button>
+        <span id="tv-slide-count" class="min-w-24 text-center text-sm font-mono font-bold text-slate-400">1 / {{ count($slides) }}</span>
+        <button type="button" data-tv-pause class="min-w-28 h-11 rounded-xl border border-slate-700 bg-slate-900 px-3 text-sm font-bold text-white/70 hover:text-white hover:border-amber-500/50" aria-pressed="false">Pause</button>
         @endif
-        <button type="button" data-tv-fullscreen class="min-w-24 h-9 rounded-xl border border-slate-700 bg-slate-900 px-3 text-xs font-bold text-white/70 hover:text-white hover:border-amber-500/50">Fullscreen</button>
+        <button type="button" data-tv-fullscreen class="min-w-28 h-11 rounded-xl border border-slate-700 bg-slate-900 px-3 text-sm font-bold text-white/70 hover:text-white hover:border-amber-500/50">Fullscreen</button>
         @if(count($slides) > 1)
-        <button type="button" data-tv-next class="w-9 h-9 rounded-xl border border-slate-700 bg-slate-900 text-white/70 hover:text-white hover:border-amber-500/50" aria-label="Next slide">→</button>
+        <button type="button" data-tv-next class="w-11 h-11 rounded-xl border border-slate-700 bg-slate-900 text-white/70 hover:text-white hover:border-amber-500/50 text-lg" aria-label="Next slide">→</button>
         @endif
     </div>
 </div>

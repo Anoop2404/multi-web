@@ -22,7 +22,7 @@
             overflow: hidden;
             background: #020617;
         }
-        html { font-size: 21px; }
+        html { font-size: 26px; }
         #tv-canvas {
             width: 1920px;
             height: 1080px;

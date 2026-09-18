@@ -1082,9 +1082,16 @@ class FestPublicScoreboardTest extends TestCase
         $this->assertStringContainsString('no-store', $data->headers->get('Cache-Control'));
     }
 
-    public function test_tv_paginates_nine_school_rows_and_exposes_display_controls(): void
+    /**
+     * $boardsPerPage was 9 (fine at the old, small row sizing) — once fest-medal-board.
+     * blade.php's rows were enlarged for venue-distance legibility (see the TV medal
+     * board font-size fixes), 9 rows no longer fit the fixed 1920x1080 canvas without
+     * clipping the bottom schools, so it dropped to 5. This fixture is sized to that
+     * new boundary: 5 schools fit page 1, the 6th spills to page 2.
+     */
+    public function test_tv_paginates_five_school_rows_and_exposes_display_controls(): void
     {
-        foreach (range(2, 10) as $rank) {
+        foreach (range(2, 6) as $rank) {
             $school = $this->school("TV School {$rank}");
             FestResult::create([
                 'event_id' => $this->north->id,
@@ -1227,8 +1234,8 @@ class FestPublicScoreboardTest extends TestCase
         // gold must carry the Phase 1 medal's points (10), not 0 with everything
         // dumped into the grade column instead.
         $row = substr($html, strpos($html, 'Cross Phase School'));
-        $this->assertMatchesRegularExpression('/text-amber-300 text-sm">10</', $row);
-        $this->assertMatchesRegularExpression('/text-sky-300 text-sm">0</', $row);
+        $this->assertMatchesRegularExpression('/text-amber-300 text-lg">10</', $row);
+        $this->assertMatchesRegularExpression('/text-sky-300 text-lg">0</', $row);
     }
 
     /**
@@ -1274,7 +1281,7 @@ class FestPublicScoreboardTest extends TestCase
         // occurrence isolates that category board's row.
         $row = substr($html, strrpos($html, 'North Star School'));
         $this->assertDoesNotMatchRegularExpression(
-            '/text-amber-300 text-sm">0</', $row,
+            '/text-amber-300 text-lg">0</', $row,
             "The merged source category's gold medal must count toward the target category's own board."
         );
     }
