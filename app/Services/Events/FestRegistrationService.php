@@ -227,6 +227,39 @@ class FestRegistrationService
     }
 
     /**
+     * Promote a standby straight to performer — unlike substitutePerformer(), no existing
+     * performer is demoted; this only works when the item's squad still has an open
+     * performer slot (same maxSquad/max_per_school cap addParticipant() enforces when
+     * adding a brand-new performer). Gated on the item's own results_published_at, same as
+     * every other roster-write action in this file.
+     */
+    public function promoteStandby(FestParticipant $standby): void
+    {
+        abort_if($standby->participant_role !== 'standby', 422, 'Participant is not a standby.');
+
+        $registration = $standby->registration;
+        abort_if($registration?->item?->results_published_at, 422, 'This item\'s results are already published. Unpublish it first to promote a standby.');
+
+        $registration->loadMissing('participants', 'item');
+        $item = $registration->item;
+        $performerCount = $registration->participants->where('participant_role', '!=', 'standby')->count();
+
+        if ($item && FestTeamSquadRules::isMultiPerson($item->participant_type)) {
+            $maxSquad = $item->squadRules()?->maxSquad ?? $item->max_group_size;
+            if ($maxSquad && ($performerCount + 1) > $maxSquad) {
+                abort(422, "This item allows at most {$maxSquad} participant(s) in the squad — no open slot. Use Substitute to swap with an existing performer instead.");
+            }
+        } else {
+            $maxAllowed = (int) ($item?->max_per_school ?? 1);
+            if ($performerCount + 1 > $maxAllowed) {
+                abort(422, "This item allows at most {$maxAllowed} performer".($maxAllowed === 1 ? '' : 's')." — no open slot. Use Substitute to swap with an existing performer instead.");
+            }
+        }
+
+        $standby->update(['participant_role' => 'performer']);
+    }
+
+    /**
      * Admin-direct roster edit: add a student who isn't currently on the registration at all
      * (unlike substitutePerformer(), which only swaps between two rows that already exist).
      * Deliberately does NOT check canSchoolEditRoster()/schedule_published — this is an

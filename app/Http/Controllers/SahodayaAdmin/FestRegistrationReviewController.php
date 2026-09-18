@@ -596,6 +596,21 @@ class FestRegistrationReviewController extends SahodayaAdminController
     }
 
     /**
+     * Promote a standby straight to performer when the item's squad still has an open
+     * slot — no swap, unlike substitute() above.
+     */
+    public function promoteParticipant(string $tenantId, FestEvent $event, FestRegistration $registration, FestParticipant $participant)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 403);
+        abort_if($participant->registration_id !== $registration->id, 403);
+
+        app(FestRegistrationService::class)->promoteStandby($participant);
+
+        return back()->with('success', 'Standby promoted to performer.');
+    }
+
+    /**
      * The school's students eligible to be added to this registration's item — used by the
      * "Manage participants" add-student picker. Unlike the on-behalf registration picker
      * (which only does a rough client-side eligibility approximation), this runs the real

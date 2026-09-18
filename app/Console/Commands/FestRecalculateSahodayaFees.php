@@ -176,7 +176,7 @@ class FestRecalculateSahodayaFees extends Command
             $this->warn('DRY RUN — nothing was written. Re-run with --commit to apply.');
         }
         $this->info("{$totalChanged} row(s) with a stale total_due, out of {$totalSchools} school registration(s) checked across {$events->count()} event(s).");
-        $this->line('amount_paid is never touched by recalculation — only total_due/participation_fee/school_registration_fee. A school already fully paid + approved whose total_due increases will be moved back to "submitted" (see FestSchoolEventFeeService::demoteSiblingApprovals()) so it\'s visibly under-paid again, not silently left "approved" while owing more.');
+        $this->line('amount_paid is never touched by recalculation — only total_due/participation_fee/school_registration_fee. A school already approved whose total_due increases now stays "approved" even though it\'s under-paid again — FestSchoolEventFeeService::demoteSiblingApprovals() no longer auto-reverts approvals (disabled 2026-09-18).');
 
         return self::SUCCESS;
     }

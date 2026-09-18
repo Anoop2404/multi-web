@@ -1231,6 +1231,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/registrations/{registration}/cancel', [FestRegistrationReviewController::class, 'cancel'])->name('registrations.cancel');
             Route::post('/{event}/registrations/{registration}/cancel-with-refund', [FestRegistrationReviewController::class, 'cancelWithRefund'])->name('registrations.cancel-with-refund');
             Route::post('/{event}/registrations/{registration}/substitute/{performer}/{standby}', [FestRegistrationReviewController::class, 'substitute'])->name('registrations.substitute');
+            Route::post('/{event}/registrations/{registration}/participants/{participant}/promote', [FestRegistrationReviewController::class, 'promoteParticipant'])->name('registrations.participants.promote');
             Route::get('/{event}/registrations/{registration}/eligible-students', [FestRegistrationReviewController::class, 'eligibleStudents'])->name('registrations.eligible-students');
             Route::post('/{event}/registrations/{registration}/participants', [FestRegistrationReviewController::class, 'addParticipant'])->name('registrations.participants.store');
             Route::delete('/{event}/registrations/{registration}/participants/{participant}', [FestRegistrationReviewController::class, 'removeParticipant'])->name('registrations.participants.destroy');

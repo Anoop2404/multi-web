@@ -1933,6 +1933,17 @@ class FestSchoolEventFeeService
      */
     public function demoteSiblingApprovals(FestEvent $event, string $schoolId, FestSchoolEventFee $fee, ?int $headId = null, string $reason = 'new items were added'): void
     {
+        // Disabled by product decision (2026-09-18, reversing the 2026-07-24 decision
+        // documented above): once a registration is approved, it stays approved even if
+        // the school's fee balance later falls short again — an admin's approval should
+        // not be silently undone by a later, unrelated change (a new item added, a
+        // payment proof reversed). Approving/rejecting a registration is still gated on
+        // the fee being paid at THAT moment (see FestRegistrationApprovalService /
+        // approveMany()'s require_fee_before_approval check) — this only stops already-
+        // approved rows from being walked back afterward. Left in place (not deleted) so
+        // every call site above keeps working unchanged if this is ever reversed again.
+        return;
+
         $registrations = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $schoolId)
             ->where('status', 'approved')

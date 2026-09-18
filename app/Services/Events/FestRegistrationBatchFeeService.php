@@ -361,6 +361,12 @@ class FestRegistrationBatchFeeService
      */
     private function demoteSiblingApprovals(FestEvent $root, string $schoolId, FestRegistrationBatch $batch, FestSchoolEventFee $fee, Collection $registrations): void
     {
+        // Disabled by the same product decision (2026-09-18) as
+        // FestSchoolEventFeeService::demoteSiblingApprovals() — see that method's
+        // docblock. Once approved, a batch's registrations stay approved even if the
+        // batch's balance later falls short again.
+        return;
+
         $approvedIds = $registrations->where('status', 'approved')->pluck('id');
         if ($approvedIds->isEmpty()) {
             return;

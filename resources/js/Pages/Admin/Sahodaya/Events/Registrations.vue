@@ -165,6 +165,8 @@
                         <th class="p-3">Category</th>
                         <th class="p-3">Status</th>
                         <th class="p-3">Participants</th>
+                        <th class="p-3">Added</th>
+                        <th class="p-3">Updated</th>
                         <th class="p-3"></th>
                     </tr>
                 </thead>
@@ -191,11 +193,20 @@
                                               :class="p.participant_role === 'standby' ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-indigo-50 text-indigo-800 border border-indigo-200'">
                                             {{ p.participant_role || 'performer' }}
                                         </span>
+                                        <button v-if="p.participant_role === 'standby' && reg.status === 'approved'"
+                                                type="button" class="text-emerald-700 font-semibold text-[10px] underline underline-offset-2"
+                                                :disabled="promotingParticipantId === p.id"
+                                                :title="hasOpenPerformerSlot(reg) ? 'Promote directly — this item still has an open performer slot' : 'No open slot — this will be rejected unless the item allows more performers'"
+                                                @click="promoteParticipant(reg, p)">
+                                            {{ promotingParticipantId === p.id ? 'Promoting…' : '↑ Promote' }}
+                                        </button>
                                     </div>
                                     <div v-if="reg.status === 'approved' && standbyCount(reg)" class="mt-1">
                                         <button type="button" class="text-indigo-600 font-semibold" @click="openSubstitute(reg)">Substitute</button>
                                     </div>
                                 </td>
+                        <td class="p-3 text-xs text-gray-500 whitespace-nowrap">{{ formatDateTimeAmPm(reg.created_at) }}</td>
+                        <td class="p-3 text-xs text-gray-500 whitespace-nowrap">{{ formatDateTimeAmPm(reg.updated_at) }}</td>
                         <td class="p-3 text-right space-x-2">
                             <template v-if="reg.status === 'submitted'">
                                 <button @click="approve(reg.id)" class="text-green-600 text-xs font-semibold">Approve</button>
@@ -226,7 +237,7 @@
                         </td>
                     </tr>
                     <tr v-if="!registrationsList.length">
-                        <td colspan="7" class="p-0">
+                        <td colspan="9" class="p-0">
                             <EmptyState title="No registrations match your filters"
                                 description="Try a different school, status, or item filter, or clear the search box above." icon="📋" class="py-8" />
                         </td>
@@ -1168,6 +1179,47 @@ function performers(reg) {
 
 function standbys(reg) {
     return reg.participants?.filter(p => p.participant_role === 'standby') ?? [];
+}
+
+// Client-side hint only — mirrors FestRegistrationService::promoteStandby()'s cap
+// loosely so the button/tooltip isn't misleading, but the server is the real
+// enforcement (this item's full squadRules()/criteria_json aren't always available
+// on the row's item relation, so this can under/over-estimate at the margins).
+function hasOpenPerformerSlot(reg) {
+    const item = reg.item;
+    if (!item) return true;
+    const isGroup = item.participant_type !== 'individual' && (
+        ['team', 'group', 'pair', 'trio'].includes(item.participant_type)
+        || Boolean(item.min_group_size)
+        || Boolean(item.max_group_size)
+    );
+    const maxAllowed = isGroup ? item.max_group_size : (item.max_per_school ?? 1);
+    if (!maxAllowed) return true;
+    return performerCount(reg) < maxAllowed;
+}
+
+const promotingParticipantId = ref(null);
+
+function promoteParticipant(reg, participant) {
+    promotingParticipantId.value = participant.id;
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations/${reg.id}/participants/${participant.id}/promote`,
+        {},
+        { preserveScroll: true, onFinish: () => { promotingParticipantId.value = null; } },
+    );
+}
+
+// Registration timestamps are stored/serialized in UTC ("created_at"/"updated_at") —
+// browsers render Date in the viewer's local timezone automatically, which is what
+// admins reviewing on-screen actually want (no separate timezone-conversion needed).
+function formatDateTimeAmPm(value) {
+    if (!value) return '—';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: 'numeric', minute: '2-digit', hour12: true,
+    });
 }
 
 function participantLabel(p) {
