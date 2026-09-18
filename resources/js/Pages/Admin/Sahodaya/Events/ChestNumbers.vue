@@ -125,7 +125,23 @@
                                 <tr v-for="(p, idx) in participants" :key="p.id" class="border-t"
                                     :class="p.chest_no ? 'hover:bg-slate-50' : 'bg-amber-50/60 hover:bg-amber-50'">
                                     <td class="p-3 text-gray-500">{{ idx + 1 }}</td>
-                                    <td class="p-3 font-mono font-bold">{{ p.chest_no ?? '—' }}</td>
+                                    <td class="p-3 font-mono font-bold">
+                                        <div v-if="editingChestId === p.id" class="relative flex items-center gap-1">
+                                            <input ref="chestEditInput" type="number" min="1"
+                                                   v-model="chestDraft"
+                                                   @keydown.enter="confirmSetChest(p)"
+                                                   @keydown.escape="cancelChestEdit"
+                                                   class="w-20 rounded border-2 border-indigo-400 px-2 py-1 text-sm font-mono font-normal focus:outline-none focus:ring-2 focus:ring-indigo-100" />
+                                            <button @click="confirmSetChest(p)" title="Save" class="text-emerald-600 hover:text-emerald-700 font-normal">✓</button>
+                                            <button @click="cancelChestEdit" title="Cancel" class="text-slate-400 hover:text-slate-600 font-normal">✕</button>
+                                            <p v-if="chestError" class="absolute mt-9 text-[11px] font-normal text-red-600 bg-white border border-red-200 rounded px-2 py-1 shadow-sm">{{ chestError }}</p>
+                                        </div>
+                                        <div v-else class="flex items-center gap-1.5">
+                                            <span>{{ p.chest_no ?? '—' }}</span>
+                                            <button @click="startChestEdit(p)" title="Set chest number"
+                                                    class="text-slate-300 hover:text-indigo-600 font-normal text-xs leading-none">✎</button>
+                                        </div>
+                                    </td>
                                     <td class="p-3">
                                         <SearchableSelect :model-value="p.order_no ?? ''"
                                                 :options="orderOptionsFor(p.id).map((n) => ({ value: n, label: String(n) }))"
@@ -144,7 +160,6 @@
                                     <td class="p-3 text-xs" :class="p.reg_status === 'approved' ? 'text-emerald-700' : 'text-amber-700'">{{ p.reg_status }}</td>
                                     <td class="p-3 text-xs">{{ p.group ?? '—' }}</td>
                                     <td class="p-3 text-right whitespace-nowrap">
-                                        <button @click="promptSetChest(p)" class="text-emerald-700 text-xs mr-2">Set #</button>
                                         <button v-if="p.chest_no" @click="clearChest(p.id)" class="text-red-600 text-xs mr-2">Clear</button>
                                         <button v-if="event.chest_reveal_mode === 'stage_entry' && !p.chest_revealed_at" @click="reveal(p.id)"
                                                 class="text-indigo-600 text-xs">Reveal</button>
@@ -213,7 +228,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, nextTick, reactive, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
@@ -223,7 +238,6 @@ import ReportHeadItemNavigator from '@/Components/reports/ReportHeadItemNavigato
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import Modal from '@/Components/ui/Modal.vue';
 import { useConfirm } from '@/composables/useConfirm';
-import { useSweetAlert } from '@/composables/useSweetAlert';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -274,8 +288,7 @@ const csvUrl = computed(() =>
     props.selectedItemId ? `${base.value}/csv?item_id=${props.selectedItemId}` : `${base.value}/csv`,
 );
 
-const { confirm, prompt } = useConfirm();
-const { showAlert } = useSweetAlert();
+const { confirm } = useConfirm();
 
 // preserveState: true on every action below (bulk and per-row) so this component
 // instance survives each round trip instead of being torn down and remounted — that's
@@ -353,29 +366,57 @@ function saveOrderNo(id, value) {
 }
 
 // Manual chest-number override, alongside the auto-assign buttons above — for matching
-// a number already printed on a badge, or any other one-off exception. Uses the shared
-// prompt() dialog rather than an always-on inline input in the table — a per-row input
-// box for every participant (sometimes hundreds) cluttered the CHEST column and, at the
-// width that column needs, clipped its own placeholder text.
-async function promptSetChest(participant) {
-    const value = await prompt({
-        title: 'Set chest number',
-        message: `${participant.name}${participant.school ? ' — ' + participant.school : ''}`,
-        inputLabel: 'Chest number',
-        inputPlaceholder: 'e.g. 105',
-        inputValue: participant.chest_no ? String(participant.chest_no) : '',
-    });
+// a number already printed on a badge, or any other one-off exception. Click-to-edit in
+// place (like Order's SearchableSelect) rather than an always-on input in every row —
+// that cluttered the CHEST column and clipped its own placeholder at the width the
+// column needs — and rather than a modal dialog, which would round-trip away from the
+// row and lose the surrounding context (who this is, what's already taken nearby).
+// editingChestId is singular: only one row edits at a time, so a single template ref is
+// enough — Vue re-mounts the input fresh for whichever row is currently open.
+const editingChestId = ref(null);
+const chestDraft = ref('');
+const chestError = ref('');
+const chestEditInput = ref(null);
 
-    const chestNo = Number(value);
-    if (!value || !Number.isInteger(chestNo) || chestNo < 1) return;
+async function startChestEdit(participant) {
+    editingChestId.value = participant.id;
+    chestDraft.value = participant.chest_no ? String(participant.chest_no) : '';
+    chestError.value = '';
+    await nextTick();
+    const el = Array.isArray(chestEditInput.value) ? chestEditInput.value[0] : chestEditInput.value;
+    el?.focus();
+    el?.select();
+}
+
+function cancelChestEdit() {
+    editingChestId.value = null;
+    chestDraft.value = '';
+    chestError.value = '';
+}
+
+function confirmSetChest(participant) {
+    const chestNo = Number(chestDraft.value);
+    if (!chestDraft.value || !Number.isInteger(chestNo) || chestNo < 1) {
+        chestError.value = 'Enter a valid chest number.';
+        return;
+    }
+
+    // Same-item participants are already loaded on screen — catching an obvious
+    // collision against them here means no server round trip for the common case.
+    // Anything scoped beyond this item (e.g. sibling sports items sharing a head) is
+    // still enforced server-side by FestChestNumberService::setChest().
+    const collision = props.participants.find((other) => other.id !== participant.id && other.chest_no === chestNo);
+    if (collision) {
+        chestError.value = `Already used by ${collision.name}.`;
+        return;
+    }
 
     router.post(`${base.value}/${participant.id}/set`, { chest_no: chestNo }, {
         preserveScroll: true,
         preserveState: true,
+        onSuccess: () => cancelChestEdit(),
         onError: (errors) => {
-            if (errors.chest_no) {
-                showAlert({ title: 'Could not set chest number', text: errors.chest_no, icon: 'error' });
-            }
+            chestError.value = errors.chest_no || 'Could not set chest number.';
         },
     });
 }
