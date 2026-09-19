@@ -820,11 +820,20 @@ class StudentController extends SchoolAdminController
 
         abort_unless($student->photo, 404);
 
-        try {
-            return TenantStorage::downloadResponse($this->school, $student->photo);
-        } catch (\Throwable) {
+        $dataUri = $student->photoDataUri();
+        abort_unless($dataUri, 404);
+
+        if (str_starts_with($dataUri, 'http://') || str_starts_with($dataUri, 'https://')) {
+            return redirect($dataUri);
+        }
+
+        if (! preg_match('/^data:([^;]+);base64,(.+)$/', $dataUri, $matches)) {
             abort(404, 'Photo not found.');
         }
+
+        return response(base64_decode($matches[2]), 200)
+            ->header('Content-Type', $matches[1])
+            ->header('Cache-Control', 'private, max-age=2592000, immutable');
     }
 
 
