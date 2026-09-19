@@ -8,8 +8,8 @@ th{background:#1d3557;color:#fff;font-size:8px;font-weight:bold;white-space:nowr
 .school-col{text-align:left;min-width:120px}
 .rank-col{width:28px}
 .head-col{background:#3d5a80;font-size:8px;padding:4px}
-.item-col{height:170px;vertical-align:bottom;padding:0 1px}
-.item-col-inner{display:block;width:160px;height:12px;line-height:12px;transform:rotate(-90deg);transform-origin:bottom left;white-space:nowrap;margin-left:9px}
+.item-col{height:210px;width:24px;min-width:24px;max-width:24px;position:relative;vertical-align:bottom;padding:0}
+.item-col-inner{display:block;position:absolute;bottom:2px;left:3px;width:230px;height:14px;line-height:14px;transform:rotate(-90deg);transform-origin:bottom left;white-space:nowrap}
 .subtotal-col{background:#eef2f8;font-weight:bold}
 .overall-col{background:#1d3557;color:#fff;font-weight:bold}
 tbody tr:nth-child(even){background:#f7f9fc}

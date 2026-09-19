@@ -2584,7 +2584,7 @@ class FestEventReportAnalyticsService
      * @param  int  $perPage  max item columns per printed page
      * @return list<array{categories: list<array<string, mixed>>, is_last_page: bool}>
      */
-    public static function paginateMatrixColumns(array $categories, int $perPage = 5): array
+    public static function paginateMatrixColumns(array $categories, int $perPage = 20): array
     {
         $flat = [];
         $totalItemsByCategory = [];

@@ -456,15 +456,19 @@ class FestCategoryItemMatrixReportTest extends TestCase
      * header's `writing-mode:vertical-rl` was silently ignored, leaving only
      * `transform:rotate(180deg)` applied to otherwise-horizontal text, which renders as
      * upside-down horizontal text instead of vertical text (confirmed by actually
-     * rendering the PDF and reading it back). A first fix (transform:rotate(-90deg) on
-     * an absolutely-positioned span) rendered a single item correctly, but with
-     * multiple items dompdf failed to establish a separate positioning context per
-     * table cell -- every column's rotated text collapsed toward the same position,
-     * overlapping (also confirmed by rendering and reading back a multi-item PDF). The
-     * working technique instead keeps the span in normal flow, sized to its full
-     * (wide) pre-rotation width so nothing needs absolute positioning to escape
-     * clipping -- verified with a multi-item render showing clean, non-overlapping,
-     * correctly-rotated columns.
+     * rendering the PDF and reading it back). A second attempt (transform:rotate(-90deg)
+     * on a plain, non-absolute span sized to its own full text width) fixed that, but
+     * every item column became as wide as its own (long) pre-rotation text box --
+     * confirmed live: noticeably wide columns with a lot of empty space next to each
+     * narrow rotated text. The working technique restores position:absolute (so the
+     * wide pre-rotation box never forces the column that wide) but locks each item
+     * <th> to an explicit min/max-width -- an EARLIER absolute-positioning attempt
+     * without that lock had every column's rotated text collapse onto the same
+     * position and overlap, because dompdf's automatic table layout left item columns
+     * unpredictably narrow/inconsistent width, not because absolute positioning itself
+     * is broken in table cells. Verified by rendering a 25-item, 2-page report and
+     * reading it back: narrow, evenly spaced, non-overlapping, non-clipped columns on
+     * every page, including the page with Sub/OVERALL columns.
      */
     public function test_pdf_item_header_uses_dompdf_compatible_rotation_not_writing_mode(): void
     {
@@ -472,6 +476,7 @@ class FestCategoryItemMatrixReportTest extends TestCase
 
         $this->assertStringNotContainsString('writing-mode', $css, 'dompdf does not support writing-mode -- it silently no-ops, leaving text upside-down instead of vertical');
         $this->assertStringContainsString('rotate(-90deg)', $css);
-        $this->assertStringNotContainsString('position:absolute', $css, 'absolute positioning inside a table cell caused every column\'s rotated text to collapse onto the same position and overlap -- confirmed by rendering a multi-item PDF');
+        $this->assertStringContainsString('position:absolute', $css);
+        $this->assertStringContainsString('max-width:24px', $css, 'each item column must be locked to a fixed width, or dompdf\'s automatic table layout can leave columns unpredictably narrow and overlapping');
     }
 }

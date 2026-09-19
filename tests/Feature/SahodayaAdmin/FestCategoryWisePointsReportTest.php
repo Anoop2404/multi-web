@@ -132,11 +132,18 @@ class FestCategoryWisePointsReportTest extends TestCase
 
     /**
      * Same dompdf writing-mode limitation as the consolidated matrix's own PDF -- see
-     * its test's docblock for the full explanation, including why position:absolute
-     * (a first fix attempt) is wrong too: with multiple item columns, dompdf failed to
-     * give each table cell its own positioning context, so every column's rotated text
-     * collapsed onto the same position and overlapped (confirmed by rendering a
-     * multi-item PDF and reading it back).
+     * its test's docblock for the full explanation. A first fix (a plain, non-absolute
+     * rotated span sized to its own full text width) avoided clipping and overlap, but
+     * at the cost of every item column becoming as wide as its own (long) pre-rotation
+     * text box -- confirmed live: item columns were noticeably wider than needed, with
+     * a lot of empty space next to each narrow rotated text. The real fix keeps
+     * position:absolute (so the wide pre-rotation box never forces the table layout to
+     * reserve that width) but locks each item <th> to an explicit min/max-width -- the
+     * true cause of the earlier "overlap" was dompdf's automatic table layout leaving
+     * item columns unpredictably narrow/inconsistent width without that lock, not
+     * absolute positioning itself. Confirmed by rendering a 10-item PDF (including a
+     * long "Classical Music (Karnatic)" title) and reading it back: narrow, evenly
+     * spaced, non-overlapping, non-clipped columns.
      */
     public function test_pdf_item_header_uses_dompdf_compatible_rotation_not_writing_mode(): void
     {
@@ -144,7 +151,8 @@ class FestCategoryWisePointsReportTest extends TestCase
 
         $this->assertStringNotContainsString('writing-mode', $css);
         $this->assertStringContainsString('rotate(-90deg)', $css);
-        $this->assertStringNotContainsString('position:absolute', $css);
+        $this->assertStringContainsString('position:absolute', $css);
+        $this->assertStringContainsString('max-width:24px', $css, 'each item column must be locked to a fixed width, or dompdf\'s automatic table layout can leave columns unpredictably narrow and overlapping');
     }
 
     /** Ten items in one category, the scenario that first revealed the column-overlap bug above -- must still render without error. */
