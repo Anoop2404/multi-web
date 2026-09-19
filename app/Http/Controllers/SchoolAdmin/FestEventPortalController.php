@@ -195,9 +195,27 @@ class FestEventPortalController extends SchoolAdminController
             'registrations' => $registrations,
             // For the "request a wildcard slot" form — a wildcard appeal has no
             // existing FestParticipant to pick from, so the school admin instead
-            // picks a student and an item directly.
-            'items'         => FestEventItem::where('event_id', $event->id)->where('is_enabled', true)
-                ->orderBy('display_order')->get(['id', 'title']),
+            // picks a student and an item directly. Many items share the same title
+            // (e.g. "Bharatanatyam" run separately per category/gender), so the picker
+            // needs category + type + gender + code to actually disambiguate them —
+            // same fields FestMarkEntryController::markEntrySheet() resolves for the
+            // same reason.
+            'items'         => (function () use ($event) {
+                $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
+
+                return FestEventItem::with('event:id,tenant_id')
+                    ->where('event_id', $event->id)->where('is_enabled', true)
+                    ->orderBy('display_order')
+                    ->get(['id', 'event_id', 'title', 'item_code', 'category', 'class_group', 'age_group', 'gender', 'participant_type'])
+                    ->map(fn (FestEventItem $item) => [
+                        'id' => $item->id,
+                        'title' => $item->title,
+                        'category_label' => \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels),
+                        'type_label' => \App\Support\FestItemCategoryLabel::typeLabel($item->participant_type),
+                        'gender_label' => \App\Support\FestItemCategoryLabel::genderLabel($item->gender),
+                        'item_code' => $item->item_code,
+                    ]);
+            })(),
             'students'      => Student::where('tenant_id', $this->school->id)->where('status', 'active')
                 ->orderBy('name')->get(['id', 'name', 'reg_no', 'admission_number']),
         ]);

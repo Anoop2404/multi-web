@@ -190,7 +190,15 @@ const studentOptions = computed(() =>
 );
 
 const itemOptions = computed(() =>
-    props.items.map(i => ({ value: i.id, label: i.title }))
+    props.items.map(i => ({
+        value: i.id,
+        // Many items share the same title (e.g. "Bharatanatyam" run once per
+        // category/gender) — without these, the picker is a wall of identical
+        // names with no way to tell which one is meant.
+        label: [i.title, i.category_label, i.type_label, i.gender_label, i.item_code]
+            .filter(Boolean)
+            .join(' · '),
+    }))
 );
 
 function participantLabel(p) {
