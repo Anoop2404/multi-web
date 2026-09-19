@@ -2531,8 +2531,23 @@ class FestEventReportAnalyticsService
                 ];
             })
             ->sortByDesc('overall')
-            ->values()
-            ->all();
+            ->values();
+
+        // Same rank/tie convention as categorySchoolPointsTable() — equal OVERALL
+        // totals share the same rank number, and the next distinct total skips ahead
+        // by the number of tied schools (1, 1, 3, 4, ...), matching how a printed
+        // result sheet ranks a tie.
+        $rank = 0;
+        $previous = null;
+        $schools = $schools->map(function (array $row) use (&$rank, &$previous) {
+            if ($previous === null || $row['overall'] < $previous) {
+                $rank++;
+            }
+            $previous = $row['overall'];
+            $row['rank'] = $rank;
+
+            return $row;
+        })->all();
 
         return [
             'categories' => $categories->all(),
@@ -2569,7 +2584,7 @@ class FestEventReportAnalyticsService
      * @param  int  $perPage  max item columns per printed page
      * @return list<array{categories: list<array<string, mixed>>, is_last_page: bool}>
      */
-    public static function paginateMatrixColumns(array $categories, int $perPage = 18): array
+    public static function paginateMatrixColumns(array $categories, int $perPage = 5): array
     {
         $flat = [];
         $totalItemsByCategory = [];

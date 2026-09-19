@@ -911,7 +911,7 @@ class FestReportService
         // have. Item-name headers are rotated (see $verticalHeaderIndices below), same
         // as the web page/PDF, so a wide combined report doesn't need one
         // impossibly-wide column per item just to fit its label horizontally.
-        $headers = ['School'];
+        $headers = ['Rank', 'School'];
         $verticalHeaderIndices = [];
         foreach ($categories as $category) {
             foreach ($category['heads'] as $head) {
@@ -933,7 +933,7 @@ class FestReportService
         $headers[] = 'OVERALL';
 
         $rows = collect($matrix['schools'])->map(function (array $school) use ($categories, $analytics) {
-            $row = [strtoupper($school['school_name'])];
+            $row = [$school['rank'], strtoupper($school['school_name'])];
             foreach ($categories as $category) {
                 foreach ($category['heads'] as $head) {
                     foreach ($head['items'] as $item) {

@@ -39,7 +39,8 @@
                 <table class="w-full text-xs border-collapse">
                     <thead>
                         <tr>
-                            <th rowspan="3" class="sticky left-0 z-20 bg-slate-900 text-white p-2.5 text-left border-r border-slate-700 min-w-[11rem]">School</th>
+                            <th rowspan="3" class="sticky left-0 z-20 bg-slate-900 text-white p-2.5 text-center border-r border-slate-700 w-10">Rank</th>
+                            <th rowspan="3" class="sticky left-10 z-20 bg-slate-900 text-white p-2.5 text-left border-r border-slate-700 min-w-[11rem]">School</th>
                             <th v-for="cat in categories" :key="cat.key" :colspan="categoryItemCount(cat) + 1"
                                 class="bg-slate-800 text-white p-2 text-center border-l border-slate-700 font-bold">
                                 {{ cat.label }}<span v-if="cat.excluded_from_overall" class="text-amber-400" title="Excluded from OVERALL">&nbsp;†</span>
@@ -70,7 +71,11 @@
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         <tr v-for="(school, idx) in schools" :key="school.school_id" :class="idx % 2 ? 'bg-slate-50/60' : 'bg-white'">
-                            <td class="sticky left-0 z-10 p-2.5 font-bold text-slate-800 border-r border-slate-200"
+                            <td class="sticky left-0 z-10 p-2.5 text-center font-semibold text-slate-500 border-r border-slate-200"
+                                :class="idx % 2 ? 'bg-slate-50' : 'bg-white'">
+                                {{ school.rank }}
+                            </td>
+                            <td class="sticky left-10 z-10 p-2.5 font-bold text-slate-800 border-r border-slate-200"
                                 :class="idx % 2 ? 'bg-slate-50' : 'bg-white'">
                                 {{ school.school_name.toUpperCase() }}
                             </td>

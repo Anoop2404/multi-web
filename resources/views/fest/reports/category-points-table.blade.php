@@ -7,8 +7,8 @@ th,td{border:1px solid #ccc;padding:3px 4px;text-align:center}
 th{background:#1d3557;color:#fff;font-size:8px;font-weight:bold;white-space:nowrap}
 .school-col{text-align:left;min-width:120px}
 .rank-col{width:28px}
-.item-col{height:170px;width:20px;position:relative;vertical-align:bottom;padding:0}
-.item-col span{display:block;position:absolute;bottom:4px;left:3px;width:160px;height:12px;line-height:12px;transform:rotate(-90deg);transform-origin:bottom left;white-space:nowrap}
+.item-col{height:170px;vertical-align:bottom;padding:0 1px}
+.item-col-inner{display:block;width:160px;height:12px;line-height:12px;transform:rotate(-90deg);transform-origin:bottom left;white-space:nowrap;margin-left:9px}
 .subtotal-col{background:#1d3557;color:#fff;font-weight:bold}
 tbody tr:nth-child(even){background:#f7f9fc}
 tbody td.subtotal-col{background:#c8d6ea;color:#1d3557}
@@ -31,7 +31,7 @@ $itemHeaderLabel = fn ($item) => ($item['item_code'] ? $item['item_code'].' — 
             <th class="rank-col">Rank</th>
             <th class="school-col">School</th>
             @foreach($items as $item)
-                <th class="item-col" title="{{ $item['title'] }}"><span>{{ $itemHeaderLabel($item) }}</span></th>
+                <th class="item-col" title="{{ $item['title'] }}"><div class="item-col-inner">{{ $itemHeaderLabel($item) }}</div></th>
             @endforeach
             <th class="subtotal-col">Total</th>
         </tr>

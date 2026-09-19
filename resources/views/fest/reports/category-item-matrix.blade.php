@@ -6,9 +6,10 @@ table{width:100%;border-collapse:collapse;margin-top:10px}
 th,td{border:1px solid #ccc;padding:3px 4px;text-align:center}
 th{background:#1d3557;color:#fff;font-size:8px;font-weight:bold;white-space:nowrap}
 .school-col{text-align:left;min-width:120px}
+.rank-col{width:28px}
 .head-col{background:#3d5a80;font-size:8px;padding:4px}
-.item-col{height:170px;width:20px;position:relative;vertical-align:bottom;padding:0}
-.item-col span{display:block;position:absolute;bottom:4px;left:3px;width:160px;height:12px;line-height:12px;transform:rotate(-90deg);transform-origin:bottom left;white-space:nowrap}
+.item-col{height:170px;vertical-align:bottom;padding:0 1px}
+.item-col-inner{display:block;width:160px;height:12px;line-height:12px;transform:rotate(-90deg);transform-origin:bottom left;white-space:nowrap;margin-left:9px}
 .subtotal-col{background:#eef2f8;font-weight:bold}
 .overall-col{background:#1d3557;color:#fff;font-weight:bold}
 tbody tr:nth-child(even){background:#f7f9fc}
@@ -42,6 +43,7 @@ $itemHeaderLabel = fn ($item) => ($item['item_code'] ? $item['item_code'].' — 
 <table>
     <thead>
         <tr>
+            <th class="rank-col" rowspan="3">Rank</th>
             <th class="school-col" rowspan="3">School</th>
             @foreach($categories as $category)
                 @php $categoryItemCount = collect($category['heads'])->sum(fn ($h) => count($h['items'])); @endphp
@@ -65,7 +67,7 @@ $itemHeaderLabel = fn ($item) => ($item['item_code'] ? $item['item_code'].' — 
             @foreach($categories as $category)
                 @foreach($category['heads'] as $head)
                     @foreach($head['items'] as $item)
-                        <th class="item-col" title="{{ $item['title'] }}"><span>{{ $itemHeaderLabel($item) }}</span></th>
+                        <th class="item-col" title="{{ $item['title'] }}"><div class="item-col-inner">{{ $itemHeaderLabel($item) }}</div></th>
                     @endforeach
                 @endforeach
             @endforeach
@@ -74,6 +76,7 @@ $itemHeaderLabel = fn ($item) => ($item['item_code'] ? $item['item_code'].' — 
     <tbody>
         @forelse($schools as $school)
         <tr>
+            <td class="rank-col">{{ $school['rank'] }}</td>
             <td class="school-col">{{ strtoupper($school['school_name']) }}</td>
             @foreach($categories as $category)
                 @foreach($category['heads'] as $head)

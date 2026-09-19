@@ -66,6 +66,7 @@ class FestCategoryItemMatrixReportTest extends TestCase
                 ->component('Sahodaya/Events/Reports/CategoryItemMatrix', false)
                 ->where('categories.0.heads.0.items.0.id', $item->id)
                 ->where('schools.0.school_id', $school->id)
+                ->where('schools.0.rank', 1)
                 ->has('schools.0.points_by_item.'.$item->id)
                 ->has('schools.0.category_totals')
                 ->has('schools.0.overall'));
@@ -191,6 +192,13 @@ class FestCategoryItemMatrixReportTest extends TestCase
         $this->assertStringContainsString('<Row ss:StyleID="body-alt">', $xml, 'the second school row should use the shaded alternate style');
         $this->assertMatchesRegularExpression('/<Cell ss:StyleID="header"><Data ss:Type="String">Sub<\/Data><\/Cell>/', $xml, 'the category subtotal header should be the short "Sub" label, not the long unrotated "Category ... Subtotal" string that forced one oversized column');
         $this->assertStringNotContainsString('Subtotal', $xml, 'the old long subtotal header text should be gone entirely');
+        $this->assertMatchesRegularExpression('/<Cell ss:StyleID="header"><Data ss:Type="String">Rank<\/Data><\/Cell>/', $xml, 'a Rank column should be the first header, matching the per-category points table');
+
+        $matrix = app(\App\Services\Events\FestEventReportAnalyticsService::class, ['event' => $event])->schoolItemPointsMatrix();
+        $schoolRow = collect($matrix['schools'])->firstWhere('school_id', $school->id);
+        $schoolBRow = collect($matrix['schools'])->firstWhere('school_id', $schoolB->id);
+        $this->assertSame(1, $schoolRow['rank'], 'the higher-scoring school (position 1) should rank 1');
+        $this->assertSame(2, $schoolBRow['rank'], 'the lower-scoring school (position 2) should rank 2, not tied with rank 1');
     }
 
     public function test_pdf_export_downloads(): void
@@ -443,12 +451,27 @@ class FestCategoryItemMatrixReportTest extends TestCase
      * blade source against a well-intentioned revert back to the broken
      * writing-mode approach.
      */
+    /**
+     * dompdf doesn't support the CSS `writing-mode` property at all -- the item-name
+     * header's `writing-mode:vertical-rl` was silently ignored, leaving only
+     * `transform:rotate(180deg)` applied to otherwise-horizontal text, which renders as
+     * upside-down horizontal text instead of vertical text (confirmed by actually
+     * rendering the PDF and reading it back). A first fix (transform:rotate(-90deg) on
+     * an absolutely-positioned span) rendered a single item correctly, but with
+     * multiple items dompdf failed to establish a separate positioning context per
+     * table cell -- every column's rotated text collapsed toward the same position,
+     * overlapping (also confirmed by rendering and reading back a multi-item PDF). The
+     * working technique instead keeps the span in normal flow, sized to its full
+     * (wide) pre-rotation width so nothing needs absolute positioning to escape
+     * clipping -- verified with a multi-item render showing clean, non-overlapping,
+     * correctly-rotated columns.
+     */
     public function test_pdf_item_header_uses_dompdf_compatible_rotation_not_writing_mode(): void
     {
         $css = file_get_contents(resource_path('views/fest/reports/category-item-matrix.blade.php'));
 
         $this->assertStringNotContainsString('writing-mode', $css, 'dompdf does not support writing-mode -- it silently no-ops, leaving text upside-down instead of vertical');
         $this->assertStringContainsString('rotate(-90deg)', $css);
-        $this->assertStringContainsString('position:absolute', $css, 'the rotated span must be taken out of flow so its wide pre-rotation box does not force a wide column, and so dompdf does not clip it to a narrow one');
+        $this->assertStringNotContainsString('position:absolute', $css, 'absolute positioning inside a table cell caused every column\'s rotated text to collapse onto the same position and overlap -- confirmed by rendering a multi-item PDF');
     }
 }

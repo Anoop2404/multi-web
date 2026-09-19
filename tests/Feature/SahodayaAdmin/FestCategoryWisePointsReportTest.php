@@ -130,14 +130,42 @@ class FestCategoryWisePointsReportTest extends TestCase
         $response->assertOk();
     }
 
-    /** Same dompdf writing-mode limitation as the consolidated matrix's own PDF -- see its test's docblock for the full explanation. */
+    /**
+     * Same dompdf writing-mode limitation as the consolidated matrix's own PDF -- see
+     * its test's docblock for the full explanation, including why position:absolute
+     * (a first fix attempt) is wrong too: with multiple item columns, dompdf failed to
+     * give each table cell its own positioning context, so every column's rotated text
+     * collapsed onto the same position and overlapped (confirmed by rendering a
+     * multi-item PDF and reading it back).
+     */
     public function test_pdf_item_header_uses_dompdf_compatible_rotation_not_writing_mode(): void
     {
         $css = file_get_contents(resource_path('views/fest/reports/category-points-table.blade.php'));
 
         $this->assertStringNotContainsString('writing-mode', $css);
         $this->assertStringContainsString('rotate(-90deg)', $css);
-        $this->assertStringContainsString('position:absolute', $css);
+        $this->assertStringNotContainsString('position:absolute', $css);
+    }
+
+    /** Ten items in one category, the scenario that first revealed the column-overlap bug above -- must still render without error. */
+    public function test_pdf_downloads_with_many_items_in_one_category(): void
+    {
+        [$sahodaya, $event, $admin, $school] = $this->fixture();
+
+        $titles = ['Light Music - Malayalam', 'Light Music - Malayalam', 'Classical Music (Karnatic)', 'Folk Dance', 'Folk Dance', 'Group Dance', 'Bharatanatyam', 'Bharatanatyam', 'Mohiniyattam', 'Mono Act'];
+        $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '9']);
+        foreach ($titles as $i => $title) {
+            $item = FestEventItem::create(['event_id' => $event->id, 'title' => $title, 'item_code' => (string) (209 + $i), 'participant_type' => 'individual', 'gender' => $i % 2 ? 'female' : 'male', 'class_group' => 'hs', 'is_enabled' => true]);
+            $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $schoolClass->id, 'name' => "Student {$i}", 'admission_no' => "MO{$i}"]);
+            $registration = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+            $participant = FestParticipant::create(['registration_id' => $registration->id, 'student_id' => $student->id, 'participant_role' => 'performer']);
+            FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'position' => 1, 'grade' => 'A']);
+        }
+
+        $response = $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/category-wise-points/hs/pdf?preview=1");
+
+        $response->assertOk();
     }
 
     public function test_xls_download_contains_rotated_item_headers_and_real_points(): void
