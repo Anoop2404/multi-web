@@ -170,6 +170,14 @@ class FestCategoryItemMatrixReportTest extends TestCase
         $participant = FestParticipant::create(['registration_id' => $registration->id, 'student_id' => $student->id, 'participant_role' => 'performer']);
         FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'position' => 1, 'grade' => 'A']);
 
+        // A second school so the alternating (zebra-striped) row style below has a
+        // second row to differ from the first.
+        $schoolB = Tenant::create(['id' => (string) Str::uuid(), 'type' => 'school', 'name' => 'Matrix XLS Data School B', 'parent_id' => $sahodaya->id, 'membership_status' => 'approved', 'is_active' => true]);
+        $studentB = Student::create(['tenant_id' => $schoolB->id, 'school_class_id' => $schoolClass->id, 'name' => 'Matrix XLS Data Student B', 'admission_no' => 'MXD2']);
+        $registrationB = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $schoolB->id, 'status' => 'approved']);
+        $participantB = FestParticipant::create(['registration_id' => $registrationB->id, 'student_id' => $studentB->id, 'participant_role' => 'performer']);
+        FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $participantB->id, 'position' => 2, 'grade' => 'A']);
+
         $response = $this->actingAs($admin)
             ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/export/category-item-matrix-xls");
 
@@ -179,6 +187,8 @@ class FestCategoryItemMatrixReportTest extends TestCase
         $this->assertStringContainsString('ss:Rotate="90"', $xml, 'item-name header columns should render rotated, matching the web page/PDF');
         $this->assertStringContainsString('<Cell ss:StyleID="header-vertical">', $xml, 'the item column header cell should use the rotated style, not the plain header style');
         $this->assertMatchesRegularExpression('/<Cell ss:StyleID="header"><Data ss:Type="String">School<\/Data><\/Cell>/', $xml, 'the School column header must stay horizontal, not rotated');
+        $this->assertStringContainsString('<Row ss:StyleID="body">', $xml, 'the first school row should use the plain body style');
+        $this->assertStringContainsString('<Row ss:StyleID="body-alt">', $xml, 'the second school row should use the shaded alternate style');
     }
 
     public function test_pdf_export_downloads(): void
@@ -356,5 +366,67 @@ class FestCategoryItemMatrixReportTest extends TestCase
             ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/export/category-item-matrix-pdf");
 
         $response->assertOk();
+    }
+
+    /**
+     * The interactive web page still shows an excluded category (with a † marker) so
+     * an admin can see the full picture — but the downloaded xls/pdf are meant to
+     * represent the school's official standing, so this Sahodaya wants that category's
+     * columns left out of the file entirely, not just left out of OVERALL.
+     */
+    public function test_excluded_category_is_left_out_of_the_downloaded_xls_and_pdf(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'sahodaya', 'name' => 'Matrix Exclude Download Sahodaya',
+            'domain' => 'matrix-exclude-dl-'.Str::random(8).'.test', 'is_active' => true,
+        ]);
+        SahodayaProfile::create(['tenant_id' => $sahodaya->id, 'prefix' => 'MED', 'student_data_mode' => 'counts_only']);
+
+        $school = Tenant::create(['id' => (string) Str::uuid(), 'type' => 'school', 'name' => 'Exclude Download School', 'parent_id' => $sahodaya->id, 'membership_status' => 'approved', 'is_active' => true]);
+
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        $event = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Matrix Exclude Download Fest', 'event_type' => 'kalolsavam',
+            'level_round' => 'sahodaya', 'status' => 'ongoing',
+            'aggregation_config' => ['excluded_overall_categories' => ['lp']],
+        ]);
+
+        $hsItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'Kept HS Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true]);
+        $lpItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'Hidden LP Item', 'participant_type' => 'individual', 'class_group' => 'lp', 'is_enabled' => true]);
+
+        $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '9']);
+        foreach ([$hsItem, $lpItem] as $i => $item) {
+            $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $schoolClass->id, 'name' => "Exclude Student {$i}", 'admission_no' => "ED{$i}"]);
+            $registration = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+            $participant = FestParticipant::create(['registration_id' => $registration->id, 'student_id' => $student->id, 'participant_role' => 'performer']);
+            FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'position' => 1, 'grade' => 'A']);
+        }
+
+        // The compiled PDF is a binary/compressed stream (dompdf FlateDecode), so text
+        // can't be reliably grepped out of it -- assert the download doesn't crash
+        // (proves the filtered-down category set still renders fine), and verify the
+        // exact filter categoryItemMatrixPdf()/categoryItemMatrixXls() apply
+        // (collect($matrix['categories'])->reject(fn ($c) => $c['excluded_from_overall']))
+        // drops 'lp' and keeps 'hs' at the data level directly.
+        $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/export/category-item-matrix-pdf")
+            ->assertOk();
+
+        $matrix = app(\App\Services\Events\FestEventReportAnalyticsService::class, ['event' => $event])->schoolItemPointsMatrix();
+        $downloadedCategoryKeys = collect($matrix['categories'])->reject(fn (array $c) => $c['excluded_from_overall'])->pluck('key')->all();
+        $this->assertContains('hs', $downloadedCategoryKeys);
+        $this->assertNotContains('lp', $downloadedCategoryKeys, 'the excluded lp category must not appear in the downloaded report at all');
+
+        // XLS is plain SpreadsheetML XML (not compressed), so its item-name headers can
+        // be checked directly in the streamed content.
+        $xls = $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/export/category-item-matrix-xls")
+            ->streamedContent();
+        $this->assertStringContainsString('Kept HS Item', $xls);
+        $this->assertStringNotContainsString('Hidden LP Item', $xls);
     }
 }

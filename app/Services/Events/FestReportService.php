@@ -898,7 +898,13 @@ class FestReportService
     private function categoryItemMatrixXls(FestEventReportAnalyticsService $analytics): StreamedResponse
     {
         $matrix = $analytics->schoolItemPointsMatrix();
-        $categories = $matrix['categories'];
+        // Categories the admin excluded from OVERALL (aggregation_config.
+        // excluded_overall_categories) are left out of the downloaded file entirely --
+        // unlike the interactive web page, which still shows them (with a † marker) for
+        // full visibility. A printed/exported sheet is meant to represent the school's
+        // official standing, and this Sahodaya doesn't want that category's numbers in
+        // the file it hands out at all, not just excluded from the OVERALL total.
+        $categories = collect($matrix['categories'])->reject(fn (array $c) => $c['excluded_from_overall'])->values()->all();
 
         // Flat single-row header ("CAT 1 › Head: Item Name") — a true multi-tier merged
         // header needs an ExcelExport extension this simple headers+rows API doesn't
@@ -941,12 +947,15 @@ class FestReportService
     private function categoryItemMatrixPdf(FestEventReportAnalyticsService $analytics): \Symfony\Component\HttpFoundation\Response
     {
         $matrix = $analytics->schoolItemPointsMatrix();
+        // Same exclusion-from-the-download as categoryItemMatrixXls() above — see its
+        // comment for why this deliberately differs from the interactive web page.
+        $categories = collect($matrix['categories'])->reject(fn (array $c) => $c['excluded_from_overall'])->values()->all();
 
         // A combined (multi-phase/region) event can easily run to 100+ item columns —
         // far too wide for one printed page. paginateMatrixColumns() splits them into
         // page-sized chunks with a "(cont'd)" continuation marker; a single-phase
         // event with few enough items still comes back as one page, unchanged.
-        $pages = FestEventReportAnalyticsService::paginateMatrixColumns($matrix['categories']);
+        $pages = FestEventReportAnalyticsService::paginateMatrixColumns($categories);
 
         return $this->renderPdf('fest.reports.category-item-matrix', [
             'event'      => $this->event,

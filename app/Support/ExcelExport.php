@@ -102,6 +102,7 @@ class ExcelExport
         $xml .= '<Style ss:ID="header"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#0F172A" ss:Pattern="Solid"/><Alignment ss:Vertical="Center"/></Style>';
         $xml .= '<Style ss:ID="header-vertical"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#0F172A" ss:Pattern="Solid"/><Alignment ss:Vertical="Bottom" ss:Horizontal="Center" ss:Rotate="90"/></Style>';
         $xml .= '<Style ss:ID="body"><Alignment ss:Vertical="Center"/></Style>';
+        $xml .= '<Style ss:ID="body-alt"><Alignment ss:Vertical="Center"/><Interior ss:Color="#F7F9FC" ss:Pattern="Solid"/></Style>';
         $xml .= '<Style ss:ID="note"><Font ss:Italic="1" ss:Color="#64748B"/></Style>';
         $xml .= '</Styles>'."\n";
 
@@ -136,13 +137,19 @@ class ExcelExport
             }
             $xml .= '</Row>'."\n";
 
+            // Alternating row shading (every other row) — same zebra-striping already
+            // used on every fest report's web page/PDF, so a large sheet like the
+            // Consolidated Report's 25+ schools stays readable instead of one
+            // undifferentiated wall of rows.
+            $rowIndex = 0;
             foreach ($rows as $row) {
-                $xml .= '<Row ss:StyleID="body">';
+                $xml .= '<Row ss:StyleID="'.($rowIndex % 2 === 1 ? 'body-alt' : 'body').'">';
                 foreach ($row as $cell) {
                     $type = is_numeric($cell) && $cell !== '' && $cell !== null ? 'Number' : 'String';
                     $xml .= '<Cell><Data ss:Type="'.$type.'">'.$escape($cell).'</Data></Cell>';
                 }
                 $xml .= '</Row>'."\n";
+                $rowIndex++;
             }
 
             $xml .= '</Table>';
