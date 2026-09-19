@@ -2478,8 +2478,14 @@ class FestEventReportAnalyticsService
         // Same dedup as EventContext::scoreboardByCategory() — pair/group items save one
         // FestMark per teammate, all sharing deduplicationKey(), so a team's points must
         // only be counted once, not once per member.
+        //
+        // Only an item's own published, non-hidden results count here — same gate
+        // PublicFestScoreboardService/FestCumulativeChampionshipService apply — so a
+        // school's totals on this sheet can't include marks a judge has entered but the
+        // admin hasn't published yet.
         $marks = FestMark::whereIn('event_id', $this->eventIds())
             ->whereIn('item_id', $allReportableItemIds)
+            ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
             ->with(['participant.registration.school', 'item'])
             ->get()
             ->unique(fn (FestMark $m) => $m->deduplicationKey());

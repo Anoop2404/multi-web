@@ -51,7 +51,7 @@ class FestCategoryItemMatrixReportTest extends TestCase
 
         $item = FestEventItem::create([
             'event_id' => $event->id, 'title' => 'Solo Song', 'participant_type' => 'individual',
-            'class_group' => 'hs', 'is_enabled' => true,
+            'class_group' => 'hs', 'is_enabled' => true, 'results_published_at' => now(),
         ]);
 
         $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '9']);
@@ -106,9 +106,9 @@ class FestCategoryItemMatrixReportTest extends TestCase
             ],
         ]);
 
-        $hsItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'HS Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true]);
-        $hssItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'HSS Item', 'participant_type' => 'individual', 'class_group' => 'hss', 'is_enabled' => true]);
-        $lpItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'LP Item', 'participant_type' => 'individual', 'class_group' => 'lp', 'is_enabled' => true]);
+        $hsItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'HS Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true, 'results_published_at' => now()]);
+        $hssItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'HSS Item', 'participant_type' => 'individual', 'class_group' => 'hss', 'is_enabled' => true, 'results_published_at' => now()]);
+        $lpItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'LP Item', 'participant_type' => 'individual', 'class_group' => 'lp', 'is_enabled' => true, 'results_published_at' => now()]);
 
         $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '9']);
         foreach ([$hsItem, $hssItem, $lpItem] as $i => $item) {
@@ -134,6 +134,56 @@ class FestCategoryItemMatrixReportTest extends TestCase
         $schoolRow = collect($matrix['schools'])->firstWhere('school_id', $school->id);
         $this->assertGreaterThan(0, $schoolRow['category_totals']['lp'], 'lp keeps its own subtotal even though it is excluded from OVERALL');
         $this->assertSame($schoolRow['category_totals']['hs'], $schoolRow['overall'], 'OVERALL should equal only the non-excluded (merged) hs total, not hs + lp');
+    }
+
+    /**
+     * A judge entering marks doesn't publish them -- an item's results only count once
+     * the admin explicitly publishes that item (results_published_at set, results_hidden
+     * false). Before this, the matrix summed every mark on record regardless of publish
+     * status, so a school's totals could jump around as judges typed in scores an admin
+     * hadn't released yet, and unofficial results leaked into an "official standing"
+     * report handed out to schools.
+     */
+    public function test_unpublished_item_results_are_excluded_from_the_matrix(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'sahodaya', 'name' => 'Matrix Unpublished Sahodaya',
+            'domain' => 'matrix-unpublished-'.Str::random(8).'.test', 'is_active' => true,
+        ]);
+        SahodayaProfile::create(['tenant_id' => $sahodaya->id, 'prefix' => 'MU', 'student_data_mode' => 'counts_only']);
+
+        $school = Tenant::create(['id' => (string) Str::uuid(), 'type' => 'school', 'name' => 'Unpublished Test School', 'parent_id' => $sahodaya->id, 'membership_status' => 'approved', 'is_active' => true]);
+
+        $event = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Matrix Unpublished Fest', 'event_type' => 'kalolsavam',
+            'level_round' => 'sahodaya', 'status' => 'ongoing',
+        ]);
+
+        $publishedItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'Published Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true, 'results_published_at' => now()]);
+        $unpublishedItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'Unpublished Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true]);
+        $hiddenItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'Hidden Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true, 'results_published_at' => now(), 'results_hidden' => true]);
+
+        $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '9']);
+        foreach ([$publishedItem, $unpublishedItem, $hiddenItem] as $i => $item) {
+            $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $schoolClass->id, 'name' => "Unpublished Student {$i}", 'admission_no' => "UP{$i}"]);
+            $registration = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+            $participant = FestParticipant::create(['registration_id' => $registration->id, 'student_id' => $student->id, 'participant_role' => 'performer']);
+            FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'position' => 1, 'grade' => 'A']);
+        }
+
+        $matrix = app(FestEventReportAnalyticsService::class, ['event' => $event])->schoolItemPointsMatrix();
+
+        // The item still shows up as a column either way (the schedule of items is
+        // unrelated to publish status) -- only the POINTS in its cells are gated.
+        $schoolRow = collect($matrix['schools'])->firstWhere('school_id', $school->id);
+        $this->assertGreaterThan(0, $schoolRow['points_by_item'][$publishedItem->id] ?? 0, 'the published item\'s points must still count');
+        $this->assertEmpty($schoolRow['points_by_item'][$unpublishedItem->id] ?? null, 'an item with no results_published_at must not contribute points');
+        $this->assertEmpty($schoolRow['points_by_item'][$hiddenItem->id] ?? null, 'a published-but-hidden item must not contribute points either');
+
+        $this->assertSame($schoolRow['category_totals']['hs'], $schoolRow['overall']);
+        $this->assertSame($schoolRow['points_by_item'][$publishedItem->id], $schoolRow['overall'], 'only the published item\'s points should reach the OVERALL total');
     }
 
     public function test_xls_export_downloads(): void
@@ -164,7 +214,7 @@ class FestCategoryItemMatrixReportTest extends TestCase
         $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
         $admin->assignRole('sahodaya_admin');
         $event = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Matrix XLS Data Fest', 'event_type' => 'kalolsavam', 'level_round' => 'sahodaya', 'status' => 'ongoing']);
-        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true]);
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true, 'results_published_at' => now()]);
         $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '9']);
         $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $schoolClass->id, 'name' => 'Matrix XLS Data Student', 'admission_no' => 'MXD1']);
         $registration = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
@@ -276,6 +326,7 @@ class FestCategoryItemMatrixReportTest extends TestCase
         $leafItem = FestEventItem::create([
             'event_id' => $leaf->id, 'title' => 'Solo Song', 'participant_type' => 'individual',
             'class_group' => 'hs', 'is_enabled' => true, 'inherited_from_item_id' => $hubItem->id,
+            'results_published_at' => now(),
         ]);
 
         $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '9']);
