@@ -1070,6 +1070,11 @@ class FestEventReportAnalyticsService
     /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */
     private function numberingRegisterRowsSorted(?string $schoolId): \Illuminate\Support\Collection
     {
+        // Computed once, outside the row loop below — this hits fest_class_category_scheme_groups,
+        // and every row shares the same event's scheme, so resolving it per-row would be exactly
+        // the kind of per-row DB lookup we've been eliminating elsewhere in this file.
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $this->event->rootEvent());
+
         return FestParticipant::query()
             ->whereHas('registration', fn ($q) => $q
                 ->whereIn('event_id', $this->eventIds())
@@ -1080,8 +1085,9 @@ class FestEventReportAnalyticsService
                 'teacher:id,name,reg_no',
                 'registration:id,event_id,item_id,school_id,status',
                 'registration.school:id,name',
-                'registration.item:id,title,head_id',
+                'registration.item:id,event_id,title,head_id,category,class_group,age_group,gender,participant_type',
                 'registration.item.head:id,name',
+                'registration.item.event:id,tenant_id',
             ])
             ->get()
             ->sortBy(fn (FestParticipant $p) => [
@@ -1091,22 +1097,29 @@ class FestEventReportAnalyticsService
                 $p->student?->name ?? $p->teacher?->name ?? '',
             ])
             ->values()
-            ->map(fn (FestParticipant $p) => [
-                'participant_id' => $p->id,
-                'head_name'      => $p->registration?->item?->head?->name,
-                'item_id'        => $p->registration?->item_id,
-                'item'           => $p->registration?->item?->title,
-                'school'         => $p->registration?->school?->name,
-                'school_id'      => $p->registration?->school_id,
-                'name'           => $p->student?->name ?? $p->teacher?->name,
-                'reg_no'         => $p->student?->admission_number ?? $p->teacher?->reg_no,
-                'reg_status'     => $p->registration?->status,
-                'role'           => $p->participant_role ?? 'performer',
-                'fest_id'        => $p->level_registration_number,
-                'item_reg'       => $p->item_registration_number,
-                'chest_no'       => $p->chest_no,
-                'disqualified'   => $p->disqualified_at !== null,
-            ]);
+            ->map(function (FestParticipant $p) use ($classGroupLabels) {
+                $item = $p->registration?->item;
+
+                return [
+                    'participant_id' => $p->id,
+                    'head_name'      => $item?->head?->name,
+                    'item_id'        => $p->registration?->item_id,
+                    'item'           => $item?->title,
+                    'category_label' => \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels),
+                    'type_label'     => \App\Support\FestItemCategoryLabel::typeLabel($item?->participant_type),
+                    'gender_label'   => \App\Support\FestItemCategoryLabel::genderLabel($item?->gender),
+                    'school'         => $p->registration?->school?->name,
+                    'school_id'      => $p->registration?->school_id,
+                    'name'           => $p->student?->name ?? $p->teacher?->name,
+                    'reg_no'         => $p->student?->admission_number ?? $p->teacher?->reg_no,
+                    'reg_status'     => $p->registration?->status,
+                    'role'           => $p->participant_role ?? 'performer',
+                    'fest_id'        => $p->level_registration_number,
+                    'item_reg'       => $p->item_registration_number,
+                    'chest_no'       => $p->chest_no,
+                    'disqualified'   => $p->disqualified_at !== null,
+                ];
+            });
     }
 
     /** @return list<array<string, mixed>> */
@@ -1189,6 +1202,9 @@ class FestEventReportAnalyticsService
         $rows = collect($this->numberingRegisterRows($schoolId))->map(fn ($r) => [
             $r['head_name'] ?? '—',
             $r['item'] ?? '',
+            $r['category_label'] ?? '',
+            $r['type_label'] ?? '',
+            $r['gender_label'] ?? '',
             $r['school'] ?? '',
             $r['name'] ?? '',
             $r['reg_no'] ?? '',
@@ -1199,7 +1215,7 @@ class FestEventReportAnalyticsService
 
         return ExcelExport::download(
             str($this->event->title)->slug()->limit(40).'-numbering-register',
-            ['Head', 'Item', 'School', 'Participant', 'Reg no', 'Reg status', 'Role', 'Chest'],
+            ['Head', 'Item', 'Category', 'Type', 'Gender', 'School', 'Participant', 'Reg no', 'Reg status', 'Role', 'Chest'],
             $rows,
             ExcelExport::generatedOnNote(),
         );

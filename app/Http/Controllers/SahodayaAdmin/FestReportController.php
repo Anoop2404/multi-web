@@ -838,11 +838,17 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $analytics = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event));
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+        $analytics = $this->scopedAnalytics($request, $targetEvent);
+        $schoolId = $request->input('school_id');
+
+        $query = array_filter(['region_id' => $request->integer('region_id') ?: null, 'school_id' => $schoolId ?: null]);
 
         return $this->inertia('Sahodaya/Events/Reports/NumberingRegister', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
-            'rows'   => $analytics->numberingRegisterRows(),
-            'xlsUrl' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/numbering-register/export".($request->integer('region_id') ? '?region_id='.$request->integer('region_id') : ''),
+            'rows'           => $analytics->numberingRegisterRows($schoolId ?: null),
+            'schools'        => $this->scopedReportService($request, $targetEvent)->schools(),
+            'filterSchoolId' => $schoolId,
+            'xlsUrl'         => "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/numbering-register/export".($query ? '?'.http_build_query($query) : ''),
         ])));
     }
 
@@ -850,7 +856,7 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        return ($this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event)))->exportNumberingRegister();
+        return ($this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event)))->exportNumberingRegister($request->input('school_id') ?: null);
     }
 
     public function pendingApprovals(Request $request, string $tenantId, FestEvent $event)
