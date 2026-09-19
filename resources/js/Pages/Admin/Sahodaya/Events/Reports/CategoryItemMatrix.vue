@@ -6,6 +6,8 @@
             <template #actions>
                 <a :href="`${exportBase}/category-item-matrix-pdf`" class="btn-secondary text-sm">⬇️ PDF</a>
                 <a :href="`${exportBase}/category-item-matrix-xls`" class="btn-secondary text-sm">⬇️ Excel</a>
+                <a :href="`${exportBase}/category-totals-pdf`" class="btn-secondary text-sm">⬇️ Category Totals (PDF)</a>
+                <a :href="`${exportBase}/category-totals-xls`" class="btn-secondary text-sm">⬇️ Category Totals (Excel)</a>
             </template>
         </PageHeader>
 

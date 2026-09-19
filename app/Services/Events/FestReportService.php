@@ -587,6 +587,8 @@ class FestReportService
             'overall-ranking' => $this->overallRankingPdf(),
             'category-item-matrix-xls' => $this->categoryItemMatrixXls($analytics()),
             'category-item-matrix-pdf' => $this->categoryItemMatrixPdf($analytics()),
+            'category-totals-xls' => $this->categoryTotalsXls($analytics()),
+            'category-totals-pdf' => $this->categoryTotalsPdf($analytics()),
             'individual-championship-xls' => $this->individualChampionshipXls(),
             'individual-championship-pdf' => $this->individualChampionshipPdf(),
             'house-wise' => $this->houseWisePdf(),
@@ -894,6 +896,62 @@ class FestReportService
             'schools' => $this->schoolRankingRows(),
             ...$this->brandingData(),
         ], $this->slug().'-overall-ranking.pdf');
+    }
+
+    /**
+     * Category totals only -- one column per category (its Sub total) plus OVERALL, no
+     * per-item breakdown at all. schoolItemPointsMatrix() already computes every number
+     * this needs (category_totals, overall); this just re-shapes the same data into a
+     * narrower table that fits comfortably in portrait instead of the item-level
+     * matrix's wide landscape sheet. Excluded-from-overall categories are left out
+     * entirely, same reasoning/consistency as categoryItemMatrixXls()/Pdf() above.
+     *
+     * @return array{categories: list<array<string, mixed>>, rows: list<list<mixed>>}
+     */
+    private function categoryTotalsData(FestEventReportAnalyticsService $analytics): array
+    {
+        $matrix = $analytics->schoolItemPointsMatrix();
+        $categories = collect($matrix['categories'])->reject(fn (array $c) => $c['excluded_from_overall'])->values()->all();
+
+        $rows = collect($matrix['schools'])->map(function (array $school) use ($categories) {
+            $row = [$school['rank'], strtoupper($school['school_name'])];
+            foreach ($categories as $category) {
+                $row[] = $school['category_totals'][$category['key']] ?? 0;
+            }
+            $row[] = $school['overall'];
+
+            return $row;
+        })->all();
+
+        return ['categories' => $categories, 'rows' => $rows];
+    }
+
+    private function categoryTotalsXls(FestEventReportAnalyticsService $analytics): StreamedResponse
+    {
+        ['categories' => $categories, 'rows' => $rows] = $this->categoryTotalsData($analytics);
+
+        $headers = ['Rank', 'School'];
+        $columnStyles = [];
+        foreach ($categories as $i => $category) {
+            $columnStyles[count($headers)] = ExcelExport::CATEGORY_BAND_STYLES[$i % count(ExcelExport::CATEGORY_BAND_STYLES)];
+            $headers[] = $category['label'];
+        }
+        $columnStyles[count($headers)] = 'overall';
+        $headers[] = 'OVERALL';
+
+        return ExcelExport::download($this->slug().'-category-totals', $headers, $rows, ExcelExport::generatedOnNote(), [], $columnStyles);
+    }
+
+    private function categoryTotalsPdf(FestEventReportAnalyticsService $analytics): \Symfony\Component\HttpFoundation\Response
+    {
+        ['categories' => $categories, 'rows' => $rows] = $this->categoryTotalsData($analytics);
+
+        return $this->renderPdf('fest.reports.category-totals', [
+            'event'      => $this->event,
+            'categories' => $categories,
+            'rows'       => $rows,
+            ...$this->brandingData(),
+        ], $this->slug().'-category-totals.pdf');
     }
 
     private function categoryItemMatrixXls(FestEventReportAnalyticsService $analytics): StreamedResponse
