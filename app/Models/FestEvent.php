@@ -14,6 +14,20 @@ class FestEvent extends Model
     use BelongsToCentralTenant;
 
     /**
+     * Memoizes reportableEventIds() below, keyed by event id rather than per-instance:
+     * FestNumberingService::existingChestNumber() calls it once per participant via
+     * $participant->loadMissing('registration.event'), which hydrates a FRESH FestEvent
+     * object for every participant even when they all share the same event — so
+     * instance-level memoization wouldn't dedupe across a report's participant list. A
+     * static, request-scoped cache does, since the parent/child ids can't change
+     * mid-request and PHP-FPM resets statics between requests (this app doesn't run
+     * Octane/queue-persisted workers for this path).
+     *
+     * @var array<int, list<int>>
+     */
+    private static array $reportableEventIdsCache = [];
+
+    /**
      * Mirrors FestItemHead::NOTIFICATION_TRIGGERS — kept as its own copy (not a shared
      * reference) for the same reason the "Sports unified event fields" block below is a
      * copy rather than a join: this list needs to work for any event, head or no head.
@@ -476,7 +490,12 @@ class FestEvent extends Model
      */
     public function reportableEventIds(): array
     {
-        $ids = [(int) $this->id];
+        $key = (int) $this->id;
+        if (isset(self::$reportableEventIdsCache[$key])) {
+            return self::$reportableEventIdsCache[$key];
+        }
+
+        $ids = [$key];
 
         $childIds = self::where('parent_event_id', $this->id)->pluck('id')->map(fn ($id) => (int) $id)->all();
         if (! empty($childIds)) {
@@ -487,7 +506,7 @@ class FestEvent extends Model
             }
         }
 
-        return array_values(array_unique($ids));
+        return self::$reportableEventIdsCache[$key] = array_values(array_unique($ids));
     }
 
     /**
