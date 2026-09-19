@@ -901,17 +901,19 @@ class FestReportService
         $categories = $matrix['categories'];
 
         // Flat single-row header ("CAT 1 › Head: Item Name") — a true multi-tier merged
-        // header, or rotated/vertical header text, needs an ExcelExport extension this
-        // simple headers+rows API doesn't have; this ships the same data immediately and
-        // is still fully readable in Excel/Sheets. See
-        // Documents/Fest_Improvements_Proposal.md §6.
+        // header needs an ExcelExport extension this simple headers+rows API doesn't
+        // have. Item-name headers are rotated (see $verticalHeaderIndices below), same
+        // as the web page/PDF, so a wide combined report doesn't need one
+        // impossibly-wide column per item just to fit its label horizontally.
         $headers = ['School'];
+        $verticalHeaderIndices = [];
         foreach ($categories as $category) {
             foreach ($category['heads'] as $head) {
                 foreach ($head['items'] as $item) {
                     $gender = (! ($item['gender'] ?? null) || $item['gender'] === 'open') ? 'Mixed' : ucfirst($item['gender']);
                     $type = in_array($item['participant_type'] ?? null, ['team', 'group', 'pair', 'trio'], true) ? 'Group' : 'Individual';
-                    $headers[] = $category['label'].' › '.$head['head_label'].': '.$item['title']." ({$gender}, {$type})";
+                    $verticalHeaderIndices[] = count($headers);
+                    $headers[] = ($item['item_code'] ? $item['item_code'].' — '.$item['title'] : $item['title'])." · {$gender} · {$type}";
                 }
             }
             $headers[] = $category['label'].' — Subtotal';
@@ -933,7 +935,7 @@ class FestReportService
             return $row;
         });
 
-        return ExcelExport::download($this->slug().'-category-item-matrix', $headers, $rows, ExcelExport::generatedOnNote());
+        return ExcelExport::download($this->slug().'-category-item-matrix', $headers, $rows, ExcelExport::generatedOnNote(), $verticalHeaderIndices);
     }
 
     private function categoryItemMatrixPdf(FestEventReportAnalyticsService $analytics): \Symfony\Component\HttpFoundation\Response

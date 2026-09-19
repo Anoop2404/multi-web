@@ -176,6 +176,9 @@ class FestCategoryItemMatrixReportTest extends TestCase
         $xml = $response->streamedContent();
         $this->assertStringContainsString('MATRIX XLS DATA SCHOOL', $xml);
         $this->assertMatchesRegularExpression('/<Cell><Data ss:Type="Number">[1-9]\d*<\/Data><\/Cell>/', $xml, 'expected at least one non-zero point cell in the exported XLS');
+        $this->assertStringContainsString('ss:Rotate="90"', $xml, 'item-name header columns should render rotated, matching the web page/PDF');
+        $this->assertStringContainsString('<Cell ss:StyleID="header-vertical">', $xml, 'the item column header cell should use the rotated style, not the plain header style');
+        $this->assertMatchesRegularExpression('/<Cell ss:StyleID="header"><Data ss:Type="String">School<\/Data><\/Cell>/', $xml, 'the School column header must stay horizontal, not rotated');
     }
 
     public function test_pdf_export_downloads(): void
