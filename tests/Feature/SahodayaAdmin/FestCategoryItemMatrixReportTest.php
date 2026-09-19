@@ -189,6 +189,8 @@ class FestCategoryItemMatrixReportTest extends TestCase
         $this->assertMatchesRegularExpression('/<Cell ss:StyleID="header"><Data ss:Type="String">School<\/Data><\/Cell>/', $xml, 'the School column header must stay horizontal, not rotated');
         $this->assertStringContainsString('<Row ss:StyleID="body">', $xml, 'the first school row should use the plain body style');
         $this->assertStringContainsString('<Row ss:StyleID="body-alt">', $xml, 'the second school row should use the shaded alternate style');
+        $this->assertMatchesRegularExpression('/<Cell ss:StyleID="header"><Data ss:Type="String">Sub<\/Data><\/Cell>/', $xml, 'the category subtotal header should be the short "Sub" label, not the long unrotated "Category ... Subtotal" string that forced one oversized column');
+        $this->assertStringNotContainsString('Subtotal', $xml, 'the old long subtotal header text should be gone entirely');
     }
 
     public function test_pdf_export_downloads(): void

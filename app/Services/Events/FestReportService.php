@@ -922,7 +922,13 @@ class FestReportService
                     $headers[] = ($item['item_code'] ? $item['item_code'].' — '.$item['title'] : $item['title'])." · {$gender} · {$type}";
                 }
             }
-            $headers[] = $category['label'].' — Subtotal';
+            // Short "Sub" (same as the web page/PDF's Sub column, relying on its
+            // position right after that category's items for context) rather than a
+            // long "Category 1 — Classes 3 & 4 — Subtotal" string -- an unrotated
+            // header column is sized to fit its own text, so a long label here forced
+            // one enormous blank-looking column that threw off the whole sheet's
+            // alignment next to the narrow rotated item columns either side of it.
+            $headers[] = 'Sub';
         }
         $headers[] = 'OVERALL';
 
