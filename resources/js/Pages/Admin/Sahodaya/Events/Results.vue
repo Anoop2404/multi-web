@@ -2,7 +2,12 @@
     <SahodayaEventsLayout :title="`${event.title} — Results`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="pageTitle" eyebrow="Results"
-                    :description="pageDescription" />
+                    :description="pageDescription">
+            <template #actions>
+                <a :href="firstRankWinnersUrl()" target="_blank" class="btn-secondary text-sm">🥇 1st Rank Winners (PDF)</a>
+                <a :href="firstRankWinnersUrl(true)" target="_blank" class="btn-secondary text-sm">CSV</a>
+            </template>
+        </PageHeader>
 
         <SportsSetupSubNav v-if="isSports" :sahodaya-id="sahodaya.id" :event-id="event.id"
                            :event="event" active="results" class="mb-4" />
@@ -506,6 +511,10 @@ function downloadWinnersUrl(row, preview = false, blank = false) {
     if (blank) q.set('blank', '1');
     const qs = q.toString();
     return `${props.resultsBaseUrl}/items/${itemId}/winners${qs ? `?${qs}` : ''}`;
+}
+
+function firstRankWinnersUrl(csv = false) {
+    return `${props.resultsBaseUrl}/first-rank-winners${csv ? '?csv=1' : ''}`;
 }
 
 function formatWindow(row) {

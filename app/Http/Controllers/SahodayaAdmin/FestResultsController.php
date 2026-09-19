@@ -192,6 +192,80 @@ class FestResultsController extends SahodayaAdminController
     }
 
     /**
+     * Event-wide "1st rank winners" list — every enabled item's own resultRowsForItem(),
+     * filtered to position === 1 and combined into one sheet, so an organizer doesn't have
+     * to open each item's own winner sheet individually to compile a prize/announcement
+     * list. Ties are kept (two participants can both hold position 1). Items with no
+     * position entered at all (grade-only marking, or nothing marked yet) simply
+     * contribute no row — same "don't guess a rank" rule as downloadItemWinners() above.
+     */
+    private function firstRankWinnerRows(FestEvent $event): array
+    {
+        // Computed once, outside the per-item loop below -- same reasoning as the
+        // Numbering Register fix: this hits fest_class_category_scheme_groups, and every
+        // item shares the same event's scheme, so resolving it per-item would be the same
+        // per-row DB lookup already eliminated elsewhere in this codebase.
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
+
+        $items = FestEventItem::with('event:id,tenant_id')
+            ->where('event_id', $event->id)->where('is_enabled', true)
+            ->orderBy('display_order')->orderBy('title')
+            ->get(['id', 'event_id', 'title', 'category', 'class_group', 'age_group', 'gender', 'participant_type']);
+
+        $service = app(FestItemResultsService::class);
+
+        return $items->flatMap(function (FestEventItem $item) use ($event, $service, $classGroupLabels) {
+            $rows = $service->resultRowsForItem($event, $item->id);
+
+            return collect($rows)
+                ->where('position', 1)
+                ->map(fn ($row) => [
+                    'item'          => $item->title,
+                    'category_label' => \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels),
+                    'type_label'    => \App\Support\FestItemCategoryLabel::typeLabel($item->participant_type),
+                    'gender_label'  => \App\Support\FestItemCategoryLabel::genderLabel($item->gender),
+                    // resultRowsForItem() already joins every team member's name with
+                    // " & " for a group/team item's single winning entry -- exactly the
+                    // roster this needs, just under the one 'name' field.
+                    'name'    => $row['name'],
+                    'school'  => $row['school'],
+                ]);
+        })->values()->all();
+    }
+
+    public function downloadFirstRankWinners(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $event = $this->regionAwareTargetEvent($request, $event);
+        $rows = $this->firstRankWinnerRows($event);
+
+        if ($request->boolean('csv')) {
+            return \App\Support\ExcelExport::download(
+                str($event->title)->slug()->limit(50).'-first-rank-winners',
+                ['Item', 'Category', 'Type', 'Gender', 'Winner / Team', 'School'],
+                collect($rows)->map(fn ($r) => [
+                    $r['item'], $r['category_label'] ?? '', $r['type_label'] ?? '', $r['gender_label'] ?? '',
+                    $r['name'], $r['school'] ?? '',
+                ]),
+                \App\Support\ExcelExport::generatedOnNote(),
+            );
+        }
+
+        $html = view('fest.reports.first-rank-winners', [
+            'event'   => $event,
+            'rows'    => $rows,
+            'orgName' => $this->sahodaya->name,
+            'logoSrc' => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+        ])->render();
+
+        $filename = str($event->title)->slug()->limit(50).'-first-rank-winners.pdf';
+        $preview = $request->boolean('preview') || $request->boolean('inline');
+
+        return \App\Support\PdfGenerator::download($html, $filename, $preview);
+    }
+
+    /**
      * Base64 data URI for a rank-1/2/3 medal image — dompdf (the PDF backend used here)
      * often refuses a bare local file path under its chroot check, so images need to be
      * embedded inline the same way TenantBranding::logoEmbedSrc() does for the org logo.
