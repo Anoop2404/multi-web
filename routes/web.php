@@ -1527,6 +1527,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
                 Route::get('/{event}/reports/category-wise-points', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'categoryWisePoints'])->name('reports.category-wise-points');
                 Route::get('/{event}/reports/category-wise-points/{itemId}/participants', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'categoryWisePointsParticipants'])->name('reports.category-wise-points.participants');
                 Route::get('/{event}/reports/category-wise-points/{category}/pdf', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'categoryWisePointsPdf'])->where('category', '[^/]+')->name('reports.category-wise-points.pdf');
+                Route::get('/{event}/reports/category-wise-points/{category}/xls', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'categoryWisePointsXls'])->where('category', '[^/]+')->name('reports.category-wise-points.xls');
+                Route::get('/{event}/reports/category-wise-points/{category}/table', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'categoryWisePointsTable'])->where('category', '[^/]+')->name('reports.category-wise-points.table');
                 Route::get('/{event}/reports/category-item-matrix', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'categoryItemMatrix'])->name('reports.category-item-matrix');
                 Route::get('/{event}/reports/export/{exportType}', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'export'])->name('reports.export');
             });

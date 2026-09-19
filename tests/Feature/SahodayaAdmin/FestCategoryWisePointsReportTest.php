@@ -104,4 +104,44 @@ class FestCategoryWisePointsReportTest extends TestCase
 
         $response->assertOk();
     }
+
+    public function test_xls_download_contains_rotated_item_headers_and_real_points(): void
+    {
+        [$sahodaya, $event, $admin, $school] = $this->fixture();
+
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'HS Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true]);
+        $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '9']);
+        $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $schoolClass->id, 'name' => 'Student', 'admission_no' => 'S1']);
+        $registration = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+        $participant = FestParticipant::create(['registration_id' => $registration->id, 'student_id' => $student->id, 'participant_role' => 'performer']);
+        FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'position' => 1, 'grade' => 'A']);
+
+        $xml = $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/category-wise-points/hs/xls")
+            ->streamedContent();
+
+        $this->assertStringContainsString(strtoupper($school->name), $xml);
+        $this->assertStringContainsString('ss:Rotate="90"', $xml);
+        $this->assertMatchesRegularExpression('/<Cell><Data ss:Type="Number">[1-9]\d*<\/Data><\/Cell>/', $xml);
+    }
+
+    public function test_points_table_json_endpoint_returns_items_and_school_points(): void
+    {
+        [$sahodaya, $event, $admin, $school] = $this->fixture();
+
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'HS Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true]);
+        $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '9']);
+        $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $schoolClass->id, 'name' => 'Student', 'admission_no' => 'S1']);
+        $registration = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+        $participant = FestParticipant::create(['registration_id' => $registration->id, 'student_id' => $student->id, 'participant_role' => 'performer']);
+        FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'position' => 1, 'grade' => 'A']);
+
+        $response = $this->actingAs($admin)
+            ->getJson("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/category-wise-points/hs/table");
+
+        $response->assertOk()
+            ->assertJsonPath('items.0.title', 'HS Item')
+            ->assertJsonPath('schools.0.school_id', $school->id);
+        $this->assertGreaterThan(0, $response->json('schools.0.subtotal'));
+    }
 }

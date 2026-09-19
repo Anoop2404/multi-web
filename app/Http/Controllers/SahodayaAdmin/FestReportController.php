@@ -1147,6 +1147,53 @@ class FestReportController extends SahodayaAdminController
         return $pdf->download($filename);
     }
 
+    /** Excel sibling of categoryWisePointsPdf() above — same data, same rotated item-name headers as the consolidated matrix's own export. */
+    public function categoryWisePointsXls(Request $request, string $tenantId, FestEvent $event, string $category)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+        $analytics = $this->scopedAnalytics($request, $targetEvent);
+        $table = $analytics->categorySchoolPointsTable($category);
+
+        $headers = ['Rank', 'School'];
+        $verticalHeaderIndices = [];
+        foreach ($table['items'] as $item) {
+            $gender = (! ($item['gender'] ?? null) || $item['gender'] === 'open') ? 'Mixed' : ucfirst($item['gender']);
+            $type = in_array($item['participant_type'] ?? null, ['team', 'group', 'pair', 'trio'], true) ? 'Group' : 'Individual';
+            $verticalHeaderIndices[] = count($headers);
+            $headers[] = ($item['item_code'] ? $item['item_code'].' — '.$item['title'] : $item['title'])." · {$gender} · {$type}";
+        }
+        $headers[] = 'Total';
+
+        $rows = collect($table['schools'])->map(function (array $school) use ($table, $analytics) {
+            $row = [$school['rank'], strtoupper($school['school_name'])];
+            foreach ($table['items'] as $item) {
+                $row[] = $analytics->formatMatrixCell($school, $item['id']);
+            }
+            $row[] = $school['subtotal'];
+
+            return $row;
+        });
+
+        return \App\Support\ExcelExport::download("{$event->id}-{$category}-category-points", $headers, $rows, \App\Support\ExcelExport::generatedOnNote(), $verticalHeaderIndices);
+    }
+
+    /** JSON endpoint the Category-wise Points report's interactive per-category points table fetches on tab switch. */
+    public function categoryWisePointsTable(Request $request, string $tenantId, FestEvent $event, string $category)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+        $analytics = $this->scopedAnalytics($request, $targetEvent);
+        $table = $analytics->categorySchoolPointsTable($category);
+
+        return response()->json([
+            'items'   => $table['items'],
+            'schools' => $table['schools'],
+        ]);
+    }
+
     /** Consolidated category-wise & item-wise report — school rows, item columns grouped by category, subtotal + overall columns. */
     public function categoryItemMatrix(Request $request, string $tenantId, FestEvent $event)
     {

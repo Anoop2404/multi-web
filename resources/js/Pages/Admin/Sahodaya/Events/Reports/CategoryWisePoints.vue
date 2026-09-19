@@ -2,7 +2,7 @@
     <SahodayaEventsLayout :title="`${event.title} — Category-wise Points`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Category-wise Points`" eyebrow="Reports"
-                    description="Items grouped by category — open an item to see each participant's rank, grade, and how their points break down." />
+                    description="Every category on its own, unmerged — a school x item points table per category, plus each item's participant breakdown." />
 
         <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="category-wise-points" />
 
@@ -28,13 +28,48 @@
                 </button>
             </div>
 
-            <div v-if="activeCategory" class="card card--flush overflow-hidden">
+            <div v-if="activeCategory" class="card card--flush overflow-hidden mb-6">
                 <div class="px-5 py-3 border-b bg-slate-50/80 flex items-center justify-between gap-3 flex-wrap">
-                    <h3 class="section-title text-sm !mb-0">{{ activeCategory.label }}</h3>
+                    <h3 class="section-title text-sm !mb-0">{{ activeCategory.label }} — Points Table</h3>
                     <div class="flex items-center gap-2">
-                        <a :href="categoryPdfUrl(activeCategory, true)" target="_blank" rel="noopener" class="btn-secondary text-xs">👁️ Preview points table</a>
-                        <a :href="categoryPdfUrl(activeCategory, false)" class="btn-secondary text-xs">⬇️ Download PDF</a>
+                        <a :href="categoryPdfUrl(activeCategory, true)" target="_blank" rel="noopener" class="btn-secondary text-xs">👁️ Preview PDF</a>
+                        <a :href="categoryPdfUrl(activeCategory, false)" class="btn-secondary text-xs">⬇️ PDF</a>
+                        <a :href="categoryXlsUrl(activeCategory)" class="btn-secondary text-xs">⬇️ Excel</a>
                     </div>
+                </div>
+
+                <div v-if="pointsTableLoading" class="p-8 text-center text-slate-400 text-sm">Loading points table…</div>
+                <div v-else-if="!pointsTable || !pointsTable.schools.length" class="p-8 text-center text-slate-400 text-sm">No results recorded yet for this category.</div>
+                <div v-else class="overflow-x-auto">
+                    <table class="w-full text-xs border-collapse">
+                        <thead>
+                            <tr>
+                                <th class="sticky left-0 z-20 bg-slate-900 text-white p-2 text-center border-r border-slate-700 w-10">Rank</th>
+                                <th class="sticky left-10 z-20 bg-slate-900 text-white p-2.5 text-left border-r border-slate-700 min-w-[11rem]">School</th>
+                                <th v-for="item in pointsTable.items" :key="item.id" :title="itemFullLabel(item)"
+                                    class="bg-slate-700 text-white p-1.5 text-center border-l border-slate-600 font-medium align-bottom">
+                                    <span class="[writing-mode:vertical-rl] rotate-180 whitespace-nowrap inline-block">{{ itemHeaderLabel(item) }}</span>
+                                </th>
+                                <th class="sticky right-0 z-20 bg-indigo-900 text-white p-2.5 text-center border-l border-slate-700 min-w-[4rem]">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr v-for="(school, idx) in pointsTable.schools" :key="school.school_id" :class="idx % 2 ? 'bg-slate-50/60' : 'bg-white'">
+                                <td class="sticky left-0 z-10 p-2 text-center font-semibold text-slate-500 border-r border-slate-200" :class="idx % 2 ? 'bg-slate-50' : 'bg-white'">{{ school.rank }}</td>
+                                <td class="sticky left-10 z-10 p-2.5 font-bold text-slate-800 border-r border-slate-200" :class="idx % 2 ? 'bg-slate-50' : 'bg-white'">{{ school.school_name.toUpperCase() }}</td>
+                                <td v-for="item in pointsTable.items" :key="item.id" class="p-1.5 text-center tabular-nums border-l border-slate-100 text-slate-600" :title="cellBreakdownLabel(school, item.id)">
+                                    {{ cellDisplay(school, item.id) }}
+                                </td>
+                                <td class="sticky right-0 z-10 p-2.5 text-center tabular-nums border-l border-slate-200 bg-indigo-100 font-black text-indigo-900">{{ school.subtotal }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div v-if="activeCategory" class="card card--flush overflow-hidden">
+                <div class="px-5 py-3 border-b bg-slate-50/80">
+                    <h3 class="section-title text-sm !mb-0">{{ activeCategory.label }} — Items</h3>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="data-table w-full text-sm">
@@ -81,7 +116,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
@@ -114,6 +149,10 @@ function categoryPdfUrl(category, preview) {
     return `${base}/${encodeURIComponent(category.key)}/pdf${preview ? '?preview=1' : ''}`;
 }
 
+function categoryXlsUrl(category) {
+    return `${base}/${encodeURIComponent(category.key)}/xls`;
+}
+
 function genderLabel(gender) {
     if (!gender || gender === 'open') return 'Mixed';
     return gender.charAt(0).toUpperCase() + gender.slice(1);
@@ -122,6 +161,58 @@ function genderLabel(gender) {
 function typeLabel(participantType) {
     return ['team', 'group', 'pair', 'trio'].includes(participantType) ? 'Group' : 'Individual';
 }
+
+function typeAbbr(participantType) {
+    return ['team', 'group', 'pair', 'trio'].includes(participantType) ? 'Grp' : 'Ind';
+}
+
+function itemHeaderLabel(item) {
+    const base = item.item_code ? `${item.item_code} — ${item.title}` : item.title;
+    return `${base} · ${genderLabel(item.gender)} · ${typeAbbr(item.participant_type)}`;
+}
+
+function itemFullLabel(item) {
+    return `${item.title} — ${genderLabel(item.gender)}, ${typeLabel(item.participant_type)}`;
+}
+
+// Same "5+3" formatting as the Consolidated Report — a school winning an item's 1st
+// AND 3rd shows how the total was actually earned, not just the bare sum.
+function cellDisplay(school, itemId) {
+    const breakdown = school.breakdown_by_item?.[itemId] ?? [];
+    if (breakdown.length > 1) {
+        return breakdown.join('+');
+    }
+    const points = school.points_by_item?.[itemId] ?? 0;
+
+    return points > 0 ? points : '';
+}
+
+function cellBreakdownLabel(school, itemId) {
+    const breakdown = school.breakdown_by_item?.[itemId] ?? [];
+
+    return breakdown.length > 1 ? `${breakdown.length} results: ${breakdown.join(' + ')}` : '';
+}
+
+const pointsTable = ref(null);
+const pointsTableLoading = ref(false);
+
+async function fetchPointsTable(categoryKey) {
+    if (!categoryKey) {
+        pointsTable.value = null;
+        return;
+    }
+    pointsTableLoading.value = true;
+    try {
+        const response = await fetch(`${base}/${encodeURIComponent(categoryKey)}/table`, { headers: { Accept: 'application/json' } });
+        pointsTable.value = response.ok ? await response.json() : null;
+    } catch {
+        pointsTable.value = null;
+    } finally {
+        pointsTableLoading.value = false;
+    }
+}
+
+watch(activeKey, (key) => fetchPointsTable(key), { immediate: true });
 
 const modalOpen = ref(false);
 const modalFetchUrl = ref(null);
