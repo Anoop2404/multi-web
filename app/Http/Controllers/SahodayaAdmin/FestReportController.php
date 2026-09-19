@@ -1135,6 +1135,21 @@ class FestReportController extends SahodayaAdminController
         $scoreboards = app(\App\Services\Events\PublicFestScoreboardService::class);
         $categoryLabel = $category === 'open' ? 'Open' : $scoreboards->categoryLabel($targetEvent, $category);
 
+        // Kept as ONE page always, even for a 50+ item category (this Sahodaya's
+        // Category 3 has 59) -- explicitly requested over splitting into several pages
+        // like the Consolidated matrix's own PDF does. Instead, the item columns (and
+        // their font) shrink to whatever width actually fits every item into one
+        // printed page's usable space -- without this, columns stayed a fixed 24px
+        // regardless of count and everything past what physically fit silently ran off
+        // the right edge instead of shrinking to make room.
+        $itemCount = count($table['items']);
+        // ~670pt of an A4 landscape page's ~780pt usable width is left for item columns
+        // once Rank/School/Total's own (deliberately narrow) space is reserved; 24px is
+        // this table's normal, comfortable column width (unchanged for any category
+        // with room to spare).
+        $itemColWidth = $itemCount > 0 ? max(10, min(24, (int) floor(670 / $itemCount))) : 24;
+        $fontSize = $itemColWidth >= 18 ? 8 : ($itemColWidth >= 13 ? 7 : 6);
+
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.category-points-table', [
             'event'         => $event,
             'categoryLabel' => $categoryLabel,
@@ -1144,6 +1159,8 @@ class FestReportController extends SahodayaAdminController
             'generatedAt'   => now()->format('d M Y, h:i A'),
             'orgName'       => $this->sahodaya->name,
             'logoSrc'       => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+            'itemColWidth'  => $itemColWidth,
+            'fontSize'      => $fontSize,
         ])->setPaper('a4', 'landscape');
 
         $filename = "{$event->id}-{$category}-category-points.pdf";

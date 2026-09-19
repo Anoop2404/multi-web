@@ -152,7 +152,7 @@ class FestCategoryWisePointsReportTest extends TestCase
         $this->assertStringNotContainsString('writing-mode', $css);
         $this->assertStringContainsString('rotate(-90deg)', $css);
         $this->assertStringContainsString('position:absolute', $css);
-        $this->assertStringContainsString('max-width:24px', $css, 'each item column must be locked to a fixed width, or dompdf\'s automatic table layout can leave columns unpredictably narrow and overlapping');
+        $this->assertStringContainsString('max-width:{{ $itemColWidth }}px', $css, 'each item column must be locked to a fixed (if dynamically computed, see categoryWisePointsPdf()) width, or dompdf\'s automatic table layout can leave columns unpredictably narrow and overlapping');
     }
 
     /** Ten items in one category, the scenario that first revealed the column-overlap bug above -- must still render without error. */
@@ -214,5 +214,33 @@ class FestCategoryWisePointsReportTest extends TestCase
             ->assertJsonPath('items.0.title', 'HS Item')
             ->assertJsonPath('schools.0.school_id', $school->id);
         $this->assertGreaterThan(0, $response->json('schools.0.subtotal'));
+    }
+
+    /**
+     * The user's real Category 3 has 59 items -- explicitly wants this kept to ONE
+     * page (unlike the Consolidated matrix, which paginates), even if that means a
+     * small font and narrow columns. Verified live by rendering this exact 59-item
+     * scenario and reading the PDF back: one page, all 59 columns present, correctly
+     * rotated, no overlap or clipping. This just guards against a crash/regression --
+     * page-count and visual layout aren't practical to assert from a compiled PDF's
+     * binary bytes in an automated test.
+     */
+    public function test_pdf_downloads_as_one_page_with_59_items(): void
+    {
+        [$sahodaya, $event, $admin, $school] = $this->fixture();
+
+        $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '9']);
+        foreach (range(1, 59) as $i) {
+            $item = FestEventItem::create(['event_id' => $event->id, 'title' => "Item {$i} Long Name Here", 'item_code' => (string) (300 + $i), 'participant_type' => 'individual', 'gender' => $i % 2 ? 'female' : 'male', 'class_group' => 'hs', 'is_enabled' => true]);
+            $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $schoolClass->id, 'name' => "Student {$i}", 'admission_no' => "D{$i}"]);
+            $registration = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+            $participant = FestParticipant::create(['registration_id' => $registration->id, 'student_id' => $student->id, 'participant_role' => 'performer']);
+            FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'position' => 1, 'grade' => 'A']);
+        }
+
+        $response = $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/category-wise-points/hs/pdf?preview=1");
+
+        $response->assertOk();
     }
 }
