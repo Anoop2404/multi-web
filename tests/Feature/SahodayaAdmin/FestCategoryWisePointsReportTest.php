@@ -61,8 +61,8 @@ class FestCategoryWisePointsReportTest extends TestCase
     {
         [$sahodaya, $event, $admin, $school] = $this->fixture();
 
-        $hsItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'HS Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true]);
-        $hssItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'HSS Item', 'participant_type' => 'individual', 'class_group' => 'hss', 'is_enabled' => true]);
+        $hsItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'HS Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true, 'results_published_at' => now()]);
+        $hssItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'HSS Item', 'participant_type' => 'individual', 'class_group' => 'hss', 'is_enabled' => true, 'results_published_at' => now()]);
 
         $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '9']);
         foreach ([$hsItem, $hssItem] as $i => $item) {
@@ -117,7 +117,7 @@ class FestCategoryWisePointsReportTest extends TestCase
     {
         [$sahodaya, $event, $admin, $school] = $this->fixture();
 
-        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'HS Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true]);
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'HS Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true, 'results_published_at' => now()]);
         $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '9']);
         $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $schoolClass->id, 'name' => 'Student', 'admission_no' => 'S1']);
         $registration = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
@@ -180,7 +180,7 @@ class FestCategoryWisePointsReportTest extends TestCase
     {
         [$sahodaya, $event, $admin, $school] = $this->fixture();
 
-        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'HS Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true]);
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'HS Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true, 'results_published_at' => now()]);
         $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '9']);
         $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $schoolClass->id, 'name' => 'Student', 'admission_no' => 'S1']);
         $registration = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
@@ -196,11 +196,65 @@ class FestCategoryWisePointsReportTest extends TestCase
         $this->assertMatchesRegularExpression('/<Cell><Data ss:Type="Number">[1-9]\d*<\/Data><\/Cell>/', $xml);
     }
 
+    /**
+     * The "Totals Only" sibling of the full item-breakdown PDF/xls above -- just
+     * School/Total/Rank for the category, no per-item columns, Rank trailing on the
+     * right (matching the all-categories Category Totals report's layout). An
+     * unpublished item's points must not reach this total either -- same publish gate
+     * as schoolItemPointsMatrix()/categorySchoolPointsTable().
+     */
+    public function test_summary_pdf_and_xls_show_only_school_total_rank_and_respect_publish_status(): void
+    {
+        [$sahodaya, $event, $admin, $school] = $this->fixture();
+
+        $publishedItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'Published HS Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true, 'results_published_at' => now()]);
+        $unpublishedItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'Unpublished HS Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true]);
+
+        $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '9']);
+
+        $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $schoolClass->id, 'name' => 'Published Student', 'admission_no' => 'SP1']);
+        $registration = FestRegistration::create(['event_id' => $event->id, 'item_id' => $publishedItem->id, 'school_id' => $school->id, 'status' => 'approved']);
+        $participant = FestParticipant::create(['registration_id' => $registration->id, 'student_id' => $student->id, 'participant_role' => 'performer']);
+        FestMark::create(['event_id' => $event->id, 'item_id' => $publishedItem->id, 'participant_id' => $participant->id, 'position' => 1, 'grade' => 'A']);
+
+        $studentU = Student::create(['tenant_id' => $school->id, 'school_class_id' => $schoolClass->id, 'name' => 'Unpublished Student', 'admission_no' => 'SU1']);
+        $registrationU = FestRegistration::create(['event_id' => $event->id, 'item_id' => $unpublishedItem->id, 'school_id' => $school->id, 'status' => 'approved']);
+        $participantU = FestParticipant::create(['registration_id' => $registrationU->id, 'student_id' => $studentU->id, 'participant_role' => 'performer']);
+        FestMark::create(['event_id' => $event->id, 'item_id' => $unpublishedItem->id, 'participant_id' => $participantU->id, 'position' => 1, 'grade' => 'A']);
+
+        $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/category-wise-points/hs/summary-pdf?preview=1")
+            ->assertOk();
+
+        $xml = $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/category-wise-points/hs/summary-xls")
+            ->streamedContent();
+
+        $this->assertStringContainsString('>School<', $xml);
+        $this->assertStringContainsString('>Total<', $xml);
+        $this->assertStringContainsString('>Rank<', $xml);
+        $this->assertStringNotContainsString('Published HS Item', $xml, 'the summary sheet must not list per-item columns at all');
+        $this->assertStringNotContainsString('Unpublished HS Item', $xml);
+
+        $publishedOnlyTable = app(FestEventReportAnalyticsService::class, ['event' => $event])->categorySchoolPointsTable('hs');
+        $schoolRow = collect($publishedOnlyTable['schools'])->firstWhere('school_id', $school->id);
+        $this->assertSame(1, $schoolRow['rank']);
+        $this->assertGreaterThan(0, $schoolRow['subtotal'], 'the published item\'s points must still count');
+
+        // Publishing the second item too must raise the total -- proves the gap above
+        // really was the unpublished item's points being excluded, not just a fluke of
+        // this fixture's numbers.
+        $unpublishedItem->update(['results_published_at' => now()]);
+        $bothPublishedTable = app(FestEventReportAnalyticsService::class, ['event' => $event])->categorySchoolPointsTable('hs');
+        $schoolRowBothPublished = collect($bothPublishedTable['schools'])->firstWhere('school_id', $school->id);
+        $this->assertGreaterThan($schoolRow['subtotal'], $schoolRowBothPublished['subtotal']);
+    }
+
     public function test_points_table_json_endpoint_returns_items_and_school_points(): void
     {
         [$sahodaya, $event, $admin, $school] = $this->fixture();
 
-        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'HS Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true]);
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'HS Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true, 'results_published_at' => now()]);
         $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '9']);
         $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $schoolClass->id, 'name' => 'Student', 'admission_no' => 'S1']);
         $registration = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);

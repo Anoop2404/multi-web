@@ -1205,6 +1205,65 @@ class FestReportController extends SahodayaAdminController
         return \App\Support\ExcelExport::download("{$event->id}-{$category}-category-points", $headers, $rows, \App\Support\ExcelExport::generatedOnNote(), $verticalHeaderIndices, $columnStyles);
     }
 
+    /**
+     * Stripped-down sibling of categoryWisePointsPdf()/Xls() above — just this one
+     * category's School/Total/Rank, no per-item columns at all. Reuses the exact same
+     * categorySchoolPointsTable() totals/ranks those already show, just re-shaped
+     * without the item breakdown -- for handing out "who stands where in this category"
+     * without the full points-per-item sheet. Rank trails after Total (right side), same
+     * layout as the all-categories Category Totals report.
+     */
+    public function categoryWisePointsSummaryPdf(Request $request, string $tenantId, FestEvent $event, string $category)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+        $analytics = $this->scopedAnalytics($request, $targetEvent);
+        $table = $analytics->categorySchoolPointsTable($category);
+
+        $scoreboards = app(\App\Services\Events\PublicFestScoreboardService::class);
+        $categoryLabel = $category === 'open' ? 'Open' : $scoreboards->categoryLabel($targetEvent, $category);
+
+        $rows = collect($table['schools'])->map(fn (array $school) => [
+            strtoupper($school['school_name']), $school['subtotal'], $school['rank'],
+        ])->all();
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.category-points-summary', [
+            'event'         => $event,
+            'categoryLabel' => $categoryLabel,
+            'rows'          => $rows,
+            'orgName'       => $this->sahodaya->name,
+            'logoSrc'       => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+        ]);
+
+        $filename = "{$event->id}-{$category}-category-points-summary.pdf";
+
+        if ($request->boolean('inline') || $request->boolean('preview')) {
+            return $pdf->stream($filename);
+        }
+
+        return $pdf->download($filename);
+    }
+
+    /** Excel sibling of categoryWisePointsSummaryPdf() above. */
+    public function categoryWisePointsSummaryXls(Request $request, string $tenantId, FestEvent $event, string $category)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+        $analytics = $this->scopedAnalytics($request, $targetEvent);
+        $table = $analytics->categorySchoolPointsTable($category);
+
+        $headers = ['School', 'Total', 'Rank'];
+        $columnStyles = [1 => 'overall'];
+
+        $rows = collect($table['schools'])->map(fn (array $school) => [
+            strtoupper($school['school_name']), $school['subtotal'], $school['rank'],
+        ]);
+
+        return \App\Support\ExcelExport::download("{$event->id}-{$category}-category-points-summary", $headers, $rows, \App\Support\ExcelExport::generatedOnNote(), [], $columnStyles);
+    }
+
     /** JSON endpoint the Category-wise Points report's interactive per-category points table fetches on tab switch. */
     public function categoryWisePointsTable(Request $request, string $tenantId, FestEvent $event, string $category)
     {

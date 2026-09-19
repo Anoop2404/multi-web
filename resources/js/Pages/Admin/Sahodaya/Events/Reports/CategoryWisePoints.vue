@@ -42,6 +42,9 @@
                         <a :href="categoryPdfUrl(activeCategory, true)" target="_blank" rel="noopener" class="btn-secondary text-xs">👁️ Preview PDF</a>
                         <a :href="categoryPdfUrl(activeCategory, false)" class="btn-secondary text-xs">⬇️ PDF</a>
                         <a :href="categoryXlsUrl(activeCategory)" class="btn-secondary text-xs">⬇️ Excel</a>
+                        <span class="w-px h-4 bg-slate-200 mx-1"></span>
+                        <a :href="categorySummaryPdfUrl(activeCategory)" class="btn-secondary text-xs">⬇️ Totals Only (PDF)</a>
+                        <a :href="categorySummaryXlsUrl(activeCategory)" class="btn-secondary text-xs">⬇️ Totals Only (Excel)</a>
                     </div>
                 </div>
 
@@ -158,6 +161,14 @@ function categoryPdfUrl(category, preview) {
 
 function categoryXlsUrl(category) {
     return `${base}/${encodeURIComponent(category.key)}/xls`;
+}
+
+function categorySummaryPdfUrl(category) {
+    return `${base}/${encodeURIComponent(category.key)}/summary-pdf`;
+}
+
+function categorySummaryXlsUrl(category) {
+    return `${base}/${encodeURIComponent(category.key)}/summary-xls`;
 }
 
 function genderLabel(gender) {

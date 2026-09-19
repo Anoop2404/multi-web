@@ -578,4 +578,76 @@ class FestCategoryItemMatrixReportTest extends TestCase
         $this->assertStringContainsString('position:absolute', $css);
         $this->assertStringContainsString('max-width:24px', $css, 'each item column must be locked to a fixed width, or dompdf\'s automatic table layout can leave columns unpredictably narrow and overlapping');
     }
+
+    /**
+     * The Category Totals sheet's top 3 ranked schools render in bold (a "top3" row
+     * class), so a printed/shared copy visually calls out the podium without a reader
+     * having to scan the Rank column -- schools ranked 4th and below stay in the
+     * sheet's normal (non-bold) weight.
+     */
+    public function test_category_totals_bolds_only_the_top_three_ranked_schools(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'sahodaya', 'name' => 'Matrix Top3 Sahodaya',
+            'domain' => 'matrix-top3-'.Str::random(8).'.test', 'is_active' => true,
+        ]);
+        SahodayaProfile::create(['tenant_id' => $sahodaya->id, 'prefix' => 'MT3', 'student_data_mode' => 'counts_only']);
+
+        $event = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Matrix Top3 Fest', 'event_type' => 'kalolsavam',
+            'level_round' => 'sahodaya', 'status' => 'ongoing',
+        ]);
+
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true, 'results_published_at' => now()]);
+
+        // Four schools, each with one mark whose (position, grade) combination scores a
+        // distinct, strictly decreasing, non-tied total (8, 3, 2, 1 points respectively
+        // per FestGradePointService's default rules) -- a clean 1st/2nd/3rd/4th with no
+        // ties, so the 4th-ranked school unambiguously must NOT get the bold class.
+        $marksByRank = [['position' => 1, 'grade' => 'A'], ['position' => 1, 'grade' => 'C'], ['position' => 2, 'grade' => 'C'], ['position' => 3, 'grade' => 'C']];
+        foreach ($marksByRank as $i => $markAttrs) {
+            $school = Tenant::create(['id' => (string) Str::uuid(), 'type' => 'school', 'name' => "Top3 School {$i}", 'parent_id' => $sahodaya->id, 'membership_status' => 'approved', 'is_active' => true]);
+            $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '9']);
+            $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $schoolClass->id, 'name' => "Student {$i}", 'admission_no' => "T3{$i}"]);
+            $registration = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+            $participant = FestParticipant::create(['registration_id' => $registration->id, 'student_id' => $student->id, 'participant_role' => 'performer']);
+            FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $participant->id, ...$markAttrs]);
+        }
+
+        $analytics = app(FestEventReportAnalyticsService::class, ['event' => $event]);
+        $service = app(\App\Services\Events\FestReportService::class, ['event' => $event]);
+        $ref = new \ReflectionMethod($service, 'categoryTotalsData');
+        $ref->setAccessible(true);
+        $data = $ref->invoke($service, $analytics);
+
+        $this->assertCount(4, $data['rows'], 'all four schools should appear as rows');
+        $points = collect($data['rows'])->map(fn ($row) => $row[1])->all();
+        $this->assertSame([8, 3, 2, 1], $points, 'sanity check: the fixture must produce four distinct, strictly decreasing totals with no ties');
+
+        $html = view('fest.reports.category-totals', [
+            'event' => $event, 'categories' => $data['categories'], 'rows' => $data['rows'],
+            'orgName' => 'Test Org', 'logoSrc' => null,
+        ])->render();
+
+        $this->assertSame(3, substr_count($html, 'class="top3"'), 'exactly the top 3 ranked rows should get the bold top3 class');
+        foreach ($data['rows'] as $i => $row) {
+            $expectedClass = $i < 3 ? 'top3' : '';
+            $this->assertStringContainsString("<tr class=\"{$expectedClass}\">", $this->rowHtmlFor($html, $row[0]), "rank ".($i + 1)." row should ".($i < 3 ? '' : 'not ')."be bold");
+        }
+    }
+
+    /** Extracts the single <tr>...</tr> block whose School cell matches $schoolName, for asserting on that row's own class attribute. */
+    private function rowHtmlFor(string $html, string $schoolName): string
+    {
+        preg_match_all('/<tr class="[^"]*">.*?<\/tr>/s', $html, $matches);
+        foreach ($matches[0] as $rowHtml) {
+            if (str_contains($rowHtml, $schoolName)) {
+                return $rowHtml;
+            }
+        }
+
+        return '';
+    }
 }

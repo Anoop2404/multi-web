@@ -2319,9 +2319,13 @@ class FestEventReportAnalyticsService
         $gradePointService = app(FestGradePointService::class);
 
         // Same dedup as schoolItemPointsMatrix() — one FestMark per teammate on pair/
-        // group items must not multiply a team's points by its squad size.
+        // group items must not multiply a team's points by its squad size. Same
+        // published/non-hidden gate as schoolItemPointsMatrix() too, for the same reason
+        // — a judge's marks shouldn't move a school's total here before the admin has
+        // actually published that item's results.
         $marks = FestMark::whereIn('event_id', $this->eventIds())
             ->whereIn('item_id', $allReportableItemIds)
+            ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
             ->with(['participant.registration.school'])
             ->get()
             ->unique(fn (FestMark $m) => $m->deduplicationKey());
