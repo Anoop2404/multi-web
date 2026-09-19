@@ -25,6 +25,15 @@
             </button>
         </div>
 
+        <div v-if="phaseOptions.length" class="card p-4 mb-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Category Totals — per Phase:</span>
+            <div v-for="phase in phaseOptions" :key="phase.id" class="flex items-center gap-1.5">
+                <span class="text-xs font-semibold text-slate-600">{{ phase.short_title || phase.title }}</span>
+                <a :href="phaseCategoryTotalsUrl(phase.id, 'pdf')" class="btn-secondary text-xs">PDF</a>
+                <a :href="phaseCategoryTotalsUrl(phase.id, 'xls')" class="btn-secondary text-xs">Excel</a>
+            </div>
+        </div>
+
         <div v-if="!schools.length" class="card p-8 text-center text-slate-400 text-sm">
             No results recorded yet for this event.
         </div>
@@ -125,6 +134,16 @@ const regionOptions = computed(() => props.childEvents.map(ev => ({
     value: String(ev.id),
     label: ev.short_title || ev.title,
 })));
+
+// The combined "All Regions" hub is one of childEvents' own rows (is_hub: true) --
+// excluded here since a per-phase Category Totals download only makes sense for an
+// actual phase/region, not the hub that already has its own Category Totals buttons
+// in the page header above.
+const phaseOptions = computed(() => props.childEvents.filter(ev => !ev.is_hub));
+
+function phaseCategoryTotalsUrl(eventId, format) {
+    return `/sahodaya-admin/${props.sahodaya.id}/events/${eventId}/reports/export/category-totals-${format}`;
+}
 
 function categoryItemCount(cat) {
     return cat.heads.reduce((sum, head) => sum + head.items.length, 0);

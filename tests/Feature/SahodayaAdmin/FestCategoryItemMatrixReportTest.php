@@ -186,6 +186,51 @@ class FestCategoryItemMatrixReportTest extends TestCase
         $this->assertSame($schoolRow['points_by_item'][$publishedItem->id], $schoolRow['overall'], 'only the published item\'s points should reach the OVERALL total');
     }
 
+    /**
+     * The interactive page's "Category Totals — per Phase" buttons link straight to
+     * each phase/region's own event id (category-totals-pdf/xls isn't in
+     * FestReportCatalog::REGION_ID_AWARE_IDS, so the export always resolves off
+     * whichever {event} the URL is bound to) -- confirms those routes actually respond,
+     * and that childEvents keeps the id/short_title/is_hub shape the Vue page's
+     * phaseOptions/regionOptions computeds rely on.
+     */
+    public function test_category_totals_export_works_for_a_specific_phase_and_hub_lists_phases(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'sahodaya', 'name' => 'Matrix Phase Sahodaya',
+            'domain' => 'matrix-phase-'.Str::random(8).'.test', 'is_active' => true,
+        ]);
+        SahodayaProfile::create(['tenant_id' => $sahodaya->id, 'prefix' => 'MPH', 'student_data_mode' => 'counts_only']);
+
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        $hub = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Matrix Phase Fest', 'event_type' => 'kalolsavam',
+            'level_round' => 'sahodaya', 'status' => 'ongoing',
+        ]);
+
+        $phase = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Matrix Phase Fest — Phase 1', 'event_type' => 'kalolsavam',
+            'parent_event_id' => $hub->id, 'level_round' => 'sahodaya', 'status' => 'ongoing',
+            'partition_role' => 'phase',
+        ]);
+
+        $childEvents = $hub->sportEventDropdownOptions();
+        $this->assertTrue(collect($childEvents)->firstWhere('id', $hub->id)['is_hub']);
+        $this->assertFalse(collect($childEvents)->firstWhere('id', $phase->id)['is_hub']);
+
+        $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/events/{$phase->id}/reports/export/category-totals-xls")
+            ->assertOk();
+
+        $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/events/{$phase->id}/reports/export/category-totals-pdf")
+            ->assertOk();
+    }
+
     public function test_xls_export_downloads(): void
     {
         [$sahodaya, $event, $admin] = $this->makeMinimalEvent();
