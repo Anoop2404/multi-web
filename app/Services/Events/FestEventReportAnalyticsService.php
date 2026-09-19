@@ -20,9 +20,11 @@ use App\Models\AuditLog;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Support\ExcelExport;
+use App\Support\FestCategoryMerge;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestIdCardTemplates;
 use App\Support\FestItemCategoryLabel;
+use App\Support\FestOverallCategoryExclusion;
 use App\Services\Events\FestIdCardService;
 use App\Support\FestTeamSquadRules;
 use App\Support\TenantBranding;
@@ -2205,8 +2207,13 @@ class FestEventReportAnalyticsService
             ->orderBy('title')
             ->get(['id', 'title', 'item_code', 'participant_type', $column]);
 
+        // Group by the merged target (aggregation_config.championship_category_map),
+        // not the item's own raw class_group/age_group — otherwise a category the
+        // admin merged into another (e.g. "category_5" folded into "category_3") still
+        // shows as its own separate section here, out of step with every scoreboard/
+        // championship view that already collapses it. See FestCategoryMerge's docblock.
         return $items
-            ->groupBy(fn (FestEventItem $item) => $item->{$column} ?: 'open')
+            ->groupBy(fn (FestEventItem $item) => FestCategoryMerge::resolve($root, $item->{$column} ?: 'open'))
             ->map(fn ($group) => $group->map(fn (FestEventItem $item) => [
                 'id'               => $item->id,
                 'title'            => $item->title,
@@ -2238,8 +2245,12 @@ class FestEventReportAnalyticsService
             ->orderBy('title')
             ->get(['id', 'title', 'item_code', 'participant_type', 'head_id', $column]);
 
+        // Same merge-target grouping as categoryWiseItemRows() above — a merged source
+        // category's items belong under the target's band here too, so the consolidated
+        // matrix's category columns match the merged category the school/championship
+        // boards already show, instead of splitting the same bucket across two headers.
         return $items
-            ->groupBy(fn (FestEventItem $item) => $item->{$column} ?: 'open')
+            ->groupBy(fn (FestEventItem $item) => FestCategoryMerge::resolve($root, $item->{$column} ?: 'open'))
             ->map(fn ($group) => $group
                 ->groupBy(fn (FestEventItem $item) => $item->head_id ?: 0)
                 ->map(fn ($headGroup) => [
@@ -2279,6 +2290,8 @@ class FestEventReportAnalyticsService
         $itemsByCategory = $this->categoryHeadItemRows();
         $gradePointService = app(FestGradePointService::class);
         $scoreboards = app(PublicFestScoreboardService::class);
+        $root = $this->event->rootEvent();
+        $excludedRawCategories = FestOverallCategoryExclusion::excluded($root);
 
         // Same dedup as EventContext::scoreboardByCategory() — pair/group items save one
         // FestMark per teammate, all sharing deduplicationKey(), so a team's points must
@@ -2291,6 +2304,14 @@ class FestEventReportAnalyticsService
         $cellPoints = [];
         $cellBreakdown = [];
         $schoolNames = [];
+        // Tracked separately from category subtotals below (below, always excluded-
+        // agnostic — a category's own band is unaffected, same rule
+        // FestOverallCategoryExclusion documents) — mirrors
+        // EventContext::recalculateSchoolPoints()'s per-mark exclusion check exactly, so
+        // the OVERALL column here always agrees with the Overall Ranking report and the
+        // public/championship boards instead of just summing every band regardless of
+        // what the admin excluded from the combined total.
+        $overallPoints = [];
 
         foreach ($marks as $mark) {
             $participant = $mark->participant;
@@ -2309,23 +2330,31 @@ class FestEventReportAnalyticsService
             if ($points > 0) {
                 $cellBreakdown[$school->id][$mark->item_id][] = $points;
             }
+
+            $rawCategory = FestOverallCategoryExclusion::categoryKeyForItem($this->event, $mark->item);
+            if (! $excludedRawCategories || ! in_array($rawCategory, $excludedRawCategories, true)) {
+                $overallPoints[$school->id] = ($overallPoints[$school->id] ?? 0) + $points;
+            }
         }
 
         $categories = collect($itemsByCategory)
             ->map(fn (array $heads, string $key) => [
-                'key'   => $key,
-                'label' => $key === 'open' ? 'Open' : $scoreboards->categoryLabel($this->event, $key),
-                'heads' => $heads,
+                'key'                 => $key,
+                'label'               => $key === 'open' ? 'Open' : $scoreboards->categoryLabel($this->event, $key),
+                'heads'               => $heads,
+                // Informational only — the category's own Sub column still totals every
+                // item in it; this just tells the UI why OVERALL doesn't equal the sum of
+                // every Sub column when an admin has excluded one from the combined total.
+                'excluded_from_overall' => in_array($key, $excludedRawCategories, true),
             ])
             ->sortBy('label')
             ->values();
 
         $schools = collect($schoolNames)
-            ->map(function (string $name, string $schoolId) use ($categories, $cellPoints, $cellBreakdown) {
+            ->map(function (string $name, string $schoolId) use ($categories, $cellPoints, $cellBreakdown, $overallPoints) {
                 $points = $cellPoints[$schoolId] ?? [];
                 $breakdown = $cellBreakdown[$schoolId] ?? [];
                 $categoryTotals = [];
-                $overall = 0;
 
                 foreach ($categories as $category) {
                     $subtotal = 0;
@@ -2335,7 +2364,6 @@ class FestEventReportAnalyticsService
                         }
                     }
                     $categoryTotals[$category['key']] = $subtotal;
-                    $overall += $subtotal;
                 }
 
                 return [
@@ -2344,7 +2372,7 @@ class FestEventReportAnalyticsService
                     'points_by_item'    => $points,
                     'breakdown_by_item' => $breakdown,
                     'category_totals'   => $categoryTotals,
-                    'overall'           => $overall,
+                    'overall'           => $overallPoints[$schoolId] ?? 0,
                 ];
             })
             ->sortByDesc('overall')
