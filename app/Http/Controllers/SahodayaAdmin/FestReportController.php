@@ -1229,8 +1229,15 @@ class FestReportController extends SahodayaAdminController
         $analytics = $this->scopedAnalytics($request, $targetEvent);
         $matrix = $analytics->schoolItemPointsMatrix();
 
+        // Categories excluded from OVERALL are left out of this page entirely, same as
+        // the PDF/Excel downloads (see categoryItemMatrixXls()/Pdf() in FestReportService
+        // for the identical reject()) -- previously this page alone still rendered them
+        // (with a † marker) while both downloads already omitted them, an inconsistency
+        // this Sahodaya doesn't want.
+        $categories = collect($matrix['categories'])->reject(fn (array $c) => $c['excluded_from_overall'])->values()->all();
+
         return $this->inertia('Sahodaya/Events/Reports/CategoryItemMatrix', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
-            'categories'  => $matrix['categories'],
+            'categories'  => $categories,
             'schools'     => $matrix['schools'],
             'childEvents' => $this->scopedChildEventOptions($event),
         ])));

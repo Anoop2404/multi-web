@@ -28,12 +28,6 @@
         </div>
 
         <template v-else>
-        <p v-if="excludedCategories.length" class="text-xs text-slate-500 mb-3">
-            <span class="font-semibold text-amber-600">†</span>
-            {{ excludedCategories.join(', ') }} {{ excludedCategories.length > 1 ? 'are' : 'is' }} excluded from OVERALL
-            (still totalled in its own Sub column) — configured under this event's overall-category settings.
-        </p>
-
         <div class="card card--flush overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-xs border-collapse">
@@ -43,7 +37,7 @@
                             <th rowspan="3" class="sticky left-10 z-20 bg-slate-900 text-white p-2.5 text-left border-r border-slate-700 min-w-[11rem]">School</th>
                             <th v-for="cat in categories" :key="cat.key" :colspan="categoryItemCount(cat) + 1"
                                 class="bg-slate-800 text-white p-2 text-center border-l border-slate-700 font-bold">
-                                {{ cat.label }}<span v-if="cat.excluded_from_overall" class="text-amber-400" title="Excluded from OVERALL">&nbsp;†</span>
+                                {{ cat.label }}
                             </th>
                             <th rowspan="3" class="sticky right-0 z-20 bg-indigo-900 text-white p-2.5 text-center border-l border-slate-700 min-w-[5rem]">OVERALL</th>
                         </tr>
@@ -129,8 +123,6 @@ const regionOptions = computed(() => props.childEvents.map(ev => ({
     value: String(ev.id),
     label: ev.short_title || ev.title,
 })));
-
-const excludedCategories = computed(() => props.categories.filter(c => c.excluded_from_overall).map(c => c.label));
 
 function categoryItemCount(cat) {
     return cat.heads.reduce((sum, head) => sum + head.items.length, 0);
