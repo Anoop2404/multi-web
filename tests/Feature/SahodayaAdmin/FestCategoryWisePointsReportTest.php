@@ -19,12 +19,12 @@ use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
- * Category-wise Points is the "separate, unmerged" companion to the Consolidated
- * matrix report — a category the admin merged into another for the combined
- * championship (aggregation_config.championship_category_map) must still show as its
- * own tab and its own point-table PDF here, since that merge is specifically an
- * overall/combined-total convention (see FestCategoryMerge's docblock), not a
- * statement the category never existed on its own.
+ * Category-wise Points now applies the same merge rule
+ * (aggregation_config.championship_category_map) and exclude rule
+ * (aggregation_config.excluded_overall_categories) as the Consolidated matrix report —
+ * a category merged into another for the combined championship folds into its
+ * target's tab here too instead of keeping its own, and a category excluded from
+ * OVERALL doesn't get a tab (or a downloadable report) here at all.
  */
 class FestCategoryWisePointsReportTest extends TestCase
 {
@@ -57,7 +57,7 @@ class FestCategoryWisePointsReportTest extends TestCase
         return [$sahodaya, $event, $admin, $school];
     }
 
-    public function test_a_merged_category_still_gets_its_own_unmerged_row_here(): void
+    public function test_a_merged_category_folds_into_its_target_tab_here(): void
     {
         [$sahodaya, $event, $admin, $school] = $this->fixture();
 
@@ -76,16 +76,41 @@ class FestCategoryWisePointsReportTest extends TestCase
         $categoryKeys = collect($analytics->categoryWiseItemRows())->keys()->all();
 
         $this->assertContains('hs', $categoryKeys);
-        $this->assertContains('hss', $categoryKeys, 'hss must stay its own category here even though it is merged into hs for the combined championship');
+        $this->assertNotContains('hss', $categoryKeys, 'hss should have collapsed into the hs merge target, matching the consolidated matrix');
 
         $hsTable = $analytics->categorySchoolPointsTable('hs');
-        $this->assertCount(1, $hsTable['items']);
-        $this->assertSame('HS Item', $hsTable['items'][0]['title']);
+        $this->assertCount(2, $hsTable['items'], 'the hs tab should list both the hs item and the merged-in hss item');
+        $this->assertSame(['HS Item', 'HSS Item'], collect($hsTable['items'])->pluck('title')->all());
+        $this->assertGreaterThan(0, $hsTable['schools'][0]['subtotal']);
+    }
 
-        $hssTable = $analytics->categorySchoolPointsTable('hss');
-        $this->assertCount(1, $hssTable['items']);
-        $this->assertSame('HSS Item', $hssTable['items'][0]['title']);
-        $this->assertGreaterThan(0, $hssTable['schools'][0]['subtotal']);
+    public function test_a_category_excluded_from_overall_has_no_tab_here(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'sahodaya', 'name' => 'Category Points Exclude Sahodaya',
+            'domain' => 'category-points-exclude-'.Str::random(8).'.test', 'is_active' => true,
+        ]);
+        SahodayaProfile::create(['tenant_id' => $sahodaya->id, 'prefix' => 'CPE', 'student_data_mode' => 'counts_only']);
+        $school = Tenant::create(['id' => (string) Str::uuid(), 'type' => 'school', 'name' => 'Category Points Exclude School', 'parent_id' => $sahodaya->id, 'membership_status' => 'approved', 'is_active' => true]);
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        $event = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Category Points Exclude Fest', 'event_type' => 'kalolsavam',
+            'level_round' => 'sahodaya', 'status' => 'ongoing',
+            'aggregation_config' => ['excluded_overall_categories' => ['lp']],
+        ]);
+
+        FestEventItem::create(['event_id' => $event->id, 'title' => 'HS Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true]);
+        FestEventItem::create(['event_id' => $event->id, 'title' => 'LP Item', 'participant_type' => 'individual', 'class_group' => 'lp', 'is_enabled' => true]);
+
+        $analytics = app(FestEventReportAnalyticsService::class, ['event' => $event]);
+        $categoryKeys = collect($analytics->categoryWiseItemRows())->keys()->all();
+
+        $this->assertContains('hs', $categoryKeys);
+        $this->assertNotContains('lp', $categoryKeys, 'lp is excluded from OVERALL and should not get its own tab/report here');
     }
 
     public function test_pdf_preview_downloads_for_a_category(): void

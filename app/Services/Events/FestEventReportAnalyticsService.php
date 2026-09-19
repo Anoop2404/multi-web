@@ -2236,17 +2236,20 @@ class FestEventReportAnalyticsService
         $column = $root->event_type === 'sports' ? 'age_group' : 'class_group';
 
         $items = $this->catalogItems();
+        $excluded = FestOverallCategoryExclusion::excluded($root);
 
-        // Deliberately grouped by the item's own RAW class_group/age_group, not the
-        // merge target — this page (Category-wise Points) is the "each category on its
-        // own, unmerged" browse view: a category the admin folded into another for the
-        // combined championship (aggregation_config.championship_category_map) still
-        // gets its own tab/sheet here, since that merge is specifically an overall/
-        // combined-total convention, not a statement that the category never existed.
-        // The CONSOLIDATED matrix (categoryHeadItemRows(), schoolItemPointsMatrix())
-        // is the one that collapses merged categories together — this is its opposite.
+        // Grouped by the MERGE TARGET (aggregation_config.championship_category_map),
+        // same as the consolidated matrix — a category the admin folded into another
+        // for the combined championship no longer gets its own tab here; its items
+        // join the target category's tab instead, matching the official scoring rule
+        // instead of presenting a category as independently scored when it isn't.
+        // Categories excluded from OVERALL (aggregation_config.
+        // excluded_overall_categories) are dropped from this page entirely — same
+        // "not offered as one of this event's official category reports" rule already
+        // applied to the consolidated matrix's own downloads.
         return $items
-            ->groupBy(fn (FestEventItem $item) => $item->{$column} ?: 'open')
+            ->groupBy(fn (FestEventItem $item) => FestCategoryMerge::resolve($root, $item->{$column} ?: 'open'))
+            ->reject(fn ($group, string $key) => in_array($key, $excluded, true))
             ->map(fn ($group) => $group->map(fn (FestEventItem $item) => [
                 'id'               => $item->id,
                 'title'            => $item->title,
@@ -2258,24 +2261,24 @@ class FestEventReportAnalyticsService
     }
 
     /**
-     * School × item point table for ONE raw category, unmerged — the "preview/print
-     * just this category's own result sheet" companion to categoryWiseItemRows()'s
-     * browse tabs. Deliberately ignores aggregation_config.championship_category_map
-     * for the same reason categoryWiseItemRows() does: a category merged into another
-     * for the combined championship still gets its own accurate sheet here. Has no
-     * OVERALL/exclusion concept — that's specific to the all-categories consolidated
-     * matrix (schoolItemPointsMatrix()); a single category's own sheet is never
-     * affected by aggregation_config.excluded_overall_categories either, matching the
-     * documented rule that exclusion only touches the combined total.
+     * School × item point table for ONE category — the "preview/print just this
+     * category's own result sheet" companion to categoryWiseItemRows()'s browse tabs.
+     * $category is a MERGE TARGET key, same as categoryWiseItemRows()'s own tabs: an
+     * item whose raw class_group/age_group merges into $category (aggregation_config.
+     * championship_category_map) is included here too, matching the official scoring
+     * rule instead of presenting it as its own independently-scored category. A
+     * category excluded from OVERALL (aggregation_config.excluded_overall_categories)
+     * never reaches this method at all in practice, since categoryWiseItemRows() (the
+     * only place a caller gets a $category key from) already drops it from the tab list.
      *
      * @return array{items: list<array<string, mixed>>, schools: list<array<string, mixed>>}
      */
-    public function categorySchoolPointsTable(string $rawCategory): array
+    public function categorySchoolPointsTable(string $category): array
     {
         $root = $this->event->rootEvent();
         $column = $root->event_type === 'sports' ? 'age_group' : 'class_group';
 
-        $items = $this->catalogItems()->filter(fn (FestEventItem $item) => ($item->{$column} ?: 'open') === $rawCategory)->values();
+        $items = $this->catalogItems()->filter(fn (FestEventItem $item) => FestCategoryMerge::resolve($root, $item->{$column} ?: 'open') === $category)->values();
 
         // Expands the deduplicated $items to every phase/region clone sharing the same
         // family (a real bug found live: an item split across two phases otherwise
