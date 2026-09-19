@@ -1202,12 +1202,41 @@ public function tv(Request $request, int $eventId)
     // every roster page to a single row, not just "small enough to usually fit".
     $rosterPerPage = 9;
 
+    // Ties are not artificially broken, so an individual item can have any number of
+    // winners sharing position 1 (or 2, 3). Each winner column below is a flat
+    // min-w-[22rem]; measured against the compiled CSS, 3 fit across one row with
+    // margin to spare (89px), but a 4th always wraps to a second row that overflows
+    // the fixed canvas by ~266px — not a close call, and the same overflow whether
+    // it's 4, 5, or 6 tied winners, since the wrap point never moves. So an individual
+    // item's winners get the same treatment as a squad item's oversized roster: split
+    // into pages of $winnersPerSlide, reusing the same split_position/split_total
+    // "Slide X of Y" mechanism. This only ever fires on a tie beyond gold/silver/
+    // bronze — the common 1-3 winner case renders exactly as before, one slide, no
+    // badge. Squad items never need this: they already get one winner per slide
+    // below regardless of count, so their winner columns never share a row at all.
+    $winnersPerSlide = 3;
+
     $tvWinnerItems = collect($dynamic['latestWinners'])
         ->take($recentItemsForTv)
-        ->flatMap(function (array $itemGroup) use ($rosterPerPage) {
+        ->flatMap(function (array $itemGroup) use ($rosterPerPage, $winnersPerSlide) {
             $isSquadItem = FestTeamSquadRules::isMultiPerson($itemGroup['participant_type'] ?? null);
             if (! $isSquadItem) {
-                return [$itemGroup];
+                $winners = collect($itemGroup['winners']);
+
+                if ($winners->count() <= $winnersPerSlide) {
+                    return [$itemGroup];
+                }
+
+                $chunks = $winners->chunk($winnersPerSlide)->values();
+                $total = $chunks->count();
+
+                return $chunks
+                    ->map(fn ($chunk, int $i) => [
+                        'winners' => $chunk->values()->all(),
+                        'split_position' => $i + 1,
+                        'split_total' => $total,
+                    ] + $itemGroup)
+                    ->all();
             }
 
             // Expand each winning position into one slide per $rosterPerPage-sized

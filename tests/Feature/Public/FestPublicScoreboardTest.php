@@ -1337,6 +1337,54 @@ class FestPublicScoreboardTest extends TestCase
     }
 
     /**
+     * Ties are not artificially broken, so an individual item can have more than 3
+     * winners sharing positions 1-3 (e.g. four students all placed first). Each
+     * winner column is a flat min-w-[22rem]; measured against the compiled CSS, only
+     * 3 fit across one row — a 4th wraps to a second row that overflows the fixed
+     * canvas. tv() now splits an individual item's winners into pages of 3, the same
+     * way it already splits a squad item's winning positions, so a tie never renders
+     * a clipped second row.
+     */
+    public function test_tv_splits_an_individual_items_more_than_three_tied_winners_across_slides(): void
+    {
+        $item = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'Anchoring (Single)', 'category' => 'performing',
+            'class_group' => 'hs', 'participant_type' => 'individual', 'is_enabled' => true,
+            'results_published_at' => now(),
+        ]);
+        $schoolClass = SchoolClass::create(['tenant_id' => $this->northSchool->id, 'name' => '9']);
+
+        foreach (['Tied Winner One', 'Tied Winner Two', 'Tied Winner Three', 'Tied Winner Four'] as $name) {
+            $registration = FestRegistration::create(['event_id' => $this->north->id, 'item_id' => $item->id, 'school_id' => $this->northSchool->id, 'status' => 'approved']);
+            $student = Student::create(['tenant_id' => $this->northSchool->id, 'school_class_id' => $schoolClass->id, 'name' => $name]);
+            $participant = FestParticipant::create(['registration_id' => $registration->id, 'event_id' => $this->north->id, 'participant_type' => 'student', 'participant_role' => 'performer', 'student_id' => $student->id]);
+            FestMark::create(['event_id' => $this->north->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'grade' => 'A', 'position' => 1, 'score' => 90]);
+        }
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/tv");
+        $html = $response->getContent();
+
+        $response->assertOk();
+        foreach (['Tied Winner One', 'Tied Winner Two', 'Tied Winner Three', 'Tied Winner Four'] as $name) {
+            $this->assertSame(1, substr_count($html, $name), "{$name} must appear exactly once.");
+        }
+
+        // 4 tied winners / 3 per slide = 2 slides (3 + 1) — never one overflowing slide.
+        $response->assertSee('Slide 1 of 2')->assertSee('Slide 2 of 2');
+
+        $firstSlideStart = strrpos(substr($html, 0, strpos($html, 'Tied Winner One')), '<section data-tv-slide');
+        $fourthSlideStart = strrpos(substr($html, 0, strpos($html, 'Tied Winner Four')), '<section data-tv-slide');
+        $this->assertNotSame($firstSlideStart, $fourthSlideStart, 'The 4th tied winner must land on a different slide than the first three — a single slide of 4 wraps to an overflowing second row.');
+
+        $firstSlideEnd = strpos($html, '<section data-tv-slide', $firstSlideStart + 1) ?: strlen($html);
+        $firstSlide = substr($html, $firstSlideStart, $firstSlideEnd - $firstSlideStart);
+        $this->assertStringContainsString('Tied Winner One', $firstSlide);
+        $this->assertStringContainsString('Tied Winner Two', $firstSlide);
+        $this->assertStringContainsString('Tied Winner Three', $firstSlide);
+        $this->assertStringNotContainsString('Tied Winner Four', $firstSlide, "The first slide's 3 winners must not also include the 4th.");
+    }
+
+    /**
      * "Latest Item Winners" used to show EVERY published item, which on a busy event
      * (50+ items) meant many minutes of rotation before the TV ever cycled back to a
      * standings board. tv() now caps this to the 10 most recently published items —
