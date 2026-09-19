@@ -14,6 +14,13 @@
                     Assign all missing chest numbers (this phase)
                 </button>
                 <Link :href="numberingUrl" class="btn-secondary text-sm">Numbering settings</Link>
+                <!-- Moved here from the per-item Danger Zone row below: this wipes chest
+                     numbers for the WHOLE event, not just the item currently open, so it
+                     belongs beside the other event-wide numbering action, not mixed in
+                     with the item-scoped buttons. Still styled/confirmed as destructive. -->
+                <button type="button" class="btn-secondary text-sm !text-rose-700 hover:!bg-rose-100 !bg-white border-rose-300 font-semibold" @click="clearEntireEventChests">
+                    Reset All Chests (Entire Event)
+                </button>
             </template>
         </PageHeader>
 
@@ -75,14 +82,13 @@
                             </button>
                         </div>
 
-                        <!-- Kept visually apart from the safe/utility actions above — both of
-                             these wipe already-assigned numbers, which is easy to fat-finger
-                             when it's sitting in the same row as "CSV". -->
+                        <!-- Kept visually apart from the safe/utility actions above — wipes
+                             already-assigned numbers, which is easy to fat-finger when it's
+                             sitting in the same row as "CSV". The whole-event reset now lives
+                             in the page header next to "Numbering settings" instead of here,
+                             since it isn't scoped to whichever item happens to be open. -->
                         <div class="flex flex-wrap gap-2 border border-rose-200 bg-rose-50/50 rounded-lg p-2">
                             <span class="text-[10px] font-bold uppercase tracking-wider text-rose-500 self-center pl-1">Danger zone</span>
-                            <button type="button" class="btn-secondary text-sm !text-rose-700 hover:!bg-rose-100 !bg-white border-rose-300 font-semibold" @click="clearEntireEventChests">
-                                Reset All Chests (Entire Event)
-                            </button>
                             <button v-if="selectedItemId" type="button" class="btn-secondary text-sm !text-rose-700 hover:!bg-rose-100 !bg-white border-rose-300 font-semibold" @click="clearAllChests">
                                 Clear Item Chests
                             </button>

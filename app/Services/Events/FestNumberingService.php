@@ -324,6 +324,15 @@ class FestNumberingService
         $count = 0;
 
         // Team/group items: one chest number per squad (FestGroup), not per member.
+        //
+        // Shuffled, not each()/chunk()'d straight off the query: with no explicit order,
+        // Eloquent's chunking enforces ORDER BY id ASC, which is really "whoever's row was
+        // inserted first" -- i.e. earliest-submitted registration always wins the lowest
+        // chest number, every single time this runs. Since this bulk action only fires once
+        // every pending registration for the item already exists, the whole batch is known
+        // up front, so shuffling it first is safe (unlike auto-assign-on-approve, which
+        // hands out numbers one at a time as registrations trickle in and can't know the
+        // final headcount yet) -- nothing here gets renumbered later, it's a one-time batch.
         FestGroup::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
             ->whereNotIn('status', ['rejected', 'withdrawn'])
@@ -331,6 +340,8 @@ class FestNumberingService
             ->whereHas('item', fn ($qi) => $qi->whereIn('participant_type', FestTeamSquadRules::MULTI_PERSON_TYPES)))
             ->with('registration.item')
             ->whereNull('chest_no')
+            ->get()
+            ->shuffle()
             ->each(function (FestGroup $group) use ($event, &$count) {
                 $groupItem = $group->registration?->item;
                 if (! $groupItem || ! $this->isGroupItem($groupItem)) {
@@ -342,6 +353,10 @@ class FestNumberingService
                 }
             });
 
+        // Same shuffle reasoning as the FestGroup block above: no explicit order here
+        // either, so this was handing out the lowest chest number to whichever
+        // participant row happened to have the lowest id -- i.e. earliest-created
+        // registration always won, every time this ran.
         FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
             ->whereNotIn('status', ['rejected', 'withdrawn'])
@@ -350,6 +365,8 @@ class FestNumberingService
             ->with('registration.item')
             ->whereNull('chest_no')
             ->whereNull('group_id')
+            ->get()
+            ->shuffle()
             ->each(function (FestParticipant $p) use ($event, &$count) {
                 if (! $p->registration?->item) {
                     return;
