@@ -931,14 +931,15 @@ class FestReportService
                     $headers[] = ($item['item_code'] ? $item['item_code'].' — '.$item['title'] : $item['title'])." · {$gender} · {$type}";
                 }
             }
-            // Short "Sub" (same as the web page/PDF's Sub column, relying on its
-            // position right after that category's items for context) rather than a
-            // long "Category 1 — Classes 3 & 4 — Subtotal" string -- an unrotated
-            // header column is sized to fit its own text, so a long label here forced
-            // one enormous blank-looking column that threw off the whole sheet's
-            // alignment next to the narrow rotated item columns either side of it.
+            // "Subtotal" alone (relying on its position right after that category's
+            // items, plus the shared $bandStyle colour, for which-category context)
+            // rather than the full "Category 1 — Classes 3 & 4 — Subtotal" -- an
+            // unrotated header column is sized to fit its own text, so prefixing the
+            // full category name here forced one enormous blank-looking column that
+            // threw off the whole sheet's alignment next to the narrow rotated item
+            // columns either side of it. "Subtotal" alone is short enough to stay narrow.
             $columnStyles[count($headers)] = 'sub';
-            $headers[] = 'Sub';
+            $headers[] = 'Subtotal';
         }
         $columnStyles[count($headers)] = 'overall';
         $headers[] = 'OVERALL';
