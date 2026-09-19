@@ -1209,7 +1209,10 @@ class FestMarkEntryController extends SahodayaAdminController
         // Rows/sort order are unaffected — only what the Blade view prints in that cell.
         $blankChest = $request->boolean('blank_chest');
 
-        $query = FestEventItem::where('event_id', $event->id)->where('is_enabled', true);
+        // Eager-load 'event': itemCategoryLabel() below (via FestItemCategoryLabel::resolve())
+        // lazy-loads $item->event for any sports-style item (age_group set, no class_group) —
+        // uncached, this reran once per qualifying item across every item on the sheet.
+        $query = FestEventItem::with('event')->where('event_id', $event->id)->where('is_enabled', true);
         if ($itemId) {
             $query->where('id', $itemId);
         }
