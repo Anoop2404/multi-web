@@ -913,11 +913,20 @@ class FestReportService
         // impossibly-wide column per item just to fit its label horizontally.
         $headers = ['Rank', 'School'];
         $verticalHeaderIndices = [];
-        foreach ($categories as $category) {
+        // A category's items (and its own Sub column) share one alternating band colour
+        // (ExcelExport::CATEGORY_BAND_STYLES) -- the same "tell categories apart at a
+        // glance" cue the web page's per-category header shading gives, needed here
+        // because this flat single-row header can't reproduce the web/PDF's merged
+        // multi-tier category band. Sub and OVERALL get their own bold highlight
+        // regardless of category, matching the PDF's .subtotal-col/.overall-col.
+        $columnStyles = [];
+        foreach ($categories as $catIndex => $category) {
+            $bandStyle = ExcelExport::CATEGORY_BAND_STYLES[$catIndex % count(ExcelExport::CATEGORY_BAND_STYLES)];
             foreach ($category['heads'] as $head) {
                 foreach ($head['items'] as $item) {
                     $gender = (! ($item['gender'] ?? null) || $item['gender'] === 'open') ? 'Mixed' : (['male' => 'Boys', 'female' => 'Girls'][$item['gender']] ?? ucfirst($item['gender']));
                     $type = in_array($item['participant_type'] ?? null, ['team', 'group', 'pair', 'trio'], true) ? 'Group' : 'Individual';
+                    $columnStyles[count($headers)] = $bandStyle;
                     $verticalHeaderIndices[] = count($headers);
                     $headers[] = ($item['item_code'] ? $item['item_code'].' — '.$item['title'] : $item['title'])." · {$gender} · {$type}";
                 }
@@ -928,8 +937,10 @@ class FestReportService
             // header column is sized to fit its own text, so a long label here forced
             // one enormous blank-looking column that threw off the whole sheet's
             // alignment next to the narrow rotated item columns either side of it.
+            $columnStyles[count($headers)] = 'sub';
             $headers[] = 'Sub';
         }
+        $columnStyles[count($headers)] = 'overall';
         $headers[] = 'OVERALL';
 
         $rows = collect($matrix['schools'])->map(function (array $school) use ($categories, $analytics) {
@@ -947,7 +958,7 @@ class FestReportService
             return $row;
         });
 
-        return ExcelExport::download($this->slug().'-category-item-matrix', $headers, $rows, ExcelExport::generatedOnNote(), $verticalHeaderIndices);
+        return ExcelExport::download($this->slug().'-category-item-matrix', $headers, $rows, ExcelExport::generatedOnNote(), $verticalHeaderIndices, $columnStyles);
     }
 
     private function categoryItemMatrixPdf(FestEventReportAnalyticsService $analytics): \Symfony\Component\HttpFoundation\Response

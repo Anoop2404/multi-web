@@ -15,6 +15,17 @@ class ExcelExport
     }
 
     /**
+     * Named body-cell styles a caller can assign to specific columns via
+     * $columnStyles, matching the same colour language the web page/PDF already use
+     * for this exact matrix shape: 'cat-a'/'cat-b' alternate per category so a reader
+     * can see where one category's block of columns ends and the next begins even in
+     * this format's flat, single-row header (no merged multi-tier band like the PDF
+     * has); 'sub' and 'overall' pick out a category's own subtotal and the combined
+     * total the same way the PDF's .subtotal-col/.overall-col do.
+     */
+    public const CATEGORY_BAND_STYLES = ['cat-a', 'cat-b'];
+
+    /**
      * @param  list<string>  $headers
      * @param  iterable<int, list<string|int|float|null>>  $rows
      * @param  string|null  $generatedNote  Optional note row (e.g. self::generatedOnNote())
@@ -26,15 +37,23 @@ class ExcelExport
      *                                            school x item matrix — keeps those
      *                                            columns narrow instead of one-column-
      *                                            per-long-header-string wide.
+     * @param  array<int, string>  $columnStyles  Zero-based $headers indices whose body
+     *                                            cells (every row) should use a named
+     *                                            style instead of the default zebra
+     *                                            body/body-alt — one of 'cat-a', 'cat-b'
+     *                                            (CATEGORY_BAND_STYLES), 'sub', or
+     *                                            'overall'. The header cell itself is
+     *                                            unaffected (always the standard navy
+     *                                            header/header-vertical look).
      */
-    public static function download(string $filename, array $headers, iterable $rows, ?string $generatedNote = null, array $verticalHeaderIndices = []): StreamedResponse
+    public static function download(string $filename, array $headers, iterable $rows, ?string $generatedNote = null, array $verticalHeaderIndices = [], array $columnStyles = []): StreamedResponse
     {
         if (! str_ends_with(strtolower($filename), '.xls')) {
             $filename .= '.xls';
         }
 
         return response()->streamDownload(
-            fn () => print(self::spreadsheetXml($headers, $rows, $generatedNote, $verticalHeaderIndices)),
+            fn () => print(self::spreadsheetXml($headers, $rows, $generatedNote, $verticalHeaderIndices, $columnStyles)),
             $filename,
             [
                 'Content-Type'        => 'application/vnd.ms-excel; charset=UTF-8',
@@ -48,16 +67,17 @@ class ExcelExport
      * @param  list<string>  $headers
      * @param  iterable<int, list<string|int|float|null>>  $rows
      * @param  list<int>  $verticalHeaderIndices  See download()'s docblock.
+     * @param  array<int, string>  $columnStyles  See download()'s docblock.
      */
-    public static function spreadsheetXml(array $headers, iterable $rows, ?string $generatedNote = null, array $verticalHeaderIndices = []): string
+    public static function spreadsheetXml(array $headers, iterable $rows, ?string $generatedNote = null, array $verticalHeaderIndices = [], array $columnStyles = []): string
     {
-        return self::workbookXml(['Sheet1' => ['headers' => $headers, 'rows' => $rows, 'verticalHeaderIndices' => $verticalHeaderIndices]], $generatedNote);
+        return self::workbookXml(['Sheet1' => ['headers' => $headers, 'rows' => $rows, 'verticalHeaderIndices' => $verticalHeaderIndices, 'columnStyles' => $columnStyles]], $generatedNote);
     }
 
     /**
      * Multi-sheet workbook — one tab per entry in $sheets, in the order given.
      *
-     * @param  array<string, array{headers: list<string>, rows: iterable<int, list<string|int|float|null>>, verticalHeaderIndices?: list<int>}>  $sheets  sheet name => {headers, rows, verticalHeaderIndices?}
+     * @param  array<string, array{headers: list<string>, rows: iterable<int, list<string|int|float|null>>, verticalHeaderIndices?: list<int>, columnStyles?: array<int, string>}>  $sheets  sheet name => {headers, rows, verticalHeaderIndices?, columnStyles?}
      * @param  string|null  $generatedNote  Optional note row written above the header row in every sheet.
      */
     public static function downloadMultiSheet(string $filename, array $sheets, ?string $generatedNote = null): StreamedResponse
@@ -78,7 +98,7 @@ class ExcelExport
     }
 
     /**
-     * @param  array<string, array{headers: list<string>, rows: iterable<int, list<string|int|float|null>>, verticalHeaderIndices?: list<int>}>  $sheets
+     * @param  array<string, array{headers: list<string>, rows: iterable<int, list<string|int|float|null>>, verticalHeaderIndices?: list<int>, columnStyles?: array<int, string>}>  $sheets
      */
     private static function workbookXml(array $sheets, ?string $generatedNote = null): string
     {
@@ -98,11 +118,21 @@ class ExcelExport
         // applied per-cell (not row-wide) to just the columns a caller flags via
         // verticalHeaderIndices, matching the vertical item-name columns already used on
         // the web page/PDF for a wide school x item matrix.
+        //
+        // "cat-a"/"cat-b"/"sub"/"overall" are per-column body-cell overrides (see
+        // download()'s $columnStyles docblock) — same colour language as the PDF/web's
+        // .item-col category tint, .subtotal-col and .overall-col, so a reader can tell
+        // a category's columns apart and pick out its Sub/the OVERALL total at a glance
+        // even in this format's flat single-row header.
         $xml .= '<Styles>';
         $xml .= '<Style ss:ID="header"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#0F172A" ss:Pattern="Solid"/><Alignment ss:Vertical="Center"/></Style>';
         $xml .= '<Style ss:ID="header-vertical"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#0F172A" ss:Pattern="Solid"/><Alignment ss:Vertical="Bottom" ss:Horizontal="Center" ss:Rotate="90"/></Style>';
         $xml .= '<Style ss:ID="body"><Alignment ss:Vertical="Center"/></Style>';
         $xml .= '<Style ss:ID="body-alt"><Alignment ss:Vertical="Center"/><Interior ss:Color="#F7F9FC" ss:Pattern="Solid"/></Style>';
+        $xml .= '<Style ss:ID="cat-a"><Alignment ss:Vertical="Center"/><Interior ss:Color="#EFF4FB" ss:Pattern="Solid"/></Style>';
+        $xml .= '<Style ss:ID="cat-b"><Alignment ss:Vertical="Center"/><Interior ss:Color="#F7F7F2" ss:Pattern="Solid"/></Style>';
+        $xml .= '<Style ss:ID="sub"><Font ss:Bold="1" ss:Color="#1D3557"/><Alignment ss:Vertical="Center"/><Interior ss:Color="#DDE6F2" ss:Pattern="Solid"/></Style>';
+        $xml .= '<Style ss:ID="overall"><Font ss:Bold="1" ss:Color="#1D3557"/><Alignment ss:Vertical="Center"/><Interior ss:Color="#C8D6EA" ss:Pattern="Solid"/></Style>';
         $xml .= '<Style ss:ID="note"><Font ss:Italic="1" ss:Color="#64748B"/></Style>';
         $xml .= '</Styles>'."\n";
 
@@ -120,6 +150,7 @@ class ExcelExport
             // find already exhausted.
             $rows = is_array($sheet['rows']) ? $sheet['rows'] : iterator_to_array($sheet['rows']);
             $verticalHeaderIndices = array_flip($sheet['verticalHeaderIndices'] ?? []);
+            $columnStyles = $sheet['columnStyles'] ?? [];
 
             $xml .= '<Worksheet ss:Name="'.$escape($safeName).'">';
             $xml .= '<Table>'."\n";
@@ -140,13 +171,19 @@ class ExcelExport
             // Alternating row shading (every other row) — same zebra-striping already
             // used on every fest report's web page/PDF, so a large sheet like the
             // Consolidated Report's 25+ schools stays readable instead of one
-            // undifferentiated wall of rows.
+            // undifferentiated wall of rows. A column flagged in $columnStyles (a
+            // category band, Sub, or OVERALL) keeps its own fixed colour regardless of
+            // row, same as the PDF/web — those columns are meant to stand out, not
+            // blend into the zebra stripe.
             $rowIndex = 0;
             foreach ($rows as $row) {
-                $xml .= '<Row ss:StyleID="'.($rowIndex % 2 === 1 ? 'body-alt' : 'body').'">';
-                foreach ($row as $cell) {
+                $rowStyleId = $rowIndex % 2 === 1 ? 'body-alt' : 'body';
+                $xml .= '<Row ss:StyleID="'.$rowStyleId.'">';
+                foreach ($row as $i => $cell) {
                     $type = is_numeric($cell) && $cell !== '' && $cell !== null ? 'Number' : 'String';
-                    $xml .= '<Cell><Data ss:Type="'.$type.'">'.$escape($cell).'</Data></Cell>';
+                    $cellStyleId = $columnStyles[$i] ?? null;
+                    $cellStyleAttr = $cellStyleId !== null ? ' ss:StyleID="'.$cellStyleId.'"' : '';
+                    $xml .= '<Cell'.$cellStyleAttr.'><Data ss:Type="'.$type.'">'.$escape($cell).'</Data></Cell>';
                 }
                 $xml .= '</Row>'."\n";
                 $rowIndex++;

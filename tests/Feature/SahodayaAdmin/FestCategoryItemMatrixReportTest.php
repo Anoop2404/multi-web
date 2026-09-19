@@ -199,6 +199,10 @@ class FestCategoryItemMatrixReportTest extends TestCase
         $schoolBRow = collect($matrix['schools'])->firstWhere('school_id', $schoolB->id);
         $this->assertSame(1, $schoolRow['rank'], 'the higher-scoring school (position 1) should rank 1');
         $this->assertSame(2, $schoolBRow['rank'], 'the lower-scoring school (position 2) should rank 2, not tied with rank 1');
+
+        $this->assertMatchesRegularExpression('/<Cell ss:StyleID="cat-a">/', $xml, 'the item columns should be shaded with the first category band colour so a reader can tell one category\'s columns apart from the next');
+        $this->assertMatchesRegularExpression('/<Cell ss:StyleID="sub">/', $xml, 'the Sub column cells should use the bold highlighted "sub" style, matching the PDF/web Sub column');
+        $this->assertMatchesRegularExpression('/<Cell ss:StyleID="overall">/', $xml, 'the OVERALL column cells should use the bold highlighted "overall" style, matching the PDF/web OVERALL column');
     }
 
     public function test_pdf_export_downloads(): void

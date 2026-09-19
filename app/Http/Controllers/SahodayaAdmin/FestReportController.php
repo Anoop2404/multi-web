@@ -1164,6 +1164,7 @@ class FestReportController extends SahodayaAdminController
             $verticalHeaderIndices[] = count($headers);
             $headers[] = ($item['item_code'] ? $item['item_code'].' — '.$item['title'] : $item['title'])." · {$gender} · {$type}";
         }
+        $columnStyles = [count($headers) => 'overall'];
         $headers[] = 'Total';
 
         $rows = collect($table['schools'])->map(function (array $school) use ($table, $analytics) {
@@ -1176,7 +1177,7 @@ class FestReportController extends SahodayaAdminController
             return $row;
         });
 
-        return \App\Support\ExcelExport::download("{$event->id}-{$category}-category-points", $headers, $rows, \App\Support\ExcelExport::generatedOnNote(), $verticalHeaderIndices);
+        return \App\Support\ExcelExport::download("{$event->id}-{$category}-category-points", $headers, $rows, \App\Support\ExcelExport::generatedOnNote(), $verticalHeaderIndices, $columnStyles);
     }
 
     /** JSON endpoint the Category-wise Points report's interactive per-category points table fetches on tab switch. */
