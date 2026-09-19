@@ -6,9 +6,16 @@
 
         <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="category-wise-points" />
 
-        <div v-if="childEvents.length" class="card mb-4 !py-3 flex flex-wrap items-center gap-2">
-            <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Region:</label>
-            <SearchableSelect :model-value="String(event.id)" @update:model-value="switchEvent" :options="childEventOptions" :all-option="false" class="w-64" />
+        <div v-if="childEventOptions.length" class="flex flex-wrap items-center gap-2 mb-4" role="tablist" aria-label="Region">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500 mr-1">Region:</span>
+            <button v-for="opt in childEventOptions" :key="opt.value" type="button" role="tab"
+                    class="px-3.5 py-1.5 rounded-xl text-sm font-semibold border transition"
+                    :class="String(event.id) === opt.value
+                        ? 'bg-slate-900 text-white border-slate-900'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'"
+                    @click="switchEvent(opt.value)">
+                {{ opt.label }}
+            </button>
         </div>
 
         <div v-if="!categories.length" class="card p-8 text-center text-slate-400 text-sm">
@@ -122,7 +129,6 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import CategoryPointsBreakdownModal from '@/Components/reports/CategoryPointsBreakdownModal.vue';
-import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
     sahodaya: Object,
