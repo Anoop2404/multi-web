@@ -41,8 +41,11 @@
                     <SearchableSelect v-if="schools?.length" v-model="selectedSchoolId" class="w-64"
                                       :options="schools" :all-label="`All Schools (${schools.length})`"
                                       @change="applyFilters" />
+                    <SearchableSelect v-model="selectedRank" class="w-40"
+                                      :options="rankOptions" :all-label="'All ranks'"
+                                      @change="applyFilters" />
                     <button type="button" @click="applyFilters" class="btn-secondary text-xs">Filter</button>
-                    <button v-if="searchQuery || selectedSchoolId" type="button" @click="clearFilters" class="btn-subtle text-xs text-slate-500">Clear</button>
+                    <button v-if="searchQuery || selectedSchoolId || selectedRank" type="button" @click="clearFilters" class="btn-subtle text-xs text-slate-500">Clear</button>
                 </div>
                 <div class="flex items-center gap-3">
                     <div class="flex items-center gap-1.5 text-xs text-slate-600">
@@ -199,6 +202,17 @@ const props = defineProps({
 
 const searchQuery = ref(props.filters.search || '');
 const selectedSchoolId = ref(props.filters.school_id || null);
+// Rank has no free-text-as-you-type case like search does, so unlike school/search
+// there's no separate client-side mirror below -- @change already round-trips through
+// applyFilters(), and studentWiseBrowserRows() on the server does the actual filtering
+// (trimming each student's items to just the matching rank, dropping students with no
+// match at all), so props.rows already reflects it by the time this page re-renders.
+const selectedRank = ref(props.filters.rank ? String(props.filters.rank) : null);
+const rankOptions = [
+    { value: '1', label: 'Rank 1' },
+    { value: '2', label: 'Rank 2' },
+    { value: '3', label: 'Rank 3' },
+];
 
 const filteredRows = computed(() => {
     let result = props.rows;
@@ -227,7 +241,7 @@ const paginatedRows = computed(() => {
     return filteredRows.value.slice(pageOffset.value, pageOffset.value + perPageNum.value);
 });
 
-watch([searchQuery, selectedSchoolId, perPage], () => {
+watch([searchQuery, selectedSchoolId, selectedRank, perPage], () => {
     currentPage.value = 1;
 });
 
@@ -246,6 +260,7 @@ function applyFilters() {
         {
             search: searchQuery.value || undefined,
             school_id: selectedSchoolId.value || undefined,
+            rank: selectedRank.value || undefined,
         },
         { preserveState: true, replace: true }
     );
@@ -254,6 +269,7 @@ function applyFilters() {
 function clearFilters() {
     searchQuery.value = '';
     selectedSchoolId.value = null;
+    selectedRank.value = null;
     applyFilters();
 }
 </script>

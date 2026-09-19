@@ -935,7 +935,8 @@ class FestReportController extends SahodayaAdminController
         $schoolId = $request->input('school_id');
         $search = $request->input('search');
         $studentId = $request->integer('student_id') ?: null;
-        $rows = $analytics->studentWiseBrowserRows($schoolId, $search);
+        $rank = $request->integer('rank') ?: null;
+        $rows = $analytics->studentWiseBrowserRows($schoolId, $search, rank: $rank);
         $selectedStudent = $studentId
             ? collect($rows)->firstWhere('student_id', $studentId)
             : null;
@@ -949,10 +950,11 @@ class FestReportController extends SahodayaAdminController
                 'school_id'  => $schoolId,
                 'search'     => $search,
                 'student_id' => $studentId,
+                'rank'       => $rank,
             ],
             'schools' => $service->schools()->values(),
-            'pdfUrl'  => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/student-wise-pdf?'.http_build_query(array_filter(['school_id' => $schoolId, 'search' => $search])),
-            'xlsUrl'  => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/student-wise-report?'.http_build_query(array_filter(['school_id' => $schoolId])),
+            'pdfUrl'  => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/student-wise-pdf?'.http_build_query(array_filter(['school_id' => $schoolId, 'search' => $search, 'rank' => $rank])),
+            'xlsUrl'  => '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/student-wise-report?'.http_build_query(array_filter(['school_id' => $schoolId, 'rank' => $rank])),
             'childEvents' => $childEvents,
         ])));
     }

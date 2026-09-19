@@ -1888,7 +1888,7 @@ class FestEventReportAnalyticsService
     }
 
     /** @return list<array<string, mixed>> */
-    public function studentWiseBrowserRows(?string $schoolId = null, ?string $search = null, bool $includePhotoDataUri = false, bool $photoForSchoolAdmin = false): array
+    public function studentWiseBrowserRows(?string $schoolId = null, ?string $search = null, bool $includePhotoDataUri = false, bool $photoForSchoolAdmin = false, ?int $rank = null): array
     {
         $eventIds = $this->eventIds();
 
@@ -1967,6 +1967,19 @@ class FestEventReportAnalyticsService
                     'sport_event_title' => $item?->event?->title,
                 ];
             })->values()->all();
+
+            // Rank filter: keep only this student's items that actually hold the
+            // requested position (already null for anything not yet published, so an
+            // unpublished item can never satisfy a rank filter). A student with no
+            // matching item at all is dropped entirely rather than shown with an empty
+            // items list -- this is meant to answer "who won rank N", not "everyone,
+            // some of them with nothing to show".
+            if ($rank !== null) {
+                $items = array_values(array_filter($items, fn ($i) => $i['position'] === $rank));
+                if ($items === []) {
+                    continue;
+                }
+            }
 
             $rows[] = [
                 'student_id'     => (int) $studentId,

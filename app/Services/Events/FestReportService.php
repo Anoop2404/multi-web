@@ -814,8 +814,9 @@ class FestReportService
     {
         $schoolId = $request->input('school_id');
         $search = $request->input('search');
+        $rank = $request->integer('rank') ?: null;
         $analytics = app(FestEventReportAnalyticsService::class, ['event' => $this->event]);
-        $rows = $analytics->studentWiseBrowserRows($schoolId, $search, includePhotoDataUri: true);
+        $rows = $analytics->studentWiseBrowserRows($schoolId, $search, includePhotoDataUri: true, rank: $rank);
 
         return $this->renderPdf('fest.reports.student-wise', [
             'event' => $this->event,
@@ -828,7 +829,7 @@ class FestReportService
     private function studentWiseReportXls(Request $request): StreamedResponse
     {
         $analytics = app(FestEventReportAnalyticsService::class, ['event' => $this->event]);
-        $students = $analytics->studentWiseBrowserRows($request->input('school_id'), $request->input('search'));
+        $students = $analytics->studentWiseBrowserRows($request->input('school_id'), $request->input('search'), rank: $request->integer('rank') ?: null);
 
         // One row per student × item (not one row per student) so rank/mark/grade — which
         // are per-item — have somewhere to go; the old one-row-per-student shape only had
