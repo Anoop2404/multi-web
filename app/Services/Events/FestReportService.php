@@ -913,12 +913,15 @@ class FestReportService
         $matrix = $analytics->schoolItemPointsMatrix();
         $categories = collect($matrix['categories'])->reject(fn (array $c) => $c['excluded_from_overall'])->values()->all();
 
+        // Rank last, not first -- this Sahodaya wants School leading the row with Rank
+        // trailing after OVERALL, not the item-matrix's Rank-first layout.
         $rows = collect($matrix['schools'])->map(function (array $school) use ($categories) {
-            $row = [$school['rank'], strtoupper($school['school_name'])];
+            $row = [strtoupper($school['school_name'])];
             foreach ($categories as $category) {
                 $row[] = $school['category_totals'][$category['key']] ?? 0;
             }
             $row[] = $school['overall'];
+            $row[] = $school['rank'];
 
             return $row;
         })->all();
@@ -930,7 +933,7 @@ class FestReportService
     {
         ['categories' => $categories, 'rows' => $rows] = $this->categoryTotalsData($analytics);
 
-        $headers = ['Rank', 'School'];
+        $headers = ['School'];
         $columnStyles = [];
         foreach ($categories as $i => $category) {
             $columnStyles[count($headers)] = ExcelExport::CATEGORY_BAND_STYLES[$i % count(ExcelExport::CATEGORY_BAND_STYLES)];
@@ -938,6 +941,7 @@ class FestReportService
         }
         $columnStyles[count($headers)] = 'overall';
         $headers[] = 'OVERALL';
+        $headers[] = 'Rank';
 
         return ExcelExport::download($this->slug().'-category-totals', $headers, $rows, ExcelExport::generatedOnNote(), [], $columnStyles);
     }

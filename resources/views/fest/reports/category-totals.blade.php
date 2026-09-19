@@ -15,6 +15,7 @@
         table.data td.school-col { text-align: left; font-weight: 700; }
         table.data tr:nth-child(even) td { background: #f7f9fc; }
         table.data td.overall-col, table.data th.overall-col { background: #c8d6ea; color: #1d3557; font-weight: 800; }
+        table.data td.rank-col, table.data th.rank-col { font-weight: 800; }
         .footer { margin-top: 14px; padding-top: 6px; border-top: 1px solid #cbd5e1; font-size: 8.5px; color: #64748b; }
         .empty { text-align: center; padding: 20px; color: #64748b; }
     </style>
@@ -32,19 +33,19 @@
         <table class="data">
             <thead>
                 <tr>
-                    <th style="width: 34px;">Rank</th>
                     <th class="school-col">School</th>
                     @foreach($categories as $category)
                         <th>{{ $category['label'] }}</th>
                     @endforeach
                     <th class="overall-col">Overall</th>
+                    <th class="rank-col" style="width: 34px;">Rank</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($rows as $row)
                 <tr>
                     @foreach($row as $i => $value)
-                        <td class="{{ $i === 1 ? 'school-col' : ($i === count($row) - 1 ? 'overall-col' : '') }}">{{ $value }}</td>
+                        <td class="{{ $i === 0 ? 'school-col' : ($i === count($row) - 1 ? 'rank-col' : ($i === count($row) - 2 ? 'overall-col' : '')) }}">{{ $value }}</td>
                     @endforeach
                 </tr>
                 @endforeach
