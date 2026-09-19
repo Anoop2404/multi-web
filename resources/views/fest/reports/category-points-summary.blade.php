@@ -16,7 +16,8 @@
         table.data tr:nth-child(even) td { background: #f7f9fc; }
         table.data td.overall-col, table.data th.overall-col { background: #c8d6ea; color: #1d3557; font-weight: 800; }
         table.data td.rank-col, table.data th.rank-col { font-weight: 800; }
-        table.data tr.top3 td { font-weight: 800; }
+        table.data tr.top3 td { font-weight: 800; font-size: 12.5px; }
+        table.data tr.top3 td.school-col { font-weight: 700; }
         .footer { margin-top: 14px; padding-top: 6px; border-top: 1px solid #cbd5e1; font-size: 8.5px; color: #64748b; }
         .empty { text-align: center; padding: 20px; color: #64748b; }
     </style>
