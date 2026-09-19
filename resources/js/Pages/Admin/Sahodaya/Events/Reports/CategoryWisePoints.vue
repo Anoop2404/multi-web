@@ -29,8 +29,12 @@
             </div>
 
             <div v-if="activeCategory" class="card card--flush overflow-hidden">
-                <div class="px-5 py-3 border-b bg-slate-50/80">
+                <div class="px-5 py-3 border-b bg-slate-50/80 flex items-center justify-between gap-3 flex-wrap">
                     <h3 class="section-title text-sm !mb-0">{{ activeCategory.label }}</h3>
+                    <div class="flex items-center gap-2">
+                        <a :href="categoryPdfUrl(activeCategory, true)" target="_blank" rel="noopener" class="btn-secondary text-xs">👁️ Preview points table</a>
+                        <a :href="categoryPdfUrl(activeCategory, false)" class="btn-secondary text-xs">⬇️ Download PDF</a>
+                    </div>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="data-table w-full text-sm">
@@ -102,6 +106,10 @@ const childEventOptions = computed(() => props.childEvents.map((ev) => ({ value:
 
 function switchEvent(value) {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${value}/reports/category-wise-points`);
+}
+
+function categoryPdfUrl(category, preview) {
+    return `${base}/${encodeURIComponent(category.key)}/pdf${preview ? '?preview=1' : ''}`;
 }
 
 const modalOpen = ref(false);

@@ -1108,6 +1108,45 @@ class FestReportController extends SahodayaAdminController
         ]);
     }
 
+    /**
+     * One category's own point-table sheet — school rows, that category's items as
+     * columns, subtotal + rank. Deliberately unmerged (see
+     * FestEventReportAnalyticsService::categorySchoolPointsTable()'s docblock): unlike
+     * the all-categories Consolidated Report, this is the "just this one category,
+     * exactly as it stands on its own" printable/previewable sheet a category-wise tab
+     * needs, independent of any championship_category_map merge configured elsewhere.
+     */
+    public function categoryWisePointsPdf(Request $request, string $tenantId, FestEvent $event, string $category)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+        $analytics = $this->scopedAnalytics($request, $targetEvent);
+        $table = $analytics->categorySchoolPointsTable($category);
+
+        $scoreboards = app(\App\Services\Events\PublicFestScoreboardService::class);
+        $categoryLabel = $category === 'open' ? 'Open' : $scoreboards->categoryLabel($targetEvent, $category);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.category-points-table', [
+            'event'         => $event,
+            'categoryLabel' => $categoryLabel,
+            'items'         => $table['items'],
+            'schools'       => $table['schools'],
+            'analytics'     => $analytics,
+            'generatedAt'   => now()->format('d M Y, h:i A'),
+            'orgName'       => $this->sahodaya->name,
+            'logoSrc'       => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+        ])->setPaper('a4', 'landscape');
+
+        $filename = "{$event->id}-{$category}-category-points.pdf";
+
+        if ($request->boolean('inline') || $request->boolean('preview')) {
+            return $pdf->stream($filename);
+        }
+
+        return $pdf->download($filename);
+    }
+
     /** Consolidated category-wise & item-wise report — school rows, item columns grouped by category, subtotal + overall columns. */
     public function categoryItemMatrix(Request $request, string $tenantId, FestEvent $event)
     {

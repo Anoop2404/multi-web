@@ -2207,13 +2207,16 @@ class FestEventReportAnalyticsService
             ->orderBy('title')
             ->get(['id', 'title', 'item_code', 'participant_type', $column]);
 
-        // Group by the merged target (aggregation_config.championship_category_map),
-        // not the item's own raw class_group/age_group — otherwise a category the
-        // admin merged into another (e.g. "category_5" folded into "category_3") still
-        // shows as its own separate section here, out of step with every scoreboard/
-        // championship view that already collapses it. See FestCategoryMerge's docblock.
+        // Deliberately grouped by the item's own RAW class_group/age_group, not the
+        // merge target — this page (Category-wise Points) is the "each category on its
+        // own, unmerged" browse view: a category the admin folded into another for the
+        // combined championship (aggregation_config.championship_category_map) still
+        // gets its own tab/sheet here, since that merge is specifically an overall/
+        // combined-total convention, not a statement that the category never existed.
+        // The CONSOLIDATED matrix (categoryHeadItemRows(), schoolItemPointsMatrix())
+        // is the one that collapses merged categories together — this is its opposite.
         return $items
-            ->groupBy(fn (FestEventItem $item) => FestCategoryMerge::resolve($root, $item->{$column} ?: 'open'))
+            ->groupBy(fn (FestEventItem $item) => $item->{$column} ?: 'open')
             ->map(fn ($group) => $group->map(fn (FestEventItem $item) => [
                 'id'               => $item->id,
                 'title'            => $item->title,
@@ -2224,12 +2227,124 @@ class FestEventReportAnalyticsService
     }
 
     /**
-     * Same item/category grouping as categoryWiseItemRows(), one level deeper — items
-     * within each category are further grouped by their item head (Off Stage, On
-     * Stage, Music, etc.), for the consolidated matrix's 3-tier header. Kept separate
-     * from categoryWiseItemRows() rather than changing its return shape, since that
-     * method also powers the Category-wise Points interactive report, which expects a
-     * flat item list per category.
+     * School × item point table for ONE raw category, unmerged — the "preview/print
+     * just this category's own result sheet" companion to categoryWiseItemRows()'s
+     * browse tabs. Deliberately ignores aggregation_config.championship_category_map
+     * for the same reason categoryWiseItemRows() does: a category merged into another
+     * for the combined championship still gets its own accurate sheet here. Has no
+     * OVERALL/exclusion concept — that's specific to the all-categories consolidated
+     * matrix (schoolItemPointsMatrix()); a single category's own sheet is never
+     * affected by aggregation_config.excluded_overall_categories either, matching the
+     * documented rule that exclusion only touches the combined total.
+     *
+     * @return array{items: list<array<string, mixed>>, schools: list<array<string, mixed>>}
+     */
+    public function categorySchoolPointsTable(string $rawCategory): array
+    {
+        $root = $this->event->rootEvent();
+        $column = $root->event_type === 'sports' ? 'age_group' : 'class_group';
+
+        $items = FestEventItem::whereIn('event_id', $this->eventIds())
+            ->where('is_enabled', true)
+            ->where($column, $rawCategory)
+            ->orderBy('display_order')
+            ->orderBy('title')
+            ->get(['id', 'title', 'item_code', 'participant_type']);
+
+        $itemIds = $items->pluck('id')->all();
+        $gradePointService = app(FestGradePointService::class);
+
+        // Same dedup as schoolItemPointsMatrix() — one FestMark per teammate on pair/
+        // group items must not multiply a team's points by its squad size.
+        $marks = FestMark::whereIn('event_id', $this->eventIds())
+            ->whereIn('item_id', $itemIds)
+            ->with(['participant.registration.school'])
+            ->get()
+            ->unique(fn (FestMark $m) => $m->deduplicationKey());
+
+        $cellPoints = [];
+        $cellBreakdown = [];
+        $schoolNames = [];
+
+        foreach ($marks as $mark) {
+            $participant = $mark->participant;
+            if (! $participant || $participant->disqualified_at) {
+                continue;
+            }
+
+            $school = $participant->registration?->school;
+            if (! $school || ! $mark->item_id) {
+                continue;
+            }
+
+            $points = $gradePointService->pointsForMark($this->event, $mark);
+            $schoolNames[$school->id] = $school->name;
+            $cellPoints[$school->id][$mark->item_id] = ($cellPoints[$school->id][$mark->item_id] ?? 0) + $points;
+            if ($points > 0) {
+                $cellBreakdown[$school->id][$mark->item_id][] = $points;
+            }
+        }
+
+        $schools = collect($schoolNames)
+            ->map(function (string $name, string $schoolId) use ($itemIds, $cellPoints, $cellBreakdown) {
+                $points = $cellPoints[$schoolId] ?? [];
+                $subtotal = 0;
+                foreach ($itemIds as $itemId) {
+                    $subtotal += $points[$itemId] ?? 0;
+                }
+
+                return [
+                    'school_id'         => $schoolId,
+                    'school_name'       => $name,
+                    'points_by_item'    => $points,
+                    'breakdown_by_item' => $cellBreakdown[$schoolId] ?? [],
+                    'subtotal'          => $subtotal,
+                ];
+            })
+            ->sortByDesc('subtotal')
+            ->values();
+
+        $rank = 0;
+        $previous = null;
+        $schools = $schools->map(function (array $row) use (&$rank, &$previous) {
+            if ($previous === null || $row['subtotal'] < $previous) {
+                $rank++;
+            }
+            $previous = $row['subtotal'];
+            $row['rank'] = $rank;
+
+            return $row;
+        })->all();
+
+        return [
+            'items' => $items->map(fn (FestEventItem $item) => [
+                'id'               => $item->id,
+                'title'            => $item->title,
+                'item_code'        => $item->item_code,
+                'participant_type' => $item->participant_type,
+            ])->all(),
+            'schools' => $schools,
+        ];
+    }
+
+    /**
+     * Same item/category source as categoryWiseItemRows() (one level deeper — items
+     * within each category are further grouped by their item head: Off Stage, On
+     * Stage, Music, etc. — for the consolidated matrix's 3-tier header), but grouped by
+     * the MERGE TARGET rather than the item's own raw category, unlike
+     * categoryWiseItemRows(): this powers the CONSOLIDATED matrix (an all-categories,
+     * one-OVERALL-column report), which should match the merged categories the
+     * school/championship boards already show — categoryWiseItemRows() powers the
+     * separate, unmerged per-category browse report instead, so it deliberately does
+     * NOT resolve the merge. Kept as its own method rather than reusing
+     * categoryWiseItemRows()'s shape, since that one also needs to stay a flat item
+     * list per category.
+     *
+     * A single item forming its own one-item head band here (visible as its own
+     * "Sub" column in the consolidated matrix, separate from its category's other
+     * items) means that item's head_id doesn't match its siblings' — fix by editing
+     * the item's Head/Competition-area assignment (not its class_group/category) under
+     * Items & Catalog so it shares the same head as the rest of its category.
      *
      * @return array<string, list<array{head_label: string, items: list<array<string, mixed>>}>>
      */
