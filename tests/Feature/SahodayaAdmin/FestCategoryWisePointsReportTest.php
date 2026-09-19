@@ -16,6 +16,7 @@ use App\Services\Events\FestEventReportAnalyticsService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 /**
@@ -84,7 +85,15 @@ class FestCategoryWisePointsReportTest extends TestCase
         $this->assertGreaterThan(0, $hsTable['schools'][0]['subtotal']);
     }
 
-    public function test_a_category_excluded_from_overall_has_no_tab_here(): void
+    /**
+     * Unlike the Category & Item-wise Consolidated Report / Category Totals sheets
+     * (which drop an excluded category entirely, since those represent the OVERALL
+     * championship standing), this Sahodaya still wants to browse/print an excluded
+     * category's own points table here -- its schools' totals are real, just not
+     * counted toward OVERALL. So the tab stays, flagged via excluded_from_overall
+     * rather than removed. This is deliberately scoped to ONLY this report page.
+     */
+    public function test_a_category_excluded_from_overall_still_gets_its_own_tab_but_flagged(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);
 
@@ -110,7 +119,44 @@ class FestCategoryWisePointsReportTest extends TestCase
         $categoryKeys = collect($analytics->categoryWiseItemRows())->keys()->all();
 
         $this->assertContains('hs', $categoryKeys);
-        $this->assertNotContains('lp', $categoryKeys, 'lp is excluded from OVERALL and should not get its own tab/report here');
+        $this->assertContains('lp', $categoryKeys, 'lp is excluded from OVERALL but should still get its own tab/report on this page');
+
+        $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/category-wise-points")
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Sahodaya/Events/Reports/CategoryWisePoints', false)
+                ->where('categories', fn ($categories) => collect($categories)->firstWhere('key', 'hs')['excluded_from_overall'] === false
+                    && collect($categories)->firstWhere('key', 'lp')['excluded_from_overall'] === true));
+    }
+
+    /** The other reports (Category & Item-wise Consolidated / Category Totals) must keep dropping an excluded category entirely -- only this report page changed. */
+    public function test_the_consolidated_matrix_still_drops_an_excluded_category_entirely(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'sahodaya', 'name' => 'Category Points Scope Sahodaya',
+            'domain' => 'category-points-scope-'.Str::random(8).'.test', 'is_active' => true,
+        ]);
+        SahodayaProfile::create(['tenant_id' => $sahodaya->id, 'prefix' => 'CPS', 'student_data_mode' => 'counts_only']);
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        $event = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Category Points Scope Fest', 'event_type' => 'kalolsavam',
+            'level_round' => 'sahodaya', 'status' => 'ongoing',
+            'aggregation_config' => ['excluded_overall_categories' => ['lp']],
+        ]);
+
+        FestEventItem::create(['event_id' => $event->id, 'title' => 'HS Item', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true]);
+        FestEventItem::create(['event_id' => $event->id, 'title' => 'LP Item', 'participant_type' => 'individual', 'class_group' => 'lp', 'is_enabled' => true]);
+
+        $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/category-item-matrix")
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Sahodaya/Events/Reports/CategoryItemMatrix', false)
+                ->where('categories', fn ($categories) => collect($categories)->pluck('key')->contains('hs')
+                    && ! collect($categories)->pluck('key')->contains('lp')));
     }
 
     public function test_pdf_preview_downloads_for_a_category(): void

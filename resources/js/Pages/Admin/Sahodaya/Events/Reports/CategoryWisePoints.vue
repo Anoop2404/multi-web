@@ -32,7 +32,16 @@
                         @click="activeKey = cat.key">
                     {{ cat.label }}
                     <span class="ml-1 text-xs opacity-70">({{ cat.items.length }})</span>
+                    <span v-if="cat.excluded_from_overall"
+                          class="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide"
+                          :class="activeKey === cat.key ? 'bg-amber-400 text-amber-950' : 'bg-amber-100 text-amber-700'">
+                        Excl.
+                    </span>
                 </button>
+            </div>
+
+            <div v-if="activeCategory && activeCategory.excluded_from_overall" class="mb-4 px-4 py-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                This category is excluded from the event's OVERALL/Championship total (Settings → Aggregation) — its own points table below is still accurate, it just isn't counted toward the combined ranking.
             </div>
 
             <div v-if="activeCategory" class="card card--flush overflow-hidden mb-6">

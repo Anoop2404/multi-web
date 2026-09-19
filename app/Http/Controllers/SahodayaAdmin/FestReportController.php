@@ -1082,13 +1082,20 @@ class FestReportController extends SahodayaAdminController
         $targetEvent = $this->regionAwareTargetEvent($request, $event);
         $analytics = $this->scopedAnalytics($request, $targetEvent);
         $itemsByCategory = $analytics->categoryWiseItemRows();
+        $excludedKeys = \App\Support\FestOverallCategoryExclusion::excluded($targetEvent->rootEvent());
 
         $scoreboards = app(\App\Services\Events\PublicFestScoreboardService::class);
         $categories = collect($itemsByCategory)
             ->map(fn (array $items, string $key) => [
-                'key'   => $key,
-                'label' => $key === 'open' ? 'Open' : $scoreboards->categoryLabel($targetEvent, $key),
-                'items' => $items,
+                'key'                   => $key,
+                'label'                 => $key === 'open' ? 'Open' : $scoreboards->categoryLabel($targetEvent, $key),
+                'items'                 => $items,
+                // Informational only, same meaning as schoolItemPointsMatrix()'s own
+                // flag -- this Sahodaya still wants to browse/print an excluded
+                // category's own points table (its schools' totals here are real, just
+                // not counted toward OVERALL), so it keeps its tab; the Vue page badges
+                // it instead of hiding it.
+                'excluded_from_overall' => in_array($key, $excludedKeys, true),
             ])
             ->sortBy('label')
             ->values()

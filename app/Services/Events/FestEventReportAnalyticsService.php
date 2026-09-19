@@ -2265,20 +2265,19 @@ class FestEventReportAnalyticsService
         $column = $root->event_type === 'sports' ? 'age_group' : 'class_group';
 
         $items = $this->catalogItems();
-        $excluded = FestOverallCategoryExclusion::excluded($root);
 
         // Grouped by the MERGE TARGET (aggregation_config.championship_category_map),
         // same as the consolidated matrix — a category the admin folded into another
         // for the combined championship no longer gets its own tab here; its items
         // join the target category's tab instead, matching the official scoring rule
         // instead of presenting a category as independently scored when it isn't.
-        // Categories excluded from OVERALL (aggregation_config.
-        // excluded_overall_categories) are dropped from this page entirely — same
-        // "not offered as one of this event's official category reports" rule already
-        // applied to the consolidated matrix's own downloads.
+        // A category excluded from OVERALL (aggregation_config.
+        // excluded_overall_categories) still keeps its own tab here, unlike the
+        // consolidated matrix's downloads — this Sahodaya wants to browse/print that
+        // category's own points table even though it isn't counted toward OVERALL; the
+        // caller (FestReportController::categoryWisePoints()) flags which tab that is.
         return $items
             ->groupBy(fn (FestEventItem $item) => FestCategoryMerge::resolve($root, $item->{$column} ?: 'open'))
-            ->reject(fn ($group, string $key) => in_array($key, $excluded, true))
             ->map(fn ($group) => $group->map(fn (FestEventItem $item) => [
                 'id'               => $item->id,
                 'title'            => $item->title,
