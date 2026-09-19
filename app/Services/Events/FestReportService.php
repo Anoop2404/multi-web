@@ -940,9 +940,15 @@ class FestReportService
     {
         $matrix = $analytics->schoolItemPointsMatrix();
 
+        // A combined (multi-phase/region) event can easily run to 100+ item columns —
+        // far too wide for one printed page. paginateMatrixColumns() splits them into
+        // page-sized chunks with a "(cont'd)" continuation marker; a single-phase
+        // event with few enough items still comes back as one page, unchanged.
+        $pages = FestEventReportAnalyticsService::paginateMatrixColumns($matrix['categories']);
+
         return $this->renderPdf('fest.reports.category-item-matrix', [
             'event'      => $this->event,
-            'categories' => $matrix['categories'],
+            'pages'      => $pages,
             'schools'    => $matrix['schools'],
             'analytics'  => $analytics,
             ...$this->brandingData(),

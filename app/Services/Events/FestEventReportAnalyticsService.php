@@ -2551,6 +2551,82 @@ class FestEventReportAnalyticsService
     }
 
     /**
+     * Splits schoolItemPointsMatrix()'s categories into print-page-sized column
+     * chunks — a district-wide combined report (every phase/region's items pooled
+     * together) easily runs to 100+ item columns, far too wide for one printed A4
+     * page no matter how small the font. Each page keeps the School column (rendered
+     * separately by the caller, repeated on every page) and a category's own "Sub"
+     * column appears exactly once, on whichever page holds that category's LAST item
+     * — a category split across pages is flagged is_continuation on every page after
+     * its first, so the caller can show "(cont'd)" instead of repeating the label
+     * (and skip repeating the Sub column early). OVERALL is the caller's job to show
+     * only on the last page.
+     *
+     * @param  list<array<string, mixed>>  $categories  schoolItemPointsMatrix()'s own 'categories' shape
+     * @param  int  $perPage  max item columns per printed page
+     * @return list<array{categories: list<array<string, mixed>>, is_last_page: bool}>
+     */
+    public static function paginateMatrixColumns(array $categories, int $perPage = 18): array
+    {
+        $flat = [];
+        $totalItemsByCategory = [];
+        foreach ($categories as $ci => $category) {
+            $count = 0;
+            foreach ($category['heads'] as $hi => $head) {
+                foreach ($head['items'] as $item) {
+                    $flat[] = ['ci' => $ci, 'hi' => $hi, 'item' => $item];
+                    $count++;
+                }
+            }
+            $totalItemsByCategory[$ci] = $count;
+        }
+
+        if ($flat === []) {
+            return [['categories' => $categories, 'is_last_page' => true]];
+        }
+
+        $chunks = array_chunk($flat, max(1, $perPage));
+        $totalChunks = count($chunks);
+        $pages = [];
+        $seenByCategory = [];
+
+        foreach ($chunks as $pageIndex => $chunkRows) {
+            $pageCategories = [];
+            $orderOnThisPage = [];
+
+            foreach ($chunkRows as $row) {
+                $ci = $row['ci'];
+                $hi = $row['hi'];
+
+                if (! isset($pageCategories[$ci])) {
+                    $pageCategories[$ci] = $categories[$ci];
+                    $pageCategories[$ci]['heads'] = [];
+                    $pageCategories[$ci]['is_continuation'] = ($seenByCategory[$ci] ?? 0) > 0;
+                    $orderOnThisPage[] = $ci;
+                }
+                if (! isset($pageCategories[$ci]['heads'][$hi])) {
+                    $pageCategories[$ci]['heads'][$hi] = $categories[$ci]['heads'][$hi];
+                    $pageCategories[$ci]['heads'][$hi]['items'] = [];
+                }
+                $pageCategories[$ci]['heads'][$hi]['items'][] = $row['item'];
+                $seenByCategory[$ci] = ($seenByCategory[$ci] ?? 0) + 1;
+            }
+
+            foreach ($orderOnThisPage as $ci) {
+                $pageCategories[$ci]['is_complete_here'] = $seenByCategory[$ci] >= $totalItemsByCategory[$ci];
+                $pageCategories[$ci]['heads'] = array_values($pageCategories[$ci]['heads']);
+            }
+
+            $pages[] = [
+                'categories'   => array_map(fn ($ci) => $pageCategories[$ci], $orderOnThisPage),
+                'is_last_page' => $pageIndex === $totalChunks - 1,
+            ];
+        }
+
+        return $pages;
+    }
+
+    /**
      * Per-participant rank/grade points breakdown for one item — powers the
      * Category-wise Points report's eye-icon detail view.
      *

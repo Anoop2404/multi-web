@@ -145,6 +145,39 @@ class FestCategoryItemMatrixReportTest extends TestCase
         $response->assertOk();
     }
 
+    /**
+     * The xls/pdf export tests above only ever asserted assertOk() on a zero-item,
+     * zero-mark fixture — assertOk() passes for a StreamedResponse regardless of
+     * whether its content is actually populated, and there were never any real marks
+     * to reveal a blank-cell bug either way. This proves real point data actually
+     * reaches the exported file: streamedContent() (not getContent(), which returns
+     * empty for an unsent StreamedResponse in tests) must contain both the school name
+     * and a non-zero point value.
+     */
+    public function test_xls_export_contains_real_school_and_point_data(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $sahodaya = Tenant::create(['id' => (string) Str::uuid(), 'type' => 'sahodaya', 'name' => 'Matrix XLS Data Sahodaya', 'domain' => 'matrix-xls-data-'.Str::random(8).'.test', 'is_active' => true]);
+        SahodayaProfile::create(['tenant_id' => $sahodaya->id, 'prefix' => 'MX', 'student_data_mode' => 'counts_only']);
+        $school = Tenant::create(['id' => (string) Str::uuid(), 'type' => 'school', 'name' => 'Matrix XLS Data School', 'parent_id' => $sahodaya->id, 'membership_status' => 'approved', 'is_active' => true]);
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+        $event = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Matrix XLS Data Fest', 'event_type' => 'kalolsavam', 'level_round' => 'sahodaya', 'status' => 'ongoing']);
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true]);
+        $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '9']);
+        $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $schoolClass->id, 'name' => 'Matrix XLS Data Student', 'admission_no' => 'MXD1']);
+        $registration = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+        $participant = FestParticipant::create(['registration_id' => $registration->id, 'student_id' => $student->id, 'participant_role' => 'performer']);
+        FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'position' => 1, 'grade' => 'A']);
+
+        $response = $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/export/category-item-matrix-xls");
+
+        $xml = $response->streamedContent();
+        $this->assertStringContainsString('MATRIX XLS DATA SCHOOL', $xml);
+        $this->assertMatchesRegularExpression('/<Cell><Data ss:Type="Number">[1-9]\d*<\/Data><\/Cell>/', $xml, 'expected at least one non-zero point cell in the exported XLS');
+    }
+
     public function test_pdf_export_downloads(): void
     {
         [$sahodaya, $event, $admin] = $this->makeMinimalEvent();
@@ -241,5 +274,84 @@ class FestCategoryItemMatrixReportTest extends TestCase
         $schoolRow = collect($matrix['schools'])->firstWhere('school_id', $school->id);
         $this->assertNotNull($schoolRow, 'the leaf-recorded mark must still roll up to a school row at the hub level');
         $this->assertGreaterThan(0, $schoolRow['overall']);
+    }
+
+    /**
+     * A combined (multi-phase/region) event's consolidated matrix can run to 100+
+     * item columns, too wide for one printed page — the PDF now splits into
+     * page-sized chunks (paginateMatrixColumns()) instead of cramming everything, or
+     * silently clipping, onto a single sheet.
+     */
+    public function test_paginate_matrix_columns_splits_a_wide_category_and_flags_continuation(): void
+    {
+        // One category with 5 items in a single head, chunked 2-per-page -> 3 pages.
+        $items = collect(range(1, 5))->map(fn ($i) => ['id' => $i, 'title' => "Item {$i}"])->all();
+        $categories = [[
+            'key' => 'hs', 'label' => 'Category 3', 'excluded_from_overall' => false,
+            'heads' => [['head_label' => 'General', 'items' => $items]],
+        ]];
+
+        $pages = FestEventReportAnalyticsService::paginateMatrixColumns($categories, perPage: 2);
+
+        $this->assertCount(3, $pages);
+
+        // Page 1: items 1-2, category just starting -> not a continuation, not complete.
+        $this->assertFalse($pages[0]['categories'][0]['is_continuation']);
+        $this->assertFalse($pages[0]['categories'][0]['is_complete_here']);
+        $this->assertFalse($pages[0]['is_last_page']);
+        $this->assertSame([1, 2], collect($pages[0]['categories'][0]['heads'][0]['items'])->pluck('id')->all());
+
+        // Page 2: items 3-4, category continues from page 1, still not complete.
+        $this->assertTrue($pages[1]['categories'][0]['is_continuation']);
+        $this->assertFalse($pages[1]['categories'][0]['is_complete_here']);
+        $this->assertSame([3, 4], collect($pages[1]['categories'][0]['heads'][0]['items'])->pluck('id')->all());
+
+        // Page 3 (last): item 5 only, category now complete -> its Sub column belongs here.
+        $this->assertTrue($pages[2]['categories'][0]['is_continuation']);
+        $this->assertTrue($pages[2]['categories'][0]['is_complete_here']);
+        $this->assertTrue($pages[2]['is_last_page']);
+        $this->assertSame([5], collect($pages[2]['categories'][0]['heads'][0]['items'])->pluck('id')->all());
+    }
+
+    public function test_paginate_matrix_columns_keeps_everything_on_one_page_when_it_fits(): void
+    {
+        $items = collect(range(1, 3))->map(fn ($i) => ['id' => $i, 'title' => "Item {$i}"])->all();
+        $categories = [[
+            'key' => 'hs', 'label' => 'Category 3', 'excluded_from_overall' => false,
+            'heads' => [['head_label' => 'General', 'items' => $items]],
+        ]];
+
+        $pages = FestEventReportAnalyticsService::paginateMatrixColumns($categories, perPage: 18);
+
+        $this->assertCount(1, $pages);
+        $this->assertTrue($pages[0]['is_last_page']);
+        $this->assertTrue($pages[0]['categories'][0]['is_complete_here']);
+        $this->assertFalse($pages[0]['categories'][0]['is_continuation']);
+    }
+
+    /** Real multi-item PDF download (not the zero-item makeMinimalEvent() fixture) must still succeed once paginated. */
+    public function test_pdf_export_downloads_and_paginates_with_many_items(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $sahodaya = Tenant::create(['id' => (string) Str::uuid(), 'type' => 'sahodaya', 'name' => 'Matrix Paginate Sahodaya', 'domain' => 'matrix-paginate-'.Str::random(8).'.test', 'is_active' => true]);
+        SahodayaProfile::create(['tenant_id' => $sahodaya->id, 'prefix' => 'MP', 'student_data_mode' => 'counts_only']);
+        $school = Tenant::create(['id' => (string) Str::uuid(), 'type' => 'school', 'name' => 'Matrix Paginate School', 'parent_id' => $sahodaya->id, 'membership_status' => 'approved', 'is_active' => true]);
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+        $event = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Matrix Paginate Fest', 'event_type' => 'kalolsavam', 'level_round' => 'sahodaya', 'status' => 'ongoing']);
+
+        $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '9']);
+        foreach (range(1, 25) as $i) {
+            $item = FestEventItem::create(['event_id' => $event->id, 'title' => "Item {$i}", 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true]);
+            $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $schoolClass->id, 'name' => "Student {$i}", 'admission_no' => "MP{$i}"]);
+            $registration = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+            $participant = FestParticipant::create(['registration_id' => $registration->id, 'student_id' => $student->id, 'participant_role' => 'performer']);
+            FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'position' => 1, 'grade' => 'A']);
+        }
+
+        $response = $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/export/category-item-matrix-pdf");
+
+        $response->assertOk();
     }
 }
