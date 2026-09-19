@@ -431,4 +431,24 @@ class FestCategoryItemMatrixReportTest extends TestCase
         $this->assertStringContainsString('Kept HS Item', $xls);
         $this->assertStringNotContainsString('Hidden LP Item', $xls);
     }
+
+    /**
+     * dompdf doesn't support the CSS `writing-mode` property at all -- the item-name
+     * header's `writing-mode:vertical-rl` was silently ignored, leaving only
+     * `transform:rotate(180deg)` applied to otherwise-horizontal text, which renders as
+     * upside-down horizontal text instead of vertical text (confirmed by actually
+     * rendering the PDF and reading it back). The working dompdf technique instead
+     * rotates a wide, absolutely-positioned span with `transform:rotate(-90deg)` so
+     * dompdf doesn't clip it to a too-small pre-rotation box. This just guards the
+     * blade source against a well-intentioned revert back to the broken
+     * writing-mode approach.
+     */
+    public function test_pdf_item_header_uses_dompdf_compatible_rotation_not_writing_mode(): void
+    {
+        $css = file_get_contents(resource_path('views/fest/reports/category-item-matrix.blade.php'));
+
+        $this->assertStringNotContainsString('writing-mode', $css, 'dompdf does not support writing-mode -- it silently no-ops, leaving text upside-down instead of vertical');
+        $this->assertStringContainsString('rotate(-90deg)', $css);
+        $this->assertStringContainsString('position:absolute', $css, 'the rotated span must be taken out of flow so its wide pre-rotation box does not force a wide column, and so dompdf does not clip it to a narrow one');
+    }
 }

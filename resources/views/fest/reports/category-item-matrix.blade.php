@@ -7,8 +7,8 @@ th,td{border:1px solid #ccc;padding:3px 4px;text-align:center}
 th{background:#1d3557;color:#fff;font-size:8px;font-weight:bold;white-space:nowrap}
 .school-col{text-align:left;min-width:120px}
 .head-col{background:#3d5a80;font-size:8px;padding:4px}
-.item-col{height:120px;vertical-align:bottom}
-.item-col span{writing-mode:vertical-rl;transform:rotate(180deg);display:inline-block;white-space:nowrap}
+.item-col{height:170px;width:20px;position:relative;vertical-align:bottom;padding:0}
+.item-col span{display:block;position:absolute;bottom:4px;left:3px;width:160px;height:12px;line-height:12px;transform:rotate(-90deg);transform-origin:bottom left;white-space:nowrap}
 .subtotal-col{background:#eef2f8;font-weight:bold}
 .overall-col{background:#1d3557;color:#fff;font-weight:bold}
 tbody tr:nth-child(even){background:#f7f9fc}
@@ -25,7 +25,7 @@ tbody td.overall-col{background:#c8d6ea;color:#1d3557}
 <p style="text-align:center;font-size:10px;color:#64748b;margin-top:2px">Generated on {{ now()->format('d M Y, h:i A') }}</p>
 @php
 $excludedLabels = collect($pages)->flatMap(fn ($p) => $p['categories'])->where('excluded_from_overall', true)->pluck('label')->unique();
-$itemGenderLabel = fn ($g) => (! $g || $g === 'open') ? 'Mixed' : ucfirst($g);
+$itemGenderLabel = fn ($g) => (! $g || $g === 'open') ? 'Mixed' : (['male' => 'Boys', 'female' => 'Girls'][$g] ?? ucfirst($g));
 $itemTypeAbbr = fn ($t) => in_array($t, ['team', 'group', 'pair', 'trio'], true) ? 'Grp' : 'Ind';
 $itemHeaderLabel = fn ($item) => ($item['item_code'] ? $item['item_code'].' — '.$item['title'] : $item['title']).' · '.$itemGenderLabel($item['gender'] ?? null).' · '.$itemTypeAbbr($item['participant_type'] ?? null);
 @endphp

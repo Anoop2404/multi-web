@@ -129,6 +129,7 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import CategoryPointsBreakdownModal from '@/Components/reports/CategoryPointsBreakdownModal.vue';
+import { genderLabel as sharedGenderLabel } from '@/support/festItemEligibility.js';
 
 const props = defineProps({
     sahodaya: Object,
@@ -160,8 +161,7 @@ function categoryXlsUrl(category) {
 }
 
 function genderLabel(gender) {
-    if (!gender || gender === 'open') return 'Mixed';
-    return gender.charAt(0).toUpperCase() + gender.slice(1);
+    return sharedGenderLabel(gender) ?? 'Mixed';
 }
 
 function typeLabel(participantType) {

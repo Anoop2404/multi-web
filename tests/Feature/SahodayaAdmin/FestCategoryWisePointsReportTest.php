@@ -130,6 +130,16 @@ class FestCategoryWisePointsReportTest extends TestCase
         $response->assertOk();
     }
 
+    /** Same dompdf writing-mode limitation as the consolidated matrix's own PDF -- see its test's docblock for the full explanation. */
+    public function test_pdf_item_header_uses_dompdf_compatible_rotation_not_writing_mode(): void
+    {
+        $css = file_get_contents(resource_path('views/fest/reports/category-points-table.blade.php'));
+
+        $this->assertStringNotContainsString('writing-mode', $css);
+        $this->assertStringContainsString('rotate(-90deg)', $css);
+        $this->assertStringContainsString('position:absolute', $css);
+    }
+
     public function test_xls_download_contains_rotated_item_headers_and_real_points(): void
     {
         [$sahodaya, $event, $admin, $school] = $this->fixture();

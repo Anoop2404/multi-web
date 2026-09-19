@@ -1159,7 +1159,7 @@ class FestReportController extends SahodayaAdminController
         $headers = ['Rank', 'School'];
         $verticalHeaderIndices = [];
         foreach ($table['items'] as $item) {
-            $gender = (! ($item['gender'] ?? null) || $item['gender'] === 'open') ? 'Mixed' : ucfirst($item['gender']);
+            $gender = (! ($item['gender'] ?? null) || $item['gender'] === 'open') ? 'Mixed' : (['male' => 'Boys', 'female' => 'Girls'][$item['gender']] ?? ucfirst($item['gender']));
             $type = in_array($item['participant_type'] ?? null, ['team', 'group', 'pair', 'trio'], true) ? 'Group' : 'Individual';
             $verticalHeaderIndices[] = count($headers);
             $headers[] = ($item['item_code'] ? $item['item_code'].' — '.$item['title'] : $item['title'])." · {$gender} · {$type}";

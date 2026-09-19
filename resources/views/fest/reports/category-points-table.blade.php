@@ -7,8 +7,8 @@ th,td{border:1px solid #ccc;padding:3px 4px;text-align:center}
 th{background:#1d3557;color:#fff;font-size:8px;font-weight:bold;white-space:nowrap}
 .school-col{text-align:left;min-width:120px}
 .rank-col{width:28px}
-.item-col{height:120px;vertical-align:bottom}
-.item-col span{writing-mode:vertical-rl;transform:rotate(180deg);display:inline-block;white-space:nowrap}
+.item-col{height:170px;width:20px;position:relative;vertical-align:bottom;padding:0}
+.item-col span{display:block;position:absolute;bottom:4px;left:3px;width:160px;height:12px;line-height:12px;transform:rotate(-90deg);transform-origin:bottom left;white-space:nowrap}
 .subtotal-col{background:#1d3557;color:#fff;font-weight:bold}
 tbody tr:nth-child(even){background:#f7f9fc}
 tbody td.subtotal-col{background:#c8d6ea;color:#1d3557}
@@ -17,7 +17,7 @@ tbody td.subtotal-col{background:#c8d6ea;color:#1d3557}
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? 'Sahodaya', 'logoSrc' => $logoSrc ?? null])
 
 @php
-$itemGenderLabel = fn ($g) => (! $g || $g === 'open') ? 'Mixed' : ucfirst($g);
+$itemGenderLabel = fn ($g) => (! $g || $g === 'open') ? 'Mixed' : (['male' => 'Boys', 'female' => 'Girls'][$g] ?? ucfirst($g));
 $itemTypeAbbr = fn ($t) => in_array($t, ['team', 'group', 'pair', 'trio'], true) ? 'Grp' : 'Ind';
 $itemHeaderLabel = fn ($item) => ($item['item_code'] ? $item['item_code'].' — '.$item['title'] : $item['title']).' · '.$itemGenderLabel($item['gender'] ?? null).' · '.$itemTypeAbbr($item['participant_type'] ?? null);
 @endphp
