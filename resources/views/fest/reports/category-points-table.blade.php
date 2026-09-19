@@ -16,6 +16,12 @@ tbody td.subtotal-col{background:#c8d6ea;color:#1d3557}
 </head><body>
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? 'Sahodaya', 'logoSrc' => $logoSrc ?? null])
 
+@php
+$itemGenderLabel = fn ($g) => (! $g || $g === 'open') ? 'Mixed' : ucfirst($g);
+$itemTypeAbbr = fn ($t) => in_array($t, ['team', 'group', 'pair', 'trio'], true) ? 'Grp' : 'Ind';
+$itemHeaderLabel = fn ($item) => ($item['item_code'] ? $item['item_code'].' — '.$item['title'] : $item['title']).' · '.$itemGenderLabel($item['gender'] ?? null).' · '.$itemTypeAbbr($item['participant_type'] ?? null);
+@endphp
+
 <h2 style="text-align:center">{{ $event->title }} — {{ $categoryLabel }} Points Table</h2>
 <p style="text-align:center;font-size:10px;color:#64748b;margin-top:2px">Generated on {{ $generatedAt }}</p>
 
@@ -25,7 +31,7 @@ tbody td.subtotal-col{background:#c8d6ea;color:#1d3557}
             <th class="rank-col">Rank</th>
             <th class="school-col">School</th>
             @foreach($items as $item)
-                <th class="item-col" title="{{ $item['title'] }}"><span>{{ $item['item_code'] ? $item['item_code'].' — '.$item['title'] : $item['title'] }}</span></th>
+                <th class="item-col" title="{{ $item['title'] }}"><span>{{ $itemHeaderLabel($item) }}</span></th>
             @endforeach
             <th class="subtotal-col">Total</th>
         </tr>

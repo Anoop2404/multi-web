@@ -909,7 +909,9 @@ class FestReportService
         foreach ($categories as $category) {
             foreach ($category['heads'] as $head) {
                 foreach ($head['items'] as $item) {
-                    $headers[] = $category['label'].' › '.$head['head_label'].': '.$item['title'];
+                    $gender = (! ($item['gender'] ?? null) || $item['gender'] === 'open') ? 'Mixed' : ucfirst($item['gender']);
+                    $type = in_array($item['participant_type'] ?? null, ['team', 'group', 'pair', 'trio'], true) ? 'Group' : 'Individual';
+                    $headers[] = $category['label'].' › '.$head['head_label'].': '.$item['title']." ({$gender}, {$type})";
                 }
             }
             $headers[] = $category['label'].' — Subtotal';

@@ -20,7 +20,12 @@ tbody td.overall-col{background:#c8d6ea;color:#1d3557}
 
 <h2 style="text-align:center">{{ $event->title }} — Category & Item-wise Consolidated Report</h2>
 <p style="text-align:center;font-size:10px;color:#64748b;margin-top:2px">Generated on {{ now()->format('d M Y, h:i A') }}</p>
-@php $excludedLabels = collect($categories)->where('excluded_from_overall', true)->pluck('label'); @endphp
+@php
+$excludedLabels = collect($categories)->where('excluded_from_overall', true)->pluck('label');
+$itemGenderLabel = fn ($g) => (! $g || $g === 'open') ? 'Mixed' : ucfirst($g);
+$itemTypeAbbr = fn ($t) => in_array($t, ['team', 'group', 'pair', 'trio'], true) ? 'Grp' : 'Ind';
+$itemHeaderLabel = fn ($item) => ($item['item_code'] ? $item['item_code'].' — '.$item['title'] : $item['title']).' · '.$itemGenderLabel($item['gender'] ?? null).' · '.$itemTypeAbbr($item['participant_type'] ?? null);
+@endphp
 @if($excludedLabels->isNotEmpty())
 <p style="text-align:center;font-size:9px;color:#b45309;margin-top:2px">† {{ $excludedLabels->implode(', ') }} excluded from OVERALL (still totalled in its own Sub column)</p>
 @endif
@@ -47,7 +52,7 @@ tbody td.overall-col{background:#c8d6ea;color:#1d3557}
             @foreach($categories as $category)
                 @foreach($category['heads'] as $head)
                     @foreach($head['items'] as $item)
-                        <th class="item-col" title="{{ $item['title'] }}"><span>{{ $item['item_code'] ? $item['item_code'].' — '.$item['title'] : $item['title'] }}</span></th>
+                        <th class="item-col" title="{{ $item['title'] }}"><span>{{ $itemHeaderLabel($item) }}</span></th>
                     @endforeach
                 @endforeach
             @endforeach

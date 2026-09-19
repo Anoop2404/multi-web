@@ -490,6 +490,16 @@ class FestEvent extends Model
      */
     public function reportableEventIds(): array
     {
+        // RefreshDatabase recycles auto-increment ids between tests, so a static cache
+        // keyed by id (see rootEvent()'s identical guard, and
+        // FestEligibilityRuleEngine::flushCache() for the same issue) must not survive
+        // past the test that populated it — otherwise a later test's event can silently
+        // inherit an earlier test's cached (and now wrong) child-id list for the same
+        // recycled id.
+        if (app()->environment('testing')) {
+            self::$reportableEventIdsCache = [];
+        }
+
         $key = (int) $this->id;
         if (isset(self::$reportableEventIdsCache[$key])) {
             return self::$reportableEventIdsCache[$key];

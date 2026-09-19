@@ -42,6 +42,7 @@
                             <tr>
                                 <th>Item</th>
                                 <th>Item Code</th>
+                                <th>Gender</th>
                                 <th>Type</th>
                                 <th class="text-right">Details</th>
                             </tr>
@@ -50,7 +51,8 @@
                             <tr v-for="item in activeCategory.items" :key="item.id">
                                 <td class="font-medium text-slate-900">{{ item.title }}</td>
                                 <td class="font-mono text-xs text-slate-500">{{ item.item_code ?? '—' }}</td>
-                                <td class="text-xs capitalize text-slate-600">{{ item.participant_type ?? '—' }}</td>
+                                <td class="text-xs text-slate-600">{{ genderLabel(item.gender) }}</td>
+                                <td class="text-xs text-slate-600">{{ typeLabel(item.participant_type) }}</td>
                                 <td class="text-right">
                                     <button type="button"
                                             class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300 transition"
@@ -64,7 +66,7 @@
                                 </td>
                             </tr>
                             <tr v-if="!activeCategory.items.length">
-                                <td colspan="4" class="p-8 text-center text-slate-400">No items in this category.</td>
+                                <td colspan="5" class="p-8 text-center text-slate-400">No items in this category.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -110,6 +112,15 @@ function switchEvent(value) {
 
 function categoryPdfUrl(category, preview) {
     return `${base}/${encodeURIComponent(category.key)}/pdf${preview ? '?preview=1' : ''}`;
+}
+
+function genderLabel(gender) {
+    if (!gender || gender === 'open') return 'Mixed';
+    return gender.charAt(0).toUpperCase() + gender.slice(1);
+}
+
+function typeLabel(participantType) {
+    return ['team', 'group', 'pair', 'trio'].includes(participantType) ? 'Group' : 'Individual';
 }
 
 const modalOpen = ref(false);

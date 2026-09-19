@@ -12,6 +12,7 @@ use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Events\FestEventReportAnalyticsService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -174,5 +175,71 @@ class FestCategoryItemMatrixReportTest extends TestCase
         ]);
 
         return [$sahodaya, $event, $admin];
+    }
+
+    /**
+     * Reproduces a real production bug (Wayanad Sahodaya): an item split across
+     * phases — the hub's own canonical item row, plus a phase leaf's inherited copy of
+     * that same item (FestEventItem.inherited_from_item_id) — showed as two duplicate
+     * columns with the identical title/code when viewed at the combined hub level,
+     * since the matrix's item query was FestEventItem::whereIn('event_id',
+     * reportableEventIds()), which returns every phase's copy as its own row.
+     */
+    public function test_an_item_inherited_onto_a_phase_leaf_does_not_duplicate_in_the_hub_level_matrix(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'sahodaya', 'name' => 'Phase Dup Sahodaya',
+            'domain' => 'phase-dup-'.Str::random(8).'.test', 'is_active' => true,
+        ]);
+        SahodayaProfile::create(['tenant_id' => $sahodaya->id, 'prefix' => 'PD', 'student_data_mode' => 'counts_only']);
+
+        $school = Tenant::create(['id' => (string) Str::uuid(), 'type' => 'school', 'name' => 'Phase Dup School', 'parent_id' => $sahodaya->id, 'membership_status' => 'approved', 'is_active' => true]);
+
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        $hub = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Phase Dup Fest', 'event_type' => 'kalolsavam',
+            'level_round' => 'sahodaya', 'status' => 'ongoing',
+        ]);
+
+        $hubItem = FestEventItem::create(['event_id' => $hub->id, 'title' => 'Solo Song', 'participant_type' => 'individual', 'class_group' => 'hs', 'is_enabled' => true]);
+
+        $leaf = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Phase Dup Fest — Phase 1', 'event_type' => 'kalolsavam',
+            'parent_event_id' => $hub->id, 'level_round' => 'sahodaya', 'status' => 'ongoing',
+        ]);
+
+        // The leaf's own inherited copy of the hub's item — same title/code, a
+        // different row, linked via inherited_from_item_id.
+        $leafItem = FestEventItem::create([
+            'event_id' => $leaf->id, 'title' => 'Solo Song', 'participant_type' => 'individual',
+            'class_group' => 'hs', 'is_enabled' => true, 'inherited_from_item_id' => $hubItem->id,
+        ]);
+
+        $schoolClass = SchoolClass::create(['tenant_id' => $school->id, 'name' => '9']);
+        $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $schoolClass->id, 'name' => 'Phase Dup Student', 'admission_no' => 'PD1']);
+
+        // The mark is recorded against the LEAF's own item/event, as it would be for a
+        // real phase competition.
+        $registration = FestRegistration::create(['event_id' => $leaf->id, 'item_id' => $leafItem->id, 'school_id' => $school->id, 'status' => 'approved']);
+        $participant = FestParticipant::create(['registration_id' => $registration->id, 'student_id' => $student->id, 'participant_role' => 'performer']);
+        FestMark::create(['event_id' => $leaf->id, 'item_id' => $leafItem->id, 'participant_id' => $participant->id, 'position' => 1, 'grade' => 'A']);
+
+        // Viewed at the HUB level, combining hub + leaf.
+        $analytics = app(FestEventReportAnalyticsService::class, ['event' => $hub]);
+        $matrix = $analytics->schoolItemPointsMatrix();
+
+        $allItemIds = collect($matrix['categories'])
+            ->flatMap(fn ($cat) => collect($cat['heads'])->flatMap(fn ($h) => $h['items']))
+            ->pluck('id');
+
+        $this->assertCount(1, $allItemIds, 'Solo Song must appear as exactly one column, not once per phase');
+
+        $schoolRow = collect($matrix['schools'])->firstWhere('school_id', $school->id);
+        $this->assertNotNull($schoolRow, 'the leaf-recorded mark must still roll up to a school row at the hub level');
+        $this->assertGreaterThan(0, $schoolRow['overall']);
     }
 }

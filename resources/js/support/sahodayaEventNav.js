@@ -157,6 +157,7 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
         { label: 'Reports hub', href: `${base}/reports`, icon: 'file-text', permissions: FEST_VIEW },
         { label: 'Overall Ranking', href: `${base}/reports/overall-ranking`, icon: 'award', permissions: FEST_VIEW },
         { label: 'Category & Item-wise Report', href: `${base}/reports/category-item-matrix`, icon: 'grid', permissions: FEST_VIEW },
+        { label: 'Category-wise Points', href: `${base}/reports/category-wise-points`, icon: 'layers', permissions: FEST_VIEW },
         { label: 'Student-wise report', href: `${base}/reports/student-wise`, icon: 'users', permissions: FEST_VIEW },
         { label: 'Item-wise report', href: `${base}/reports/item-wise`, icon: 'list', permissions: FEST_VIEW },
         { label: 'Item counts', href: `${base}/reports/item-counts`, icon: 'bar-chart', permissions: FEST_VIEW },

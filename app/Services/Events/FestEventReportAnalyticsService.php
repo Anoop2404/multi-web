@@ -88,6 +88,40 @@ class FestEventReportAnalyticsService
     }
 
     /**
+     * This event's own catalog, deduplicated to ONE row per item — never
+     * FestEventItem::whereIn('event_id', $this->eventIds()), which returns every
+     * phase/region clone of the same item as a separate row (a real bug found live:
+     * an item split across two phases showed as two identical duplicate columns in the
+     * consolidated matrix). Mirrors itemRegistrationRows()'s own target-event
+     * resolution (self if it holds items directly, else its root) plus
+     * FestHeadItemNavigationService::filterToOwnPhase() (a phase leaf's own item table
+     * can still hold a stray item copied under the wrong phase).
+     *
+     * Pair with itemFamiliesFor() when aggregating something scoped by event_id (marks,
+     * registrations) across every phase/region clone: this method gives the canonical,
+     * one-per-family item list to group by; itemFamiliesFor() maps each clone's raw
+     * item_id back to that same canonical id so their figures land in one bucket instead
+     * of splitting across duplicate columns.
+     *
+     * @param  list<string>  $with  relations to eager-load (e.g. ['head'])
+     */
+    private function catalogItems(array $with = []): \Illuminate\Support\Collection
+    {
+        $targetEventId = FestEventItem::where('event_id', $this->event->id)->where('is_enabled', true)->exists()
+            ? $this->event->id
+            : ($this->event->parent_event_id ? $this->event->rootEvent()->id : $this->event->id);
+
+        $items = FestEventItem::where('event_id', $targetEventId)
+            ->where('is_enabled', true)
+            ->with(array_merge(['phase:id,source_phase_id'], $with))
+            ->orderBy('display_order')
+            ->orderBy('title')
+            ->get();
+
+        return \App\Services\Events\FestHeadItemNavigationService::filterToOwnPhase($items, $this->event);
+    }
+
+    /**
      * Sahodaya branding (org name + logo data URI) for PDF report headers.
      *
      * @return array{orgName: string, logoSrc: ?string}
@@ -2201,11 +2235,7 @@ class FestEventReportAnalyticsService
         $root = $this->event->rootEvent();
         $column = $root->event_type === 'sports' ? 'age_group' : 'class_group';
 
-        $items = FestEventItem::whereIn('event_id', $this->eventIds())
-            ->where('is_enabled', true)
-            ->orderBy('display_order')
-            ->orderBy('title')
-            ->get(['id', 'title', 'item_code', 'participant_type', $column]);
+        $items = $this->catalogItems();
 
         // Deliberately grouped by the item's own RAW class_group/age_group, not the
         // merge target — this page (Category-wise Points) is the "each category on its
@@ -2222,6 +2252,7 @@ class FestEventReportAnalyticsService
                 'title'            => $item->title,
                 'item_code'        => $item->item_code,
                 'participant_type' => $item->participant_type,
+                'gender'           => $item->gender,
             ])->values()->all())
             ->all();
     }
@@ -2244,20 +2275,21 @@ class FestEventReportAnalyticsService
         $root = $this->event->rootEvent();
         $column = $root->event_type === 'sports' ? 'age_group' : 'class_group';
 
-        $items = FestEventItem::whereIn('event_id', $this->eventIds())
-            ->where('is_enabled', true)
-            ->where($column, $rawCategory)
-            ->orderBy('display_order')
-            ->orderBy('title')
-            ->get(['id', 'title', 'item_code', 'participant_type']);
+        $items = $this->catalogItems()->filter(fn (FestEventItem $item) => ($item->{$column} ?: 'open') === $rawCategory)->values();
 
+        // Expands the deduplicated $items to every phase/region clone sharing the same
+        // family (a real bug found live: an item split across two phases otherwise
+        // shows as two duplicate columns) and maps each clone's raw item_id back to
+        // its ONE canonical id, so a school's points on either phase's copy land in the
+        // same cell/column instead of splitting across two.
+        [$allReportableItemIds, $itemFamilyMap] = $this->itemFamiliesFor($items);
         $itemIds = $items->pluck('id')->all();
         $gradePointService = app(FestGradePointService::class);
 
         // Same dedup as schoolItemPointsMatrix() — one FestMark per teammate on pair/
         // group items must not multiply a team's points by its squad size.
         $marks = FestMark::whereIn('event_id', $this->eventIds())
-            ->whereIn('item_id', $itemIds)
+            ->whereIn('item_id', $allReportableItemIds)
             ->with(['participant.registration.school'])
             ->get()
             ->unique(fn (FestMark $m) => $m->deduplicationKey());
@@ -2277,11 +2309,12 @@ class FestEventReportAnalyticsService
                 continue;
             }
 
+            $canonicalItemId = $itemFamilyMap[$mark->item_id] ?? $mark->item_id;
             $points = $gradePointService->pointsForMark($this->event, $mark);
             $schoolNames[$school->id] = $school->name;
-            $cellPoints[$school->id][$mark->item_id] = ($cellPoints[$school->id][$mark->item_id] ?? 0) + $points;
+            $cellPoints[$school->id][$canonicalItemId] = ($cellPoints[$school->id][$canonicalItemId] ?? 0) + $points;
             if ($points > 0) {
-                $cellBreakdown[$school->id][$mark->item_id][] = $points;
+                $cellBreakdown[$school->id][$canonicalItemId][] = $points;
             }
         }
 
@@ -2322,6 +2355,7 @@ class FestEventReportAnalyticsService
                 'title'            => $item->title,
                 'item_code'        => $item->item_code,
                 'participant_type' => $item->participant_type,
+                'gender'           => $item->gender,
             ])->all(),
             'schools' => $schools,
         ];
@@ -2353,12 +2387,7 @@ class FestEventReportAnalyticsService
         $root = $this->event->rootEvent();
         $column = $root->event_type === 'sports' ? 'age_group' : 'class_group';
 
-        $items = FestEventItem::whereIn('event_id', $this->eventIds())
-            ->where('is_enabled', true)
-            ->with('head')
-            ->orderBy('display_order')
-            ->orderBy('title')
-            ->get(['id', 'title', 'item_code', 'participant_type', 'head_id', $column]);
+        $items = $this->catalogItems(['head']);
 
         // Same merge-target grouping as categoryWiseItemRows() above — a merged source
         // category's items belong under the target's band here too, so the consolidated
@@ -2375,6 +2404,7 @@ class FestEventReportAnalyticsService
                         'title'            => $item->title,
                         'item_code'        => $item->item_code,
                         'participant_type' => $item->participant_type,
+                        'gender'           => $item->gender,
                     ])->values()->all(),
                 ])
                 ->sortBy('head_label')
@@ -2408,10 +2438,16 @@ class FestEventReportAnalyticsService
         $root = $this->event->rootEvent();
         $excludedRawCategories = FestOverallCategoryExclusion::excluded($root);
 
+        // Maps every phase/region clone's raw item_id back to the ONE canonical id
+        // categoryHeadItemRows() actually renders a column for — an item split across
+        // two phases otherwise gets its points split across two duplicate columns too.
+        [$allReportableItemIds, $itemFamilyMap] = $this->itemFamiliesFor($this->catalogItems(['head']));
+
         // Same dedup as EventContext::scoreboardByCategory() — pair/group items save one
         // FestMark per teammate, all sharing deduplicationKey(), so a team's points must
         // only be counted once, not once per member.
         $marks = FestMark::whereIn('event_id', $this->eventIds())
+            ->whereIn('item_id', $allReportableItemIds)
             ->with(['participant.registration.school', 'item'])
             ->get()
             ->unique(fn (FestMark $m) => $m->deduplicationKey());
@@ -2439,11 +2475,12 @@ class FestEventReportAnalyticsService
                 continue;
             }
 
+            $canonicalItemId = $itemFamilyMap[$mark->item_id] ?? $mark->item_id;
             $points = $gradePointService->pointsForMark($this->event, $mark);
             $schoolNames[$school->id] = $school->name;
-            $cellPoints[$school->id][$mark->item_id] = ($cellPoints[$school->id][$mark->item_id] ?? 0) + $points;
+            $cellPoints[$school->id][$canonicalItemId] = ($cellPoints[$school->id][$canonicalItemId] ?? 0) + $points;
             if ($points > 0) {
-                $cellBreakdown[$school->id][$mark->item_id][] = $points;
+                $cellBreakdown[$school->id][$canonicalItemId][] = $points;
             }
 
             $rawCategory = FestOverallCategoryExclusion::categoryKeyForItem($this->event, $mark->item);

@@ -52,10 +52,10 @@
                         <tr>
                             <template v-for="cat in categories" :key="`${cat.key}-items`">
                                 <template v-for="head in cat.heads" :key="`${cat.key}-${head.head_label}`">
-                                    <th v-for="item in head.items" :key="item.id" :title="item.title"
+                                    <th v-for="item in head.items" :key="item.id" :title="itemFullLabel(item)"
                                         class="bg-slate-700 text-white p-1.5 text-center border-l border-slate-600 font-medium align-bottom">
                                         <span class="[writing-mode:vertical-rl] rotate-180 whitespace-nowrap inline-block">
-                                            {{ item.item_code ? `${item.item_code} — ${item.title}` : item.title }}
+                                            {{ itemHeaderLabel(item) }}
                                         </span>
                                     </th>
                                 </template>
@@ -123,6 +123,25 @@ const excludedCategories = computed(() => props.categories.filter(c => c.exclude
 
 function categoryItemCount(cat) {
     return cat.heads.reduce((sum, head) => sum + head.items.length, 0);
+}
+
+function typeAbbr(participantType) {
+    return ['team', 'group', 'pair', 'trio'].includes(participantType) ? 'Grp' : 'Ind';
+}
+
+function genderLabel(gender) {
+    if (!gender || gender === 'open') return 'Mixed';
+    return gender.charAt(0).toUpperCase() + gender.slice(1);
+}
+
+function itemHeaderLabel(item) {
+    const base = item.item_code ? `${item.item_code} — ${item.title}` : item.title;
+    return `${base} · ${genderLabel(item.gender)} · ${typeAbbr(item.participant_type)}`;
+}
+
+function itemFullLabel(item) {
+    const type = typeAbbr(item.participant_type) === 'Grp' ? 'Group' : 'Individual';
+    return `${item.title} — ${genderLabel(item.gender)}, ${type}`;
 }
 
 // A school winning an item's 1st AND 3rd (two separate participants/groups both
