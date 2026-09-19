@@ -21,13 +21,14 @@
             No results recorded yet for this event.
         </div>
 
+        <template v-else>
         <p v-if="excludedCategories.length" class="text-xs text-slate-500 mb-3">
             <span class="font-semibold text-amber-600">†</span>
             {{ excludedCategories.join(', ') }} {{ excludedCategories.length > 1 ? 'are' : 'is' }} excluded from OVERALL
             (still totalled in its own Sub column) — configured under this event's overall-category settings.
         </p>
 
-        <div v-else class="card card--flush overflow-hidden">
+        <div class="card card--flush overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-xs border-collapse">
                     <thead>
@@ -86,6 +87,7 @@
                 </table>
             </div>
         </div>
+        </template>
 
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />
     </SahodayaEventsLayout>
