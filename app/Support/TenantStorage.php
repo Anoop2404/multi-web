@@ -349,12 +349,12 @@ class TenantStorage
 
         foreach (self::downloadDisks() as $disk) {
             try {
-                if (self::disk($disk)->exists($relativePath)) {
-                    $contents = self::disk($disk)->get($relativePath);
-                    $mime = self::disk($disk)->mimeType($relativePath) ?: 'image/jpeg';
-
-                    return 'data:'.$mime.';base64,'.base64_encode($contents);
+                $contents = self::disk($disk)->get($relativePath);
+                if ($contents === null || $contents === '') {
+                    continue;
                 }
+
+                return 'data:'.self::detectMimeFromBytes($contents).';base64,'.base64_encode($contents);
             } catch (\Throwable) {
                 continue;
             }
@@ -421,22 +421,34 @@ class TenantStorage
 
         foreach (self::downloadDisks() as $disk) {
             try {
-                if (self::disk($disk)->exists($relativePath)) {
-                    $contents = self::disk($disk)->get($relativePath);
-                    if ($contents === null || $contents === '') {
-                        continue;
-                    }
-                    $mime = self::disk($disk)->mimeType($relativePath) ?: 'image/jpeg';
-                    [$contents, $mime] = self::shrinkImageForEmbed($contents, $maxDimension) ?? [$contents, $mime];
-
-                    return 'data:'.$mime.';base64,'.base64_encode($contents);
+                $contents = self::disk($disk)->get($relativePath);
+                if ($contents === null || $contents === '') {
+                    continue;
                 }
+                [$contents, $mime] = self::shrinkImageForEmbed($contents, $maxDimension)
+                    ?? [$contents, self::detectMimeFromBytes($contents)];
+
+                return 'data:'.$mime.';base64,'.base64_encode($contents);
             } catch (\Throwable) {
                 continue;
             }
         }
 
         return null;
+    }
+
+    /** Detect an image's mime type from raw bytes — no network or filesystem round trip. */
+    private static function detectMimeFromBytes(string $contents): string
+    {
+        if (function_exists('finfo_buffer')) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mime = $finfo ? finfo_buffer($finfo, $contents) : false;
+            if (is_string($mime) && $mime !== '') {
+                return $mime;
+            }
+        }
+
+        return 'image/jpeg';
     }
 
     /**
