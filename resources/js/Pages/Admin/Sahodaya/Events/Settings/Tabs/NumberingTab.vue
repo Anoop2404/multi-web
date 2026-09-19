@@ -37,7 +37,19 @@
                 </label>
                 <label class="flex items-start gap-2 text-xs">
                     <input type="checkbox" v-model="numberingSettingsForm.auto_assign_on_approve" class="mt-0.5">
-                    <span>Auto-assign chest numbers when a registration is approved</span>
+                    <span>Auto-assign Item Reg IDs when a registration is approved</span>
+                </label>
+                <label class="flex items-start gap-2 text-xs">
+                    <input type="checkbox" v-model="numberingSettingsForm.auto_assign_chest_on_approve" class="mt-0.5">
+                    <span>
+                        Also auto-assign chest numbers at the same time
+                        <span class="block text-slate-400 font-normal mt-0.5">
+                            Uncheck this to leave chest numbers unassigned at approval — an item's numbers
+                            then get handed out later, all at once and in shuffled order, from the
+                            "Assign missing chest" button on the Chest Numbers page. Item Reg IDs above
+                            are unaffected either way.
+                        </span>
+                    </span>
                 </label>
             </div>
             <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">

@@ -197,6 +197,17 @@ class FestRegistrationApprovalService
         $numbering = app(FestNumberingService::class);
         $settings = $numbering->settings($event);
         $autoAssign = (bool) ($settings['auto_assign_on_approve'] ?? true);
+        // Independent of $autoAssign above (which still unconditionally governs item-reg
+        // numbers): lets chest-number assignment specifically stop happening live at
+        // approval time, so numbers can instead be handed out later in one shuffled batch
+        // via assignMissingChestNumbers() -- see that method's docblock for why a live,
+        // one-at-a-time assignment can't itself be made random without either leaving
+        // gaps in the numbering or renumbering already-issued numbers later. Falls back
+        // to $autoAssign when unset, so any event that has never touched this setting
+        // keeps its exact current behavior.
+        $autoAssignChest = array_key_exists('auto_assign_chest_on_approve', $settings)
+            ? (bool) $settings['auto_assign_chest_on_approve']
+            : $autoAssign;
 
         foreach ($registration->participants as $participant) {
             if ($participant->participant_role === 'standby') {
@@ -205,7 +216,7 @@ class FestRegistrationApprovalService
 
             $updates = ['event_id' => $event->id];
 
-            if ($autoAssign) {
+            if ($autoAssignChest) {
                 if (! $numbering->persistedChestNumber($participant) && $registration->item_id && $registration->item) {
                     ['chest' => $chest, 'persist' => $persist, 'chest_head_id' => $chestHeadId] = $numbering->resolveChestAssignment(
                         $event,
@@ -217,7 +228,9 @@ class FestRegistrationApprovalService
                         $updates['chest_head_id'] = $chestHeadId;
                     }
                 }
+            }
 
+            if ($autoAssign) {
                 if (! $participant->item_registration_number && $registration->item) {
                     $updates['item_registration_number'] = $numbering->nextItemRegistrationNumber($event, $registration->item);
                 }

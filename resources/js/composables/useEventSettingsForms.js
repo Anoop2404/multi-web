@@ -147,6 +147,13 @@ export function useEventSettingsForms(props) {
         chest_no_prefix: props.numberingSettings?.chest_no_prefix ?? '',
         auto_assign_on_approve: props.numberingSettings?.auto_assign_on_approve ?? true,
         auto_assign_chest_on_create: props.numberingSettings?.auto_assign_chest_on_create ?? false,
+        // Mirrors the backend fallback in FestRegistrationApprovalService::approve():
+        // when this has never been explicitly set, it tracks auto_assign_on_approve
+        // rather than defaulting to a fixed value, so the checkbox shows what actually
+        // happens today instead of contradicting the setting above it.
+        auto_assign_chest_on_approve: props.numberingSettings?.auto_assign_chest_on_approve
+            ?? props.numberingSettings?.auto_assign_on_approve
+            ?? true,
     });
 
     const itemNumberingForm = useForm({
