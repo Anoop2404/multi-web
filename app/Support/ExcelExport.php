@@ -124,15 +124,25 @@ class ExcelExport
         // .item-col category tint, .subtotal-col and .overall-col, so a reader can tell
         // a category's columns apart and pick out its Sub/the OVERALL total at a glance
         // even in this format's flat single-row header.
+        // Every body/header style below gets the same thin, light-gray grid on all four
+        // sides -- SpreadsheetML draws NO border at all unless a style says so explicitly
+        // (there's no implicit-gridlines fallback once ss:StyleID is assigned to a cell,
+        // unlike a plain unstyled sheet), so without this every exported "Excel" file
+        // opened with cell fills but no visible cell separators whatsoever.
+        $border = '<Borders><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D0D7DE"/>'
+            .'<Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D0D7DE"/>'
+            .'<Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D0D7DE"/>'
+            .'<Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D0D7DE"/></Borders>';
+
         $xml .= '<Styles>';
-        $xml .= '<Style ss:ID="header"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#0F172A" ss:Pattern="Solid"/><Alignment ss:Vertical="Center"/></Style>';
-        $xml .= '<Style ss:ID="header-vertical"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#0F172A" ss:Pattern="Solid"/><Alignment ss:Vertical="Bottom" ss:Horizontal="Center" ss:Rotate="90"/></Style>';
-        $xml .= '<Style ss:ID="body"><Alignment ss:Vertical="Center"/></Style>';
-        $xml .= '<Style ss:ID="body-alt"><Alignment ss:Vertical="Center"/><Interior ss:Color="#F7F9FC" ss:Pattern="Solid"/></Style>';
-        $xml .= '<Style ss:ID="cat-a"><Alignment ss:Vertical="Center"/><Interior ss:Color="#EFF4FB" ss:Pattern="Solid"/></Style>';
-        $xml .= '<Style ss:ID="cat-b"><Alignment ss:Vertical="Center"/><Interior ss:Color="#F7F7F2" ss:Pattern="Solid"/></Style>';
-        $xml .= '<Style ss:ID="sub"><Font ss:Bold="1" ss:Color="#1D3557"/><Alignment ss:Vertical="Center"/><Interior ss:Color="#DDE6F2" ss:Pattern="Solid"/></Style>';
-        $xml .= '<Style ss:ID="overall"><Font ss:Bold="1" ss:Color="#1D3557"/><Alignment ss:Vertical="Center"/><Interior ss:Color="#C8D6EA" ss:Pattern="Solid"/></Style>';
+        $xml .= '<Style ss:ID="header"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#0F172A" ss:Pattern="Solid"/><Alignment ss:Vertical="Center"/>'.$border.'</Style>';
+        $xml .= '<Style ss:ID="header-vertical"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#0F172A" ss:Pattern="Solid"/><Alignment ss:Vertical="Bottom" ss:Horizontal="Center" ss:Rotate="90"/>'.$border.'</Style>';
+        $xml .= '<Style ss:ID="body"><Alignment ss:Vertical="Center"/>'.$border.'</Style>';
+        $xml .= '<Style ss:ID="body-alt"><Alignment ss:Vertical="Center"/><Interior ss:Color="#F7F9FC" ss:Pattern="Solid"/>'.$border.'</Style>';
+        $xml .= '<Style ss:ID="cat-a"><Alignment ss:Vertical="Center"/><Interior ss:Color="#EFF4FB" ss:Pattern="Solid"/>'.$border.'</Style>';
+        $xml .= '<Style ss:ID="cat-b"><Alignment ss:Vertical="Center"/><Interior ss:Color="#F7F7F2" ss:Pattern="Solid"/>'.$border.'</Style>';
+        $xml .= '<Style ss:ID="sub"><Font ss:Bold="1" ss:Color="#1D3557"/><Alignment ss:Vertical="Center"/><Interior ss:Color="#DDE6F2" ss:Pattern="Solid"/>'.$border.'</Style>';
+        $xml .= '<Style ss:ID="overall"><Font ss:Bold="1" ss:Color="#1D3557"/><Alignment ss:Vertical="Center"/><Interior ss:Color="#C8D6EA" ss:Pattern="Solid"/>'.$border.'</Style>';
         $xml .= '<Style ss:ID="note"><Font ss:Italic="1" ss:Color="#64748B"/></Style>';
         $xml .= '</Styles>'."\n";
 
