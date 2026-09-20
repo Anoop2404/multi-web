@@ -61,8 +61,8 @@
             </div>
             <button type="submit" class="btn-secondary text-sm" :disabled="!importFile || importForm.processing">Import</button>
         </form>
-        <ul v-if="$page.props.importErrors?.length" class="mb-4 text-xs text-red-600 list-disc pl-4">
-            <li v-for="(err, i) in $page.props.importErrors" :key="i">{{ err }}</li>
+        <ul v-if="$page.props.flash?.importErrors?.length" class="mb-4 text-xs text-red-600 list-disc pl-4">
+            <li v-for="(err, i) in $page.props.flash.importErrors" :key="i">{{ err }}</li>
         </ul>
 
         <div class="card !p-4 mb-4 bg-indigo-50/40 border-indigo-100">

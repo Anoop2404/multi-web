@@ -53,6 +53,16 @@
             </div>
         </div>
 
+        <!-- Row-level reasons behind a CSV import's "N skipped" summary -- the import
+             modal itself closes on success (even a partial one), so this can't live
+             inside it. -->
+        <div v-if="importErrors.length" class="mb-4 rounded-lg border border-red-100 bg-red-50 p-3 max-h-64 overflow-y-auto">
+            <p class="text-xs font-semibold text-red-800 mb-1.5">{{ importErrors.length }} row(s) skipped:</p>
+            <ul class="text-xs text-red-700 list-disc pl-4 space-y-0.5">
+                <li v-for="(err, i) in importErrors" :key="i">{{ err }}</li>
+            </ul>
+        </div>
+
         <!-- Main Card Section -->
         <div class="card !p-4 space-y-4">
             
@@ -219,7 +229,7 @@
 
 <script setup>
 import { computed, ref } from 'vue';
-import { router, useForm } from '@inertiajs/vue3';
+import { router, useForm, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
@@ -238,6 +248,9 @@ const props = defineProps({
     markedParticipantIds: { type: Array, default: () => [] },
     selectedItemId: { type: [String, Number], default: null },
 });
+
+const page = usePage();
+const importErrors = computed(() => page.props.flash?.importErrors ?? []);
 
 function switchSportEvent(value) {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${value}/attendance`);

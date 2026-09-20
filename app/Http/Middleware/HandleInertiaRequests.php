@@ -41,6 +41,15 @@ class HandleInertiaRequests extends Middleware
                 'importResult' => fn () => $request->session()->get('importResult'),
                 'bulkMarkSaveResult' => fn () => $request->session()->get('bulkMarkSaveResult'),
                 'import_errors' => fn () => $request->session()->get('import_errors'),
+                // Separate from the snake_case key above: McqExamOpsController flashes
+                // under 'import_errors', but every other importer (FestRegistrationReview
+                // Controller, FestAttendanceController, SchoolAdmin\TeacherController)
+                // flashes under 'importErrors' (camelCase, matching importResult right
+                // above) -- that key was never shared at all, so their detail lists
+                // silently never reached the page even though the main success/error
+                // flash worked. Both keys stay, each read from its own matching session
+                // key, so this doesn't touch the already-working MCQ flow.
+                'importErrors' => fn () => $request->session()->get('importErrors'),
                 'newCredentials' => fn () => $request->session()->get('newCredentials'),
                 'mcqNewCredentials' => fn () => $request->session()->get('mcqNewCredentials'),
                 'studentPortalCredentials' => fn () => $request->session()->get('studentPortalCredentials'),

@@ -164,8 +164,8 @@
                     Import CSV
                 </button>
             </div>
-            <ul v-if="$page.props.importErrors?.length" class="mt-3 text-xs text-red-600 list-disc pl-4">
-                <li v-for="(err, i) in $page.props.importErrors" :key="i">{{ err }}</li>
+            <ul v-if="$page.props.flash?.importErrors?.length" class="mt-3 text-xs text-red-600 list-disc pl-4">
+                <li v-for="(err, i) in $page.props.flash.importErrors" :key="i">{{ err }}</li>
             </ul>
         </div>
 

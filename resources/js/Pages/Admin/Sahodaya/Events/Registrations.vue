@@ -38,6 +38,16 @@
             </div>
         </div>
 
+        <!-- Row-level reasons behind a bulk-approve/bulk-reject "N skipped" summary
+             above (the SweetAlert popup/FlashBanner only ever shows that headline
+             count, not why) -->
+        <div v-if="importErrors.length" class="mb-4 rounded-lg border border-red-100 bg-red-50 p-3 max-h-64 overflow-y-auto">
+            <p class="text-xs font-semibold text-red-800 mb-1.5">{{ importErrors.length }} row(s) skipped:</p>
+            <ul class="text-xs text-red-700 list-disc pl-4 space-y-0.5">
+                <li v-for="(err, i) in importErrors" :key="i">{{ err }}</li>
+            </ul>
+        </div>
+
         <div class="card mb-4 space-y-3">
             <div class="flex flex-wrap gap-2 items-end">
                 <div v-if="regionOptions.length">
@@ -583,7 +593,7 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
@@ -611,6 +621,9 @@ const props = defineProps({
     regionOptions: { type: Array, default: () => [] },
     childEvents: { type: Array, default: () => [] },
 });
+
+const page = usePage();
+const importErrors = computed(() => page.props.flash?.importErrors ?? []);
 
 const filterDescription = computed(() => {
     if (props.selectedItemId) {

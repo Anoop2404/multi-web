@@ -13,6 +13,14 @@
                 <input type="file" accept=".csv,.xls,.xlsx" class="field text-sm" @change="onFile">
                 <button type="submit" class="btn-primary" :disabled="!importFile || importForm.processing">Import spreadsheet</button>
             </form>
+
+            <div v-if="importErrors.length" class="rounded-lg border border-red-100 bg-red-50 p-3 max-h-64 overflow-y-auto">
+                <p class="text-xs font-semibold text-red-800 mb-1.5">{{ importErrors.length }} row(s) skipped:</p>
+                <ul class="text-xs text-red-700 list-disc pl-4 space-y-0.5">
+                    <li v-for="(err, i) in importErrors" :key="i">{{ err }}</li>
+                </ul>
+            </div>
+
             <Link :href="`${base}/registrations`" class="text-sm link-brand">← Back to registrations</Link>
         </div>
 
@@ -21,8 +29,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { Link, useForm } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { Link, useForm, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 
@@ -30,6 +38,9 @@ const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, activityLogs: { type: Array, default: () => [] },
 });
+
+const page = usePage();
+const importErrors = computed(() => page.props.flash?.importErrors ?? []);
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 const importFile = ref(null);
