@@ -33,11 +33,15 @@
             position: absolute;
             line-height: 1.25;
             overflow: hidden;
-            word-wrap: break-word;
+            white-space: nowrap;
+            text-overflow: ellipsis;
         }
         .card__photo, .card__qr {
             position: absolute;
             object-fit: cover;
+        }
+        .card__photo {
+            border-radius: 50%;
         }
         .page-break { page-break-after: always; }
     </style>

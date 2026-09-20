@@ -246,7 +246,94 @@ class IdCardTemplateController extends SahodayaAdminController
         $gridLayout = $mode === 'die' ? $template->gridLayout() : null;
         $count = $gridLayout ? $gridLayout['cols'] * $gridLayout['rows'] : 1;
 
-        $sampleCard = [
+        $backgroundUrl = $template->background_path
+            ? TenantStorage::logoUrl($this->sahodaya, $template->background_path)
+            : null;
+
+        return view('fest.id-cards.custom-sheet', [
+            'cards'          => array_fill(0, $count, $this->sampleCard()),
+            'sections'       => null,
+            'clusterName'    => $this->sahodaya->name,
+            'clusterLogoSrc' => null,
+            'eventTitle'     => 'Sample preview',
+            'audience'       => $template->audience ?? 'student',
+            'showTitle'      => false,
+            'isPdf'          => false,
+            'backgroundUrl'  => $backgroundUrl,
+            'fields'         => $template->fields(),
+            'cardWidthMm'    => $template->card_width_mm,
+            'cardHeightMm'   => $template->card_height_mm,
+            'cardsPerPage'   => $count,
+            'pageWidthMm'    => $mode === 'die' ? $template->page_width_mm : null,
+            'pageHeightMm'   => $mode === 'die' ? $template->page_height_mm : null,
+            'gridLayout'     => $gridLayout,
+        ]);
+    }
+
+    /**
+     * Same rendering pipeline as previewSample(), but for a template that hasn't been
+     * saved yet (or is mid-edit) — the admin form posts its current, unsaved field
+     * values here so "preview" works while creating/editing, not only after Save.
+     * A newly-uploaded background is used as-is; without one, falls back to the
+     * existing template's stored background (edit) so re-previewing doesn't require
+     * re-picking the file every time.
+     */
+    public function previewDraft(Request $request, string $tenantId)
+    {
+        $data = $this->validatedData($request, forUpdate: true);
+
+        $existing = $request->integer('template_id')
+            ? IdCardTemplate::where('tenant_id', $this->sahodaya->id)->find($request->integer('template_id'))
+            : null;
+
+        $backgroundPath = $existing?->background_path;
+        if ($request->hasFile('background')) {
+            $baseDir = 'sahodaya/'.$this->sahodaya->id.'/id-card-templates';
+            $disk = TenantStorage::uploadDisk();
+            $stored = app(CertificateBackgroundConverter::class)
+                ->storeFromUpload($request->file('background'), $baseDir, $disk);
+            $backgroundPath = $stored['background_path'];
+        }
+
+        $mode = $request->query('mode') === 'die' ? 'die' : 'single';
+        $gridJson = $this->buildGridJson($data);
+        $gridLayout = $mode === 'die' ? (new IdCardTemplate(['grid_json' => $gridJson]))->gridLayout() : null;
+        $count = $gridLayout ? $gridLayout['cols'] * $gridLayout['rows'] : 1;
+
+        $fields = $data['fields'] ?? $existing?->fields() ?? IdCardTemplate::defaultFields();
+        $cardWidthMm = $data['card_width_mm'] ?? $existing?->card_width_mm ?? 96;
+        $cardHeightMm = $data['card_height_mm'] ?? $existing?->card_height_mm ?? 72;
+        $pageWidthMm = $data['page_width_mm'] ?? $existing?->page_width_mm ?? null;
+        $pageHeightMm = $data['page_height_mm'] ?? $existing?->page_height_mm ?? null;
+
+        $backgroundUrl = $backgroundPath
+            ? TenantStorage::logoUrl($this->sahodaya, $backgroundPath)
+            : null;
+
+        return view('fest.id-cards.custom-sheet', [
+            'cards'          => array_fill(0, $count, $this->sampleCard()),
+            'sections'       => null,
+            'clusterName'    => $this->sahodaya->name,
+            'clusterLogoSrc' => null,
+            'eventTitle'     => 'Draft preview',
+            'audience'       => $data['audience'] ?? 'student',
+            'showTitle'      => false,
+            'isPdf'          => false,
+            'backgroundUrl'  => $backgroundUrl,
+            'fields'         => $fields,
+            'cardWidthMm'    => $cardWidthMm,
+            'cardHeightMm'   => $cardHeightMm,
+            'cardsPerPage'   => $count,
+            'pageWidthMm'    => $mode === 'die' ? $pageWidthMm : null,
+            'pageHeightMm'   => $mode === 'die' ? $pageHeightMm : null,
+            'gridLayout'     => $gridLayout,
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function sampleCard(): array
+    {
+        return [
             'name'            => 'SAMPLE STUDENT',
             'subtitle'        => 'Sample School Name',
             'detail'          => 'Sample Item Title',
@@ -265,29 +352,6 @@ class IdCardTemplateController extends SahodayaAdminController
             'photo_src'       => $this->samplePhotoDataUri(),
             'qr_src'          => null,
         ];
-
-        $backgroundUrl = $template->background_path
-            ? TenantStorage::logoUrl($this->sahodaya, $template->background_path)
-            : null;
-
-        return view('fest.id-cards.custom-sheet', [
-            'cards'          => array_fill(0, $count, $sampleCard),
-            'sections'       => null,
-            'clusterName'    => $this->sahodaya->name,
-            'clusterLogoSrc' => null,
-            'eventTitle'     => 'Sample preview',
-            'audience'       => $template->audience ?? 'student',
-            'showTitle'      => false,
-            'isPdf'          => false,
-            'backgroundUrl'  => $backgroundUrl,
-            'fields'         => $template->fields(),
-            'cardWidthMm'    => $template->card_width_mm,
-            'cardHeightMm'   => $template->card_height_mm,
-            'cardsPerPage'   => $count,
-            'pageWidthMm'    => $mode === 'die' ? $template->page_width_mm : null,
-            'pageHeightMm'   => $mode === 'die' ? $template->page_height_mm : null,
-            'gridLayout'     => $gridLayout,
-        ]);
     }
 
     private function samplePhotoDataUri(): string

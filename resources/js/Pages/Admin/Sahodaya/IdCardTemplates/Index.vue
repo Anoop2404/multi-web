@@ -4,7 +4,8 @@
         <PageHeader title="ID card templates" eyebrow="Tools"
                     description="Upload a custom ID card background and place fields (photo, QR, name, etc.) on it. Scope to a specific event/item/audience, or leave blank for a Sahodaya-wide default." />
 
-        <form @submit.prevent="upload" class="card mb-4 space-y-4">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-4 items-start">
+        <form @submit.prevent="upload" class="card space-y-4 lg:col-span-7">
             <h3 class="section-title">{{ editingId ? 'Edit ID card template' : 'New ID card template' }}</h3>
 
             <FormGrid>
@@ -214,11 +215,45 @@
                 <button type="submit" class="btn-primary" :disabled="form.processing">
                     {{ form.processing ? 'Saving…' : (editingId ? 'Update template' : 'Save template') }}
                 </button>
+                <button type="button" class="btn-secondary" @click="previewDraft('single')">
+                    Preview card
+                </button>
+                <button v-if="form.grid_cols && form.grid_rows" type="button" class="btn-secondary" @click="previewDraft('die')">
+                    Preview die sheet
+                </button>
                 <button v-if="editingId" type="button" class="btn-secondary" :disabled="form.processing" @click="cancelEdit">
                     Cancel edit
                 </button>
             </FormActions>
+            <p class="text-xs text-slate-500 -mt-2">
+                "Preview card" / "Preview die sheet" opens the exact print output (server-rendered) in a new tab — use the live canvas on the right for instant feedback while you type.
+            </p>
         </form>
+
+        <div class="lg:col-span-5">
+            <div class="sticky top-6 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                        <span>👁️</span> Live Visual Preview
+                    </h3>
+                    <span class="text-xs text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                        Updates as you type
+                    </span>
+                </div>
+                <IdCardLiveCanvas
+                    :background-url="editingTemplate?.background_url"
+                    :local-file-url="localFileUrl"
+                    :fields="form.fields"
+                    :card-width-mm="form.card_width_mm"
+                    :card-height-mm="form.card_height_mm"
+                />
+                <div class="p-3 bg-slate-50 border border-slate-200/90 rounded-xl space-y-1.5 text-xs text-slate-600">
+                    <p class="font-bold text-slate-800">💡 Tip</p>
+                    <p>Adjust Top %, Left %, Width % and Font size in the form — this canvas updates instantly, with sample data standing in for real fields.</p>
+                </div>
+            </div>
+        </div>
+        </div>
 
         <div class="form-section overflow-hidden !p-0">
             <div class="overflow-x-auto">
@@ -278,9 +313,10 @@
 
 <script setup>
 import { useForm, router } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import { ref, computed, watch, onUnmounted } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import IdCardLiveCanvas from '@/Components/idcards/IdCardLiveCanvas.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -299,6 +335,62 @@ const editingTemplate = ref(null);
 
 function previewUrl(template, mode) {
     return `/sahodaya-admin/${props.sahodaya.id}/id-card-templates/${template.id}/preview?mode=${mode}`;
+}
+
+// A native <form target="_blank"> submit (not window.open, which popup blockers
+// reject unless it happens perfectly synchronously inside the click) is the
+// reliable way to open a new tab with a POST/multipart response — this posts the
+// current, possibly-unsaved form state (including any newly-picked background
+// file) and lets the browser open the rendered preview itself.
+function previewDraft(mode) {
+    const formEl = document.createElement('form');
+    formEl.method = 'POST';
+    formEl.action = `/sahodaya-admin/${props.sahodaya.id}/id-card-templates/preview-draft?mode=${mode}`;
+    formEl.target = '_blank';
+    formEl.enctype = 'multipart/form-data';
+    formEl.style.display = 'none';
+
+    const addField = (name, value) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = value ?? '';
+        formEl.appendChild(input);
+    };
+
+    const token = document.querySelector('meta[name="csrf-token"]')?.content;
+    addField('_token', token);
+    addField('title', form.title || '');
+    if (editingId.value) addField('template_id', editingId.value);
+    if (form.audience) addField('audience', form.audience);
+    addField('card_width_mm', form.card_width_mm);
+    addField('card_height_mm', form.card_height_mm);
+    addField('page_width_mm', form.page_width_mm);
+    addField('page_height_mm', form.page_height_mm);
+    addField('grid_cols', form.grid_cols);
+    addField('grid_rows', form.grid_rows);
+    addField('grid_first_col_center_mm', form.grid_first_col_center_mm);
+    addField('grid_first_row_center_mm', form.grid_first_row_center_mm);
+    addField('grid_col_pitch_mm', form.grid_col_pitch_mm);
+    addField('grid_row_pitch_mm', form.grid_row_pitch_mm);
+    form.fields.forEach((field, i) => {
+        Object.entries(field).forEach(([key, value]) => addField(`fields[${i}][${key}]`, value));
+    });
+
+    if (form.background) {
+        const dt = new DataTransfer();
+        dt.items.add(form.background);
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.name = 'background';
+        fileInput.style.display = 'none';
+        fileInput.files = dt.files;
+        formEl.appendChild(fileInput);
+    }
+
+    document.body.appendChild(formEl);
+    formEl.submit();
+    document.body.removeChild(formEl);
 }
 
 const selectedEventItems = computed(() => {
@@ -358,6 +450,18 @@ const form = useForm({
     grid_row_pitch_mm: null,
     fields: blankFields(),
     is_active: true,
+});
+
+// Object URL for a newly-picked (not yet uploaded) background file, so the live
+// canvas can show it immediately — revoked whenever it's replaced or cleared to
+// avoid leaking blob URLs across edits.
+const localFileUrl = ref(null);
+watch(() => form.background, (file) => {
+    if (localFileUrl.value) URL.revokeObjectURL(localFileUrl.value);
+    localFileUrl.value = file ? URL.createObjectURL(file) : null;
+});
+onUnmounted(() => {
+    if (localFileUrl.value) URL.revokeObjectURL(localFileUrl.value);
 });
 
 function addField() {

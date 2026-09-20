@@ -1743,6 +1743,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::prefix('id-card-templates')->name('id-card-templates.')->group(function () {
             Route::get('/', [\App\Http\Controllers\SahodayaAdmin\IdCardTemplateController::class, 'index'])->name('index');
             Route::post('/', [\App\Http\Controllers\SahodayaAdmin\IdCardTemplateController::class, 'store'])->name('store');
+            Route::post('/preview-draft', [\App\Http\Controllers\SahodayaAdmin\IdCardTemplateController::class, 'previewDraft'])->name('preview-draft');
             Route::put('/{template}', [\App\Http\Controllers\SahodayaAdmin\IdCardTemplateController::class, 'update'])->name('update');
             Route::delete('/{template}', [\App\Http\Controllers\SahodayaAdmin\IdCardTemplateController::class, 'destroy'])->name('destroy');
             Route::get('/{template}/preview', [\App\Http\Controllers\SahodayaAdmin\IdCardTemplateController::class, 'previewSample'])->name('preview');
