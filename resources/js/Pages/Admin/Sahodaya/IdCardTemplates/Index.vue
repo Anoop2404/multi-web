@@ -167,19 +167,19 @@
                         </div>
                         <div>
                             <label class="text-[10px] uppercase text-slate-400">Top %</label>
-                            <input v-model.number="field.top" type="number" min="0" max="100" class="field text-sm">
+                            <input v-model.number="field.top" type="number" min="0" max="100" step="0.01" class="field text-sm">
                         </div>
                         <div>
                             <label class="text-[10px] uppercase text-slate-400">Left %</label>
-                            <input v-model.number="field.left" type="number" min="0" max="100" class="field text-sm">
+                            <input v-model.number="field.left" type="number" min="0" max="100" step="0.01" class="field text-sm">
                         </div>
                         <div>
                             <label class="text-[10px] uppercase text-slate-400">Width %</label>
-                            <input v-model.number="field.width" type="number" min="1" max="100" class="field text-sm">
+                            <input v-model.number="field.width" type="number" min="1" max="100" step="0.01" class="field text-sm">
                         </div>
                         <div v-if="field.type !== 'text'">
                             <label class="text-[10px] uppercase text-slate-400">Height %</label>
-                            <input v-model.number="field.height" type="number" min="1" max="100" class="field text-sm">
+                            <input v-model.number="field.height" type="number" min="1" max="100" step="0.01" class="field text-sm">
                         </div>
                         <div v-if="field.type === 'text'">
                             <label class="text-[10px] uppercase text-slate-400">Font size</label>
