@@ -26,6 +26,9 @@
                     <a v-if="cumulativeSheetBlankChestUrl" :href="cumulativeSheetBlankChestUrl" target="_blank" class="btn-secondary text-xs shrink-0 whitespace-nowrap">
                         📊 Sum Sheet — No Chest No
                     </a>
+                    <a :href="resultDeclarationSheetUrl" target="_blank" class="btn-secondary text-xs shrink-0 whitespace-nowrap">
+                        📝 Result Declaration Sheet
+                    </a>
                     <Link :href="importUrl" class="btn-primary text-xs shrink-0 whitespace-nowrap">
                         Import Marks
                     </Link>
@@ -440,6 +443,13 @@ const markEntrySheetUrl = computed(() => {
 const markEntrySheetBlankChestUrl = computed(() =>
     `${markEntrySheetUrl.value}${markEntrySheetUrl.value.includes('?') ? '&' : '?'}blank_chest=1`
 );
+const resultDeclarationSheetUrl = computed(() => {
+    let url = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/result-declaration-sheet`;
+    if (props.selectedItemId) {
+        url += `?item_id=${props.selectedItemId}`;
+    }
+    return url;
+});
 const cumulativeSheetBlankChestUrl = computed(() =>
     props.cumulativeSheetUrl
         ? `${props.cumulativeSheetUrl}${props.cumulativeSheetUrl.includes('?') ? '&' : '?'}blank_chest=1`

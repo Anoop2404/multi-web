@@ -1331,6 +1331,56 @@ class FestMarkEntryController extends SahodayaAdminController
     }
 
     /**
+     * Printable blank result declaration sheet: Sl No, Chest No, Points, Rank — every
+     * cell left empty (not participant-pre-filled like the other sheets) for the stage
+     * panel/convenor to write down the announced result by hand before it's typed into
+     * Mark Entry. Fixed at 7 rows per item regardless of how many participants there
+     * are; one sheet per item, portrait.
+     */
+    public function resultDeclarationSheet(Request $request, string $tenantId, FestEvent $event, FestNumberingService $numbering)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $itemId = $request->integer('item_id');
+
+        $query = FestEventItem::with('event')->where('event_id', $event->id)->where('is_enabled', true);
+        if ($itemId) {
+            $query->where('id', $itemId);
+        }
+        $items = $query->orderBy('display_order')->orderBy('title')->get();
+
+        abort_if($items->isEmpty(), 404, 'No competition items found.');
+
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
+
+        $sheets = $items->map(fn ($item) => [
+            'item'          => $item,
+            'category_label' => $this->itemCategoryLabel($item, $classGroupLabels),
+        ]);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.result-declaration-sheet', [
+            'sahodaya' => $this->sahodaya,
+            'event'    => $event,
+            'sheets'   => $sheets,
+            'logoSrc'  => TenantBranding::logoEmbedSrc($this->sahodaya),
+        ])->setPaper('a4', 'portrait');
+
+        $nameParts = [$event->title];
+        if ($itemId) {
+            $singleItem = $items->first();
+            $singleItemCategory = $this->itemCategoryLabel($singleItem, $classGroupLabels);
+            if ($singleItemCategory) {
+                $nameParts[] = $singleItemCategory;
+            }
+            $nameParts[] = $singleItem->title;
+        }
+        $nameParts[] = 'result declaration sheet';
+        $fileName = \Illuminate\Support\Str::slug(implode(' ', $nameParts)).'.pdf';
+
+        return $pdf->download($fileName);
+    }
+
+    /**
      * "Category" for a Kalotsav item means its class/age bracket (e.g. "Category 1 —
      * Classes 3 & 4"), not the internal arts_category genre tag. Falls back to the
      * sports age_group, then the arts genre, and to null when nothing says anything
