@@ -1490,15 +1490,43 @@ class FestPublicScoreboardTest extends TestCase
             'event_id' => $this->north->id, 'title' => 'Aaa Unpublished Item',
             'participant_type' => 'individual', 'is_enabled' => true,
         ]);
-        FestEventItem::create([
+        // Actually has a recorded mark, not just the publish flag -- a published item
+        // with zero marks no longer counts as "ready" for this sort (see the fest
+        // public-pages duplicate-link cleanup: floating an item with no data to the top
+        // just to show a disabled "Not published" card isn't the point of this sort).
+        $publishedItem = FestEventItem::create([
             'event_id' => $this->north->id, 'title' => 'Zzz Published Item',
+            'participant_type' => 'individual', 'is_enabled' => true,
+            'results_published_at' => now(), 'results_hidden' => false,
+        ]);
+        $this->markItemWinner($this->north, $publishedItem, $this->northSchool);
+
+        $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}");
+
+        $response->assertOk()->assertSeeInOrder(['Zzz Published Item', 'Aaa Unpublished Item']);
+    }
+
+    /** A published item with zero marks recorded (published too early, or a no-show item) must not float to the top of the item grid or render a clickable Results link -- it renders the same "not ready" disabled state as an unpublished item. */
+    public function test_event_item_finder_does_not_promote_a_published_item_with_no_marks(): void
+    {
+        FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'Aaa Unpublished Item',
+            'participant_type' => 'individual', 'is_enabled' => true,
+        ]);
+        FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'Zzz Published No Marks Item',
             'participant_type' => 'individual', 'is_enabled' => true,
             'results_published_at' => now(), 'results_hidden' => false,
         ]);
 
         $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}");
 
-        $response->assertOk()->assertSeeInOrder(['Zzz Published Item', 'Aaa Unpublished Item']);
+        $response->assertOk();
+        $content = $response->getContent();
+        $this->assertStringContainsString('Zzz Published No Marks Item', $content);
+        $this->assertStringNotContainsString(route('tenant.fest.item-results', [$this->north->id, FestEventItem::where('title', 'Zzz Published No Marks Item')->value('id')]), $content);
+        // Both items are equally "not ready" -- original display order (Aaa before Zzz) wins the stable sort, unlike the promoted case above.
+        $response->assertSeeInOrder(['Aaa Unpublished Item', 'Zzz Published No Marks Item']);
     }
 
     /**

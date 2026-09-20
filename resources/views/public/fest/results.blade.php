@@ -494,10 +494,6 @@
             <div class="rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-8 sm:p-10 text-center">
                 <h2 class="font-bold text-white">No individual championship standing is published</h2>
                 <p class="text-sm text-white/45 mt-2 max-w-xl mx-auto">{{ $event->status === 'completed' ? 'This event has ended without a published individual championship table.' : 'The championship table will appear here if the event committee publishes cumulative individual points.' }}</p>
-                <div class="flex flex-wrap justify-center gap-3 mt-5">
-                    <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => 'item']) }}" class="rounded-xl bg-amber-500 px-4 py-2 text-sm font-bold text-slate-950 hover:bg-amber-400">Browse item results</a>
-                    <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => 'school']) }}" class="rounded-xl border border-slate-700 bg-white/5 px-4 py-2 text-sm font-bold text-white hover:bg-white/10">School results</a>
-                </div>
             </div>
             @else
             @php

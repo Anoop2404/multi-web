@@ -37,6 +37,7 @@ use App\Support\TenantStorage;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class FestPortalController extends Controller
 {
@@ -90,13 +91,29 @@ class FestPortalController extends Controller
         $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
         $isResultsPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
 
+        // Same two gates item-finder.blade.php's own item grid uses (see itemFinder()
+        // above): an item's own results_published_at alone isn't enough — itemResults()
+        // hard-requires the EVENT-wide publish flag too (FestItemResultsService::
+        // isItemVisible()), and a published item can still have zero marks recorded
+        // (published too early, or a no-show item). Without both checks here, this
+        // page's own item grid rendered a normal, inviting "Results" link into a page
+        // that either 403s or just says "No published results for this item."
+        $resultedItemIds = FestMark::where('event_id', $targetEvent->id)
+            ->whereIn('item_id', $items->pluck('id'))
+            ->distinct()
+            ->pluck('item_id');
+        $itemResultsService = app(FestItemResultsService::class);
+        $visibleResultItemIds = $items
+            ->filter(fn (FestEventItem $item) => $isAdminPreview || $itemResultsService->isItemVisible($item, $event))
+            ->pluck('id');
+
         // Items whose results are actually out (the same condition the view's own
         // "Results" button renders on, see show.blade.php) float to the top of the item
         // finder grid, so a grid mostly full of "Not yet published" cards doesn't bury
         // the handful that are actually ready. sortByDesc() is a stable sort, so within
         // each of the two groups items keep their original display_order/title ordering.
         $items = $items->sortByDesc(
-            fn (FestEventItem $item) => (($item->results_published_at || $isAdminPreview) && ! $item->results_hidden) ? 1 : 0
+            fn (FestEventItem $item) => ($visibleResultItemIds->contains($item->id) && $resultedItemIds->contains($item->id)) ? 1 : 0
         )->values();
 
         $itemGroups = $items->groupBy('event_id')
@@ -185,6 +202,8 @@ class FestPortalController extends Controller
             'publishedItemCount' => $publishedItemCount,
             'scopeSchedulePublished' => (bool) $selectedScope['schedule_published'],
             'scheduledItemIds' => $scheduledItemIds,
+            'resultedItemIds' => $resultedItemIds,
+            'visibleResultItemIds' => $visibleResultItemIds,
             'pageSeo' => ['title' => $event->title.' — '.$tenant->name],
         ]);
     }
@@ -293,6 +312,45 @@ class FestPortalController extends Controller
             ->whereNull('item_id')
             ->max('published_at');
 
+        // The rest of this method computes every tab's data unconditionally regardless
+        // of $tab (see $tab's only other use, below, and in the returned payload) — so
+        // the computed payload is identical for every ?tab= variant. Caching it once,
+        // shared across every tab, multiplies the benefit of Cloudflare's own per-URL
+        // edge cache rather than paying the ~40-70 query computation separately for each
+        // of the 5 tab query strings. Keyed on publishedAt so a new publish naturally
+        // invalidates it, no explicit cache-busting needed.
+        //
+        // Bypassed for ANY authenticated request, not just $isAdminPreview — the
+        // championship computation below also runs a per-SIBLING-LEAF
+        // isAuthorizedAdminPreview() check (crossPhaseStandingForVisibleLeaves()) that
+        // can broaden the result even when this top-level event/scope is already
+        // published, so $isAdminPreview alone doesn't fully capture when the computed
+        // payload is preview-widened. Any logged-in user hitting this public URL always
+        // gets a fresh, uncached computation; only genuinely anonymous requests share
+        // the cache.
+        $bypassCache = (bool) ($request->user() ?? auth()->user());
+
+        $computeResultsPayload = function () use ($request, $event, $selectedScope, $isPublished, $publishedAt, $scopes) {
+            return $this->buildResultsPayload($request, $event, $selectedScope, $isPublished, $publishedAt, $scopes);
+        };
+
+        if ($bypassCache) {
+            $payload = $computeResultsPayload();
+        } else {
+            $cacheKey = 'fest-results-payload:'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.((string) $publishedAt);
+            $payload = Cache::remember($cacheKey, now()->addSeconds(20), $computeResultsPayload);
+        }
+
+        return $this->renderPublic('public.fest.results', $tenant, $payload + ['tab' => $tab]);
+    }
+
+    /**
+     * The actual per-tab-agnostic computation for results() — split out so it can be
+     * wrapped in Cache::remember() there without an unwieldy inline closure. See the
+     * caching comment on results() for why this is safe to share across every tab.
+     */
+    private function buildResultsPayload(Request $request, FestEvent $event, array $selectedScope, bool $isPublished, mixed $publishedAt, array $scopes): array
+    {
         // FestIndividualChampionshipPoint is a stored aggregate across every item in the
         // event (recalculated on demand by an admin action), not a live per-item query —
         // unlike the school scoreboard there's no "provisional, published-items-only"
@@ -569,10 +627,9 @@ class FestPortalController extends Controller
             ->values()
             ->all();
 
-        return $this->renderPublic('public.fest.results', $tenant, [
+        return [
             'event' => $event,
             'eventContext' => $this->operationalEvents->publicContext($event),
-            'tab' => $tab,
             'schoolBoard' => $schoolBoard,
             'schoolWinnersBoard' => $schoolWinnersBoard,
             'usesPhases' => $usesPhases,
@@ -592,7 +649,7 @@ class FestPortalController extends Controller
             'schoolCategoryToppers' => $schoolCategoryToppers,
             'studentCategoryToppers' => $studentCategoryToppers,
             'pageSeo' => ['title' => $event->title.' — Results'],
-        ]);
+        ];
     }
 
     /**
@@ -1461,8 +1518,33 @@ public function tv(Request $request, int $eventId)
         return response()->json($this->livePayload($request, $event, $selectedScope));
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * Cache::remember() wraps computeLivePayload() below — hot path behind both live()
+     * (full page) and liveData() (the JSON endpoint public viewers poll). Bypassed for
+     * ANY authenticated request, same reasoning as scoreboardDynamicData()'s cache: the
+     * cross-phase branch inside (crossPhaseScoreboard()/crossPhaseVisibleEventIds())
+     * runs a per-sibling-leaf isAuthorizedAdminPreview() check that can broaden the
+     * result independent of this event's own admin-preview state.
+     *
+     * @return array<string, mixed>
+     */
     private function livePayload(Request $request, FestEvent $event, array $selectedScope): array
+    {
+        $bypassCache = (bool) ($request->user() ?? auth()->user());
+        $compute = fn () => $this->computeLivePayload($request, $event, $selectedScope);
+
+        if ($bypassCache) {
+            return $compute();
+        }
+
+        $publishedFlag = $selectedScope['results_published'] ? '1' : '0';
+        $cacheKey = 'fest-live-payload:'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.$publishedFlag;
+
+        return Cache::remember($cacheKey, now()->addSeconds(4), $compute);
+    }
+
+    /** @return array<string, mixed> */
+    private function computeLivePayload(Request $request, FestEvent $event, array $selectedScope): array
     {
         $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
         $isPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
@@ -1847,7 +1929,34 @@ public function tv(Request $request, int $eventId)
         return $eventIds ?: null;
     }
 
+    /**
+     * Cache::remember() wraps computeScoreboardDynamicData() below — this is the hot
+     * path behind both scoreboard() (full page) and scoreboardData() (the JSON endpoint
+     * public viewers poll), so a short shared cache directly cuts the DB work Cloudflare's
+     * own 5s edge cache can't avoid recomputing on every gap.
+     *
+     * Bypassed for ANY authenticated request (not just $isAdminPreview): the cross-phase
+     * branch below (crossPhaseScoreboard()) runs its own per-SIBLING-LEAF
+     * isAuthorizedAdminPreview() check that can broaden the result even when this
+     * event/category's own $isAdminPreview is false — see the identical note on
+     * results()'s cache. Only genuinely anonymous requests share the cache.
+     */
     private function scoreboardDynamicData(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished, bool $isAdminPreview = false, ?Request $request = null): array
+    {
+        $bypassCache = (bool) ($request?->user() ?? auth()->user());
+
+        $compute = fn () => $this->computeScoreboardDynamicData($event, $selectedScope, $category, $isPublished, $isAdminPreview, $request);
+
+        if ($bypassCache) {
+            return $compute();
+        }
+
+        $cacheKey = 'fest-scoreboard-dynamic:'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.($category ?? 'all').':'.($isPublished ? '1' : '0');
+
+        return Cache::remember($cacheKey, now()->addSeconds(4), $compute);
+    }
+
+    private function computeScoreboardDynamicData(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished, bool $isAdminPreview = false, ?Request $request = null): array
     {
         [$scoreboard, $cumulativeStanding] = $this->resolveScoreboard($event, $selectedScope, $category, $isPublished, $isAdminPreview);
 

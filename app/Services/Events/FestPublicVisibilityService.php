@@ -277,10 +277,20 @@ class FestPublicVisibilityService
             ->get()
             ->keyBy('participant_id');
 
+        // Same "has any marks recorded" gate item-finder.blade.php's item grid uses on
+        // its own Results link (see FestPortalController::itemFinder()'s
+        // $resultedItemIds) -- an item can be flagged results_published_at with zero
+        // marks ever entered (published too early, or a no-show item), so $itemVisible
+        // alone below isn't enough to avoid linking into a page that just says "No
+        // published results for this item."
+        $resultedItemIds = FestMark::whereIn('item_id', $entries->pluck('registration.item_id')->filter()->unique())
+            ->distinct()
+            ->pluck('item_id');
+
         $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
 
         return $entries
-            ->map(function (FestParticipant $p) use ($eventsById, $event, $marksByParticipant, $isAdminPreview, $classGroupLabels) {
+            ->map(function (FestParticipant $p) use ($eventsById, $event, $marksByParticipant, $resultedItemIds, $isAdminPreview, $classGroupLabels) {
                 $item = $p->registration?->item;
                 if (! $item) {
                     return null;
@@ -318,7 +328,7 @@ class FestPublicVisibilityService
                     'points'           => $points,
                     'result'           => $showMarks ? trim(($mark?->measurement_value ?? '').' '.($mark?->measurement_unit ?? '')) : null,
                     'disqualified'     => (bool) $p->disqualified_at,
-                    'results_url'      => $itemVisible ? route('tenant.fest.item-results', [$itemEvent->id, $item->id]) : null,
+                    'results_url'      => ($itemVisible && $resultedItemIds->contains($item->id)) ? route('tenant.fest.item-results', [$itemEvent->id, $item->id]) : null,
                 ];
             })
             ->filter()

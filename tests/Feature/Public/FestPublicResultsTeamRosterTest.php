@@ -165,14 +165,59 @@ class FestPublicResultsTeamRosterTest extends TestCase
         $response->assertSee("/fest/{$this->event->id}/participant/p-{$participant->id}", false);
     }
 
+    /**
+     * publicParticipantItems() (FestPublicVisibilityService) used to build results_url
+     * off the item's publish gate alone -- a published item with zero marks recorded
+     * (published too early, or a no-show item) still got a "View full item results"
+     * link into item-results.blade.php's empty "No published results for this item."
+     * state. Fixed with the same has-any-marks gate item-finder.blade.php's grid uses.
+     */
+    public function test_participant_page_hides_results_link_for_a_published_item_with_no_marks(): void
+    {
+        $noMarksItem = FestEventItem::create([
+            'event_id' => $this->event->id,
+            'title' => 'No Marks Item',
+            'participant_type' => 'individual',
+            'class_group' => 'hs',
+            'is_enabled' => true,
+            'results_published_at' => now(),
+        ]);
+        $student = Student::where('name', 'Anu Krishna')->firstOrFail();
+        FestParticipant::create([
+            'registration_id' => FestRegistration::create([
+                'event_id' => $this->event->id,
+                'item_id' => $noMarksItem->id,
+                'school_id' => $this->schoolA->id,
+                'status' => 'approved',
+            ])->id,
+            'event_id' => $this->event->id,
+            'student_id' => $student->id,
+            'participant_type' => 'student',
+        ]);
+        $participant = FestParticipant::whereHas('student', fn ($q) => $q->where('name', 'Anu Krishna'))
+            ->whereHas('registration', fn ($q) => $q->where('item_id', FestEventItem::where('title', 'Solo Song')->value('id')))
+            ->firstOrFail();
+
+        $response = $this->get("http://roster-test.test/fest/{$this->event->id}/participant/p-{$participant->id}");
+
+        $response->assertOk();
+        $content = $response->getContent();
+
+        $this->assertStringContainsString('No Marks Item', $content);
+        $soloItem = FestEventItem::where('title', 'Solo Song')->firstOrFail();
+        $this->assertStringContainsString(route('tenant.fest.item-results', [$this->event->id, $soloItem->id]), $content);
+        $this->assertStringNotContainsString(route('tenant.fest.item-results', [$this->event->id, $noMarksItem->id]), $content);
+    }
+
     public function test_empty_championship_uses_an_explanatory_state_instead_of_an_empty_table(): void
     {
         $response = $this->get("http://roster-test.test/fest/{$this->event->id}/results?tab=championship");
 
+        // The "Browse item results"/"School results" buttons this empty state used to
+        // duplicate were dropped -- the page's own tab switcher, right above this empty
+        // state, already links to both (see the fest public-pages duplicate-link cleanup).
         $response->assertOk()
             ->assertSee('No individual championship standing is published')
-            ->assertSee('Browse item results')
-            ->assertSee('School results')
             ->assertDontSee('<table', false);
     }
 
@@ -199,6 +244,55 @@ class FestPublicResultsTeamRosterTest extends TestCase
         $winnerRosterHtml = Str::before($response->getContent(), 'Full Results');
         $this->assertStringNotContainsString('Fourth Place Child', $winnerRosterHtml);
         $this->assertStringContainsString('Podium finishers · ties included', $winnerRosterHtml);
+    }
+
+    /**
+     * The public event page's own item grid (show.blade.php) used to render "Results" as
+     * a normal, clickable link the moment an item's results_published_at was set, even
+     * for an item with zero marks ever recorded (published too early, or a no-show
+     * item) -- landing on item-results.blade.php's empty "No published results for this
+     * item." state. Fixed to reuse the same visible+has-data guard item-finder.blade.php
+     * already applied on its own copy of this grid.
+     */
+    public function test_show_page_item_grid_disables_results_link_for_a_published_item_with_no_marks(): void
+    {
+        $unmarkedItem = FestEventItem::create([
+            'event_id' => $this->event->id,
+            'title' => 'Unmarked Item',
+            'participant_type' => 'individual',
+            'class_group' => 'hs',
+            'is_enabled' => true,
+            'results_published_at' => now(),
+        ]);
+
+        $response = $this->get("http://roster-test.test/fest/{$this->event->id}");
+
+        $response->assertOk();
+        $content = $response->getContent();
+
+        // The item still appears (as a card), but without a clickable Results link --
+        // asserting on the absence of an <a> to its results route within that card is
+        // fragile against markup changes, so instead assert the disabled-state copy
+        // this item's card must show is present, and the "Solo Song" card (which does
+        // have marks) still links normally.
+        $this->assertStringContainsString('Unmarked Item', $content);
+        $this->assertStringContainsString('Published, but no marks recorded yet', $content);
+        $soloItem = FestEventItem::where('title', 'Solo Song')->firstOrFail();
+        $this->assertStringContainsString(route('tenant.fest.item-results', [$this->event->id, $soloItem->id]), $content);
+        $this->assertStringNotContainsString(route('tenant.fest.item-results', [$this->event->id, $unmarkedItem->id]), $content);
+    }
+
+    /** The "Item Wise Results" button duplicated "Browse items"' destination exactly; "Detailed Results" duplicated "School results" once published (results() defaults its tab to 'school' then) -- see the fest public-pages duplicate-link cleanup. */
+    public function test_show_page_event_services_grid_has_no_duplicate_destination_buttons(): void
+    {
+        $response = $this->get("http://roster-test.test/fest/{$this->event->id}");
+
+        $response->assertOk();
+        $content = $response->getContent();
+
+        $this->assertStringNotContainsString('Item Wise Results', $content);
+        $this->assertStringContainsString('Category-wise Results', $content);
+        $this->assertStringContainsString(route('tenant.fest.results', ['event' => $this->event->id, 'tab' => 'category']), $content);
     }
 
     public function test_search_consolidates_one_students_items_and_uses_an_unambiguous_link(): void
