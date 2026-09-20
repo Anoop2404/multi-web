@@ -156,6 +156,7 @@ import { eventsModuleNav, eventScopedNav, navItemActive, shouldShowSportsHeadSid
 import { filterNavByPermissions, staffCanSeeNavItem } from '@/support/sahodayaEventNavPermissions.js';
 import { filterNavGroups } from '@/support/filterNavGroups.js';
 import { programForEventType, programScopedNav, sahodayaProgramHref } from '@/support/sahodayaPrograms.js';
+import { useSweetAlert } from '@/composables/useSweetAlert.js';
 import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
@@ -230,6 +231,21 @@ const headerEyebrow = computed(() => {
 watch(() => page.url, () => {
     mobileNavOpen.value = false;
     navSearch.value = '';
+});
+
+// FlashBanner already shows every flash success/error as a passive top-of-page banner,
+// but on these event workspace pages (Registrations, Chest Numbers, Attendance, Mark
+// Entry, Results, ...) an admin can easily miss it while scrolled deep into a long
+// table — pop the same message as a modal (useSweetAlert.js) too, so it can't be
+// missed. Non-immediate watch: only fires on an actual NEW flash (the typical case is
+// staying on the same page via preserveState after a router.post()), not on every
+// fresh page's initial mount.
+const { showSuccess, showError } = useSweetAlert();
+watch(() => page.props.flash?.success, (message) => {
+    if (message) showSuccess(message);
+});
+watch(() => page.props.flash?.error, (message) => {
+    if (message) showError(message, 'Error');
 });
 
 const navGroups = computed(() => {
