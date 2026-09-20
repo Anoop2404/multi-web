@@ -59,6 +59,18 @@
             </div>
         </div>
 
+        <div class="flex flex-wrap gap-2 mb-5" role="tablist">
+            <button v-for="tab in resultsTabs" :key="tab.id" type="button" role="tab"
+                    class="px-4 py-2 rounded-xl text-sm font-semibold border transition"
+                    :class="activeResultsTab === tab.id
+                        ? 'bg-slate-900 text-white border-slate-900'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'"
+                    @click="activeResultsTab = tab.id">
+                {{ tab.label }}
+            </button>
+        </div>
+
+        <div v-show="activeResultsTab === 'items'">
         <ReportHeadItemNavigator :groups="headItemGroups"
                                  :base-url="resultsBaseUrl"
                                  :selected-head-id="selectedHeadId"
@@ -161,14 +173,15 @@
                 </div>
             </template>
         </ReportHeadItemNavigator>
+        </div>
 
-        <div v-if="!selectedHeadId && !selectedItemId" class="card overflow-hidden p-0 mb-6">
+        <div v-show="activeResultsTab === 'status'" class="card overflow-hidden p-0 mb-6">
             <div class="px-5 py-4 border-b border-slate-100 bg-slate-50/80 flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h3 class="section-title">Item publish status</h3>
                     <p class="section-desc mt-0.5">Head-wise list — sort by published or pending. Click an item to review marks.</p>
                 </div>
-                <div class="flex flex-wrap gap-2">
+                <div class="flex flex-wrap gap-2 items-center">
                     <button v-if="selectedPublishIds.length" type="button" class="btn-primary text-xs mr-2" @click="bulkPublishItems">
                         Publish selected ({{ selectedPublishIds.length }})
                     </button>
@@ -180,6 +193,11 @@
                             @click="statusFilter = opt.id">
                         {{ opt.label }}
                     </button>
+                    <span class="w-px h-4 bg-slate-200 mx-1"></span>
+                    <label class="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
+                        <input type="checkbox" v-model="sortPendingFirst" class="rounded border-slate-300">
+                        Not published first
+                    </label>
                 </div>
             </div>
             <div class="overflow-x-auto">
@@ -227,6 +245,8 @@
                                     <span v-else-if="row.age_group">{{ row.age_group }}</span>
                                     <span v-if="row.sport_discipline"> · {{ row.sport_discipline }}</span>
                                     <span v-if="!row.category_label && !row.age_group && !row.sport_discipline">—</span>
+                                    <span v-if="row.gender_label"> · {{ row.gender_label }}</span>
+                                    <span v-if="row.type_label"> · {{ row.type_label }}</span>
                                 </td>
                                 <td class="text-xs text-slate-600">{{ formatWindow(row) }}</td>
                                 <td class="text-sm">
@@ -270,6 +290,7 @@
             </div>
         </div>
 
+        <div v-show="activeResultsTab === 'points'">
         <div class="card mb-6">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div>
@@ -308,13 +329,18 @@
         </div>
 
         <div class="grid lg:grid-cols-2 gap-4 mb-4">
-            <ol class="card-list">
-                <li v-for="row in scoreboard" :key="row.school_id" class="p-4 flex justify-between">
-                    <span><strong>#{{ row.rank }}</strong> {{ row.school_name }}</span>
-                    <span class="font-mono">{{ row.total_points }} pts</span>
-                </li>
-                <li v-if="!scoreboard.length" class="p-4 text-gray-400 text-sm">No results yet</li>
-            </ol>
+            <div class="card card--flush overflow-hidden">
+                <div class="px-4 py-2.5 border-b border-slate-100 bg-slate-50/80">
+                    <h3 class="section-title text-sm !mb-0">Overall</h3>
+                </div>
+                <ol class="card-list">
+                    <li v-for="row in scoreboard" :key="row.school_id" class="p-4 flex justify-between">
+                        <span><strong>#{{ row.rank }}</strong> {{ row.school_name }}</span>
+                        <span class="font-mono">{{ row.total_points }} pts</span>
+                    </li>
+                    <li v-if="!scoreboard.length" class="p-4 text-gray-400 text-sm">No results yet</li>
+                </ol>
+            </div>
 
             <div class="card">
                 <h3 class="font-semibold text-sm mb-2">Promoted participants</h3>
@@ -329,6 +355,25 @@
                     <li v-if="!qualifications.length" class="py-2 text-gray-400">None yet</li>
                 </ul>
             </div>
+        </div>
+
+        <div v-if="categoryBoards.length" class="mb-6">
+            <h3 class="section-title mb-3">Category-wise points</h3>
+            <div class="grid lg:grid-cols-2 gap-4">
+                <div v-for="board in categoryBoards" :key="board.key" class="card card--flush overflow-hidden">
+                    <div class="px-4 py-2.5 border-b border-slate-100 bg-slate-50/80">
+                        <h4 class="section-title text-sm !mb-0">{{ board.label }}</h4>
+                    </div>
+                    <ol class="card-list">
+                        <li v-for="row in board.rows" :key="row.school_id" class="p-3 flex justify-between text-sm">
+                            <span><strong>#{{ row.rank }}</strong> {{ row.school_name }}</span>
+                            <span class="font-mono">{{ row.total_points }} pts</span>
+                        </li>
+                        <li v-if="!board.rows.length" class="p-3 text-gray-400 text-sm">No results yet</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
         </div>
 
         <div class="card">
@@ -376,7 +421,8 @@ import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
-    event: Object, scoreboard: Array, qualifications: Array, nextEvents: Array,
+    event: Object, scoreboard: Array, categoryBoards: { type: Array, default: () => [] },
+    qualifications: Array, nextEvents: Array,
     suggestedNextId: Number, levelLabels: Object,
     activityLogs: { type: Array, default: () => [] },
     headItemGroups: { type: Array, default: () => [] },
@@ -398,6 +444,19 @@ const promoteForm = useForm({ next_event_id: props.suggestedNextId ?? '' });
 const { confirm } = useConfirm();
 const publishModalOpen = ref(false);
 const statusFilter = ref('all');
+const sortPendingFirst = ref(false);
+
+// Item Picker / Publish Status / Point Tables -- three client-side tabs (same pattern
+// as Reports/CategoryWisePoints.vue's plain role="tablist" ref-toggle) replacing what
+// used to be one long scroll through all three sections at once. All the data for
+// every tab is already in this page's own props, so switching tabs is instant with no
+// extra server round trip.
+const resultsTabs = [
+    { id: 'items', label: 'Item Picker' },
+    { id: 'status', label: 'Publish Status' },
+    { id: 'points', label: 'Point Tables' },
+];
+const activeResultsTab = ref('items');
 
 watch(() => props.suggestedNextId, (id) => {
     if (id && !promoteForm.next_event_id) promoteForm.next_event_id = id;
@@ -452,6 +511,11 @@ const filteredSummaries = computed(() => {
         rows = rows.filter((r) => !r.results_published);
     } else if (statusFilter.value === 'marks_pending') {
         rows = rows.filter((r) => !r.marks_ready);
+    }
+    if (sortPendingFirst.value) {
+        // Stable sort (Array.prototype.sort is stable per spec) -- rows keep their
+        // existing head/display_order relative ordering within each of the two groups.
+        rows = [...rows].sort((a, b) => Number(a.results_published) - Number(b.results_published));
     }
     return rows;
 });

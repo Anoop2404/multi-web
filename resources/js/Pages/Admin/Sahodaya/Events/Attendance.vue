@@ -236,6 +236,7 @@ const props = defineProps({
     activityLogs: { type: Array, default: () => [] },
     childEvents: { type: Array, default: () => [] },
     markedParticipantIds: { type: Array, default: () => [] },
+    selectedItemId: { type: [String, Number], default: null },
 });
 
 function switchSportEvent(value) {
@@ -250,8 +251,11 @@ const childEventOptions = computed(() => (props.childEvents ?? []).map((ev) => (
 // Attendance, chest numbers, and marks are always entered per competition
 // item — there's no meaningful "mark everyone present across every item at
 // once" action, so this page requires an item to be selected rather than
-// offering an "All items" combined view. Default to the first item.
-const itemFilter = ref(props.event.items?.[0]?.id ?? '');
+// offering an "All items" combined view. Prefer whatever item was already
+// selected elsewhere (carried over via ?item_id= by EventSubNav/
+// SportsSetupSubNav when switching tabs), falling back to the first item
+// only when there's no incoming selection.
+const itemFilter = ref(props.selectedItemId ?? props.event.items?.[0]?.id ?? '');
 const showChestOnSheet = ref(false);
 const searchQuery = ref('');
 const showImportModal = ref(false);

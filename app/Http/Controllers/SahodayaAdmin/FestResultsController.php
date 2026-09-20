@@ -77,9 +77,25 @@ class FestResultsController extends SahodayaAdminController
 
         $childEvents = $this->scopedChildEventOptions($event);
 
+        // Category-wise boards for the Results page's own "Point tables" tab -- same
+        // shape/labels the public results page's "School Category-wise Toppers" already
+        // uses (EventContext::scoreboardCategories()/scoreboardCategoryLabel()), just
+        // surfaced here too so an admin doesn't have to leave this page to see the
+        // per-category standings alongside the overall one.
+        $eventContext = EventContext::for($event);
+        $categoryBoards = collect($eventContext->scoreboardCategories())
+            ->map(fn (string $key) => [
+                'key' => $key,
+                'label' => $eventContext->scoreboardCategoryLabel($key),
+                'rows' => $eventContext->scoreboardByCategory($key),
+            ])
+            ->values()
+            ->all();
+
         return $this->inertia('Sahodaya/Events/Results', $this->withEventActivity($event, FestPageActivity::RESULTS, array_merge($ctx, [
             'event' => $event,
-            'scoreboard' => EventContext::for($event)->scoreboardBySchool(),
+            'scoreboard' => $eventContext->scoreboardBySchool(),
+            'categoryBoards' => $categoryBoards,
             'qualifications' => $qualifications,
             'nextEvents' => $nextEvents,
             'suggestedNextId' => $suggestedNext?->id,
@@ -131,6 +147,7 @@ class FestResultsController extends SahodayaAdminController
             'rows'         => $rows,
             'orgName'      => $this->sahodaya->name,
             'logoSrc'      => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+            'publishedAt'  => $item->results_published_at,
         ])->render();
 
         $filename = str($event->title.'-'.$item->title)->slug()->limit(60)->toString().'-results.pdf';

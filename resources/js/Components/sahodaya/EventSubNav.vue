@@ -39,6 +39,22 @@ const base = computed(() => `/sahodaya-admin/${props.sahodayaId}/events/${props.
 const isStaffUser = computed(() => page.props.isStaff ?? false);
 const staffPermissions = computed(() => page.props.staffPermissions ?? []);
 
+// Chest Numbers, Attendance, Marks, and Results all already read/write the same
+// `?item_id=` query convention for "which item am I looking at" -- this nav built
+// every tab href as a bare base URL with no query string, so switching between those
+// four tabs silently reset the selection every time. Forward whatever item is
+// currently selected (from this page's own Inertia props) onto each of those four
+// hrefs so it survives a tab switch instead of making the admin re-pick it.
+const currentItemId = computed(() => page.props.selectedItemId ?? null);
+const ITEM_AWARE_KEYS = ['chest-numbers', 'attendance', 'marks', 'results'];
+
+function withCurrentItem(href, key) {
+    if (!currentItemId.value || !ITEM_AWARE_KEYS.includes(key)) {
+        return href;
+    }
+    return `${href}?item_id=${currentItemId.value}`;
+}
+
 // Map legacy active keys to current tab ('items-list', 'competition' -> 'items')
 const currentActiveKey = computed(() => {
     if (['items-list', 'competition'].includes(props.active)) return 'items';
@@ -74,11 +90,10 @@ const tabs = computed(() => {
         }
     }
 
-    if (!isStaffUser.value) {
-        return list;
-    }
+    const scoped = isStaffUser.value
+        ? list.filter((tab) => staffCanSeeNavItem(tab, staffPermissions.value))
+        : list;
 
-    const perms = staffPermissions.value;
-    return list.filter((tab) => staffCanSeeNavItem(tab, perms));
+    return scoped.map((tab) => ({ ...tab, href: withCurrentItem(tab.href, tab.key) }));
 });
 </script>

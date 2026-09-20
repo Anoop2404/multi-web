@@ -23,11 +23,23 @@
             <p v-if="displayHint" class="text-sm text-slate-600 mb-4">{{ displayHint }}</p>
             <EmptyState v-if="!navGroups.length" title="No competition items" :description="emptyHeadsText" icon="📂" />
             <div v-else-if="flatItemsMode" class="space-y-4">
-                <div v-if="flatItems.length > 2" class="max-w-sm">
-                    <input v-model="itemSearchQuery"
-                           type="search"
-                           placeholder="Search items by name or code…"
-                           class="w-full text-xs px-3.5 py-2 bg-white border border-slate-200 rounded-xl shadow-2xs focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" />
+                <div class="flex flex-wrap items-center gap-3">
+                    <div v-if="flatItems.length > 2" class="max-w-sm flex-1 min-w-[14rem]">
+                        <input v-model="itemSearchQuery"
+                               type="search"
+                               placeholder="Search items by name or code…"
+                               class="w-full text-xs px-3.5 py-2 bg-white border border-slate-200 rounded-xl shadow-2xs focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" />
+                    </div>
+                    <div v-if="showAssignedFilter" class="flex gap-1.5">
+                        <button v-for="opt in assignedFilterOptions" :key="opt.id" type="button"
+                                class="text-xs px-3 py-1.5 rounded-full border transition-colors"
+                                :class="assignedFilter === opt.id
+                                    ? 'bg-indigo-600 text-white border-indigo-600'
+                                    : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300'"
+                                @click="assignedFilter = opt.id">
+                            {{ opt.label }}
+                        </button>
+                    </div>
                 </div>
                 <EmptyState v-if="!filteredFlatItems.length" title="No items match search" :description="`No item found matching “${itemSearchQuery}”.`" icon="🔍" />
                 <div v-else class="reports-tile-grid">
@@ -95,11 +107,23 @@
             </div>
             <EmptyState v-if="!selectedHead.items?.length" title="No items in this head" icon="📋" />
             <div v-else class="space-y-4">
-                <div v-if="selectedHead.items.length > 2" class="max-w-sm">
-                    <input v-model="itemSearchQuery"
-                           type="search"
-                           placeholder="Search items by name or code…"
-                           class="w-full text-xs px-3.5 py-2 bg-white border border-slate-200 rounded-xl shadow-2xs focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" />
+                <div class="flex flex-wrap items-center gap-3">
+                    <div v-if="selectedHead.items.length > 2" class="max-w-sm flex-1 min-w-[14rem]">
+                        <input v-model="itemSearchQuery"
+                               type="search"
+                               placeholder="Search items by name or code…"
+                               class="w-full text-xs px-3.5 py-2 bg-white border border-slate-200 rounded-xl shadow-2xs focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" />
+                    </div>
+                    <div v-if="showAssignedFilter" class="flex gap-1.5">
+                        <button v-for="opt in assignedFilterOptions" :key="opt.id" type="button"
+                                class="text-xs px-3 py-1.5 rounded-full border transition-colors"
+                                :class="assignedFilter === opt.id
+                                    ? 'bg-indigo-600 text-white border-indigo-600'
+                                    : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300'"
+                                @click="assignedFilter = opt.id">
+                            {{ opt.label }}
+                        </button>
+                    </div>
                 </div>
                 <EmptyState v-if="!filteredHeadItems.length" title="No items match search" :description="`No item found matching “${itemSearchQuery}”.`" icon="🔍" />
                 <div v-else class="reports-tile-grid">
@@ -181,11 +205,30 @@ const props = defineProps({
     hint: { type: String, default: '' },
     emptyHeadsText: { type: String, default: 'Add items to this event from the catalog, then return here.' },
     isSports: { type: Boolean, default: false },
+    // Chest Numbers-only today (opts in explicitly) -- meaningless on Results/Marks/
+    // Attendance, which don't track a per-item "assigned" count the same way.
+    showAssignedFilter: { type: Boolean, default: false },
 });
 
 const { groups: navGroups, selectedHead, selectedItem } = useHeadItemNav(props);
 
 const itemSearchQuery = ref('');
+const assignedFilter = ref('all');
+const assignedFilterOptions = [
+    { id: 'all', label: 'All' },
+    { id: 'assigned', label: 'Assigned' },
+    { id: 'not_assigned', label: 'Not assigned' },
+];
+
+function matchesAssignedFilter(item) {
+    if (assignedFilter.value === 'assigned') {
+        return (item.participant_count ?? 0) > 0 && !(item.chest_missing > 0);
+    }
+    if (assignedFilter.value === 'not_assigned') {
+        return (item.chest_missing ?? 0) > 0;
+    }
+    return true;
+}
 
 const flatItemsMode = computed(() => {
     if (!props.flatWhenSingleGroup) {
@@ -199,31 +242,22 @@ const flatItemsMode = computed(() => {
 
 const flatItems = computed(() => navGroups.value.flatMap((g) => g.items ?? []));
 
+function matchesSearch(item, q) {
+    return (item.title && item.title.toLowerCase().includes(q))
+        || (item.item_code && item.item_code.toLowerCase().includes(q))
+        || (item.category_label && item.category_label.toLowerCase().includes(q))
+        || (item.age_group && item.age_group.toLowerCase().includes(q));
+}
+
 const filteredFlatItems = computed(() => {
-    if (!itemSearchQuery.value.trim()) {
-        return flatItems.value;
-    }
     const q = itemSearchQuery.value.toLowerCase().trim();
-    return flatItems.value.filter((item) => {
-        return (item.title && item.title.toLowerCase().includes(q))
-            || (item.item_code && item.item_code.toLowerCase().includes(q))
-            || (item.category_label && item.category_label.toLowerCase().includes(q))
-            || (item.age_group && item.age_group.toLowerCase().includes(q));
-    });
+    return flatItems.value.filter((item) => (!q || matchesSearch(item, q)) && matchesAssignedFilter(item));
 });
 
 const filteredHeadItems = computed(() => {
     const items = selectedHead.value?.items ?? [];
-    if (!itemSearchQuery.value.trim()) {
-        return items;
-    }
     const q = itemSearchQuery.value.toLowerCase().trim();
-    return items.filter((item) => {
-        return (item.title && item.title.toLowerCase().includes(q))
-            || (item.item_code && item.item_code.toLowerCase().includes(q))
-            || (item.category_label && item.category_label.toLowerCase().includes(q))
-            || (item.age_group && item.age_group.toLowerCase().includes(q));
-    });
+    return items.filter((item) => (!q || matchesSearch(item, q)) && matchesAssignedFilter(item));
 });
 
 const displayHint = computed(() => {
@@ -280,6 +314,19 @@ function formatShortDate(iso) {
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
+// Same 5-value mapping as FestItemCategoryLabel::typeLabel() (PHP) -- kept local since
+// this is the only place in this component that needs it, unlike genderLabel() which
+// is already a cross-page shared import.
+function typeLabel(participantType) {
+    switch (String(participantType ?? '').toLowerCase()) {
+        case 'group': return 'Group';
+        case 'team': return 'Team';
+        case 'pair': return 'Pair';
+        case 'trio': return 'Trio';
+        default: return 'Individual';
+    }
+}
+
 function itemMetaLabel(item) {
     if (!item) return '';
     const parts = [];
@@ -289,8 +336,12 @@ function itemMetaLabel(item) {
         || (item.category && item.category !== 'general' ? String(item.category).replace(/[_-]/g, ' ') : null);
     if (cat) parts.push(cat);
 
-    const g = genderLabel(item.gender);
-    if (g) parts.push(g);
+    // genderLabel() deliberately returns null for 'open' everywhere else it's used
+    // (a compact chip list doesn't need to state "no restriction") -- this
+    // item-picker meta line is different: the user wants Boy/Girl/Open always
+    // stated explicitly here, so fall back to 'Open' rather than omitting it.
+    parts.push(genderLabel(item.gender) ?? 'Open');
+    parts.push(typeLabel(item.participant_type));
 
     return parts.join(' · ');
 }

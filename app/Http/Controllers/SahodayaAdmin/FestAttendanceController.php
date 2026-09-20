@@ -82,12 +82,18 @@ class FestAttendanceController extends SahodayaAdminController
 
         $childEvents = $this->scopedChildEventOptions($event);
 
+        // Same ?item_id= convention Results/Chest Numbers/Marks already read -- lets
+        // EventSubNav/SportsSetupSubNav carry the currently-open item across tabs
+        // instead of this page always defaulting back to the first item in the list.
+        $itemId = $request->integer('item_id') ?: null;
+
         return $this->inertia('Sahodaya/Events/Attendance', $this->withEventActivity($event, FestPageActivity::ATTENDANCE, [
             'event' => $event,
             'participants' => $participants,
             'attendance' => $attendance,
             'childEvents' => $childEvents,
             'markedParticipantIds' => $markedParticipantIds,
+            'selectedItemId' => $itemId,
         ]));
     }
 

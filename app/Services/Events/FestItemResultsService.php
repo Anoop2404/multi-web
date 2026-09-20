@@ -49,7 +49,7 @@ class FestItemResultsService
             ->orderBy('title')
             ->get([
                 'id', 'title', 'item_code', 'head_id', 'age_group', 'class_group', 'category', 'gender',
-                'sport_discipline', 'stage_type', 'reg_start', 'reg_end', 'competition_start',
+                'participant_type', 'sport_discipline', 'stage_type', 'reg_start', 'reg_end', 'competition_start',
                 'competition_end', 'results_published_at', 'inherited_from_item_id', 'event_id', 'phase_id',
             ]);
 
@@ -108,6 +108,8 @@ class FestItemResultsService
                 'class_group'           => $primary->class_group,
                 'category_label'        => FestItemCategoryLabel::resolve($primary, $classGroupLabels, $artsCategoryLabels),
                 'gender'                => $primary->gender,
+                'gender_label'          => FestItemCategoryLabel::genderLabel($primary->gender) ?? 'Open',
+                'type_label'            => FestItemCategoryLabel::typeLabel($primary->participant_type),
                 'sport_discipline'      => $primary->sport_discipline,
                 'stage_type'            => $primary->stage_type,
                 'participant_type'      => $primary->participant_type,

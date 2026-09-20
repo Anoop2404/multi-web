@@ -36,12 +36,20 @@
             </div>
         </div>
 
+        <div v-if="flatItems.length" class="card mb-4 !py-3">
+            <ReportItemSearchSelect :items="flatItems" :model-value="selectedItemId"
+                                    label="Jump to item" all-items-label="Select an item"
+                                    search-placeholder="Search by item name or code…"
+                                    @select="jumpToItem" />
+        </div>
+
         <ReportHeadItemNavigator :groups="headItemGroups"
                                  :base-url="base"
                                  :selected-head-id="selectedHeadId"
                                  :selected-item-id="selectedItemId"
                                  :has-item-heads="hasItemHeads"
                                  :is-sports="event.event_type === 'sports'"
+                                 :show-assigned-filter="true"
                                  :hint="event.event_type === 'sports'
                                      ? 'Select a competition item to view or assign chest numbers — each student holds one chest number for the whole sports event.'
                                      : 'Select a competition item to view or assign chest numbers for participants in that item.'"
@@ -242,6 +250,7 @@ import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportHeadItemNavigator from '@/Components/reports/ReportHeadItemNavigator.vue';
+import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import Modal from '@/Components/ui/Modal.vue';
 import { useConfirm } from '@/composables/useConfirm';
@@ -288,6 +297,22 @@ const pageTitle = computed(() => {
     }
     return `${props.event.title} — Chest Numbers`;
 });
+// Flattened once for the "Jump to item" dropdown -- an alternate, faster entry point
+// alongside the existing card grid, matching the item picker already on Attendance/
+// Marks (ReportItemSearchSelect), which this page didn't have before.
+const flatItems = computed(() => props.headItemGroups.flatMap((g) => g.items ?? []));
+
+function jumpToItem(itemId) {
+    if (!itemId) {
+        router.get(base.value, {}, { preserveState: true });
+        return;
+    }
+    const item = flatItems.value.find((it) => String(it.id) === String(itemId));
+    const params = { item_id: itemId };
+    if (item?.head_id != null) params.head_id = item.head_id;
+    router.get(base.value, params, { preserveState: true });
+}
+
 const printUrl = computed(() =>
     props.selectedItemId ? `${base.value}/print?item_id=${props.selectedItemId}` : `${base.value}/print`,
 );

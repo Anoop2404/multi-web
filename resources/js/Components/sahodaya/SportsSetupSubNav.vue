@@ -3,7 +3,7 @@
  * Horizontal tab strip for sports setup & competition workflow pages.
  * Combines Items & Item Listing into a single unified "Items" tab.
  */
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import { isSportsSeasonEvent } from '@/support/sportsEventNav.js';
 
@@ -16,6 +16,18 @@ const props = defineProps({
 
 const base = computed(() => `/sahodaya-admin/${props.sahodayaId}/events/${props.eventId}`);
 const isSeason = computed(() => isSportsSeasonEvent(props.event));
+
+// Same "remembered item" forwarding as EventSubNav.vue -- see its own comment for why.
+const page = usePage();
+const currentItemId = computed(() => page.props.selectedItemId ?? null);
+const ITEM_AWARE_KEYS = ['chest-numbers', 'attendance', 'marks', 'results'];
+
+function withCurrentItem(href, key) {
+    if (!currentItemId.value || !ITEM_AWARE_KEYS.includes(key)) {
+        return href;
+    }
+    return `${href}?item_id=${currentItemId.value}`;
+}
 
 // Map active keys to current tab ('competition' or 'items-list' maps to 'items')
 const currentActiveKey = computed(() => {
@@ -31,7 +43,7 @@ const tabs = computed(() => {
         ];
     }
 
-    return [
+    const list = [
         { key: 'setup', label: 'Setup Hub', icon: '⚙️', href: `${base.value}/setup` },
         { key: 'settings', label: 'Settings', icon: '🛠️', href: `${base.value}/settings/fees` },
         { key: 'items', label: 'Items', icon: '🏆', href: `${base.value}/items` },
@@ -47,6 +59,8 @@ const tabs = computed(() => {
         { key: 'schedule', label: 'Schedule', icon: '📅', href: `${base.value}/schedule` },
         { key: 'activity', label: 'Activity log', icon: '🕒', href: `${base.value}/activity` },
     ];
+
+    return list.map((tab) => ({ ...tab, href: withCurrentItem(tab.href, tab.key) }));
 });
 </script>
 
