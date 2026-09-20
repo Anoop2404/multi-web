@@ -84,6 +84,9 @@ trait BuildsFestIdCardResponses
             'cardWidthMm'   => $customTemplate->card_width_mm,
             'cardHeightMm'  => $customTemplate->card_height_mm,
             'cardsPerPage'  => $customTemplate->cards_per_page,
+            'pageWidthMm'   => $customTemplate->page_width_mm,
+            'pageHeightMm'  => $customTemplate->page_height_mm,
+            'gridLayout'    => $customTemplate->gridLayout(),
         ]);
     }
 }

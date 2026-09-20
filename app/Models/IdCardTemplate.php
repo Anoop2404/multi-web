@@ -8,15 +8,19 @@ class IdCardTemplate extends Model
 {
     protected $fillable = [
         'tenant_id', 'event_id', 'item_id', 'audience', 'title', 'background_path',
-        'card_width_mm', 'card_height_mm', 'cards_per_page', 'layout_json', 'is_active',
+        'card_width_mm', 'card_height_mm', 'cards_per_page', 'page_width_mm', 'page_height_mm',
+        'grid_json', 'layout_json', 'is_active',
     ];
 
     protected $casts = [
         'layout_json'    => 'array',
+        'grid_json'      => 'array',
         'is_active'      => 'boolean',
         'card_width_mm'  => 'integer',
         'card_height_mm' => 'integer',
         'cards_per_page' => 'integer',
+        'page_width_mm'  => 'float',
+        'page_height_mm' => 'float',
     ];
 
     public function event()
@@ -87,6 +91,48 @@ class IdCardTemplate extends Model
         $fields = $this->layout_json;
 
         return is_array($fields) && $fields !== [] ? $fields : self::defaultFields();
+    }
+
+    /**
+     * Exact physical grid for a die-cut print sheet — every card placed at a precise
+     * center point (cols/rows × pitch, from an anchor center) instead of the plain
+     * 2-per-row auto-flow table custom-sheet.blade.php otherwise uses. Column/row
+     * pitch (center-to-center distance) can be smaller than the card's own width/
+     * height on purpose — a die-cut sheet is printed with bleed, so adjacent cards'
+     * bleed areas are expected to slightly overlap; that's normal, not a layout bug.
+     * Returns null (→ fall back to the auto-flow table) unless every required key is
+     * present and cols/rows are positive.
+     *
+     * @return ?array{cols: int, rows: int, first_col_center_mm: float, first_row_center_mm: float, col_pitch_mm: float, row_pitch_mm: float}
+     */
+    public function gridLayout(): ?array
+    {
+        $g = $this->grid_json;
+        if (! is_array($g)) {
+            return null;
+        }
+
+        $required = ['cols', 'rows', 'first_col_center_mm', 'first_row_center_mm', 'col_pitch_mm', 'row_pitch_mm'];
+        foreach ($required as $key) {
+            if (! isset($g[$key]) || ! is_numeric($g[$key])) {
+                return null;
+            }
+        }
+
+        $cols = (int) $g['cols'];
+        $rows = (int) $g['rows'];
+        if ($cols < 1 || $rows < 1) {
+            return null;
+        }
+
+        return [
+            'cols'                 => $cols,
+            'rows'                 => $rows,
+            'first_col_center_mm'  => (float) $g['first_col_center_mm'],
+            'first_row_center_mm'  => (float) $g['first_row_center_mm'],
+            'col_pitch_mm'         => (float) $g['col_pitch_mm'],
+            'row_pitch_mm'         => (float) $g['row_pitch_mm'],
+        ];
     }
 
     /**

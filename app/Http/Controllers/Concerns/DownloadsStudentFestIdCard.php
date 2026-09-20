@@ -105,6 +105,12 @@ trait DownloadsStudentFestIdCard
             $this->idCardViewData($event, $cluster, $cards, 'student', false, null, $customTemplate, $isDomPdf),
         )->render();
 
-        return \App\Support\PdfGenerator::download($html, $filename, $request->boolean('inline'));
+        return \App\Support\PdfGenerator::download(
+            $html,
+            $filename,
+            $request->boolean('inline'),
+            pageWidthMm: $customTemplate?->page_width_mm,
+            pageHeightMm: $customTemplate?->page_height_mm,
+        );
     }
 }

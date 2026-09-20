@@ -4,8 +4,13 @@
     <meta charset="utf-8">
     <title>ID Cards — {{ $eventTitle }}</title>
     <style>
-        @page { size: A4 portrait; margin: 6mm; }
+        @page {
+            size: {{ ($pageWidthMm ?? null) && ($pageHeightMm ?? null) ? $pageWidthMm.'mm '.$pageHeightMm.'mm' : 'A4 portrait' }};
+            margin: {{ ($gridLayout ?? null) ? '0' : '6mm' }};
+        }
         * { box-sizing: border-box; }
+        .die-page { position: relative; width: 100%; }
+        .die-card-slot { position: absolute; }
         body { font-family: Arial, DejaVu Sans, sans-serif; color: #1e293b; margin: 0; }
         .sheet-title { text-align: center; font-size: 11px; font-weight: bold; color: #475569; margin-bottom: 4mm; }
         .section-title { font-size: 10px; font-weight: bold; color: #475569; margin: 3mm 0 2mm; }
@@ -43,7 +48,9 @@
 @endif
 
 @php
-    $perPage = max(1, $cardsPerPage ?? 4);
+    // A grid layout dictates its own per-page count (cols × rows, e.g. a 10-up
+    // die-cut sheet) — cardsPerPage only applies to the plain auto-flow table.
+    $perPage = ($gridLayout ?? null) ? ($gridLayout['cols'] * $gridLayout['rows']) : max(1, $cardsPerPage ?? 4);
     $renderSections = ! empty($sections);
 @endphp
 
@@ -54,32 +61,14 @@
         @php $chunks = array_chunk($section['cards'] ?? [], $perPage); @endphp
         @foreach($chunks as $pageIndex => $pageCards)
             @if($pageIndex > 0)<div class="page-break"></div>@endif
-            <table class="grid">
-                @foreach(array_chunk($pageCards, 2) as $row)
-                <tr>
-                    @foreach($row as $card)
-                    <td>@include('fest.id-cards.partials.custom-card', ['card' => $card, 'backgroundUrl' => $backgroundUrl ?? null, 'fields' => $fields ?? [], 'cardWidthMm' => $cardWidthMm ?? 96, 'cardHeightMm' => $cardHeightMm ?? 72])</td>
-                    @endforeach
-                    @if(count($row) === 1)<td></td>@endif
-                </tr>
-                @endforeach
-            </table>
+            @include('fest.id-cards.partials.custom-sheet-page', ['pageCards' => $pageCards, 'gridLayout' => $gridLayout ?? null, 'backgroundUrl' => $backgroundUrl ?? null, 'fields' => $fields ?? [], 'cardWidthMm' => $cardWidthMm ?? 96, 'cardHeightMm' => $cardHeightMm ?? 72, 'pageHeightMm' => $pageHeightMm ?? null])
         @endforeach
     @endforeach
 @else
     @php $chunks = array_chunk($cards ?? [], $perPage); @endphp
     @foreach($chunks as $pageIndex => $pageCards)
         @if($pageIndex > 0)<div class="page-break"></div>@endif
-        <table class="grid">
-            @foreach(array_chunk($pageCards, 2) as $row)
-            <tr>
-                @foreach($row as $card)
-                <td>@include('fest.id-cards.partials.custom-card', ['card' => $card, 'backgroundUrl' => $backgroundUrl ?? null, 'fields' => $fields ?? [], 'cardWidthMm' => $cardWidthMm ?? 96, 'cardHeightMm' => $cardHeightMm ?? 72])</td>
-                @endforeach
-                @if(count($row) === 1)<td></td>@endif
-            </tr>
-            @endforeach
-        </table>
+        @include('fest.id-cards.partials.custom-sheet-page', ['pageCards' => $pageCards, 'gridLayout' => $gridLayout ?? null, 'backgroundUrl' => $backgroundUrl ?? null, 'fields' => $fields ?? [], 'cardWidthMm' => $cardWidthMm ?? 96, 'cardHeightMm' => $cardHeightMm ?? 72, 'pageHeightMm' => $pageHeightMm ?? null])
     @endforeach
 @endif
 

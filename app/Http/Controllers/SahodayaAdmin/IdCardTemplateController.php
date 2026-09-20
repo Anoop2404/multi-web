@@ -94,6 +94,9 @@ class IdCardTemplateController extends SahodayaAdminController
             'card_width_mm'   => $data['card_width_mm'] ?? 96,
             'card_height_mm'  => $data['card_height_mm'] ?? 72,
             'cards_per_page'  => $data['cards_per_page'] ?? 4,
+            'page_width_mm'   => $data['page_width_mm'] ?? null,
+            'page_height_mm'  => $data['page_height_mm'] ?? null,
+            'grid_json'       => $this->parseGridJson($data['grid_json'] ?? null),
             'layout_json'     => $data['fields'] ?? IdCardTemplate::defaultFields(),
             'is_active'       => $data['is_active'] ?? true,
         ]);
@@ -115,10 +118,19 @@ class IdCardTemplateController extends SahodayaAdminController
             'card_width_mm'  => $data['card_width_mm'] ?? null,
             'card_height_mm' => $data['card_height_mm'] ?? null,
             'cards_per_page' => $data['cards_per_page'] ?? null,
+            'page_width_mm'  => $data['page_width_mm'] ?? null,
+            'page_height_mm' => $data['page_height_mm'] ?? null,
         ], fn ($v) => $v !== null);
 
         if (array_key_exists('fields', $data)) {
             $updates['layout_json'] = $data['fields'];
+        }
+
+        if (array_key_exists('grid_json', $data)) {
+            // Unlike the array_filter()'d fields above, an explicitly-submitted blank
+            // grid_json (clearing it back to the plain auto-flow table) must persist as
+            // null, not be silently dropped — so this is set directly, outside the filter.
+            $updates['grid_json'] = $this->parseGridJson($data['grid_json']);
         }
 
         if ($request->hasFile('background')) {
@@ -159,6 +171,16 @@ class IdCardTemplateController extends SahodayaAdminController
             'card_width_mm'   => 'nullable|integer|min:40|max:150',
             'card_height_mm'  => 'nullable|integer|min:40|max:150',
             'cards_per_page'  => 'nullable|integer|min:1|max:12',
+            // Physical print page/sheet size — distinct from the card's own size above.
+            // Null (either one) means "use A4 portrait", the size the sheet views have
+            // always hardcoded via `@page`.
+            'page_width_mm'   => 'nullable|numeric|min:50|max:2000',
+            'page_height_mm'  => 'nullable|numeric|min:50|max:2000',
+            // Raw JSON text from the admin form — {cols,rows,first_col_center_mm,
+            // first_row_center_mm,col_pitch_mm,row_pitch_mm}, or blank to clear it back
+            // to the plain auto-flow table. Parsed/validated in parseGridJson(), not
+            // here, since its shape doesn't fit Laravel's dot-notation array rules.
+            'grid_json'       => 'nullable|string|max:2000',
             'fields'                  => 'nullable|array',
             'fields.*.key'            => 'nullable|string|max:60',
             'fields.*.type'           => ['nullable', Rule::in(['text', 'photo', 'qr'])],
@@ -180,6 +202,41 @@ class IdCardTemplateController extends SahodayaAdminController
         }
 
         return $request->validate($rules);
+    }
+
+    /**
+     * Parses the admin form's raw grid_json textarea into the shape
+     * IdCardTemplate::gridLayout() expects, or null (blank input, invalid JSON, or
+     * missing/non-numeric keys all just fall back to the plain auto-flow table rather
+     * than erroring the whole save — this field is optional and advanced).
+     */
+    private function parseGridJson(?string $raw): ?array
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return null;
+        }
+
+        $decoded = json_decode($raw, true);
+        if (! is_array($decoded)) {
+            return null;
+        }
+
+        $required = ['cols', 'rows', 'first_col_center_mm', 'first_row_center_mm', 'col_pitch_mm', 'row_pitch_mm'];
+        foreach ($required as $key) {
+            if (! isset($decoded[$key]) || ! is_numeric($decoded[$key])) {
+                return null;
+            }
+        }
+
+        return [
+            'cols'                => (int) $decoded['cols'],
+            'rows'                => (int) $decoded['rows'],
+            'first_col_center_mm' => (float) $decoded['first_col_center_mm'],
+            'first_row_center_mm' => (float) $decoded['first_row_center_mm'],
+            'col_pitch_mm'        => (float) $decoded['col_pitch_mm'],
+            'row_pitch_mm'        => (float) $decoded['row_pitch_mm'],
+        ];
     }
 
     private function deactivateSiblings(?int $eventId, ?int $itemId, ?string $audience, ?int $exceptId = null): void

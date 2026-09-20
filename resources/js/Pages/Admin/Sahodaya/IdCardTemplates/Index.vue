@@ -75,9 +75,28 @@
                         <input :id="id" v-model.number="form.card_height_mm" type="number" min="40" max="150" class="field">
                     </template>
                 </FormField>
-                <FormField label="Cards per A4 page" hint="Arranged 2 per row.">
+                <FormField label="Cards per A4 page" hint="Arranged 2 per row. Ignored when a die-cut grid (below) is set.">
                     <template #default="{ id }">
                         <input :id="id" v-model.number="form.cards_per_page" type="number" min="1" max="12" class="field">
+                    </template>
+                </FormField>
+
+                <FormField label="Print page width (mm)" hint="Leave blank for A4 portrait. Set both to print on a custom sheet size.">
+                    <template #default="{ id }">
+                        <input :id="id" v-model.number="form.page_width_mm" type="number" min="50" max="2000" step="0.01" placeholder="A4 (210)" class="field">
+                    </template>
+                </FormField>
+                <FormField label="Print page height (mm)" hint="Leave blank for A4 portrait.">
+                    <template #default="{ id }">
+                        <input :id="id" v-model.number="form.page_height_mm" type="number" min="50" max="2000" step="0.01" placeholder="A4 (297)" class="field">
+                    </template>
+                </FormField>
+
+                <FormField label="Die-cut grid (advanced, JSON)" class-extra="sm:col-span-2"
+                           hint='Exact card placement for a physical die-cut sheet — overrides "cards per A4 page" above with precise positions instead of a plain 2-per-row flow. Leave blank for the normal flow. Shape: {"cols":5,"rows":2,"first_col_center_mm":49.758,"first_row_center_mm":87.96,"col_pitch_mm":92.979,"row_pitch_mm":138.969}'>
+                    <template #default="{ id }">
+                        <textarea :id="id" v-model="form.grid_json" rows="2" class="field font-mono text-xs"
+                                  placeholder='{"cols":5,"rows":2,"first_col_center_mm":49.758,"first_row_center_mm":87.96,"col_pitch_mm":92.979,"row_pitch_mm":138.969}'></textarea>
                     </template>
                 </FormField>
 
@@ -181,6 +200,7 @@
                             <th>Audience</th>
                             <th>Background</th>
                             <th>Cards/page</th>
+                            <th>Page size</th>
                             <th>Active</th>
                             <th class="w-32"></th>
                         </tr>
@@ -196,6 +216,10 @@
                                 <span v-else class="text-slate-400 text-xs">None</span>
                             </td>
                             <td>{{ t.cards_per_page }}</td>
+                            <td class="text-xs text-slate-600">
+                                <span v-if="t.grid_json">{{ t.grid_json.cols }}×{{ t.grid_json.rows }} die grid</span>
+                                <span v-else>{{ t.page_width_mm && t.page_height_mm ? `${t.page_width_mm}×${t.page_height_mm}mm` : 'A4' }}</span>
+                            </td>
                             <td>{{ t.is_active ? 'Yes' : 'No' }}</td>
                             <td class="text-right space-x-3">
                                 <button type="button" class="text-slate-700 text-xs font-semibold hover:text-slate-900" @click="editTemplate(t)">
@@ -284,6 +308,9 @@ const form = useForm({
     card_width_mm: 96,
     card_height_mm: 72,
     cards_per_page: 4,
+    page_width_mm: null,
+    page_height_mm: null,
+    grid_json: '',
     fields: blankFields(),
     is_active: true,
 });
@@ -307,6 +334,9 @@ function editTemplate(template) {
     form.card_width_mm = template.card_width_mm || 96;
     form.card_height_mm = template.card_height_mm || 72;
     form.cards_per_page = template.cards_per_page || 4;
+    form.page_width_mm = template.page_width_mm ?? null;
+    form.page_height_mm = template.page_height_mm ?? null;
+    form.grid_json = template.grid_json ? JSON.stringify(template.grid_json) : '';
     form.fields = Array.isArray(template.layout_json) && template.layout_json.length
         ? JSON.parse(JSON.stringify(template.layout_json))
         : blankFields();
@@ -325,6 +355,9 @@ function cancelEdit() {
     form.card_width_mm = 96;
     form.card_height_mm = 72;
     form.cards_per_page = 4;
+    form.page_width_mm = null;
+    form.page_height_mm = null;
+    form.grid_json = '';
     form.fields = blankFields();
     form.is_active = true;
     form.clearErrors();

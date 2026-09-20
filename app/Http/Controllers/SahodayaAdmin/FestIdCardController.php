@@ -138,7 +138,12 @@ class FestIdCardController extends SahodayaAdminController
             $isDomPdf,
         ))->render();
 
-        return \App\Support\PdfGenerator::download($html, "{$slug}-{$scopeSuffix}-id-cards.pdf");
+        return \App\Support\PdfGenerator::download(
+            $html,
+            "{$slug}-{$scopeSuffix}-id-cards.pdf",
+            pageWidthMm: $customTemplate?->page_width_mm,
+            pageHeightMm: $customTemplate?->page_height_mm,
+        );
     }
 
     public function pdfAllItems(Request $request, string $tenantId, FestEvent $event, FestIdCardService $service, PlatformAuditLogger $audit)
@@ -187,7 +192,12 @@ class FestIdCardController extends SahodayaAdminController
             $isDomPdf,
         ))->render();
 
-        return \App\Support\PdfGenerator::download($html, "{$slug}-all-items-id-cards.pdf");
+        return \App\Support\PdfGenerator::download(
+            $html,
+            "{$slug}-all-items-id-cards.pdf",
+            pageWidthMm: $customTemplate?->page_width_mm,
+            pageHeightMm: $customTemplate?->page_height_mm,
+        );
     }
 
     public function pdfAllHeads(Request $request, string $tenantId, FestEvent $event, FestIdCardService $service, PlatformAuditLogger $audit)
@@ -241,7 +251,12 @@ class FestIdCardController extends SahodayaAdminController
             $isDomPdf,
         ))->render();
 
-        return \App\Support\PdfGenerator::download($html, "{$slug}-all-heads-id-cards.pdf");
+        return \App\Support\PdfGenerator::download(
+            $html,
+            "{$slug}-all-heads-id-cards.pdf",
+            pageWidthMm: $customTemplate?->page_width_mm,
+            pageHeightMm: $customTemplate?->page_height_mm,
+        );
     }
 
     /**
