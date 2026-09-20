@@ -96,7 +96,7 @@ class IdCardTemplateController extends SahodayaAdminController
             'cards_per_page'  => $data['cards_per_page'] ?? 4,
             'page_width_mm'   => $data['page_width_mm'] ?? null,
             'page_height_mm'  => $data['page_height_mm'] ?? null,
-            'grid_json'       => $this->parseGridJson($data['grid_json'] ?? null),
+            'grid_json'       => $this->buildGridJson($data),
             'layout_json'     => $data['fields'] ?? IdCardTemplate::defaultFields(),
             'is_active'       => $data['is_active'] ?? true,
         ]);
@@ -126,12 +126,10 @@ class IdCardTemplateController extends SahodayaAdminController
             $updates['layout_json'] = $data['fields'];
         }
 
-        if (array_key_exists('grid_json', $data)) {
-            // Unlike the array_filter()'d fields above, an explicitly-submitted blank
-            // grid_json (clearing it back to the plain auto-flow table) must persist as
-            // null, not be silently dropped — so this is set directly, outside the filter.
-            $updates['grid_json'] = $this->parseGridJson($data['grid_json']);
-        }
+        // Unlike the array_filter()'d fields above, an explicitly-cleared grid (all 6
+        // sub-fields left blank, going back to the plain auto-flow table) must persist
+        // as null, not be silently dropped — so this is always set directly.
+        $updates['grid_json'] = $this->buildGridJson($data);
 
         if ($request->hasFile('background')) {
             $stored = app(CertificateBackgroundConverter::class)
@@ -176,11 +174,15 @@ class IdCardTemplateController extends SahodayaAdminController
             // always hardcoded via `@page`.
             'page_width_mm'   => 'nullable|numeric|min:50|max:2000',
             'page_height_mm'  => 'nullable|numeric|min:50|max:2000',
-            // Raw JSON text from the admin form — {cols,rows,first_col_center_mm,
-            // first_row_center_mm,col_pitch_mm,row_pitch_mm}, or blank to clear it back
-            // to the plain auto-flow table. Parsed/validated in parseGridJson(), not
-            // here, since its shape doesn't fit Laravel's dot-notation array rules.
-            'grid_json'       => 'nullable|string|max:2000',
+            // Exact die-cut card placement — see IdCardTemplate::gridLayout(). All six
+            // must be present (buildGridJson()) for the grid to take effect; any left
+            // blank clears it back to the plain auto-flow table.
+            'grid_cols'                  => 'nullable|integer|min:1|max:20',
+            'grid_rows'                  => 'nullable|integer|min:1|max:20',
+            'grid_first_col_center_mm'   => 'nullable|numeric|min:0|max:2000',
+            'grid_first_row_center_mm'   => 'nullable|numeric|min:0|max:2000',
+            'grid_col_pitch_mm'          => 'nullable|numeric|min:0|max:2000',
+            'grid_row_pitch_mm'          => 'nullable|numeric|min:0|max:2000',
             'fields'                  => 'nullable|array',
             'fields.*.key'            => 'nullable|string|max:60',
             'fields.*.type'           => ['nullable', Rule::in(['text', 'photo', 'qr'])],
@@ -205,38 +207,97 @@ class IdCardTemplateController extends SahodayaAdminController
     }
 
     /**
-     * Parses the admin form's raw grid_json textarea into the shape
-     * IdCardTemplate::gridLayout() expects, or null (blank input, invalid JSON, or
-     * missing/non-numeric keys all just fall back to the plain auto-flow table rather
-     * than erroring the whole save — this field is optional and advanced).
+     * Builds the grid_json array from the admin form's six discrete number inputs, or
+     * null if any is missing — a half-filled grid isn't a usable placement, and falling
+     * back to the plain auto-flow table is safer than guessing at the missing values.
      */
-    private function parseGridJson(?string $raw): ?array
+    private function buildGridJson(array $data): ?array
     {
-        $raw = trim((string) $raw);
-        if ($raw === '') {
-            return null;
-        }
-
-        $decoded = json_decode($raw, true);
-        if (! is_array($decoded)) {
-            return null;
-        }
-
-        $required = ['cols', 'rows', 'first_col_center_mm', 'first_row_center_mm', 'col_pitch_mm', 'row_pitch_mm'];
-        foreach ($required as $key) {
-            if (! isset($decoded[$key]) || ! is_numeric($decoded[$key])) {
+        $keys = ['grid_cols', 'grid_rows', 'grid_first_col_center_mm', 'grid_first_row_center_mm', 'grid_col_pitch_mm', 'grid_row_pitch_mm'];
+        foreach ($keys as $key) {
+            if (! isset($data[$key]) || $data[$key] === '') {
                 return null;
             }
         }
 
         return [
-            'cols'                => (int) $decoded['cols'],
-            'rows'                => (int) $decoded['rows'],
-            'first_col_center_mm' => (float) $decoded['first_col_center_mm'],
-            'first_row_center_mm' => (float) $decoded['first_row_center_mm'],
-            'col_pitch_mm'        => (float) $decoded['col_pitch_mm'],
-            'row_pitch_mm'        => (float) $decoded['row_pitch_mm'],
+            'cols'                => (int) $data['grid_cols'],
+            'rows'                => (int) $data['grid_rows'],
+            'first_col_center_mm' => (float) $data['grid_first_col_center_mm'],
+            'first_row_center_mm' => (float) $data['grid_first_row_center_mm'],
+            'col_pitch_mm'        => (float) $data['grid_col_pitch_mm'],
+            'row_pitch_mm'        => (float) $data['grid_row_pitch_mm'],
         ];
+    }
+
+    /**
+     * Renders the template with placeholder sample data — for the admin to visually
+     * check field placement without needing a real event/registration. ?mode=die
+     * repeats the sample card to fill every slot of the die-cut grid at the template's
+     * real page size; the default ("single") shows just one card. Reuses the exact
+     * same blade the real Generate PDF flow uses, so what's previewed here is what
+     * actually prints.
+     */
+    public function previewSample(Request $request, string $tenantId, IdCardTemplate $template)
+    {
+        abort_if($template->tenant_id !== $this->sahodaya->id, 403);
+
+        $mode = $request->query('mode') === 'die' ? 'die' : 'single';
+        $gridLayout = $mode === 'die' ? $template->gridLayout() : null;
+        $count = $gridLayout ? $gridLayout['cols'] * $gridLayout['rows'] : 1;
+
+        $sampleCard = [
+            'name'            => 'SAMPLE STUDENT',
+            'subtitle'        => 'Sample School Name',
+            'detail'          => 'Sample Item Title',
+            'item_label'      => 'Sample Item',
+            'role_label'      => 'STUDENT',
+            'id_number'       => 'SAMPLE-0001',
+            'secondary_value' => 'Sample',
+            'chest_number'    => '000',
+            'category'        => 'Sample Category',
+            'gender'          => 'sample',
+            'school_code'     => 'ABC-001',
+            'student_reg_no'  => 'STU/26/0001',
+            'student_class'   => 'X',
+            'schedule'        => 'Sample schedule line',
+            'footer'          => 'Sample footer',
+            'photo_src'       => $this->samplePhotoDataUri(),
+            'qr_src'          => null,
+        ];
+
+        $backgroundUrl = $template->background_path
+            ? TenantStorage::logoUrl($this->sahodaya, $template->background_path)
+            : null;
+
+        return view('fest.id-cards.custom-sheet', [
+            'cards'          => array_fill(0, $count, $sampleCard),
+            'sections'       => null,
+            'clusterName'    => $this->sahodaya->name,
+            'clusterLogoSrc' => null,
+            'eventTitle'     => 'Sample preview',
+            'audience'       => $template->audience ?? 'student',
+            'showTitle'      => false,
+            'isPdf'          => false,
+            'backgroundUrl'  => $backgroundUrl,
+            'fields'         => $template->fields(),
+            'cardWidthMm'    => $template->card_width_mm,
+            'cardHeightMm'   => $template->card_height_mm,
+            'cardsPerPage'   => $count,
+            'pageWidthMm'    => $mode === 'die' ? $template->page_width_mm : null,
+            'pageHeightMm'   => $mode === 'die' ? $template->page_height_mm : null,
+            'gridLayout'     => $gridLayout,
+        ]);
+    }
+
+    private function samplePhotoDataUri(): string
+    {
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">'
+            .'<rect width="100%" height="100%" fill="#d1d5db"/>'
+            .'<text x="50%" y="50%" font-family="Arial" font-size="24" fill="#6b7280" text-anchor="middle" dominant-baseline="middle">PHOTO</text>'
+            .'</svg>';
+
+        return 'data:image/svg+xml;base64,'.base64_encode($svg);
     }
 
     private function deactivateSiblings(?int $eventId, ?int $itemId, ?string $audience, ?int $exceptId = null): void

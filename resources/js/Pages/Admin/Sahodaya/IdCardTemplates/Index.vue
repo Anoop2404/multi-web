@@ -92,13 +92,43 @@
                     </template>
                 </FormField>
 
-                <FormField label="Die-cut grid (advanced, JSON)" class-extra="sm:col-span-2"
-                           hint='Exact card placement for a physical die-cut sheet — overrides "cards per A4 page" above with precise positions instead of a plain 2-per-row flow. Leave blank for the normal flow. Shape: {"cols":5,"rows":2,"first_col_center_mm":49.758,"first_row_center_mm":87.96,"col_pitch_mm":92.979,"row_pitch_mm":138.969}'>
-                    <template #default="{ id }">
-                        <textarea :id="id" v-model="form.grid_json" rows="2" class="field font-mono text-xs"
-                                  placeholder='{"cols":5,"rows":2,"first_col_center_mm":49.758,"first_row_center_mm":87.96,"col_pitch_mm":92.979,"row_pitch_mm":138.969}'></textarea>
-                    </template>
-                </FormField>
+                <div class="sm:col-span-2 space-y-2 border rounded-lg p-3">
+                    <p class="text-sm font-semibold text-slate-700">Die-cut grid (optional)</p>
+                    <p class="text-xs text-slate-500">
+                        Exact card placement for a physical die-cut sheet — overrides "cards per A4 page" above
+                        with precise positions instead of a plain 2-per-row flow. Get these numbers from whoever
+                        supplies the die-cutting template (or ask me to work them out from the die file). Leave
+                        all six blank for the normal flow.
+                    </p>
+                    <div class="grid gap-2 sm:grid-cols-3">
+                        <div>
+                            <label class="text-[10px] uppercase text-slate-400">Columns</label>
+                            <input v-model.number="form.grid_cols" type="number" min="1" max="20" class="field text-sm">
+                        </div>
+                        <div>
+                            <label class="text-[10px] uppercase text-slate-400">Rows</label>
+                            <input v-model.number="form.grid_rows" type="number" min="1" max="20" class="field text-sm">
+                        </div>
+                        <div></div>
+                        <div>
+                            <label class="text-[10px] uppercase text-slate-400">1st column center (mm)</label>
+                            <input v-model.number="form.grid_first_col_center_mm" type="number" step="0.001" class="field text-sm">
+                        </div>
+                        <div>
+                            <label class="text-[10px] uppercase text-slate-400">1st row center (mm)</label>
+                            <input v-model.number="form.grid_first_row_center_mm" type="number" step="0.001" class="field text-sm">
+                        </div>
+                        <div></div>
+                        <div>
+                            <label class="text-[10px] uppercase text-slate-400">Column pitch (mm)</label>
+                            <input v-model.number="form.grid_col_pitch_mm" type="number" step="0.001" class="field text-sm">
+                        </div>
+                        <div>
+                            <label class="text-[10px] uppercase text-slate-400">Row pitch (mm)</label>
+                            <input v-model.number="form.grid_row_pitch_mm" type="number" step="0.001" class="field text-sm">
+                        </div>
+                    </div>
+                </div>
 
                 <div class="sm:col-span-2 space-y-3">
                     <div class="flex items-center justify-between">
@@ -221,7 +251,13 @@
                                 <span v-else>{{ t.page_width_mm && t.page_height_mm ? `${t.page_width_mm}×${t.page_height_mm}mm` : 'A4' }}</span>
                             </td>
                             <td>{{ t.is_active ? 'Yes' : 'No' }}</td>
-                            <td class="text-right space-x-3">
+                            <td class="text-right space-x-3 whitespace-nowrap">
+                                <a :href="previewUrl(t, 'single')" target="_blank" class="text-indigo-700 text-xs font-semibold hover:text-indigo-900">
+                                    Preview card
+                                </a>
+                                <a v-if="t.grid_json" :href="previewUrl(t, 'die')" target="_blank" class="text-indigo-700 text-xs font-semibold hover:text-indigo-900">
+                                    Preview die sheet
+                                </a>
                                 <button type="button" class="text-slate-700 text-xs font-semibold hover:text-slate-900" @click="editTemplate(t)">
                                     Edit
                                 </button>
@@ -260,6 +296,10 @@ const props = defineProps({
 const editingId = ref(null);
 const { confirm } = useConfirm();
 const editingTemplate = ref(null);
+
+function previewUrl(template, mode) {
+    return `/sahodaya-admin/${props.sahodaya.id}/id-card-templates/${template.id}/preview?mode=${mode}`;
+}
 
 const selectedEventItems = computed(() => {
     const event = props.festEvents.find(e => e.id === form.event_id);
@@ -310,7 +350,12 @@ const form = useForm({
     cards_per_page: 4,
     page_width_mm: null,
     page_height_mm: null,
-    grid_json: '',
+    grid_cols: null,
+    grid_rows: null,
+    grid_first_col_center_mm: null,
+    grid_first_row_center_mm: null,
+    grid_col_pitch_mm: null,
+    grid_row_pitch_mm: null,
     fields: blankFields(),
     is_active: true,
 });
@@ -336,7 +381,12 @@ function editTemplate(template) {
     form.cards_per_page = template.cards_per_page || 4;
     form.page_width_mm = template.page_width_mm ?? null;
     form.page_height_mm = template.page_height_mm ?? null;
-    form.grid_json = template.grid_json ? JSON.stringify(template.grid_json) : '';
+    form.grid_cols = template.grid_json?.cols ?? null;
+    form.grid_rows = template.grid_json?.rows ?? null;
+    form.grid_first_col_center_mm = template.grid_json?.first_col_center_mm ?? null;
+    form.grid_first_row_center_mm = template.grid_json?.first_row_center_mm ?? null;
+    form.grid_col_pitch_mm = template.grid_json?.col_pitch_mm ?? null;
+    form.grid_row_pitch_mm = template.grid_json?.row_pitch_mm ?? null;
     form.fields = Array.isArray(template.layout_json) && template.layout_json.length
         ? JSON.parse(JSON.stringify(template.layout_json))
         : blankFields();
@@ -357,7 +407,12 @@ function cancelEdit() {
     form.cards_per_page = 4;
     form.page_width_mm = null;
     form.page_height_mm = null;
-    form.grid_json = '';
+    form.grid_cols = null;
+    form.grid_rows = null;
+    form.grid_first_col_center_mm = null;
+    form.grid_first_row_center_mm = null;
+    form.grid_col_pitch_mm = null;
+    form.grid_row_pitch_mm = null;
     form.fields = blankFields();
     form.is_active = true;
     form.clearErrors();
