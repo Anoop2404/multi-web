@@ -79,7 +79,9 @@
       "mcp__Claude_Browser__preview_stop",
       "mcp__Claude_Browser__preview_logs",
       "mcp__Claude_Browser__preview_list",
-      "mcp__Claude_Browser__form_input"
+      "mcp__Claude_Browser__form_input",
+      "Bash(PSYSH_CONFIG_DIR=__TRACKED_VAR__ HOME=__TRACKED_VAR__ php artisan tinker '--execute=echo App\\\\Models\\\\SiteSection::where\\('\\\\''section_type'\\\\'','\\\\''sahodaya_home'\\\\''\\)->count\\(\\);')",
+      "mcp__claude-in-chrome__computer"
     ]
   }
 }
