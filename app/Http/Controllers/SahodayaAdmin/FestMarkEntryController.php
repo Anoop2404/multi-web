@@ -14,6 +14,7 @@ use App\Models\FestMarkSheetUpload;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestScoringRubricTemplate;
+use App\Models\SahodayaProfile;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\EventLifecycleGate;
 use App\Services\Events\FestHeadItemNavigationService;
@@ -28,6 +29,7 @@ use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -36,6 +38,17 @@ class FestMarkEntryController extends SahodayaAdminController
 {
     use BuildsItemHeadReportContext;
     use \App\Http\Controllers\SahodayaAdmin\Concerns\ResolvesRegionAwareReportEvent;
+
+    /**
+     * The bulk print panel's selectable report-type checkboxes -- each key maps to one
+     * sheet download (with its own blank_chest variant handled client-side), and is the
+     * allow-list for what a Sahodaya's saved bulk_report_combo may contain.
+     */
+    private const BULK_REPORT_TYPES = [
+        'judge_sheet', 'judge_sheet_no_chest',
+        'sum_sheet', 'sum_sheet_no_chest',
+        'result_declaration',
+    ];
 
     public function index(Request $request, string $tenantId, FestEvent $event)
     {
@@ -83,6 +96,7 @@ class FestMarkEntryController extends SahodayaAdminController
                 'sheetUploads'   => [],
                 'missingChestCount' => 0,
                 'cumulativeSheetUrl' => null,
+                'bulkReportCombo' => [],
             ]));
         }
 
@@ -245,6 +259,12 @@ class FestMarkEntryController extends SahodayaAdminController
             'cumulativeSheetUrl' => $itemId
                 ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/reports/mark-criteria-sheet?item_id={$itemId}"
                 : null,
+            // For the bulk print-sheets picker's Phase/Area quick filters -- id+name only,
+            // the actual filtering happens server-side in markEntrySheet()/
+            // resultDeclarationSheet() off these same ids, not client-side.
+            'phases' => \App\Models\FestEventPhase::where('event_id', $event->id)->orderBy('sort_order')->get(['id', 'name']),
+            'competitionAreas' => \App\Models\FestCompetitionArea::where('event_id', $event->id)->orderBy('sort_order')->get(['id', 'name']),
+            'bulkReportCombo' => \App\Models\SahodayaProfile::where('tenant_id', $this->sahodaya->id)->first()?->bulk_report_combo ?? [],
         ]));
     }
 
@@ -1092,85 +1112,120 @@ class FestMarkEntryController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $itemId = $request->integer('item_id');
-        abort_unless($itemId, 422, 'Select an item.');
+        [$itemIds, $phaseId, $areaId] = $this->parseBulkSheetFilters($request);
+        abort_unless($itemId || $itemIds || $phaseId || $areaId, 422, 'Select an item.');
 
         // Same "hand out before chest numbers exist / keep judges blind on paper" option
         // as markEntrySheet() — a separate download, sort order untouched.
         $blankChest = $request->boolean('blank_chest');
 
-        $item = FestEventItem::findOrFail($itemId);
-        abort_if($item->event_id !== $event->id, 404);
-
-        $judgeCount = $criteriaService->judgeCountForItem($item);
-
-        // Multi-judge items keep per-judge subtotals in FestMarkJudgeScore. A single-judge
-        // item never writes there — its one score lives directly on FestMark — so build the
-        // same participant_id => [judge_number => score] shape from that instead, letting
-        // the rest of this method (and the shared blade view) treat both cases identically.
-        if ($judgeCount > 1) {
-            $scores = $criteriaService->judgeScoresForItem($item);
-        } else {
-            $scores = FestMark::where('item_id', $item->id)
-                ->pluck('score', 'participant_id')
-                ->map(fn ($score) => [1 => $score === null ? null : (float) $score])
-                ->all();
+        $query = FestEventItem::with('event')->where('event_id', $event->id)->where('is_enabled', true);
+        if ($itemIds) {
+            $query->whereIn('id', $itemIds);
+        } elseif ($itemId) {
+            $query->where('id', $itemId);
         }
+        if ($phaseId) {
+            $query->where('phase_id', $phaseId);
+        }
+        if ($areaId) {
+            $query->where('area_id', $areaId);
+        }
+        $items = $query->orderBy('display_order')->orderBy('title')->get();
 
-        $isGroup = $numbering->isGroupItem($item);
+        abort_if($items->isEmpty(), 404, 'No competition items found.');
 
-        // Chest number only — no name/school. Judges and convenors work off chest numbers
-        // everywhere else in this app (blind judging); this tabulation sheet shouldn't be
-        // the one place that leaks who's who.
-        $participants = FestParticipant::whereHas('registration', fn ($q) => $q
-                ->whereIn('event_id', $event->reportableEventIds())
-                ->where('item_id', $item->id)
-                ->whereNotIn('status', ['rejected', 'withdrawn']))
-            ->where('participant_role', '!=', 'standby')
-            ->with(['group'])
-            ->get();
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
+        $criteriaByItem = $criteriaService->criteriaForItems($items);
 
-        $rows = [];
-        $seenGroups = [];
+        $sheets = [];
 
-        foreach ($participants as $p) {
-            if ($isGroup && $p->group_id) {
-                if (isset($seenGroups[$p->group_id])) {
-                    continue;
-                }
-                $seenGroups[$p->group_id] = true;
-                $chest = $p->group?->chest_no;
+        foreach ($items as $item) {
+            $judgeCount = $criteriaService->judgeCountForItem($item);
+
+            // Multi-judge items keep per-judge subtotals in FestMarkJudgeScore. A single-judge
+            // item never writes there — its one score lives directly on FestMark — so build
+            // the same participant_id => [judge_number => score] shape from that instead,
+            // letting the rest of this method (and the shared blade view) treat both cases
+            // identically.
+            if ($judgeCount > 1) {
+                $scores = $criteriaService->judgeScoresForItem($item);
             } else {
-                $chest = $numbering->effectiveChestNumber($p);
+                $scores = FestMark::where('item_id', $item->id)
+                    ->pluck('score', 'participant_id')
+                    ->map(fn ($score) => [1 => $score === null ? null : (float) $score])
+                    ->all();
             }
 
-            $rowScores = $scores[$p->id] ?? [];
+            $isGroup = $numbering->isGroupItem($item);
 
-            $judgeValues = [];
-            for ($j = 1; $j <= $judgeCount; $j++) {
-                $judgeValues[] = $rowScores[$j] ?? null;
+            // Chest number only — no name/school. Judges and convenors work off chest
+            // numbers everywhere else in this app (blind judging); this tabulation sheet
+            // shouldn't be the one place that leaks who's who.
+            $participants = FestParticipant::whereHas('registration', fn ($q) => $q
+                    ->whereIn('event_id', $event->reportableEventIds())
+                    ->where('item_id', $item->id)
+                    ->whereNotIn('status', ['rejected', 'withdrawn']))
+                ->where('participant_role', '!=', 'standby')
+                ->with(['group'])
+                ->get();
+
+            $rows = [];
+            $seenGroups = [];
+
+            foreach ($participants as $p) {
+                if ($isGroup && $p->group_id) {
+                    if (isset($seenGroups[$p->group_id])) {
+                        continue;
+                    }
+                    $seenGroups[$p->group_id] = true;
+                    $chest = $p->group?->chest_no;
+                } else {
+                    $chest = $numbering->effectiveChestNumber($p);
+                }
+
+                $rowScores = $scores[$p->id] ?? [];
+
+                $judgeValues = [];
+                for ($j = 1; $j <= $judgeCount; $j++) {
+                    $judgeValues[] = $rowScores[$j] ?? null;
+                }
+
+                // Blank (not 0) when nothing's been entered yet — this sheet doubles as a
+                // paper form for typing in judges' subtotals by hand, and a "0" reads as a
+                // real score.
+                $hasAnyScore = collect($judgeValues)->contains(fn ($v) => $v !== null);
+
+                $rows[] = [
+                    'chest_no' => $chest,
+                    'scores'   => $judgeValues,
+                    'total'    => $hasAnyScore ? array_sum(array_map(fn ($v) => (float) ($v ?? 0), $rowScores)) : null,
+                ];
             }
 
-            // Blank (not 0) when nothing's been entered yet — this sheet doubles as a paper
-            // form for typing in judges' subtotals by hand, and a "0" reads as a real score.
-            $hasAnyScore = collect($judgeValues)->contains(fn ($v) => $v !== null);
+            usort($rows, fn ($a, $b) => ((int) preg_replace('/[^0-9]/', '', (string) ($a['chest_no'] ?? 999999))) <=> ((int) preg_replace('/[^0-9]/', '', (string) ($b['chest_no'] ?? 999999))));
 
-            $rows[] = [
-                'chest_no' => $chest,
-                'scores'   => $judgeValues,
-                'total'    => $hasAnyScore ? array_sum(array_map(fn ($v) => (float) ($v ?? 0), $rowScores)) : null,
+            $sheets[] = [
+                'item'          => $item,
+                'rows'          => $rows,
+                'judge_count'   => $judgeCount,
+                'category_label' => $this->itemCategoryLabel($item, $classGroupLabels),
             ];
         }
 
-        usort($rows, fn ($a, $b) => ((int) preg_replace('/[^0-9]/', '', (string) ($a['chest_no'] ?? 999999))) <=> ((int) preg_replace('/[^0-9]/', '', (string) ($b['chest_no'] ?? 999999))));
-
         $sheetTitle = 'Digital Sum Sheet';
-        $categoryLabel = $this->itemCategoryLabel($item, \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent()));
 
         $nameParts = [$event->title];
-        if ($categoryLabel) {
-            $nameParts[] = $categoryLabel;
+        if ($itemId && ! $itemIds) {
+            $singleItem = $items->first();
+            $singleItemCategory = $this->itemCategoryLabel($singleItem, $classGroupLabels);
+            if ($singleItemCategory) {
+                $nameParts[] = $singleItemCategory;
+            }
+            $nameParts[] = $singleItem->title;
+        } elseif ($itemIds || $phaseId || $areaId) {
+            $nameParts[] = count($items).' items';
         }
-        $nameParts[] = $item->title;
         $nameParts[] = $sheetTitle;
         if ($blankChest) {
             $nameParts[] = 'blank chest';
@@ -1178,15 +1233,13 @@ class FestMarkEntryController extends SahodayaAdminController
         $fileName = \Illuminate\Support\Str::slug(implode(' ', $nameParts)).'.pdf';
 
         return \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.mark-criteria-sheet', [
-            'event'         => $event,
-            'item'          => $item,
-            'judgeCount'    => $judgeCount,
-            'sheetTitle'    => $sheetTitle.($blankChest ? ' — Blank Chest No' : ''),
-            'categoryLabel' => $categoryLabel,
-            'rows'          => $rows,
-            'orgName'       => $this->sahodaya->name ?? 'Sahodaya',
-            'logoSrc'       => TenantBranding::logoEmbedSrc($this->sahodaya),
-            'blankChest'    => $blankChest,
+            'event'      => $event,
+            'sahodaya'   => $this->sahodaya,
+            'sheets'     => $sheets,
+            'sheetTitle' => $sheetTitle.($blankChest ? ' — Blank Chest No' : ''),
+            'orgName'    => $this->sahodaya->name ?? 'Sahodaya',
+            'logoSrc'    => TenantBranding::logoEmbedSrc($this->sahodaya),
+            'blankChest' => $blankChest,
         ])->setPaper('a4', 'portrait')->download($fileName);
     }
 
@@ -1209,12 +1262,25 @@ class FestMarkEntryController extends SahodayaAdminController
         // Rows/sort order are unaffected — only what the Blade view prints in that cell.
         $blankChest = $request->boolean('blank_chest');
 
+        [$itemIds, $phaseId, $areaId] = $this->parseBulkSheetFilters($request);
+
         // Eager-load 'event': itemCategoryLabel() below (via FestItemCategoryLabel::resolve())
         // lazy-loads $item->event for any sports-style item (age_group set, no class_group) —
         // uncached, this reran once per qualifying item across every item on the sheet.
         $query = FestEventItem::with('event')->where('event_id', $event->id)->where('is_enabled', true);
-        if ($itemId) {
+        if ($itemIds) {
+            // Bulk selection (checkbox multi-select, or a phase/area filter with no
+            // individual items picked) -- takes over from the single item_id/"every
+            // item" behavior below rather than combining with it.
+            $query->whereIn('id', $itemIds);
+        } elseif ($itemId) {
             $query->where('id', $itemId);
+        }
+        if ($phaseId) {
+            $query->where('phase_id', $phaseId);
+        }
+        if ($areaId) {
+            $query->where('area_id', $areaId);
         }
         $items = $query->orderBy('display_order')->orderBy('title')->get();
 
@@ -1313,13 +1379,15 @@ class FestMarkEntryController extends SahodayaAdminController
         ])->setPaper('a4', 'portrait');
 
         $nameParts = [$event->title];
-        if ($itemId) {
+        if ($itemId && ! $itemIds) {
             $singleItem = $items->first();
             $singleItemCategory = $this->itemCategoryLabel($singleItem, $classGroupLabels);
             if ($singleItemCategory) {
                 $nameParts[] = $singleItemCategory;
             }
             $nameParts[] = $singleItem->title;
+        } elseif ($itemIds || $phaseId || $areaId) {
+            $nameParts[] = count($items).' items';
         }
         $nameParts[] = 'mark entry sheet';
         if ($blankChest) {
@@ -1342,10 +1410,19 @@ class FestMarkEntryController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $itemId = $request->integer('item_id');
+        [$itemIds, $phaseId, $areaId] = $this->parseBulkSheetFilters($request);
 
         $query = FestEventItem::with('event')->where('event_id', $event->id)->where('is_enabled', true);
-        if ($itemId) {
+        if ($itemIds) {
+            $query->whereIn('id', $itemIds);
+        } elseif ($itemId) {
             $query->where('id', $itemId);
+        }
+        if ($phaseId) {
+            $query->where('phase_id', $phaseId);
+        }
+        if ($areaId) {
+            $query->where('area_id', $areaId);
         }
         $items = $query->orderBy('display_order')->orderBy('title')->get();
 
@@ -1366,13 +1443,15 @@ class FestMarkEntryController extends SahodayaAdminController
         ])->setPaper('a4', 'portrait');
 
         $nameParts = [$event->title];
-        if ($itemId) {
+        if ($itemId && ! $itemIds) {
             $singleItem = $items->first();
             $singleItemCategory = $this->itemCategoryLabel($singleItem, $classGroupLabels);
             if ($singleItemCategory) {
                 $nameParts[] = $singleItemCategory;
             }
             $nameParts[] = $singleItem->title;
+        } elseif ($itemIds || $phaseId || $areaId) {
+            $nameParts[] = count($items).' items';
         }
         $nameParts[] = 'result declaration sheet';
         $fileName = \Illuminate\Support\Str::slug(implode(' ', $nameParts)).'.pdf';
@@ -1390,6 +1469,49 @@ class FestMarkEntryController extends SahodayaAdminController
     private function itemCategoryLabel(FestEventItem $item, array $classGroupLabels): ?string
     {
         return \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels);
+    }
+
+    /**
+     * Shared bulk-selection filters for markEntrySheet()/cumulativeSheet()/
+     * resultDeclarationSheet() -- pick several items at once (a checkbox multi-select on
+     * the Mark Entry page) and/or narrow by phase or competition area/"stage", instead of
+     * only ever downloading one item's sheet or every enabled item in the event. `item_ids`
+     * takes precedence over the pre-existing single `item_id`/"all items" behavior those
+     * methods already had; `phase_id`/`area_id` combine with either (or with no item
+     * selection at all, to mean "every item in this phase/area").
+     *
+     * @return array{0: list<int>, 1: int|null, 2: int|null}
+     */
+    private function parseBulkSheetFilters(Request $request): array
+    {
+        $itemIds = array_values(array_filter(array_map(
+            'intval',
+            array_filter(explode(',', (string) $request->input('item_ids', '')), fn ($v) => $v !== ''),
+        )));
+
+        return [$itemIds, $request->integer('phase_id') ?: null, $request->integer('area_id') ?: null];
+    }
+
+    /**
+     * A Sahodaya's preferred set of bulk sheet types (e.g. "Judge Sheets" + "Digital Sum
+     * Sheet"), remembered across events/sessions so an admin doesn't have to re-check the
+     * same combo of report checkboxes every time they open the bulk print panel. Scoped to
+     * the Sahodaya tenant, not to one event -- there's deliberately only one saved combo
+     * per Sahodaya, not per-event or per-user presets.
+     */
+    public function saveBulkReportCombo(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'report_types'   => 'present|array',
+            'report_types.*' => ['string', Rule::in(self::BULK_REPORT_TYPES)],
+        ]);
+
+        SahodayaProfile::where('tenant_id', $this->sahodaya->id)
+            ->update(['bulk_report_combo' => array_values($data['report_types'])]);
+
+        return back()->with('success', 'Default bulk report combo saved.');
     }
 
     public function autoRankItem(string $tenantId, FestEvent $event, FestEventItem $item, FestSportsAutoRankService $ranker)

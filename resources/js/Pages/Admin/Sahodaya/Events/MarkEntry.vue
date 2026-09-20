@@ -137,6 +137,74 @@
                     </button>
                 </div>
             </div>
+
+            <!-- Bulk print sheets: select several items (and/or a phase/area) and
+                 download one combined PDF, instead of the single-item buttons above
+                 which only ever cover "this one item" or "the whole event". -->
+            <div class="pt-3 border-t border-slate-100">
+                <button type="button" class="text-xs font-semibold text-indigo-700 hover:underline" @click="showBulkPrint = !showBulkPrint">
+                    {{ showBulkPrint ? '▾' : '▸' }} Bulk print sheets for several items…
+                </button>
+                <div v-if="showBulkPrint" class="mt-3 space-y-3">
+                    <div class="flex flex-wrap gap-3">
+                        <div v-if="phases.length" class="w-48">
+                            <label class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">Phase</label>
+                            <SearchableSelect v-model="bulkPhaseId" :options="phases.map((p) => ({ value: String(p.id), label: p.name }))"
+                                              :all-option="true" all-label="Any phase" />
+                        </div>
+                        <div v-if="competitionAreas.length" class="w-48">
+                            <label class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">Competition area</label>
+                            <SearchableSelect v-model="bulkAreaId" :options="competitionAreas.map((a) => ({ value: String(a.id), label: a.name }))"
+                                              :all-option="true" all-label="Any area" />
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between gap-3">
+                        <label class="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
+                            <input type="checkbox" :checked="bulkSelectedItemIds.length === flatItems.length && flatItems.length > 0"
+                                   class="rounded border-slate-300" @change="toggleSelectAllFlatItems">
+                            Select all {{ flatItems.length }} items
+                        </label>
+                        <span class="text-xs text-slate-400">{{ bulkSelectedItemIds.length }} item(s) individually selected</span>
+                    </div>
+                    <div class="max-h-48 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100">
+                        <label v-for="item in flatItems" :key="item.id" class="flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer hover:bg-slate-50">
+                            <input type="checkbox" :value="item.id" v-model="bulkSelectedItemIds" class="rounded border-slate-300">
+                            {{ item.title }}
+                        </label>
+                    </div>
+
+                    <div v-if="bulkSelectionActive" class="flex flex-wrap gap-2 pt-1">
+                        <a :href="bulkMarkEntrySheetUrl" target="_blank" class="btn-secondary text-xs">🖨️ Judge Sheets (combined PDF)</a>
+                        <a :href="bulkMarkEntrySheetBlankChestUrl" target="_blank" class="btn-secondary text-xs">🖨️ Judge Sheets — No Chest No</a>
+                        <a :href="bulkCumulativeSheetUrl" target="_blank" class="btn-secondary text-xs">📊 Digital Sum Sheet</a>
+                        <a :href="bulkCumulativeSheetBlankChestUrl" target="_blank" class="btn-secondary text-xs">📊 Sum Sheet — No Chest No</a>
+                        <a :href="bulkResultDeclarationSheetUrl" target="_blank" class="btn-secondary text-xs">📝 Result Declaration Sheet</a>
+                    </div>
+                    <p v-else class="text-xs text-slate-400">Pick a phase, an area, or one or more items above to enable the download buttons.</p>
+
+                    <!-- Report combo: check which of the report types above to include, download
+                         them all in one click, and optionally remember this combo as the
+                         Sahodaya's default so it's pre-checked next time (any admin, any event). -->
+                    <div v-if="bulkSelectionActive" class="mt-3 pt-3 border-t border-slate-100 space-y-2">
+                        <label class="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Report combo</label>
+                        <div class="flex flex-wrap gap-x-4 gap-y-1.5">
+                            <label v-for="type in reportTypeOptions" :key="type.key" class="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
+                                <input type="checkbox" :value="type.key" v-model="comboSelectedTypes" class="rounded border-slate-300">
+                                {{ type.label }}
+                            </label>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 pt-1">
+                            <button type="button" class="btn-primary text-xs !py-1.5 !px-4" :disabled="!comboSelectedTypes.length" @click="downloadCombo">
+                                ⬇️ Download checked reports
+                            </button>
+                            <button type="button" class="btn-secondary text-xs !py-1.5 !px-3" :disabled="savingCombo" @click="saveComboAsDefault">
+                                {{ savingCombo ? 'Saving…' : '💾 Save as default for this Sahodaya' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Region required: this event has region children — marks can only be saved
@@ -394,6 +462,9 @@ const props = defineProps({
     cumulativeSheetUrl: { type: String, default: null },
     sheetUploads: { type: Array, default: () => [] },
     missingChestCount: { type: Number, default: 0 },
+    phases: { type: Array, default: () => [] },
+    competitionAreas: { type: Array, default: () => [] },
+    bulkReportCombo: { type: Array, default: () => [] },
 });
 
 const importUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks/import`);
@@ -455,6 +526,73 @@ const cumulativeSheetBlankChestUrl = computed(() =>
         ? `${props.cumulativeSheetUrl}${props.cumulativeSheetUrl.includes('?') ? '&' : '?'}blank_chest=1`
         : null
 );
+
+// Bulk print sheets: pick several items at once (checkbox multi-select, same pattern as
+// MeritCertificates.vue's bulk toolbar) and/or narrow by phase or competition area, so
+// sheets can be printed for a whole session in one combined PDF instead of downloading
+// each item's sheet one at a time. Backed by FestMarkEntryController::
+// parseBulkSheetFilters() (item_ids/phase_id/area_id), which combines with the existing
+// single item_id/"every item" behavior rather than replacing it.
+const showBulkPrint = ref(false);
+const bulkSelectedItemIds = ref([]);
+const bulkPhaseId = ref('');
+const bulkAreaId = ref('');
+
+function bulkSheetUrl(basePath) {
+    const params = new URLSearchParams();
+    if (bulkSelectedItemIds.value.length) params.set('item_ids', bulkSelectedItemIds.value.join(','));
+    if (bulkPhaseId.value) params.set('phase_id', bulkPhaseId.value);
+    if (bulkAreaId.value) params.set('area_id', bulkAreaId.value);
+    const qs = params.toString();
+    return `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/${basePath}${qs ? `?${qs}` : ''}`;
+}
+
+const bulkMarkEntrySheetUrl = computed(() => bulkSheetUrl('mark-entry-sheet'));
+const bulkMarkEntrySheetBlankChestUrl = computed(() => `${bulkMarkEntrySheetUrl.value}${bulkMarkEntrySheetUrl.value.includes('?') ? '&' : '?'}blank_chest=1`);
+const bulkCumulativeSheetUrl = computed(() => bulkSheetUrl('mark-criteria-sheet'));
+const bulkCumulativeSheetBlankChestUrl = computed(() => `${bulkCumulativeSheetUrl.value}${bulkCumulativeSheetUrl.value.includes('?') ? '&' : '?'}blank_chest=1`);
+const bulkResultDeclarationSheetUrl = computed(() => bulkSheetUrl('result-declaration-sheet'));
+const bulkSelectionActive = computed(() => bulkSelectedItemIds.value.length > 0 || !!bulkPhaseId.value || !!bulkAreaId.value);
+
+// Report combo: which of the bulk sheet types above to include in one "Download checked
+// reports" click, plus an optional save as this Sahodaya's remembered default (server-side,
+// tenant-scoped — not per-browser localStorage — so it's the same for every admin/device).
+// Each `url` is a getter (not a plain computed ref) so it re-evaluates against whatever
+// item/phase/area selection is active at click time.
+const reportTypeOptions = [
+    { key: 'judge_sheet', label: '🖨️ Judge Sheets', url: () => bulkMarkEntrySheetUrl.value },
+    { key: 'judge_sheet_no_chest', label: '🖨️ Judge Sheets — No Chest No', url: () => bulkMarkEntrySheetBlankChestUrl.value },
+    { key: 'sum_sheet', label: '📊 Digital Sum Sheet', url: () => bulkCumulativeSheetUrl.value },
+    { key: 'sum_sheet_no_chest', label: '📊 Sum Sheet — No Chest No', url: () => bulkCumulativeSheetBlankChestUrl.value },
+    { key: 'result_declaration', label: '📝 Result Declaration Sheet', url: () => bulkResultDeclarationSheetUrl.value },
+];
+const comboSelectedTypes = ref([...props.bulkReportCombo]);
+const savingCombo = ref(false);
+
+// One browser download per checked type, fired synchronously within this click handler
+// (same user gesture) so popup blockers treat every window.open as expected, not just the
+// first. There's no merged-PDF format that mixes multiple different report types into one
+// file, so "download the combo" means "trigger all of them together" rather than one file.
+function downloadCombo() {
+    reportTypeOptions
+        .filter((type) => comboSelectedTypes.value.includes(type.key))
+        .forEach((type) => window.open(type.url(), '_blank'));
+}
+
+function saveComboAsDefault() {
+    savingCombo.value = true;
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/bulk-report-combo`,
+        { report_types: comboSelectedTypes.value },
+        { preserveScroll: true, preserveState: true, onFinish: () => { savingCombo.value = false; } },
+    );
+}
+
+function toggleSelectAllFlatItems() {
+    bulkSelectedItemIds.value = bulkSelectedItemIds.value.length === flatItems.value.length
+        ? []
+        : flatItems.value.map((item) => item.id);
+}
 
 const filterDescription = computed(() => (
     isSports.value
