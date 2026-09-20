@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>Mark Entry Sheet — {{ $event->title }}</title>
     <style>
-        @page { margin: 16px 20px; size: portrait; }
+        @page { margin: 16px 20px; size: portrait; margin-bottom: 24px;}
         body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11.5px; color: #1e293b; line-height: 1.4; }
         .sheet { page-break-after: always; }
         .sheet:last-child { page-break-after: avoid; }
@@ -23,6 +23,7 @@
     </style>
 </head>
 <body>
+    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
     @foreach($sheets as $sheet)
         <div class="sheet">
             <div class="header" style="margin-bottom: 12px;">

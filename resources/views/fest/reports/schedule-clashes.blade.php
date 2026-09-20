@@ -3,6 +3,7 @@
 @include('partials.pdf-report-styles')
 <style>.item-tags{margin-top:3px}</style>
 </head><body>
+    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
 @php($participantByDate = collect($participant)->groupBy(fn ($c) => $c['date'] ?? 'Unscheduled'))
 @php($stageByDate = collect($stage)->groupBy(fn ($c) => $c['date'] ?? 'Unscheduled'))
 @php($firstPage = true)

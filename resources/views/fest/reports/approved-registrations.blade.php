@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>Approved Registrations — {{ $event->title }}</title>
     <style>
-        @page { margin: 16px 20px; size: A4 portrait; }
+        @page { margin: 16px 20px; size: A4 portrait; margin-bottom: 24px;}
         body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11.5px; color: #1e293b; line-height: 1.4; }
         .header { margin-bottom: 12px; }
         .table { width: 100%; border-collapse: collapse; margin-top: 10px; }
@@ -22,6 +22,7 @@
     </style>
 </head>
 <body>
+    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
     <div class="header">
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 6px;">
             <tr>

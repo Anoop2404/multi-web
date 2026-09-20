@@ -115,6 +115,7 @@
     </style>
 </head>
 <body>
+    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
     @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
     <h2>{{ $event->title }} — Student-Wise Participant Report</h2>

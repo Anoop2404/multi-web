@@ -145,6 +145,7 @@
     </style>
 </head>
 <body>
+    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
     @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
     {{-- Only set when this PDF was requested from a School Admin's own scoped report

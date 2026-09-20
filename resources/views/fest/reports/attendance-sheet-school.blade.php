@@ -2,6 +2,7 @@
 <html><head><meta charset="utf-8"><title>Attendance — {{ strtoupper($school->name) }}</title>
 <style>body{font-family:DejaVu Sans,sans-serif;font-size:9px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:3px}th{background:#f3f4f6}.photo{width:30px;text-align:center}.photo img,.initials{width:26px;height:26px;border-radius:50%;object-fit:cover;display:inline-block}.initials{background:#e2e8f0;color:#64748b;line-height:26px;font-weight:bold}</style>
 </head><body>
+    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
 <h2 style="text-align:center">{{ $event->title }} — {{ strtoupper($school->name) }}</h2>

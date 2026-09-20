@@ -2,6 +2,7 @@
 <html><head><meta charset="utf-8"><title>Green Room</title>
 <style>body{font-family:DejaVu Sans,sans-serif;font-size:11.5px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:5px 6px;font-size:11px}th{background:#ecfdf5;font-size:11.5px}</style>
 </head><body>
+    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
 <h2 style="text-align:center">{{ $event->title }} — Green Room List</h2>

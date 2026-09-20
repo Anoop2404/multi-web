@@ -6,6 +6,7 @@ body{font-family:DejaVu Sans,sans-serif;font-size:12px}
 h3{margin:0 0 6px;color:#1e3a8a;font-size:15px}
 .meta{font-size:11.5px;color:#475569;line-height:1.4}
 </style></head><body>
+    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
 <h2 style="text-align:center">{{ $event->title }} — Participant Admit Cards</h2>

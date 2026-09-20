@@ -23,6 +23,7 @@ tbody tr:nth-child(even){background:#f7f9fc}
 tbody td.subtotal-col{background:#c8d6ea;color:#1d3557}
 </style>
 </head><body>
+    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? 'Sahodaya', 'logoSrc' => $logoSrc ?? null])
 
 @php

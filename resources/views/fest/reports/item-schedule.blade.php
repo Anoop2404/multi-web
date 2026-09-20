@@ -2,6 +2,7 @@
 <html><head><meta charset="utf-8"><title>Item Schedule</title>
 @include('partials.pdf-report-styles')
 </head><body>
+    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
 @php($rowsByDate = collect($rows)->groupBy(fn ($r) => $r['scheduled_date'] ?? 'Not scheduled'))
 @php($slNo = 0)
 @forelse($rowsByDate as $dateKey => $dateRows)

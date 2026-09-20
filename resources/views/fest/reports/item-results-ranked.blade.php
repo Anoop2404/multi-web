@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>{{ $orgName ?? 'Sahodaya' }} — {{ $event->title }}@if(!empty($item)) — {{ $item->title }}@endif — Results</title>
     <style>
-        @page { margin: 22px 28px; }
+        @page { margin: 22px 28px; margin-bottom: 24px;}
         body { font-family: 'DejaVu Sans', system-ui, sans-serif; font-size: 11px; color: #0f172a; margin: 0; }
         h1 { font-size: 14px; font-weight: 800; color: #0f172a; margin: 4px 0 12px; text-align: center; }
         table.data { width: 100%; border-collapse: collapse; }
@@ -13,9 +13,11 @@
         table.data tr:nth-child(even) td { background: #f8fafc; }
         .rank { font-weight: 800; font-size: 12px; color: #0f172a; }
         .footer { margin-top: 14px; padding-top: 6px; border-top: 1px solid #cbd5e1; font-size: 8.5px; color: #64748b; }
+        .published-at { margin-top: 14px; font-size: 13px; font-weight: bold; color: #0f172a; }
     </style>
 </head>
 <body>
+    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
     @include('partials.pdf-branding-header', [
         'orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'),
         'logoSrc' => $logoSrc ?? null,
@@ -53,6 +55,8 @@
             @endforelse
         </tbody>
     </table>
+
+    <div class="published-at">Published At: {{ !empty($publishedAt) ? $publishedAt->format('d M Y, h:i A') : 'Not yet published' }}</div>
 
     <div class="footer">{{ $orgName ?? ($sahodaya->name ?? 'Sahodaya') }} &bull; {{ $event->title }} &bull; Generated {{ now()->format('d M Y, h:i A') }}</div>
 </body>

@@ -83,6 +83,7 @@
     </style>
 </head>
 <body>
+    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
     @php
         $groupedByItem = collect($rows)->groupBy('item_id');
     @endphp

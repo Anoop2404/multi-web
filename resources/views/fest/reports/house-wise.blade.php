@@ -2,6 +2,7 @@
 <html><head><meta charset="utf-8"><title>House Results</title>
 <style>body{font-family:DejaVu Sans,sans-serif;font-size:12px}table{width:100%;border-collapse:collapse}th{background:#1d3557;color:#fff;padding:6px;font-size:12px}td{border:1px solid #ccc;padding:6px;font-size:11.5px}</style>
 </head><body>
+    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
 <h2 style="text-align:center">{{ $event->title }} — House-wise Results</h2>

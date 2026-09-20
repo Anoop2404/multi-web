@@ -10,6 +10,7 @@ th,td{border:1px solid #cbd5e1;padding:4px 5px;vertical-align:top;font-size:10.5
 th{background:#f1f5f9;font-size:10px;text-transform:uppercase}
 </style>
 </head><body>
+    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
 <h2>{{ $event->title }}</h2>

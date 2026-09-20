@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>{{ $sheetTitle ?? 'Digital Sum Sheet' }} — {{ $event->title }}</title>
     <style>
-        @page { margin: 16px 20px; size: portrait; }
+        @page { margin: 16px 20px; size: portrait; margin-bottom: 24px;}
         body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11.5px; color: #1e293b; line-height: 1.4; }
         .header { border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 12px; }
         .table { width: 100%; border-collapse: collapse; margin-top: 10px; }
@@ -16,6 +16,7 @@
     </style>
 </head>
 <body>
+    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
     <div class="header" style="margin-bottom: 12px;">
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 6px;">
             <tr>

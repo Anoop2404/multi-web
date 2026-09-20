@@ -2,6 +2,7 @@
 <html><head><meta charset="utf-8"><title>Judge Sheet</title>
 <style>body{font-family:DejaVu Sans,sans-serif;font-size:11.5px}h1{font-size:16px;text-align:center}table{width:100%;border-collapse:collapse;margin-top:8px}th{background:#023e8a;color:#fff;padding:6px 5px;font-size:10.5px}td{border:1px solid #aaa;padding:6px 5px;font-size:11px;min-height:30px}.score-cell{min-height:30px}</style>
 </head><body>
+    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
 <h1>Judge Sheet — {{ $item->title }}</h1>

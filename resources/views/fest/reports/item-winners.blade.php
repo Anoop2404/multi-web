@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>{{ $orgName ?? 'Sahodaya' }} — {{ $event->title }}@if(!empty($item)) — {{ $item->title }}@endif — Winners</title>
     <style>
-        @page { margin: 22px 28px; }
+        @page { margin: 22px 28px; margin-bottom: 24px;}
         body { font-family: 'DejaVu Sans', system-ui, sans-serif; font-size: 11px; color: #0f172a; margin: 0; }
         h1 { font-size: 15px; font-weight: 800; color: #0f172a; margin: 4px 0 2px; text-align: center; }
         .subtitle { text-align: center; font-size: 10px; color: #64748b; margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
@@ -22,6 +22,7 @@
     </style>
 </head>
 <body>
+    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
     @include('partials.pdf-branding-header', [
         'orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'),
         'logoSrc' => $logoSrc ?? null,

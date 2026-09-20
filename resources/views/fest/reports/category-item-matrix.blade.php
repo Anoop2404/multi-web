@@ -20,6 +20,7 @@ tbody td.overall-col{background:#c8d6ea;color:#1d3557}
 .page-note{text-align:right;font-size:8px;color:#64748b;margin:0 0 2px}
 </style>
 </head><body>
+    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
 <h2 style="text-align:center">{{ $event->title }} — Category & Item-wise Consolidated Report</h2>

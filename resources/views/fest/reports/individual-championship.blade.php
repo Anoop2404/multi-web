@@ -19,6 +19,7 @@ tbody tr:nth-child(even){background:#f7f9fc}
 .empty{text-align:center;color:#64748b;margin-top:40px;font-size:12px}
 </style>
 </head><body>
+    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
 <h2 style="text-align:center;margin:4px 0 2px;font-size:16px;color:#0f172a">{{ $event->title }} — Individual Championship</h2>

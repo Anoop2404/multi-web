@@ -263,6 +263,7 @@
     </style>
 </head>
 <body>
+    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
 
 <div class="report-header">
     @include('partials.pdf-branding-header', [
