@@ -906,6 +906,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::post('/schools/bulk-send-credentials', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'bulkSendCredentials'])->name('schools.bulk-send-credentials');
         Route::post('/schools/bulk-create-login', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'bulkCreateLogin'])->name('schools.bulk-create-login');
         Route::get('/schools/export', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'export'])->name('schools.export');
+        Route::get('/schools/export-id-card-codes', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'exportSchoolCodes'])->name('schools.export-id-card-codes');
         Route::get('/schools/{school}/students', [\App\Http\Controllers\SahodayaAdmin\SchoolStudentsController::class, 'show'])->name('schools.students');
         Route::get('/schools/{school}', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'show'])->name('schools.show');
         Route::post('/schools/{school}/create-login', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'createSchoolLogin'])->name('schools.create-login');

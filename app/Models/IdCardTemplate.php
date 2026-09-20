@@ -41,6 +41,11 @@ class IdCardTemplate extends Model
             'id_number'        => 'ID number',
             'secondary_value'  => 'Secondary value (chest no. etc)',
             'chest_number'     => 'Chest number',
+            'category'         => 'Category (class/age group)',
+            'gender'           => 'Gender',
+            'school_code'      => 'School code (Sahodaya prefix + school no.)',
+            'student_reg_no'   => "Student's registration no.",
+            'student_class'    => 'Class',
             'schedule'         => 'Schedule line',
             'footer'           => 'Footer text',
         ];

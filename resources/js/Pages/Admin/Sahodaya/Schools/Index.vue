@@ -125,8 +125,13 @@
                             Clear
                         </button>
                     </div>
+                    <a :href="`/sahodaya-admin/${sahodaya.id}/schools/export-id-card-codes`"
+                       class="ml-auto inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                       title="Every approved school's ID-card code (Sahodaya prefix + permanent school number) in one sheet">
+                        ID card codes ↓
+                    </a>
                     <a :href="exportUrl()"
-                       class="ml-auto inline-flex items-center gap-1.5 rounded-xl border border-[#bfdbfe] bg-[#eff6ff] px-4 py-2.5 text-sm font-semibold text-[#0f3d7a] transition hover:bg-[#dbeafe]">
+                       class="inline-flex items-center gap-1.5 rounded-xl border border-[#bfdbfe] bg-[#eff6ff] px-4 py-2.5 text-sm font-semibold text-[#0f3d7a] transition hover:bg-[#dbeafe]">
                         Download Excel ↓
                     </a>
                 </div>

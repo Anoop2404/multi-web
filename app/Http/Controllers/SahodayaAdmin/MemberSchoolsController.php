@@ -159,6 +159,36 @@ class MemberSchoolsController extends SahodayaAdminController
         ], $rows);
     }
 
+    /**
+     * Reference sheet for the ID-card "school code" (Sahodaya prefix + permanent
+     * per-school number, e.g. "MCS-027" — see Tenant::schoolCode()) — every approved
+     * school under this Sahodaya, one row each, so an admin configuring or checking
+     * printed cards can look up which code belongs to which school. Calling
+     * schoolCode() here also lazily assigns a number to any school that doesn't have
+     * one yet, in name order — the closest this Sahodaya gets to a one-time backfill
+     * without a separate console command.
+     */
+    public function exportSchoolCodes(): StreamedResponse
+    {
+        $schools = Tenant::where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->where('membership_status', 'approved')
+            ->orderBy('name')
+            ->get();
+
+        $rows = $schools
+            ->map(fn (Tenant $school) => [
+                'school' => $school->name,
+                'code'   => $school->schoolCode() ?? '—',
+                'no'     => $school->school_no,
+            ])
+            ->sortBy('no')
+            ->values()
+            ->map(fn (array $row) => [$row['school'], $row['code']]);
+
+        return ExcelExport::download('school-id-card-codes', ['School', 'ID card code'], $rows);
+    }
+
     public function show(string $tenantId, Tenant $school)
     {
         abort_if($school->parent_id !== $this->sahodaya->id || $school->type !== 'school', 404);

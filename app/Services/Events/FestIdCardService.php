@@ -749,6 +749,8 @@ class FestIdCardService
             'photo_src'       => $photoSrc,
             'subtitle'        => $school,
             'school_name'     => $school,
+            'school_code'     => $p->registration?->school?->schoolCode(),
+            'student_reg_no'  => $p->student?->reg_no ?? $p->teacher?->reg_no ?? null,
             'student_class'   => $studentClass,
             'class_category'  => $classCategory,
             'event_name'      => $event->title,

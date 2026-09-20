@@ -33,7 +33,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     protected $fillable = [
         'id', 'type', 'name', 'domain', 'subdomain',
         'parent_id', 'plan', 'is_active', 'fest_registration_closed',
-        'school_prefix', 'membership_status', 'is_non_affiliated', 'is_appeal_pool', 'renewal_status', 'application_payload', 'prefixes_locked',
+        'school_prefix', 'school_no', 'membership_status', 'is_non_affiliated', 'is_appeal_pool', 'renewal_status', 'application_payload', 'prefixes_locked',
         'school_setup_wizard_dismissed', 'nav_overrides',
     ];
 
@@ -47,6 +47,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         'nav_overrides'             => 'array',
         'prefixes_locked'           => 'boolean',
         'school_setup_wizard_dismissed' => 'boolean',
+        'school_no'                 => 'integer',
     ];
 
     public static function getCustomColumns(): array
@@ -54,7 +55,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         return [
             'id', 'type', 'name', 'domain', 'subdomain', 'parent_id', 'plan', 'is_active',
             'fest_registration_closed',
-            'school_prefix', 'membership_status', 'is_non_affiliated', 'is_appeal_pool', 'renewal_status', 'application_payload', 'prefixes_locked',
+            'school_prefix', 'school_no', 'membership_status', 'is_non_affiliated', 'is_appeal_pool', 'renewal_status', 'application_payload', 'prefixes_locked',
             'school_setup_wizard_dismissed', 'nav_overrides',
         ];
     }
@@ -99,6 +100,67 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     public function sahodayaProfile() { return $this->hasOne(SahodayaProfile::class, 'tenant_id'); }
     public function registrations()   { return $this->hasMany(Registration::class, 'school_id'); }
     public function submissions()     { return $this->hasMany(SchoolYearSubmission::class, 'school_id'); }
+
+    /**
+     * A school's printable "code" for ID cards etc. — {Sahodaya prefix}-{permanent
+     * per-Sahodaya school number, zero-padded to 3 digits}, e.g. "MCS-027". The
+     * number is assigned lazily (on first call, for whichever school asks first) and
+     * then stays fixed forever — see assignNextSchoolNo() — so cards already printed
+     * never go stale. Returns null for a non-school tenant, or a school whose
+     * Sahodaya has no SahodayaProfile.prefix set yet.
+     */
+    public function schoolCode(): ?string
+    {
+        if ($this->type !== 'school' || ! $this->parent_id) {
+            return null;
+        }
+
+        $prefix = Tenant::find($this->parent_id)?->sahodayaProfile?->prefix;
+        if (! $prefix) {
+            return null;
+        }
+
+        // Cached on this instance too, not just re-fetched — schoolCode() can be
+        // called repeatedly on the same in-memory Tenant (e.g. once per card on a
+        // print run) and must not re-run assignNextSchoolNo() each time, which would
+        // otherwise see this instance's own $school_no still null and hand out a
+        // second, wrong number for the same school.
+        $schoolNo = $this->school_no ?? static::assignNextSchoolNo($this->parent_id, $this->id);
+        $this->school_no = $schoolNo;
+
+        return $prefix.'-'.str_pad((string) $schoolNo, 3, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Assigns the next free per-Sahodaya school number (1, 2, 3...) to $schoolId and
+     * persists it — locks every school row under this Sahodaya for the duration so two
+     * concurrent callers (e.g. two ID cards rendering at once for different
+     * first-time schools) can't both compute the same next number. Re-checks the
+     * target row's own school_no under lock first, so calling this twice for a school
+     * that already has one (a stale caller, or a concurrent assignment that just won
+     * the race) returns the existing number instead of handing out a second one.
+     */
+    public static function assignNextSchoolNo(string $sahodayaId, string $schoolId): int
+    {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($sahodayaId, $schoolId) {
+            $existing = static::where('id', $schoolId)->lockForUpdate()->value('school_no');
+            if ($existing) {
+                return $existing;
+            }
+
+            // Postgres rejects FOR UPDATE combined with an aggregate (max()) in one
+            // query — lock the rows with a plain SELECT instead and take the max in
+            // PHP from the locked set.
+            $max = static::where('parent_id', $sahodayaId)->where('type', 'school')
+                ->lockForUpdate()
+                ->pluck('school_no')
+                ->max();
+            $next = ((int) $max) + 1;
+            static::where('id', $schoolId)->update(['school_no' => $next]);
+
+            return $next;
+        });
+    }
 
     public function isMembershipApproved(): bool
     {
