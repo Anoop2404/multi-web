@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Tenant;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -13,6 +14,9 @@ class TenantStorage
 {
     /** Local disk for dev uploads (not tenant-suffixed). */
     public const SHARED_DISK = 'shared';
+
+    /** Must match photoBase64DataUri()'s default $maxDimension — see storePhotoWithThumbnail(). */
+    private const PHOTO_THUMBNAIL_MAX_DIMENSION = 160;
 
     public static function uploadDisk(): string
     {
@@ -295,6 +299,33 @@ class TenantStorage
         return null;
     }
 
+    /**
+     * Cache::remember() a photo data URI, guarded by a short-lived lock so a burst of
+     * concurrent requests for the same cold cache key (e.g. right after a fest result
+     * publishes) don't all redo the S3 fetch + resize at once — only the first request
+     * does the work, the rest wait briefly and then reuse its result. Falls back to an
+     * unlocked remember() if the cache store doesn't support atomic locks (e.g. the
+     * file driver in local dev) or the lock can't be acquired in time.
+     */
+    public static function rememberPhotoDataUri(string $cacheKey, ?Tenant $tenant, ?string $photo): ?string
+    {
+        $remember = fn () => Cache::remember(
+            $cacheKey,
+            now()->addDays(30),
+            fn () => self::photoBase64DataUri($tenant, $photo),
+        );
+
+        if (Cache::has($cacheKey)) {
+            return $remember();
+        }
+
+        try {
+            return Cache::lock('lock:'.$cacheKey, 10)->block(5, $remember);
+        } catch (\Throwable) {
+            return $remember();
+        }
+    }
+
     public static function downloadResponse(Tenant $tenant, string $relativePath): BinaryFileResponse|StreamedResponse|Response
     {
         $relativePath = ltrim($relativePath, '/');
@@ -319,12 +350,45 @@ class TenantStorage
 
     public static function storeStudentPhoto($file, string $schoolId): string
     {
-        return self::storeUploadedFile($file, 'students/'.$schoolId, self::photosDisk());
+        return self::storePhotoWithThumbnail($file, 'students/'.$schoolId, self::photosDisk());
     }
 
     public static function storeTeacherPhoto($file, string $schoolId): string
     {
-        return self::storeUploadedFile($file, 'teachers/'.$schoolId, self::photosDisk());
+        return self::storePhotoWithThumbnail($file, 'teachers/'.$schoolId, self::photosDisk());
+    }
+
+    /**
+     * Like storeUploadedFile(), but also generates and stores a small pre-shrunk
+     * thumbnail alongside the original, so a cold-cache photoBase64DataUri() call can
+     * fetch a few KB instead of downloading the full-resolution original (up to 2MB)
+     * and running imagecopyresampled() on every cache miss. Thumbnail generation is a
+     * pure optimization — any failure here is swallowed, never fails the upload.
+     */
+    private static function storePhotoWithThumbnail($file, string $directory, string $disk): string
+    {
+        $path = self::storeUploadedFile($file, $directory, $disk);
+
+        try {
+            $realPath = method_exists($file, 'getRealPath') ? $file->getRealPath() : null;
+            $original = is_string($realPath) && $realPath !== '' ? @file_get_contents($realPath) : false;
+
+            if (is_string($original) && $original !== '') {
+                $shrunk = self::shrinkImageForEmbed($original, self::PHOTO_THUMBNAIL_MAX_DIMENSION);
+                if ($shrunk) {
+                    self::disk($disk)->put(self::thumbnailPath($path), $shrunk[0]);
+                }
+            }
+        } catch (\Throwable) {
+            // ignore — the original upload already succeeded.
+        }
+
+        return $path;
+    }
+
+    private static function thumbnailPath(string $relativePath): string
+    {
+        return $relativePath.'.thumb.jpg';
     }
 
     /** Embed path as data URI or local filesystem path for PDF rendering. */
@@ -408,6 +472,13 @@ class TenantStorage
 
         $relativePath = ltrim($relativePath, '/');
 
+        if ($maxDimension === self::PHOTO_THUMBNAIL_MAX_DIMENSION) {
+            $prebuilt = self::fetchPrebuiltThumbnail($tenant, $relativePath);
+            if ($prebuilt) {
+                return $prebuilt;
+            }
+        }
+
         $local = self::localAbsolutePath($tenant, $relativePath);
         if ($local && is_file($local)) {
             $contents = @file_get_contents($local);
@@ -429,6 +500,37 @@ class TenantStorage
                     ?? [$contents, self::detectMimeFromBytes($contents)];
 
                 return 'data:'.$mime.';base64,'.base64_encode($contents);
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Fetch a thumbnail written by storePhotoWithThumbnail() at upload time, without
+     * touching the full-resolution original at all. Returns null (caller falls back to
+     * fetching + resizing the original) for photos uploaded before this existed.
+     */
+    private static function fetchPrebuiltThumbnail(?Tenant $tenant, string $relativePath): ?string
+    {
+        $thumbPath = self::thumbnailPath($relativePath);
+
+        $local = self::localAbsolutePath($tenant, $thumbPath);
+        if ($local && is_file($local)) {
+            $contents = @file_get_contents($local);
+            if ($contents !== false && $contents !== '') {
+                return 'data:image/jpeg;base64,'.base64_encode($contents);
+            }
+        }
+
+        foreach (self::downloadDisks() as $disk) {
+            try {
+                $contents = self::disk($disk)->get($thumbPath);
+                if ($contents !== null && $contents !== '') {
+                    return 'data:image/jpeg;base64,'.base64_encode($contents);
+                }
             } catch (\Throwable) {
                 continue;
             }

@@ -135,15 +135,8 @@ class Student extends Model
         }
 
         $cacheKey = 'student-photo-thumb:'.$this->id.':'.($this->updated_at?->timestamp ?? 0);
+        $tenant = $this->relationLoaded('tenant') ? $this->tenant : Tenant::find($this->tenant_id);
 
-        return \Illuminate\Support\Facades\Cache::remember(
-            $cacheKey,
-            now()->addDays(30),
-            function () {
-                $tenant = $this->relationLoaded('tenant') ? $this->tenant : Tenant::find($this->tenant_id);
-
-                return TenantStorage::photoBase64DataUri($tenant, $this->photo);
-            },
-        );
+        return TenantStorage::rememberPhotoDataUri($cacheKey, $tenant, $this->photo);
     }
 }
