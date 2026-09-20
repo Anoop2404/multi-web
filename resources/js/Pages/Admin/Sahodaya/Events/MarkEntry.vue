@@ -123,13 +123,10 @@
                         View full status report →
                     </Link>
                     <!-- Only shown with 2+ items in view — with exactly one, this would sit right
-                         above that section's own identical "Auto-rank"/"Auto-grade" buttons
-                         (below), duplicating them for the everyday single-item workflow. -->
-                    <button v-if="sections.length > 1" type="button" class="btn-secondary text-xs !py-1.5 !px-3 shrink-0 whitespace-nowrap" :disabled="itemLocked" @click="autoRankAll">
-                        Auto-rank All
-                    </button>
-                    <button v-if="sections.length > 1 && showGradeColumn" type="button" class="btn-secondary text-xs !py-1.5 !px-3 shrink-0 whitespace-nowrap" :disabled="itemLocked" @click="autoGradeAll">
-                        Auto-grade All
+                         above that section's own identical "Auto-rank & Grade" button (below),
+                         duplicating it for the everyday single-item workflow. -->
+                    <button v-if="sections.length > 1" type="button" class="btn-secondary text-xs !py-1.5 !px-3 shrink-0 whitespace-nowrap" :disabled="itemLocked" @click="autoRankAndGradeAll">
+                        Auto-rank &amp; Grade All
                     </button>
                     <button v-if="sections.length" type="button" class="btn-primary text-xs !py-1.5 !px-4 shrink-0 whitespace-nowrap"
                             :disabled="bulkSaving || itemLocked" @click="saveAll">
@@ -256,11 +253,8 @@
                             </button>
                         </div>
 
-                        <button v-if="section.item?.id" type="button" class="btn-secondary text-xs !py-1 !px-2.5 shrink-0 whitespace-nowrap" :disabled="itemLocked" @click="autoRankSection(section)">
-                            Auto-rank
-                        </button>
-                        <button v-if="section.item?.id && showGradeColumn" type="button" class="btn-secondary text-xs !py-1 !px-2.5 shrink-0 whitespace-nowrap" :disabled="itemLocked" @click="autoGrade(section)">
-                            Auto-grade
+                        <button v-if="section.item?.id" type="button" class="btn-secondary text-xs !py-1 !px-2.5 shrink-0 whitespace-nowrap" :disabled="itemLocked" @click="autoRankAndGrade(section)">
+                            Auto-rank &amp; Grade
                         </button>
                         <button v-if="section.item?.id" type="button" class="text-xs !py-1 !px-2.5 shrink-0 whitespace-nowrap rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 font-medium" :disabled="itemLocked" @click="clearAllMarks(section)">
                             Clear All Marks
@@ -862,9 +856,18 @@ function autoGrade(section) {
     }
 }
 
-function autoGradeAll() {
-    for (const section of sections.value) {
+// Combined single-click version — auto-rank always applies, grade only
+// when this event actually shows a grade column (sports events, etc. don't).
+function autoRankAndGrade(section) {
+    autoRankSection(section);
+    if (showGradeColumn.value) {
         autoGrade(section);
+    }
+}
+
+function autoRankAndGradeAll() {
+    for (const section of sections.value) {
+        autoRankAndGrade(section);
     }
 }
 
@@ -1110,12 +1113,6 @@ function autoRankSection(section) {
             lastScore = scoredRows[i].score;
         }
         setRank(scoredRows[i].participantId, scoredRows[i].item, markForms, currentRank);
-    }
-}
-
-function autoRankAll() {
-    for (const section of sections.value) {
-        autoRankSection(section);
     }
 }
 
