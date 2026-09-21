@@ -561,6 +561,48 @@ class TenantStorage
     }
 
     /**
+     * Embed a certificate/ID-card background image as a base64 data URI for PDF rendering.
+     *
+     * Unlike photoBase64DataUri(), this also handles the case where $path is an HTTP/HTTPS
+     * URL (e.g. an S3 signed URL or a public CDN URL) by downloading the bytes locally and
+     * re-embedding them — the Chromium PDF microservice cannot load arbitrary external URLs.
+     *
+     * Falls back to null only when the image cannot be read by any means.
+     */
+    public static function backgroundDataUri(?Tenant $tenant, ?string $path, int $maxDimension = 1600): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+
+        if (str_starts_with($path, 'data:image/')) {
+            return $path;
+        }
+
+        // For storage-relative paths, delegate to the existing method (handles local + all disks).
+        if (! str_starts_with($path, 'http://') && ! str_starts_with($path, 'https://')) {
+            return self::photoBase64DataUri($tenant, $path, $maxDimension);
+        }
+
+        // The path is already a full URL (e.g. an S3 signed URL resolved by logoUrl()).
+        // Download it locally so we can embed it as base64 — the PDF renderer is an external
+        // Chromium service that cannot load application-server URLs.
+        try {
+            $ctx = stream_context_create(['http' => ['timeout' => 10, 'ignore_errors' => true]]);
+            $contents = @file_get_contents($path, false, $ctx);
+            if ($contents === false || $contents === '') {
+                return null;
+            }
+            [$contents, $mime] = self::shrinkImageForEmbed($contents, $maxDimension)
+                ?? [$contents, self::detectMimeFromBytes($contents)];
+
+            return 'data:'.$mime.';base64,'.base64_encode($contents);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
      * Fetch a thumbnail written by storePhotoWithThumbnail() at upload time, without
      * touching the full-resolution original at all. Returns null (caller falls back to
      * fetching + resizing the original) for photos uploaded before this existed.

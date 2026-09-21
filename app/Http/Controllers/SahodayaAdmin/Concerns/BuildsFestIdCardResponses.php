@@ -79,7 +79,15 @@ trait BuildsFestIdCardResponses
         return array_merge($base, [
             'backgroundUrl' => $customTemplate->background_path
                 ? ($isPdf
-                    ? (TenantStorage::photoBase64DataUri($sahodaya, $customTemplate->background_path, 1600) ?: TenantStorage::logoUrl($sahodaya, $customTemplate->background_path))
+                    // For PDF generation the external Chromium service cannot load relative
+                    // URLs ("/storage/...") or signed S3 URLs without network access.
+                    // backgroundDataUri() embeds the image as base64 so it travels inline
+                    // in the HTML string sent to the renderer. If embedding fails we fall
+                    // back to an absolute URL using the app's own base URL so that a
+                    // self-hosted Chromium instance on the same server can still load it.
+                    ? (TenantStorage::backgroundDataUri($sahodaya, $customTemplate->background_path)
+                        ?: (($u = TenantStorage::logoUrl($sahodaya, $customTemplate->background_path)) && ! str_starts_with($u, '/') ? $u : url($u ?? ''))
+                      )
                     : TenantStorage::logoUrl($sahodaya, $customTemplate->background_path))
                 : null,
             'fields'        => $customTemplate->fields(),
