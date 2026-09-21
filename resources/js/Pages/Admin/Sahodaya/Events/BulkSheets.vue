@@ -167,10 +167,23 @@ const reportTypeOptions = [
 const comboSelectedTypes = ref([...props.bulkReportCombo]);
 const savingCombo = ref(false);
 
+// Every report in the combo downloads as a real file (Content-Disposition: attachment),
+// not a page to view -- so this triggers each one via a throwaway <a> click instead of
+// window.open(). Browsers only ever let the first window.open() per click through as a
+// real popup and silently block the rest ("multiple popups" protection), which is
+// exactly why several checked reports never showed up. A clicked <a> isn't a new window
+// at all, just a download, so it isn't subject to that block.
 function downloadCombo() {
     reportTypeOptions
         .filter((type) => comboSelectedTypes.value.includes(type.key))
-        .forEach((type) => window.open(type.url(), '_blank'));
+        .forEach((type) => {
+            const link = document.createElement('a');
+            link.href = type.url();
+            link.rel = 'noopener';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
 }
 
 function saveComboAsDefault() {
