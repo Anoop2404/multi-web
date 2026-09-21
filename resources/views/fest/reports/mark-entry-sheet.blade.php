@@ -62,7 +62,7 @@
                         <tr class="item-context-row">
                             <th colspan="{{ $sheet['judge_count'] + 3 }}">
                                 @if(!empty($sheet['sheet_label']))
-                                    <span style="background: #0f172a; color: #ffffff; padding: 2px 7px; border-radius: 3px; font-size: 10px; letter-spacing: 0.03em; margin-right: 6px;">{{ $sheet['sheet_label'] }}</span>
+                                    <span style="font-weight: bold; margin-right: 6px;">{{ $sheet['sheet_label'] }} —</span>
                                 @endif
                                 {{ implode(' · ', $itemInfoParts) }} &middot; {{ count($sheet['rows']) }} participants
                             </th>
@@ -105,7 +105,7 @@
                         <tr class="item-context-row">
                             <th colspan="{{ 2 + ($sheet['criteria']->isNotEmpty() ? $sheet['criteria']->count() + 1 : 1) }}">
                                 @if(!empty($sheet['sheet_label']))
-                                    <span style="background: #0f172a; color: #ffffff; padding: 2px 7px; border-radius: 3px; font-size: 10px; letter-spacing: 0.03em; margin-right: 6px;">{{ $sheet['sheet_label'] }}</span>
+                                    <span style="font-weight: bold; margin-right: 6px;">{{ $sheet['sheet_label'] }} —</span>
                                 @endif
                                 {{ implode(' · ', $itemInfoParts) }} &middot; {{ count($sheet['rows']) }} participants
                             </th>

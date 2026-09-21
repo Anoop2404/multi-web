@@ -24,11 +24,10 @@
              name/category goes in that sheet's own table <thead> instead, since that's
              scoped correctly to just the pages that ONE item's table spans. --}}
         .pdf-page-header { position: fixed; top: -98px; left: 0; right: 0; }
-        {{-- Same dark item bar every other Bulk Sheets report type uses -- see
-             .item-heading-bar in fest.reports.attendance-sheet and the equivalent row in
-             fest.chest-numbers-print. --}}
-        .item-context-row th { background: #0f172a; color: #ffffff; border: none; padding: 7px 10px; font-weight: bold; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; }
-        .item-context-row .item-meta { font-weight: normal; font-size: 10px; color: #94a3b8; text-transform: none; margin-left: 8px; }
+        {{-- Plain text, no dark box -- matches mark-entry-sheet.blade.php's own
+             item-context-row styling. --}}
+        .item-context-row th { background: #ffffff; color: #0f172a; border: none; padding: 4px 0 8px; font-weight: bold; font-size: 12px; }
+        .item-context-row .item-meta { font-weight: normal; font-size: 10px; color: #64748b; margin-left: 8px; }
     </style>
 </head>
 <body>

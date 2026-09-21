@@ -304,7 +304,7 @@ class FestChestNumberController extends SahodayaAdminController
         };
         $inline = $request->boolean('inline') || $request->boolean('preview');
 
-        [$headerTemplate, $footerTemplate] = $this->chestNumberHeaderFooterTemplates($event, $orgName, $logoSrc);
+        [$headerTemplate, $footerTemplate] = $this->chestNumberHeaderFooterTemplates($event, $orgName, $logoSrc, $item, $itemCategory, $item ? count($rows) : 0);
 
         return PdfGenerator::download(
             $html,
@@ -313,26 +313,29 @@ class FestChestNumberController extends SahodayaAdminController
             false,
             $headerTemplate,
             $footerTemplate,
-            ['top' => '32mm', 'right' => '10mm', 'bottom' => '14mm', 'left' => '10mm'],
+            ['top' => '38mm', 'right' => '10mm', 'bottom' => '14mm', 'left' => '10mm'],
         );
     }
 
     /**
      * Renders the exact same partials.pdf-report-heading Blade partial the dompdf path
-     * uses, via \App\Support\PdfChromeHeaderFooter -- see that class's own docblock.
-     * Ignored by the dompdf fallback. Item name/category deliberately NOT included --
-     * the dark .item-bar-row in the blade (repeats on every page) is the one place that
-     * shows, matching every other Bulk Sheets report type instead of showing it twice.
+     * uses, via \App\Support\PdfChromeHeaderFooter -- see that class's own docblock. Item
+     * name/category shown here as plain text (not a dark bar/badge) -- this document
+     * only ever covers one item (or none), so naming it once in the top header is
+     * enough. Ignored by the dompdf fallback.
      *
      * @return array{0: string, 1: string}
      */
-    private function chestNumberHeaderFooterTemplates(FestEvent $event, string $orgName, ?string $logoSrc): array
+    private function chestNumberHeaderFooterTemplates(FestEvent $event, string $orgName, ?string $logoSrc, ?FestEventItem $item, ?string $itemCategory, int $participantCount = 0): array
     {
         return \App\Support\PdfChromeHeaderFooter::build([
-            'orgName'    => $orgName,
-            'logoSrc'    => $logoSrc,
-            'docTitle'   => 'CHEST NUMBER LIST',
-            'eventTitle' => $event->title,
+            'orgName'          => $orgName,
+            'logoSrc'          => $logoSrc,
+            'docTitle'         => 'CHEST NUMBER LIST',
+            'eventTitle'       => $event->title,
+            'item'             => $item,
+            'categoryLabel'    => $itemCategory,
+            'participantCount' => $participantCount > 0 ? $participantCount : null,
         ]);
     }
 

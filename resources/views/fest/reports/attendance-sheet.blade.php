@@ -170,28 +170,21 @@
             text-align: center;
             line-height: 36px;
         }
-        {{-- Now a <thead> row (see the usage site's own comment for why), not a
-             standalone div -- background/padding move to the cell itself. --}}
+        {{-- Plain text, no dark box -- a <thead> row (see the usage site's own comment
+             for why) only needed at all when this document covers more than one item,
+             since a single item is already named once, plainly, in the top header. --}}
         .item-heading-bar th {
-            background: #0f172a;
-            color: #ffffff;
-            padding: 6px 10px;
+            background: #ffffff;
+            color: #0f172a;
+            padding: 0 0 6px;
             font-size: 12px;
             font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
             border: none;
         }
         .item-heading-bar .count-badge {
             float: right;
-            background: #334155;
-            color: #f8fafc;
-            font-size: 10px;
-            padding: 2px 8px;
-            border-radius: 10px;
             font-weight: normal;
-            text-transform: none;
-            letter-spacing: normal;
+            color: #64748b;
         }
         .brand-row td, .foot-row td {
             border: none;
@@ -284,14 +277,24 @@
         'logoSrc' => $logo ?? null,
         'docTitle' => 'ATTENDANCE SHEET',
     ])
-    {{-- Item name/category deliberately NOT shown here -- .item-heading-bar below (now
-         always visible, see its own comment) is the one place that appears, same as
-         every other Bulk Sheets report type. Showing it in both places read as two
-         different-looking labels for the same thing rather than one consistent one. --}}
+    {{-- Plain text, no dark box -- shown here (not a bar/badge near the table) when this
+         document covers exactly one item, since the fixed/native header already repeats
+         on every physical page on its own; no per-page thead trick needed for that case.
+         Multiple items in one document still get a plain per-section label in each
+         table's own thead instead, since a single top-level header can't vary per item. --}}
     <div class="event-context-bar" style="margin-top: 4px; padding-top: 4px; border-top: 1px solid #e2e8f0; display: block;">
         <div style="font-size: 9px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px;">
             {{ $event->title }}
         </div>
+        @if(!empty($singleItemMetaStr))
+            <div style="font-size: 12px; font-weight: 800; color: #0f172a; margin-top: 2px;">
+                {!! $singleItemMetaStr !!}
+            </div>
+        @elseif(!empty($singleItemName))
+            <div style="font-size: 12px; font-weight: 800; color: #0f172a; margin-top: 2px;">
+                {{ $singleItemName }}
+            </div>
+        @endif
     </div>
 </div>
 @endif
@@ -378,15 +381,15 @@
         @endphp
         <table>
             <thead>
-                {{-- This used to be a standalone .item-heading-bar div shown once before
-                     the table -- fine on the first physical page of an item's section,
-                     but silently absent on any continuation page once that item's own
-                     rows naturally overflowed onto it (a div outside the table doesn't
-                     repeat; dompdf/Chromium only ever natively reprint an actual <thead>,
-                     which is why the Sl/Order/... column row below already survived
-                     pagination and this didn't). Moved inside <thead> and made
-                     unconditional -- matches mark-entry-sheet.blade.php's JUDGE N SHEET/
-                     SUM SHEET badge, which never had this gap for exactly this reason. --}}
+                {{-- Only needed when this document covers more than one item -- with a
+                     single item, the fixed/native header above already names it once and
+                     repeats on every physical page on its own. A div outside the table
+                     used to be the only place this showed, which silently went missing on
+                     any continuation page once an item's own rows naturally overflowed
+                     onto it (a div doesn't repeat; only an actual <thead> does, which is
+                     why the Sl/Order/... column row below already survived that). Moved
+                     inside <thead> so the multi-item case gets the same reliability. --}}
+                @if($rowsByItem->count() > 1)
                 <tr class="item-heading-bar">
                     <th colspan="{{ $colspan }}">
                         {{ $cleanTitle }}
@@ -398,6 +401,7 @@
                         <span class="count-badge">{!! $countLabel !!}</span>
                     </th>
                 </tr>
+                @endif
                 <tr>
                     <th style="width: 28px;" class="text-center">Sl</th>
                     <th style="width: 50px;" class="text-center">Order</th>

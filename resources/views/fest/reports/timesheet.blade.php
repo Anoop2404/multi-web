@@ -113,28 +113,21 @@
             border-radius: 3px;
             margin-top: 1px;
         }
-        {{-- Now a <thead> row (see the usage site's own comment for why), not a
-             standalone div -- background/padding move to the cell itself. --}}
+        {{-- Plain text, no dark box -- a <thead> row (see the usage site's own comment
+             for why) only needed at all when this document covers more than one item,
+             since a single item is already named once, plainly, in the top header. --}}
         .item-heading-bar th {
-            background: #0f172a;
-            color: #ffffff;
-            padding: 6px 10px;
+            background: #ffffff;
+            color: #0f172a;
+            padding: 0 0 6px;
             font-size: 12px;
             font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
             border: none;
         }
         .item-heading-bar .count-badge {
             float: right;
-            background: #334155;
-            color: #f8fafc;
-            font-size: 10px;
-            padding: 2px 8px;
-            border-radius: 10px;
             font-weight: normal;
-            text-transform: none;
-            letter-spacing: normal;
+            color: #64748b;
         }
         .brand-cell-table {
             width: 100%;
@@ -199,12 +192,21 @@
         'logoSrc' => $logo ?? null,
         'docTitle' => 'TIMESHEET',
     ])
-    {{-- Item name/category deliberately NOT shown here -- see the matching comment in
-         fest.reports.attendance-sheet. --}}
+    {{-- Plain text, no dark box -- see the matching comment in fest.reports.attendance-sheet
+         for the single-item vs. multi-item split this follows. --}}
     <div class="event-context-bar" style="margin-top: 4px; padding-top: 4px; border-top: 1px solid #e2e8f0; display: block;">
         <div style="font-size: 9px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px;">
             {{ $event->title }}
         </div>
+        @if(!empty($singleItemMetaStr))
+            <div style="font-size: 12px; font-weight: 800; color: #0f172a; margin-top: 2px;">
+                {!! $singleItemMetaStr !!}
+            </div>
+        @elseif(!empty($singleItemName))
+            <div style="font-size: 12px; font-weight: 800; color: #0f172a; margin-top: 2px;">
+                {{ $singleItemName }}
+            </div>
+        @endif
     </div>
 </div>
 @endif
@@ -281,11 +283,11 @@
         @endphp
         <table>
             <thead>
-                {{-- See the matching comment in fest.reports.attendance-sheet -- this
-                     used to be a standalone div shown once before the table, silently
-                     absent on any page this item's own rows naturally overflowed onto.
-                     Now inside <thead> and unconditional, matching mark-entry-sheet's
-                     JUDGE N SHEET/SUM SHEET badge, which never had this gap. --}}
+                {{-- See the matching comment in fest.reports.attendance-sheet -- only
+                     needed when this document covers more than one item; a single item
+                     is already named once, plainly, in the top header, which repeats on
+                     every physical page on its own. --}}
+                @if($rowsByItem->count() > 1)
                 <tr class="item-heading-bar">
                     <th colspan="7">
                         {{ $cleanTitle }}
@@ -297,6 +299,7 @@
                         <span class="count-badge">{!! $countLabel !!}</span>
                     </th>
                 </tr>
+                @endif
                 <tr>
                     <th style="width: 32px;" class="text-center">Sl.No.</th>
                     <th style="width: 60px;" class="text-center">Chest</th>
