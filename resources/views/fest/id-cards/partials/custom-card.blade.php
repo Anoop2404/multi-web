@@ -25,15 +25,8 @@
             @endif
         @elseif($type === 'item_row')
             @if($value !== null && $value !== '')
-                @php
-                    $rowColors = ['#EC4899', '#F97316', '#EAB308', '#22C55E', '#06B6D4', '#6366F1', '#A855F7'];
-                    $rowNum = (int) ($field['row'] ?? 1);
-                    $rowColor = $rowColors[($rowNum - 1) % count($rowColors)];
-                    $rowTop = $field['top'] ?? 0;
-                @endphp
-                <div class="card__item-badge" style="top:{{ $rowTop }}%; background:{{ $rowColor }};">{{ $rowNum }}</div>
-                <div class="card__item-bar" style="top:{{ $rowTop }}%;"></div>
-                <div class="card__item-text" style="top:{{ $rowTop }}%;">{{ $value }}</div>
+                @php $rowNum = (int) ($field['row'] ?? 1); @endphp
+                <div class="card__item-text" style="top:{{ $field['top'] ?? 0 }}%;">{{ $rowNum }}) {{ $value }}</div>
             @endif
         @elseif($type === 'shape')
             @php

@@ -23,19 +23,11 @@
                          :style="{ top: `${field.top ?? 4}%`, left: `${field.left ?? 82}%`, width: `${field.width ?? 14}%`, height: `${field.height ?? 14}%` }">
                         QR
                     </div>
-                    <template v-else-if="field.type === 'item_row'">
-                        <div v-if="sampleValue(field.source)" class="absolute rounded-full text-white flex items-center justify-center"
-                             :style="{ top: `${field.top ?? 0}%`, left: '5.56%', width: '2.89%', height: '1.86%', background: rowColor(field.row), fontSize: '5px', fontWeight: 'bold' }">
-                            {{ field.row ?? 1 }}
-                        </div>
-                        <div v-if="sampleValue(field.source)" class="absolute rounded-full"
-                             :style="{ top: `${field.top ?? 0}%`, left: '10%', width: '84.44%', height: '1.57%', background: '#eef2f9' }">
-                        </div>
-                        <div v-if="sampleValue(field.source)" class="absolute flex items-center overflow-hidden whitespace-nowrap text-ellipsis"
-                             :style="{ top: `${field.top ?? 0}%`, left: '11.11%', width: '82.22%', height: '1.57%', fontSize: '5px', color: '#1e293b' }">
-                            {{ sampleValue(field.source) }}
-                        </div>
-                    </template>
+                    <div v-else-if="field.type === 'item_row' && sampleValue(field.source)"
+                         class="absolute flex items-center overflow-hidden whitespace-nowrap text-ellipsis"
+                         :style="{ top: `${field.top ?? 0}%`, left: '8%', width: '84%', height: '2.2%', fontSize: '9px', fontWeight: 'bold', color: '#12345a' }">
+                        {{ field.row ?? 1 }}) {{ sampleValue(field.source) }}
+                    </div>
                     <div v-else-if="field.type === 'shape'" class="absolute"
                          :style="{ top: `${field.top ?? 0}%`, left: `${field.left ?? 0}%`, width: `${field.width ?? 20}%`, height: `${field.height ?? 10}%`, borderRadius: `${field.radius ?? 0}mm`, background: shapeBackground(field) }">
                     </div>
@@ -132,12 +124,6 @@ const SAMPLE = {
 function sampleValue(source) {
     if (!source) return null;
     return SAMPLE[source] ?? null;
-}
-
-const ROW_COLORS = ['#EC4899', '#F97316', '#EAB308', '#22C55E', '#06B6D4', '#6366F1', '#A855F7'];
-function rowColor(row) {
-    const n = Math.max(1, Number(row) || 1);
-    return ROW_COLORS[(n - 1) % ROW_COLORS.length];
 }
 
 function shapeBackground(field = {}) {
