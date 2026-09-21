@@ -15,13 +15,13 @@ use Tests\TestCase;
 /**
  * Blank paper form for the stage panel/convenor to write down an announced result
  * (Sl No, Chest No, Points, Rank) before it's typed into Mark Entry -- every data
- * cell stays empty regardless of registrations, fixed at 7 rows per item.
+ * cell stays empty regardless of registrations, fixed at 10 rows per item.
  */
 class FestResultDeclarationSheetTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_downloads_a_blank_pdf_with_seven_rows_per_item(): void
+    public function test_downloads_a_blank_pdf_with_ten_rows_per_item(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);
 

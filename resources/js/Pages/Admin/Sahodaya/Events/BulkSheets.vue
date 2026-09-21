@@ -168,10 +168,15 @@ const reportTypeOptions = [
         url: (o = {}) => bulkSheetUrl('reports/mark-entry-sheet', o.preview ? { preview: 1 } : {}, o) },
     { key: 'judge_sheet_no_chest', label: '🖨️ Judge Sheets — No Chest No',
         url: (o = {}) => bulkSheetUrl('reports/mark-entry-sheet', { blank_chest: 1, ...(o.preview ? { preview: 1 } : {}) }, o) },
-    { key: 'sum_sheet', label: '📊 Digital Sum Sheet',
-        url: (o = {}) => bulkSheetUrl('reports/mark-criteria-sheet', o.preview ? { preview: 1 } : {}, o) },
+    // A genuinely blank paper Sum Sheet (Sl No/Chest No/one column per judge/Grand
+    // Total, nothing filled in) -- NOT the same as the "Digital Sum Sheet" / Online
+    // Tabulation report elsewhere on the Mark Entry page, which shows the real marks
+    // already entered. Only covers multi-judge items (a sum sheet has nothing to add
+    // up for a single-judge item).
+    { key: 'sum_sheet', label: '📊 Sum Sheet',
+        url: (o = {}) => bulkSheetUrl('reports/sum-sheet', o.preview ? { preview: 1 } : {}, o) },
     { key: 'sum_sheet_no_chest', label: '📊 Sum Sheet — No Chest No',
-        url: (o = {}) => bulkSheetUrl('reports/mark-criteria-sheet', { blank_chest: 1, ...(o.preview ? { preview: 1 } : {}) }, o) },
+        url: (o = {}) => bulkSheetUrl('reports/sum-sheet', { blank_chest: 1, ...(o.preview ? { preview: 1 } : {}) }, o) },
     { key: 'result_declaration', label: '📝 Result Declaration Sheet',
         url: (o = {}) => bulkSheetUrl('reports/result-declaration-sheet', o.preview ? { preview: 1 } : {}, o) },
     { key: 'chest_number_list', label: '🔢 Chest Number List',
@@ -183,8 +188,6 @@ const reportTypeOptions = [
         url: (o = {}) => bulkSheetUrl('reports/export/attendance-sheet', o.preview ? {} : { download: 1 }, o) },
     { key: 'timesheet', label: '⏱️ Timesheet',
         url: (o = {}) => bulkSheetUrl('reports/export/timesheet', o.preview ? {} : { download: 1 }, o) },
-    { key: 'items_list', label: '📃 Items List',
-        url: (o = {}) => bulkSheetUrl('reports/items-list', o.preview ? { preview: 1 } : {}, o) },
 ];
 const comboSelectedTypes = ref([...props.bulkReportCombo]);
 const savingCombo = ref(false);

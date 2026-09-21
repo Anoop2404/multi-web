@@ -47,10 +47,13 @@ class FestMarkEntryController extends SahodayaAdminController
      */
     private const BULK_REPORT_TYPES = [
         'judge_sheet', 'judge_sheet_no_chest',
+        // 'sum_sheet' here means the BLANK paper Sum Sheet (blankSumSheetPdf()) -- not
+        // cumulativeSheet()'s "Digital Sum Sheet"/Online Tabulation (real entered marks),
+        // which stays a single-item-only report reachable from the Mark Entry page, not
+        // part of this bulk "print blank forms" picker.
         'sum_sheet', 'sum_sheet_no_chest',
         'result_declaration',
         'chest_number_list', 'attendance_sheet', 'timesheet',
-        'items_list',
     ];
 
     public function index(Request $request, string $tenantId, FestEvent $event)
@@ -1435,10 +1438,134 @@ class FestMarkEntryController extends SahodayaAdminController
     }
 
     /**
+     * Printable blank Sum Sheet ONLY -- Sl No, Chest No, one column per judge, Grand
+     * Total, every cell empty -- without the per-judge JUDGE N SHEETs markEntrySheet()
+     * bundles it with. Genuinely blank, unlike cumulativeSheet()'s "Digital Sum Sheet",
+     * which shows the real marks already entered online (that's the "Online Tabulation"
+     * report, a different thing despite the similar name -- this one is the paper form
+     * used BEFORE marks exist). Single-judge items have no per-judge total to sum, so
+     * they're skipped entirely rather than showing a sum sheet with only one column.
+     * Reuses mark-entry-sheet.blade.php's existing is_sum_sheet branch -- same template,
+     * just handing it only the sum-sheet entries instead of the full per-judge set.
+     */
+    public function blankSumSheetPdf(Request $request, string $tenantId, FestEvent $event, FestNumberingService $numbering, FestMarkCriteriaService $criteriaService)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $itemId = $request->integer('item_id');
+        $blankChest = $request->boolean('blank_chest');
+        [$itemIds, $phaseId, $areaId] = $this->parseBulkSheetFilters($request);
+
+        $query = FestEventItem::with('event')->where('event_id', $event->id)->where('is_enabled', true);
+        if ($itemIds) {
+            $query->whereIn('id', $itemIds);
+        } elseif ($itemId) {
+            $query->where('id', $itemId);
+        }
+        if ($phaseId) {
+            $query->where('phase_id', $phaseId);
+        }
+        if ($areaId) {
+            $query->where('area_id', $areaId);
+        }
+        $items = $query->orderBy('display_order')->orderBy('title')->get();
+
+        abort_if($items->isEmpty(), 404, 'No competition items found.');
+
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
+        $criteriaByItem = $criteriaService->criteriaForItems($items);
+
+        $participantsByItem = FestParticipant::whereHas('registration', fn ($q) => $q
+                ->where('event_id', $event->id)
+                ->whereIn('item_id', $items->pluck('id'))
+                ->whereNotIn('status', ['rejected', 'withdrawn']))
+            ->where('participant_role', '!=', 'standby')
+            ->with(['student', 'teacher', 'registration.school', 'group'])
+            ->get()
+            ->groupBy(fn ($p) => $p->registration->item_id);
+
+        $sheets = [];
+
+        foreach ($items as $item) {
+            $judgeCount = $criteriaService->judgeCountForItem($item);
+            if ($judgeCount <= 1) {
+                continue;
+            }
+
+            $isGroup = $numbering->isGroupItem($item);
+            $criteria = $criteriaByItem->get($item->id, collect());
+            $categoryLabel = $this->itemCategoryLabel($item, $classGroupLabels);
+            $participants = $participantsByItem->get($item->id, collect());
+
+            $rows = [];
+            $seenGroups = [];
+
+            foreach ($participants as $p) {
+                if ($isGroup && $p->group_id) {
+                    if (isset($seenGroups[$p->group_id])) {
+                        continue;
+                    }
+                    $seenGroups[$p->group_id] = true;
+                    $chest = $p->group?->chest_no;
+                } else {
+                    $chest = $numbering->effectiveChestNumber($p);
+                }
+
+                $rows[] = ['chest_no' => $chest];
+            }
+
+            usort($rows, fn ($a, $b) => (int) ($a['chest_no'] ?? 999999) <=> (int) ($b['chest_no'] ?? 999999));
+
+            $sheets[] = [
+                'item'          => $item,
+                'criteria'      => $criteria,
+                'rows'          => $rows,
+                'sheet_label'   => 'SUM SHEET',
+                'is_sum_sheet'  => true,
+                'judge_count'   => $judgeCount,
+                'category_label' => $categoryLabel,
+            ];
+        }
+
+        abort_if($sheets === [], 404, 'No multi-judge items found for this selection -- a Sum Sheet only applies to items scored by more than one judge.');
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.mark-entry-sheet', [
+            'sahodaya'   => $this->sahodaya,
+            'event'      => $event,
+            'sheets'     => $sheets,
+            'logoSrc'    => TenantBranding::logoEmbedSrc($this->sahodaya),
+            'blankChest' => $blankChest,
+        ])->setPaper('a4', 'portrait');
+
+        $nameParts = [$event->title];
+        if ($itemId && ! $itemIds) {
+            $singleItem = $items->first();
+            $singleItemCategory = $this->itemCategoryLabel($singleItem, $classGroupLabels);
+            if ($singleItemCategory) {
+                $nameParts[] = $singleItemCategory;
+            }
+            $nameParts[] = $singleItem->title;
+        } elseif ($itemIds || $phaseId || $areaId) {
+            $nameParts[] = count($items).' items';
+        }
+        $nameParts[] = 'sum sheet';
+        if ($blankChest) {
+            $nameParts[] = 'blank chest';
+        }
+        $fileName = \Illuminate\Support\Str::slug(implode(' ', $nameParts)).'.pdf';
+
+        if ($request->boolean('inline') || $request->boolean('preview')) {
+            return $pdf->stream($fileName);
+        }
+
+        return $pdf->download($fileName);
+    }
+
+    /**
      * Printable blank result declaration sheet: Sl No, Chest No, Points, Rank — every
      * cell left empty (not participant-pre-filled like the other sheets) for the stage
      * panel/convenor to write down the announced result by hand before it's typed into
-     * Mark Entry. Fixed at 7 rows per item regardless of how many participants there
+     * Mark Entry. Fixed at 10 rows per item regardless of how many participants there
      * are; one sheet per item, portrait.
      */
     public function resultDeclarationSheet(Request $request, string $tenantId, FestEvent $event, FestNumberingService $numbering)
@@ -1598,8 +1725,8 @@ class FestMarkEntryController extends SahodayaAdminController
 
     /**
      * Merges several checked report types (Judge Sheets, Sum Sheet, Result Declaration,
-     * Items List, Chest Number List, Attendance Sheet, Timesheet -- whichever the combo
-     * picker has checked) into ONE PDF, each report's own pages appended in turn, instead
+     * Chest Number List, Attendance Sheet, Timesheet -- whichever the combo picker has
+     * checked) into ONE PDF, each report's own pages appended in turn, instead
      * of separate downloads/tabs per type. Firing several separate downloads or preview
      * tabs from one click hits real browser limits (only the first popup/tab-open per
      * click is ever let through, the rest silently blocked) that no amount of client-side
@@ -1648,9 +1775,8 @@ class FestMarkEntryController extends SahodayaAdminController
             try {
                 $response = match ($type) {
                     'judge_sheet', 'judge_sheet_no_chest' => $this->markEntrySheet($subRequest, $tenantId, $event, $numbering, $criteriaService),
-                    'sum_sheet', 'sum_sheet_no_chest' => $this->cumulativeSheet($subRequest, $tenantId, $event, $criteriaService, $numbering),
+                    'sum_sheet', 'sum_sheet_no_chest' => $this->blankSumSheetPdf($subRequest, $tenantId, $event, $numbering, $criteriaService),
                     'result_declaration' => $this->resultDeclarationSheet($subRequest, $tenantId, $event, $numbering),
-                    'items_list' => $this->itemsListPdf($subRequest, $tenantId, $event),
                     'chest_number_list' => app()->makeWith(\App\Http\Controllers\SahodayaAdmin\FestChestNumberController::class, ['request' => $subRequest])
                         ->print($subRequest, $tenantId, $event),
                     'attendance_sheet' => (new \App\Services\Events\FestReportService($event))->export('attendance-sheet', $subRequest),

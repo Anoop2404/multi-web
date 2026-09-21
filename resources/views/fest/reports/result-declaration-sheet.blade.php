@@ -49,7 +49,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @for($i = 1; $i <= 7; $i++)
+                    @for($i = 1; $i <= 10; $i++)
                         <tr>
                             <td class="center" style="color: #64748b; font-weight: bold;">{{ $i }}</td>
                             <td></td>
@@ -61,10 +61,9 @@
             </table>
 
             <div class="sign-box">
-                <div class="sign-col">Judge Signature: __________________</div>
-                <div class="sign-col">Convenor Signature: __________________</div>
+                <div class="sign-col" style="width: 100%;">Convenor Signature: __________________________________</div>
                 <div class="clear"></div>
-                <div class="published-at">Published At: __________________ (Date &amp; Time)</div>
+                <div class="published-at">Published At: ______________________________________________ (Date &amp; Time)</div>
             </div>
         </div>
     @endforeach

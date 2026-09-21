@@ -1283,6 +1283,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/items/{item}/mark-criteria/apply-template', [FestMarkEntryController::class, 'applyTemplate'])->name('items.mark-criteria.apply-template');
             Route::get('/{event}/reports/mark-entry-sheet', [FestMarkEntryController::class, 'markEntrySheet'])->name('reports.mark-entry-sheet');
             Route::get('/{event}/reports/mark-criteria-sheet', [FestMarkEntryController::class, 'cumulativeSheet'])->name('reports.mark-criteria-sheet');
+            Route::get('/{event}/reports/sum-sheet', [FestMarkEntryController::class, 'blankSumSheetPdf'])->name('reports.sum-sheet');
             Route::get('/{event}/reports/result-declaration-sheet', [FestMarkEntryController::class, 'resultDeclarationSheet'])->name('reports.result-declaration-sheet');
             Route::get('/{event}/reports/items-list', [FestMarkEntryController::class, 'itemsListPdf'])->name('reports.items-list');
             Route::post('/{event}/bulk-report-combo', [FestMarkEntryController::class, 'saveBulkReportCombo'])->name('bulk-report-combo.save');

@@ -73,7 +73,7 @@ class FestBulkComboPdfMergeTest extends TestCase
         [$sahodaya, $event, $admin, $item] = $this->fixture();
 
         $response = $this->actingAs($admin)->get($this->comboUrl($sahodaya, $event, [
-            'report_types' => ['judge_sheet', 'result_declaration', 'items_list'],
+            'report_types' => ['judge_sheet', 'result_declaration', 'chest_number_list'],
             'item_ids' => (string) $item->id,
         ]));
 
@@ -90,8 +90,8 @@ class FestBulkComboPdfMergeTest extends TestCase
         unlink($tmpFile);
 
         // At least 3 pages -- one per merged report type (judge_sheet/result_declaration/
-        // items_list are each single-page for one item with no judge panel), proves pages
-        // were actually appended from all three, not just the first.
+        // chest_number_list are each single-page for one item with no judge panel),
+        // proves pages were actually appended from all three, not just the first.
         $this->assertGreaterThanOrEqual(3, $pageCount);
     }
 
@@ -99,16 +99,20 @@ class FestBulkComboPdfMergeTest extends TestCase
     {
         [$sahodaya, $event, $admin, $item] = $this->fixture();
 
-        // sum_sheet (Digital Sum Sheet / cumulativeSheet()) 422s when no item selection
-        // resolves at all under some param combos -- mixing it with a type that always
-        // succeeds proves one failure doesn't sink the whole merge.
+        // sum_sheet (the blank Sum Sheet) only covers multi-judge items -- the fixture
+        // item has no configured criteria at all, so it defaults to a single judge and
+        // sum_sheet comes up with nothing to include. Mixing it with a type that always
+        // succeeds proves one empty type doesn't sink the whole merge.
         $response = $this->actingAs($admin)->get($this->comboUrl($sahodaya, $event, [
-            'report_types' => ['items_list', 'sum_sheet'],
+            'report_types' => ['chest_number_list', 'sum_sheet'],
             'item_ids' => (string) $item->id,
         ]));
 
         $response->assertOk();
         $this->assertStringStartsWith('%PDF', $response->getContent());
+        // Only chest_number_list actually contributed -- proves sum_sheet was the one
+        // skipped, not that chest_number_list silently failed instead.
+        $this->assertStringContainsString('1-reports-merged', urldecode($response->headers->get('content-disposition')));
     }
 
     public function test_no_report_types_selected_is_rejected(): void
@@ -124,7 +128,7 @@ class FestBulkComboPdfMergeTest extends TestCase
     {
         [$sahodaya, $event, $admin] = $this->fixture();
 
-        $response = $this->actingAs($admin)->get($this->comboUrl($sahodaya, $event, ['report_types' => ['items_list']]));
+        $response = $this->actingAs($admin)->get($this->comboUrl($sahodaya, $event, ['report_types' => ['chest_number_list']]));
 
         $response->assertOk();
         $this->assertStringStartsWith('%PDF', $response->getContent());
