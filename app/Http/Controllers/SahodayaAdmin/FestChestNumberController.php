@@ -263,6 +263,16 @@ class FestChestNumberController extends SahodayaAdminController
 
         if ($bulkItemIds === null && $itemId) {
             $item = FestEventItem::where('event_id', $event->id)->findOrFail($itemId);
+        } elseif ($bulkItemIds !== null && count($bulkItemIds) === 1) {
+            // bulkComboPdf() (and any other caller building a filtered combo) always
+            // sends the picker's selection as item_ids[] -- plural -- even when exactly
+            // one item is checked, so the singular item_id branch above never fires from
+            // that path. Without this, a genuinely single-item selection always rendered
+            // as if "every item" had been picked: no item name in the header, an extra
+            // ITEM column instead. This only affects what's DISPLAYED -- the row query
+            // below still gets the full $bulkItemIds list unchanged, so this can't
+            // silently narrow which participants show up.
+            $item = FestEventItem::where('event_id', $event->id)->find($bulkItemIds[0]);
         }
 
         $rows = $this->chestNumberRows($event, $itemId, $bulkItemIds ?? []);
