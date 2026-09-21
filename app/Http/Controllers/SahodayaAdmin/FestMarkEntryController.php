@@ -1765,8 +1765,11 @@ class FestMarkEntryController extends SahodayaAdminController
             'area_id'  => $request->input('area_id'),
         ], fn ($v) => $v !== null && $v !== '');
 
-        $pdfByteStrings = [];
-        $included = [];
+        // Keyed by type (not a plain list) so a file FPDI can't actually import --
+        // possible even after a 200 response, e.g. an external PDF-converter hiccup that
+        // returns an HTML error page instead of real PDF bytes -- can be reported against
+        // exactly which report type produced it, not just "something in the merge failed".
+        $pdfBytesByType = [];
 
         foreach ($types as $type) {
             $extra = in_array($type, ['judge_sheet_no_chest', 'sum_sheet_no_chest'], true) ? ['blank_chest' => 1] : [];
@@ -1793,13 +1796,14 @@ class FestMarkEntryController extends SahodayaAdminController
                 continue;
             }
 
-            $pdfByteStrings[] = $this->responseToPdfBytes($response);
-            $included[] = $type;
+            $pdfBytesByType[$type] = $this->responseToPdfBytes($response);
         }
 
-        abort_if($pdfByteStrings === [], 422, 'None of the selected reports had anything to include for this selection.');
+        abort_if($pdfBytesByType === [], 422, 'None of the selected reports had anything to include for this selection.');
 
-        $merged = $this->mergePdfByteStrings($pdfByteStrings);
+        [$merged, $included] = $this->mergePdfByteStrings($pdfBytesByType);
+
+        abort_if($included === [], 500, 'None of the selected reports could be merged into a PDF.');
 
         $nameParts = [$event->title, count($included).' reports merged'];
         $fileName = \Illuminate\Support\Str::slug(implode(' ', $nameParts)).'.pdf';
@@ -1837,14 +1841,20 @@ class FestMarkEntryController extends SahodayaAdminController
      *
      * @param  list<string>  $pdfByteStrings
      */
-    private function mergePdfByteStrings(array $pdfByteStrings): string
+    /**
+     * @param  array<string, string>  $pdfBytesByType
+     * @return array{0: string, 1: list<string>} [merged PDF bytes, the subset of types that actually made it in]
+     */
+    private function mergePdfByteStrings(array $pdfBytesByType): array
     {
         // FPDI's base FPDF (unlike TCPDF) never draws an automatic header/footer of its
         // own unless Header()/Footer() are overridden, which they aren't here -- nothing
         // to disable.
         $pdf = new \setasign\Fpdi\Fpdi();
 
-        foreach ($pdfByteStrings as $bytes) {
+        $included = [];
+
+        foreach ($pdfBytesByType as $type => $bytes) {
             $tmpPath = tempnam(sys_get_temp_dir(), 'fpdi_');
             file_put_contents($tmpPath, $bytes);
 
@@ -1857,12 +1867,24 @@ class FestMarkEntryController extends SahodayaAdminController
                     $pdf->AddPage($orientation, [$size['width'], $size['height']]);
                     $pdf->useTemplate($templateId);
                 }
+                $included[] = $type;
+            } catch (\Throwable $e) {
+                // A source PDF FPDI can't parse (e.g. an external PDF-converter hiccup
+                // returning something that isn't actually a valid PDF, confirmed live --
+                // "Unable to find PDF file header" from a 200 response that generated
+                // fine but wasn't real PDF bytes) shouldn't sink the whole merge -- skip
+                // just that one report's pages, same as a report that failed to generate
+                // at all in bulkComboPdf()'s own per-type loop. Logged with the type
+                // attached (report() alone wouldn't say which of several merged reports
+                // this was) so the actual bad source is traceable instead of a bare
+                // parser exception.
+                report(new \RuntimeException("bulkComboPdf: could not import '{$type}' into the merge — {$e->getMessage()}", previous: $e));
             } finally {
                 @unlink($tmpPath);
             }
         }
 
-        return $pdf->Output('S');
+        return [$included === [] ? '' : $pdf->Output('S'), $included];
     }
 
     public function autoRankItem(string $tenantId, FestEvent $event, FestEventItem $item, FestSportsAutoRankService $ranker)

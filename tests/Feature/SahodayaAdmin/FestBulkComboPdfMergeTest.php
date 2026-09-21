@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\SahodayaAdmin;
 
+use App\Http\Controllers\SahodayaAdmin\FestMarkEntryController;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestParticipant;
@@ -14,6 +15,7 @@ use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use ReflectionMethod;
 use Tests\TestCase;
 
 /**
@@ -132,5 +134,54 @@ class FestBulkComboPdfMergeTest extends TestCase
 
         $response->assertOk();
         $this->assertStringStartsWith('%PDF', $response->getContent());
+    }
+
+    /**
+     * Reproduces a real production error: a report type generated successfully (200,
+     * no exception) but its bytes weren't a real PDF -- "Unable to find PDF file
+     * header" from FPDI, e.g. an external PDF-converter hiccup returning an HTML error
+     * page instead of PDF content. That crashed the whole merge with a 500 instead of
+     * just leaving that one report out. mergePdfByteStrings() is private, so this drives
+     * it directly via reflection rather than needing to actually reproduce a broken
+     * external converter end-to-end.
+     */
+    /**
+     * mergePdfByteStrings() doesn't touch $this->sahodaya (or anything else set up by
+     * SahodayaAdminController's constructor, which needs a real routed request to
+     * resolve) -- newInstanceWithoutConstructor() is deliberate here, not a workaround
+     * for a real dependency.
+     */
+    private function controllerForMergeTest(): FestMarkEntryController
+    {
+        return (new \ReflectionClass(FestMarkEntryController::class))->newInstanceWithoutConstructor();
+    }
+
+    public function test_a_non_pdf_byte_string_is_skipped_not_fatal(): void
+    {
+        $method = new ReflectionMethod(FestMarkEntryController::class, 'mergePdfByteStrings');
+        $method->setAccessible(true);
+
+        $realPdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML('<h1>Real page</h1>')->output();
+
+        [$merged, $included] = $method->invoke($this->controllerForMergeTest(), [
+            'judge_sheet' => $realPdf,
+            'attendance_sheet' => '<html><body>500 Internal Server Error</body></html>',
+        ]);
+
+        $this->assertSame(['judge_sheet'], $included);
+        $this->assertStringStartsWith('%PDF', $merged);
+    }
+
+    public function test_every_type_producing_non_pdf_bytes_still_errors_cleanly(): void
+    {
+        $method = new ReflectionMethod(FestMarkEntryController::class, 'mergePdfByteStrings');
+        $method->setAccessible(true);
+
+        [$merged, $included] = $method->invoke($this->controllerForMergeTest(), [
+            'attendance_sheet' => 'not a pdf at all',
+        ]);
+
+        $this->assertSame([], $included);
+        $this->assertSame('', $merged);
     }
 }
