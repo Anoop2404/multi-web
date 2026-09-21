@@ -296,9 +296,11 @@ function itemRowCount(field = {}) {
 function itemColumns(field = {}) {
     const items = participatingItems(field);
     const columns = itemColumnCount(field);
-    const rows = itemRowCount(field);
 
-    return Array.from({ length: columns }, (_, index) => items.slice(index * rows, (index + 1) * rows));
+    // Fill across each row: 1 | 2, then 3 | 4, then 5 | 6, then 7.
+    return Array.from({ length: columns }, (_, columnIndex) =>
+        items.filter((_, itemIndex) => itemIndex % columns === columnIndex),
+    );
 }
 
 function itemListStyle(field = {}) {

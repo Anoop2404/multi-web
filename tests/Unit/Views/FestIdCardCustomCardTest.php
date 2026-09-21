@@ -77,4 +77,30 @@ class FestIdCardCustomCardTest extends TestCase
         $this->assertStringContainsString('7) Item 7', $html);
         $this->assertStringNotContainsString('Item 8', $html);
     }
+
+    public function test_participating_items_fill_across_rows_before_moving_down(): void
+    {
+        $html = view('fest.id-cards.partials.custom-card', [
+            'cardWidthMm' => 89,
+            'cardHeightMm' => 135,
+            'backgroundUrl' => null,
+            'card' => [
+                'participating_items' => collect(range(1, 7))->map(fn ($number) => "Item {$number}")->all(),
+            ],
+            'fields' => [[
+                'key' => 'participating_items',
+                'type' => 'item_list',
+                'source' => 'participating_items',
+                'columns' => 2,
+                'max_items' => 7,
+            ]],
+        ])->render();
+
+        $positions = collect(range(1, 7))
+            ->map(fn ($number) => strpos($html, "{$number}) Item {$number}"))
+            ->all();
+
+        $this->assertNotContains(false, $positions);
+        $this->assertSame($positions, collect($positions)->sort()->values()->all());
+    }
 }

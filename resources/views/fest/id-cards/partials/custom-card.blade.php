@@ -50,8 +50,7 @@
                     ->filter()
                     ->take($maxItems)
                     ->values();
-                // Keep the reference layout stable: slots 1–4 stay in the left
-                // column and 5–7 in the right even when a student has fewer items.
+                // Fill across each row: 1 | 2, then 3 | 4, then 5 | 6, then 7.
                 $rowCount = max(1, (int) ceil($maxItems / $columns));
             @endphp
             @if($items->isNotEmpty())
@@ -62,7 +61,7 @@
                         @for($row = 0; $row < $rowCount; $row++)
                             <tr style="height:{{ 100 / $rowCount }}%;">
                                 @for($column = 0; $column < $columns; $column++)
-                                    @php $itemIndex = ($column * $rowCount) + $row; @endphp
+                                    @php $itemIndex = ($row * $columns) + $column; @endphp
                                     <td style="width:{{ 100 / $columns }}%;">
                                         @if($items->has($itemIndex))
                                             <div class="card__item-list-row">{{ $itemIndex + 1 }}) {{ $items->get($itemIndex) }}</div>
