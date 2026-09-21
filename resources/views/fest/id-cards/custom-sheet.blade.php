@@ -45,7 +45,7 @@
         }
         .card__item-text {
             position: absolute;
-            left: 8%; width: 84%; height: 2.4%;
+            height: 2.4%;
             font-size: 7pt; font-weight: bold; color: #12345a;
             display: flex; align-items: center;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

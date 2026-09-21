@@ -26,7 +26,9 @@
         @elseif($type === 'item_row')
             @if($value !== null && $value !== '')
                 @php $rowNum = (int) ($field['row'] ?? 1); @endphp
-                <div class="card__item-text" style="top:{{ $field['top'] ?? 0 }}%;">{{ $rowNum }}) {{ $value }}</div>
+                <div class="card__item-text" style="
+                    top:{{ $field['top'] ?? 0 }}%; left:{{ $field['left'] ?? 8 }}%; width:{{ $field['width'] ?? 84 }}%;
+                ">{{ $rowNum }}) {{ $value }}</div>
             @endif
         @elseif($type === 'shape')
             @php

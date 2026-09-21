@@ -348,7 +348,7 @@ class IdCardTemplateController extends SahodayaAdminController
     private function sampleCard(): array
     {
         return [
-            'name'            => 'SAMPLE STUDENT',
+            'name'            => 'LAKSHMI PRIYA VENKATARAMAN NAIR',
             'subtitle'        => 'Sample School Name',
             'detail'          => 'Sample Item Title',
             'item_label'      => 'Sample Item',
@@ -356,8 +356,8 @@ class IdCardTemplateController extends SahodayaAdminController
             'id_number'       => 'SAMPLE-0001',
             'secondary_value' => 'Sample',
             'chest_number'    => '000',
-            'category'        => 'Sample Category',
-            'gender'          => 'sample',
+            'category'        => 'III',
+            'gender'          => 'Sample',
             'school_code'     => 'ABC-001',
             'student_reg_no'  => 'STU/26/0001',
             'student_class'   => 'X',

@@ -25,7 +25,7 @@
                     </div>
                     <div v-else-if="field.type === 'item_row' && sampleValue(field.source)"
                          class="absolute flex items-center overflow-hidden whitespace-nowrap text-ellipsis"
-                         :style="{ top: `${field.top ?? 0}%`, left: '8%', width: '84%', height: '2.2%', fontSize: '9px', fontWeight: 'bold', color: '#12345a' }">
+                         :style="{ top: `${field.top ?? 0}%`, left: `${field.left ?? 8}%`, width: `${field.width ?? 84}%`, height: '2.2%', fontSize: '9px', fontWeight: 'bold', color: '#12345a' }">
                         {{ field.row ?? 1 }}) {{ sampleValue(field.source) }}
                     </div>
                     <div v-else-if="field.type === 'shape'" class="absolute"
@@ -97,7 +97,7 @@ const bgUrl = computed(() => props.localFileUrl || props.backgroundUrl);
 // Mirrors the sample card IdCardTemplateController::sampleCard() renders server-side
 // for the Preview links, so this authoring canvas shows the same placeholder values.
 const SAMPLE = {
-    name: 'SAMPLE STUDENT',
+    name: 'LAKSHMI PRIYA VENKATARAMAN NAIR',
     subtitle: 'Sample School Name',
     detail: 'Sample Item Title',
     item_label: 'Sample Item',
@@ -105,8 +105,8 @@ const SAMPLE = {
     id_number: 'SAMPLE-0001',
     secondary_value: 'Sample',
     chest_number: '000',
-    category: 'Sample Category',
-    gender: 'sample',
+    category: 'III',
+    gender: 'Sample',
     school_code: 'ABC-001',
     student_reg_no: 'STU/26/0001',
     student_class: 'X',

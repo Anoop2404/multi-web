@@ -746,6 +746,14 @@ class FestIdCardService
         // to chase the leaf event's own academicYear() and risk an N+1 per card.
         $academicYear = $this->resolveEventYearLabel($event);
 
+        // ID cards title-case most display text ("amu residential school" ->
+        // "Amu Residential School") for a consistent look regardless of how a
+        // school/item title was typed in — except the student's own name, which
+        // prints exactly as entered (a person's name isn't ours to "correct").
+        $schoolDisplay = $this->titleCase($school);
+        $itemTitleDisplay = $this->titleCase($itemTitleClean);
+        $genderDisplay = $this->titleCase($gender);
+
         return [
             'card_type'       => 'individual',
             'audience'        => 'student',
@@ -754,11 +762,11 @@ class FestIdCardService
             'role_class'      => $isTeacher ? 'staff' : 'student',
             'name'            => $name,
             'initials'        => $this->initials($name),
-            'gender'          => $gender,
+            'gender'          => $genderDisplay,
             'photo_url'       => $photoUrl,
             'photo_src'       => $photoSrc,
-            'subtitle'        => $school,
-            'school_name'     => $school,
+            'subtitle'        => $schoolDisplay,
+            'school_name'     => $schoolDisplay,
             'school_code'     => $p->registration?->school?->schoolCode(),
             'student_reg_no'  => $p->student?->reg_no ?? $p->teacher?->reg_no ?? null,
             'student_class'   => $studentClass,
@@ -772,10 +780,10 @@ class FestIdCardService
             'is_sports'       => $isSports,
             'sahodaya_name'   => $sahodayaName,
             'category'        => $categoryDisplay,
-            'items_display'   => $itemTitleClean,
-            'detail'          => $itemTitleClean,
+            'items_display'   => $itemTitleDisplay,
+            'detail'          => $itemTitleDisplay,
             'head_label'      => $headName,
-            'item_label'      => $itemTitleClean ?: ($headName ?: null),
+            'item_label'      => $itemTitleDisplay ?: ($headName ?: null),
             'age_group_label' => $ageGroupLabel,
             'chest_number'    => $chestNumber,
             'schedule'        => $scheduleLine,
@@ -791,7 +799,7 @@ class FestIdCardService
             // own item; the other slots exist for a template author to use (a future
             // pass could fill 2-7 with the student's full item list, but that needs an
             // event-wide aggregation query too heavy to run per card in a bulk sheet).
-            'item_row_1'      => $itemTitleClean,
+            'item_row_1'      => $itemTitleDisplay,
             'item_row_2'      => null,
             'item_row_3'      => null,
             'item_row_4'      => null,
@@ -1327,6 +1335,20 @@ class FestIdCardService
         return preg_replace_callback('/\d+/', function (array $m): string {
             return $this->toRomanNumeral((int) $m[0]) ?? $m[0];
         }, $value, 1);
+    }
+
+    /**
+     * Title-cases a display label ("amu residential school" -> "Amu Residential
+     * School") regardless of how it was typed/stored — used for every ID card text
+     * field except the student's own name.
+     */
+    private function titleCase(?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+
+        return mb_convert_case($value, MB_CASE_TITLE, 'UTF-8');
     }
 
     private function toRomanNumeral(int $number): ?string
