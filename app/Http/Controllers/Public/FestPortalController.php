@@ -1968,8 +1968,11 @@ public function tv(Request $request, int $eventId)
      */
     private function rememberPublicHotPath(string $key, int $ttlSeconds, callable $compute, int $waitSeconds = 10): mixed
     {
-        if (Cache::has($key)) {
-            return Cache::get($key);
+        // A separate has()-then-get() risks the key expiring between the two calls
+        // under this method's short TTLs, returning null instead of falling through
+        // to recompute — check the value itself, not existence.
+        if (($cached = Cache::get($key)) !== null) {
+            return $cached;
         }
 
         $remember = fn () => Cache::remember($key, now()->addSeconds($ttlSeconds), $compute);
@@ -1979,7 +1982,7 @@ public function tv(Request $request, int $eventId)
         } catch (\Throwable) {
             // A request may have filled the key just before our lock timed out. Recheck
             // before falling back so an unavailable lock driver never breaks the page.
-            return Cache::has($key) ? Cache::get($key) : $remember();
+            return Cache::get($key) ?? $remember();
         }
     }
 

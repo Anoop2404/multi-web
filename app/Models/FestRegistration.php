@@ -6,6 +6,7 @@ use App\Models\Concerns\BelongsToCentralTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class FestRegistration extends Model
 {
@@ -54,6 +55,12 @@ class FestRegistration extends Model
     public function groups(): HasMany
     {
         return $this->hasMany(FestGroup::class, 'registration_id');
+    }
+
+    /** A registration has exactly one group in practice — FestGroup::updateOrCreate() keys on registration_id. */
+    public function group(): HasOne
+    {
+        return $this->hasOne(FestGroup::class, 'registration_id');
     }
 
     public function participants(): HasMany

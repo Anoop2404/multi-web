@@ -140,6 +140,12 @@ class NotificationService
                 'title' => 'Subscription Suspended',
                 'body_template' => 'Your subscription ({{plan_name}}) has been suspended after its grace period expired. Contact the platform administrator to restore access.',
             ],
+            // Mirrors NotificationTemplatesSeeder's row for tenants provisioned before
+            // this template existed / whose seeder run predates it.
+            'fest.registration.withdrawn' => [
+                'title' => 'Event registration cancelled',
+                'body_template' => 'Registration for {{event_title}} ({{item_title}}) has been cancelled.',
+            ],
             default => null,
         };
     }
