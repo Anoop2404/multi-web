@@ -416,12 +416,19 @@ class FestGradePointService
     /**
      * The set of valid grade labels for this event, best-first — driven by whatever
      * FestGradeConfig rows the event has configured (event-wide and/or per-item bands,
-     * set up via the Grades settings tab), falling back to the original fixed A+/A/B/C
-     * set for every event that hasn't customized its grade vocabulary. Ordered by each
-     * grade's highest configured threshold (score or percent) descending, so "best grade
-     * first" holds even for a fully custom label set. This is also what
-     * gradeOptionsForEvent() and gradeValidationRule() build from — the single source of
-     * truth for "what grades can this event's marks/point-rules use."
+     * set up via the Grades settings tab). Ordered by each grade's highest configured
+     * threshold (score or percent) descending, so "best grade first" holds even for a
+     * fully custom label set. This is also what gradeOptionsForEvent() and
+     * gradeValidationRule() build from — the single source of truth for "what grades can
+     * this event's marks/point-rules use."
+     *
+     * With no FestGradeConfig rows at all, this must fall back the same way
+     * resolveGradeFromScore() does: an event on a fixed scoring preset (mcs_kalotsav/
+     * confed_kalotsav) offers only THAT table's own grades (e.g. mcs_kalotsav has no
+     * A+), not the unrelated legacy A+/A/B/C set — otherwise a phase/region event that
+     * hasn't had its hub's Grade Master bands synced down to it yet (or a preset event
+     * that has never needed Grade Master bands at all) would show/auto-assign a grade
+     * that the event's own scoring never actually produces.
      *
      * @return list<string>
      */
@@ -433,11 +440,28 @@ class FestGradePointService
             ->map(fn (Collection $rows) => $rows->max(fn (FestGradeConfig $r) => (float) ($r->min_percent ?? $r->min_score ?? 0)))
             ->sortDesc();
 
-        if ($configured->isEmpty()) {
-            return ['A+', 'A', 'B', 'C'];
+        if ($configured->isNotEmpty()) {
+            return $configured->keys()->all();
         }
 
-        return $configured->keys()->all();
+        if ($event->scoring_preset === 'mcs_kalotsav') {
+            return $this->presetGradeLabels('fest_mcs_scoring.grades');
+        }
+
+        if ($event->scoring_preset === 'confed_kalotsav') {
+            return $this->presetGradeLabels('fest_confed_kalotsav_scoring.grades');
+        }
+
+        return ['A+', 'A', 'B', 'C'];
+    }
+
+    /** Grade labels from a fixed scoring-preset config, best-first — same band shape/ordering as highestMatchingBand(). */
+    private function presetGradeLabels(string $configKey): array
+    {
+        $bands = config($configKey, []);
+        uasort($bands, fn ($a, $b) => ($b['min'] ?? 0) <=> ($a['min'] ?? 0));
+
+        return collect($bands)->map(fn ($band, $key) => $band['label'] ?? $key)->values()->all();
     }
 
     /** @return array<string, string> grade value => display label (identical for custom grades) */

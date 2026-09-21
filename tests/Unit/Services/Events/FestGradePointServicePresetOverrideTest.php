@@ -92,6 +92,41 @@ class FestGradePointServicePresetOverrideTest extends TestCase
         $this->assertSame(999, $this->service()->pointsForMark($event, $mark));
     }
 
+    /**
+     * validGradesForEvent() (what drives the Mark Entry grade dropdown/live-preview, and
+     * gradeValidationRule()) previously ignored scoring_preset entirely, always falling
+     * back to the unrelated legacy A+/A/B/C set whenever no FestGradeConfig rows existed
+     * -- including for an mcs_kalotsav event, whose own fixed table has no A+ at all. A
+     * score of 75%+ could then show/save as 'A+' in the UI even though
+     * resolveGradeFromScore() (the same no-config case) would correctly resolve it to 'A'.
+     */
+    public function test_valid_grades_for_event_uses_the_presets_own_grades_not_the_legacy_default(): void
+    {
+        $mcs = $this->makeEvent('mcs_kalotsav');
+        $this->assertSame(['A', 'B', 'C'], $this->service()->validGradesForEvent($mcs));
+        $this->assertNotContains('A+', $this->service()->validGradesForEvent($mcs));
+
+        $confed = $this->makeEvent('confed_kalotsav');
+        $this->assertNotContains('A+', $this->service()->validGradesForEvent($confed));
+    }
+
+    public function test_valid_grades_for_event_prefers_custom_bands_once_any_are_configured(): void
+    {
+        $event = $this->makeEvent('mcs_kalotsav');
+
+        FestGradeConfig::create(['event_id' => $event->id, 'item_id' => null, 'grade' => 'A_plus', 'min_score' => 90, 'max_score' => 100]);
+        FestGradeConfig::create(['event_id' => $event->id, 'item_id' => null, 'grade' => 'A', 'min_score' => 70, 'max_score' => 89]);
+
+        $this->assertSame(['A+', 'A'], $this->service()->validGradesForEvent($event));
+    }
+
+    public function test_valid_grades_for_event_still_uses_the_legacy_default_without_a_preset(): void
+    {
+        $event = $this->makeEvent('');
+
+        $this->assertSame(['A+', 'A', 'B', 'C'], $this->service()->validGradesForEvent($event));
+    }
+
     /** @return array{0: FestParticipant} */
     private function makeParticipant(FestEvent $event, FestEventItem $item): array
     {

@@ -36,7 +36,6 @@
                             <th>Participant</th>
                             <th>Position</th>
                             <th>Grade</th>
-                            <th>Score</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -45,10 +44,9 @@
                             <td class="font-medium">{{ row.participant }}</td>
                             <td>{{ row.position ?? '—' }}</td>
                             <td>{{ row.grade ?? '—' }}</td>
-                            <td>{{ row.score ?? '—' }}</td>
                         </tr>
                         <tr v-if="!results.items?.length">
-                            <td colspan="5" class="p-6 text-center text-slate-400">No published results yet.</td>
+                            <td colspan="4" class="p-6 text-center text-slate-400">No published results yet.</td>
                         </tr>
                     </tbody>
                 </table>
