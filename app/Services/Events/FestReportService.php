@@ -1400,12 +1400,14 @@ class FestReportService
         // server.js) — pass its native repeating headerTemplate/footerTemplate instead of
         // relying on any CSS trick. Ignored by the dompdf fallback (only used locally),
         // which gets its own branding baked into the page content — see the blade file.
+        // Item name/category deliberately NOT included here -- .item-heading-bar in the
+        // blade (always visible now) is the one place that shows, matching every other
+        // Bulk Sheets report type instead of showing it twice in two different styles.
         [$headerTemplate, $footerTemplate] = \App\Support\PdfChromeHeaderFooter::build([
             'orgName'    => $sahodaya->name ?? 'SAHODAYA',
             'logoSrc'    => $logo,
             'docTitle'   => 'ATTENDANCE SHEET',
             'eventTitle' => $this->event->title,
-            'itemLine'   => $singleItemMetaStr ?: $singleItemName,
         ]);
         $itemsLabel = $singleItemName ?? ($bulkItemIds !== null ? count($bulkItemIds).'-items' : 'all-items');
         $filename = ReportFilename::build(
@@ -1504,12 +1506,13 @@ class FestReportService
                 ->header('Content-Type', 'text/html');
         }
 
+        // Item name/category deliberately NOT included here -- see the matching comment
+        // in attendanceSheetPdf().
         [$headerTemplate, $footerTemplate] = \App\Support\PdfChromeHeaderFooter::build([
             'orgName'    => $sahodaya->name ?? 'SAHODAYA',
             'logoSrc'    => $logo,
             'docTitle'   => 'TIMESHEET',
             'eventTitle' => $this->event->title,
-            'itemLine'   => $singleItemMetaStr ?: $singleItemName,
         ]);
         $itemsLabel = $singleItemName ?? ($bulkItemIds !== null ? count($bulkItemIds).'-items' : 'all-items');
         $filename = ReportFilename::build(

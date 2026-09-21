@@ -34,6 +34,9 @@
          renders correctly there -- so this in-flow copy is skipped entirely to avoid
          showing the branding twice. dompdf has no such native mechanism, so it still
          needs this, made position:fixed to repeat on every page. --}}
+    {{-- Item name/category deliberately NOT included here -- the dark .item-bar-row
+         inside the table below (repeats on every page) is the one place that shows,
+         matching every other Bulk Sheets report type instead of showing it twice. --}}
     @if($isDomPdf ?? true)
     <div class="pdf-page-header" style="position: fixed; top: -96px; left: 0; right: 0;">
         @include('partials.pdf-report-heading', [
@@ -41,9 +44,6 @@
             'logoSrc' => $logoSrc ?? null,
             'docTitle' => 'CHEST NUMBER LIST',
             'eventTitle' => $event->title,
-            'item' => $item ?? null,
-            'categoryLabel' => $itemCategory ?? null,
-            'participantCount' => !empty($item) ? count($rows) : null,
         ])
     </div>
     @endif

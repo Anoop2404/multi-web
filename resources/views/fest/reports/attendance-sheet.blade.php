@@ -284,19 +284,14 @@
         'logoSrc' => $logo ?? null,
         'docTitle' => 'ATTENDANCE SHEET',
     ])
+    {{-- Item name/category deliberately NOT shown here -- .item-heading-bar below (now
+         always visible, see its own comment) is the one place that appears, same as
+         every other Bulk Sheets report type. Showing it in both places read as two
+         different-looking labels for the same thing rather than one consistent one. --}}
     <div class="event-context-bar" style="margin-top: 4px; padding-top: 4px; border-top: 1px solid #e2e8f0; display: block;">
         <div style="font-size: 9px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px;">
             {{ $event->title }}
         </div>
-        @if(!empty($singleItemMetaStr))
-            <div style="font-size: 12px; font-weight: 800; color: #0f172a; margin-top: 2px;">
-                {!! $singleItemMetaStr !!}
-            </div>
-        @elseif(!empty($singleItemName))
-            <div style="font-size: 12px; font-weight: 800; color: #0f172a; margin-top: 2px;">
-                {{ $singleItemName }}
-            </div>
-        @endif
     </div>
 </div>
 @endif
