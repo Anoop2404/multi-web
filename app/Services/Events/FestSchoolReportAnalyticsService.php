@@ -94,19 +94,23 @@ class FestSchoolReportAnalyticsService
             ->with(['item:id,title', 'participant.student:id,name', 'participant.teacher:id,name'])
             ->get();
 
+        $gradePointService = app(FestGradePointService::class);
+
         $items = $marks->map(fn ($m) => [
             'item'     => $m->item?->title,
             'participant' => $m->participant?->student?->name ?? $m->participant?->teacher?->name,
             'position' => $m->position,
             'grade'    => $m->grade,
-            'score'    => $m->score,
+            // Championship points, not the judge's raw marks -- schools/students see how
+            // many points a result earned, not the marks themselves.
+            'points'   => $gradePointService->pointsForMark($this->event, $m),
         ])->values()->all();
 
         return [
             'gold'         => $marks->where('position', 1)->count(),
             'silver'       => $marks->where('position', 2)->count(),
             'bronze'       => $marks->where('position', 3)->count(),
-            'total_score'  => (float) $marks->sum('score'),
+            'total_score'  => (float) collect($items)->sum('points'),
             'items'        => $items,
         ];
     }
@@ -272,6 +276,8 @@ class FestSchoolReportAnalyticsService
             ])
             ->get();
 
+        $gradePointService = app(FestGradePointService::class);
+
         $items = $marks->map(fn ($m) => [
             'head_id'     => $m->item?->head_id,
             'head_name'   => $m->item?->head?->name,
@@ -285,7 +291,9 @@ class FestSchoolReportAnalyticsService
             'fest_id'     => $m->participant?->level_registration_number,
             'position'    => $m->position,
             'grade'       => $m->grade,
-            'score'       => $m->score,
+            // Championship points, not the judge's raw marks -- schools/students see how
+            // many points a result earned, not the marks themselves.
+            'points'      => $gradePointService->pointsForMark($this->event, $m),
         ])->values()->all();
 
         return [
@@ -294,7 +302,7 @@ class FestSchoolReportAnalyticsService
             'gold'        => $marks->where('position', 1)->count(),
             'silver'      => $marks->where('position', 2)->count(),
             'bronze'      => $marks->where('position', 3)->count(),
-            'total_score' => (float) $marks->sum('score'),
+            'total_score' => (float) collect($items)->sum('points'),
             'items'       => $items,
         ];
     }

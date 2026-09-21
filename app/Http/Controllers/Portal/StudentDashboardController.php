@@ -16,6 +16,7 @@ use App\Models\Tenant;
 use App\Models\FestSchedule;
 use App\Services\Events\FestPublicVisibilityService;
 use App\Services\Events\FestCertificateService;
+use App\Services\Events\FestGradePointService;
 use App\Services\Events\FestReportService;
 use App\Support\Mcq\McqResultPresenter;
 use App\Support\TenantBranding;
@@ -181,17 +182,22 @@ class StudentDashboardController extends Controller
             ->get()
             ->map(function (FestParticipant $p) {
                 $mark = $p->mark;
+                $event = $p->registration?->event;
                 $record = $mark
                     ? FestAthleticRecord::where('source_mark_id', $mark->id)->first()
                     : null;
 
                 return [
-                    'event_title' => $p->registration?->event?->title,
+                    'event_title' => $event?->title,
                     'head_name'   => $p->registration?->item?->head?->name,
                     'item_title'  => $p->registration?->item?->title,
                     'grade'       => $mark?->grade,
                     'position'    => $mark?->position,
-                    'score'       => $mark?->score,
+                    // Championship points, not the athlete's raw marks -- students see how
+                    // many points a result earned, not the marks themselves.
+                    'points'      => ($mark && $event)
+                        ? app(FestGradePointService::class)->pointsForMark($event, $mark)
+                        : null,
                     'measurement' => $mark?->measurement_value
                         ? trim("{$mark->measurement_value} {$mark->measurement_unit}")
                         : null,
@@ -329,6 +335,8 @@ class StudentDashboardController extends Controller
     /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */
     private function festResults($student, string $tenantId)
     {
+        $gradePointService = app(FestGradePointService::class);
+
         return FestParticipant::where('student_id', $student->id)
             ->whereHas('registration', fn ($q) => $q->where('school_id', $tenantId))
             ->whereHas('registration.event', fn ($q) => $q->where('results_published', true))
@@ -341,7 +349,11 @@ class StudentDashboardController extends Controller
                 'item_title'  => $p->registration?->item?->title,
                 'grade'       => $p->mark?->grade,
                 'position'    => $p->mark?->position,
-                'score'       => $p->mark?->score,
+                // Championship points, not the judge's raw marks -- students see how many
+                // points a result earned, not the marks themselves.
+                'points'      => ($p->mark && $p->registration?->event)
+                    ? $gradePointService->pointsForMark($p->registration->event, $p->mark)
+                    : null,
                 'chest_no'    => $p->chest_no,
             ]);
     }

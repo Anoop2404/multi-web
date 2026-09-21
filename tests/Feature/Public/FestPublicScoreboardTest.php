@@ -378,12 +378,11 @@ class FestPublicScoreboardTest extends TestCase
         $response->assertOk();
         $response->assertSee('School-wise Results');
         $response->assertSee('North Poetry');
-        // markCategoryWinner() stores grade=A with score=80, but pointsForMark()
-        // re-derives the effective grade from score first — 80% clears the A+ band
-        // (>=70%) under the default Kalotsavam scale — so with no FestPointRule
-        // configured this resolves through the default CKSC-style table to A+'s
-        // 10 points, not A's 8.
-        $response->assertSeeInOrder(['North Poetry', '10'], false);
+        // markCategoryWinner() stores grade=A with score=80, and pointsForMark()
+        // re-derives the effective grade from score first — 80% clears the platform
+        // default table's A band (>=70%, its top tier, no A+) — so with no FestPointRule
+        // configured this resolves through DEFAULT_POINTS to A's 8 points.
+        $response->assertSeeInOrder(['North Poetry', '8'], false);
     }
 
     public function test_ranking_table_has_an_eye_link_to_the_school_detail_page(): void
@@ -475,9 +474,9 @@ class FestPublicScoreboardTest extends TestCase
 
     public function test_school_detail_page_scopes_the_roster_and_total_to_a_selected_category(): void
     {
-        // hs item: grade A, position 1, score 80 — same as markCategoryWinner(), which
-        // re-derives to grade A+ (score-based re-derivation, see the comment on
-        // test_individual_tab_shows_points_alongside_position) and resolves to 10 points.
+        // hs item: grade A, position 1, score 80 — same as markCategoryWinner(). Score
+        // re-derivation keeps this at grade A (the platform default table has no A+ tier
+        // at all — A is 70%+) and resolves to DEFAULT_POINTS['A']['1'] = 8 points.
         $this->markCategoryWinner($this->north, $this->northSchool, 'North Poetry');
 
         // lp item: grade B, position 1, no score (so grade stays literally 'B', no
@@ -507,7 +506,7 @@ class FestPublicScoreboardTest extends TestCase
         $filtered->assertDontSee('North LP Item');
         // Live-computed (category-filtered path bypasses the FestResult snapshot
         // entirely), so this is the hs item's own points, not setUp()'s seeded total.
-        $filtered->assertSee('text-2xl font-mono font-extrabold text-amber-400">10 <small', false);
+        $filtered->assertSee('text-2xl font-mono font-extrabold text-amber-400">8 <small', false);
         $filtered->assertSee('Showing', false);
         $filtered->assertSee('View full roster (all categories)', false);
 
@@ -752,9 +751,12 @@ class FestPublicScoreboardTest extends TestCase
         $participant = FestParticipant::create([
             'registration_id' => $registration->id, 'event_id' => $this->north->id, 'participant_type' => 'student',
         ]);
+        // score must land in the platform default table's B band (>= 60%, < 70%) -- the
+        // page re-derives the effective grade from score, so a lower value here would
+        // silently display as Grade C instead.
         FestMark::create([
             'event_id' => $this->north->id, 'item_id' => $nonWinningItem->id, 'participant_id' => $participant->id,
-            'grade' => 'B', 'position' => 4, 'score' => 55,
+            'grade' => 'B', 'position' => 4, 'score' => 65,
         ]);
 
         $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results?tab=school");
@@ -785,10 +787,10 @@ class FestPublicScoreboardTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('>Points<', false);
-        // Score=80 re-derives to grade A+ (>=70% band) before points are looked up, so
-        // with no FestPointRule configured this resolves to A+'s default value, 10 —
-        // see the matching comment on test_school_tab_lists_a_winner_roster_with_points_per_school.
-        $response->assertSeeInOrder(['North Poetry', '10'], false);
+        // Score=80 re-derives to grade A (the platform default table's top tier, no A+)
+        // before points are looked up, so with no FestPointRule configured this resolves
+        // to DEFAULT_POINTS['A']['1'] = 8.
+        $response->assertSeeInOrder(['North Poetry', '8'], false);
     }
 
     public function test_item_results_cannot_cross_the_operational_event_boundary(): void
@@ -1581,10 +1583,11 @@ class FestPublicScoreboardTest extends TestCase
         $response->assertOk()->assertSee('Cross Phase School');
 
         // Row order: rank badge, school name, gold, silver, bronze, grade, total —
-        // gold must carry the Phase 1 medal's points (10), not 0 with everything
-        // dumped into the grade column instead.
+        // gold must carry the Phase 1 medal's points (score 90% re-derives to grade A,
+        // the platform default table's top tier -- DEFAULT_POINTS['A']['1'] = 8), not 0
+        // with everything dumped into the grade column instead.
         $row = substr($html, strpos($html, 'Cross Phase School'));
-        $this->assertMatchesRegularExpression('/text-amber-300 text-lg">10</', $row);
+        $this->assertMatchesRegularExpression('/text-amber-300 text-lg">8</', $row);
         $this->assertMatchesRegularExpression('/text-sky-300 text-lg">0</', $row);
     }
 

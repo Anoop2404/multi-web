@@ -25,6 +25,7 @@
                             <p class="text-xs text-indigo-700 mt-1">
                                 <span v-if="r.position">Position: {{ r.position }}</span>
                                 <span v-if="r.grade"> · Grade: {{ r.grade }}</span>
+                                <span v-if="r.points !== null && r.points !== undefined"> · Points: {{ r.points }}</span>
                                 <span v-if="r.measurement"> · {{ r.measurement }}</span>
                             </p>
                             <p v-if="r.record_label" class="text-xs text-amber-700 mt-1 font-medium">{{ r.record_label }}</p>

@@ -41,7 +41,7 @@
             </div>
             <div class="card text-center">
                 <p class="text-2xl font-bold">{{ results.total_score }}</p>
-                <p class="text-xs text-gray-500 mt-1">Total score</p>
+                <p class="text-xs text-gray-500 mt-1">Total points</p>
             </div>
         </div>
 
@@ -55,6 +55,7 @@
                             <th>Fest ID</th>
                             <th>Position</th>
                             <th>Grade</th>
+                            <th>Points</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -69,9 +70,10 @@
                             <td class="font-mono text-xs">{{ row.fest_id ?? '—' }}</td>
                             <td>{{ row.position ?? '—' }}</td>
                             <td>{{ row.grade ?? '—' }}</td>
+                            <td>{{ row.points ?? '—' }}</td>
                         </tr>
                         <tr v-if="!displayRows.length">
-                            <td colspan="5" class="p-6 text-center text-slate-400">No results for the selected filters.</td>
+                            <td colspan="6" class="p-6 text-center text-slate-400">No results for the selected filters.</td>
                         </tr>
                     </tbody>
                 </table>

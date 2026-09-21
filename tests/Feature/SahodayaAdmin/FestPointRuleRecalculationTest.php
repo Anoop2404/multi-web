@@ -53,7 +53,11 @@ class FestPointRuleRecalculationTest extends TestCase
 
         $registration = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
         $participant = FestParticipant::create(['registration_id' => $registration->id, 'event_id' => $event->id, 'participant_type' => 'student']);
-        FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'grade' => 'A', 'position' => 1, 'score' => 65]);
+        // score is deliberately >= 70% -- pointsForMark() re-derives the grade from score
+        // first, and the platform default table (fest_mcs_scoring.php) only grades 'A' at
+        // 70%+, so a lower score here would silently re-grade to 'B' and break every test
+        // below that expects a grade-A point rule/table lookup to apply.
+        FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'grade' => 'A', 'position' => 1, 'score' => 75]);
 
         return compact('sahodaya', 'school', 'admin', 'event');
     }

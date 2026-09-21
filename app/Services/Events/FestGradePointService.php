@@ -279,23 +279,10 @@ class FestGradePointService
             return $resolved;
         }
 
-        // Standard Kalotsavam percentage grade scale fallback
-        $percent = $maxPossibleMarks > 0 ? ($score / $maxPossibleMarks) * 100 : ($score <= 100 ? $score : null);
-        if ($percent !== null) {
-            $validGrades = $this->validGradesForEvent($event);
-            if (in_array('A+', $validGrades, true)) {
-                if ($percent >= 70.0) return 'A+';
-                if ($percent >= 60.0) return 'A';
-                if ($percent >= 50.0) return 'B';
-                if ($percent >= 40.0) return 'C';
-            } else {
-                if ($percent >= 70.0) return 'A';
-                if ($percent >= 60.0) return 'B';
-                if ($percent >= 50.0) return 'C';
-            }
-        }
-
-        return null;
+        // No custom bands, and no scoring_preset set either -- the platform default is
+        // the same fixed A/B/C table as mcs_kalotsav (A >= 70%, B >= 60%, C >= 50%, no
+        // A+), not the old legacy A+/A/B/C scale. See config/fest_mcs_scoring.php.
+        return $this->resolveMcsGradeFromScore($score, $maxPossibleMarks);
     }
 
     /**
@@ -423,12 +410,12 @@ class FestGradePointService
      * this event's marks/point-rules use."
      *
      * With no FestGradeConfig rows at all, this must fall back the same way
-     * resolveGradeFromScore() does: an event on a fixed scoring preset (mcs_kalotsav/
-     * confed_kalotsav) offers only THAT table's own grades (e.g. mcs_kalotsav has no
-     * A+), not the unrelated legacy A+/A/B/C set — otherwise a phase/region event that
-     * hasn't had its hub's Grade Master bands synced down to it yet (or a preset event
-     * that has never needed Grade Master bands at all) would show/auto-assign a grade
-     * that the event's own scoring never actually produces.
+     * resolveGradeFromScore() does: an event on the confed_kalotsav preset offers only
+     * that table's own grades, and every other event (mcs_kalotsav or no preset at all)
+     * offers the platform default -- fest_mcs_scoring.php's plain A/B/C, no A+ -- instead
+     * of the old legacy A+/A/B/C set. Otherwise a phase/region event that hasn't had its
+     * hub's Grade Master bands synced down to it yet would show/auto-assign a grade the
+     * event's own scoring never actually produces.
      *
      * @return list<string>
      */
@@ -444,15 +431,11 @@ class FestGradePointService
             return $configured->keys()->all();
         }
 
-        if ($event->scoring_preset === 'mcs_kalotsav') {
-            return $this->presetGradeLabels('fest_mcs_scoring.grades');
-        }
-
         if ($event->scoring_preset === 'confed_kalotsav') {
             return $this->presetGradeLabels('fest_confed_kalotsav_scoring.grades');
         }
 
-        return ['A+', 'A', 'B', 'C'];
+        return $this->presetGradeLabels('fest_mcs_scoring.grades');
     }
 
     /** Grade labels from a fixed scoring-preset config, best-first — same band shape/ordering as highestMatchingBand(). */

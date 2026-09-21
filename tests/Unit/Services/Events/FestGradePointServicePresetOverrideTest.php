@@ -120,11 +120,13 @@ class FestGradePointServicePresetOverrideTest extends TestCase
         $this->assertSame(['A+', 'A'], $this->service()->validGradesForEvent($event));
     }
 
-    public function test_valid_grades_for_event_still_uses_the_legacy_default_without_a_preset(): void
+    public function test_valid_grades_for_event_uses_the_platform_default_without_a_preset(): void
     {
         $event = $this->makeEvent('');
 
-        $this->assertSame(['A+', 'A', 'B', 'C'], $this->service()->validGradesForEvent($event));
+        // No scoring_preset at all falls back to the same plain A/B/C table as
+        // mcs_kalotsav -- the old legacy A+/A/B/C default no longer applies to anyone.
+        $this->assertSame(['A', 'B', 'C'], $this->service()->validGradesForEvent($event));
     }
 
     /** @return array{0: FestParticipant} */

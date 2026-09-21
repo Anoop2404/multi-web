@@ -17,6 +17,7 @@
                     <p v-if="r.grade || r.position" class="text-xs text-indigo-700 mt-0.5">
                         <span v-if="r.grade">Grade: {{ r.grade }}</span>
                         <span v-if="r.position"> · Position: {{ r.position }}</span>
+                        <span v-if="r.points !== null && r.points !== undefined"> · Points: {{ r.points }}</span>
                         <span v-if="r.chest_no"> · Chest #{{ r.chest_no }}</span>
                     </p>
                     <p v-else class="text-xs text-gray-400 mt-0.5">Results not yet recorded</p>

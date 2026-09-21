@@ -23,7 +23,7 @@
             </div>
             <div class="card text-center">
                 <p class="text-2xl font-bold">{{ results.total_score }}</p>
-                <p class="text-xs text-gray-500 mt-1">Total score</p>
+                <p class="text-xs text-gray-500 mt-1">Total points</p>
             </div>
         </div>
 
@@ -36,6 +36,7 @@
                             <th>Participant</th>
                             <th>Position</th>
                             <th>Grade</th>
+                            <th>Points</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -44,9 +45,10 @@
                             <td class="font-medium">{{ row.participant }}</td>
                             <td>{{ row.position ?? '—' }}</td>
                             <td>{{ row.grade ?? '—' }}</td>
+                            <td>{{ row.points ?? '—' }}</td>
                         </tr>
                         <tr v-if="!results.items?.length">
-                            <td colspan="4" class="p-6 text-center text-slate-400">No published results yet.</td>
+                            <td colspan="5" class="p-6 text-center text-slate-400">No published results yet.</td>
                         </tr>
                     </tbody>
                 </table>

@@ -18,9 +18,9 @@ use Tests\TestCase;
 /**
  * Covers the per-event grade vocabulary generalization: validGradesForEvent(),
  * gradeOptionsForEvent(), gradeValidationRule(), and normalizeGrade() becoming
- * event-aware. Every event that never customizes its grades must keep resolving to
- * exactly the original fixed A+/A/B/C set — that backward-compatibility guarantee is
- * the main thing under test here, alongside the new custom-vocabulary behavior.
+ * event-aware. Every event that never customizes its grades falls back to the platform
+ * default -- fest_mcs_scoring.php's plain A/B/C, no A+ (the old legacy A+/A/B/C set is
+ * no longer used anywhere) -- alongside the new custom-vocabulary behavior.
  */
 class FestGradePointServiceCustomVocabularyTest extends TestCase
 {
@@ -50,12 +50,12 @@ class FestGradePointServiceCustomVocabularyTest extends TestCase
         ], $overrides));
     }
 
-    public function test_untouched_event_falls_back_to_the_original_legacy_grade_set(): void
+    public function test_untouched_event_falls_back_to_the_platform_default_grade_set(): void
     {
         $event = $this->makeEvent();
 
-        $this->assertSame(['A+', 'A', 'B', 'C'], $this->service()->validGradesForEvent($event));
-        $this->assertSame(['A+' => 'A+', 'A' => 'A', 'B' => 'B', 'C' => 'C'], $this->service()->gradeOptionsForEvent($event));
+        $this->assertSame(['A', 'B', 'C'], $this->service()->validGradesForEvent($event));
+        $this->assertSame(['A' => 'A', 'B' => 'B', 'C' => 'C'], $this->service()->gradeOptionsForEvent($event));
     }
 
     public function test_custom_grade_labels_become_the_events_own_vocabulary_best_first(): void
