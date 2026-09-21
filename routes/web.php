@@ -1286,6 +1286,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/reports/result-declaration-sheet', [FestMarkEntryController::class, 'resultDeclarationSheet'])->name('reports.result-declaration-sheet');
             Route::get('/{event}/reports/items-list', [FestMarkEntryController::class, 'itemsListPdf'])->name('reports.items-list');
             Route::post('/{event}/bulk-report-combo', [FestMarkEntryController::class, 'saveBulkReportCombo'])->name('bulk-report-combo.save');
+            Route::get('/{event}/reports/bulk-combo-pdf', [FestMarkEntryController::class, 'bulkComboPdf'])->name('reports.bulk-combo-pdf');
             Route::post('/{event}/items/{item}/mark-sheet-uploads', [FestMarkEntryController::class, 'uploadSheet'])->name('items.mark-sheet-uploads.store');
             Route::get('/{event}/mark-sheet-uploads/{upload}', [FestMarkEntryController::class, 'downloadSheetUpload'])->name('mark-sheet-uploads.download');
             Route::delete('/{event}/mark-sheet-uploads/{upload}', [FestMarkEntryController::class, 'destroySheetUpload'])->name('mark-sheet-uploads.destroy');

@@ -1596,6 +1596,149 @@ class FestMarkEntryController extends SahodayaAdminController
         return back()->with('success', 'Default bulk report combo saved.');
     }
 
+    /**
+     * Merges several checked report types (Judge Sheets, Sum Sheet, Result Declaration,
+     * Items List, Chest Number List, Attendance Sheet, Timesheet -- whichever the combo
+     * picker has checked) into ONE PDF, each report's own pages appended in turn, instead
+     * of separate downloads/tabs per type. Firing several separate downloads or preview
+     * tabs from one click hits real browser limits (only the first popup/tab-open per
+     * click is ever let through, the rest silently blocked) that no amount of client-side
+     * trickery reliably gets around -- a single merged file sidesteps that entirely.
+     *
+     * Each report type still goes through its OWN existing controller/service method
+     * (same validation, same data, nothing duplicated here) -- this only captures each
+     * one's already-rendered PDF bytes and appends their pages via FPDI, agnostic to
+     * whether a given type rendered through dompdf or the external Puppeteer converter
+     * (PdfGenerator::download() can return either a buffered Response or a
+     * StreamedResponse depending on config('services.pdf_converter.url'); both are
+     * handled the same way here). A type with nothing to include for the current
+     * selection (e.g. abort_if(...404...) firing because zero items matched) is skipped
+     * rather than failing the whole merge -- the user gets everything that could be
+     * generated, not nothing just because one type came up empty.
+     */
+    public function bulkComboPdf(Request $request, string $tenantId, FestEvent $event, FestNumberingService $numbering, FestMarkCriteriaService $criteriaService)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $types = collect((array) $request->input('report_types', []))
+            ->filter(fn ($t) => in_array($t, self::BULK_REPORT_TYPES, true))
+            ->unique()
+            ->values();
+
+        abort_if($types->isEmpty(), 422, 'Select at least one report type.');
+
+        // Deliberately NOT including this request's own 'report_types'/'preview' --
+        // each sub-call gets a clean query bag of just the item/phase/area selection
+        // (or none of them at all, for a "whole event" merge -- every one of these
+        // report types already treats "no item filter" as "every enabled item", the
+        // same convention their own single-type bulk downloads rely on).
+        $baseParams = array_filter([
+            'item_ids' => $request->input('item_ids'),
+            'phase_id' => $request->input('phase_id'),
+            'area_id'  => $request->input('area_id'),
+        ], fn ($v) => $v !== null && $v !== '');
+
+        $pdfByteStrings = [];
+        $included = [];
+
+        foreach ($types as $type) {
+            $extra = in_array($type, ['judge_sheet_no_chest', 'sum_sheet_no_chest'], true) ? ['blank_chest' => 1] : [];
+            $subRequest = $request->duplicate($baseParams + $extra);
+
+            try {
+                $response = match ($type) {
+                    'judge_sheet', 'judge_sheet_no_chest' => $this->markEntrySheet($subRequest, $tenantId, $event, $numbering, $criteriaService),
+                    'sum_sheet', 'sum_sheet_no_chest' => $this->cumulativeSheet($subRequest, $tenantId, $event, $criteriaService, $numbering),
+                    'result_declaration' => $this->resultDeclarationSheet($subRequest, $tenantId, $event, $numbering),
+                    'items_list' => $this->itemsListPdf($subRequest, $tenantId, $event),
+                    'chest_number_list' => app()->makeWith(\App\Http\Controllers\SahodayaAdmin\FestChestNumberController::class, ['request' => $subRequest])
+                        ->print($subRequest, $tenantId, $event),
+                    'attendance_sheet' => (new \App\Services\Events\FestReportService($event))->export('attendance-sheet', $subRequest),
+                    'timesheet' => (new \App\Services\Events\FestReportService($event))->export('timesheet', $subRequest),
+                    default => null,
+                };
+            } catch (\Throwable $e) {
+                report($e);
+
+                continue;
+            }
+
+            if ($response === null) {
+                continue;
+            }
+
+            $pdfByteStrings[] = $this->responseToPdfBytes($response);
+            $included[] = $type;
+        }
+
+        abort_if($pdfByteStrings === [], 422, 'None of the selected reports had anything to include for this selection.');
+
+        $merged = $this->mergePdfByteStrings($pdfByteStrings);
+
+        $nameParts = [$event->title, count($included).' reports merged'];
+        $fileName = \Illuminate\Support\Str::slug(implode(' ', $nameParts)).'.pdf';
+        $disposition = ($request->boolean('preview') || $request->boolean('inline')) ? 'inline' : 'attachment';
+
+        return response($merged, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => "{$disposition}; filename=\"{$fileName}\"",
+        ]);
+    }
+
+    /**
+     * A plain (non-streamed) Response already has its full body buffered -- getContent()
+     * just reads it. A StreamedResponse (the external-PDF-converter path) only produces
+     * its body when actually sent, so this captures what sendContent() WOULD have sent
+     * to the client via output buffering instead, without a real HTTP round trip.
+     */
+    private function responseToPdfBytes($response): string
+    {
+        if ($response instanceof \Symfony\Component\HttpFoundation\StreamedResponse) {
+            ob_start();
+            $response->sendContent();
+
+            return (string) ob_get_clean();
+        }
+
+        return (string) $response->getContent();
+    }
+
+    /**
+     * Appends every page of every given PDF (as raw bytes, regardless of what rendered
+     * them) into one output PDF, in order -- FPDI operates on already-rendered PDF files,
+     * so this doesn't care whether a given source came from dompdf or the external
+     * Puppeteer converter.
+     *
+     * @param  list<string>  $pdfByteStrings
+     */
+    private function mergePdfByteStrings(array $pdfByteStrings): string
+    {
+        // FPDI's base FPDF (unlike TCPDF) never draws an automatic header/footer of its
+        // own unless Header()/Footer() are overridden, which they aren't here -- nothing
+        // to disable.
+        $pdf = new \setasign\Fpdi\Fpdi();
+
+        foreach ($pdfByteStrings as $bytes) {
+            $tmpPath = tempnam(sys_get_temp_dir(), 'fpdi_');
+            file_put_contents($tmpPath, $bytes);
+
+            try {
+                $pageCount = $pdf->setSourceFile($tmpPath);
+                for ($i = 1; $i <= $pageCount; $i++) {
+                    $templateId = $pdf->importPage($i);
+                    $size = $pdf->getTemplateSize($templateId);
+                    $orientation = ($size['orientation'] ?? 'P') === 'L' ? 'L' : 'P';
+                    $pdf->AddPage($orientation, [$size['width'], $size['height']]);
+                    $pdf->useTemplate($templateId);
+                }
+            } finally {
+                @unlink($tmpPath);
+            }
+        }
+
+        return $pdf->Output('S');
+    }
+
     public function autoRankItem(string $tenantId, FestEvent $event, FestEventItem $item, FestSportsAutoRankService $ranker)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

@@ -59,13 +59,14 @@
             </div>
             <p v-else class="text-xs text-slate-400">Pick a phase, an area, or one or more items above to enable the download buttons.</p>
 
-            <!-- Report combo: check which of the report types above to include, then
-                 download/preview them all in one click -- either for the phase/area/item
-                 selection above, or (ignoring that selection entirely) for literally every
-                 enabled item in the whole event -- and optionally remember this combo as
-                 the Sahodaya's default so it's pre-checked next time (any admin, any event). -->
+            <!-- Report combo: check which of the report types above to include, then get
+                 them all as ONE merged PDF (each report's own pages appended in turn) --
+                 either for the phase/area/item selection above, or (ignoring that
+                 selection entirely) for literally every enabled item in the whole event --
+                 and optionally remember this combo as the Sahodaya's default so it's
+                 pre-checked next time (any admin, any event). -->
             <div class="mt-3 pt-3 border-t border-slate-100 space-y-2">
-                <label class="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Report combo</label>
+                <label class="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Report combo — merged into one PDF</label>
                 <div class="flex flex-wrap gap-x-4 gap-y-1.5">
                     <label v-for="type in reportTypeOptions" :key="type.key" class="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
                         <input type="checkbox" :value="type.key" v-model="comboSelectedTypes" class="rounded border-slate-300">
@@ -75,11 +76,11 @@
                 <div class="flex flex-wrap items-center gap-2 pt-1">
                     <button type="button" class="btn-primary text-xs !py-1.5 !px-4" :disabled="!comboSelectedTypes.length || !bulkSelectionActive"
                             :title="!bulkSelectionActive ? 'Pick a phase, an area, or one or more items above first' : ''" @click="downloadCombo(false)">
-                        ⬇️ Download checked reports
+                        ⬇️ Download merged PDF
                     </button>
                     <button type="button" class="btn-secondary text-xs !py-1.5 !px-4" :disabled="!comboSelectedTypes.length || !bulkSelectionActive"
                             :title="!bulkSelectionActive ? 'Pick a phase, an area, or one or more items above first' : ''" @click="previewCombo(false)">
-                        👁️ Preview checked reports
+                        👁️ Preview merged PDF
                     </button>
                     <button type="button" class="btn-secondary text-xs !py-1.5 !px-3" :disabled="savingCombo" @click="saveComboAsDefault">
                         {{ savingCombo ? 'Saving…' : '💾 Save as default for this Sahodaya' }}
@@ -88,10 +89,10 @@
                 <div class="flex flex-wrap items-center gap-2 pt-2 mt-2 border-t border-slate-100">
                     <span class="text-[10px] font-bold uppercase tracking-wide text-slate-500 mr-1">Whole event (ignores the filters above):</span>
                     <button type="button" class="btn-primary text-xs !py-1.5 !px-4" :disabled="!comboSelectedTypes.length" @click="downloadCombo(true)">
-                        ⬇️ Download for ALL items
+                        ⬇️ Download merged PDF for ALL items
                     </button>
                     <button type="button" class="btn-secondary text-xs !py-1.5 !px-4" :disabled="!comboSelectedTypes.length" @click="previewCombo(true)">
-                        👁️ Preview for ALL items
+                        👁️ Preview merged PDF for ALL items
                     </button>
                 </div>
             </div>
@@ -188,30 +189,33 @@ const reportTypeOptions = [
 const comboSelectedTypes = ref([...props.bulkReportCombo]);
 const savingCombo = ref(false);
 
-// Fires one <a> click per checked report type instead of window.open(): browsers only
-// ever let the FIRST window.open() per click through as a real popup and silently block
-// the rest ("multiple popups" protection), which is exactly why several checked reports
-// never showed up before. A clicked <a> -- even one that opens a new tab via
-// target="_blank" -- is treated as a normal user-gesture navigation, not a popup, so it
-// isn't subject to that block the same way.
-function triggerCombo(opts) {
-    reportTypeOptions
-        .filter((type) => comboSelectedTypes.value.includes(type.key))
-        .forEach((type) => {
-            const link = document.createElement('a');
-            link.href = type.url(opts);
-            if (opts.preview) link.target = '_blank';
-            link.rel = 'noopener';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        });
+// One merged PDF for every checked report type (each type's own pages appended in
+// turn via FPDI server-side -- see FestMarkEntryController::bulkComboPdf()), instead of
+// firing a separate download/tab per type. That used to only ever deliver the first
+// checked report -- browsers cap "popup/tab opens triggered by one click" at one, and
+// silently drop the rest, whether via window.open() or a synthetic <a target=_blank>
+// click. A single merged file sidesteps that limit entirely: there's only ever one URL
+// to open, downloaded or previewed exactly like any other single report on this page.
+function comboMergeUrl({ preview = false, global = false } = {}) {
+    const params = new URLSearchParams();
+    comboSelectedTypes.value.forEach((type) => params.append('report_types[]', type));
+    if (!global) {
+        if (bulkSelectedItemIds.value.length) params.set('item_ids', bulkSelectedItemIds.value.join(','));
+        if (bulkPhaseId.value) params.set('phase_id', bulkPhaseId.value);
+        if (bulkAreaId.value) params.set('area_id', bulkAreaId.value);
+    }
+    if (preview) params.set('preview', 1);
+    return `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/bulk-combo-pdf?${params.toString()}`;
 }
+
 function downloadCombo(global = false) {
-    triggerCombo({ global });
+    if (!comboSelectedTypes.value.length) return;
+    window.location.href = comboMergeUrl({ global });
 }
+
 function previewCombo(global = false) {
-    triggerCombo({ preview: true, global });
+    if (!comboSelectedTypes.value.length) return;
+    window.open(comboMergeUrl({ preview: true, global }), '_blank');
 }
 
 function saveComboAsDefault() {
