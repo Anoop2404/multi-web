@@ -113,17 +113,17 @@
             border-radius: 3px;
             margin-top: 1px;
         }
-        .item-heading-bar {
+        {{-- Now a <thead> row (see the usage site's own comment for why), not a
+             standalone div -- background/padding move to the cell itself. --}}
+        .item-heading-bar th {
             background: #0f172a;
             color: #ffffff;
             padding: 6px 10px;
             font-size: 12px;
             font-weight: bold;
-            border-radius: 4px;
             text-transform: uppercase;
             letter-spacing: 0.03em;
-            margin-bottom: 0;
-            page-break-after: avoid;
+            border: none;
         }
         .item-heading-bar .count-badge {
             float: right;
@@ -279,29 +279,24 @@
             $genderLabel = $firstRow['item_gender'] ?? null;
             $metaBadges = array_filter([$catLabel, $typeLabel, $genderLabel]);
         @endphp
-        {{-- Always shown now -- see the matching comment in fest.reports.attendance-sheet
-             for why this used to be conditionally suppressed and no longer is. --}}
-        <div class="item-heading-bar">
-            <span>{{ $cleanTitle }}</span>
-            @if(!empty($metaBadges))
-                <span style="font-weight: normal; font-size: 10px; color: #94a3b8; margin-left: 8px; text-transform: none;">
-                    • {{ implode(' • ', $metaBadges) }}
-                </span>
-            @endif
-            <span class="count-badge">{!! $countLabel !!}</span>
-        </div>
         <table>
             <thead>
-                @if($rowsByItem->count() > 1)
-                {{-- Backstop for natural page overflow, and needed at all only when this
-                     document covers more than one item -- see the matching comment in
-                     fest.reports.attendance-sheet. --}}
-                <tr class="item-context-row">
-                    <th colspan="7" style="background: #ffffff; color: #0f172a; border: none; padding: 0 0 6px; font-weight: bold; font-size: 11px; text-transform: none; letter-spacing: normal;">
-                        {{ implode(' · ', array_filter([$cleanTitle, ...$metaBadges])) }}
+                {{-- See the matching comment in fest.reports.attendance-sheet -- this
+                     used to be a standalone div shown once before the table, silently
+                     absent on any page this item's own rows naturally overflowed onto.
+                     Now inside <thead> and unconditional, matching mark-entry-sheet's
+                     JUDGE N SHEET/SUM SHEET badge, which never had this gap. --}}
+                <tr class="item-heading-bar">
+                    <th colspan="7">
+                        {{ $cleanTitle }}
+                        @if(!empty($metaBadges))
+                            <span style="font-weight: normal; font-size: 10px; color: #94a3b8; margin-left: 8px; text-transform: none;">
+                                • {{ implode(' • ', $metaBadges) }}
+                            </span>
+                        @endif
+                        <span class="count-badge">{!! $countLabel !!}</span>
                     </th>
                 </tr>
-                @endif
                 <tr>
                     <th style="width: 32px;" class="text-center">Sl.No.</th>
                     <th style="width: 60px;" class="text-center">Chest</th>

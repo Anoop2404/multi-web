@@ -170,17 +170,17 @@
             text-align: center;
             line-height: 36px;
         }
-        .item-heading-bar {
+        {{-- Now a <thead> row (see the usage site's own comment for why), not a
+             standalone div -- background/padding move to the cell itself. --}}
+        .item-heading-bar th {
             background: #0f172a;
             color: #ffffff;
             padding: 6px 10px;
             font-size: 12px;
             font-weight: bold;
-            border-radius: 4px;
             text-transform: uppercase;
             letter-spacing: 0.03em;
-            margin-bottom: 0;
-            page-break-after: avoid;
+            border: none;
         }
         .item-heading-bar .count-badge {
             float: right;
@@ -376,39 +376,28 @@
             $genderLabel = $firstRow['item_gender'] ?? null;
             $metaBadges = array_filter([$catLabel, $typeLabel, $genderLabel]);
         @endphp
-        {{-- Always shown now, regardless of renderer path or single/multi-item selection
-             -- this dark item bar used to be suppressed specifically when Chromium
-             rendered a single-item selection, on the assumption the native page header
-             already named the item so this would be redundant. But every other report
-             type (see mark-entry-sheet.blade.php's JUDGE N SHEET/SUM SHEET badge) shows
-             its own dark per-section label unconditionally, and that's the standard this
-             now matches instead of being the one exception. --}}
-        <div class="item-heading-bar">
-            <span>{{ $cleanTitle }}</span>
-            @if(!empty($metaBadges))
-                <span style="font-weight: normal; font-size: 10px; color: #94a3b8; margin-left: 8px; text-transform: none;">
-                    • {{ implode(' • ', $metaBadges) }}
-                </span>
-            @endif
-            <span class="count-badge">{!! $countLabel !!}</span>
-        </div>
         <table>
             <thead>
-                {{-- Backstop for natural (non-chunk-boundary) page overflow within this
-                     item's own table -- dompdf/Chromium both natively reprint <thead> on
-                     every page a table spans, which is what already keeps the Sl/Order/...
-                     column row visible on a continuation page even when .item-heading-bar
-                     above (outside the table, in normal flow) does not repeat. --}}
-                @if($rowsByItem->count() > 1)
-                {{-- Only needed when this document covers more than one item -- with a
-                     single item, the fixed header above already names it via
-                     $singleItemMetaStr, and repeating that again here just overlaps it. --}}
-                <tr class="item-context-row">
-                    <th colspan="{{ $colspan }}" style="background: #ffffff; color: #0f172a; border: none; padding: 0 0 6px; font-weight: bold; font-size: 11px; text-transform: none; letter-spacing: normal;">
-                        {{ implode(' · ', array_filter([$cleanTitle, ...$metaBadges])) }}
+                {{-- This used to be a standalone .item-heading-bar div shown once before
+                     the table -- fine on the first physical page of an item's section,
+                     but silently absent on any continuation page once that item's own
+                     rows naturally overflowed onto it (a div outside the table doesn't
+                     repeat; dompdf/Chromium only ever natively reprint an actual <thead>,
+                     which is why the Sl/Order/... column row below already survived
+                     pagination and this didn't). Moved inside <thead> and made
+                     unconditional -- matches mark-entry-sheet.blade.php's JUDGE N SHEET/
+                     SUM SHEET badge, which never had this gap for exactly this reason. --}}
+                <tr class="item-heading-bar">
+                    <th colspan="{{ $colspan }}">
+                        {{ $cleanTitle }}
+                        @if(!empty($metaBadges))
+                            <span style="font-weight: normal; font-size: 10px; color: #94a3b8; margin-left: 8px; text-transform: none;">
+                                • {{ implode(' • ', $metaBadges) }}
+                            </span>
+                        @endif
+                        <span class="count-badge">{!! $countLabel !!}</span>
                     </th>
                 </tr>
-                @endif
                 <tr>
                     <th style="width: 28px;" class="text-center">Sl</th>
                     <th style="width: 50px;" class="text-center">Order</th>
