@@ -42,7 +42,11 @@
             <div class="max-h-96 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100">
                 <label v-for="item in items" :key="item.id" class="flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer hover:bg-slate-50">
                     <input type="checkbox" :value="item.id" v-model="bulkSelectedItemIds" class="rounded border-slate-300">
-                    {{ item.title }}
+                    <span>
+                        {{ item.title }}
+                        <span v-if="item.item_code" class="text-slate-400">· #{{ item.item_code }}</span>
+                        <span v-if="item.category_label" class="text-slate-400">· {{ item.category_label }}</span>
+                    </span>
                 </label>
                 <p v-if="!items.length" class="px-3 py-4 text-xs text-slate-400">No items in this event yet.</p>
             </div>
