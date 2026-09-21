@@ -286,7 +286,8 @@
             $genderLabel = $firstRow['item_gender'] ?? null;
             $metaBadges = array_filter([$catLabel, $typeLabel, $genderLabel]);
         @endphp
-        @if(!empty($isPreview) || ($isDomPdf ?? true) || empty($singleItemName))
+        {{-- Always shown now -- see the matching comment in fest.reports.attendance-sheet
+             for why this used to be conditionally suppressed and no longer is. --}}
         <div class="item-heading-bar">
             <span>{{ $cleanTitle }}</span>
             @if(!empty($metaBadges))
@@ -296,7 +297,6 @@
             @endif
             <span class="count-badge">{!! $countLabel !!}</span>
         </div>
-        @endif
         <table>
             <thead>
                 @if($rowsByItem->count() > 1)

@@ -24,7 +24,11 @@
              name/category goes in that sheet's own table <thead> instead, since that's
              scoped correctly to just the pages that ONE item's table spans. --}}
         .pdf-page-header { position: fixed; top: -98px; left: 0; right: 0; }
-        .item-context-row th { background: #ffffff; color: #0f172a; border: none; padding: 4px 0 8px; font-weight: normal; text-transform: none; letter-spacing: normal; }
+        {{-- Same dark item bar every other Bulk Sheets report type uses -- see
+             .item-heading-bar in fest.reports.attendance-sheet and the equivalent row in
+             fest.chest-numbers-print. --}}
+        .item-context-row th { background: #0f172a; color: #ffffff; border: none; padding: 7px 10px; font-weight: bold; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; }
+        .item-context-row .item-meta { font-weight: normal; font-size: 10px; color: #94a3b8; text-transform: none; margin-left: 8px; }
     </style>
 </head>
 <body>
@@ -40,8 +44,8 @@
     @foreach($sheets as $sheet)
         <div class="sheet">
             @php
-                $itemInfoParts = array_filter([
-                    ($sheet['item']->item_code ?? null) ? "[{$sheet['item']->item_code}] " . $sheet['item']->title : ($sheet['item']->title ?? null),
+                $itemTitle = ($sheet['item']->item_code ?? null) ? "[{$sheet['item']->item_code}] " . $sheet['item']->title : ($sheet['item']->title ?? null);
+                $itemMetaParts = array_filter([
                     $sheet['category_label'] ?? null,
                     \App\Support\FestTeamSquadRules::isMultiPerson($sheet['item']->participant_type ?? null) ? 'Group' : 'Individual',
                     \App\Support\FestSportsAgeGroup::genderLabel($sheet['item']->gender ?? null),
@@ -50,9 +54,14 @@
 
             <table class="table">
                 <thead>
-                    @if(!empty($itemInfoParts))
+                    @if(!empty($itemTitle))
                     <tr class="item-context-row">
-                        <th colspan="4">{{ implode(' · ', $itemInfoParts) }}</th>
+                        <th colspan="4">
+                            {{ $itemTitle }}
+                            @if(!empty($itemMetaParts))
+                                <span class="item-meta">{{ implode(' · ', $itemMetaParts) }}</span>
+                            @endif
+                        </th>
                     </tr>
                     @endif
                     <tr>

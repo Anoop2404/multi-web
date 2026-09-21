@@ -18,6 +18,14 @@
         table.data tr:nth-child(even) td { background: #f8fafc; }
         .chest-no { font-weight: 800; font-size: 12px; color: #0f172a; }
         .footer { margin-top: 14px; padding-top: 6px; border-top: 1px solid #cbd5e1; font-size: 8.5px; color: #64748b; }
+        {{-- Same dark item bar every other Bulk Sheets report type uses (see
+             .item-heading-bar in fest.reports.attendance-sheet and the JUDGE/SUM badge
+             in fest.reports.mark-entry-sheet) -- inside <thead> so it reprints on every
+             page this table spans, same mechanism the column header row already relies
+             on. --}}
+        .item-bar-row th { background: #0f172a; color: #ffffff; padding: 7px 10px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.03em; border: none; }
+        .item-bar-row .item-meta { font-weight: normal; font-size: 10px; color: #94a3b8; text-transform: none; margin-left: 8px; }
+        .item-bar-row .count-badge { float: right; background: #334155; color: #f8fafc; font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: normal; text-transform: none; letter-spacing: normal; }
     </style>
 </head>
 <body>
@@ -42,6 +50,24 @@
 
     <table class="data">
         <thead>
+            @if(!empty($item))
+            @php
+                $itemBarParts = array_filter([
+                    $itemCategory ?? null,
+                    \App\Support\FestTeamSquadRules::isMultiPerson($item->participant_type ?? null) ? 'Group' : 'Individual',
+                    \App\Support\FestSportsAgeGroup::genderLabel($item->gender ?? null),
+                ]);
+            @endphp
+            <tr class="item-bar-row">
+                <th colspan="7">
+                    {{ ($item->item_code ? "[{$item->item_code}] " : '').$item->title }}
+                    @if(!empty($itemBarParts))
+                        <span class="item-meta">{{ implode(' · ', $itemBarParts) }}</span>
+                    @endif
+                    <span class="count-badge">{{ count($rows) }} participant{{ count($rows) === 1 ? '' : 's' }}</span>
+                </th>
+            </tr>
+            @endif
             <tr>
                 <th style="width: 70px;">Chest No</th>
                 <th style="width: 60px;">Order No</th>

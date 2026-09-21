@@ -381,7 +381,13 @@
             $genderLabel = $firstRow['item_gender'] ?? null;
             $metaBadges = array_filter([$catLabel, $typeLabel, $genderLabel]);
         @endphp
-        @if(!empty($isPreview) || ($isDomPdf ?? true) || empty($singleItemName))
+        {{-- Always shown now, regardless of renderer path or single/multi-item selection
+             -- this dark item bar used to be suppressed specifically when Chromium
+             rendered a single-item selection, on the assumption the native page header
+             already named the item so this would be redundant. But every other report
+             type (see mark-entry-sheet.blade.php's JUDGE N SHEET/SUM SHEET badge) shows
+             its own dark per-section label unconditionally, and that's the standard this
+             now matches instead of being the one exception. --}}
         <div class="item-heading-bar">
             <span>{{ $cleanTitle }}</span>
             @if(!empty($metaBadges))
@@ -391,7 +397,6 @@
             @endif
             <span class="count-badge">{!! $countLabel !!}</span>
         </div>
-        @endif
         <table>
             <thead>
                 {{-- Backstop for natural (non-chunk-boundary) page overflow within this
