@@ -52,22 +52,19 @@
             </div>
 
             <div v-if="bulkSelectionActive" class="flex flex-wrap gap-2 pt-1">
-                <a :href="bulkMarkEntrySheetUrl" target="_blank" class="btn-secondary text-xs">🖨️ Judge Sheets (combined PDF)</a>
-                <a :href="bulkMarkEntrySheetBlankChestUrl" target="_blank" class="btn-secondary text-xs">🖨️ Judge Sheets — No Chest No</a>
-                <a :href="bulkCumulativeSheetUrl" target="_blank" class="btn-secondary text-xs">📊 Digital Sum Sheet</a>
-                <a :href="bulkCumulativeSheetBlankChestUrl" target="_blank" class="btn-secondary text-xs">📊 Sum Sheet — No Chest No</a>
-                <a :href="bulkResultDeclarationSheetUrl" target="_blank" class="btn-secondary text-xs">📝 Result Declaration Sheet</a>
-                <a :href="bulkChestNumberListUrl" target="_blank" class="btn-secondary text-xs">🔢 Chest Number List</a>
-                <a :href="bulkAttendanceSheetUrl" target="_blank" class="btn-secondary text-xs">📋 Attendance Sheet</a>
-                <a :href="bulkTimesheetUrl" target="_blank" class="btn-secondary text-xs">⏱️ Timesheet</a>
-                <a :href="bulkItemsListUrl" target="_blank" class="btn-secondary text-xs">📃 Items List</a>
+                <span v-for="type in reportTypeOptions" :key="type.key" class="inline-flex rounded-lg overflow-hidden border border-slate-200">
+                    <a :href="type.url()" target="_blank" class="btn-secondary text-xs !rounded-none !border-0">{{ type.label }}</a>
+                    <a :href="type.url({ preview: true })" target="_blank" title="Preview in a new tab" class="btn-secondary text-xs !rounded-none !border-0 !border-l !border-slate-200 !px-2">👁️</a>
+                </span>
             </div>
             <p v-else class="text-xs text-slate-400">Pick a phase, an area, or one or more items above to enable the download buttons.</p>
 
-            <!-- Report combo: check which of the report types above to include, download
-                 them all in one click, and optionally remember this combo as the
-                 Sahodaya's default so it's pre-checked next time (any admin, any event). -->
-            <div v-if="bulkSelectionActive" class="mt-3 pt-3 border-t border-slate-100 space-y-2">
+            <!-- Report combo: check which of the report types above to include, then
+                 download/preview them all in one click -- either for the phase/area/item
+                 selection above, or (ignoring that selection entirely) for literally every
+                 enabled item in the whole event -- and optionally remember this combo as
+                 the Sahodaya's default so it's pre-checked next time (any admin, any event). -->
+            <div class="mt-3 pt-3 border-t border-slate-100 space-y-2">
                 <label class="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Report combo</label>
                 <div class="flex flex-wrap gap-x-4 gap-y-1.5">
                     <label v-for="type in reportTypeOptions" :key="type.key" class="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
@@ -76,11 +73,25 @@
                     </label>
                 </div>
                 <div class="flex flex-wrap items-center gap-2 pt-1">
-                    <button type="button" class="btn-primary text-xs !py-1.5 !px-4" :disabled="!comboSelectedTypes.length" @click="downloadCombo">
+                    <button type="button" class="btn-primary text-xs !py-1.5 !px-4" :disabled="!comboSelectedTypes.length || !bulkSelectionActive"
+                            :title="!bulkSelectionActive ? 'Pick a phase, an area, or one or more items above first' : ''" @click="downloadCombo(false)">
                         ⬇️ Download checked reports
+                    </button>
+                    <button type="button" class="btn-secondary text-xs !py-1.5 !px-4" :disabled="!comboSelectedTypes.length || !bulkSelectionActive"
+                            :title="!bulkSelectionActive ? 'Pick a phase, an area, or one or more items above first' : ''" @click="previewCombo(false)">
+                        👁️ Preview checked reports
                     </button>
                     <button type="button" class="btn-secondary text-xs !py-1.5 !px-3" :disabled="savingCombo" @click="saveComboAsDefault">
                         {{ savingCombo ? 'Saving…' : '💾 Save as default for this Sahodaya' }}
+                    </button>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 pt-2 mt-2 border-t border-slate-100">
+                    <span class="text-[10px] font-bold uppercase tracking-wide text-slate-500 mr-1">Whole event (ignores the filters above):</span>
+                    <button type="button" class="btn-primary text-xs !py-1.5 !px-4" :disabled="!comboSelectedTypes.length" @click="downloadCombo(true)">
+                        ⬇️ Download for ALL items
+                    </button>
+                    <button type="button" class="btn-secondary text-xs !py-1.5 !px-4" :disabled="!comboSelectedTypes.length" @click="previewCombo(true)">
+                        👁️ Preview for ALL items
                     </button>
                 </div>
             </div>
@@ -129,61 +140,78 @@ const bulkAreaId = ref('');
 
 // `path` is relative to the event base (e.g. 'reports/mark-entry-sheet',
 // 'chest-numbers/print') -- not every bulk-capable report lives under /reports/.
-function bulkSheetUrl(path, extraParams = {}) {
+// `global: true` skips item_ids/phase_id/area_id entirely -- every bulk-capable
+// controller already treats "no item filter at all" as "every enabled item in the
+// event" (that's the original single-item_id/whole-event behavior these reports had
+// before bulk selection existed), so this is a real function (not a computed) since it
+// needs to branch per call, not just per reactive state.
+function bulkSheetUrl(path, extraParams = {}, { global = false } = {}) {
     const params = new URLSearchParams();
-    if (bulkSelectedItemIds.value.length) params.set('item_ids', bulkSelectedItemIds.value.join(','));
-    if (bulkPhaseId.value) params.set('phase_id', bulkPhaseId.value);
-    if (bulkAreaId.value) params.set('area_id', bulkAreaId.value);
+    if (!global) {
+        if (bulkSelectedItemIds.value.length) params.set('item_ids', bulkSelectedItemIds.value.join(','));
+        if (bulkPhaseId.value) params.set('phase_id', bulkPhaseId.value);
+        if (bulkAreaId.value) params.set('area_id', bulkAreaId.value);
+    }
     Object.entries(extraParams).forEach(([key, value]) => params.set(key, value));
     const qs = params.toString();
     return `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/${path}${qs ? `?${qs}` : ''}`;
 }
 
-const bulkMarkEntrySheetUrl = computed(() => bulkSheetUrl('reports/mark-entry-sheet'));
-const bulkMarkEntrySheetBlankChestUrl = computed(() => `${bulkMarkEntrySheetUrl.value}${bulkMarkEntrySheetUrl.value.includes('?') ? '&' : '?'}blank_chest=1`);
-const bulkCumulativeSheetUrl = computed(() => bulkSheetUrl('reports/mark-criteria-sheet'));
-const bulkCumulativeSheetBlankChestUrl = computed(() => `${bulkCumulativeSheetUrl.value}${bulkCumulativeSheetUrl.value.includes('?') ? '&' : '?'}blank_chest=1`);
-const bulkResultDeclarationSheetUrl = computed(() => bulkSheetUrl('reports/result-declaration-sheet'));
-// Chest Numbers' print() defaults to a real download (no extra param needed), unlike the
-// generic reports/export/{type} dispatcher below, which defaults to preview and needs
-// download=1 for an actual attachment -- see FestReportService::export()'s $this->preview.
-const bulkChestNumberListUrl = computed(() => bulkSheetUrl('chest-numbers/print'));
-const bulkAttendanceSheetUrl = computed(() => bulkSheetUrl('reports/export/attendance-sheet', { download: 1 }));
-const bulkTimesheetUrl = computed(() => bulkSheetUrl('reports/export/timesheet', { download: 1 }));
-const bulkItemsListUrl = computed(() => bulkSheetUrl('reports/items-list'));
 const bulkSelectionActive = computed(() => bulkSelectedItemIds.value.length > 0 || !!bulkPhaseId.value || !!bulkAreaId.value);
 
+// Every report now supports ?preview=1 (view inline in a new tab) alongside its default
+// download. attendance-sheet/timesheet actually default to preview already (see the
+// comment below) -- explicit download:1 only when NOT previewing keeps that reversed.
 const reportTypeOptions = [
-    { key: 'judge_sheet', label: '🖨️ Judge Sheets', url: () => bulkMarkEntrySheetUrl.value },
-    { key: 'judge_sheet_no_chest', label: '🖨️ Judge Sheets — No Chest No', url: () => bulkMarkEntrySheetBlankChestUrl.value },
-    { key: 'sum_sheet', label: '📊 Digital Sum Sheet', url: () => bulkCumulativeSheetUrl.value },
-    { key: 'sum_sheet_no_chest', label: '📊 Sum Sheet — No Chest No', url: () => bulkCumulativeSheetBlankChestUrl.value },
-    { key: 'result_declaration', label: '📝 Result Declaration Sheet', url: () => bulkResultDeclarationSheetUrl.value },
-    { key: 'chest_number_list', label: '🔢 Chest Number List', url: () => bulkChestNumberListUrl.value },
-    { key: 'attendance_sheet', label: '📋 Attendance Sheet', url: () => bulkAttendanceSheetUrl.value },
-    { key: 'timesheet', label: '⏱️ Timesheet', url: () => bulkTimesheetUrl.value },
-    { key: 'items_list', label: '📃 Items List', url: () => bulkItemsListUrl.value },
+    { key: 'judge_sheet', label: '🖨️ Judge Sheets',
+        url: (o = {}) => bulkSheetUrl('reports/mark-entry-sheet', o.preview ? { preview: 1 } : {}, o) },
+    { key: 'judge_sheet_no_chest', label: '🖨️ Judge Sheets — No Chest No',
+        url: (o = {}) => bulkSheetUrl('reports/mark-entry-sheet', { blank_chest: 1, ...(o.preview ? { preview: 1 } : {}) }, o) },
+    { key: 'sum_sheet', label: '📊 Digital Sum Sheet',
+        url: (o = {}) => bulkSheetUrl('reports/mark-criteria-sheet', o.preview ? { preview: 1 } : {}, o) },
+    { key: 'sum_sheet_no_chest', label: '📊 Sum Sheet — No Chest No',
+        url: (o = {}) => bulkSheetUrl('reports/mark-criteria-sheet', { blank_chest: 1, ...(o.preview ? { preview: 1 } : {}) }, o) },
+    { key: 'result_declaration', label: '📝 Result Declaration Sheet',
+        url: (o = {}) => bulkSheetUrl('reports/result-declaration-sheet', o.preview ? { preview: 1 } : {}, o) },
+    { key: 'chest_number_list', label: '🔢 Chest Number List',
+        url: (o = {}) => bulkSheetUrl('chest-numbers/print', o.preview ? { preview: 1 } : {}, o) },
+    // Chest Numbers' print() defaults to a real download (no extra param needed) unlike
+    // this generic reports/export/{type} dispatcher, which defaults to preview and needs
+    // download=1 for an actual attachment -- see FestReportService::export()'s $this->preview.
+    { key: 'attendance_sheet', label: '📋 Attendance Sheet',
+        url: (o = {}) => bulkSheetUrl('reports/export/attendance-sheet', o.preview ? {} : { download: 1 }, o) },
+    { key: 'timesheet', label: '⏱️ Timesheet',
+        url: (o = {}) => bulkSheetUrl('reports/export/timesheet', o.preview ? {} : { download: 1 }, o) },
+    { key: 'items_list', label: '📃 Items List',
+        url: (o = {}) => bulkSheetUrl('reports/items-list', o.preview ? { preview: 1 } : {}, o) },
 ];
 const comboSelectedTypes = ref([...props.bulkReportCombo]);
 const savingCombo = ref(false);
 
-// Every report in the combo downloads as a real file (Content-Disposition: attachment),
-// not a page to view -- so this triggers each one via a throwaway <a> click instead of
-// window.open(). Browsers only ever let the first window.open() per click through as a
-// real popup and silently block the rest ("multiple popups" protection), which is
-// exactly why several checked reports never showed up. A clicked <a> isn't a new window
-// at all, just a download, so it isn't subject to that block.
-function downloadCombo() {
+// Fires one <a> click per checked report type instead of window.open(): browsers only
+// ever let the FIRST window.open() per click through as a real popup and silently block
+// the rest ("multiple popups" protection), which is exactly why several checked reports
+// never showed up before. A clicked <a> -- even one that opens a new tab via
+// target="_blank" -- is treated as a normal user-gesture navigation, not a popup, so it
+// isn't subject to that block the same way.
+function triggerCombo(opts) {
     reportTypeOptions
         .filter((type) => comboSelectedTypes.value.includes(type.key))
         .forEach((type) => {
             const link = document.createElement('a');
-            link.href = type.url();
+            link.href = type.url(opts);
+            if (opts.preview) link.target = '_blank';
             link.rel = 'noopener';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
         });
+}
+function downloadCombo(global = false) {
+    triggerCombo({ global });
+}
+function previewCombo(global = false) {
+    triggerCombo({ preview: true, global });
 }
 
 function saveComboAsDefault() {

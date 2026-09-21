@@ -143,4 +143,19 @@ class FestMarkEntrySheetBulkTest extends TestCase
             ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/mark-entry-sheet");
         $whole->assertOk();
     }
+
+    public function test_preview_streams_inline_instead_of_downloading(): void
+    {
+        [$sahodaya, $event, $admin, $items] = $this->fixture();
+
+        $markEntry = $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/mark-entry-sheet?item_id={$items[0]->id}&preview=1");
+        $markEntry->assertOk();
+        $this->assertStringContainsString('inline', $markEntry->headers->get('content-disposition'));
+
+        $resultDeclaration = $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/result-declaration-sheet?item_id={$items[0]->id}&preview=1");
+        $resultDeclaration->assertOk();
+        $this->assertStringContainsString('inline', $resultDeclaration->headers->get('content-disposition'));
+    }
 }

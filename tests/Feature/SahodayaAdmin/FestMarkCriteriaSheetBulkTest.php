@@ -81,4 +81,15 @@ class FestMarkCriteriaSheetBulkTest extends TestCase
 
         $response->assertStatus(422);
     }
+
+    public function test_preview_streams_inline_instead_of_downloading(): void
+    {
+        [$sahodaya, $event, $admin, $items] = $this->fixture();
+
+        $response = $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/mark-criteria-sheet?item_id={$items[0]->id}&preview=1");
+
+        $response->assertOk();
+        $this->assertStringContainsString('inline', $response->headers->get('content-disposition'));
+    }
 }

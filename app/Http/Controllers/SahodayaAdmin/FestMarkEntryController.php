@@ -1258,7 +1258,7 @@ class FestMarkEntryController extends SahodayaAdminController
         }
         $fileName = \Illuminate\Support\Str::slug(implode(' ', $nameParts)).'.pdf';
 
-        return \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.mark-criteria-sheet', [
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.mark-criteria-sheet', [
             'event'      => $event,
             'sahodaya'   => $this->sahodaya,
             'sheets'     => $sheets,
@@ -1266,7 +1266,13 @@ class FestMarkEntryController extends SahodayaAdminController
             'orgName'    => $this->sahodaya->name ?? 'Sahodaya',
             'logoSrc'    => TenantBranding::logoEmbedSrc($this->sahodaya),
             'blankChest' => $blankChest,
-        ])->setPaper('a4', 'portrait')->download($fileName);
+        ])->setPaper('a4', 'portrait');
+
+        if ($request->boolean('inline') || $request->boolean('preview')) {
+            return $pdf->stream($fileName);
+        }
+
+        return $pdf->download($fileName);
     }
 
     /**
@@ -1421,6 +1427,10 @@ class FestMarkEntryController extends SahodayaAdminController
         }
         $fileName = \Illuminate\Support\Str::slug(implode(' ', $nameParts)).'.pdf';
 
+        if ($request->boolean('inline') || $request->boolean('preview')) {
+            return $pdf->stream($fileName);
+        }
+
         return $pdf->download($fileName);
     }
 
@@ -1482,6 +1492,10 @@ class FestMarkEntryController extends SahodayaAdminController
         $nameParts[] = 'result declaration sheet';
         $fileName = \Illuminate\Support\Str::slug(implode(' ', $nameParts)).'.pdf';
 
+        if ($request->boolean('inline') || $request->boolean('preview')) {
+            return $pdf->stream($fileName);
+        }
+
         return $pdf->download($fileName);
     }
 
@@ -1540,6 +1554,10 @@ class FestMarkEntryController extends SahodayaAdminController
         }
         $nameParts[] = 'items list';
         $fileName = \Illuminate\Support\Str::slug(implode(' ', $nameParts)).'.pdf';
+
+        if ($request->boolean('inline') || $request->boolean('preview')) {
+            return $pdf->stream($fileName);
+        }
 
         return $pdf->download($fileName);
     }

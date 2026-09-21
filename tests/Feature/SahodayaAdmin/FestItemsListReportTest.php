@@ -67,6 +67,37 @@ class FestItemsListReportTest extends TestCase
         $this->assertStringContainsString('2-items', urldecode($response->headers->get('content-disposition')));
     }
 
+    public function test_preview_streams_inline_instead_of_downloading(): void
+    {
+        [$sahodaya, $event, $admin, $items] = $this->fixture();
+
+        $response = $this->actingAs($admin)->get(
+            "/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/items-list?item_ids={$items[0]->id}&preview=1"
+        );
+
+        $response->assertOk();
+        $this->assertStringContainsString('inline', $response->headers->get('content-disposition'));
+    }
+
+    /**
+     * No item_ids/item_id/phase_id/area_id at all -- the "whole event" bulk download.
+     * Matches the same "no filter = every enabled item" convention markEntrySheet()/
+     * resultDeclarationSheet() already had before bulk selection existed -- the filename
+     * doesn't get a "-N-items" suffix in this case (that's reserved for a bulk filter
+     * that actually narrowed something), it's just this simply succeeding that proves
+     * every enabled item was found rather than 404ing on an empty query.
+     */
+    public function test_no_filters_at_all_covers_every_enabled_item_in_the_event(): void
+    {
+        [$sahodaya, $event, $admin] = $this->fixture();
+
+        $response = $this->actingAs($admin)->get(
+            "/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/items-list"
+        );
+
+        $response->assertOk();
+    }
+
     public function test_no_items_selected_and_none_in_event_returns_404(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);
