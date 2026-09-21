@@ -336,23 +336,14 @@ class FestIdCardController extends SahodayaAdminController
         $gridLayout = $customTemplate?->gridLayout();
         $perPage = $gridLayout ? ($gridLayout['cols'] * $gridLayout['rows']) : 4;
 
-        $schoolList = [];
+        $schoolList = $service->schoolParticipantSummaries($targetEvent, $filters, $perPage);
+
         $totalParticipants = 0;
         $totalEstimatedPages = 0;
 
-        foreach ($allSections as $section) {
-            $count = count($section['cards'] ?? []);
-            $pages = (int) ceil($count / max(1, $perPage));
-            $totalParticipants += $count;
-            $totalEstimatedPages += $pages;
-
-            $schoolList[] = [
-                'school_id'         => $section['school_id'] ?? null,
-                'school_name'       => $section['school_name'] ?? 'School',
-                'school_code'       => $section['cards'][0]['school_code'] ?? null,
-                'participant_count' => $count,
-                'page_count'        => $pages,
-            ];
+        foreach ($schoolList as $sc) {
+            $totalParticipants += $sc['participant_count'];
+            $totalEstimatedPages += $sc['page_count'];
         }
 
         // Build volumes: group schools so each volume is ~80–120 pages (or ~400-500 students)
@@ -395,9 +386,16 @@ class FestIdCardController extends SahodayaAdminController
             ];
         }
 
-        // Sample preview cards (first 1-2 pages of the first school, or sample cards)
-        $firstSchool = $allSections[0] ?? null;
-        $sampleCards = array_slice($firstSchool['cards'] ?? [], 0, $perPage * 2);
+        // Sample preview cards (first 1-2 pages of the first school, lightweight single-school query)
+        $firstSchool = $schoolList[0] ?? null;
+        $sampleCards = [];
+        if ($firstSchool && ! empty($firstSchool['school_id'])) {
+            $previewFilters = array_merge($filters, [
+                'school_id'         => $firstSchool['school_id'],
+                'include_data_uris' => false,
+            ]);
+            $sampleCards = array_slice($service->cards($targetEvent, 'student', $previewFilters), 0, $perPage * 2);
+        }
 
         return $this->inertia('Sahodaya/Events/IdCards/DieGenerator', $this->withEventActivity($event, FestPageActivity::ID_CARDS, [
             'event'               => $targetEvent->only('id', 'title', 'status', 'event_type'),
@@ -445,16 +443,14 @@ class FestIdCardController extends SahodayaAdminController
             $filters['school_id'] = $request->input('school_id');
         }
 
+        if ($request->filled('school_ids')) {
+            $filters['school_ids'] = (array) $request->input('school_ids');
+        }
+
         $allSections = $service->cardsGroupedBySchool($targetEvent, $filters);
         abort_if($allSections === [], 422, 'No approved participants found for this selection.');
 
-        if ($request->filled('school_ids')) {
-            $allowedSchoolIds = (array) $request->input('school_ids');
-            $sections = array_values(array_filter($allSections, fn ($s) => in_array($s['school_id'], $allowedSchoolIds, true)));
-            abort_if($sections === [], 422, 'No schools match the requested volume.');
-        } else {
-            $sections = $allSections;
-        }
+        $sections = $allSections;
 
         $totalCards = collect($sections)->sum(fn ($section) => count($section['cards']));
         $customTemplate = $this->resolveCustomIdCardTemplate($targetEvent, null, 'student');

@@ -164,6 +164,69 @@ class FestIdCardService
             ->all();
     }
 
+    /**
+     * Lightweight summary of schools with participant counts and estimated page counts.
+     * Designed for high-speed page loads to avoid hydrating thousands of student cards.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return list<array{school_id: string, school_name: string, school_code: ?string, participant_count: int, page_count: int}>
+     */
+    public function schoolParticipantSummaries(FestEvent $event, array $filters = [], int $perPage = 4): array
+    {
+        $query = FestParticipant::query()
+            ->join('fest_registrations', 'fest_participants.registration_id', '=', 'fest_registrations.id')
+            ->whereIn('fest_registrations.event_id', $event->reportableEventIds());
+
+        $this->constrainRegistrationScope($query, $filters, $event);
+
+        $query->where('fest_participants.participant_role', '!=', 'standby')
+            ->where(fn ($q) => $q->whereNotNull('fest_participants.student_id')->orWhereNotNull('fest_participants.teacher_id'));
+
+        if (! empty($filters['school_id'])) {
+            $query->where('fest_registrations.school_id', $filters['school_id']);
+        }
+        if (! empty($filters['school_ids'])) {
+            $query->whereIn('fest_registrations.school_id', (array) $filters['school_ids']);
+        }
+        if (! empty($filters['item_id'])) {
+            $query->whereIn('fest_registrations.item_id', $event->reportableItemIds([(int) $filters['item_id']]));
+        }
+
+        $rows = $query
+            ->select(['fest_registrations.school_id', 'fest_participants.student_id', 'fest_participants.teacher_id'])
+            ->distinct()
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        $schools = Tenant::whereIn('id', $rows->pluck('school_id')->unique())
+            ->get()
+            ->keyBy('id');
+
+        $grouped = $rows->groupBy('school_id');
+
+        $summaries = [];
+        foreach ($grouped as $schoolId => $participants) {
+            $school = $schools->get($schoolId);
+            $count = $participants->count();
+
+            $summaries[] = [
+                'school_id'         => (string) $schoolId,
+                'school_name'       => $school?->name ?? 'School',
+                'school_code'       => $school?->schoolCode(),
+                'participant_count' => $count,
+                'page_count'        => (int) ceil($count / max(1, $perPage)),
+            ];
+        }
+
+        return collect($summaries)
+            ->sortBy('school_name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->all();
+    }
+
     /** @return list<array{id: int, name: string, count: int}> */
     public function headOptions(FestEvent $event, ?string $schoolId = null): array
     {
@@ -477,6 +540,9 @@ class FestIdCardService
             $this->constrainRegistrationScope($q, $filters, $event);
             if (! empty($filters['school_id'])) {
                 $q->where('school_id', $filters['school_id']);
+            }
+            if (! empty($filters['school_ids'])) {
+                $q->whereIn('school_id', (array) $filters['school_ids']);
             }
             if (! empty($filters['item_id'])) {
                 $q->whereIn('item_id', $event->reportableItemIds([(int) $filters['item_id']]));
