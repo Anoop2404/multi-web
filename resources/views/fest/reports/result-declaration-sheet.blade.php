@@ -7,7 +7,9 @@
         {{-- Top margin reserved for the fixed running header below -- must stay >= that
              header's rendered height or dompdf/Chromium will let content overlap it. --}}
         @page { margin: 108px 20px 24px; size: portrait; }
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11.5px; color: #1e293b; line-height: 1.4; }
+        {{-- See the matching comment in mark-entry-sheet.blade.php -- 'Helvetica Neue'
+             wasn't resolving in dompdf and silently fell back to serif. --}}
+        body { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 11.5px; color: #1e293b; line-height: 1.4; }
         .sheet { page-break-after: always; }
         .sheet:last-child { page-break-after: avoid; }
         .table { width: 100%; border-collapse: collapse; margin-top: 4px; }
@@ -24,15 +26,14 @@
              name/category goes in that sheet's own table <thead> instead, since that's
              scoped correctly to just the pages that ONE item's table spans. --}}
         .pdf-page-header { position: fixed; top: -98px; left: 0; right: 0; }
-        {{-- Plain text, no dark box -- matches mark-entry-sheet.blade.php's own
-             item-context-row styling. --}}
-        {{-- text-transform/letter-spacing must be reset explicitly -- .table th above
-             (the real column-header style, e.g. SL NO/CHEST NO.) sets text-transform:
-             uppercase, and since .item-context-row th doesn't win on specificity alone
-             (same specificity, just declared later), that uppercase silently carried
-             over here too without this. --}}
-        .item-context-row th { background: #ffffff; color: #0f172a; border: none; padding: 4px 0 8px; font-weight: bold; font-size: 12px; text-transform: none; letter-spacing: normal; }
-        .item-context-row .item-meta { font-weight: normal; font-size: 10px; color: #64748b; margin-left: 8px; }
+        {{-- Identical rule to mark-entry-sheet.blade.php's own item-context-row --
+             deliberately no font-size override here, so it inherits 11px from .table th
+             above rather than picking its own size. text-transform/letter-spacing must
+             still be reset explicitly -- .table th sets text-transform: uppercase, and
+             since .item-context-row th doesn't win on specificity alone (same
+             specificity, just declared later), that uppercase would otherwise silently
+             carry over here too. --}}
+        .item-context-row th { background: #ffffff; color: #0f172a; border: none; padding: 4px 0 8px; font-weight: normal; text-transform: none; letter-spacing: normal; }
     </style>
 </head>
 <body>
@@ -48,8 +49,11 @@
     @foreach($sheets as $sheet)
         <div class="sheet">
             @php
-                $itemTitle = ($sheet['item']->item_code ?? null) ? "[{$sheet['item']->item_code}] " . $sheet['item']->title : ($sheet['item']->title ?? null);
-                $itemMetaParts = array_filter([
+                // Same construction as mark-entry-sheet.blade.php's $itemInfoParts --
+                // one implode(' · ', ...) string, not a separate bold title + lighter
+                // "meta" span, so the two report types' item lines match exactly.
+                $itemInfoParts = array_filter([
+                    ($sheet['item']->item_code ?? null) ? "[{$sheet['item']->item_code}] " . $sheet['item']->title : ($sheet['item']->title ?? null),
                     $sheet['category_label'] ?? null,
                     \App\Support\FestTeamSquadRules::isMultiPerson($sheet['item']->participant_type ?? null) ? 'Group' : 'Individual',
                     \App\Support\FestSportsAgeGroup::genderLabel($sheet['item']->gender ?? null),
@@ -58,14 +62,9 @@
 
             <table class="table">
                 <thead>
-                    @if(!empty($itemTitle))
+                    @if(!empty($itemInfoParts))
                     <tr class="item-context-row">
-                        <th colspan="4">
-                            {{ $itemTitle }}
-                            @if(!empty($itemMetaParts))
-                                <span class="item-meta">{{ implode(' · ', $itemMetaParts) }}</span>
-                            @endif
-                        </th>
+                        <th colspan="4">{{ implode(' · ', $itemInfoParts) }}</th>
                     </tr>
                     @endif
                     <tr>

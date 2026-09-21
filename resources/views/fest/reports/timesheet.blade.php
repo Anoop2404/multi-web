@@ -11,7 +11,9 @@
              matching comment in fest.reports.attendance-sheet) -- kept as one fixed,
              generous value regardless of path. --}}
         @page {
-            margin: 116px 38px 24px;
+            {{-- See the matching comment in fest.reports.attendance-sheet -- this margin
+                 only needs to stay >= the fixed header's |top offset| below. --}}
+            margin: 175px 38px 24px;
         }
         body {
             font-family: 'DejaVu Sans', Arial, sans-serif;
@@ -129,54 +131,6 @@
             font-weight: normal;
             color: #64748b;
         }
-        .brand-cell-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .brand-cell-table td {
-            border: none;
-            padding: 0;
-        }
-        .brand-cell-table .logo-cell {
-            width: 50px;
-            vertical-align: middle;
-            padding-right: 10px;
-        }
-        .brand-cell-table .logo-cell img {
-            width: 42px;
-            height: 42px;
-            object-fit: contain;
-        }
-        .brand-cell-table .org-cell {
-            vertical-align: middle;
-        }
-        .brand-cell-table .org-name {
-            font-size: 16px;
-            font-weight: 800;
-            color: #0f172a;
-            text-transform: uppercase;
-        }
-        .brand-cell-table .org-context {
-            font-size: 11px;
-            font-weight: 600;
-            color: #475569;
-            margin-top: 3px;
-        }
-        .brand-cell-table .doc-badge-cell {
-            text-align: right;
-            vertical-align: middle;
-            white-space: nowrap;
-        }
-        .brand-cell-table .doc-badge {
-            display: inline-block;
-            background: #0f172a;
-            color: #ffffff;
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 10px;
-            font-weight: bold;
-            letter-spacing: 0.3px;
-        }
     </style>
 </head>
 <body>
@@ -186,7 +140,7 @@
      this in-flow copy is skipped entirely on that path -- see the matching comment in
      fest.reports.attendance-sheet. Only the dompdf fallback still needs it. --}}
 @if($isDomPdf ?? true)
-<div class="report-header" style="position: fixed; top: -100px; left: 0; right: 0;">
+<div class="report-header" style="position: fixed; top: -165px; left: 0; right: 0;">
     @include('partials.pdf-branding-header', [
         'orgName' => $sahodaya->name ?? 'SAHODAYA',
         'logoSrc' => $logo ?? null,
@@ -199,11 +153,11 @@
             {{ $event->title }}
         </div>
         @if(!empty($singleItemMetaStr))
-            <div style="font-size: 12px; font-weight: 800; color: #0f172a; margin-top: 2px;">
+            <div style="font-size: 12px; font-weight: bold; color: #0f172a; margin-top: 2px;">
                 {!! $singleItemMetaStr !!}
             </div>
         @elseif(!empty($singleItemName))
-            <div style="font-size: 12px; font-weight: 800; color: #0f172a; margin-top: 2px;">
+            <div style="font-size: 12px; font-weight: bold; color: #0f172a; margin-top: 2px;">
                 {{ $singleItemName }}
             </div>
         @endif

@@ -34,7 +34,9 @@
             $headingParts[] = $participantCount.' participant'.((int) $participantCount === 1 ? '' : 's');
         }
     @endphp
-    <div style="font-size: 13px; font-weight: 800; color: #0f172a;">{{ implode(' · ', $headingParts) }}</div>
+    {{-- font-weight: bold (700), not 800 -- see the matching comment in
+         pdf-branding-header.blade.php for why. --}}
+    <div style="font-size: 13px; font-weight: bold; color: #0f172a;">{{ implode(' · ', $headingParts) }}</div>
 @elseif(!empty($itemLine))
-    <div style="font-size: 13px; font-weight: 800; color: #0f172a;">{{ $itemLine }}</div>
+    <div style="font-size: 13px; font-weight: bold; color: #0f172a;">{{ $itemLine }}</div>
 @endif

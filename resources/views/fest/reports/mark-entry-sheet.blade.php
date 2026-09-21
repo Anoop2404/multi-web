@@ -7,7 +7,12 @@
         {{-- Top margin reserved for the fixed running header below -- must stay >= that
              header's rendered height or dompdf/Chromium will let content overlap it. --}}
         @page { margin: 108px 20px 24px; size: portrait; }
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11.5px; color: #1e293b; line-height: 1.4; }
+        {{-- 'Helvetica Neue' isn't one of dompdf's bundled/resolvable font names --
+             confirmed visually against Chest Number List/Attendance Sheet/Timesheet
+             (all using 'DejaVu Sans', which dompdf DOES resolve correctly): this
+             report's org name/body text was silently falling back to a serif font
+             instead, a real visible mismatch across otherwise-identical headers. --}}
+        body { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 11.5px; color: #1e293b; line-height: 1.4; }
         .sheet { page-break-after: always; }
         .sheet:last-child { page-break-after: avoid; }
         .title { font-size: 16px; font-weight: bold; color: #0f172a; text-transform: uppercase; margin: 0; }

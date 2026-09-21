@@ -13,10 +13,17 @@
                 </td>
             @endif
             <td style="vertical-align: middle;">
-                <div style="font-size: 16px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.1;">
+                {{-- font-weight: bold (700), not a numeric weight like 800/600 -- dompdf
+                     doesn't reliably have a matching font file registered for in-between
+                     weights, and silently falls back to its OWN default (serif) font for
+                     text at a weight it can't match, rather than keeping the requested
+                     font-family at the closest weight it does have. Confirmed visually:
+                     this line rendered in a completely different (serif) typeface than
+                     the rest of the same header, which only ever uses normal/bold. --}}
+                <div style="font-size: 16px; font-weight: bold; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.1;">
                     {{ $orgName ?? 'SAHODAYA SCHOOLS COMPLEX' }}
                 </div>
-                <div style="font-size: 11.5px; font-weight: 600; color: #475569; margin-top: 3px;">
+                <div style="font-size: 11.5px; font-weight: bold; color: #475569; margin-top: 3px;">
                     CBSE Sahodaya Inter-School Competitions & Events
                 </div>
             </td>

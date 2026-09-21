@@ -27,7 +27,11 @@
              margin sent for the Chromium case, which is why this template never showed
              the same bug, but that was luck, not the reasoning this comment used to give. --}}
         @page {
-            margin: 116px 38px 24px;
+            {{-- The header's usable height is bounded by |top offset| on the fixed div
+                 below, NOT by this margin directly -- raising the margin alone without
+                 also raising that offset left the same overlap in place. This margin
+                 only needs to be >= that offset so the header renders on-page. --}}
+            margin: 175px 38px 24px;
         }
         body {
             font-family: 'DejaVu Sans', Arial, sans-serif;
@@ -186,81 +190,6 @@
             font-weight: normal;
             color: #64748b;
         }
-        .brand-row td, .foot-row td {
-            border: none;
-            padding: 0 0 6px;
-        }
-        .item-title-row td {
-            border: none;
-            padding: 4px 0 0;
-            background: #ffffff;
-        }
-        .foot-row td {
-            padding: 4px 0 0;
-        }
-        .brand-cell-table, .foot-cell-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .brand-cell-table td, .foot-cell-table td {
-            border: none;
-            padding: 0;
-        }
-        .brand-cell-table .logo-cell {
-            width: 50px;
-            vertical-align: middle;
-            padding-right: 10px;
-        }
-        .brand-cell-table .logo-cell img {
-            width: 42px;
-            height: 42px;
-            object-fit: contain;
-        }
-        .brand-cell-table .org-cell {
-            vertical-align: middle;
-        }
-        .brand-cell-table .org-name {
-            font-size: 16px;
-            font-weight: 800;
-            color: #0f172a;
-            text-transform: uppercase;
-        }
-        .brand-cell-table .org-context {
-            font-size: 11px;
-            font-weight: 600;
-            color: #475569;
-            margin-top: 3px;
-        }
-        .brand-cell-table .doc-badge-cell {
-            text-align: right;
-            vertical-align: middle;
-            white-space: nowrap;
-        }
-        .brand-cell-table .doc-badge {
-            display: inline-block;
-            background: #0f172a;
-            color: #ffffff;
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 10px;
-            font-weight: bold;
-            letter-spacing: 0.3px;
-        }
-        .foot-cell-table .foot-left {
-            text-align: left;
-            font-size: 8.5px;
-            color: #64748b;
-            border-top: 1px solid #cbd5e1;
-            padding-top: 3px;
-        }
-        .foot-cell-table .foot-right {
-            text-align: right;
-            font-size: 8.5px;
-            color: #64748b;
-            white-space: nowrap;
-            border-top: 1px solid #cbd5e1;
-            padding-top: 3px;
-        }
     </style>
 </head>
 <body>
@@ -271,7 +200,7 @@
      that path to avoid showing the branding twice -- only the dompdf fallback (no
      equivalent native mechanism) still needs it, made position:fixed to repeat. --}}
 @if($isDomPdf ?? true)
-<div class="report-header" style="position: fixed; top: -100px; left: 0; right: 0;">
+<div class="report-header" style="position: fixed; top: -165px; left: 0; right: 0;">
     @include('partials.pdf-branding-header', [
         'orgName' => $sahodaya->name ?? 'SAHODAYA',
         'logoSrc' => $logo ?? null,
@@ -287,11 +216,11 @@
             {{ $event->title }}
         </div>
         @if(!empty($singleItemMetaStr))
-            <div style="font-size: 12px; font-weight: 800; color: #0f172a; margin-top: 2px;">
+            <div style="font-size: 12px; font-weight: bold; color: #0f172a; margin-top: 2px;">
                 {!! $singleItemMetaStr !!}
             </div>
         @elseif(!empty($singleItemName))
-            <div style="font-size: 12px; font-weight: 800; color: #0f172a; margin-top: 2px;">
+            <div style="font-size: 12px; font-weight: bold; color: #0f172a; margin-top: 2px;">
                 {{ $singleItemName }}
             </div>
         @endif

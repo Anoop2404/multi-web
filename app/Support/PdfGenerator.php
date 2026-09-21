@@ -111,7 +111,11 @@ class PdfGenerator
         // DomPDF does not replace {PAGE_NUM}/{PAGE_COUNT} tokens written inside
         // ordinary HTML. When a caller supplied a footer template (the Chromium
         // path's signal that page furniture is required), draw the real page count
-        // directly on DomPDF's canvas instead.
+        // directly on DomPDF's canvas instead. Drawn bottom-LEFT deliberately --
+        // partials/pdf-generated-footer.blade.php's "Generated on ..." timestamp
+        // (included by every one of these same report types) is right-aligned at the
+        // very bottom edge, and this used to sit at almost the same bottom-right spot,
+        // visibly overlapping it.
         if ($footerTemplate !== null) {
             $pdf->render();
 
@@ -121,7 +125,7 @@ class PdfGenerator
             $label = 'Page {PAGE_NUM} of {PAGE_COUNT}';
             $fontSize = 7;
             $canvas->page_text(
-                max(38, $canvas->get_width() - 105),
+                38,
                 $canvas->get_height() - 28,
                 $label,
                 $font,
@@ -194,6 +198,7 @@ class PdfGenerator
             $pdf->setPaper('A4', 'landscape');
         }
 
+        // Drawn bottom-LEFT -- see the matching comment in download() above.
         if ($footerTemplate !== null) {
             $pdf->render();
 
@@ -203,7 +208,7 @@ class PdfGenerator
             $label = 'Page {PAGE_NUM} of {PAGE_COUNT}';
             $fontSize = 7;
             $canvas->page_text(
-                max(38, $canvas->get_width() - 105),
+                38,
                 $canvas->get_height() - 28,
                 $label,
                 $font,

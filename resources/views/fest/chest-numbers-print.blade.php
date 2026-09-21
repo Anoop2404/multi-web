@@ -11,12 +11,12 @@
              instead produced a header/content overlap. Kept as one fixed, generous value
              for both paths now, matching attendance-sheet.blade.php/timesheet.blade.php. --}}
         @page { margin: 140px 28px 34px; }
-        body { font-family: 'DejaVu Sans', system-ui, sans-serif; font-size: 11px; color: #0f172a; margin: 0; }
+        body { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 11px; color: #0f172a; margin: 0; }
         table.data { width: 100%; border-collapse: collapse; margin-top: 8px; }
         table.data th { background: #f1f5f9; color: #334155; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; text-align: left; padding: 6px 8px; border: 1px solid #cbd5e1; }
         table.data td { border: 1px solid #cbd5e1; padding: 7px 8px; font-size: 10.5px; vertical-align: middle; }
         table.data tr:nth-child(even) td { background: #f8fafc; }
-        .chest-no { font-weight: 800; font-size: 12px; color: #0f172a; }
+        .chest-no { font-weight: bold; font-size: 12px; color: #0f172a; }
         .footer { margin-top: 14px; padding-top: 6px; border-top: 1px solid #cbd5e1; font-size: 8.5px; color: #64748b; }
     </style>
 </head>

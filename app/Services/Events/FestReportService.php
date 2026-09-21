@@ -1426,7 +1426,7 @@ class FestReportService
             false,
             $headerTemplate,
             $footerTemplate,
-            ['top' => '32mm', 'right' => '10mm', 'bottom' => '15mm', 'left' => '10mm'],
+            ['top' => '46mm', 'right' => '10mm', 'bottom' => '15mm', 'left' => '10mm'],
         );
     }
 
@@ -1532,7 +1532,7 @@ class FestReportService
             false,
             $headerTemplate,
             $footerTemplate,
-            ['top' => '32mm', 'right' => '10mm', 'bottom' => '15mm', 'left' => '10mm'],
+            ['top' => '46mm', 'right' => '10mm', 'bottom' => '15mm', 'left' => '10mm'],
         );
     }
 
