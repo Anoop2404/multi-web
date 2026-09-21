@@ -79,7 +79,9 @@
 </head>
 <body>
 @if($showTitle ?? true)
-<p class="sheet-title">{{ $clusterName }} · {{ $eventTitle }} · {{ ucfirst($audience ?? 'participant') }} ID cards</p>
+    @if(!($gridLayout ?? null))
+        <p class="sheet-title">{{ $clusterName }} · {{ $eventTitle }} · {{ ucfirst($audience ?? 'participant') }} ID cards</p>
+    @endif
 @endif
 
 @php
@@ -90,12 +92,18 @@
 @endphp
 
 @if($renderSections)
+    @php $firstPageRendered = false; @endphp
     @foreach($sections as $sectionIndex => $section)
-        @if($sectionIndex > 0)<div class="page-break"></div>@endif
-        <p class="section-title">{{ $section['item_title'] ?? 'Item' }}</p>
-        @php $chunks = array_chunk($section['cards'] ?? [], $perPage); @endphp
+        @php
+            $sectionTitle = $section['school_name'] ?? $section['item_title'] ?? 'Section';
+            $chunks = array_chunk($section['cards'] ?? [], $perPage);
+        @endphp
         @foreach($chunks as $pageIndex => $pageCards)
-            @if($pageIndex > 0)<div class="page-break"></div>@endif
+            @if($firstPageRendered)<div class="page-break"></div>@endif
+            @php $firstPageRendered = true; @endphp
+            @if(!($gridLayout ?? null) && ($showTitle ?? true) && $pageIndex === 0)
+                <p class="section-title">{{ $sectionTitle }}</p>
+            @endif
             @include('fest.id-cards.partials.custom-sheet-page', ['pageCards' => $pageCards, 'gridLayout' => $gridLayout ?? null, 'backgroundUrl' => $backgroundUrl ?? null, 'fields' => $fields ?? [], 'cardWidthMm' => $cardWidthMm ?? 96, 'cardHeightMm' => $cardHeightMm ?? 72, 'pageHeightMm' => $pageHeightMm ?? null])
         @endforeach
     @endforeach

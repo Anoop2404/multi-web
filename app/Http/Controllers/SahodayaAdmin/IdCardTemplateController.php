@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Models\CertificateTemplate;
 use App\Models\FestEvent;
-use App\Models\FestEventItem;
 use App\Models\IdCardTemplate;
 use App\Services\Certificates\CertificateBackgroundConverter;
 use App\Support\FestClassGroupScheme;
@@ -52,6 +52,7 @@ class IdCardTemplateController extends SahodayaAdminController
             'templates'          => $templates,
             'festEvents'         => $festEvents,
             'dataSourceOptions'  => IdCardTemplate::dataSourceOptions(),
+            'fontFamilyOptions'  => CertificateTemplate::fontFamilyOptions(),
             'defaultFields'      => IdCardTemplate::defaultFields(),
         ]);
     }
@@ -194,22 +195,19 @@ class IdCardTemplateController extends SahodayaAdminController
             'fields.*.font_size'      => 'nullable|integer|min:5|max:48',
             'fields.*.line_height'    => 'nullable|numeric|min:0.8|max:2',
             'fields.*.wrap'           => 'nullable|boolean',
+            'fields.*.rotation'       => 'nullable|numeric|min:-360|max:360',
             'fields.*.font_family'    => 'nullable|string|max:40',
             'fields.*.font_weight'    => 'nullable|in:normal,bold',
             'fields.*.font_style'     => 'nullable|in:normal,italic',
             'fields.*.align'          => 'nullable|in:left,right,center',
             // Decorative/static field types — 'shape'/'static_text'/'divider' are
-            // fixed chrome (column labels, ribbons, gradient items header)
-            // that used to be baked into the background image; 'item_row' is the
-            // numbered participating-item row. None of these are admin-editable via
-            // the current field-list UI (no color/text inputs there yet) — they're
-            // configured directly in code/data for now, but validated here so an
-            // unrelated form edit+save doesn't get rejected or silently strip them.
+            // template-configured chrome (column labels, ribbons, gradient items
+            // header); 'item_row' is a numbered participating-item row.
             'fields.*.row'            => 'nullable|integer|min:1|max:20',
             'fields.*.text'           => 'nullable|string|max:120',
-            'fields.*.color'          => 'nullable|string|max:20',
-            'fields.*.gradient_from'  => 'nullable|string|max:20',
-            'fields.*.gradient_to'    => 'nullable|string|max:20',
+            'fields.*.color'          => ['nullable', 'string', 'max:20', 'regex:/^#[0-9a-fA-F]{3,8}$/'],
+            'fields.*.gradient_from'  => ['nullable', 'string', 'max:20', 'regex:/^#[0-9a-fA-F]{3,8}$/'],
+            'fields.*.gradient_to'    => ['nullable', 'string', 'max:20', 'regex:/^#[0-9a-fA-F]{3,8}$/'],
             'fields.*.radius'         => 'nullable|numeric|min:0|max:50',
             'fields.*.orientation'    => 'nullable|in:horizontal,vertical',
             'is_active'       => 'nullable|boolean',
@@ -363,8 +361,10 @@ class IdCardTemplateController extends SahodayaAdminController
             'school_code'     => 'ABC-001',
             'student_reg_no'  => 'STU/26/0001',
             'student_class'   => 'X',
+            'student_info_inline' => "CATEGORY : II\u{2003}\u{2003}ROLL No.: 10203\u{2003}\u{2003}GENDER: FEMALE",
             'schedule'        => 'Sample schedule line',
             'footer'          => 'Sample footer',
+            'items_inline'    => 'Painting Water Colour | Recitation - Malayalam | Essay Writing Malayalam | Light Music - Malayalam - Girls | Mappillapattu (Boys) (MCS) | Classical Music - Karnatic (Boys)',
             'photo_src'       => $this->samplePhotoDataUri(),
             'qr_src'          => null,
             'item_row_1'      => 'Power Point Presentation',

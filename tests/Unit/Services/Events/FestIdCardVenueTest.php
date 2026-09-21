@@ -113,6 +113,7 @@ class FestIdCardVenueTest extends TestCase
             'school_class_id' => $class->id,
             'name' => 'John Doe',
             'gender' => 'male',
+            'reg_no' => '10203',
         ]);
 
         $item1 = FestEventItem::create([
@@ -139,5 +140,7 @@ class FestIdCardVenueTest extends TestCase
 
         $this->assertNotEmpty($cards);
         $this->assertSame('MES Central School, Tirur', $cards[0]['venue']);
+        $this->assertStringContainsString('ROLL No.: 10203', $cards[0]['student_info_inline']);
+        $this->assertStringContainsString('GENDER: MALE', $cards[0]['student_info_inline']);
     }
 }

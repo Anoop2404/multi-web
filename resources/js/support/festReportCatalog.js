@@ -47,6 +47,10 @@ export const EXPORT_PREVIEW_MAP = {
     'attendance-sheet-school': 'attendance',
     'id-cards-by-head': 'id-cards',
     'admit-cards': 'id-cards',
+    'school-participation-pdf': 'school-participation',
+    'school-participation-xls': 'school-participation',
+    'unique-participants-pdf': 'unique-participants',
+    'unique-participants-xls': 'unique-participants',
 };
 
 /** Interactive page id → category */
@@ -57,6 +61,8 @@ export const INTERACTIVE_CATEGORY_MAP = {
     'overall-ranking': 'competition',
     'house-detailed': 'competition',
     'participation-counts': 'registration',
+    'school-participation': 'registration',
+    'unique-participants': 'registration',
     'registration-register': 'registration',
     'mark-entry-status': 'competition',
     'item-schedule': 'schedule',
@@ -71,6 +77,8 @@ export const INTERACTIVE_CATEGORY_MAP = {
     'student-wise': 'competition',
     'item-wise': 'competition',
     'category-wise-points': 'competition',
+    'category-item-matrix': 'competition',
+    'championship': 'competition',
     'attendance': 'schedule',
     'id-cards': 'ops',
 };
@@ -224,6 +232,8 @@ export const INTERACTIVE_REPORT_META = {
     'overall-ranking': { icon: '🥇', hint: 'School ranking and total points' },
     'house-detailed': { icon: '🏠', hint: 'House-wise performance board' },
     'participation-counts': { icon: '👥', hint: 'Registration counts per school' },
+    'school-participation': { icon: '🏫', hint: 'School-wise participation and candidate counts' },
+    'unique-participants': { icon: '👥', hint: 'Unique participant counts category-wise based on class ranges & school totals' },
     'registration-register': { icon: '📋', hint: 'Full register with fees status' },
     'mark-entry-status': { icon: '✏️', hint: 'Which items have marks entered' },
     'item-schedule': { icon: '🗓️', hint: 'Venue and time for each item' },

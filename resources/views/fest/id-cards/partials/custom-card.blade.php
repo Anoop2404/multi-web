@@ -16,12 +16,12 @@
         @if($type === 'photo')
             @if(!empty($value))
                 <img src="{{ $value }}" alt="" class="card__photo"
-                     style="top:{{ $field['top'] ?? 8 }}%;left:{{ $field['left'] ?? 4 }}%;width:{{ $field['width'] ?? 22 }}%;height:{{ $field['height'] ?? 26 }}%;">
+                     style="top:{{ $field['top'] ?? 8 }}%;left:{{ $field['left'] ?? 4 }}%;width:{{ $field['width'] ?? 22 }}%;height:{{ $field['height'] ?? 26 }}%;@if(!empty($field['rotation'])) transform:rotate({{ (float) $field['rotation'] }}deg);transform-origin:center center;@endif">
             @endif
         @elseif($type === 'qr')
             @if(!empty($value))
                 <img src="{{ $value }}" alt="" class="card__qr"
-                     style="top:{{ $field['top'] ?? 4 }}%;left:{{ $field['left'] ?? 82 }}%;width:{{ $field['width'] ?? 14 }}%;height:{{ $field['height'] ?? 14 }}%;">
+                     style="top:{{ $field['top'] ?? 4 }}%;left:{{ $field['left'] ?? 82 }}%;width:{{ $field['width'] ?? 14 }}%;height:{{ $field['height'] ?? 14 }}%;@if(!empty($field['rotation'])) transform:rotate({{ (float) $field['rotation'] }}deg);transform-origin:center center;@endif">
             @endif
         @elseif($type === 'item_row')
             @if($value !== null && $value !== '')
@@ -41,12 +41,14 @@
                 top:{{ $field['top'] ?? 0 }}%; left:{{ $field['left'] ?? 0 }}%;
                 width:{{ $field['width'] ?? 20 }}%; height:{{ $field['height'] ?? 10 }}%;
                 border-radius:{{ $field['radius'] ?? 0 }}mm; background:{{ $bg }};
+                @if(!empty($field['rotation'])) transform:rotate({{ (float) $field['rotation'] }}deg); transform-origin:center center; @endif
             "></div>
         @elseif($type === 'static_text')
             @if(!empty($field['text']))
-                <div class="card__field"
-                     style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($field, ['font_size' => 9, 'font_family' => 'Arial']) }}">
-                    {{ $field['text'] }}
+                @php $wrap = (bool) ($field['wrap'] ?? false); @endphp
+                <div class="card__field{{ $wrap ? ' card__field--wrap' : '' }}"
+                     style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($field, ['font_size' => 9, 'font_family' => 'Arial']) }} @if(isset($field['height'])) height:{{ $field['height'] }}%; @endif @if(isset($field['line_height'])) line-height:{{ $field['line_height'] }}; @endif">
+                    @if($wrap)<span>{{ $field['text'] }}</span>@else{{ $field['text'] }}@endif
                 </div>
             @endif
         @elseif($type === 'divider')
@@ -55,6 +57,8 @@
                 top:{{ $field['top'] ?? 0 }}%; left:{{ $field['left'] ?? 0 }}%;
                 @if($orientation === 'vertical') height:{{ $field['height'] ?? 10 }}%;
                 @else width:{{ $field['width'] ?? 10 }}%; @endif
+                border-color:{{ $field['color'] ?? '#cbd5e1' }};
+                @if(!empty($field['rotation'])) transform:rotate({{ (float) $field['rotation'] }}deg); transform-origin:center center; @endif
             "></div>
         @else
             @if($value !== null && $value !== '')

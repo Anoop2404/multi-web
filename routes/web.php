@@ -909,6 +909,12 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::post('/schools/bulk-create-login', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'bulkCreateLogin'])->name('schools.bulk-create-login');
         Route::get('/schools/export', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'export'])->name('schools.export');
         Route::get('/schools/export-id-card-codes', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'exportSchoolCodes'])->name('schools.export-id-card-codes');
+        Route::get('/schools/code-assignment', [\App\Http\Controllers\SahodayaAdmin\SchoolCodeController::class, 'index'])->name('schools.codes');
+        Route::post('/schools/code-assignment/auto-assign', [\App\Http\Controllers\SahodayaAdmin\SchoolCodeController::class, 'autoAssign'])->name('schools.codes.auto-assign');
+        Route::post('/schools/code-assignment/save', [\App\Http\Controllers\SahodayaAdmin\SchoolCodeController::class, 'save'])->name('schools.codes.save');
+        Route::get('/schools/code-assignment/export-excel', [\App\Http\Controllers\SahodayaAdmin\SchoolCodeController::class, 'exportExcel'])->name('schools.codes.export-excel');
+        Route::get('/schools/code-assignment/export-pdf', [\App\Http\Controllers\SahodayaAdmin\SchoolCodeController::class, 'exportPdf'])->name('schools.codes.export-pdf');
+        Route::get('/schools/code-assignment/export-csv', [\App\Http\Controllers\SahodayaAdmin\SchoolCodeController::class, 'exportCsv'])->name('schools.codes.export-csv');
         Route::get('/schools/{school}/students', [\App\Http\Controllers\SahodayaAdmin\SchoolStudentsController::class, 'show'])->name('schools.students');
         Route::get('/schools/{school}', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'show'])->name('schools.show');
         Route::post('/schools/{school}/create-login', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'createSchoolLogin'])->name('schools.create-login');
@@ -1389,6 +1395,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/id-cards/pdf', [\App\Http\Controllers\SahodayaAdmin\FestIdCardController::class, 'pdf'])->name('id-cards.pdf');
             Route::get('/{event}/id-cards/pdf-all-items', [\App\Http\Controllers\SahodayaAdmin\FestIdCardController::class, 'pdfAllItems'])->name('id-cards.pdf-all-items');
             Route::get('/{event}/id-cards/pdf-all-heads', [\App\Http\Controllers\SahodayaAdmin\FestIdCardController::class, 'pdfAllHeads'])->name('id-cards.pdf-all-heads');
+            Route::get('/{event}/id-cards/pdf-all-schools', [\App\Http\Controllers\SahodayaAdmin\FestIdCardController::class, 'pdfAllSchools'])->name('id-cards.pdf-all-schools');
             Route::get('/{event}/settings/{tab?}', [FestEventSettingsController::class, 'settings'])
                 ->where('tab', 'lifecycle|locks|venues|combo|grades|points|participation|eligibility|fees|registration|numbering|volunteers|records|clone')
                 ->name('settings');
@@ -1516,6 +1523,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
                 Route::get('/{event}/reports/item-schedule', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemSchedule'])->name('reports.item-schedule');
                 Route::get('/{event}/reports/item-counts', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemCounts'])->name('reports.item-counts');
                 Route::get('/{event}/reports/school-participation', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'schoolParticipation'])->name('reports.school-participation');
+                Route::get('/{event}/reports/unique-participants', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'uniqueParticipants'])->name('reports.unique-participants');
                 Route::get('/{event}/reports/discipline-registration', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'disciplineRegistration'])->name('reports.discipline-registration');
                 Route::get('/{event}/reports/head-wise-participants', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'headWiseParticipants'])->name('reports.head-wise-participants');
                 Route::get('/{event}/reports/area-wise-participants', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'areaWiseParticipants'])->name('reports.area-wise-participants');

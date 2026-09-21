@@ -19,6 +19,7 @@ use App\Services\Events\FestIndividualChampionshipService;
 use App\Support\ExcelExport;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestItemCategoryLabel;
+use App\Support\FestStudentClassResolver;
 use App\Support\PdfGenerator;
 use App\Support\ReportFilename;
 use App\Support\TenantBranding;
@@ -226,6 +227,185 @@ class FestReportService
             : [$r['school_name'], $r['active_count'], $r['item_count'], $r['unique_student_count']]);
 
         return ExcelExport::download($this->slug().'-school-participation', $header, $rows, ExcelExport::generatedOnNote());
+    }
+
+    /**
+     * Unique participant counts categorized by class group / category range and school-wise,
+     * including bulk category counts across all schools and summary statistics.
+     *
+     * @return array{
+     *     categories: list<array{key: string, label: string}>,
+     *     rows: list<array{
+     *         school_id: string,
+     *         school_name: string,
+     *         school_code: ?string,
+     *         category_counts: array<string, int>,
+     *         total_unique_participants: int,
+     *         total_registrations: int,
+     *     }>,
+     *     totals: array{
+     *         category_counts: array<string, int>,
+     *         total_schools: int,
+     *         total_unique_participants: int,
+     *         total_registrations: int,
+     *     }
+     * }
+     */
+    public function uniqueParticipantCategoryReport(?string $schoolId = null): array
+    {
+        $rootEvent = $this->event->rootEvent();
+        $rawCategoryLabels = FestClassGroupScheme::labels(null, $rootEvent);
+
+        $schoolId = $this->scopedSchoolId($schoolId);
+        $participants = $this->participantsFlat(schoolId: $schoolId);
+
+        $categories = [];
+        $categoryUniqueMap = [];
+        foreach ($rawCategoryLabels as $key => $label) {
+            $categories[] = ['key' => (string) $key, 'label' => (string) $label];
+            $categoryUniqueMap[$key] = [];
+        }
+
+        $schools = [];
+        $allUniqueStudentIds = [];
+
+        foreach ($participants as $p) {
+            $studentEntityId = $p->student_id ?: ('t:'.$p->teacher_id);
+            if (! $studentEntityId) {
+                continue;
+            }
+
+            $allUniqueStudentIds[$studentEntityId] = true;
+
+            $item = $p->registration?->item;
+            $rawCat = $item?->class_group;
+            $catKey = null;
+
+            if ($rawCat && $rawCat !== 'open') {
+                $catKey = FestClassGroupScheme::resolveItemKey($rawCategoryLabels, $rawCat);
+            } elseif ($p->student) {
+                $studentCat = FestStudentClassResolver::classGroupForStudent($p->student, $rootEvent);
+                if ($studentCat) {
+                    $catKey = FestClassGroupScheme::resolveItemKey($rawCategoryLabels, $studentCat);
+                }
+            }
+
+            $catKey = $catKey ?: 'open';
+            if (! isset($rawCategoryLabels[$catKey])) {
+                $rawCategoryLabels[$catKey] = ucwords(str_replace(['_', '-'], ' ', $catKey));
+                $categories[] = ['key' => (string) $catKey, 'label' => (string) $rawCategoryLabels[$catKey]];
+                $categoryUniqueMap[$catKey] = [];
+            }
+
+            $categoryUniqueMap[$catKey][$studentEntityId] = true;
+
+            $sId = (string) ($p->registration?->school_id ?? 'unknown');
+            if (! isset($schools[$sId])) {
+                $schools[$sId] = [
+                    'school_id'           => $sId,
+                    'school_name'         => $p->registration?->school?->name ?? 'Unknown School',
+                    'school_code'         => $p->registration?->school?->schoolCode(),
+                    'students_by_cat'     => [],
+                    'all_students'        => [],
+                    'total_registrations' => 0,
+                ];
+                foreach ($rawCategoryLabels as $k => $l) {
+                    $schools[$sId]['students_by_cat'][$k] = [];
+                }
+            }
+
+            $schools[$sId]['students_by_cat'][$catKey][$studentEntityId] = true;
+            $schools[$sId]['all_students'][$studentEntityId] = true;
+            $schools[$sId]['total_registrations']++;
+        }
+
+        $rows = [];
+        foreach ($schools as $sId => $data) {
+            $catCounts = [];
+            foreach ($categories as $cat) {
+                $k = $cat['key'];
+                $catCounts[$k] = count($data['students_by_cat'][$k] ?? []);
+            }
+
+            $rows[] = [
+                'school_id'                 => $sId,
+                'school_name'               => $data['school_name'],
+                'school_code'               => $data['school_code'],
+                'category_counts'           => $catCounts,
+                'total_unique_participants' => count($data['all_students']),
+                'total_registrations'       => $data['total_registrations'],
+            ];
+        }
+
+        usort($rows, fn ($a, $b) => strcmp($a['school_name'], $b['school_name']));
+
+        $totalCategoryCounts = [];
+        foreach ($categories as $cat) {
+            $k = $cat['key'];
+            $totalCategoryCounts[$k] = count($categoryUniqueMap[$k] ?? []);
+        }
+
+        return [
+            'categories' => $categories,
+            'rows'       => $rows,
+            'totals'     => [
+                'category_counts'           => $totalCategoryCounts,
+                'total_schools'             => count($rows),
+                'total_unique_participants' => count($allUniqueStudentIds),
+                'total_registrations'       => array_sum(array_column($rows, 'total_registrations')),
+            ],
+        ];
+    }
+
+    public function uniqueParticipantsPdf(?string $schoolId = null): \Symfony\Component\HttpFoundation\Response
+    {
+        $report = $this->uniqueParticipantCategoryReport($schoolId);
+
+        return $this->renderPdf('fest.reports.unique-participants', [
+            'event'      => $this->event,
+            'categories' => $report['categories'],
+            'rows'       => $report['rows'],
+            'totals'     => $report['totals'],
+            ...$this->brandingData(),
+        ], $this->slug().'-unique-participants.pdf');
+    }
+
+    public function uniqueParticipantsXls(?string $schoolId = null): StreamedResponse
+    {
+        $report = $this->uniqueParticipantCategoryReport($schoolId);
+
+        $headers = ['School Code', 'School Name'];
+        foreach ($report['categories'] as $cat) {
+            $headers[] = $cat['label'];
+        }
+        $headers[] = 'Total Unique Students';
+        $headers[] = 'Total Registrations';
+
+        $rows = [];
+        foreach ($report['rows'] as $r) {
+            $row = [$r['school_code'] ?? '—', $r['school_name']];
+            foreach ($report['categories'] as $cat) {
+                $row[] = $r['category_counts'][$cat['key']] ?? 0;
+            }
+            $row[] = $r['total_unique_participants'];
+            $row[] = $r['total_registrations'];
+            $rows[] = $row;
+        }
+
+        $summaryRow = ['TOTALS', count($report['rows']).' Schools'];
+        foreach ($report['categories'] as $cat) {
+            $summaryRow[] = $report['totals']['category_counts'][$cat['key']] ?? 0;
+        }
+        $summaryRow[] = $report['totals']['total_unique_participants'];
+        $summaryRow[] = $report['totals']['total_registrations'];
+        $rows[] = $summaryRow;
+
+        return ExcelExport::download(
+            $this->slug().'-unique-participants',
+            $headers,
+            $rows,
+            ExcelExport::generatedOnNote()
+        );
     }
 
     /**
@@ -683,6 +863,8 @@ class FestReportService
             'item-schedule-pdf' => $this->itemSchedulePdf($request),
             'school-participation-pdf' => $this->schoolParticipationPdf(),
             'school-participation-xls' => $this->schoolParticipationXls(),
+            'unique-participants-pdf' => $this->uniqueParticipantsPdf($request->input('school_id')),
+            'unique-participants-xls' => $this->uniqueParticipantsXls($request->input('school_id')),
             'student-limits-pdf' => $this->studentLimitsPdf($request),
             'student-limits-xls' => $this->studentLimitsXls($request),
             'team-managers' => $this->teamManagersXls($request),

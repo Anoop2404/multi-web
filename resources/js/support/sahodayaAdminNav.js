@@ -130,6 +130,7 @@ export function sahodayaMembershipScopedNav(sahodayaId, options = {}) {
             section: 'Membership Core',
             items: [
                 { label: 'Member schools', href: `${base}/schools`, icon: 'building', badge: approvedSchoolsCount },
+                { label: 'School codes', href: `${base}/schools/code-assignment`, icon: 'hash' },
                 { label: 'Pending applications', href: `${base}/schools/applications`, icon: 'inbox', badge: pendingSchoolsCount, hidden: !pendingSchoolsCount },
                 { label: 'Membership fees', href: `${base}/membership/payments`, icon: 'credit-card', badge: pendingPaymentsCount },
                 { label: 'Student verification', href: `${base}/students/verification${unverifiedStudentsCount ? '?verification=unverified' : ''}`, icon: 'users', badge: unverifiedStudentsCount },

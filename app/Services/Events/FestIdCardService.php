@@ -135,6 +135,35 @@ class FestIdCardService
             ->all();
     }
 
+    /**
+     * Cards grouped by school, each school as its own self-contained section.
+     * Used for school-wise bulk printing (die-cut sheets, bulk PDF downloads).
+     *
+     * @param  array<string, mixed>  $filters
+     * @return list<array{school_name: string, school_id: ?string, cards: list<array<string, mixed>>}>
+     */
+    public function cardsGroupedBySchool(FestEvent $event, array $filters = []): array
+    {
+        $filters['scope'] = $filters['scope'] ?? 'event';
+        $audience = $filters['audience'] ?? 'student';
+        $cards = $this->cards($event, $audience, $filters);
+
+        return collect($cards)
+            ->groupBy(fn ($card) => (string) ($card['school_id'] ?? $card['subtitle'] ?? 'Unknown School'))
+            ->map(function ($schoolCards) {
+                $first = $schoolCards->first();
+
+                return [
+                    'school_name' => $first['school_name'] ?? $first['subtitle'] ?? 'School',
+                    'school_id'   => $first['school_id'] ?? null,
+                    'cards'       => $schoolCards->values()->all(),
+                ];
+            })
+            ->sortBy('school_name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->all();
+    }
+
     /** @return list<array{id: int, name: string, count: int}> */
     public function headOptions(FestEvent $event, ?string $schoolId = null): array
     {
@@ -707,7 +736,10 @@ class FestIdCardService
             $classCategory = \App\Support\FestClassGroupScheme::resolveItemLabel($schemeLabels, $itemModel->class_group);
         }
 
-        $pureCategory = $ageGroupLabel ?: ($classCategory ?: ($studentClass ? "Class {$studentClass}" : null));
+        $studentClassLabel = $studentClass
+            ? (preg_match('/^class\b/i', $studentClass) ? $studentClass : "Class {$studentClass}")
+            : null;
+        $pureCategory = $ageGroupLabel ?: ($classCategory ?: $studentClassLabel);
         $itemTitleClean = ($item !== '—' && $item) ? str_replace('_', ' ', $item) : null;
         $categoryDisplay = $pureCategory ? str_replace('_', ' ', $pureCategory) : ($itemTitleClean ?: '—');
         // The ID card's Category column is narrow — it shows just the short roman
@@ -758,6 +790,35 @@ class FestIdCardService
         $schoolDisplay = $this->titleCase($school);
         $itemTitleDisplay = $this->titleCase($itemTitleClean);
         $genderDisplay = $this->titleCase($gender);
+        $studentRegNo = $p->student?->reg_no;
+        if (! $studentRegNo && $p->student) {
+            $studentSchool = $p->student->tenant ?? $p->registration?->school;
+            if ($studentSchool) {
+                try {
+                    $studentRegNo = app(\App\Services\Students\StudentRegistrationNumberGenerator::class)
+                        ->assignMissing($p->student, $studentSchool);
+                } catch (\Throwable $e) {
+                    // Fallback to student ID if generator cannot allocate
+                    $studentRegNo = "STU/".($p->student->id ?? '—');
+                }
+            }
+        }
+        $studentRegNo = $studentRegNo ?? $p->teacher?->reg_no ?? ($festId !== '—' ? $festId : null);
+
+        // Sequence number e.g. 10495 from STU/27/10495
+        $studentSeqId = null;
+        if ($studentRegNo && preg_match('/(?:STU\/\d{2}\/)?(\d+)/i', $studentRegNo, $m)) {
+            $studentSeqId = $m[1];
+        }
+        $rollNo = $p->student?->roll_number ?: ($studentSeqId ?: $studentRegNo);
+
+        // Em spaces survive HTML whitespace collapsing, keeping the three footer
+        // groups visibly separated in both browser previews and generated PDFs.
+        $studentInfoInline = implode("\u{2003}\u{2003}", array_filter([
+            $categoryDisplay !== '—' ? "CATEGORY : {$categoryDisplay}" : null,
+            $studentRegNo && $studentRegNo !== '—' ? "ROLL No.: {$studentRegNo}" : null,
+            $genderDisplay !== '' ? "GENDER: ".mb_strtoupper($genderDisplay) : null,
+        ]));
 
         return [
             'card_type'       => 'individual',
@@ -772,9 +833,14 @@ class FestIdCardService
             'photo_src'       => $photoSrc,
             'subtitle'        => $schoolDisplay,
             'school_name'     => $schoolDisplay,
+            'school_id'       => $p->registration?->school_id,
             'school_code'     => $p->registration?->school?->schoolCode(),
-            'student_reg_no'  => $p->student?->reg_no ?? $p->teacher?->reg_no ?? null,
+            'student_reg_no'  => $studentRegNo,
+            'student_seq_id'  => $studentSeqId ?: $studentRegNo,
+            'roll_no'         => $rollNo,
+            'student_id'      => $studentRegNo,
             'student_class'   => $studentClass,
+            'student_info_inline' => $studentInfoInline,
             'class_category'  => $classCategory,
             'event_name'      => $event->title,
             'phase_name'      => $phaseName,
@@ -793,12 +859,13 @@ class FestIdCardService
             'chest_number'    => $chestNumber,
             'schedule'        => $scheduleLine,
             'id_label'        => 'Reg ID',
-            'id_number'       => $festId,
+            'id_number'       => ($festId && $festId !== '—') ? $festId : ($studentRegNo ?: '—'),
             'secondary_label' => null,
             'secondary_value' => null,
             'qr_src'          => $this->qrService->dataUri($qrPayload),
             'footer'          => null,
             'entity_id'       => (string) $p->id,
+            'items_inline'    => $itemTitleDisplay,
             // individualStudentCards() replaces these placeholders with the person's
             // complete, pre-fetched event item list. Keeping row 1 here makes direct
             // participantCard() consumers useful without introducing an N+1 query.
@@ -902,6 +969,7 @@ class FestIdCardService
         for ($row = 1; $row <= 7; $row++) {
             $card['item_row_'.$row] = $titles->get($row - 1);
         }
+        $card['items_inline'] = $titles->implode(' | ');
 
         return $card;
     }

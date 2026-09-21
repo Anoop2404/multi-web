@@ -556,6 +556,29 @@ class FestReportController extends SahodayaAdminController
         ])));
     }
 
+    public function uniqueParticipants(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $target = $this->regionAwareTargetEvent($request, $event);
+        $service = $this->scopedReportService($request, $target);
+        $schoolId = $request->input('school_id');
+        $report = $service->uniqueParticipantCategoryReport($schoolId);
+
+        $exportParams = http_build_query(array_filter([
+            'school_id' => $schoolId,
+        ]));
+        $exportBase = "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export";
+
+        return $this->inertia('Sahodaya/Events/Reports/UniqueParticipants', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
+            'categories' => $report['categories'],
+            'rows'       => $report['rows'],
+            'totals'     => $report['totals'],
+            'pdfUrl'     => "{$exportBase}/unique-participants-pdf".($exportParams ? "?{$exportParams}" : ''),
+            'xlsUrl'     => "{$exportBase}/unique-participants-xls".($exportParams ? "?{$exportParams}" : ''),
+        ])));
+    }
+
     public function disciplineRegistration(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

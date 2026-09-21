@@ -86,6 +86,8 @@ class FestReportCatalog
         'age-group-matrix',
         'team-managers',
         'team-managers-pdf',
+        'unique-participants-pdf',
+        'unique-participants-xls',
     ];
 
     public static function isSchoolSafe(string $exportId): bool
@@ -172,6 +174,8 @@ class FestReportCatalog
             ['id' => 'student-limits-xls', 'label' => 'Student Item Limits (Excel)', 'format' => 'xls', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'team-managers', 'label' => 'School Team Managers & Contingent Officials (Excel)', 'format' => 'xls', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'team-managers-pdf', 'label' => 'School Team Managers & Contingent Officials (PDF)', 'format' => 'pdf', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
+            ['id' => 'unique-participants-pdf', 'label' => 'Unique Participant Counts (PDF)', 'format' => 'pdf', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
+            ['id' => 'unique-participants-xls', 'label' => 'Unique Participant Counts (Excel)', 'format' => 'xls', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
         ];
 
         return array_map(
@@ -277,6 +281,8 @@ class FestReportCatalog
         'student-limits-xls'            => ['dataset' => 'registration', 'supported_scopes' => ['self'], 'supports_competition_phase' => false],
         'team-managers'                 => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
         'team-managers-pdf'             => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'unique-participants-pdf'       => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'unique-participants-xls'       => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
     ];
 
     /** @return list<array<string, string>> */
@@ -292,6 +298,7 @@ class FestReportCatalog
             ['id' => 'house-detailed', 'label' => 'House Detailed', 'href' => "{$base}/house-detailed"],
             ['id' => 'participation-counts', 'label' => 'Participation Counts', 'href' => "{$base}/participation-counts"],
             ['id' => 'school-participation', 'label' => 'School Participation Counts', 'href' => "{$base}/school-participation"],
+            ['id' => 'unique-participants', 'label' => 'Unique Participant Counts', 'href' => "{$base}/unique-participants"],
             ['id' => 'registration-register', 'label' => 'Registration & Fees Register', 'href' => "{$base}/registration-register"],
             ['id' => 'mark-entry-status', 'label' => 'Mark Entry Status', 'href' => "{$base}/mark-entry-status"],
             ['id' => 'results-pending', 'label' => 'Results Pending', 'href' => "{$base}/results-pending"],

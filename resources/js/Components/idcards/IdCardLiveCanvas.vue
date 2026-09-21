@@ -13,14 +13,14 @@
 
                 <template v-for="(field, idx) in fields" :key="idx">
                     <div v-if="field.type === 'photo'" class="absolute overflow-hidden rounded-full bg-slate-200"
-                         :style="{ top: `${field.top ?? 8}%`, left: `${field.left ?? 4}%`, width: `${field.width ?? 22}%`, height: `${field.height ?? 26}%` }">
+                         :style="mediaFieldStyle(field, { top: 8, left: 4, width: 22, height: 26 })">
                         <svg viewBox="0 0 100 100" class="w-full h-full">
                             <rect width="100" height="100" fill="#d1d5db" />
                             <text x="50" y="54" font-family="Arial" font-size="14" fill="#6b7280" text-anchor="middle">PHOTO</text>
                         </svg>
                     </div>
                     <div v-else-if="field.type === 'qr'" class="absolute bg-slate-200 flex items-center justify-center text-[8px] text-slate-500"
-                         :style="{ top: `${field.top ?? 4}%`, left: `${field.left ?? 82}%`, width: `${field.width ?? 14}%`, height: `${field.height ?? 14}%` }">
+                         :style="mediaFieldStyle(field, { top: 4, left: 82, width: 14, height: 14 })">
                         QR
                     </div>
                     <div v-else-if="field.type === 'item_row' && sampleValue(field.source)"
@@ -29,11 +29,11 @@
                         {{ field.row ?? 1 }}) {{ sampleValue(field.source) }}
                     </div>
                     <div v-else-if="field.type === 'shape'" class="absolute"
-                         :style="{ top: `${field.top ?? 0}%`, left: `${field.left ?? 0}%`, width: `${field.width ?? 20}%`, height: `${field.height ?? 10}%`, borderRadius: `${field.radius ?? 0}mm`, background: shapeBackground(field) }">
+                         :style="shapeStyle(field)">
                     </div>
-                    <div v-else-if="field.type === 'static_text'" class="absolute leading-tight overflow-hidden whitespace-nowrap text-ellipsis"
+                    <div v-else-if="field.type === 'static_text'" class="absolute overflow-hidden"
                          :style="overlayStyle(field)">
-                        {{ field.text }}
+                        <span :style="field.wrap ? { display: 'block', width: '100%' } : undefined">{{ field.text }}</span>
                     </div>
                     <div v-else-if="field.type === 'divider'" class="absolute"
                          :style="dividerStyle(field)">
@@ -108,10 +108,15 @@ const SAMPLE = {
     category: 'III',
     gender: 'Sample',
     school_code: 'ABC-001',
-    student_reg_no: 'STU/26/0001',
+    student_reg_no: 'STU/27/10495',
+    roll_no: '10495',
+    student_seq_id: '10495',
+    student_id: 'STU/27/10495',
     student_class: 'X',
+    student_info_inline: 'CATEGORY : II\u2003\u2003ROLL No.: STU/27/10495\u2003\u2003GENDER: FEMALE',
     schedule: 'Sample schedule line',
     footer: 'Sample footer',
+    items_inline: 'Painting Water Colour | Recitation - Malayalam | Essay Writing Malayalam | Light Music - Malayalam | Classical Music - Karnatic',
     item_row_1: 'Power Point Presentation',
     item_row_2: 'Elocution English',
     item_row_3: 'Quiz Junior',
@@ -133,17 +138,43 @@ function shapeBackground(field = {}) {
     return field.color || '#DCEBFB';
 }
 
+function rotationStyle(field = {}) {
+    const rotation = Number(field.rotation ?? 0);
+    return rotation !== 0
+        ? { transform: `rotate(${rotation}deg)`, transformOrigin: 'center center' }
+        : {};
+}
+
+function mediaFieldStyle(field = {}, fallback = {}) {
+    return {
+        top: `${field.top ?? fallback.top ?? 0}%`,
+        left: `${field.left ?? fallback.left ?? 0}%`,
+        width: `${field.width ?? fallback.width ?? 20}%`,
+        height: `${field.height ?? fallback.height ?? 20}%`,
+        ...rotationStyle(field),
+    };
+}
+
+function shapeStyle(field = {}) {
+    return {
+        ...mediaFieldStyle(field, { top: 0, left: 0, width: 20, height: 10 }),
+        borderRadius: `${field.radius ?? 0}mm`,
+        background: shapeBackground(field),
+    };
+}
+
 function dividerStyle(field = {}) {
     const vertical = (field.orientation ?? 'vertical') === 'vertical';
     return {
         top: `${field.top ?? 0}%`,
         left: `${field.left ?? 0}%`,
-        borderColor: '#cbd5e1',
+        borderColor: field.color || '#cbd5e1',
         borderLeftWidth: vertical ? '1px' : '0',
         borderTopWidth: vertical ? '0' : '1px',
         borderStyle: 'solid',
         height: vertical ? `${field.height ?? 10}%` : '0',
         width: vertical ? '0' : `${field.width ?? 10}%`,
+        ...rotationStyle(field),
     };
 }
 
@@ -183,6 +214,8 @@ function overlayStyle(field = {}) {
         overflowWrap: wrap ? 'anywhere' : undefined,
         display: wrap ? 'flex' : undefined,
         alignItems: wrap ? 'center' : undefined,
+        transform: Number(field.rotation ?? 0) !== 0 ? `rotate(${Number(field.rotation)}deg)` : undefined,
+        transformOrigin: Number(field.rotation ?? 0) !== 0 ? 'center center' : undefined,
     };
 }
 </script>

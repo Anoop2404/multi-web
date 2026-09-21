@@ -143,6 +143,7 @@ class CertificateTemplate extends Model
             'Helvetica',
             'Verdana',
             'Courier New',
+            'DejaVu Sans Mono',
             'Palatino Linotype',
             'Garamond',
         ];
@@ -170,6 +171,7 @@ class CertificateTemplate extends Model
             'Helvetica' => 'Helvetica, Arial, sans-serif',
             'Verdana' => 'Verdana, Geneva, sans-serif',
             'Courier New' => '"Courier New", Courier, monospace',
+            'DejaVu Sans Mono' => '"DejaVu Sans Mono", "Courier New", monospace',
             'Palatino Linotype' => '"Palatino Linotype", Palatino, "Book Antiqua", serif',
             'Garamond' => 'Garamond, "Times New Roman", Times, serif',
             default => '"Times New Roman", Times, serif',
@@ -196,6 +198,12 @@ class CertificateTemplate extends Model
         $color = $field['color'] ?? $fallback['color'] ?? null;
         if (is_string($color) && preg_match('/^#[0-9a-fA-F]{3,8}$/', $color)) {
             $parts[] = 'color:'.$color;
+        }
+
+        $rotation = max(-360, min(360, (float) ($field['rotation'] ?? 0)));
+        if ($rotation !== 0.0) {
+            $parts[] = 'transform:rotate('.$rotation.'deg)';
+            $parts[] = 'transform-origin:center center';
         }
 
         return implode(';', $parts).';';

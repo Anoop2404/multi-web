@@ -76,7 +76,7 @@
                         <input :id="id" v-model.number="form.card_height_mm" type="number" min="40" max="150" class="field">
                     </template>
                 </FormField>
-                <FormField label="Cards per A4 page" hint="Arranged 2 per row. Ignored when a die-cut grid (below) is set.">
+                <FormField label="Cards per page (standard flow)" hint="Used only when no die-cut grid is set. A die-cut grid uses Columns × Rows instead.">
                     <template #default="{ id }">
                         <input :id="id" v-model.number="form.cards_per_page" type="number" min="1" max="12" class="field">
                     </template>
@@ -137,66 +137,152 @@
                         <button type="button" class="btn-secondary text-xs" @click="addField">+ Add field</button>
                     </div>
                     <p class="text-xs text-slate-500 -mt-1">
-                        Position values are % of the card (0–100). Photo and QR fields also use width/height %.
+                        Every design value below is stored with this template. Position and size values are percentages of the card.
                     </p>
-                    <div v-for="(field, i) in form.fields" :key="i" class="grid gap-2 sm:grid-cols-6 border rounded-lg p-3 items-end">
-                        <div class="sm:col-span-2">
-                            <label class="text-[10px] uppercase text-slate-400">Type</label>
-                            <SearchableSelect
-                                v-model="field.type"
-                                :options="[{ value: 'text', label: 'Text' }, { value: 'photo', label: 'Photo' }, { value: 'qr', label: 'QR code' }]"
-                                :all-option="false"
-                                placeholder="Select type"
-                            />
+                    <details v-for="(field, i) in form.fields" :key="`${field.key || 'field'}-${i}`"
+                             class="group rounded-lg border border-slate-200 bg-white open:border-indigo-200 open:shadow-sm">
+                        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5">
+                            <span class="min-w-0">
+                                <span class="block truncate text-sm font-semibold text-slate-700">{{ field.key || `Field ${i + 1}` }}</span>
+                                <span class="text-[11px] text-slate-400">{{ fieldTypeLabel(field.type) }}<template v-if="field.source"> · {{ field.source }}</template></span>
+                            </span>
+                            <span class="text-xs font-semibold text-indigo-600 group-open:rotate-180">⌄</span>
+                        </summary>
+
+                        <div class="grid gap-3 border-t border-slate-100 p-3 sm:grid-cols-6">
+                            <div class="sm:col-span-2">
+                                <label class="text-[10px] uppercase text-slate-400">Field type</label>
+                                <SearchableSelect
+                                    :model-value="field.type"
+                                    :options="fieldTypeOptions"
+                                    :all-option="false"
+                                    placeholder="Select type"
+                                    @update:model-value="value => changeFieldType(field, value)"
+                                />
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="text-[10px] uppercase text-slate-400">Field key</label>
+                                <input v-model.trim="field.key" type="text" maxlength="60" class="field text-sm" placeholder="e.g. school_code">
+                            </div>
+                            <div v-if="['text', 'item_row'].includes(field.type)" class="sm:col-span-2">
+                                <label class="text-[10px] uppercase text-slate-400">Data source</label>
+                                <SearchableSelect v-model="field.source" :options="dataSourceSelectOptions" :all-option="false" placeholder="Select data source" />
+                            </div>
+                            <div v-else-if="['photo', 'qr'].includes(field.type)" class="sm:col-span-2">
+                                <label class="text-[10px] uppercase text-slate-400">Data source</label>
+                                <input :value="field.type === 'photo' ? 'Participant photo' : 'QR code'" disabled class="field text-sm bg-slate-50">
+                            </div>
+                            <div v-else-if="field.type === 'static_text'" class="sm:col-span-2">
+                                <label class="text-[10px] uppercase text-slate-400">Displayed text</label>
+                                <input v-model="field.text" type="text" maxlength="120" class="field text-sm" placeholder="Static label">
+                            </div>
+                            <div v-if="field.type === 'item_row'">
+                                <label class="text-[10px] uppercase text-slate-400">Item number</label>
+                                <input v-model.number="field.row" type="number" min="1" max="20" class="field text-sm">
+                            </div>
+
+                            <div>
+                                <label class="text-[10px] uppercase text-slate-400">Top %</label>
+                                <input v-model.number="field.top" type="number" min="0" max="100" step="0.01" class="field text-sm">
+                            </div>
+                            <div>
+                                <label class="text-[10px] uppercase text-slate-400">Left %</label>
+                                <input v-model.number="field.left" type="number" min="0" max="100" step="0.01" class="field text-sm">
+                            </div>
+                            <div>
+                                <label class="text-[10px] uppercase text-slate-400">Width %</label>
+                                <input v-model.number="field.width" type="number" min="1" max="100" step="0.01" class="field text-sm">
+                            </div>
+                            <div>
+                                <label class="text-[10px] uppercase text-slate-400">Height %</label>
+                                <input v-model.number="field.height" type="number" min="1" max="100" step="0.01" class="field text-sm" placeholder="Auto">
+                            </div>
+                            <div>
+                                <label class="text-[10px] uppercase text-slate-400">Rotation °</label>
+                                <input v-model.number="field.rotation" type="number" min="-360" max="360" step="1" class="field text-sm" placeholder="0">
+                            </div>
+
+                            <template v-if="isTypographyField(field)">
+                                <div>
+                                    <label class="text-[10px] uppercase text-slate-400">Font size</label>
+                                    <input v-model.number="field.font_size" type="number" min="5" max="48" class="field text-sm">
+                                </div>
+                                <div class="sm:col-span-2">
+                                    <label class="text-[10px] uppercase text-slate-400">Font family</label>
+                                    <SearchableSelect v-model="field.font_family" :options="fontFamilySelectOptions" :all-option="false" placeholder="Select font" />
+                                </div>
+                                <div>
+                                    <label class="text-[10px] uppercase text-slate-400">Alignment</label>
+                                    <SearchableSelect v-model="field.align" :options="alignmentOptions" :all-option="false" placeholder="Default" />
+                                </div>
+                                <div>
+                                    <label class="text-[10px] uppercase text-slate-400">Line height</label>
+                                    <input v-model.number="field.line_height" type="number" min="0.8" max="2" step="0.05" class="field text-sm" placeholder="1.25">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] uppercase text-slate-400">Text color</label>
+                                    <div class="flex gap-2">
+                                        <input :value="validHexColor(field.color) ? field.color : '#12345a'" type="color" class="h-10 w-10 rounded border border-slate-200 bg-white p-1"
+                                               @input="field.color = $event.target.value">
+                                        <input v-model.trim="field.color" type="text" maxlength="9" class="field min-w-0 text-sm" placeholder="#12345a">
+                                    </div>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-x-4 gap-y-2 sm:col-span-6">
+                                    <label class="flex items-center gap-1.5 text-xs text-slate-600">
+                                        <input type="checkbox" :checked="field.font_weight === 'bold'"
+                                               @change="field.font_weight = $event.target.checked ? 'bold' : 'normal'">
+                                        Bold
+                                    </label>
+                                    <label class="flex items-center gap-1.5 text-xs text-slate-600">
+                                        <input type="checkbox" :checked="field.font_style === 'italic'"
+                                               @change="field.font_style = $event.target.checked ? 'italic' : 'normal'">
+                                        Italic
+                                    </label>
+                                    <label v-if="['text', 'static_text'].includes(field.type)" class="flex items-center gap-1.5 text-xs text-slate-600">
+                                        <input v-model="field.wrap" type="checkbox">
+                                        Allow multiple lines
+                                    </label>
+                                </div>
+                            </template>
+
+                            <template v-if="field.type === 'shape'">
+                                <div>
+                                    <label class="text-[10px] uppercase text-slate-400">Solid color</label>
+                                    <input v-model.trim="field.color" type="text" maxlength="9" class="field text-sm" placeholder="#DCEBFB">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] uppercase text-slate-400">Gradient start</label>
+                                    <input v-model.trim="field.gradient_from" type="text" maxlength="9" class="field text-sm" placeholder="#20B6F6">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] uppercase text-slate-400">Gradient end</label>
+                                    <input v-model.trim="field.gradient_to" type="text" maxlength="9" class="field text-sm" placeholder="#7C3CF0">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] uppercase text-slate-400">Corner radius mm</label>
+                                    <input v-model.number="field.radius" type="number" min="0" max="50" step="0.1" class="field text-sm">
+                                </div>
+                            </template>
+
+                            <template v-if="field.type === 'divider'">
+                                <div class="sm:col-span-2">
+                                    <label class="text-[10px] uppercase text-slate-400">Orientation</label>
+                                    <SearchableSelect v-model="field.orientation" :options="orientationOptions" :all-option="false" placeholder="Vertical" />
+                                </div>
+                                <div>
+                                    <label class="text-[10px] uppercase text-slate-400">Line color</label>
+                                    <input v-model.trim="field.color" type="text" maxlength="9" class="field text-sm" placeholder="#cbd5e1">
+                                </div>
+                            </template>
+
+                            <div class="flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-3 sm:col-span-6">
+                                <button type="button" class="text-xs font-semibold text-slate-600 disabled:opacity-30" :disabled="i === 0" @click="moveField(i, -1)">Move up</button>
+                                <button type="button" class="text-xs font-semibold text-slate-600 disabled:opacity-30" :disabled="i === form.fields.length - 1" @click="moveField(i, 1)">Move down</button>
+                                <button type="button" class="text-xs font-semibold text-indigo-600" @click="duplicateField(i)">Duplicate</button>
+                                <button type="button" class="text-xs font-semibold text-red-600" @click="removeField(i)">Remove</button>
+                            </div>
                         </div>
-                        <div class="sm:col-span-2">
-                            <label class="text-[10px] uppercase text-slate-400">Data source</label>
-                            <SearchableSelect
-                                v-if="field.type === 'text'"
-                                v-model="field.source"
-                                :options="dataSourceSelectOptions"
-                                :all-option="false"
-                                placeholder="Select data source"
-                            />
-                            <SearchableSelect
-                                v-else
-                                v-model="field.source"
-                                :options="[{ value: field.type === 'photo' ? 'photo_src' : 'qr_src', label: field.type === 'photo' ? 'Participant photo' : 'QR code' }]"
-                                :all-option="false"
-                                placeholder="Select data source"
-                            />
-                        </div>
-                        <div>
-                            <label class="text-[10px] uppercase text-slate-400">Top %</label>
-                            <input v-model.number="field.top" type="number" min="0" max="100" step="0.01" class="field text-sm">
-                        </div>
-                        <div>
-                            <label class="text-[10px] uppercase text-slate-400">Left %</label>
-                            <input v-model.number="field.left" type="number" min="0" max="100" step="0.01" class="field text-sm">
-                        </div>
-                        <div>
-                            <label class="text-[10px] uppercase text-slate-400">Width %</label>
-                            <input v-model.number="field.width" type="number" min="1" max="100" step="0.01" class="field text-sm">
-                        </div>
-                        <div v-if="field.type !== 'text'">
-                            <label class="text-[10px] uppercase text-slate-400">Height %</label>
-                            <input v-model.number="field.height" type="number" min="1" max="100" step="0.01" class="field text-sm">
-                        </div>
-                        <div v-if="field.type === 'text'">
-                            <label class="text-[10px] uppercase text-slate-400">Font size</label>
-                            <input v-model.number="field.font_size" type="number" min="5" max="48" class="field text-sm">
-                        </div>
-                        <div v-if="field.type === 'text'" class="flex items-center gap-3 pt-4">
-                            <label class="flex items-center gap-1 text-xs">
-                                <input type="checkbox" :checked="field.font_weight === 'bold'"
-                                       @change="field.font_weight = $event.target.checked ? 'bold' : 'normal'">
-                                Bold
-                            </label>
-                        </div>
-                        <div class="sm:col-span-6 text-right">
-                            <button type="button" class="text-red-600 text-xs font-semibold" @click="removeField(i)">Remove field</button>
-                        </div>
-                    </div>
+                    </details>
                     <p v-if="!form.fields.length" class="text-xs text-slate-400">No fields yet — add at least a name and photo/QR field.</p>
                 </div>
 
@@ -249,7 +335,7 @@
                 />
                 <div class="p-3 bg-slate-50 border border-slate-200/90 rounded-xl space-y-1.5 text-xs text-slate-600">
                     <p class="font-bold text-slate-800">💡 Tip</p>
-                    <p>Adjust Top %, Left %, Width % and Font size in the form — this canvas updates instantly, with sample data standing in for real fields.</p>
+                    <p>Expand any field to adjust its content, layer, position, size, typography, colors, wrapping, or rotation. The canvas updates instantly.</p>
                 </div>
             </div>
         </div>
@@ -326,6 +412,7 @@ const props = defineProps({
     templates: { type: Array, default: () => [] },
     festEvents: { type: Array, default: () => [] },
     dataSourceOptions: { type: Object, default: () => ({}) },
+    fontFamilyOptions: { type: Array, default: () => [] },
     defaultFields: { type: Array, default: () => [] },
 });
 
@@ -360,7 +447,7 @@ function previewDraft(mode) {
         const input = document.createElement('input');
         input.type = 'hidden';
         input.name = name;
-        input.value = value ?? '';
+        input.value = typeof value === 'boolean' ? (value ? '1' : '0') : (value ?? '');
         formEl.appendChild(input);
     };
 
@@ -419,6 +506,78 @@ const dataSourceSelectOptions = computed(() => Object.entries(props.dataSourceOp
     label,
 })));
 
+const fieldTypeOptions = [
+    { value: 'text', label: 'Dynamic text' },
+    { value: 'static_text', label: 'Static label' },
+    { value: 'photo', label: 'Participant photo' },
+    { value: 'qr', label: 'QR code' },
+    { value: 'item_row', label: 'Participating-item row' },
+    { value: 'shape', label: 'Shape / ribbon' },
+    { value: 'divider', label: 'Divider line' },
+];
+
+const alignmentOptions = [
+    { value: 'left', label: 'Left' },
+    { value: 'center', label: 'Center' },
+    { value: 'right', label: 'Right' },
+];
+
+const orientationOptions = [
+    { value: 'vertical', label: 'Vertical' },
+    { value: 'horizontal', label: 'Horizontal' },
+];
+
+const fontFamilySelectOptions = computed(() => props.fontFamilyOptions.map(font => ({
+    value: font,
+    label: font,
+})));
+
+function fieldTypeLabel(type) {
+    return fieldTypeOptions.find(option => option.value === type)?.label || type || 'Unconfigured field';
+}
+
+function isTypographyField(field) {
+    return ['text', 'static_text', 'item_row'].includes(field.type);
+}
+
+function validHexColor(color) {
+    return /^#[0-9a-fA-F]{6}$/.test(color || '');
+}
+
+function changeFieldType(field, type) {
+    field.type = type;
+
+    if (type === 'photo') {
+        field.source = 'photo_src';
+        field.height ??= 26;
+    } else if (type === 'qr') {
+        field.source = 'qr_src';
+        field.height ??= 14;
+    } else if (type === 'text') {
+        field.source = props.dataSourceOptions[field.source] ? field.source : 'name';
+        field.font_size ??= 10;
+        field.font_family ??= 'Arial';
+    } else if (type === 'item_row') {
+        field.row ??= 1;
+        field.source = String(field.source || '').startsWith('item_row_') ? field.source : `item_row_${field.row}`;
+        field.font_size ??= 8;
+        field.font_family ??= 'Arial';
+        field.height ??= 2.4;
+    } else if (type === 'static_text') {
+        field.text ??= 'Label';
+        field.font_size ??= 9;
+        field.font_family ??= 'Arial';
+    } else if (type === 'shape') {
+        field.height ??= 10;
+        field.color ??= '#DCEBFB';
+        field.radius ??= 0;
+    } else if (type === 'divider') {
+        field.orientation ??= 'vertical';
+        field.height ??= 10;
+        field.color ??= '#cbd5e1';
+    }
+}
+
 function scopeLabel(t) {
     const event = props.festEvents.find(e => e.id === t.event_id);
     if (!event) return 'All events (default)';
@@ -471,11 +630,38 @@ onUnmounted(() => {
 });
 
 function addField() {
-    form.fields.push({ key: '', type: 'text', source: 'name', top: 10, left: 10, width: 50, height: 15, font_size: 10, font_weight: 'normal' });
+    form.fields.push({
+        key: `field_${form.fields.length + 1}`,
+        type: 'text',
+        source: 'name',
+        top: 10,
+        left: 10,
+        width: 50,
+        font_size: 10,
+        font_family: 'Arial',
+        font_weight: 'normal',
+        font_style: 'normal',
+        align: 'left',
+        color: '#12345a',
+        rotation: 0,
+    });
 }
 
 function removeField(i) {
     form.fields.splice(i, 1);
+}
+
+function moveField(index, direction) {
+    const destination = index + direction;
+    if (destination < 0 || destination >= form.fields.length) return;
+    const [field] = form.fields.splice(index, 1);
+    form.fields.splice(destination, 0, field);
+}
+
+function duplicateField(index) {
+    const copy = JSON.parse(JSON.stringify(form.fields[index]));
+    copy.key = `${copy.key || 'field'}_copy`;
+    form.fields.splice(index + 1, 0, copy);
 }
 
 function editTemplate(template) {

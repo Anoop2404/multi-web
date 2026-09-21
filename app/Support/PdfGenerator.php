@@ -80,24 +80,26 @@ class PdfGenerator
                 $payload['footerTemplate'] = $footerTemplate ?? '<span></span>';
             }
 
-            $response = Http::timeout((int) config('services.pdf_converter.timeout', 300))->post($url, $payload);
+            try {
+                $response = Http::timeout((int) config('services.pdf_converter.timeout', 30))->post($url, $payload);
 
-            if ($response->successful()) {
-                if ($inline) {
-                    return response()->stream(function () use ($response) {
+                if ($response->successful()) {
+                    if ($inline) {
+                        return response()->stream(function () use ($response) {
+                            echo $response->body();
+                        }, 200, [
+                            'Content-Type' => 'application/pdf',
+                            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+                        ]);
+                    }
+
+                    return response()->streamDownload(function () use ($response) {
                         echo $response->body();
-                    }, 200, [
-                        'Content-Type' => 'application/pdf',
-                        'Content-Disposition' => 'inline; filename="' . $filename . '"',
-                    ]);
+                    }, $filename, ['Content-Type' => 'application/pdf']);
                 }
-
-                return response()->streamDownload(function () use ($response) {
-                    echo $response->body();
-                }, $filename, ['Content-Type' => 'application/pdf']);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('External PDF generation failed, falling back to DomPDF: ' . $e->getMessage());
             }
-
-            throw new \Exception("External PDF generation failed: " . $response->status() . " - " . $response->body());
         }
 
         // Fallback to DomPDF

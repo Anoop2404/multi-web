@@ -31,7 +31,7 @@ class InertiaAuth
     {
         $intended = $request->session()->get('url.intended');
 
-        if (is_string($intended) && self::isLoginUrl($intended)) {
+        if (is_string($intended) && (self::isLoginUrl($intended) || self::isInvalidIntendedForUser($request, $intended))) {
             $request->session()->forget('url.intended');
         }
 
@@ -55,7 +55,35 @@ class InertiaAuth
     {
         $path = parse_url($url, PHP_URL_PATH) ?? $url;
 
-        return $path === '/login';
+        return in_array($path, ['/login', '/school-login', '/portal/login'], true);
+    }
+
+    private static function isInvalidIntendedForUser(Request $request, string $url): bool
+    {
+        $user = $request->user();
+        if (! $user) {
+            return false;
+        }
+
+        $path = parse_url($url, PHP_URL_PATH) ?? $url;
+
+        if (method_exists($user, 'isSuperAdmin') && ! $user->isSuperAdmin()) {
+            if (in_array($path, ['/dashboard', '/schools', '/tenants', '/states', '/announcements'], true)
+                || str_starts_with($path, '/schools/')
+                || str_starts_with($path, '/tenants/')
+                || str_starts_with($path, '/states/')
+                || str_starts_with($path, '/announcements/')) {
+                return true;
+            }
+        }
+
+        if (method_exists($user, 'hasAnyRole') && $user->hasAnyRole(['school_admin', 'school_staff', 'school_principal', 'school_vice_principal'])) {
+            if ($path === '/' || str_starts_with($path, '/sahodaya-admin/')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function isSameOrigin(Request $request, string $url): bool

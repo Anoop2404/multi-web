@@ -259,6 +259,56 @@ class FestIdCardController extends SahodayaAdminController
         );
     }
 
+    public function pdfAllSchools(Request $request, string $tenantId, FestEvent $event, FestIdCardService $service, PlatformAuditLogger $audit)
+    {
+        @ini_set('memory_limit', '1024M');
+        @set_time_limit(600);
+
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $this->validated($request);
+        abort_unless($data['audience'] === 'student', 422, 'Bulk school PDF is available for student cards only.');
+
+        $filters = $this->idCardFilters($request);
+        $filters['include_data_uris'] = true;
+        unset($filters['head_id']);
+
+        $sections = $service->cardsGroupedBySchool($event, $filters);
+        abort_if($sections === [], 422, 'No approved participants found for any school.');
+
+        $totalCards = collect($sections)->sum(fn ($section) => count($section['cards']));
+        $customTemplate = $this->resolveCustomIdCardTemplate($event, null, 'student');
+
+        $audit->festEvent($event, FestPageActivity::ID_CARDS, 'fest.id_cards.generated', 'School-wise bulk ID cards PDF generated', [
+            'audience' => 'student',
+            'count'    => $totalCards,
+            'schools'  => count($sections),
+            'template' => $customTemplate ? 'custom:'.$customTemplate->id : $request->input('template', 'standard'),
+        ]);
+
+        $slug = str($event->title)->slug('-');
+        $isDomPdf = empty(config('services.pdf_converter.url'));
+        $cards = collect($sections)->flatMap(fn ($section) => $section['cards'])->values()->all();
+
+        $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
+            $event,
+            $this->sahodaya,
+            $cards,
+            'student',
+            false,
+            $sections,
+            $customTemplate,
+            $isDomPdf,
+        ))->render();
+
+        return \App\Support\PdfGenerator::download(
+            $html,
+            "{$slug}-school-wise-id-cards.pdf",
+            pageWidthMm: $customTemplate?->page_width_mm,
+            pageHeightMm: $customTemplate?->page_height_mm,
+        );
+    }
+
     /**
      * Human-readable class/age-bracket or arts-genre label for an item, for display
      * next to the item's title in pickers. Sports events use age_group; everything

@@ -125,8 +125,13 @@
                             Clear
                         </button>
                     </div>
+                    <Link :href="`/sahodaya-admin/${sahodaya.id}/schools/code-assignment`"
+                          class="ml-auto inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-800 transition hover:bg-indigo-100"
+                          title="Bulk assign, renumber, and manage school codes (1..N)">
+                        ⚡ Assign school codes →
+                    </Link>
                     <a :href="`/sahodaya-admin/${sahodaya.id}/schools/export-id-card-codes`"
-                       class="ml-auto inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                       class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
                        title="Every approved school's ID-card code (Sahodaya prefix + permanent school number) in one sheet">
                         ID card codes ↓
                     </a>
