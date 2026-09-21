@@ -445,8 +445,9 @@ class FestIdCardController extends SahodayaAdminController
 
         $totalCards = collect($sections)->sum(fn ($section) => count($section['cards']));
         $customTemplate = $this->resolveCustomIdCardTemplate($targetEvent, null, 'student');
+        $inlinePreview = $request->boolean('preview');
 
-        $audit->festEvent($targetEvent, FestPageActivity::ID_CARDS, 'fest.id_cards.die_generated', 'Die ID cards PDF generated', [
+        $audit->festEvent($targetEvent, FestPageActivity::ID_CARDS, $inlinePreview ? 'fest.id_cards.die_previewed' : 'fest.id_cards.die_generated', $inlinePreview ? 'Die ID cards PDF previewed' : 'Die ID cards PDF generated', [
             'count'     => $totalCards,
             'schools'   => count($sections),
             'volume'    => $request->input('volume'),
@@ -475,6 +476,7 @@ class FestIdCardController extends SahodayaAdminController
         return \App\Support\PdfGenerator::download(
             $html,
             "{$slug}-{$scopeSuffix}-id-cards.pdf",
+            inline: $inlinePreview,
             isLandscape: true,
             pageWidthMm: $customTemplate?->page_width_mm,
             pageHeightMm: $customTemplate?->page_height_mm,

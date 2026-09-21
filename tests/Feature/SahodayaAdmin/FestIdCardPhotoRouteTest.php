@@ -234,6 +234,30 @@ class FestIdCardPhotoRouteTest extends TestCase
         $this->assertEquals('application/pdf', $response->headers->get('content-type'));
     }
 
+    public function test_pdf_die_previews_single_school_inline(): void
+    {
+        $response = $this->actingAs($this->sahodayaAdmin)->get(
+            "/sahodaya-admin/{$this->sahodaya->id}/events/{$this->event->id}/id-cards/die/pdf?preview=1&school_id={$this->school->id}"
+        );
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/pdf');
+        $response->assertHeaderContains('content-disposition', 'inline');
+    }
+
+    public function test_pdf_die_previews_a_volume_inline(): void
+    {
+        $schoolId = urlencode($this->school->id);
+        $response = $this->actingAs($this->sahodayaAdmin)->get(
+            "/sahodaya-admin/{$this->sahodaya->id}/events/{$this->event->id}/id-cards/die/pdf?preview=1&volume=1&school_ids[]={$schoolId}"
+        );
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/pdf');
+        $response->assertHeaderContains('content-disposition', 'inline');
+        $response->assertHeaderContains('content-disposition', 'volume-1');
+    }
+
     public function test_pdf_die_downloads_all_schools_pdf(): void
     {
         $response = $this->actingAs($this->sahodayaAdmin)->get(

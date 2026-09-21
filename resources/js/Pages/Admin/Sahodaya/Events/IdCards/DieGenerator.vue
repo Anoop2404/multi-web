@@ -101,11 +101,16 @@
                             <span>Sheets: <strong>{{ vol.page_count }}</strong></span>
                         </div>
                     </div>
-                    <div class="mt-4 pt-3 border-t border-slate-100">
+                    <div class="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2">
+                        <a :href="volumePreviewUrl(vol)" target="_blank" rel="noopener"
+                           class="btn-secondary w-full text-xs py-2 text-center flex items-center justify-center gap-1.5 text-indigo-700">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            Preview
+                        </a>
                         <a :href="volumeDownloadUrl(vol)"
                            class="btn-primary w-full text-xs py-2 text-center flex items-center justify-center gap-1.5 !bg-indigo-700 hover:!bg-indigo-800">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                            Download Vol. {{ vol.volume }} PDF
+                            PDF
                         </a>
                     </div>
                 </div>
@@ -256,11 +261,18 @@
                                     <span>{{ s.page_count }} sheets</span>
                                 </div>
                             </div>
-                            <a :href="schoolDownloadUrl(s.school_id)"
-                               class="btn-secondary !px-2.5 !py-1 text-xs whitespace-nowrap flex items-center gap-1 font-semibold text-indigo-700 hover:text-indigo-800">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                                PDF
-                            </a>
+                            <div class="flex items-center gap-1.5">
+                                <a :href="schoolPreviewUrl(s.school_id)" target="_blank" rel="noopener"
+                                   class="btn-secondary !px-2.5 !py-1 text-xs whitespace-nowrap flex items-center gap-1 font-semibold text-indigo-700 hover:text-indigo-800">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                    Preview
+                                </a>
+                                <a :href="schoolDownloadUrl(s.school_id)"
+                                   class="btn-secondary !px-2.5 !py-1 text-xs whitespace-nowrap flex items-center gap-1 font-semibold text-indigo-700 hover:text-indigo-800">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                    PDF
+                                </a>
+                            </div>
                         </div>
                         <div v-if="!filteredSchools.length" class="text-center py-6 text-xs text-slate-400">
                             No schools match your search.
@@ -400,8 +412,17 @@ function volumeDownloadUrl(vol) {
     return `${base}/die/pdf?volume=${vol.volume}&${ids}`;
 }
 
+function volumePreviewUrl(vol) {
+    const ids = (vol.school_ids || []).map(id => `school_ids[]=${encodeURIComponent(id)}`).join('&');
+    return `${base}/die/pdf?preview=1&volume=${vol.volume}&${ids}`;
+}
+
 function schoolDownloadUrl(schoolId) {
     return `${base}/die/pdf?school_id=${encodeURIComponent(schoolId)}`;
+}
+
+function schoolPreviewUrl(schoolId) {
+    return `${base}/die/pdf?preview=1&school_id=${encodeURIComponent(schoolId)}`;
 }
 
 const gridColsClass = computed(() => {
