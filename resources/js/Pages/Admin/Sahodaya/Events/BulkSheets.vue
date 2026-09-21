@@ -56,6 +56,7 @@
                 <a :href="bulkChestNumberListUrl" target="_blank" class="btn-secondary text-xs">🔢 Chest Number List</a>
                 <a :href="bulkAttendanceSheetUrl" target="_blank" class="btn-secondary text-xs">📋 Attendance Sheet</a>
                 <a :href="bulkTimesheetUrl" target="_blank" class="btn-secondary text-xs">⏱️ Timesheet</a>
+                <a :href="bulkItemsListUrl" target="_blank" class="btn-secondary text-xs">📃 Items List</a>
             </div>
             <p v-else class="text-xs text-slate-400">Pick a phase, an area, or one or more items above to enable the download buttons.</p>
 
@@ -145,6 +146,7 @@ const bulkResultDeclarationSheetUrl = computed(() => bulkSheetUrl('reports/resul
 const bulkChestNumberListUrl = computed(() => bulkSheetUrl('chest-numbers/print'));
 const bulkAttendanceSheetUrl = computed(() => bulkSheetUrl('reports/export/attendance-sheet', { download: 1 }));
 const bulkTimesheetUrl = computed(() => bulkSheetUrl('reports/export/timesheet', { download: 1 }));
+const bulkItemsListUrl = computed(() => bulkSheetUrl('reports/items-list'));
 const bulkSelectionActive = computed(() => bulkSelectedItemIds.value.length > 0 || !!bulkPhaseId.value || !!bulkAreaId.value);
 
 const reportTypeOptions = [
@@ -156,6 +158,7 @@ const reportTypeOptions = [
     { key: 'chest_number_list', label: '🔢 Chest Number List', url: () => bulkChestNumberListUrl.value },
     { key: 'attendance_sheet', label: '📋 Attendance Sheet', url: () => bulkAttendanceSheetUrl.value },
     { key: 'timesheet', label: '⏱️ Timesheet', url: () => bulkTimesheetUrl.value },
+    { key: 'items_list', label: '📃 Items List', url: () => bulkItemsListUrl.value },
 ];
 const comboSelectedTypes = ref([...props.bulkReportCombo]);
 const savingCombo = ref(false);

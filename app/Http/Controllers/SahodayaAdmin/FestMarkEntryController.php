@@ -50,6 +50,7 @@ class FestMarkEntryController extends SahodayaAdminController
         'sum_sheet', 'sum_sheet_no_chest',
         'result_declaration',
         'chest_number_list', 'attendance_sheet', 'timesheet',
+        'items_list',
     ];
 
     public function index(Request $request, string $tenantId, FestEvent $event)
@@ -1479,6 +1480,65 @@ class FestMarkEntryController extends SahodayaAdminController
             $nameParts[] = count($items).' items';
         }
         $nameParts[] = 'result declaration sheet';
+        $fileName = \Illuminate\Support\Str::slug(implode(' ', $nameParts)).'.pdf';
+
+        return $pdf->download($fileName);
+    }
+
+    /**
+     * Plain catalog listing for a phase/area/checkbox-selected set of items (or every
+     * item, with none of the bulk filters): Name, Code, Gender, Category, Group/
+     * Individual -- one row per item, no participant/mark data at all. Same
+     * parseBulkSheetFilters() selection as the other Bulk Sheets reports.
+     */
+    public function itemsListPdf(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $itemId = $request->integer('item_id');
+        [$itemIds, $phaseId, $areaId] = $this->parseBulkSheetFilters($request);
+
+        $query = FestEventItem::with('event')->where('event_id', $event->id)->where('is_enabled', true);
+        if ($itemIds) {
+            $query->whereIn('id', $itemIds);
+        } elseif ($itemId) {
+            $query->where('id', $itemId);
+        }
+        if ($phaseId) {
+            $query->where('phase_id', $phaseId);
+        }
+        if ($areaId) {
+            $query->where('area_id', $areaId);
+        }
+        $items = $query->orderBy('display_order')->orderBy('title')->get();
+
+        abort_if($items->isEmpty(), 404, 'No competition items found.');
+
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
+
+        $genderLabels = ['male' => 'Boys', 'female' => 'Girls', 'mixed' => 'Mixed'];
+        $groupTypes = ['team', 'group', 'pair', 'trio'];
+
+        $rows = $items->map(fn ($item) => [
+            'title'    => $item->title,
+            'code'     => $item->item_code,
+            'gender'   => $genderLabels[$item->gender ?? ''] ?? 'Open',
+            'category' => $this->itemCategoryLabel($item, $classGroupLabels),
+            'type'     => in_array($item->participant_type, $groupTypes, true) ? 'Group' : 'Individual',
+        ]);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.items-list', [
+            'sahodaya' => $this->sahodaya,
+            'event'    => $event,
+            'rows'     => $rows,
+            'logoSrc'  => TenantBranding::logoEmbedSrc($this->sahodaya),
+        ])->setPaper('a4', 'portrait');
+
+        $nameParts = [$event->title];
+        if ($itemIds || $phaseId || $areaId) {
+            $nameParts[] = count($items).' items';
+        }
+        $nameParts[] = 'items list';
         $fileName = \Illuminate\Support\Str::slug(implode(' ', $nameParts)).'.pdf';
 
         return $pdf->download($fileName);
