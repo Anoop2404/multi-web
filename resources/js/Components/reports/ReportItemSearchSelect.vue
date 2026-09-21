@@ -68,6 +68,22 @@ function categoryFor(item) {
     return '';
 }
 
+const GENDER_LABELS = { male: 'Boys', boys: 'Boys', female: 'Girls', girls: 'Girls', mixed: 'Mixed' };
+
+// Picking the right item out of several same-named ones (e.g. "Digital Painting" once
+// per category, or a Boys/Girls pair sharing a title) needs more than the name +
+// category this dropdown already showed -- gender and individual/group are the other
+// two things that commonly repeat a title across otherwise-different items.
+function genderFor(item) {
+    return GENDER_LABELS[String(item.gender ?? '').toLowerCase()] ?? 'Open';
+}
+
+const GROUP_PARTICIPANT_TYPES = ['team', 'group', 'pair', 'trio'];
+
+function typeFor(item) {
+    return GROUP_PARTICIPANT_TYPES.includes(item.participant_type) ? 'Group' : 'Individual';
+}
+
 function itemLabel(item) {
     const parts = [];
     const status = typeof props.statusFor === 'function' ? props.statusFor(item) : null;
@@ -75,6 +91,7 @@ function itemLabel(item) {
     let title = item.title;
     const category = categoryFor(item);
     if (category) title += ` — ${category}`;
+    title += ` · ${genderFor(item)} · ${typeFor(item)}`;
     parts.push(title);
     if (item.participant_count) parts.push(`(${item.participant_count} reg.)`);
     return parts.join(' ');
