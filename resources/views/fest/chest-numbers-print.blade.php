@@ -4,16 +4,13 @@
     <meta charset="utf-8">
     <title>{{ $orgName ?? 'Sahodaya' }} — {{ $event->title }}@if(!empty($item)) — {{ $item->title }}@endif — Chest Number List</title>
     <style>
-        {{-- Top margin reserved for the fixed running header below -- must stay >= that
-             header's rendered height or dompdf/Chromium will let content overlap it. --}}
-        @page { margin: 132px 28px 34px; }
+        {{-- The external Chromium converter (PDF_CONVERTER_URL) supplies its own native
+             repeating header/footer (see FestChestNumberController::print()) and ignores
+             this @page rule entirely -- margin there comes from the $margin passed to
+             PdfGenerator instead. This margin only matters for the dompdf fallback. --}}
+        @page { margin: {{ ($isDomPdf ?? true) ? '132px' : '22px' }} 28px 34px; }
         body { font-family: 'DejaVu Sans', system-ui, sans-serif; font-size: 11px; color: #0f172a; margin: 0; }
         h1 { font-size: 14px; font-weight: 800; color: #0f172a; margin: 4px 0 12px; }
-        {{-- position:fixed content repeats on every printed page (both dompdf and the
-             external Chromium converter honor this in paginated output) -- unlike the
-             branding header this replaces, which used to render once at the very top
-             of the document and vanish on any continuation page. --}}
-        .pdf-page-header { position: fixed; top: -122px; left: 0; right: 0; }
         table.data { width: 100%; border-collapse: collapse; }
         table.data th { background: #f1f5f9; color: #334155; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; text-align: left; padding: 6px 8px; border: 1px solid #cbd5e1; }
         table.data td { border: 1px solid #cbd5e1; padding: 7px 8px; font-size: 10.5px; vertical-align: middle; }
@@ -28,7 +25,7 @@
     </style>
 </head>
 <body>
-    <div class="pdf-page-header">
+    <div class="pdf-page-header" @if($isDomPdf ?? true) style="position: fixed; top: -122px; left: 0; right: 0;" @endif>
         @include('partials.pdf-branding-header', [
             'orgName' => $orgName ?? 'Sahodaya',
             'logoSrc' => $logoSrc ?? null,

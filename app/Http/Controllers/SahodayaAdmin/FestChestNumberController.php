@@ -275,13 +275,25 @@ class FestChestNumberController extends SahodayaAdminController
             );
         }
 
+        $orgName = $this->sahodaya->name;
+        $logoSrc = TenantBranding::logoEmbedSrc($this->sahodaya);
+        // The external Chromium converter (PDF_CONVERTER_URL) ignores this document's
+        // own @page CSS margin entirely -- without an explicit $margin passed below, it
+        // renders at zero margin, which also pushes any position:fixed header content in
+        // the HTML off-page. So on that path, page furniture has to come from Chromium's
+        // own native repeating header/footer instead of a CSS trick (see the blade file's
+        // own isDomPdf-gated fallback for local dev / dompdf, which still needs the CSS
+        // approach since dompdf never applies a headerTemplate at all).
+        $isDomPdf = empty(config('services.pdf_converter.url'));
+
         $html = view('fest.chest-numbers-print', [
             'event'        => $event,
             'item'         => $item,
             'itemCategory' => $itemCategory,
             'rows'         => $rows,
-            'orgName'      => $this->sahodaya->name,
-            'logoSrc'      => TenantBranding::logoEmbedSrc($this->sahodaya),
+            'orgName'      => $orgName,
+            'logoSrc'      => $logoSrc,
+            'isDomPdf'     => $isDomPdf,
         ])->render();
 
         $slug = str($event->title)->slug()->limit(40).match (true) {
@@ -291,7 +303,70 @@ class FestChestNumberController extends SahodayaAdminController
         };
         $inline = $request->boolean('inline') || $request->boolean('preview');
 
-        return PdfGenerator::download($html, "{$slug}-chest-numbers.pdf", $inline);
+        [$headerTemplate, $footerTemplate] = $this->chestNumberHeaderFooterTemplates($event, $orgName, $logoSrc, $item, $itemCategory);
+
+        return PdfGenerator::download(
+            $html,
+            "{$slug}-chest-numbers.pdf",
+            $inline,
+            false,
+            $headerTemplate,
+            $footerTemplate,
+            ['top' => '112px', 'right' => '28px', 'bottom' => '40px', 'left' => '28px'],
+        );
+    }
+
+    /**
+     * Puppeteer header/footer templates, rendered by Chromium in isolation from the main
+     * page (no external/page stylesheet access) -- same approach as
+     * FestReportService::attendanceSheetHeaderFooterTemplates(), kept in sync by hand with
+     * partials/pdf-branding-header.blade.php. Ignored by the dompdf fallback.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function chestNumberHeaderFooterTemplates(FestEvent $event, string $orgName, ?string $logoSrc, ?FestEventItem $item, ?string $itemCategory): array
+    {
+        $orgNameSafe = e($orgName);
+        $eventTitle = e($event->title);
+        $generated = e(now()->format('d M Y, h:i A'));
+
+        $itemLine = '';
+        if ($item) {
+            $itemLabel = e(($item->item_code ? "[{$item->item_code}] " : '').$item->title.($itemCategory ? " — {$itemCategory}" : ''));
+            $itemLine = '<div style="font-size:11px; font-weight:800; color:#0f172a; margin-top:2px;">'.$itemLabel.'</div>';
+        }
+
+        $logoImg = $logoSrc
+            ? '<img src="'.e($logoSrc).'" style="width:34px;height:34px;object-fit:contain;margin-right:10px;">'
+            : '';
+
+        $header = <<<HTML
+            <div style="width:100%; font-family:Arial,sans-serif; padding:0 28px; box-sizing:border-box; border-bottom:2px solid #0f172a; padding-bottom:6px;">
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <div style="display:flex; align-items:center;">
+                        {$logoImg}
+                        <div>
+                            <div style="font-size:14px; font-weight:800; color:#0f172a; text-transform:uppercase; letter-spacing:0.3px;">{$orgNameSafe}</div>
+                            <div style="font-size:8px; font-weight:600; color:#475569; margin-top:2px;">CBSE Sahodaya Inter-School Competitions &amp; Events</div>
+                        </div>
+                    </div>
+                    <div style="background:#0f172a; color:#fff; padding:4px 10px; border-radius:4px; font-size:8px; font-weight:bold; letter-spacing:0.4px; white-space:nowrap;">CHEST NUMBER LIST</div>
+                </div>
+                <div style="margin-top:5px; padding-top:4px; border-top:1px solid #e2e8f0;">
+                    <div style="font-size:8.5px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.3px;">{$eventTitle}</div>
+                    {$itemLine}
+                </div>
+            </div>
+            HTML;
+
+        $footer = <<<HTML
+            <div style="width:100%; font-family:Arial,sans-serif; font-size:7px; color:#64748b; padding:0 28px; box-sizing:border-box; display:flex; justify-content:space-between; border-top:1px solid #cbd5e1; padding-top:4px;">
+                <span>{$orgNameSafe} &bull; {$eventTitle} &bull; Generated {$generated}</span>
+                <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+            </div>
+            HTML;
+
+        return [$header, $footer];
     }
 
     public function csv(Request $request, string $tenantId, FestEvent $event)
