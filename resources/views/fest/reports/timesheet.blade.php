@@ -188,10 +188,11 @@
 <body>
     @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
 
-{{-- Position:fixed on the dompdf fallback so it repeats every page -- see the matching
-     comment in fest.reports.attendance-sheet. Left in normal flow on the Chromium path,
-     which already gets its own native repeating header. --}}
-<div class="report-header" @if($isDomPdf ?? true) style="position: fixed; top: -100px; left: 0; right: 0;" @endif>
+{{-- Chromium's own native repeating header now actually renders correctly there, so
+     this in-flow copy is skipped entirely on that path -- see the matching comment in
+     fest.reports.attendance-sheet. Only the dompdf fallback still needs it. --}}
+@if($isDomPdf ?? true)
+<div class="report-header" style="position: fixed; top: -100px; left: 0; right: 0;">
     @include('partials.pdf-branding-header', [
         'orgName' => $sahodaya->name ?? 'SAHODAYA',
         'logoSrc' => $logo ?? null,
@@ -212,6 +213,7 @@
         @endif
     </div>
 </div>
+@endif
 
 <main>
 @php

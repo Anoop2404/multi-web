@@ -271,11 +271,12 @@
 <body>
     @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
 
-{{-- On the dompdf fallback, made position:fixed so it repeats on every page -- the
-     Chromium path already gets an equivalent repeating header natively (see the
-     $margin comment above), so it's left in normal flow there instead of stacking a
-     second header underneath Chromium's own. --}}
-<div class="report-header" @if($isDomPdf ?? true) style="position: fixed; top: -100px; left: 0; right: 0;" @endif>
+{{-- Chromium's own native repeating header (see attendanceSheetHeaderFooterTemplates())
+     now actually renders correctly there, so this in-flow copy is skipped entirely on
+     that path to avoid showing the branding twice -- only the dompdf fallback (no
+     equivalent native mechanism) still needs it, made position:fixed to repeat. --}}
+@if($isDomPdf ?? true)
+<div class="report-header" style="position: fixed; top: -100px; left: 0; right: 0;">
     @include('partials.pdf-branding-header', [
         'orgName' => $sahodaya->name ?? 'SAHODAYA',
         'logoSrc' => $logo ?? null,
@@ -296,6 +297,7 @@
         @endif
     </div>
 </div>
+@endif
 
 <main>
 @php
