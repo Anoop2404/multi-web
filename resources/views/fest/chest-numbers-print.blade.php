@@ -4,11 +4,13 @@
     <meta charset="utf-8">
     <title>{{ $orgName ?? 'Sahodaya' }} — {{ $event->title }}@if(!empty($item)) — {{ $item->title }}@endif — Chest Number List</title>
     <style>
-        {{-- The external Chromium converter (PDF_CONVERTER_URL) supplies its own native
-             repeating header/footer (see FestChestNumberController::print()) and ignores
-             this @page rule entirely -- margin there comes from the $margin passed to
-             PdfGenerator instead. This margin only matters for the dompdf fallback. --}}
-        @page { margin: {{ ($isDomPdf ?? true) ? '110px' : '22px' }} 28px 34px; }
+        {{-- Chromium's preferCSSPageSize option (always on in chrome-print-server.js)
+             makes it prefer this @page margin over the $margin passed via the API to
+             PdfGenerator -- confirmed the hard way: this used to read 22px on the
+             Chromium branch on the assumption the API margin alone would apply, which
+             instead produced a header/content overlap. Kept as one fixed, generous value
+             for both paths now, matching attendance-sheet.blade.php/timesheet.blade.php. --}}
+        @page { margin: 120px 28px 34px; }
         body { font-family: 'DejaVu Sans', system-ui, sans-serif; font-size: 11px; color: #0f172a; margin: 0; }
         table.data { width: 100%; border-collapse: collapse; margin-top: 8px; }
         table.data th { background: #f1f5f9; color: #334155; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; text-align: left; padding: 6px 8px; border: 1px solid #cbd5e1; }

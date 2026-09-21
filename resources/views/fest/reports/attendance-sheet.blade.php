@@ -18,12 +18,14 @@
            spans, which is also why the SL/Name/... column header repeats).
            The on-screen preview has no concept of pages at all, so it keeps a simple
            normal-flow header/footer shown once at the top/bottom. */
-        {{-- Chromium (PDF_CONVERTER_URL) ignores this @page rule entirely -- its own
-             margin comes from the PHP-side $margin passed to PdfGenerator, sized to fit
-             its native repeating headerTemplate/footerTemplate (see
-             attendanceSheetHeaderFooterTemplates()). This margin only matters for the
-             dompdf fallback, so bumping it to fit .report-header as a fixed, repeating
-             header below is safe either way. --}}
+        {{-- Chromium's preferCSSPageSize option (always on in chrome-print-server.js)
+             makes it prefer this @page margin over the PHP-side $margin passed to
+             PdfGenerator -- confirmed by a matching bug in chest-numbers-print.blade.php,
+             where a conditionally tiny margin here (on the assumption Chromium ignores
+             it) produced a real header/content overlap. Kept as one fixed, generous
+             value here regardless of path -- it happens to already roughly match the API
+             margin sent for the Chromium case, which is why this template never showed
+             the same bug, but that was luck, not the reasoning this comment used to give. --}}
         @page {
             margin: 116px 38px 24px;
         }

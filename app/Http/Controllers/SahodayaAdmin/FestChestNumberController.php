@@ -277,13 +277,14 @@ class FestChestNumberController extends SahodayaAdminController
 
         $orgName = $this->sahodaya->name;
         $logoSrc = TenantBranding::logoEmbedSrc($this->sahodaya);
-        // The external Chromium converter (PDF_CONVERTER_URL) ignores this document's
-        // own @page CSS margin entirely -- without an explicit $margin passed below, it
-        // renders at zero margin, which also pushes any position:fixed header content in
-        // the HTML off-page. So on that path, page furniture has to come from Chromium's
-        // own native repeating header/footer instead of a CSS trick (see the blade file's
-        // own isDomPdf-gated fallback for local dev / dompdf, which still needs the CSS
-        // approach since dompdf never applies a headerTemplate at all).
+        // The external Chromium converter (PDF_CONVERTER_URL) actually PREFERS the
+        // blade's own @page CSS margin over the $margin passed below (preferCSSPageSize
+        // is always on server-side) -- so that margin has to stay generous on both paths,
+        // not just the dompdf one (see the blade file's own comment; a conditionally
+        // tiny margin there used to produce a real header/content overlap on this exact
+        // path). Page furniture itself still comes from Chromium's native repeating
+        // header/footer, not a CSS trick -- dompdf has no such native mechanism, so it
+        // still needs the isDomPdf-gated fallback in the blade file.
         $isDomPdf = empty(config('services.pdf_converter.url'));
 
         $html = view('fest.chest-numbers-print', [

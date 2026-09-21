@@ -7,8 +7,9 @@
         /* Same repeating header/footer split as fest.reports.attendance-sheet — see that
            file's own comment for the full reasoning (Chromium's native header/footer vs
            dompdf's baked-in thead/tfoot fallback). */
-        {{-- Chromium (PDF_CONVERTER_URL) ignores this @page rule -- see the matching
-             comment in fest.reports.attendance-sheet for why bumping it is safe here. --}}
+        {{-- Chromium actually prefers this @page margin over the API-level one (see the
+             matching comment in fest.reports.attendance-sheet) -- kept as one fixed,
+             generous value regardless of path. --}}
         @page {
             margin: 116px 38px 24px;
         }
