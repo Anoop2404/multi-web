@@ -24,9 +24,9 @@
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             @foreach($events as $event)
             <a href="/events/{{ $event->slug }}" class="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition group block">
-                @if($event->image)
+                @if($event->image_url)
                 <div class="aspect-video overflow-hidden relative">
-                    <img loading="lazy" src="{{ $event->image }}" alt="{{ $event->title }}"
+                    <img loading="lazy" src="{{ $event->image_url }}" alt="{{ $event->title }}"
                          class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
                     {{-- Date badge --}}
                     <div class="absolute top-3 left-3 bg-white rounded-xl px-3 py-2 text-center shadow">

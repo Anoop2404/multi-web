@@ -13,18 +13,18 @@
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             @foreach($albums as $album)
             @php
-                $images   = $album->items->pluck('image_path')->values()->all();
+                $images   = $album->items->pluck('image_url')->filter()->values()->all();
                 $captions = $album->items->map(fn ($item) => $item->caption ?: $album->title)->values()->all();
-                if (empty($images) && $album->cover_image) {
-                    $images   = [$album->cover_image];
+                if (empty($images) && $album->cover_url) {
+                    $images   = [$album->cover_url];
                     $captions = [$album->title];
                 }
             @endphp
             <a href="/gallery/{{ $album->slug }}"
                class="group block rounded-xl overflow-hidden shadow-sm border border-gray-100 bg-white hover:shadow-md transition">
-                @if($album->cover_image)
+                @if($album->cover_url)
                 <div class="aspect-video overflow-hidden">
-                    <img loading="lazy" src="{{ $album->cover_image }}" alt="{{ $album->title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+                    <img loading="lazy" src="{{ $album->cover_url }}" alt="{{ $album->title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
                 </div>
                 @endif
                 <div class="p-4">

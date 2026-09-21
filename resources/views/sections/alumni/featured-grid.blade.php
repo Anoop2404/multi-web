@@ -17,9 +17,9 @@
         <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             @foreach($alumni as $al)
             <div class="bg-white rounded-2xl p-6 text-center shadow-sm hover:shadow-md transition">
-                @if($al->photo)
+                @if($al->photo_url)
                 <div class="w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-gray-100 mb-4">
-                    <img loading="lazy" src="{{ $al->photo }}" alt="{{ $al->name }}" class="w-full h-full object-cover">
+                    <img loading="lazy" src="{{ $al->photo_url }}" alt="{{ $al->name }}" class="w-full h-full object-cover">
                 </div>
                 @else
                 <div class="w-24 h-24 mx-auto rounded-full flex items-center justify-center text-white text-3xl font-bold mb-4"

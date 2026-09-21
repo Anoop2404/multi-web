@@ -18,9 +18,9 @@
         <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             @foreach($achievements as $ach)
             <div class="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition group">
-                @if($ach->image)
+                @if($ach->image_url)
                 <div class="aspect-video overflow-hidden">
-                    <img loading="lazy" src="{{ $ach->image }}" alt="{{ $ach->title }}"
+                    <img loading="lazy" src="{{ $ach->image_url }}" alt="{{ $ach->title }}"
                          class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
                 </div>
                 @else

@@ -56,10 +56,10 @@
                 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                     @foreach($result->toppers as $i => $topper)
                     <div class="text-center bg-gray-50 rounded-xl p-4">
-                        @if($topper->photo)
+                        @if($topper->photo_url)
                         <div class="w-16 h-16 mx-auto rounded-full overflow-hidden border-2 mb-2"
                              style="border-color: var(--color-primary)">
-                            <img loading="lazy" src="{{ $topper->photo }}" alt="{{ $topper->name }}"
+                            <img loading="lazy" src="{{ $topper->photo_url }}" alt="{{ $topper->name }}"
                                  class="w-full h-full object-cover">
                         </div>
                         @else

@@ -1,7 +1,8 @@
 <section class="relative bg-primary text-white py-24 px-4 text-center" style="background-color: var(--color-primary)">
-    @if(!empty($config['background_image']))
+    @php($backgroundImage = $config['bg_image'] ?? ($config['background_image'] ?? null))
+    @if(!empty($backgroundImage))
         <div class="absolute inset-0 bg-cover bg-center opacity-30"
-             style="background-image: url('{{ $config['background_image'] }}')"></div>
+             style="background-image: url('{{ $backgroundImage }}')"></div>
     @endif
     <div class="relative z-10 max-w-4xl mx-auto">
         <h1 class="text-4xl md:text-6xl font-bold font-heading mb-4">

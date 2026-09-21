@@ -27,7 +27,7 @@ class TestimonialController extends SchoolAdminController
             'rating' => 'nullable|integer|min:1|max:5',
             'display_order' => 'nullable|integer|min:0',
             'is_active' => 'nullable|boolean',
-            'photo' => 'nullable|image|max:4096',
+            'photo' => 'nullable|image|mimes:jpeg,jpg,png,webp,gif|max:4096',
         ]);
 
         $data['tenant_id'] = $this->school->id;
@@ -54,7 +54,7 @@ class TestimonialController extends SchoolAdminController
             'rating' => 'nullable|integer|min:1|max:5',
             'display_order' => 'nullable|integer|min:0',
             'is_active' => 'nullable|boolean',
-            'photo' => 'nullable|image|max:4096',
+            'photo' => 'nullable|image|mimes:jpeg,jpg,png,webp,gif|max:4096',
         ]);
 
         $data['is_active'] = $request->boolean('is_active');

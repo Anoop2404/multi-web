@@ -25,8 +25,8 @@
                     <blockquote class="text-xl text-gray-700 italic mb-6">{{ $t->quote }}</blockquote>
 
                     <div class="flex items-center justify-center gap-3">
-                        @if($t->photo)
-                        <img loading="lazy" src="{{ $t->photo }}" alt="{{ $t->name }}"
+                        @if($t->photo_url)
+                        <img loading="lazy" src="{{ $t->photo_url }}" alt="{{ $t->name }}"
                              class="w-12 h-12 rounded-full object-cover border-2"
                              style="border-color: var(--color-primary)">
                         @endif

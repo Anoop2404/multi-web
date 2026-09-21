@@ -27,9 +27,9 @@
             @foreach($articles as $article)
             <article class="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition group">
                 <a href="/news/{{ $article->slug }}" class="block">
-                    @if($article->image)
+                    @if($article->image_url)
                     <div class="aspect-video overflow-hidden">
-                        <img loading="lazy" src="{{ $article->image }}" alt="{{ $article->title }}"
+                        <img loading="lazy" src="{{ $article->image_url }}" alt="{{ $article->title }}"
                              class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
                     </div>
                     @endif

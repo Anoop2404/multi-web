@@ -60,9 +60,9 @@
                     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                         @foreach($streamToppers as $topper)
                         <div class="text-center bg-gray-50 rounded-xl p-4">
-                            @if($topper->photo)
+                            @if($topper->photo_url)
                             <div class="w-16 h-16 mx-auto rounded-full overflow-hidden border-2 mb-2" style="border-color: var(--color-primary)">
-                                <img loading="lazy" src="{{ $topper->photo }}" alt="{{ $topper->name }}" class="w-full h-full object-cover">
+                                <img loading="lazy" src="{{ $topper->photo_url }}" alt="{{ $topper->name }}" class="w-full h-full object-cover">
                             </div>
                             @else
                             <div class="w-16 h-16 mx-auto rounded-full flex items-center justify-center text-white font-bold text-xl mb-2" style="background-color: var(--color-primary)">

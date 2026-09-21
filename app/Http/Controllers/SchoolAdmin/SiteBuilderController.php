@@ -10,6 +10,7 @@ use App\Support\SchoolPublicPageContent;
 use App\Support\SchoolSiteBuilderCatalog;
 use App\Support\SchoolWebsiteTemplateCatalog;
 use App\Support\SectionFieldRegistry;
+use App\Support\SiteSectionMedia;
 use App\Support\TenantPublicSite;
 use Inertia\Response;
 
@@ -29,6 +30,19 @@ class SiteBuilderController extends SchoolAdminController
             $defaults['portal_cta'] ?? SchoolPortalNavLinks::portalCtaDefaults(),
             $navConfig['portal_cta'] ?? []
         );
+
+        $mediaUrls = [];
+        foreach ($sections as $section) {
+            $mediaUrls = array_replace(
+                $mediaUrls,
+                SiteSectionMedia::urlMap(
+                    $this->school,
+                    $section->section_type,
+                    $section->variant,
+                    $section->config ?? []
+                )
+            );
+        }
 
         return $this->inertia('School/SiteBuilder', [
             'sections' => $sections,
@@ -51,6 +65,7 @@ class SiteBuilderController extends SchoolAdminController
             'defaultNavConfig' => $defaults,
             'navLayoutOptions' => NavConfigDefaults::layoutOptions('school'),
             'navNeedsSetup' => empty($navConfig['items']),
+            'mediaUrls' => $mediaUrls,
         ]);
     }
 }

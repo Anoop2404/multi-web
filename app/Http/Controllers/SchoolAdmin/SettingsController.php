@@ -14,6 +14,7 @@ class SettingsController extends SchoolAdminController
 
         return $this->inertia('School/Settings/Index', [
             'settings' => $settings,
+            'logoUrl' => TenantStorage::logoUrl($this->school, $settings['logo'] ?? null),
             'publicWebsiteEnabled' => TenantPublicSite::isEnabled($this->school),
             'paymentDetails' => $this->school->paymentDetails(),
             'paymentQrCodeUrl' => $this->school->paymentQrCodeUrl(),
@@ -38,7 +39,7 @@ class SettingsController extends SchoolAdminController
             'whatsapp_number' => 'nullable|string|max:20',
             'cbse_affiliation_number' => 'nullable|string|max:50',
             'cbse_badge_show' => 'nullable|boolean',
-            'logo' => 'nullable|image|max:2048',
+            'logo' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:2048',
             'seo_title' => 'nullable|string|max:70',
             'seo_description' => 'nullable|string|max:160',
             'seo_keywords' => 'nullable|string|max:500',

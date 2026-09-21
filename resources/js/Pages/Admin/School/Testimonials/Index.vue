@@ -37,11 +37,10 @@
                                       placeholder="Share their experience..."
                                       class="field resize-none"></textarea>
                         </div>
-                        <div>
-                            <label class="form-label mb-1.5">Photo</label>
-                            <input type="file" accept="image/*" @change="form.photo = $event.target.files[0]"
-                                   class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100">
-                        </div>
+                        <ImageUploadField v-model="form.photo" label="Person photo"
+                            :preview-url="editingItem?.photo_url || ''" :allow-remove="!editing"
+                            :max-size-mb="4" :error="form.errors.photo"
+                            help="Square or portrait image recommended · up to 4 MB" />
                         <div class="flex items-center gap-2 pt-5">
                             <input type="checkbox" id="is_active" v-model="form.is_active" class="rounded">
                             <label for="is_active" class="text-sm text-gray-700">Show on website</label>
@@ -76,7 +75,7 @@
                         <tr v-for="t in testimonials" :key="t.id" class="hover:bg-gray-50">
                             <td class="px-5 py-3">
                                 <div class="flex items-center gap-3">
-                                    <img v-if="t.photo" :src="t.photo" class="w-9 h-9 rounded-full object-cover border border-gray-100 shrink-0">
+                                    <img v-if="t.photo_url" :src="t.photo_url" :alt="t.name" class="w-9 h-9 rounded-full object-cover border border-gray-100 shrink-0">
                                     <div class="w-9 h-9 rounded-full bg-teal-50 flex items-center justify-center text-teal-600 font-bold text-sm shrink-0" v-else>
                                         {{ t.name[0] }}
                                     </div>
@@ -109,7 +108,8 @@
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
-import { ref } from 'vue';
+import ImageUploadField from '@/Components/Website/ImageUploadField.vue';
+import { computed, ref } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -121,6 +121,7 @@ const props = defineProps({
 });
 
 const editing = ref(null);
+const editingItem = computed(() => props.testimonials.find(item => item.id === editing.value) ?? null);
 
 const form = useForm({
     name:          '',

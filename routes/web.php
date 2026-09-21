@@ -632,6 +632,7 @@ Route::prefix('school-admin/{tenantId}')
     Route::post('/gallery/albums',                   [GalleryController::class, 'storeAlbum'])->name('gallery.albums.store');
     Route::put('/gallery/albums/{album}',            [GalleryController::class, 'updateAlbum'])->name('gallery.albums.update');
     Route::post('/gallery/albums/{album}/photos',    [GalleryController::class, 'uploadPhotos'])->name('gallery.photos.upload');
+    Route::patch('/gallery/albums/{album}/cover/{photo}', [GalleryController::class, 'setCover'])->name('gallery.cover.update');
     Route::patch('/gallery/photos/{photo}',          [GalleryController::class, 'updatePhoto'])->name('gallery.photos.update');
     Route::delete('/gallery/albums/{album}',         [GalleryController::class, 'destroyAlbum'])->name('gallery.albums.destroy');
     Route::delete('/gallery/photos/{photo}',         [GalleryController::class, 'destroyPhoto'])->name('gallery.photos.destroy');
@@ -723,6 +724,7 @@ Route::prefix('school-admin/{tenantId}')
         Route::post('/experience/versions/{versionId}/restore', [SiteBuilderApiController::class, 'restoreExperienceVersion'])->name('experience.versions.restore');
         Route::post('/design', [SiteBuilderApiController::class, 'saveDesign'])->name('design.save');
         Route::post('/site-content', [SiteBuilderApiController::class, 'saveSiteContent'])->name('site-content.save');
+        Route::post('/media', [SiteBuilderApiController::class, 'uploadMedia'])->name('media.upload');
     });
     }); // public.website.admin.cms
 });

@@ -33,11 +33,8 @@
                                   class="field resize-y"></textarea>
                     </div>
 
-                    <div>
-                        <label class="form-label mb-1.5">Featured Image</label>
-                        <input type="file" accept="image/*" @change="form.image = $event.target.files[0]"
-                               class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                    </div>
+                    <ImageUploadField v-model="form.image" label="Featured image" :max-size-mb="4"
+                        :error="form.errors.image" help="Landscape image recommended · JPG, PNG, WebP or GIF · up to 4 MB" />
 
                     <div class="flex items-center gap-2">
                         <input type="checkbox" id="is_featured" v-model="form.is_featured" class="rounded">
@@ -59,6 +56,7 @@
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
+import ImageUploadField from '@/Components/Website/ImageUploadField.vue';
 import { Link, useForm } from '@inertiajs/vue3';
 
 const props = defineProps({ school: Object });

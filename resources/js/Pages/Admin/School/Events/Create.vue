@@ -43,12 +43,8 @@
                         <InputError :message="form.errors.description" class="mt-1" />
                     </div>
 
-                    <div>
-                        <label class="form-label mb-1.5">Event Image</label>
-                        <input type="file" accept="image/*" @change="form.image = $event.target.files[0]"
-                               class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
-                        <InputError :message="form.errors.image" class="mt-1" />
-                    </div>
+                    <ImageUploadField v-model="form.image" label="Event image" :max-size-mb="4"
+                        :error="form.errors.image" help="Landscape image recommended · JPG, PNG, WebP or GIF · up to 4 MB" />
                 </div>
 
                 <div class="flex items-center gap-4">
@@ -66,6 +62,7 @@
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import InputError from '@/Components/ui/InputError.vue';
+import ImageUploadField from '@/Components/Website/ImageUploadField.vue';
 import { Link, useForm } from '@inertiajs/vue3';
 
 const props = defineProps({ school: Object });

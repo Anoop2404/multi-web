@@ -50,12 +50,8 @@
                         <InputError :message="form.errors.type" class="mt-1" />
                     </div>
 
-                    <div>
-                        <label class="form-label mb-1.5">Photo</label>
-                        <input type="file" accept="image/*" @change="form.photo = $event.target.files[0]"
-                               class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700">
-                        <InputError :message="form.errors.photo" class="mt-1" />
-                    </div>
+                    <ImageUploadField v-model="form.photo" label="Staff photo" :max-size-mb="2"
+                        :error="form.errors.photo" help="Portrait or square image recommended · up to 2 MB" />
                 </div>
 
                 <div class="flex items-center gap-4">
@@ -73,6 +69,7 @@
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import InputError from '@/Components/ui/InputError.vue';
+import ImageUploadField from '@/Components/Website/ImageUploadField.vue';
 import { Link, useForm } from '@inertiajs/vue3';
 
 const props = defineProps({ school: Object });

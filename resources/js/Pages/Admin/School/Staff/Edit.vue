@@ -50,17 +50,9 @@
                         <InputError :message="form.errors.type" class="mt-1" />
                     </div>
 
-                    <div v-if="staff.photo" class="flex items-center gap-3 text-sm text-gray-500">
-                        <img :src="staff.photo" class="h-16 w-16 object-cover rounded-full border border-gray-100">
-                        <span>Current photo</span>
-                    </div>
-
-                    <div>
-                        <label class="form-label mb-1.5">{{ staff.photo ? 'Replace Photo' : 'Photo' }}</label>
-                        <input type="file" accept="image/*" @change="form.photo = $event.target.files[0]"
-                               class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700">
-                        <InputError :message="form.errors.photo" class="mt-1" />
-                    </div>
+                    <ImageUploadField v-model="form.photo" label="Staff photo" :preview-url="staff.photo_url || ''"
+                        :max-size-mb="2" :error="form.errors.photo" :allow-remove="false"
+                        help="Choose a new file only when replacing the current photo" />
 
                     <div class="flex items-center gap-2">
                         <input type="checkbox" id="is_active" v-model="form.is_active" class="rounded">
@@ -83,6 +75,7 @@
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import InputError from '@/Components/ui/InputError.vue';
+import ImageUploadField from '@/Components/Website/ImageUploadField.vue';
 import { Link, useForm } from '@inertiajs/vue3';
 
 const props = defineProps({ school: Object, staff: Object });

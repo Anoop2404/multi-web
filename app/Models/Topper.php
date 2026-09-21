@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToCentralTenant;
+use App\Support\TenantStorage;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -51,7 +52,22 @@ class Topper extends Model
     protected $appends = [
         'subject_marks',
         'marksheet_url',
+        'photo_url',
     ];
+
+    public function getPhotoUrlAttribute(): ?string
+    {
+        if (! $this->photo) {
+            return null;
+        }
+
+        $tenant = optional(tenancy())->tenant;
+        if (! $tenant || $tenant->id !== $this->tenant_id) {
+            $tenant = Tenant::find($this->tenant_id);
+        }
+
+        return TenantStorage::siteMediaUrl($tenant, $this->photo);
+    }
 
     public function getMarksheetUrlAttribute(): ?string
     {
@@ -59,7 +75,7 @@ class Topper extends Model
             return null;
         }
 
-        return \App\Support\TenantStorage::logoUrl($this->tenant, $this->marksheet_path);
+        return TenantStorage::logoUrl($this->tenant, $this->marksheet_path);
     }
 
     public function boardResult(): BelongsTo

@@ -24,7 +24,7 @@
 
     $toppers = $results->flatMap(fn ($r) => $r->toppers->map(fn ($t) => [
         'name' => $t->name,
-        'photo' => $t->photo,
+        'photo' => $t->photo_url,
         'percentage' => $t->percentage,
         'class' => $r->class,
         'is_perfect_scorer' => $t->is_perfect_scorer,

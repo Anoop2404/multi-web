@@ -37,18 +37,11 @@
                 <!-- Logo & Branding -->
                 <div class="card space-y-5">
                     <h3 class="font-bold text-gray-800">Logo & Identity</h3>
-
-                    <div v-if="settings.logo">
-                        <p class="text-xs font-semibold text-gray-600 mb-2">Current Logo</p>
-                        <img :src="settings.logo" class="h-16 object-contain rounded border border-gray-100 bg-gray-50 px-3">
-                    </div>
-
-                    <div>
-                        <label class="form-label mb-1.5">{{ settings.logo ? 'Replace Logo' : 'Upload Logo' }}</label>
-                        <input type="file" accept="image/*" @change="form.logo = $event.target.files[0]"
-                               class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
-                        <p class="text-xs text-gray-400 mt-1">PNG or SVG recommended. Shown in navbar and footer.</p>
-                    </div>
+                    <ImageUploadField v-model="form.logo" label="School logo" :preview-url="logoUrl || ''"
+                        :max-size-mb="2" :error="form.errors.logo" :allow-remove="false"
+                        accept="image/jpeg,image/png,image/webp"
+                        help="PNG, JPG or WebP · up to 2 MB · a transparent square logo works best" />
+                    <p class="text-xs text-gray-500">Shown in the website navbar, footer, login page, and school identity areas.</p>
                 </div>
 
                 <!-- Contact Information -->
@@ -105,19 +98,16 @@
                         </div>
                     </div>
 
-                    <div v-if="paymentQrCodeUrl && !removeQrCode">
-                        <p class="text-xs font-semibold text-gray-600 mb-2">Current QR code</p>
-                        <img :src="paymentQrCodeUrl" class="h-32 object-contain rounded border border-gray-100 bg-gray-50 p-2">
-                        <label class="flex items-center gap-2 mt-2 cursor-pointer">
-                            <input v-model="removeQrCode" type="checkbox" class="w-4 h-4 rounded text-indigo-600">
-                            <span class="text-xs text-gray-600">Remove QR code</span>
-                        </label>
-                    </div>
-                    <div v-else>
-                        <label class="form-label mb-1.5">UPI QR code (optional)</label>
-                        <input type="file" accept="image/*" @change="form.payment_qr_code = $event.target.files[0]"
-                               class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
-                    </div>
+                    <ImageUploadField
+                        :model-value="form.payment_qr_code"
+                        label="UPI QR code (optional)"
+                        :preview-url="removeQrCode ? '' : (paymentQrCodeUrl || '')"
+                        :max-size-mb="3"
+                        :error="form.errors.payment_qr_code"
+                        accept="image/jpeg,image/png,image/webp"
+                        help="PNG, JPG or WebP · up to 3 MB · upload a clear square QR image"
+                        @update:model-value="onPaymentQrChange"
+                    />
                 </div>
 
                 <!-- Social Media -->
@@ -226,12 +216,14 @@
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import ImageUploadField from '@/Components/Website/ImageUploadField.vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
 const props = defineProps({
     school:   Object,
     settings: { type: Object, default: () => ({}) },
+    logoUrl: { type: String, default: '' },
     publicWebsiteEnabled: { type: Boolean, default: true },
     paymentDetails: { type: Object, default: () => ({}) },
     paymentQrCodeUrl: { type: String, default: null },
@@ -274,5 +266,16 @@ function submit() {
         public_website_enabled: publicSiteEnabled.value,
         remove_payment_qr_code: removeQrCode.value,
     })).post(`/school-admin/${props.school.id}/settings`, { forceFormData: true });
+}
+
+function onPaymentQrChange(value) {
+    if (value instanceof File) {
+        form.payment_qr_code = value;
+        removeQrCode.value = false;
+        return;
+    }
+
+    form.payment_qr_code = null;
+    removeQrCode.value = Boolean(props.paymentQrCodeUrl);
 }
 </script>

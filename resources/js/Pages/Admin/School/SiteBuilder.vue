@@ -44,6 +44,11 @@
                 </a>
             </div>
 
+            <div v-if="requestError" role="alert" class="flex items-start justify-between gap-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                <span>{{ requestError }}</span>
+                <button type="button" class="font-bold" aria-label="Dismiss error" @click="requestError = ''">×</button>
+            </div>
+
             <!-- ── Design ────────────────────────────────────────────────── -->
             <div v-if="activeTab === 'design'" class="space-y-5">
                 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
@@ -319,8 +324,8 @@
 
             <!-- ── Page Sections ──────────────────────────────────────────── -->
             <template v-if="activeTab === 'sections'">
-            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-3.5 flex items-center justify-between gap-3">
-                <div class="flex items-center gap-3">
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-3">
                     <h2 class="font-bold text-gray-900">Page Sections</h2>
                     <span class="text-xs text-gray-400">{{ sections.length }} total · {{ sections.filter(s => s.is_active).length }} active</span>
                 </div>
@@ -334,6 +339,16 @@
                         + Add Section
                     </button>
                 </div>
+            </div>
+
+            <div class="grid gap-3 rounded-2xl border border-sky-100 bg-sky-50/70 p-4 text-sm text-sky-950 sm:grid-cols-[1fr_auto] sm:items-center">
+                <div>
+                    <p class="font-bold">Adding hero and section images</p>
+                    <p class="mt-1 text-xs leading-5 text-sky-800">Open a section, choose its layout, then use the image upload area. Hero sliders accept a separate background image for every slide.</p>
+                </div>
+                <a :href="`/school-admin/${school.id}/gallery`" class="inline-flex items-center justify-center rounded-xl border border-sky-200 bg-white px-4 py-2 text-xs font-bold text-sky-800 shadow-sm hover:bg-sky-100">
+                    Manage gallery photos →
+                </a>
             </div>
 
             <!-- Empty state -->
@@ -355,7 +370,7 @@
                      :class="section.is_active ? 'border-gray-100' : 'border-gray-100 opacity-60'">
 
                     <!-- Card header row -->
-                    <div class="px-5 py-4 flex items-center gap-4">
+                    <div class="px-4 sm:px-5 py-4 flex flex-wrap items-center gap-3 sm:gap-4">
                         <!-- Reorder handles -->
                         <div class="flex flex-col gap-0.5 shrink-0">
                             <button @click="moveUp(idx)" :disabled="idx === 0"
@@ -375,7 +390,7 @@
                                 <span class="text-sm font-bold text-gray-900 capitalize">
                                     {{ sectionTypeLabel(section.section_type) }}
                                 </span>
-                                <span class="text-[11px] font-mono bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{{ section.variant }}</span>
+                                <span class="text-[11px] font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{{ variantLabel(section.section_type, section.variant) }}</span>
                                 <span v-if="!section.is_active" class="text-[11px] font-semibold bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full">Hidden</span>
                             </div>
                             <p class="text-xs text-gray-400 truncate">
@@ -384,7 +399,7 @@
                         </div>
 
                         <!-- Action buttons -->
-                        <div class="flex items-center gap-2 shrink-0">
+                        <div class="flex w-full items-center justify-end gap-2 sm:w-auto shrink-0">
                             <button @click="toggleActive(section)"
                                     class="text-xs font-semibold px-3 py-1.5 rounded-xl border transition"
                                     :class="section.is_active
@@ -424,7 +439,7 @@
                                                     ? 'bg-[#041525] text-white border-[#041525]'
                                                     : 'bg-white text-gray-600 border-gray-200 hover:border-sky-300'
                                             ]">
-                                        {{ v }}
+                                        {{ variantLabel(section.section_type, v) }}
                                     </button>
                                 </div>
                             </div>
@@ -440,8 +455,11 @@
                         <!-- Content fields -->
                         <div v-if="fieldsFor(section.section_type, section.variant).length">
                             <SectionFieldEditor
+                                :key="`${section.id}-${section.variant}`"
                                 :fields="fieldsFor(section.section_type, section.variant)"
                                 :config="editConfigs[section.id] || section.config || {}"
+                                :upload-media="uploadSiteMedia"
+                                :media-preview="mediaPreviewUrl"
                                 @update="val => editConfigs[section.id] = val" />
                         </div>
                         <div v-else class="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-xs text-amber-700">
@@ -450,6 +468,9 @@
                         </div>
 
                         <!-- Save row -->
+                        <p v-if="sectionErrors[section.id]" class="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                            {{ sectionErrors[section.id] }}
+                        </p>
                         <div class="flex items-center gap-3 pt-2 border-t border-gray-100">
                             <button @click="saveSection(section)"
                                     :disabled="saving[section.id]"
@@ -506,7 +527,7 @@
                                                     ? 'border-[#041525] bg-[#041525]/5'
                                                     : 'border-gray-100 hover:border-sky-200'
                                             ]">
-                                        <p class="text-xs font-bold text-gray-700 capitalize">{{ v.replace(/-/g,' ') }}</p>
+                                        <p class="text-xs font-bold text-gray-700">{{ variantLabel(addModal.selectedType, v) }}</p>
                                         <p class="text-[11px] text-gray-400">
                                             {{ fieldDefs[addModal.selectedType]?.[v]?.description || '' }}
                                         </p>
@@ -534,6 +555,7 @@
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import ExperiencePicker from '@/Components/sahodaya/website/ExperiencePicker.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import ImageUploadField from '@/Components/Website/ImageUploadField.vue';
 import { ref, reactive, computed, defineComponent, h, onMounted } from 'vue';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -555,6 +577,7 @@ const props = defineProps({
     defaultNavConfig:        { type: Object, default: () => ({}) },
     navLayoutOptions:        { type: Array,  default: () => [] },
     navNeedsSetup:           { type: Boolean, default: false },
+    mediaUrls:               { type: Object, default: () => ({}) },
 });
 
 const tabs = [
@@ -571,6 +594,9 @@ const sections    = ref([...(props.sections ?? [])]);
 const expandedId  = ref(null);
 const editConfigs = reactive({});
 const saving      = reactive({});
+const sectionErrors = reactive({});
+const requestError = ref('');
+const mediaUrls = reactive({ ...(props.mediaUrls ?? {}) });
 
 const navConfig = reactive({
     layout_variant: props.navConfig?.layout_variant ?? 'logo-left',
@@ -797,6 +823,10 @@ function sectionTypeLabel(type) {
 }
 function variantsFor(type) { return props.sectionTypes[type] ?? []; }
 function fieldsFor(type, variant) { return props.fieldDefs?.[type]?.[variant]?.fields ?? []; }
+function variantLabel(type, variant) {
+    return props.fieldDefs?.[type]?.[variant]?.label
+        ?? (variant ?? '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
 function sectionPreview(s) {
     const cfg = s.config ?? {};
     return cfg.heading ?? cfg.title ?? cfg.tagline ?? (fieldsFor(s.section_type, s.variant).length ? 'Click Edit to configure content' : 'Data-driven section');
@@ -823,7 +853,7 @@ async function apiPatch(path, body) {
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
         body: JSON.stringify(body),
     });
-    return r.json();
+    return parseResponse(r);
 }
 async function apiPost(path, body) {
     const r = await fetch(`${baseUrl.value}${path}`, {
@@ -831,17 +861,49 @@ async function apiPost(path, body) {
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
         body: JSON.stringify(body),
     });
-    return r.json();
+    return parseResponse(r);
 }
 async function apiGet(path) {
     const r = await fetch(`${baseUrl.value}${path}`, { headers: { 'Accept': 'application/json' } });
-    return r.json();
+    return parseResponse(r);
 }
 async function apiDelete(path) {
-    await fetch(`${baseUrl.value}${path}`, {
+    const r = await fetch(`${baseUrl.value}${path}`, {
         method: 'DELETE',
         headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
     });
+    return parseResponse(r);
+}
+
+async function parseResponse(response) {
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        const validation = Object.values(data.errors ?? {}).flat().filter(Boolean);
+        requestError.value = validation[0] || data.message || 'The change could not be saved. Please try again.';
+        throw new Error(requestError.value);
+    }
+    requestError.value = '';
+    return data;
+}
+
+function mediaPreviewUrl(stored) {
+    if (!stored || typeof stored !== 'string') return '';
+    if (mediaUrls[stored]) return mediaUrls[stored];
+    if (stored.startsWith('http://') || stored.startsWith('https://') || stored.startsWith('/') || stored.startsWith('data:')) return stored;
+    return `/storage/${stored.replace(/^\//, '')}`;
+}
+
+async function uploadSiteMedia(file) {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await fetch(`${baseUrl.value}/media`, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
+        body: form,
+    });
+    const data = await parseResponse(response);
+    if (data.path && data.url) mediaUrls[data.path] = data.url;
+    return data.path ?? data.url;
 }
 
 // ── Nav & footer actions ──────────────────────────────────────────────────────
@@ -997,12 +1059,15 @@ async function toggleActive(section) {
 
 async function saveSection(section) {
     saving[section.id] = true;
+    sectionErrors[section.id] = '';
     try {
         const config = editConfigs[section.id] ?? section.config ?? {};
         const updated = await apiPatch(`/sections/${section.id}`, { config });
         const idx = sections.value.findIndex(s => s.id === section.id);
         if (idx !== -1) Object.assign(sections.value[idx], updated);
         expandedId.value = null;
+    } catch (error) {
+        sectionErrors[section.id] = error?.message || 'This section could not be saved.';
     } finally {
         saving[section.id] = false;
     }
@@ -1010,7 +1075,7 @@ async function saveSection(section) {
 
 async function switchVariant(section, newVariant) {
     if (newVariant === section.variant) return;
-    const msg = `Switch from "${section.variant}" to "${newVariant}"?\n\nCurrent content will be archived and you can restore it any time.`;
+    const msg = `Switch from “${variantLabel(section.section_type, section.variant)}” to “${variantLabel(section.section_type, newVariant)}”?\n\nCurrent content will be archived and you can restore it any time.`;
     if (!(await confirm({ message: msg, destructive: false }))) return;
     const updated = await apiPatch(`/sections/${section.id}`, { variant: newVariant });
     const idx = sections.value.findIndex(s => s.id === section.id);
@@ -1026,7 +1091,7 @@ function restoreArchived(section, archiveIdx) {
 }
 
 async function removeSection(section) {
-    if (!(await confirm({ message: `Delete the "${sectionTypeLabel(section.section_type)} / ${section.variant}" section?\n\nThis cannot be undone.`, destructive: true }))) return;
+    if (!(await confirm({ message: `Delete the “${sectionTypeLabel(section.section_type)} / ${variantLabel(section.section_type, section.variant)}” section?\n\nThis cannot be undone.`, destructive: true }))) return;
     await apiDelete(`/sections/${section.id}`);
     sections.value = sections.value.filter(s => s.id !== section.id);
 }
@@ -1066,7 +1131,7 @@ async function createSection() {
                 is_active:    false,
             }),
         });
-        const newSection = await r.json();
+        const newSection = await parseResponse(r);
         sections.value.push(newSection);
         addModal.open = false;
         // Auto-open editor for the new section
@@ -1083,6 +1148,8 @@ const SectionFieldEditor = defineComponent({
     props: {
         fields: Array,
         config: Object,
+        uploadMedia: Function,
+        mediaPreview: Function,
     },
     emits: ['update'],
     setup(props, { emit }) {
@@ -1105,6 +1172,15 @@ const SectionFieldEditor = defineComponent({
             emit('update', { ...local });
         }
 
+        function onRepeaterMove(key, idx, direction) {
+            const arr = [...(local[key] ?? [])];
+            const target = idx + direction;
+            if (target < 0 || target >= arr.length) return;
+            [arr[idx], arr[target]] = [arr[target], arr[idx]];
+            local[key] = arr;
+            emit('update', { ...local });
+        }
+
         function onRepeaterField(key, idx, fieldKey, val) {
             const arr = [...(local[key] ?? [])];
             arr[idx] = { ...arr[idx], [fieldKey]: val };
@@ -1114,20 +1190,59 @@ const SectionFieldEditor = defineComponent({
 
         return () => h('div', { class: 'space-y-4' }, (props.fields ?? []).map(field => {
             if (field.type === 'repeater') {
-                return h('div', { key: field.key, class: 'space-y-2' }, [
+                return h('div', { key: field.key, class: 'space-y-3 rounded-xl border border-gray-200 bg-gray-50/60 p-3 sm:p-4' }, [
                     h('div', { class: 'flex items-center justify-between' }, [
-                        h('label', { class: 'text-xs font-bold text-gray-700' }, field.label),
+                        h('div', {}, [
+                            h('label', { class: 'text-xs font-bold text-gray-800' }, field.label),
+                            h('p', { class: 'mt-0.5 text-[11px] text-gray-400' }, `${(local[field.key] ?? []).length} item${(local[field.key] ?? []).length === 1 ? '' : 's'}`),
+                        ]),
                         h('button', {
                             type: 'button',
                             onClick: () => onRepeaterAdd(field.key, field.fields),
-                            class: 'text-xs text-sky-600 hover:text-sky-800 font-semibold',
-                        }, '+ Add'),
+                            class: 'rounded-lg border border-sky-200 bg-white px-3 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-50',
+                        }, '+ Add item'),
                     ]),
                     ...(local[field.key] ?? []).map((item, idx) =>
-                        h('div', { key: idx, class: 'border border-gray-200 bg-white rounded-xl p-3 space-y-2' }, [
-                            h('div', { class: 'grid grid-cols-2 gap-2' },
+                        h('div', { key: idx, class: 'border border-gray-200 bg-white rounded-xl p-3 sm:p-4 space-y-3 shadow-sm' }, [
+                            h('div', { class: 'flex items-center justify-between gap-3' }, [
+                                h('span', { class: 'text-xs font-bold text-gray-500' }, `Item ${idx + 1}`),
+                                h('div', { class: 'flex items-center gap-3' }, [
+                                    h('button', {
+                                        type: 'button',
+                                        disabled: idx === 0,
+                                        onClick: () => onRepeaterMove(field.key, idx, -1),
+                                        class: 'text-xs font-bold text-gray-500 disabled:cursor-not-allowed disabled:opacity-30',
+                                        title: 'Move up',
+                                    }, '↑ Up'),
+                                    h('button', {
+                                        type: 'button',
+                                        disabled: idx === (local[field.key] ?? []).length - 1,
+                                        onClick: () => onRepeaterMove(field.key, idx, 1),
+                                        class: 'text-xs font-bold text-gray-500 disabled:cursor-not-allowed disabled:opacity-30',
+                                        title: 'Move down',
+                                    }, '↓ Down'),
+                                    h('button', {
+                                        type: 'button',
+                                        onClick: () => onRepeaterRemove(field.key, idx),
+                                        class: 'text-xs font-bold text-red-500 hover:text-red-700',
+                                    }, 'Remove'),
+                                ]),
+                            ]),
+                            h('div', { class: 'grid grid-cols-1 gap-3 sm:grid-cols-2' },
                                 (field.fields ?? []).map(sub =>
-                                    h('div', { key: sub.key }, [
+                                    sub.type === 'media'
+                                        ? h(ImageUploadField, {
+                                            key: sub.key,
+                                            class: 'sm:col-span-2',
+                                            modelValue: item[sub.key] ?? '',
+                                            label: sub.label,
+                                            required: !!sub.required,
+                                            allowUrl: true,
+                                            upload: props.uploadMedia,
+                                            previewUrl: props.mediaPreview?.(item[sub.key] ?? '') ?? '',
+                                            'onUpdate:modelValue': val => onRepeaterField(field.key, idx, sub.key, val),
+                                        })
+                                        : h('div', { key: sub.key, class: sub.type === 'textarea' ? 'sm:col-span-2' : '' }, [
                                         h('label', { class: 'text-[11px] text-gray-400 font-medium' }, sub.label),
                                         sub.type === 'textarea'
                                             ? h('textarea', {
@@ -1137,7 +1252,12 @@ const SectionFieldEditor = defineComponent({
                                                 class: 'w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-sky-200 focus:outline-none',
                                             })
                                             : h('input', {
-                                                type: sub.type === 'url' ? 'url' : sub.type === 'color' ? 'color' : 'text',
+                                                type: sub.type === 'url' ? 'url'
+                                                    : sub.type === 'color' ? 'color'
+                                                    : sub.type === 'number' ? 'number'
+                                                    : sub.type === 'email' ? 'email'
+                                                    : sub.type === 'tel' ? 'tel'
+                                                    : 'text',
                                                 value: item[sub.key] ?? '',
                                                 onInput: e => onRepeaterField(field.key, idx, sub.key, e.target.value),
                                                 class: 'w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-sky-200 focus:outline-none',
@@ -1145,17 +1265,15 @@ const SectionFieldEditor = defineComponent({
                                     ])
                                 )
                             ),
-                            h('button', {
-                                type: 'button',
-                                onClick: () => onRepeaterRemove(field.key, idx),
-                                class: 'text-xs text-red-400 hover:text-red-600',
-                            }, 'Remove'),
                         ])
                     ),
+                    !(local[field.key] ?? []).length
+                        ? h('p', { class: 'rounded-lg border border-dashed border-gray-200 bg-white px-3 py-4 text-center text-xs text-gray-400' }, 'No items yet. Use “Add item” to create the first one.')
+                        : null,
                 ]);
             }
 
-            if (field.type === 'switch') {
+            if (field.type === 'switch' || field.type === 'checkbox') {
                 return h('label', { key: field.key, class: 'flex items-center gap-3 cursor-pointer' }, [
                     h('input', {
                         type: 'checkbox',
@@ -1165,6 +1283,19 @@ const SectionFieldEditor = defineComponent({
                     }),
                     h('span', { class: 'text-sm font-medium text-gray-700' }, field.label),
                 ]);
+            }
+
+            if (field.type === 'media') {
+                return h(ImageUploadField, {
+                    key: field.key,
+                    modelValue: local[field.key] ?? '',
+                    label: field.label,
+                    required: !!field.required,
+                    allowUrl: true,
+                    upload: props.uploadMedia,
+                    previewUrl: props.mediaPreview?.(local[field.key] ?? '') ?? '',
+                    'onUpdate:modelValue': val => onInput(field.key, val),
+                });
             }
 
             if (field.type === 'textarea' || field.type === 'wysiwyg') {
@@ -1192,6 +1323,22 @@ const SectionFieldEditor = defineComponent({
                 ]);
             }
 
+            if (field.type === 'multiselect') {
+                const selected = Array.isArray(local[field.key]) ? local[field.key] : [];
+                return h('div', { key: field.key }, [
+                    h('label', { class: 'block text-xs font-bold text-gray-700 mb-1.5' }, field.label),
+                    h('select', {
+                        multiple: true,
+                        value: selected,
+                        onChange: e => onInput(field.key, Array.from(e.target.selectedOptions).map(option => option.value)),
+                        class: 'w-full min-h-24 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-sky-200 focus:outline-none bg-white',
+                    }, (field.options ?? []).map(opt =>
+                        h('option', { value: opt.value ?? opt, key: opt.value ?? opt, selected: selected.includes(opt.value ?? opt) }, opt.label ?? opt)
+                    )),
+                    h('p', { class: 'mt-1 text-[11px] text-gray-400' }, 'Hold Ctrl or Command to choose more than one.'),
+                ]);
+            }
+
             if (field.type === 'color') {
                 return h('div', { key: field.key, class: 'flex items-center gap-3' }, [
                     h('label', { class: 'text-xs font-bold text-gray-700 flex-1' }, field.label),
@@ -1212,7 +1359,7 @@ const SectionFieldEditor = defineComponent({
                 ]);
             }
 
-            // Default: text / number / url / email / media
+            // Default: text / number / url / email / telephone
             return h('div', { key: field.key }, [
                 h('label', { class: 'block text-xs font-bold text-gray-700 mb-1.5' }, [
                     field.label,
@@ -1222,6 +1369,7 @@ const SectionFieldEditor = defineComponent({
                     type: field.type === 'number' ? 'number'
                         : field.type === 'url' ? 'url'
                         : field.type === 'email' ? 'email'
+                        : field.type === 'tel' ? 'tel'
                         : 'text',
                     value: local[field.key] ?? field.default ?? '',
                     placeholder: field.placeholder ?? '',

@@ -23,8 +23,8 @@
                 <div class="relative mx-auto w-32 h-32 rounded-full overflow-hidden mb-4 shadow-md ring-4 ring-transparent
                             group-hover:ring-primary/30 transition"
                      style="--tw-ring-color: color-mix(in srgb, var(--color-primary) 30%, transparent)">
-                    @if($member->photo)
-                    <img loading="lazy" src="{{ $member->photo }}" alt="{{ $member->name }}"
+                    @if($member->photo_url)
+                    <img loading="lazy" src="{{ $member->photo_url }}" alt="{{ $member->name }}"
                          class="w-full h-full object-cover">
                     @else
                     <div class="w-full h-full flex items-center justify-center text-white text-3xl font-bold"

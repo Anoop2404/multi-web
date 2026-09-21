@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToCentralTenant;
 use App\Support\AchievementCatalog;
+use App\Support\TenantStorage;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -29,6 +30,8 @@ class Achievement extends Model
         'achieved_at' => 'date',
         'is_system_generated' => 'boolean',
     ];
+
+    protected $appends = ['image_url'];
 
     public function tenant()
     {
@@ -57,5 +60,15 @@ class Achievement extends Model
     public function scopeByAcademicYear($q, string $year)
     {
         return $q->where('academic_year', $year);
+    }
+
+    public function getImageUrlAttribute(): ?string
+    {
+        $tenant = optional(tenancy())->tenant;
+        if (! $tenant || $tenant->id !== $this->tenant_id) {
+            $tenant = Tenant::find($this->tenant_id);
+        }
+
+        return $this->image ? TenantStorage::siteMediaUrl($tenant, $this->image) : null;
     }
 }

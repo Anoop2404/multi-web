@@ -52,14 +52,19 @@
 
 {{-- Sub-Page Main Content Sections --}}
 <div class="subpage-content bg-slate-50 min-h-[60vh]">
-    @php use App\Support\SectionVariantResolver; @endphp
+    @php
+        use App\Support\SectionVariantResolver;
+        use App\Support\SiteSectionMedia;
+    @endphp
     @forelse($sections as $section)
         @php
             [$sectionType, $variant] = SectionVariantResolver::path($section->section_type, $section->variant);
+            $rawConfig = !empty($previewMode) ? ($section->config ?? []) : $section->publicConfig();
+            $resolvedConfig = SiteSectionMedia::resolveConfig($tenant, $sectionType, $variant, $rawConfig);
         @endphp
         <x-site-section-frame :section="$section" :experience="$experience ?? []" :preview-mode="!empty($previewMode)" default-width="wide">
         @includeIf("sections.{$sectionType}.{$variant}", [
-            'config'  => (!empty($previewMode) ? ($section->config ?? []) : $section->publicConfig()),
+            'config'  => $resolvedConfig,
             'section' => $section,
             'tenant'  => $tenant,
             'logo'    => $logo ?? \App\Support\TenantBranding::logoUrl($tenant),

@@ -17,10 +17,10 @@
         <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             @foreach($albums as $i => $album)
             @php
-                $images   = $album->items->pluck('image_path')->values()->all();
+                $images   = $album->items->pluck('image_url')->filter()->values()->all();
                 $captions = $album->items->map(fn ($item) => $item->caption ?: $album->title)->values()->all();
-                if (empty($images) && $album->cover_image) {
-                    $images   = [$album->cover_image];
+                if (empty($images) && $album->cover_url) {
+                    $images   = [$album->cover_url];
                     $captions = [$album->title];
                 }
             @endphp
@@ -32,8 +32,8 @@
                     class="relative rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition text-left w-full"
                     aria-label="View {{ $album->title }} gallery">
                 <div class="{{ $i === 0 ? 'aspect-square' : 'aspect-video' }} overflow-hidden bg-gray-100">
-                    @if($album->cover_image)
-                    <img loading="lazy" src="{{ $album->cover_image }}" alt="{{ $album->title }}"
+                    @if($album->cover_url)
+                    <img loading="lazy" src="{{ $album->cover_url }}" alt="{{ $album->title }}"
                          class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
                     @else
                     <div class="w-full h-full flex items-center justify-center text-gray-300">

@@ -12,6 +12,7 @@ use App\Support\SchoolPublicPageContent;
 use App\Support\SchoolSiteBuilderCatalog;
 use App\Support\SchoolWebsiteTemplateCatalog;
 use App\Support\TenantPublicSite;
+use App\Support\TenantStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -116,6 +117,20 @@ class SiteBuilderApiController extends SchoolAdminController
         $this->school->invalidateCache();
 
         return response()->json(['saved' => true, 'design' => $data]);
+    }
+
+    public function uploadMedia(Request $request): JsonResponse
+    {
+        $request->validate([
+            'file' => 'required|image|mimes:jpeg,jpg,png,webp,gif|max:5120',
+        ]);
+
+        $path = TenantStorage::storeSiteMedia($request->file('file'), $this->school->id);
+
+        return response()->json([
+            'path' => $path,
+            'url' => TenantStorage::siteMediaUrl($this->school, $path),
+        ]);
     }
 
     private function requestSite(Request $request): WebsiteSite

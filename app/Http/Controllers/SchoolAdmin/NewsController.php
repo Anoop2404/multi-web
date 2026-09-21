@@ -32,7 +32,7 @@ class NewsController extends SchoolAdminController
             'category' => 'nullable|string|max:100',
             'is_featured' => 'boolean',
             'published_at' => 'nullable|date',
-            'image' => 'nullable|image|max:4096',
+            'image' => 'nullable|image|mimes:jpeg,jpg,png,webp,gif|max:4096',
         ]);
 
         $data['tenant_id'] = $this->school->id;
@@ -65,7 +65,7 @@ class NewsController extends SchoolAdminController
             'category' => 'nullable|string|max:100',
             'is_featured' => 'boolean',
             'published_at' => 'nullable|date',
-            'image' => 'nullable|image|max:4096',
+            'image' => 'nullable|image|mimes:jpeg,jpg,png,webp,gif|max:4096',
         ]);
 
         if ($request->hasFile('image')) {

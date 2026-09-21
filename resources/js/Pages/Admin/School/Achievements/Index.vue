@@ -44,11 +44,10 @@
                             <label class="form-label mb-1.5">Date Achieved</label>
                             <input v-model="form.achieved_at" type="date" class="field">
                         </div>
-                        <div>
-                            <label class="form-label mb-1.5">Photo / Trophy Image</label>
-                            <input type="file" accept="image/*" @change="form.image = $event.target.files[0]"
-                                   class="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100">
-                        </div>
+                        <ImageUploadField v-model="form.image" label="Photo or trophy image"
+                            :preview-url="editingItem?.image_url || ''" :allow-remove="!editing"
+                            :max-size-mb="4" :error="form.errors.image"
+                            help="JPG, PNG, WebP or GIF · up to 4 MB" />
                         <div class="sm:col-span-2">
                             <label class="form-label mb-1.5">Description</label>
                             <textarea v-model="form.description" rows="3" class="field resize-none"></textarea>
@@ -82,7 +81,7 @@
                         <tr v-for="item in achievements" :key="item.id" class="hover:bg-gray-50">
                             <td class="px-5 py-3">
                                 <div class="flex items-center gap-3">
-                                    <img v-if="item.image" :src="item.image" class="h-10 w-10 object-cover rounded-lg border border-gray-100">
+                                    <img v-if="item.image_url" :src="item.image_url" :alt="item.title" class="h-10 w-10 object-cover rounded-lg border border-gray-100">
                                     <div class="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center text-amber-600 text-lg" v-else>★</div>
                                     <div>
                                         <p class="font-medium text-gray-800">
@@ -126,6 +125,7 @@
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import ImageUploadField from '@/Components/Website/ImageUploadField.vue';
 import { computed, reactive, ref } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import { useConfirm } from '@/composables/useConfirm';
@@ -144,6 +144,7 @@ const categoryOptions = computed(() => Object.entries(props.categories).map(([va
 const levelOptions = computed(() => Object.entries(props.levels).map(([value, label]) => ({ value, label })));
 
 const editing = ref(null);
+const editingItem = computed(() => props.achievements.find(item => item.id === editing.value) ?? null);
 const filterForm = reactive({
     category: props.filters.category || '',
     level: props.filters.level || '',

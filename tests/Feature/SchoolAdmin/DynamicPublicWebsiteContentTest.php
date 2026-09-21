@@ -2,14 +2,21 @@
 
 namespace Tests\Feature\SchoolAdmin;
 
+use App\Models\Achievement;
 use App\Models\Alumni;
+use App\Models\BoardResult;
 use App\Models\Download;
+use App\Models\Event;
 use App\Models\GalleryAlbum;
+use App\Models\GalleryItem;
+use App\Models\NewsArticle;
 use App\Models\SiteForm;
 use App\Models\SiteFormSubmission;
 use App\Models\SiteSection;
+use App\Models\StaffMember;
 use App\Models\Tenant;
 use App\Models\Testimonial;
+use App\Models\Topper;
 use App\Models\User;
 use App\Models\WebsiteSite;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -236,6 +243,104 @@ class DynamicPublicWebsiteContentTest extends TestCase
             ->assertHeader('content-type', 'image/jpeg');
     }
 
+    public function test_section_media_upload_is_previewed_and_rendered_on_the_public_site(): void
+    {
+        Storage::fake('shared');
+        config()->set('filesystems.upload_disk', 'shared');
+
+        $response = $this->actingAs($this->admin)->post(
+            "/school-admin/{$this->school->id}/site-builder/api/media",
+            ['file' => UploadedFile::fake()->image('welcome-hero.jpg', 1600, 900)],
+            ['Accept' => 'application/json'],
+        );
+
+        $response
+            ->assertOk()
+            ->assertJsonStructure(['path', 'url']);
+
+        $path = $response->json('path');
+        $url = $response->json('url');
+
+        Storage::disk('shared')->assertExists($path);
+
+        $this->addPublishedSection('hero', 'full-slider', [
+            'autoplay_seconds' => 6,
+            'height_vh' => '75vh',
+            'slides' => [[
+                'title' => 'A dynamic hero from the CMS',
+                'description' => 'This slide and its image were added from the school dashboard.',
+                'image_path' => $path,
+            ]],
+        ]);
+
+        $this->get('http://dynamic-school.sahodaya.test/')
+            ->assertOk()
+            ->assertSee('A dynamic hero from the CMS')
+            ->assertSee($url, false)
+            ->assertDontSee("background-image: url('{$path}')", false);
+
+        $this->actingAs($this->admin)
+            ->get("/school-admin/{$this->school->id}/site-builder")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('School/SiteBuilder', false)
+                ->where('mediaUrls', fn ($urls) => ($urls[$path] ?? null) === $url));
+
+        $this->actingAs($this->admin)->postJson(
+            "/school-admin/{$this->school->id}/site-builder/api/media",
+            ['file' => UploadedFile::fake()->create('not-an-image.pdf', 20, 'application/pdf')],
+        )->assertUnprocessable()->assertJsonValidationErrors('file');
+    }
+
+    public function test_gallery_batch_upload_displays_every_photo_and_allows_cover_selection(): void
+    {
+        Storage::fake('shared');
+        config()->set('filesystems.upload_disk', 'shared');
+
+        $album = GalleryAlbum::create([
+            'tenant_id' => $this->school->id,
+            'title' => 'Life on Campus',
+            'slug' => 'life-on-campus',
+            'description' => 'A complete album managed by the school.',
+        ]);
+
+        $photos = collect(range(1, 18))
+            ->map(fn (int $number) => UploadedFile::fake()->image("campus-{$number}.jpg", 640, 480))
+            ->all();
+
+        $this->actingAs($this->admin)->post(
+            "/school-admin/{$this->school->id}/gallery/albums/{$album->id}/photos",
+            ['photos' => $photos],
+        )->assertRedirect()->assertSessionHasNoErrors();
+
+        $items = GalleryItem::where('album_id', $album->id)->orderBy('display_order')->get();
+        $this->assertCount(18, $items);
+        $this->assertSame($items->first()->image_path, $album->fresh()->cover_image);
+
+        $selectedCover = $items->last();
+        $this->actingAs($this->admin)->patch(
+            "/school-admin/{$this->school->id}/gallery/albums/{$album->id}/cover/{$selectedCover->id}",
+        )->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame($selectedCover->image_path, $album->fresh()->cover_image);
+
+        $this->actingAs($this->admin)
+            ->get("/school-admin/{$this->school->id}/gallery")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('School/Gallery/Index', false)
+                ->has('albums.0.items', 18)
+                ->where('albums.0.cover_image', $selectedCover->image_path));
+
+        $this->get('http://dynamic-school.sahodaya.test/gallery')
+            ->assertOk()
+            ->assertSee('Life on Campus');
+
+        $this->get('http://dynamic-school.sahodaya.test/gallery/life-on-campus')
+            ->assertOk()
+            ->assertSee("/gallery/photos/{$selectedCover->id}", false);
+    }
+
     public function test_school_admin_can_replace_and_clear_public_contact_widget_and_seo_values(): void
     {
         $this->school->setSetting('widgets', [
@@ -293,6 +398,8 @@ class DynamicPublicWebsiteContentTest extends TestCase
 
     public function test_content_added_in_school_admin_reaches_the_published_website(): void
     {
+        Storage::fake('shared');
+        config()->set('filesystems.upload_disk', 'shared');
         $this->publishAlFarooqueTemplate();
 
         $this->actingAs($this->admin)->post("/school-admin/{$this->school->id}/news", [
@@ -301,6 +408,7 @@ class DynamicPublicWebsiteContentTest extends TestCase
             'category' => 'Campus',
             'is_featured' => true,
             'published_at' => now()->subMinute()->toDateTimeString(),
+            'image' => UploadedFile::fake()->image('science-fair.jpg', 1200, 800),
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $this->actingAs($this->admin)->post("/school-admin/{$this->school->id}/events", [
@@ -308,6 +416,7 @@ class DynamicPublicWebsiteContentTest extends TestCase
             'description' => 'Athletics and team events.',
             'start_date' => now()->addWeek()->toDateString(),
             'venue' => 'School Ground',
+            'image' => UploadedFile::fake()->image('sports-day.jpg', 1200, 800),
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $this->actingAs($this->admin)->post("/school-admin/{$this->school->id}/staff", [
@@ -318,6 +427,7 @@ class DynamicPublicWebsiteContentTest extends TestCase
             'type' => 'teaching',
             'display_order' => 1,
             'is_active' => true,
+            'photo' => UploadedFile::fake()->image('anitha-teacher.jpg', 600, 800),
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $this->actingAs($this->admin)->post("/school-admin/{$this->school->id}/achievements", [
@@ -327,6 +437,7 @@ class DynamicPublicWebsiteContentTest extends TestCase
             'level' => 'district',
             'academic_year' => '2026-27',
             'achieved_at' => now()->toDateString(),
+            'image' => UploadedFile::fake()->image('quiz-champions.jpg', 800, 1000),
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $this->actingAs($this->admin)->post("/school-admin/{$this->school->id}/testimonials", [
@@ -336,26 +447,66 @@ class DynamicPublicWebsiteContentTest extends TestCase
             'rating' => 4,
             'display_order' => 1,
             'is_active' => true,
+            'photo' => UploadedFile::fake()->image('amina-parent.jpg', 500, 500),
         ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $news = NewsArticle::where('tenant_id', $this->school->id)->firstOrFail();
+        $event = Event::where('tenant_id', $this->school->id)->firstOrFail();
+        $staff = StaffMember::where('tenant_id', $this->school->id)->firstOrFail();
+        $achievement = Achievement::where('tenant_id', $this->school->id)->firstOrFail();
+        $testimonial = Testimonial::where('tenant_id', $this->school->id)->firstOrFail();
+
+        $boardResult = BoardResult::create([
+            'tenant_id' => $this->school->id,
+            'class' => 10,
+            'examination_type' => 'AISSE',
+            'academic_year' => '2025-26',
+            'total_appeared' => 60,
+            'pass_count' => 60,
+            'pass_percent' => 100,
+            'distinctions' => 42,
+            'first_class' => 18,
+            'status' => BoardResult::STATUS_PUBLISHED,
+            'published_at' => now(),
+        ]);
+        $topperPath = UploadedFile::fake()->image('school-topper.jpg', 500, 500)
+            ->store("board-results/{$this->school->id}/{$boardResult->id}", 'shared');
+        $topper = Topper::create([
+            'board_result_id' => $boardResult->id,
+            'tenant_id' => $this->school->id,
+            'entry_type' => Topper::ENTRY_OVERALL,
+            'name' => 'Nihal School Topper',
+            'photo' => $topperPath,
+            'percentage' => 98.6,
+            'rank' => 1,
+        ]);
 
         $this->get('http://dynamic-school.sahodaya.test/')
             ->assertOk()
             ->assertSee('Science Fair Winners')
+            ->assertSee($news->image_url, false)
             ->assertSee('Anitha Teacher')
+            ->assertSee($staff->photo_url, false)
             ->assertSee('District Quiz Champions')
+            ->assertSee($achievement->image_url, false)
             ->assertSee('Amina Parent')
+            ->assertSee($testimonial->photo_url, false)
+            ->assertSee('Nihal School Topper')
+            ->assertSee($topper->photo_url, false)
             ->assertSee('The teachers communicate clearly and care for every child.')
             ->assertDontSee('Our child has grown so much in confidence');
 
         $this->get('http://dynamic-school.sahodaya.test/events')
             ->assertOk()
             ->assertSee('Annual Sports Day')
+            ->assertSee($event->image_url, false)
             ->assertSee('School Ground');
 
         $this->get('http://dynamic-school.sahodaya.test/faculty')
             ->assertOk()
             ->assertSee('Anitha Teacher')
             ->assertSee('Science Teacher')
+            ->assertSee($staff->photo_url, false)
             ->assertSee('href="/faculty"', false);
 
         $this->get('http://dynamic-school.sahodaya.test/about')
@@ -363,7 +514,6 @@ class DynamicPublicWebsiteContentTest extends TestCase
             ->assertSee('id="principal-message"', false)
             ->assertSee('id="facilities"', false);
 
-        $testimonial = Testimonial::where('tenant_id', $this->school->id)->firstOrFail();
         $this->actingAs($this->admin)->put("/school-admin/{$this->school->id}/testimonials/{$testimonial->id}", [
             'name' => 'Amina Parent',
             'designation' => 'Class VII Parent',

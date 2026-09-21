@@ -31,7 +31,7 @@ class EventController extends SchoolAdminController
             'start_date' => 'required|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'venue' => 'nullable|string|max:255',
-            'image' => 'nullable|image|max:4096',
+            'image' => 'nullable|image|mimes:jpeg,jpg,png,webp,gif|max:4096',
         ]);
 
         $data['tenant_id'] = $this->school->id;
@@ -63,7 +63,7 @@ class EventController extends SchoolAdminController
             'start_date' => 'required|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'venue' => 'nullable|string|max:255',
-            'image' => 'nullable|image|max:4096',
+            'image' => 'nullable|image|mimes:jpeg,jpg,png,webp,gif|max:4096',
         ]);
 
         if ($request->hasFile('image')) {

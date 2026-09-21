@@ -25,20 +25,20 @@ class StaffController extends SchoolAdminController
     public function store(Request $request)
     {
         $data = $request->validate([
-            'name'          => 'required|string|max:255',
-            'designation'   => 'required|string|max:255',
-            'department'    => 'nullable|string|max:255',
+            'name' => 'required|string|max:255',
+            'designation' => 'required|string|max:255',
+            'department' => 'nullable|string|max:255',
             'qualification' => 'nullable|string|max:255',
-            'type'          => 'required|in:teaching,non-teaching,admin',
+            'type' => 'required|in:teaching,non-teaching,admin',
             'display_order' => 'integer',
-            'is_active'     => 'boolean',
-            'photo'         => 'nullable|image|max:2048',
+            'is_active' => 'boolean',
+            'photo' => 'nullable|image|mimes:jpeg,jpg,png,webp,gif|max:2048',
         ]);
 
         $data['tenant_id'] = $this->school->id;
 
         if ($request->hasFile('photo')) {
-            $data['photo'] = $request->file('photo')->store('staff/' . $this->school->id, \App\Support\TenantStorage::uploadDisk());
+            $data['photo'] = $request->file('photo')->store('staff/'.$this->school->id, TenantStorage::uploadDisk());
         }
 
         StaffMember::create($data);
@@ -49,6 +49,7 @@ class StaffController extends SchoolAdminController
     public function edit(string $tenantId, StaffMember $staff)
     {
         abort_if($staff->tenant_id !== $this->school->id, 403);
+
         return $this->inertia('School/Staff/Edit', compact('staff'));
     }
 
@@ -57,18 +58,18 @@ class StaffController extends SchoolAdminController
         abort_if($staff->tenant_id !== $this->school->id, 403);
 
         $data = $request->validate([
-            'name'          => 'required|string|max:255',
-            'designation'   => 'required|string|max:255',
-            'department'    => 'nullable|string|max:255',
+            'name' => 'required|string|max:255',
+            'designation' => 'required|string|max:255',
+            'department' => 'nullable|string|max:255',
             'qualification' => 'nullable|string|max:255',
-            'type'          => 'required|in:teaching,non-teaching,admin',
+            'type' => 'required|in:teaching,non-teaching,admin',
             'display_order' => 'integer',
-            'is_active'     => 'boolean',
-            'photo'         => 'nullable|image|max:2048',
+            'is_active' => 'boolean',
+            'photo' => 'nullable|image|mimes:jpeg,jpg,png,webp,gif|max:2048',
         ]);
 
         if ($request->hasFile('photo')) {
-            $data['photo'] = $request->file('photo')->store('staff/' . $this->school->id, \App\Support\TenantStorage::uploadDisk());
+            $data['photo'] = $request->file('photo')->store('staff/'.$this->school->id, TenantStorage::uploadDisk());
         }
 
         $staff->update($data);
@@ -80,6 +81,7 @@ class StaffController extends SchoolAdminController
     {
         abort_if($staff->tenant_id !== $this->school->id, 403);
         $staff->delete();
+
         return back()->with('success', 'Staff member removed.');
     }
 }

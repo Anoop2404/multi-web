@@ -126,7 +126,7 @@ class AchievementController extends SchoolAdminController
             'level' => ['nullable', 'string', Rule::in(AchievementCatalog::levelKeys())],
             'academic_year' => 'nullable|string|max:20',
             'achieved_at' => 'nullable|date',
-            'image' => 'nullable|image|max:4096',
+            'image' => 'nullable|image|mimes:jpeg,jpg,png,webp,gif|max:4096',
         ]);
 
         $data['category'] = AchievementCatalog::normalizeCategory($data['category'] ?? null);
