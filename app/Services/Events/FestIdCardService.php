@@ -201,6 +201,9 @@ class FestIdCardService
             return [];
         }
 
+        $sahodaya = Tenant::with('sahodayaProfile')->find($event->tenant_id);
+        $prefix = $sahodaya?->sahodayaProfile?->prefix;
+
         $schools = Tenant::whereIn('id', $rows->pluck('school_id')->unique())
             ->get()
             ->keyBy('id');
@@ -212,10 +215,19 @@ class FestIdCardService
             $school = $schools->get($schoolId);
             $count = $participants->count();
 
+            $code = null;
+            if ($school) {
+                if ($prefix && $school->school_no) {
+                    $code = $prefix.'-'.str_pad((string) $school->school_no, 3, '0', STR_PAD_LEFT);
+                } else {
+                    $code = $school->schoolCode();
+                }
+            }
+
             $summaries[] = [
                 'school_id'         => (string) $schoolId,
                 'school_name'       => $school?->name ?? 'School',
-                'school_code'       => $school?->schoolCode(),
+                'school_code'       => $code,
                 'participant_count' => $count,
                 'page_count'        => (int) ceil($count / max(1, $perPage)),
             ];
