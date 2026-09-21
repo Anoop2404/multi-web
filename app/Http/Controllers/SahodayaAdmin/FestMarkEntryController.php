@@ -1766,13 +1766,24 @@ class FestMarkEntryController extends SahodayaAdminController
         ], fn ($v) => $v !== null && $v !== '');
 
         // Keyed by type (not a plain list) so a file FPDI can't actually import --
-        // possible even after a 200 response, e.g. an external PDF-converter hiccup that
-        // returns an HTML error page instead of real PDF bytes -- can be reported against
-        // exactly which report type produced it, not just "something in the merge failed".
+        // possible even after a 200 response -- can be reported against exactly which
+        // report type produced it, not just "something in the merge failed".
         $pdfBytesByType = [];
 
         foreach ($types as $type) {
             $extra = in_array($type, ['judge_sheet_no_chest', 'sum_sheet_no_chest'], true) ? ['blank_chest' => 1] : [];
+            // attendance_sheet/timesheet go through FestReportService::export(), whose
+            // $this->preview defaults to true unless download=1 is explicitly set (see
+            // its own docblock) -- and attendanceSheetPdf()/timesheetPdf() BOTH return
+            // raw HTML (Content-Type: text/html) instead of a PDF at all when in preview
+            // mode, meant for this same page's own on-screen preview panel. Without this,
+            // every merge silently fed FPDI an HTML page instead of a PDF for these two
+            // types -- confirmed live in production ("Unable to find PDF file header").
+            // The OTHER bulk buttons on this same page already knew to add this; the
+            // combo/merge path just hadn't been taught the same thing.
+            if (in_array($type, ['attendance_sheet', 'timesheet'], true)) {
+                $extra['download'] = 1;
+            }
             $subRequest = $request->duplicate($baseParams + $extra);
 
             try {

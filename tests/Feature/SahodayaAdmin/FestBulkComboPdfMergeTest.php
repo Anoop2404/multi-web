@@ -97,6 +97,31 @@ class FestBulkComboPdfMergeTest extends TestCase
         $this->assertGreaterThanOrEqual(3, $pageCount);
     }
 
+    /**
+     * Regression test for a real production bug: attendance_sheet/timesheet go through
+     * FestReportService::export(), whose $this->preview defaults to true unless
+     * download=1 is explicitly set -- and both attendanceSheetPdf()/timesheetPdf()
+     * return raw HTML (not a PDF at all) when in preview mode. bulkComboPdf() wasn't
+     * adding download=1 for these two types, so they silently produced an HTML page
+     * that FPDI couldn't import ("Unable to find PDF file header") and got skipped
+     * from every merge that included them.
+     */
+    public function test_attendance_sheet_and_timesheet_actually_produce_real_pdf_pages(): void
+    {
+        [$sahodaya, $event, $admin, $item] = $this->fixture();
+
+        $response = $this->actingAs($admin)->get($this->comboUrl($sahodaya, $event, [
+            'report_types' => ['attendance_sheet', 'timesheet'],
+            'item_ids' => (string) $item->id,
+        ]));
+
+        $response->assertOk();
+        $this->assertStringStartsWith('%PDF', $response->getContent());
+        // Both types actually contributed pages -- if either had silently come back as
+        // HTML instead of a PDF, this would read "1-reports-merged" instead of 2.
+        $this->assertStringContainsString('2-reports-merged', urldecode($response->headers->get('content-disposition')));
+    }
+
     public function test_skips_a_type_with_nothing_to_include_instead_of_failing_the_whole_merge(): void
     {
         [$sahodaya, $event, $admin, $item] = $this->fixture();
