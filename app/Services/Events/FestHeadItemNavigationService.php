@@ -189,7 +189,7 @@ class FestHeadItemNavigationService
                 ->with('phase:id,source_phase_id')
                 ->orderBy('display_order')
                 ->orderBy('title')
-                ->get(['id', 'title', 'item_code', 'head_id', 'chest_no_start', 'item_reg_id_start', 'stage_type', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'competition_time', 'results_published_at', 'class_group', 'category', 'age_group', 'phase_id']),
+                ->get(['id', 'title', 'item_code', 'head_id', 'chest_no_start', 'item_reg_id_start', 'stage_type', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'competition_time', 'results_published_at', 'class_group', 'category', 'age_group', 'phase_id', 'participant_type', 'gender']),
             $event,
         );
 
