@@ -81,7 +81,9 @@ class PdfGenerator
             }
 
             try {
-                $response = Http::timeout((int) config('services.pdf_converter.timeout', 30))->post($url, $payload);
+                $response = Http::connectTimeout(3)
+                    ->timeout((int) config('services.pdf_converter.timeout', 30))
+                    ->post($url, $payload);
 
                 if ($response->successful()) {
                     if ($inline) {
@@ -183,13 +185,19 @@ class PdfGenerator
                 $payload['footerTemplate'] = $footerTemplate ?? '<span></span>';
             }
 
-            $response = Http::timeout((int) config('services.pdf_converter.timeout', 300))->post($url, $payload);
+            try {
+                $response = Http::connectTimeout(3)
+                    ->timeout((int) config('services.pdf_converter.timeout', 300))
+                    ->post($url, $payload);
 
-            if ($response->successful()) {
-                return $response->body();
+                if ($response->successful()) {
+                    return $response->body();
+                }
+
+                \Illuminate\Support\Facades\Log::warning('External PDF generation failed with status ' . $response->status() . ', falling back to DomPDF');
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('External PDF render failed, falling back to DomPDF: ' . $e->getMessage());
             }
-
-            throw new \Exception("External PDF generation failed: " . $response->status() . " - " . $response->body());
         }
 
         // Fallback to DomPDF

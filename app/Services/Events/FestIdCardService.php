@@ -393,7 +393,7 @@ class FestIdCardService
             return [];
         }
 
-        $schedules = $this->schedulesForParticipants($event, $participants->pluck('id'));
+        $includeDataUris = (bool) ($filters['include_data_uris'] ?? false);
 
         return $participants
             ->groupBy(function (FestParticipant $p) {
@@ -402,7 +402,7 @@ class FestIdCardService
 
                 return $head.':'.$entity;
             })
-            ->map(function ($group) use ($event, $schedules) {
+            ->map(function ($group) use ($event, $schedules, $includeDataUris) {
                 /** @var \Illuminate\Support\Collection<int, FestParticipant> $group */
                 $lead = $group->sortBy('id')->first();
                 $head = $lead->registration?->item?->head;
@@ -421,7 +421,7 @@ class FestIdCardService
                     ->sortBy(fn (?FestSchedule $s) => $s?->scheduled_at?->timestamp ?? PHP_INT_MAX)
                     ->first();
 
-                $card = $this->participantCard($event, $lead, $schedule);
+                $card = $this->participantCard($event, $lead, $schedule, $includeDataUris);
                 $entityKey = $lead->student_id ? 's'.$lead->student_id : 't'.$lead->teacher_id;
 
                 $cleanItems = array_map(fn ($i) => $this->titleCase(str_replace('_', ' ', $i)), $items);
@@ -494,12 +494,13 @@ class FestIdCardService
             $query->where('student_id', (int) $filters['student_id']);
         }
 
+        $includeDataUris = (bool) ($filters['include_data_uris'] ?? false);
         $participants = $query->orderBy('id')->get();
         $schedules = $this->schedulesForParticipants($event, $participants->pluck('id'));
 
         return $participants
             ->groupBy(fn (FestParticipant $p) => $p->student_id ? 's:'.$p->student_id : 't:'.$p->teacher_id)
-            ->map(function ($group) use ($event, $schedules) {
+            ->map(function ($group) use ($event, $schedules, $includeDataUris) {
                 /** @var \Illuminate\Support\Collection<int, FestParticipant> $group */
                 $lead = $group->sortBy('id')->first();
                 $items = $group
@@ -518,7 +519,7 @@ class FestIdCardService
                     ->sortBy(fn (?FestSchedule $s) => $s?->scheduled_at?->timestamp ?? PHP_INT_MAX)
                     ->first();
 
-                $card = $this->participantCard($event, $lead, $schedule);
+                $card = $this->participantCard($event, $lead, $schedule, $includeDataUris);
                 $entityKey = $lead->student_id ? 's'.$lead->student_id : 't'.$lead->teacher_id;
 
                 return $this->withItemRows(array_merge($card, [

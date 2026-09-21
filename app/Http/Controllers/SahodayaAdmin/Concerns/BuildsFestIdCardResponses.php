@@ -78,7 +78,9 @@ trait BuildsFestIdCardResponses
 
         return array_merge($base, [
             'backgroundUrl' => $customTemplate->background_path
-                ? TenantStorage::logoUrl($sahodaya, $customTemplate->background_path)
+                ? ($isPdf
+                    ? (TenantStorage::photoBase64DataUri($sahodaya, $customTemplate->background_path, 1600) ?: TenantStorage::logoUrl($sahodaya, $customTemplate->background_path))
+                    : TenantStorage::logoUrl($sahodaya, $customTemplate->background_path))
                 : null,
             'fields'        => $customTemplate->fields(),
             'cardWidthMm'   => $customTemplate->card_width_mm,

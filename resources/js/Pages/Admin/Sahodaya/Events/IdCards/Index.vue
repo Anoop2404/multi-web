@@ -179,13 +179,13 @@
                 <div v-if="audience === 'head' || audience === 'participant'" class="card space-y-3">
                     <h3 class="section-title text-sm">Bulk downloads</h3>
                     <p class="text-xs text-slate-500">Generate bulk PDFs in the active template / die-cut layout. Each school starts on a separate page so sheets can be handed out cleanly.</p>
-                    <a :href="`${base}/pdf-all-schools?template=${cardTemplate}&scope=${filters.scope || 'event'}`" class="btn-primary w-full text-sm text-center block !bg-indigo-700 hover:!bg-indigo-800 text-white font-semibold">
+                    <a :href="`${base}/pdf-all-schools?audience=student&template=${cardTemplate}&scope=${filters.scope || 'event'}`" class="btn-primary w-full text-sm text-center block !bg-indigo-700 hover:!bg-indigo-800 text-white font-semibold">
                         All schools (die / separate pages) PDF ↓
                     </a>
-                    <a :href="`${base}/pdf-all-items?template=${cardTemplate}`" class="btn-secondary w-full text-sm text-center block">
+                    <a :href="`${base}/pdf-all-items?audience=student&template=${cardTemplate}`" class="btn-secondary w-full text-sm text-center block">
                         All items — one PDF ↓
                     </a>
-                    <a :href="`${base}/pdf-all-heads?template=${cardTemplate}`" class="btn-secondary w-full text-sm text-center block">
+                    <a :href="`${base}/pdf-all-heads?audience=student&template=${cardTemplate}`" class="btn-secondary w-full text-sm text-center block">
                         All heads — one PDF ↓
                     </a>
                 </div>

@@ -157,8 +157,8 @@ class FestIdCardController extends SahodayaAdminController
 
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $data = $this->validated($request);
-        abort_unless($data['audience'] === 'student', 422, 'Bulk item PDF is available for student cards only.');
+        $audience = $request->input('audience', 'student');
+        abort_unless($audience === 'student', 422, 'Bulk item PDF is available for student cards only.');
 
         $filters = $this->idCardFilters($request);
         $filters['include_data_uris'] = true;
@@ -209,8 +209,8 @@ class FestIdCardController extends SahodayaAdminController
 
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $data = $this->validated($request);
-        abort_unless($data['audience'] === 'student', 422, 'Bulk head PDF is available for student cards only.');
+        $audience = $request->input('audience', 'student');
+        abort_unless($audience === 'student', 422, 'Bulk head PDF is available for student cards only.');
 
         $filters = $this->idCardFilters($request);
         $filters['include_data_uris'] = true;
@@ -266,8 +266,8 @@ class FestIdCardController extends SahodayaAdminController
 
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $data = $this->validated($request);
-        abort_unless($data['audience'] === 'student', 422, 'Bulk school PDF is available for student cards only.');
+        $audience = $request->input('audience', 'student');
+        abort_unless($audience === 'student', 422, 'Bulk school PDF is available for student cards only.');
 
         $filters = $this->idCardFilters($request);
         $filters['include_data_uris'] = true;
