@@ -8,6 +8,7 @@ use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestPageActivity;
+use App\Support\TenantStorage;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\FestIdCardService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -410,7 +411,7 @@ class FestIdCardController extends SahodayaAdminController
             'perPage'             => $perPage,
             'activeTemplate'      => $customTemplate ? [
                 'id'             => $customTemplate->id,
-                'name'           => $customTemplate->name,
+                'name'           => $customTemplate->title ?? 'Custom Template',
                 'card_width_mm'  => $customTemplate->card_width_mm,
                 'card_height_mm' => $customTemplate->card_height_mm,
                 'page_width_mm'  => $customTemplate->page_width_mm,

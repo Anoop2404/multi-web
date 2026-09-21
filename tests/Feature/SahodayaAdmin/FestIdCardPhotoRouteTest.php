@@ -189,6 +189,41 @@ class FestIdCardPhotoRouteTest extends TestCase
         );
     }
 
+    public function test_die_generator_renders_with_active_custom_template(): void
+    {
+        \App\Models\IdCardTemplate::create([
+            'tenant_id' => $this->sahodaya->id,
+            'event_id' => $this->event->id,
+            'title' => 'Die Cut 4-up',
+            'audience' => 'student',
+            'is_active' => true,
+            'background_path' => 'templates/die-bg.jpg',
+            'card_width_mm' => 96,
+            'card_height_mm' => 72,
+            'page_width_mm' => 297,
+            'page_height_mm' => 210,
+            'grid_json' => [
+                'cols' => 2,
+                'rows' => 2,
+                'left_margin_mm' => 10,
+                'top_margin_mm' => 10,
+                'col_pitch_mm' => 140,
+                'row_pitch_mm' => 95,
+            ],
+            'fields_json' => [],
+        ]);
+
+        $response = $this->actingAs($this->sahodayaAdmin)->get(
+            "/sahodaya-admin/{$this->sahodaya->id}/events/{$this->event->id}/id-cards/die"
+        );
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Sahodaya/Events/IdCards/DieGenerator', false)
+            ->where('activeTemplate.name', 'Die Cut 4-up')
+        );
+    }
+
     public function test_pdf_die_downloads_single_school_pdf(): void
     {
         $response = $this->actingAs($this->sahodayaAdmin)->get(
