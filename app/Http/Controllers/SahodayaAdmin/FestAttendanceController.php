@@ -46,9 +46,26 @@ class FestAttendanceController extends SahodayaAdminController
         // child events — filtering by event_id alone returns nothing.
         $eventIds = $event->reportableEventIds();
 
+        // Same ?item_id= convention Results/Chest Numbers/Marks already read -- lets
+        // EventSubNav/SportsSetupSubNav carry the currently-open item across tabs
+        // instead of this page always defaulting back to the first item in the list.
+        // Defaulting to the first item here (not null) is what makes the query below
+        // possible to scope at all -- the page only ever shows one item's roster at a
+        // time (see Attendance.vue's itemFilter, which defaults the exact same way),
+        // so there was never a real "every participant in the whole event" view to
+        // preserve; that was just this query's own unscoped default.
+        $itemId = $request->integer('item_id') ?: $event->items->first()?->id;
+
+        // reportableItemIds() expands one item id to its full phase/region clone
+        // family (inherited_from_item_id + matching item_code) -- the same resolution
+        // Attendance.vue's own client-side filter (regItemId/inheritedId) already did
+        // against the unscoped list this query used to send it.
+        $reportableItemIds = $itemId ? $event->reportableItemIds([$itemId]) : [];
+
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
             ->whereIn('event_id', $eventIds)
             ->whereNotIn('status', ['rejected', 'withdrawn'])
+            ->when($reportableItemIds !== [], fn ($q2) => $q2->whereIn('item_id', $reportableItemIds))
             ->whereHas('item', fn ($itemQuery) => $itemQuery->where('is_enabled', true)))
             // Exclude unfilled standby slots and any row with no actual person
             // attached (student_id/teacher_id both null) — these aren't real
@@ -60,14 +77,26 @@ class FestAttendanceController extends SahodayaAdminController
 
         foreach ($participants as $participant) {
             if ($participant->student) {
+                // publicPhotoUrl() -- a stable, browser/CDN-cacheable direct S3 URL (or a
+                // 30-day-cached base64 fallback when S3 isn't configured) -- instead of
+                // sahodayaPhotoUrl(), which points at showPhoto() (TenantStorage::
+                // downloadResponse()): a live, uncached S3 existence-check-then-stream on
+                // every single request, no caching at all. That was firing once per row on
+                // every page load (up to dozens at once) and was the main reason this page
+                // was slow to open -- confirmed live: a single photo request alone visibly
+                // hung the tab.
                 $participant->student->setAttribute(
                     'photo_url',
-                    $participant->student->sahodayaPhotoUrl($this->sahodaya->id),
+                    $participant->student->publicPhotoUrl(),
                 );
             }
         }
 
+        // Scoped to this same item family -- previously every attendance row for the
+        // whole event/phase (every item, not just the one being viewed) was fetched on
+        // every single load, the single biggest reason this page was slow to open.
         $attendance = FestAttendance::whereIn('event_id', $eventIds)
+            ->when($reportableItemIds !== [], fn ($q) => $q->whereIn('item_id', $reportableItemIds))
             ->get()
             ->keyBy(fn ($a) => $a->item_id.'-'.$a->participant_id);
 
@@ -81,11 +110,6 @@ class FestAttendanceController extends SahodayaAdminController
             ->all();
 
         $childEvents = $this->scopedChildEventOptions($event);
-
-        // Same ?item_id= convention Results/Chest Numbers/Marks already read -- lets
-        // EventSubNav/SportsSetupSubNav carry the currently-open item across tabs
-        // instead of this page always defaulting back to the first item in the list.
-        $itemId = $request->integer('item_id') ?: null;
 
         return $this->inertia('Sahodaya/Events/Attendance', $this->withEventActivity($event, FestPageActivity::ATTENDANCE, [
             'event' => $event,
