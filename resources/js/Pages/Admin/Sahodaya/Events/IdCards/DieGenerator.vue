@@ -165,11 +165,35 @@
                             <span>{{ activeTemplate ? `${activeTemplate.page_width_mm || 297} × ${activeTemplate.page_height_mm || 210} mm` : 'A4 Landscape (297 × 210 mm)' }}</span>
                         </div>
 
-                        <!-- The A4 Sheet Box (2x2 Grid) -->
+                        <!-- The A4 Sheet Box (Dynamic Grid) -->
                         <div class="w-full bg-white rounded shadow-md border border-slate-200 p-4 transition-all"
                              :style="{ minHeight: '400px' }">
                             <div v-if="loadingPreview" class="py-24 text-center text-sm text-slate-400">
                                 Loading cards for selected school…
+                            </div>
+                            <div v-else-if="activeSheetCards.length && activeTemplate">
+                                <div :class="gridColsClass">
+                                    <div v-for="slotIndex in perPage" :key="slotIndex" class="relative group">
+                                        <div class="absolute -top-2 -left-2 z-20 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-600 text-white shadow">
+                                            Slot {{ slotIndex }}
+                                        </div>
+                                        <IdCardLiveCanvas
+                                            v-if="activeSheetCards[slotIndex - 1]"
+                                            :card="activeSheetCards[slotIndex - 1]"
+                                            :background-url="activeTemplate.background_url"
+                                            :fields="activeTemplate.fields"
+                                            :card-width-mm="activeTemplate.card_width_mm"
+                                            :card-height-mm="activeTemplate.card_height_mm"
+                                            :hide-footer="true"
+                                        />
+                                        <div v-else class="relative w-full rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/70 select-none overflow-hidden"
+                                             :style="{ paddingBottom: `${((Number(activeTemplate.card_height_mm) || 72) / (Number(activeTemplate.card_width_mm) || 96)) * 100}%` }">
+                                            <div class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 p-2 text-center">
+                                                <span class="text-[11px] font-medium text-slate-400">Empty Slot {{ slotIndex }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div v-else-if="activeSheetCards.length"
                                  class="grid sm:grid-cols-2 gap-4">
@@ -273,6 +297,7 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import IdCardPreviewTile from '@/Components/fest/IdCardPreviewTile.vue';
+import IdCardLiveCanvas from '@/Components/idcards/IdCardLiveCanvas.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
@@ -379,8 +404,23 @@ function schoolDownloadUrl(schoolId) {
     return `${base}/die/pdf?school_id=${encodeURIComponent(schoolId)}`;
 }
 
+const gridColsClass = computed(() => {
+    const cols = props.activeTemplate?.grid_layout?.cols || (props.perPage >= 6 ? (props.perPage === 6 ? 3 : 5) : 2);
+    if (cols >= 5) {
+        return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3';
+    }
+    if (cols === 4) {
+        return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3';
+    }
+    if (cols === 3) {
+        return 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4';
+    }
+    return 'grid sm:grid-cols-2 gap-4';
+});
+
 const fullHtmlPreviewUrl = computed(() => {
     const schoolParam = selectedSchoolId.value ? `&school_id=${encodeURIComponent(selectedSchoolId.value)}` : '';
-    return `${base}/preview?template=pass&scope=event${schoolParam}`;
+    const templateParam = props.activeTemplate ? '' : '&template=pass';
+    return `${base}/preview?audience=student&scope=event${templateParam}${schoolParam}`;
 });
 </script>

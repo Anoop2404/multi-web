@@ -332,7 +332,7 @@ class FestIdCardController extends SahodayaAdminController
         $filters['include_data_uris'] = false;
 
         $gridLayout = $customTemplate?->gridLayout();
-        $perPage = $gridLayout ? ($gridLayout['cols'] * $gridLayout['rows']) : 4;
+        $perPage = $gridLayout ? ($gridLayout['cols'] * $gridLayout['rows']) : ($customTemplate?->cards_per_page ?: 4);
 
         $schoolList = $service->schoolParticipantSummaries($targetEvent, $filters, $perPage);
 

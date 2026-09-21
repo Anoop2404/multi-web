@@ -118,26 +118,38 @@ class IdCardTemplate extends Model
             return null;
         }
 
-        $required = ['cols', 'rows', 'first_col_center_mm', 'first_row_center_mm', 'col_pitch_mm', 'row_pitch_mm'];
-        foreach ($required as $key) {
-            if (! isset($g[$key]) || ! is_numeric($g[$key])) {
-                return null;
-            }
-        }
-
-        $cols = (int) $g['cols'];
-        $rows = (int) $g['rows'];
+        $cols = isset($g['cols']) && is_numeric($g['cols']) ? (int) $g['cols'] : 0;
+        $rows = isset($g['rows']) && is_numeric($g['rows']) ? (int) $g['rows'] : 0;
         if ($cols < 1 || $rows < 1) {
             return null;
         }
 
+        $pageW = (float) ($this->page_width_mm ?: 297);
+        $pageH = (float) ($this->page_height_mm ?: 210);
+
+        $colPitch = isset($g['col_pitch_mm']) && is_numeric($g['col_pitch_mm'])
+            ? (float) $g['col_pitch_mm']
+            : ($pageW / $cols);
+
+        $rowPitch = isset($g['row_pitch_mm']) && is_numeric($g['row_pitch_mm'])
+            ? (float) $g['row_pitch_mm']
+            : ($pageH / $rows);
+
+        $firstColCenter = isset($g['first_col_center_mm']) && is_numeric($g['first_col_center_mm'])
+            ? (float) $g['first_col_center_mm']
+            : ($colPitch / 2);
+
+        $firstRowCenter = isset($g['first_row_center_mm']) && is_numeric($g['first_row_center_mm'])
+            ? (float) $g['first_row_center_mm']
+            : ($rowPitch / 2);
+
         return [
             'cols'                 => $cols,
             'rows'                 => $rows,
-            'first_col_center_mm'  => (float) $g['first_col_center_mm'],
-            'first_row_center_mm'  => (float) $g['first_row_center_mm'],
-            'col_pitch_mm'         => (float) $g['col_pitch_mm'],
-            'row_pitch_mm'         => (float) $g['row_pitch_mm'],
+            'first_col_center_mm'  => $firstColCenter,
+            'first_row_center_mm'  => $firstRowCenter,
+            'col_pitch_mm'         => $colPitch,
+            'row_pitch_mm'         => $rowPitch,
         ];
     }
 

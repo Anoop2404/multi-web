@@ -11,6 +11,15 @@
             $type = $field['type'] ?? 'text';
             $source = $field['source'] ?? $field['key'] ?? null;
             $value = $source ? ($card[$source] ?? null) : null;
+            if ($value === null || $value === '') {
+                if ($source === 'subtitle') {
+                    $value = $card['school_name'] ?? null;
+                } elseif ($source === 'id_number') {
+                    $value = $card['roll_no'] ?? $card['student_seq_id'] ?? null;
+                } elseif ($source === 'student_id') {
+                    $value = $card['student_reg_no'] ?? null;
+                }
+            }
             if ($type === 'text' && !empty($field['text_format'])) {
                 $value = preg_replace_callback('/\{([a-zA-Z0-9_]+)\}/', function (array $matches) use ($card) {
                     $replacement = $card[$matches[1]] ?? '';
@@ -21,13 +30,15 @@
         @endphp
 
         @if($type === 'photo')
-            @if(!empty($value))
-                <img src="{{ $value }}" alt="" class="card__photo"
+            @php $photoVal = $value ?: ($card['photo_src'] ?? $card['photo_url'] ?? null); @endphp
+            @if(!empty($photoVal))
+                <img src="{{ $photoVal }}" alt="" class="card__photo"
                      style="top:{{ $field['top'] ?? 8 }}%;left:{{ $field['left'] ?? 4 }}%;width:{{ $field['width'] ?? 22 }}%;height:{{ $field['height'] ?? 26 }}%;@if(!empty($field['rotation'])) transform:rotate({{ (float) $field['rotation'] }}deg);transform-origin:center center;@endif">
             @endif
         @elseif($type === 'qr')
-            @if(!empty($value))
-                <img src="{{ $value }}" alt="" class="card__qr"
+            @php $qrVal = $value ?: ($card['qr_src'] ?? null); @endphp
+            @if(!empty($qrVal))
+                <img src="{{ $qrVal }}" alt="" class="card__qr"
                      style="top:{{ $field['top'] ?? 4 }}%;left:{{ $field['left'] ?? 82 }}%;width:{{ $field['width'] ?? 14 }}%;height:{{ $field['height'] ?? 14 }}%;@if(!empty($field['rotation'])) transform:rotate({{ (float) $field['rotation'] }}deg);transform-origin:center center;@endif">
             @endif
         @elseif($type === 'item_list')
