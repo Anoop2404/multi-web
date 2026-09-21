@@ -705,6 +705,11 @@ class FestIdCardService
         $pureCategory = $ageGroupLabel ?: ($classCategory ?: ($studentClass ? "Class {$studentClass}" : null));
         $itemTitleClean = ($item !== '—' && $item) ? str_replace('_', ' ', $item) : null;
         $categoryDisplay = $pureCategory ? str_replace('_', ' ', $pureCategory) : ($itemTitleClean ?: '—');
+        // ID cards print category numbers as roman numerals ("Category 2" -> "Category
+        // II"), matching how certificates already show class/category numbers — see
+        // FestCertificateService::toRomanIfNumeric(). Only the trailing number is
+        // converted, so non-numeric labels ("Sub Junior") pass through unchanged.
+        $categoryDisplay = $this->numeralizeTrailingNumber($categoryDisplay);
 
         $rawGender = strtolower((string) ($p->student?->gender ?? $p->teacher?->gender ?? ''));
         $gender = match (true) {
@@ -1304,12 +1309,49 @@ class FestIdCardService
         ];
     }
 
+    /**
+     * Converts a trailing plain number in a label to roman numerals ("Category 2" ->
+     * "Category II"); labels with no trailing number, or a non-numeric one, pass
+     * through unchanged.
+     */
+    private function numeralizeTrailingNumber(string $value): string
+    {
+        return preg_replace_callback('/(\d+)\s*$/', function (array $m): string {
+            return $this->toRomanNumeral((int) $m[1]) ?? $m[1];
+        }, $value);
+    }
+
+    private function toRomanNumeral(int $number): ?string
+    {
+        if ($number <= 0 || $number > 3999) {
+            return null;
+        }
+
+        $map = [
+            1000 => 'M', 900 => 'CM', 500 => 'D', 400 => 'CD',
+            100 => 'C', 90 => 'XC', 50 => 'L', 40 => 'XL',
+            10 => 'X', 9 => 'IX', 5 => 'V', 4 => 'IV', 1 => 'I',
+        ];
+        $roman = '';
+        foreach ($map as $threshold => $numeral) {
+            while ($number >= $threshold) {
+                $roman .= $numeral;
+                $number -= $threshold;
+            }
+        }
+
+        return $roman;
+    }
+
     public function defaultAvatarDataUri(string $gender): string
     {
+        // The head+shoulders silhouette is wrapped in a scale(1.25) group (around the
+        // viewBox center) so it fills the circular photo frame it's cropped into —
+        // unscaled, it left a wide flat-color margin around a comparatively small icon.
         $svg = match ($gender) {
-            'female' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#fcf4f6"/><circle cx="50" cy="37" r="19" fill="#0f3d7a"/><path fill="#0f3d7a" d="M50 61c-21 0-37 12-37 26v13h74V87c0-14-16-26-37-26z"/><path fill="#0f3d7a" d="M30 35c-2 6-3 12 0 18m40-18c2 6 3 12 0 18"/></svg>',
-            'male'   => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#f0f7ff"/><circle cx="50" cy="38" r="20" fill="#0f3d7a"/><path fill="#0f3d7a" d="M50 63c-22 0-38 12-38 27v10h76V90c0-15-16-27-38-27z"/></svg>',
-            default  => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#f1f5f9"/><circle cx="50" cy="38" r="20" fill="#475569"/><path fill="#475569" d="M50 63c-22 0-38 12-38 27v10h76V90c0-15-16-27-38-27z"/></svg>',
+            'female' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#fcf4f6"/><g transform="translate(50,50) scale(1.25) translate(-50,-50)"><circle cx="50" cy="37" r="19" fill="#0f3d7a"/><path fill="#0f3d7a" d="M50 61c-21 0-37 12-37 26v13h74V87c0-14-16-26-37-26z"/><path fill="#0f3d7a" d="M30 35c-2 6-3 12 0 18m40-18c2 6 3 12 0 18"/></g></svg>',
+            'male'   => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#f0f7ff"/><g transform="translate(50,50) scale(1.25) translate(-50,-50)"><circle cx="50" cy="38" r="20" fill="#0f3d7a"/><path fill="#0f3d7a" d="M50 63c-22 0-38 12-38 27v10h76V90c0-15-16-27-38-27z"/></g></svg>',
+            default  => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#f1f5f9"/><g transform="translate(50,50) scale(1.25) translate(-50,-50)"><circle cx="50" cy="38" r="20" fill="#475569"/><path fill="#475569" d="M50 63c-22 0-38 12-38 27v10h76V90c0-15-16-27-38-27z"/></g></svg>',
         };
 
         return 'data:image/svg+xml;base64,'.base64_encode($svg);

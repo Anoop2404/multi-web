@@ -23,6 +23,29 @@
                          :style="{ top: `${field.top ?? 4}%`, left: `${field.left ?? 82}%`, width: `${field.width ?? 14}%`, height: `${field.height ?? 14}%` }">
                         QR
                     </div>
+                    <template v-else-if="field.type === 'item_row'">
+                        <div v-if="sampleValue(field.source)" class="absolute rounded-full text-white flex items-center justify-center"
+                             :style="{ top: `${field.top ?? 0}%`, left: '5.56%', width: '2.89%', height: '1.86%', background: rowColor(field.row), fontSize: '5px', fontWeight: 'bold' }">
+                            {{ field.row ?? 1 }}
+                        </div>
+                        <div v-if="sampleValue(field.source)" class="absolute rounded-full"
+                             :style="{ top: `${field.top ?? 0}%`, left: '10%', width: '84.44%', height: '1.57%', background: '#eef2f9' }">
+                        </div>
+                        <div v-if="sampleValue(field.source)" class="absolute flex items-center overflow-hidden whitespace-nowrap text-ellipsis"
+                             :style="{ top: `${field.top ?? 0}%`, left: '11.11%', width: '82.22%', height: '1.57%', fontSize: '5px', color: '#1e293b' }">
+                            {{ sampleValue(field.source) }}
+                        </div>
+                    </template>
+                    <div v-else-if="field.type === 'shape'" class="absolute"
+                         :style="{ top: `${field.top ?? 0}%`, left: `${field.left ?? 0}%`, width: `${field.width ?? 20}%`, height: `${field.height ?? 10}%`, borderRadius: `${field.radius ?? 0}mm`, background: shapeBackground(field) }">
+                    </div>
+                    <div v-else-if="field.type === 'static_text'" class="absolute leading-tight overflow-hidden whitespace-nowrap text-ellipsis"
+                         :style="overlayStyle(field)">
+                        {{ field.text }}
+                    </div>
+                    <div v-else-if="field.type === 'divider'" class="absolute"
+                         :style="dividerStyle(field)">
+                    </div>
                     <div v-else-if="sampleValue(field.source) !== null" class="absolute leading-tight overflow-hidden whitespace-nowrap text-ellipsis"
                          :style="overlayStyle(field)">
                         {{ sampleValue(field.source) }}
@@ -111,6 +134,33 @@ function sampleValue(source) {
     return SAMPLE[source] ?? null;
 }
 
+const ROW_COLORS = ['#EC4899', '#F97316', '#EAB308', '#22C55E', '#06B6D4', '#6366F1', '#A855F7'];
+function rowColor(row) {
+    const n = Math.max(1, Number(row) || 1);
+    return ROW_COLORS[(n - 1) % ROW_COLORS.length];
+}
+
+function shapeBackground(field = {}) {
+    if (field.gradient_from && field.gradient_to) {
+        return `linear-gradient(to right, ${field.gradient_from}, ${field.gradient_to})`;
+    }
+    return field.color || '#DCEBFB';
+}
+
+function dividerStyle(field = {}) {
+    const vertical = (field.orientation ?? 'vertical') === 'vertical';
+    return {
+        top: `${field.top ?? 0}%`,
+        left: `${field.left ?? 0}%`,
+        borderColor: '#cbd5e1',
+        borderLeftWidth: vertical ? '1px' : '0',
+        borderTopWidth: vertical ? '0' : '1px',
+        borderStyle: 'solid',
+        height: vertical ? `${field.height ?? 10}%` : '0',
+        width: vertical ? '0' : `${field.width ?? 10}%`,
+    };
+}
+
 function overlayStyle(field = {}) {
     const size = Math.max(6, Math.min(96, Number(field.font_size ?? 10)));
     const weight = (field.font_weight ?? 'normal') === 'bold' ? '700' : '400';
@@ -123,7 +173,7 @@ function overlayStyle(field = {}) {
         fontWeight: weight,
         fontStyle: (field.font_style ?? 'normal') === 'italic' ? 'italic' : 'normal',
         textAlign: ['left', 'right', 'center', 'justify'].includes(field.align) ? field.align : undefined,
-        color: '#1e293b',
+        color: field.color || '#1e293b',
     };
 }
 </script>

@@ -185,7 +185,7 @@ class IdCardTemplateController extends SahodayaAdminController
             'grid_row_pitch_mm'          => 'nullable|numeric|min:0|max:2000',
             'fields'                  => 'nullable|array',
             'fields.*.key'            => 'nullable|string|max:60',
-            'fields.*.type'           => ['nullable', Rule::in(['text', 'photo', 'qr'])],
+            'fields.*.type'           => ['nullable', Rule::in(['text', 'photo', 'qr', 'item_row', 'shape', 'static_text', 'divider'])],
             'fields.*.source'         => 'nullable|string|max:60',
             'fields.*.top'            => 'nullable|numeric|min:0|max:100',
             'fields.*.left'           => 'nullable|numeric|min:0|max:100',
@@ -196,6 +196,20 @@ class IdCardTemplateController extends SahodayaAdminController
             'fields.*.font_weight'    => 'nullable|in:normal,bold',
             'fields.*.font_style'     => 'nullable|in:normal,italic',
             'fields.*.align'          => 'nullable|in:left,right,center',
+            // Decorative/static field types — 'shape'/'static_text'/'divider' are
+            // fixed chrome (School ID badge, column labels, gradient items header)
+            // that used to be baked into the background image; 'item_row' is the
+            // numbered participating-item row. None of these are admin-editable via
+            // the current field-list UI (no color/text inputs there yet) — they're
+            // configured directly in code/data for now, but validated here so an
+            // unrelated form edit+save doesn't get rejected or silently strip them.
+            'fields.*.row'            => 'nullable|integer|min:1|max:20',
+            'fields.*.text'           => 'nullable|string|max:120',
+            'fields.*.color'          => 'nullable|string|max:20',
+            'fields.*.gradient_from'  => 'nullable|string|max:20',
+            'fields.*.gradient_to'    => 'nullable|string|max:20',
+            'fields.*.radius'         => 'nullable|numeric|min:0|max:50',
+            'fields.*.orientation'    => 'nullable|in:horizontal,vertical',
             'is_active'       => 'nullable|boolean',
         ];
 

@@ -193,6 +193,11 @@ class CertificateTemplate extends Model
             $parts[] = 'text-align:'.$align;
         }
 
+        $color = $field['color'] ?? $fallback['color'] ?? null;
+        if (is_string($color) && preg_match('/^#[0-9a-fA-F]{3,8}$/', $color)) {
+            $parts[] = 'color:'.$color;
+        }
+
         return implode(';', $parts).';';
     }
 

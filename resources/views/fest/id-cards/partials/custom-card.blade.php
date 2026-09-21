@@ -23,6 +23,43 @@
                 <img src="{{ $value }}" alt="" class="card__qr"
                      style="top:{{ $field['top'] ?? 4 }}%;left:{{ $field['left'] ?? 82 }}%;width:{{ $field['width'] ?? 14 }}%;height:{{ $field['height'] ?? 14 }}%;">
             @endif
+        @elseif($type === 'item_row')
+            @if($value !== null && $value !== '')
+                @php
+                    $rowColors = ['#EC4899', '#F97316', '#EAB308', '#22C55E', '#06B6D4', '#6366F1', '#A855F7'];
+                    $rowNum = (int) ($field['row'] ?? 1);
+                    $rowColor = $rowColors[($rowNum - 1) % count($rowColors)];
+                    $rowTop = $field['top'] ?? 0;
+                @endphp
+                <div class="card__item-badge" style="top:{{ $rowTop }}%; background:{{ $rowColor }};">{{ $rowNum }}</div>
+                <div class="card__item-bar" style="top:{{ $rowTop }}%;"></div>
+                <div class="card__item-text" style="top:{{ $rowTop }}%;">{{ $value }}</div>
+            @endif
+        @elseif($type === 'shape')
+            @php
+                $bg = !empty($field['gradient_from']) && !empty($field['gradient_to'])
+                    ? 'linear-gradient(to right, '.$field['gradient_from'].', '.$field['gradient_to'].')'
+                    : ($field['color'] ?? '#DCEBFB');
+            @endphp
+            <div class="card__shape" style="
+                top:{{ $field['top'] ?? 0 }}%; left:{{ $field['left'] ?? 0 }}%;
+                width:{{ $field['width'] ?? 20 }}%; height:{{ $field['height'] ?? 10 }}%;
+                border-radius:{{ $field['radius'] ?? 0 }}mm; background:{{ $bg }};
+            "></div>
+        @elseif($type === 'static_text')
+            @if(!empty($field['text']))
+                <div class="card__field"
+                     style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($field, ['font_size' => 9, 'font_family' => 'Arial']) }}">
+                    {{ $field['text'] }}
+                </div>
+            @endif
+        @elseif($type === 'divider')
+            @php $orientation = $field['orientation'] ?? 'vertical'; @endphp
+            <div class="card__divider card__divider--{{ $orientation }}" style="
+                top:{{ $field['top'] ?? 0 }}%; left:{{ $field['left'] ?? 0 }}%;
+                @if($orientation === 'vertical') height:{{ $field['height'] ?? 10 }}%;
+                @else width:{{ $field['width'] ?? 10 }}%; @endif
+            "></div>
         @else
             @if($value !== null && $value !== '')
                 <div class="card__field"

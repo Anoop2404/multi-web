@@ -43,6 +43,40 @@
         .card__photo {
             border-radius: 50%;
         }
+        .card__item-badge {
+            position: absolute;
+            left: 5.56%; width: 2.89%; height: 1.86%;
+            border-radius: 50%;
+            color: #fff; font-size: 4.6pt; font-weight: bold;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .card__item-bar {
+            position: absolute;
+            left: 10%; width: 84.44%; height: 1.57%;
+            border-radius: 1.1mm;
+            background: #eef2f9;
+        }
+        .card__item-text {
+            position: absolute;
+            left: 11.11%; width: 82.22%; height: 1.57%;
+            font-size: 5pt; color: #1e293b;
+            display: flex; align-items: center;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .card__shape {
+            position: absolute;
+        }
+        .card__divider {
+            position: absolute;
+        }
+        .card__divider--vertical {
+            border-left: 0.6pt solid #cbd5e1;
+            width: 0;
+        }
+        .card__divider--horizontal {
+            border-top: 0.6pt solid #cbd5e1;
+            height: 0;
+        }
         .page-break { page-break-after: always; }
     </style>
 </head>
