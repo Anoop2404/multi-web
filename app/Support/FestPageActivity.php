@@ -20,6 +20,7 @@ class FestPageActivity
     public const MARKS = 'event.marks';
     public const MARKS_IMPORT = 'event.marks.import';
     public const MARK_SETTINGS = 'event.mark-settings';
+    public const BULK_SHEETS = 'event.bulk-sheets';
     public const RESULTS = 'event.results';
     public const LEADERBOARD = 'event.leaderboard';
     public const CHAMPIONSHIP = 'event.championship';
@@ -75,6 +76,7 @@ class FestPageActivity
             self::MARKS => 'Mark entry',
             self::MARKS_IMPORT => 'Import marks',
             self::MARK_SETTINGS => 'Mark settings',
+            self::BULK_SHEETS => 'Bulk sheets',
             self::RESULTS => 'Results',
             self::LEADERBOARD => 'Leaderboard',
             self::CHAMPIONSHIP => 'Championship',

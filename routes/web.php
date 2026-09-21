@@ -1270,6 +1270,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/marks', [FestMarkEntryController::class, 'index'])->name('marks.index');
             Route::post('/{event}/marks', [FestMarkEntryController::class, 'store'])->name('marks.store');
             Route::post('/{event}/marks/bulk', [FestMarkEntryController::class, 'bulkStore'])->name('marks.bulk-store');
+            Route::get('/{event}/bulk-sheets', [FestMarkEntryController::class, 'bulkSheets'])->name('bulk-sheets.index');
             Route::get('/{event}/mark-settings', [FestMarkEntryController::class, 'markSettings'])->name('mark-settings.index');
             Route::get('/{event}/mark-settings/bulk', [FestMarkEntryController::class, 'markSettingsBulk'])->name('mark-settings.bulk');
             Route::post('/{event}/mark-settings/bulk', [FestMarkEntryController::class, 'bulkUpdateMarkSettings'])->name('mark-settings.bulk-update');

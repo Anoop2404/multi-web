@@ -53,6 +53,7 @@ const tabs = computed(() => {
         { key: 'chest-numbers', label: 'Chest Numbers', icon: '🔢', href: `${base.value}/chest-numbers` },
         { key: 'attendance', label: 'Attendance', icon: '📋', href: `${base.value}/attendance` },
         { key: 'marks', label: 'Marks', icon: '✍️', href: `${base.value}/marks` },
+        { key: 'bulk-sheets', label: 'Bulk Sheets', icon: '🖨️', href: `${base.value}/bulk-sheets` },
         { key: 'mark-settings', label: 'Mark Settings', icon: '🎚️', href: `${base.value}/mark-settings` },
         { key: 'rank-points', label: 'Rank Points', icon: '🏅', href: `${base.value}/rank-points` },
         { key: 'results', label: 'Results', icon: '🥇', href: `${base.value}/results` },

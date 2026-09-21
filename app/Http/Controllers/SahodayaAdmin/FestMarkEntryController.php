@@ -96,7 +96,6 @@ class FestMarkEntryController extends SahodayaAdminController
                 'sheetUploads'   => [],
                 'missingChestCount' => 0,
                 'cumulativeSheetUrl' => null,
-                'bulkReportCombo' => [],
             ]));
         }
 
@@ -259,10 +258,34 @@ class FestMarkEntryController extends SahodayaAdminController
             'cumulativeSheetUrl' => $itemId
                 ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/reports/mark-criteria-sheet?item_id={$itemId}"
                 : null,
-            // For the bulk print-sheets picker's Phase/Area quick filters -- id+name only,
-            // the actual filtering happens server-side in markEntrySheet()/
-            // resultDeclarationSheet() off these same ids, not client-side.
-            'phases' => \App\Models\FestEventPhase::where('event_id', $event->id)->orderBy('sort_order')->get(['id', 'name']),
+        ]));
+    }
+
+    /**
+     * Standalone item-picker page for the bulk combined-PDF sheets (Judge Sheets, Digital
+     * Sum Sheet, Result Declaration Sheet) — previously a collapsible panel embedded in
+     * Mark Entry, moved to its own page/tab since it's a distinct "print for a session"
+     * workflow rather than something done alongside entering marks for one item at a time.
+     * The actual downloads still go through markEntrySheet()/cumulativeSheet()/
+     * resultDeclarationSheet()/parseBulkSheetFilters() unchanged.
+     */
+    public function bulkSheets(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $event = $this->regionAwareTargetEvent($request, $event);
+
+        $nav = app(FestHeadItemNavigationService::class)->navigationForEvent($event);
+        $flatItems = collect($nav['headItemGroups'])
+            ->flatMap(fn (array $group) => $group['items'] ?? [])
+            ->values()
+            ->all();
+
+        return $this->inertia('Sahodaya/Events/BulkSheets', $this->withEventActivity($event, FestPageActivity::BULK_SHEETS, [
+            'event'       => $event,
+            'items'       => $flatItems,
+            'childEvents' => $this->scopedChildEventOptions($event),
+            'phases'      => \App\Models\FestEventPhase::where('event_id', $event->id)->orderBy('sort_order')->get(['id', 'name']),
             'competitionAreas' => \App\Models\FestCompetitionArea::where('event_id', $event->id)->orderBy('sort_order')->get(['id', 'name']),
             'bulkReportCombo' => \App\Models\SahodayaProfile::where('tenant_id', $this->sahodaya->id)->first()?->bulk_report_combo ?? [],
         ]));
