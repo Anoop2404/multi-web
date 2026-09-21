@@ -25,7 +25,7 @@
                     </div>
                     <div v-else-if="field.type === 'item_row' && sampleValue(field.source)"
                          class="absolute flex items-center overflow-hidden whitespace-nowrap text-ellipsis"
-                         :style="{ top: `${field.top ?? 0}%`, left: `${field.left ?? 8}%`, width: `${field.width ?? 84}%`, height: '2.2%', fontSize: '9px', fontWeight: 'bold', color: '#12345a' }">
+                         :style="itemRowStyle(field)">
                         {{ field.row ?? 1 }}) {{ sampleValue(field.source) }}
                     </div>
                     <div v-else-if="field.type === 'shape'" class="absolute"
@@ -38,9 +38,9 @@
                     <div v-else-if="field.type === 'divider'" class="absolute"
                          :style="dividerStyle(field)">
                     </div>
-                    <div v-else-if="sampleValue(field.source) !== null" class="absolute leading-tight overflow-hidden whitespace-nowrap text-ellipsis"
+                    <div v-else-if="sampleValue(field.source) !== null" class="absolute overflow-hidden"
                          :style="overlayStyle(field)">
-                        {{ sampleValue(field.source) }}
+                        <span :style="field.wrap ? { display: 'block', width: '100%' } : undefined">{{ sampleValue(field.source) }}</span>
                     </div>
                 </template>
             </div>
@@ -147,19 +147,42 @@ function dividerStyle(field = {}) {
     };
 }
 
+function itemRowStyle(field = {}) {
+    return {
+        ...overlayStyle({
+            font_size: 9,
+            font_family: 'Arial',
+            font_weight: 'normal',
+            color: '#12345a',
+            ...field,
+        }),
+        height: `${field.height ?? 2.4}%`,
+        display: 'flex',
+        alignItems: 'center',
+    };
+}
+
 function overlayStyle(field = {}) {
     const size = Math.max(6, Math.min(96, Number(field.font_size ?? 10)));
     const weight = (field.font_weight ?? 'normal') === 'bold' ? '700' : '400';
+    const wrap = Boolean(field.wrap);
     return {
         top: `${field.top ?? 0}%`,
         left: `${field.left ?? 0}%`,
         width: `${field.width ?? 80}%`,
+        height: field.height != null ? `${field.height}%` : undefined,
         fontSize: `${size}px`,
         fontFamily: field.font_family || 'Arial, Helvetica, sans-serif',
         fontWeight: weight,
         fontStyle: (field.font_style ?? 'normal') === 'italic' ? 'italic' : 'normal',
+        lineHeight: field.line_height != null ? String(field.line_height) : '1.25',
         textAlign: ['left', 'right', 'center', 'justify'].includes(field.align) ? field.align : undefined,
         color: field.color || '#1e293b',
+        whiteSpace: wrap ? 'normal' : 'nowrap',
+        textOverflow: wrap ? 'clip' : 'ellipsis',
+        overflowWrap: wrap ? 'anywhere' : undefined,
+        display: wrap ? 'flex' : undefined,
+        alignItems: wrap ? 'center' : undefined,
     };
 }
 </script>

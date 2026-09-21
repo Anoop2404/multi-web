@@ -917,6 +917,10 @@ class FestSchoolEventFeeServiceTest extends TestCase
         $this->assertSame(2, $sections[0]['cards'][0]['item_count']);
         $this->assertContains('Mono Act', $sections[0]['cards'][0]['items']);
         $this->assertContains('Mime', $sections[0]['cards'][0]['items']);
+        $this->assertSame(
+            ['Mime', 'Mono Act'],
+            collect(range(1, 7))->map(fn ($row) => $sections[0]['cards'][0]['item_row_'.$row])->filter()->all(),
+        );
     }
 
     public function test_event_participant_cards_dedupe_by_student(): void
@@ -961,6 +965,10 @@ class FestSchoolEventFeeServiceTest extends TestCase
         $this->assertSame(2, $cards[0]['item_count']);
         $this->assertContains('Mono Act', $cards[0]['items']);
         $this->assertContains('Mime', $cards[0]['items']);
+        $this->assertSame(
+            ['Mime', 'Mono Act'],
+            collect(range(1, 7))->map(fn ($row) => $cards[0]['item_row_'.$row])->filter()->all(),
+        );
     }
 
     public function test_cards_grouped_by_item_returns_sections(): void
@@ -1000,14 +1008,34 @@ class FestSchoolEventFeeServiceTest extends TestCase
             'is_enabled'       => true,
         ]);
 
-        $this->approvedRegistration($event, $item, $school);
-        $this->approvedRegistration($event, $itemTwo, $school);
+        $schoolClass = SchoolClass::where('tenant_id', $school->id)->first()
+            ?? SchoolClass::create([
+                'tenant_id'         => $school->id,
+                'name'              => '10',
+                'class_category_id' => 1,
+                'is_active'         => true,
+            ]);
+        $student = Student::create([
+            'tenant_id'       => $school->id,
+            'school_class_id' => $schoolClass->id,
+            'name'            => 'Multi Item Student',
+            'gender'          => 'male',
+            'dob'             => '2012-01-01',
+            'status'          => 'active',
+        ]);
+
+        $this->approvedRegistration($event, $item, $school, $student);
+        $this->approvedRegistration($event, $itemTwo, $school, $student);
 
         $service = app(FestIdCardService::class);
         $cards = $service->cards($event, 'student', ['item_id' => $item->id]);
 
         $this->assertCount(1, $cards);
         $this->assertSame('Mono Act', $cards[0]['detail']);
+        $this->assertEqualsCanonicalizing(
+            ['Mono Act', 'Mime'],
+            collect(range(1, 7))->map(fn ($row) => $cards[0]['item_row_'.$row])->filter()->values()->all(),
+        );
         $this->assertNotEmpty($cards[0]['qr_src']);
     }
 

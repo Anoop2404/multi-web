@@ -36,6 +36,17 @@
             white-space: nowrap;
             text-overflow: ellipsis;
         }
+        .card__field--wrap {
+            display: flex;
+            align-items: center;
+            white-space: normal;
+            text-overflow: clip;
+            overflow-wrap: anywhere;
+        }
+        .card__field--wrap > span {
+            display: block;
+            width: 100%;
+        }
         .card__photo, .card__qr {
             position: absolute;
             object-fit: cover;
@@ -46,7 +57,6 @@
         .card__item-text {
             position: absolute;
             height: 2.4%;
-            font-size: 7pt; font-weight: bold; color: #12345a;
             display: flex; align-items: center;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }

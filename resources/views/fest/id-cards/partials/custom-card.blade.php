@@ -26,9 +26,10 @@
         @elseif($type === 'item_row')
             @if($value !== null && $value !== '')
                 @php $rowNum = (int) ($field['row'] ?? 1); @endphp
-                <div class="card__item-text" style="
-                    top:{{ $field['top'] ?? 0 }}%; left:{{ $field['left'] ?? 8 }}%; width:{{ $field['width'] ?? 84 }}%;
-                ">{{ $rowNum }}) {{ $value }}</div>
+                <div class="card__item-text"
+                     style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($field, ['font_size' => 9, 'font_family' => 'Arial', 'font_weight' => 'normal', 'color' => '#12345a']) }} height:{{ $field['height'] ?? 2.4 }}%;">
+                    {{ $rowNum }}) {{ $value }}
+                </div>
             @endif
         @elseif($type === 'shape')
             @php
@@ -57,9 +58,10 @@
             "></div>
         @else
             @if($value !== null && $value !== '')
-                <div class="card__field"
-                     style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($field, ['font_size' => 9, 'font_family' => 'Arial']) }}">
-                    {{ $value }}
+                @php $wrap = (bool) ($field['wrap'] ?? false); @endphp
+                <div class="card__field{{ $wrap ? ' card__field--wrap' : '' }}"
+                     style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($field, ['font_size' => 9, 'font_family' => 'Arial']) }} @if(isset($field['height'])) height:{{ $field['height'] }}%; @endif @if(isset($field['line_height'])) line-height:{{ $field['line_height'] }}; @endif">
+                    @if($wrap)<span>{{ $value }}</span>@else{{ $value }}@endif
                 </div>
             @endif
         @endif

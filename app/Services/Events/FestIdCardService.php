@@ -395,10 +395,10 @@ class FestIdCardService
                 $card = $this->participantCard($event, $lead, $schedule);
                 $entityKey = $lead->student_id ? 's'.$lead->student_id : 't'.$lead->teacher_id;
 
-                $cleanItems = array_map(fn ($i) => str_replace('_', ' ', $i), $items);
+                $cleanItems = array_map(fn ($i) => $this->titleCase(str_replace('_', ' ', $i)), $items);
                 $itemsDisplay = implode(' · ', $cleanItems);
 
-                return array_merge($card, [
+                return $this->withItemRows(array_merge($card, [
                     'card_type'       => 'head_participant',
                     'role_label'      => $card['role_label'],
                     'head_label'      => $headName,
@@ -414,7 +414,7 @@ class FestIdCardService
                     'schedule'        => $this->scheduleLine($schedule),
                     'footer'          => null,
                     'entity_id'       => 'hp-'.($head?->id ?? 0).'-'.$entityKey,
-                ]);
+                ]), $cleanItems);
             })
             ->values()
             ->all();
@@ -480,7 +480,7 @@ class FestIdCardService
                     ->sort()
                     ->values()
                     ->all();
-                $cleanItems = array_map(fn ($i) => str_replace('_', ' ', $i), $items);
+                $cleanItems = array_map(fn ($i) => $this->titleCase(str_replace('_', ' ', $i)), $items);
                 $itemsDisplay = implode(' · ', $cleanItems);
 
                 $schedule = $group
@@ -492,7 +492,7 @@ class FestIdCardService
                 $card = $this->participantCard($event, $lead, $schedule);
                 $entityKey = $lead->student_id ? 's'.$lead->student_id : 't'.$lead->teacher_id;
 
-                return array_merge($card, [
+                return $this->withItemRows(array_merge($card, [
                     'card_type'       => 'event_participant',
                     'role_label'      => 'PARTICIPANT',
                     'role_class'      => 'student',
@@ -507,7 +507,7 @@ class FestIdCardService
                     'schedule'        => $this->scheduleLine($schedule),
                     'footer'          => null,
                     'entity_id'       => 'ep-'.$entityKey,
-                ]);
+                ]), $cleanItems);
             })
             ->values()
             ->all();
@@ -544,8 +544,13 @@ class FestIdCardService
         $includeDataUris = (bool) ($filters['include_data_uris'] ?? false);
         $participants = $query->orderBy('id')->get();
         $schedules = $this->schedulesForParticipants($event, $participants->pluck('id'));
+        $itemsByEntity = $this->itemTitlesByEntity($event, $participants, $filters);
 
-        return $participants->map(fn (FestParticipant $p) => $this->participantCard($event, $p, $schedules->get($p->id), $includeDataUris))
+        return $participants->map(function (FestParticipant $p) use ($event, $schedules, $includeDataUris, $itemsByEntity) {
+            $card = $this->participantCard($event, $p, $schedules->get($p->id), $includeDataUris);
+
+            return $this->withItemRows($card, $itemsByEntity->get($this->participantEntityKey($p), []));
+        })
             ->values()
             ->all();
     }
@@ -794,11 +799,9 @@ class FestIdCardService
             'qr_src'          => $this->qrService->dataUri($qrPayload),
             'footer'          => null,
             'entity_id'       => (string) $p->id,
-            // A student can be registered for several items, but this card is built
-            // per-participation-row, not per-student — item_row_1 carries this row's
-            // own item; the other slots exist for a template author to use (a future
-            // pass could fill 2-7 with the student's full item list, but that needs an
-            // event-wide aggregation query too heavy to run per card in a bulk sheet).
+            // individualStudentCards() replaces these placeholders with the person's
+            // complete, pre-fetched event item list. Keeping row 1 here makes direct
+            // participantCard() consumers useful without introducing an N+1 query.
             'item_row_1'      => $itemTitleDisplay,
             'item_row_2'      => null,
             'item_row_3'      => null,
@@ -807,6 +810,100 @@ class FestIdCardService
             'item_row_6'      => null,
             'item_row_7'      => null,
         ];
+    }
+
+    private function participantEntityKey(FestParticipant $participant): string
+    {
+        if ($participant->student_id) {
+            return 's:'.$participant->student_id;
+        }
+
+        if ($participant->teacher_id) {
+            return 't:'.$participant->teacher_id;
+        }
+
+        return 'p:'.$participant->id;
+    }
+
+    /**
+     * Fetch every item for the people represented by an item-scoped card batch in one
+     * query. A card may be requested for one item, but its "Participating items" list
+     * is person-wide for the event; resolving that list inside participantCard() would
+     * otherwise add a query per printed card.
+     *
+     * @param  \Illuminate\Support\Collection<int, FestParticipant>  $participants
+     * @param  array<string, mixed>  $filters
+     * @return \Illuminate\Support\Collection<string, list<string>>
+     */
+    private function itemTitlesByEntity(FestEvent $event, $participants, array $filters)
+    {
+        if ($participants->isEmpty()) {
+            return collect();
+        }
+
+        $studentIds = $participants->pluck('student_id')->filter()->unique()->values();
+        $teacherIds = $participants->pluck('teacher_id')->filter()->unique()->values();
+        if ($studentIds->isEmpty() && $teacherIds->isEmpty()) {
+            return collect();
+        }
+
+        $query = FestParticipant::query()
+            ->whereHas('registration', function ($query) use ($event, $filters) {
+                $query->whereIn('event_id', $event->reportableEventIds());
+                $this->constrainRegistrationScope($query, $filters, $event);
+                if (! empty($filters['school_id'])) {
+                    $query->where('school_id', $filters['school_id']);
+                }
+            })
+            ->where('participant_role', '!=', 'standby')
+            ->where(function ($query) use ($studentIds, $teacherIds) {
+                if ($studentIds->isNotEmpty()) {
+                    $query->whereIn('student_id', $studentIds);
+                }
+                if ($teacherIds->isNotEmpty()) {
+                    $method = $studentIds->isNotEmpty() ? 'orWhereIn' : 'whereIn';
+                    $query->{$method}('teacher_id', $teacherIds);
+                }
+            })
+            ->with('registration.item:id,title,display_order')
+            ->get();
+
+        return $query
+            ->groupBy(fn (FestParticipant $participant) => $this->participantEntityKey($participant))
+            ->map(fn ($group) => $group
+                ->map(fn (FestParticipant $participant) => $participant->registration?->item)
+                ->filter()
+                ->unique('id')
+                ->sortBy(fn (FestEventItem $item) => $item->display_order ?? PHP_INT_MAX)
+                ->map(fn (FestEventItem $item) => $this->titleCase(str_replace('_', ' ', $item->title)))
+                ->filter()
+                ->values()
+                ->all());
+    }
+
+    /**
+     * @param  array<string, mixed>  $card
+     * @param  iterable<mixed>  $items
+     * @return array<string, mixed>
+     */
+    private function withItemRows(array $card, iterable $items): array
+    {
+        $titles = collect($items)
+            ->map(fn ($item) => $this->titleCase(str_replace('_', ' ', (string) $item)))
+            ->filter()
+            ->unique()
+            ->take(7)
+            ->values();
+
+        if ($titles->isEmpty()) {
+            return $card;
+        }
+
+        for ($row = 1; $row <= 7; $row++) {
+            $card['item_row_'.$row] = $titles->get($row - 1);
+        }
+
+        return $card;
     }
 
     private function resolveVenue(FestEvent $event, ?FestParticipant $p = null, ?FestRegistration $registration = null): string

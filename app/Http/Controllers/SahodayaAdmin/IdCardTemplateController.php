@@ -192,12 +192,14 @@ class IdCardTemplateController extends SahodayaAdminController
             'fields.*.width'          => 'nullable|numeric|min:1|max:100',
             'fields.*.height'         => 'nullable|numeric|min:1|max:100',
             'fields.*.font_size'      => 'nullable|integer|min:5|max:48',
+            'fields.*.line_height'    => 'nullable|numeric|min:0.8|max:2',
+            'fields.*.wrap'           => 'nullable|boolean',
             'fields.*.font_family'    => 'nullable|string|max:40',
             'fields.*.font_weight'    => 'nullable|in:normal,bold',
             'fields.*.font_style'     => 'nullable|in:normal,italic',
             'fields.*.align'          => 'nullable|in:left,right,center',
             // Decorative/static field types — 'shape'/'static_text'/'divider' are
-            // fixed chrome (School ID badge, column labels, gradient items header)
+            // fixed chrome (column labels, ribbons, gradient items header)
             // that used to be baked into the background image; 'item_row' is the
             // numbered participating-item row. None of these are admin-editable via
             // the current field-list UI (no color/text inputs there yet) — they're
