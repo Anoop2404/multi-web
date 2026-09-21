@@ -61,7 +61,7 @@
                                  class="h-16 w-auto rounded border border-slate-200 object-contain bg-slate-50">
                             <span class="text-xs text-slate-500">Current background</span>
                         </div>
-                        <input :id="id" type="file" accept=".pdf,.png,.jpg,.jpeg" class="field"
+                        <input :id="id" :key="fileInputKey" type="file" accept=".pdf,.png,.jpg,.jpeg" class="field"
                                @change="e => form.background = e.target.files[0]">
                     </template>
                 </FormField>
@@ -332,6 +332,12 @@ const props = defineProps({
 const editingId = ref(null);
 const { confirm } = useConfirm();
 const editingTemplate = ref(null);
+// Bumped whenever the background <input type=file> must forget its current
+// selection — browsers refuse to let JS clear a file input's .files, so
+// form.background = null alone leaves the native picker (and a since-stale
+// File object) in place across edits/cancel/save; re-keying forces Vue to
+// throw the old <input> away and mount a genuinely empty one.
+const fileInputKey = ref(0);
 
 function previewUrl(template, mode) {
     return `/sahodaya-admin/${props.sahodaya.id}/id-card-templates/${template.id}/preview?mode=${mode}`;
@@ -495,6 +501,7 @@ function editTemplate(template) {
         ? JSON.parse(JSON.stringify(template.layout_json))
         : blankFields();
     form.is_active = template.is_active ?? true;
+    fileInputKey.value++;
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -520,6 +527,7 @@ function cancelEdit() {
     form.fields = blankFields();
     form.is_active = true;
     form.clearErrors();
+    fileInputKey.value++;
 }
 
 function upload() {
@@ -528,6 +536,7 @@ function upload() {
         preserveScroll: true,
         onSuccess: () => {
             form.reset('background');
+            fileInputKey.value++;
             if (editingId.value) cancelEdit();
         },
     };
