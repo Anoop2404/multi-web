@@ -173,47 +173,59 @@ class FestIdCardService
      */
     public function schoolParticipantSummaries(FestEvent $event, array $filters = [], int $perPage = 4): array
     {
-        $query = FestParticipant::query()
-            ->join('fest_registrations', 'fest_participants.registration_id', '=', 'fest_registrations.id')
-            ->whereIn('fest_registrations.event_id', $event->reportableEventIds());
+        $regQuery = FestRegistration::query()
+            ->whereIn('event_id', $event->reportableEventIds());
 
-        $this->constrainRegistrationScope($query, $filters, $event);
-
-        $query->where('fest_participants.participant_role', '!=', 'standby')
-            ->where(fn ($q) => $q->whereNotNull('fest_participants.student_id')->orWhereNotNull('fest_participants.teacher_id'));
+        $this->constrainRegistrationScope($regQuery, $filters, $event);
 
         if (! empty($filters['school_id'])) {
-            $query->where('fest_registrations.school_id', $filters['school_id']);
+            $regQuery->where('school_id', $filters['school_id']);
         }
         if (! empty($filters['school_ids'])) {
-            $query->whereIn('fest_registrations.school_id', (array) $filters['school_ids']);
+            $regQuery->whereIn('school_id', (array) $filters['school_ids']);
         }
         if (! empty($filters['item_id'])) {
-            $query->whereIn('fest_registrations.item_id', $event->reportableItemIds([(int) $filters['item_id']]));
+            $regQuery->whereIn('item_id', $event->reportableItemIds([(int) $filters['item_id']]));
         }
 
-        $rows = $query
-            ->select(['fest_registrations.school_id', 'fest_participants.student_id', 'fest_participants.teacher_id'])
-            ->distinct()
-            ->get();
-
-        if ($rows->isEmpty()) {
+        $regMap = $regQuery->pluck('school_id', 'id');
+        if ($regMap->isEmpty()) {
             return [];
         }
+
+        $participants = FestParticipant::query()
+            ->whereIn('registration_id', $regMap->keys())
+            ->where('participant_role', '!=', 'standby')
+            ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
+            ->select(['registration_id', 'student_id', 'teacher_id'])
+            ->get();
+
+        if ($participants->isEmpty()) {
+            return [];
+        }
+
+        // Deduplicate participants per school (a student registered in multiple items gets 1 card)
+        $schoolCounts = [];
+        foreach ($participants as $p) {
+            $schoolId = $regMap->get($p->registration_id);
+            if (! $schoolId) {
+                continue;
+            }
+            $entityKey = $p->student_id ? 's'.$p->student_id : 't'.$p->teacher_id;
+            $schoolCounts[$schoolId][$entityKey] = true;
+        }
+
+        $schools = Tenant::whereIn('id', array_keys($schoolCounts))
+            ->get()
+            ->keyBy('id');
 
         $sahodaya = Tenant::with('sahodayaProfile')->find($event->tenant_id);
         $prefix = $sahodaya?->sahodayaProfile?->prefix;
 
-        $schools = Tenant::whereIn('id', $rows->pluck('school_id')->unique())
-            ->get()
-            ->keyBy('id');
-
-        $grouped = $rows->groupBy('school_id');
-
         $summaries = [];
-        foreach ($grouped as $schoolId => $participants) {
+        foreach ($schoolCounts as $schoolId => $members) {
             $school = $schools->get($schoolId);
-            $count = $participants->count();
+            $count = count($members);
 
             $code = null;
             if ($school) {
@@ -547,19 +559,26 @@ class FestIdCardService
         $schoolId = $filters['school_id'] ?? null;
         $participantIds = $filters['participant_ids'] ?? null;
 
-        $query = FestParticipant::whereHas('registration', function ($q) use ($event, $filters) {
-            $q->whereIn('event_id', $event->reportableEventIds());
-            $this->constrainRegistrationScope($q, $filters, $event);
-            if (! empty($filters['school_id'])) {
-                $q->where('school_id', $filters['school_id']);
-            }
-            if (! empty($filters['school_ids'])) {
-                $q->whereIn('school_id', (array) $filters['school_ids']);
-            }
-            if (! empty($filters['item_id'])) {
-                $q->whereIn('item_id', $event->reportableItemIds([(int) $filters['item_id']]));
-            }
-        })
+        $regQuery = FestRegistration::query()
+            ->whereIn('event_id', $event->reportableEventIds());
+        $this->constrainRegistrationScope($regQuery, $filters, $event);
+
+        if (! empty($filters['school_id'])) {
+            $regQuery->where('school_id', $filters['school_id']);
+        }
+        if (! empty($filters['school_ids'])) {
+            $regQuery->whereIn('school_id', (array) $filters['school_ids']);
+        }
+        if (! empty($filters['item_id'])) {
+            $regQuery->whereIn('item_id', $event->reportableItemIds([(int) $filters['item_id']]));
+        }
+
+        $registrationIds = $regQuery->pluck('id');
+        if ($registrationIds->isEmpty()) {
+            return [];
+        }
+
+        $query = FestParticipant::whereIn('registration_id', $registrationIds)
             ->where('participant_role', '!=', 'standby')
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
             ->with(['student.tenant', 'teacher.tenant', 'registration.item.head', 'registration.school', 'registration.event.sourcePhase', 'registration.event.region']);

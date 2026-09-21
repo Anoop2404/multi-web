@@ -267,7 +267,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
@@ -363,6 +363,12 @@ async function loadSchoolPreview() {
         loadingPreview.value = false;
     }
 }
+
+onMounted(() => {
+    if (activePreviewCards.value.length === 0 && selectedSchoolId.value) {
+        loadSchoolPreview();
+    }
+});
 
 function volumeDownloadUrl(vol) {
     const ids = (vol.school_ids || []).map(id => `school_ids[]=${encodeURIComponent(id)}`).join('&');

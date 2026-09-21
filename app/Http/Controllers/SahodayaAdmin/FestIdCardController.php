@@ -386,16 +386,9 @@ class FestIdCardController extends SahodayaAdminController
             ];
         }
 
-        // Sample preview cards (first 1-2 pages of the first school, lightweight single-school query)
+        // Sample preview cards are loaded asynchronously by the Vue client on mount
         $firstSchool = $schoolList[0] ?? null;
         $sampleCards = [];
-        if ($firstSchool && ! empty($firstSchool['school_id'])) {
-            $previewFilters = array_merge($filters, [
-                'school_id'         => $firstSchool['school_id'],
-                'include_data_uris' => false,
-            ]);
-            $sampleCards = array_slice($service->cards($targetEvent, 'student', $previewFilters), 0, $perPage * 2);
-        }
 
         return $this->inertia('Sahodaya/Events/IdCards/DieGenerator', $this->withEventActivity($event, FestPageActivity::ID_CARDS, [
             'event'               => $targetEvent->only('id', 'title', 'status', 'event_type'),
