@@ -106,7 +106,7 @@
                     </div>
                     <div class="flex flex-wrap">
                         @foreach($itemGroup['winners'] as $winner)
-                        @php $roster = ($winner['team'] ?? []) ?: [['name' => $winner['participant'], 'photo' => $winner['photo'] ?? null]]; @endphp
+                        @php $roster = ($winner['team'] ?? []) ?: [['name' => $winner['participant'], 'photo' => $winner['photo'] ?? null, 'photo_fallback' => $winner['photo_fallback'] ?? null]]; @endphp
                         <div class="flex gap-3 p-4 flex-1 min-w-[16rem] border-l border-slate-800/60 first:border-l-0">
                             <div class="shrink-0">
                                 @if($winner['position'] <= 3)
@@ -120,7 +120,7 @@
                                     @foreach($roster as $member)
                                     <div class="flex flex-col items-center gap-1 w-20">
                                         @if($member['photo'] ?? null)
-                                        <img src="{{ $member['photo'] }}" alt="" class="w-20 h-20 rounded-xl object-cover object-top border-2 border-slate-700/60 shadow-md shadow-black/30">
+                                        <img src="{{ $member['photo'] }}" @if($member['photo_fallback'] ?? null) data-fallback-src="{{ $member['photo_fallback'] }}" onerror="this.onerror=null;this.src=this.dataset.fallbackSrc" @endif loading="lazy" decoding="async" alt="" class="w-20 h-20 rounded-xl object-cover object-top border-2 border-slate-700/60 shadow-md shadow-black/30">
                                         @else
                                         <span class="w-20 h-20 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold text-lg border-2 border-slate-700/60 shadow-md shadow-black/30">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
                                         @endif

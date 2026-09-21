@@ -90,7 +90,7 @@
                             <ol class="divide-y divide-slate-800">
                                 @foreach($group['rows'] as $row)
                                 <li class="flex items-center gap-3 px-4 py-3">
-                                    @if($row['photo'] ?? null)<img src="{{ $row['photo'] }}" alt="" class="w-10 h-10 rounded-xl object-cover object-top border border-slate-700 shrink-0">@else<span class="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-sm font-extrabold text-amber-400 shrink-0">{{ strtoupper(substr($row['student'] ?? '?', 0, 1)) }}</span>@endif
+                                    @if($row['photo'] ?? null)<img src="{{ $row['photo'] }}" @if($row['photo_fallback'] ?? null) data-fallback-src="{{ $row['photo_fallback'] }}" onerror="this.onerror=null;this.src=this.dataset.fallbackSrc" @endif loading="lazy" decoding="async" alt="" class="w-10 h-10 rounded-xl object-cover object-top border border-slate-700 shrink-0">@else<span class="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-sm font-extrabold text-amber-400 shrink-0">{{ strtoupper(substr($row['student'] ?? '?', 0, 1)) }}</span>@endif
                                     <div class="min-w-0 flex-1"><p class="font-bold text-sm text-white uppercase"><span class="text-amber-400 mr-1">#{{ $row['category_rank'] }}</span>{{ $row['student'] }}</p><p class="text-xs text-white/40 mt-0.5 uppercase">{{ $row['school'] }}</p></div><span class="font-mono font-bold text-white">{{ $row['points'] }}</span>
                                 </li>
                                 @endforeach
@@ -251,7 +251,7 @@
                                 // Same roster fallback the Item-wise tab above uses: the
                                 // full team for a group/team item, or a one-person "team"
                                 // built from participant/photo for an individual item.
-                                $roster = ($winner['team'] ?? []) ?: [['name' => $winner['participant'], 'photo' => $winner['photo'] ?? null]];
+                                $roster = ($winner['team'] ?? []) ?: [['name' => $winner['participant'], 'photo' => $winner['photo'] ?? null, 'photo_fallback' => $winner['photo_fallback'] ?? null]];
                                 $rosterNames = collect($roster)->pluck('name')->filter()->values();
                             @endphp
                             <li class="flex items-start gap-3 px-4 py-2.5">
@@ -263,7 +263,7 @@
                                 <div class="flex -space-x-2 shrink-0 mt-0.5">
                                     @foreach(collect($roster)->take(3) as $member)
                                         @if($member['photo'] ?? null)
-                                            <img src="{{ $member['photo'] }}" alt="" class="w-6 h-6 rounded-full object-cover object-top border border-slate-900">
+                                            <img src="{{ $member['photo'] }}" @if($member['photo_fallback'] ?? null) data-fallback-src="{{ $member['photo_fallback'] }}" onerror="this.onerror=null;this.src=this.dataset.fallbackSrc" @endif loading="lazy" decoding="async" alt="" class="w-6 h-6 rounded-full object-cover object-top border border-slate-900">
                                         @else
                                             <span class="w-6 h-6 rounded-full bg-amber-500/15 text-amber-300 flex items-center justify-center text-[9px] font-bold border border-slate-900">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
                                         @endif
@@ -393,7 +393,7 @@
                                     <div class="flex flex-wrap">
                                         @foreach($item['winners'] as $winner)
                                         @php
-                                            $roster = ($winner['team'] ?? []) ?: [['name' => $winner['participant'], 'photo' => $winner['photo'] ?? null]];
+                                            $roster = ($winner['team'] ?? []) ?: [['name' => $winner['participant'], 'photo' => $winner['photo'] ?? null, 'photo_fallback' => $winner['photo_fallback'] ?? null]];
                                         @endphp
                                         <div class="flex gap-3 p-4 flex-1 min-w-[18rem] border-l border-slate-800 first:border-l-0 {{ $rankTint[$winner['position']] ?? '' }}">
                                             <div class="shrink-0 flex flex-col items-center gap-1.5">
@@ -411,7 +411,7 @@
                                                     @foreach($roster as $member)
                                                     <div class="flex flex-col items-center gap-1 w-20">
                                                         @if($member['photo'] ?? null)
-                                                        <img src="{{ $member['photo'] }}" alt="" class="w-20 h-20 rounded-xl object-cover object-top border-2 border-slate-700/60 shadow-md shadow-black/30">
+                                                        <img src="{{ $member['photo'] }}" @if($member['photo_fallback'] ?? null) data-fallback-src="{{ $member['photo_fallback'] }}" onerror="this.onerror=null;this.src=this.dataset.fallbackSrc" @endif loading="lazy" decoding="async" alt="" class="w-20 h-20 rounded-xl object-cover object-top border-2 border-slate-700/60 shadow-md shadow-black/30">
                                                         @else
                                                         <span class="w-20 h-20 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center text-lg font-bold border-2 border-slate-700/60 shadow-md shadow-black/30">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
                                                         @endif
@@ -444,7 +444,7 @@
                 @foreach($individualResults as $row)
                 <article data-individual-result data-category="{{ Str::slug($row['category'] ?? '') }}" data-search="{{ Str::lower(collect([$row['participant'], $row['school'], $row['item']])->filter()->implode(' ')) }}" class="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
                     <div class="flex items-start gap-3">
-                        @if($row['photo'] ?? null)<img src="{{ $row['photo'] }}" alt="" class="w-12 h-12 rounded-xl object-cover object-top border border-slate-700 shrink-0">@else<span class="w-12 h-12 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold shrink-0" aria-hidden="true">{{ strtoupper(substr($row['participant'] ?? '?', 0, 1)) }}</span>@endif
+                        @if($row['photo'] ?? null)<img src="{{ $row['photo'] }}" @if($row['photo_fallback'] ?? null) data-fallback-src="{{ $row['photo_fallback'] }}" onerror="this.onerror=null;this.src=this.dataset.fallbackSrc" @endif loading="lazy" decoding="async" alt="" class="w-12 h-12 rounded-xl object-cover object-top border border-slate-700 shrink-0">@else<span class="w-12 h-12 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold shrink-0" aria-hidden="true">{{ strtoupper(substr($row['participant'] ?? '?', 0, 1)) }}</span>@endif
                         <div class="min-w-0 flex-1"><h3 class="font-bold text-white uppercase leading-snug break-words">{{ $row['participant'] }}</h3><p class="text-xs text-white/45 uppercase mt-1 break-words">{{ $row['school'] }}</p></div>
                         <span class="font-mono font-extrabold text-amber-300 shrink-0">#{{ $row['position'] }}</span>
                     </div>
@@ -469,7 +469,7 @@
                                 <td class="p-3 font-semibold text-white">
                                     <div class="flex items-center gap-2">
                                         @if($row['photo'] ?? null)
-                                        <img src="{{ $row['photo'] }}" alt="" class="w-7 h-7 rounded-full object-cover object-top border border-slate-700 shrink-0">
+                                        <img src="{{ $row['photo'] }}" @if($row['photo_fallback'] ?? null) data-fallback-src="{{ $row['photo_fallback'] }}" onerror="this.onerror=null;this.src=this.dataset.fallbackSrc" @endif loading="lazy" decoding="async" alt="" class="w-7 h-7 rounded-full object-cover object-top border border-slate-700 shrink-0">
                                         @else
                                         <span class="w-7 h-7 rounded-full bg-amber-500/15 text-amber-300 flex items-center justify-center text-[10px] font-bold shrink-0">{{ strtoupper(substr($row['participant'] ?? '?', 0, 1)) }}</span>
                                         @endif
@@ -543,7 +543,7 @@
                                 <td class="p-3 font-semibold text-white uppercase">
                                     <div class="flex items-center gap-3">
                                         @if($row['photo'])
-                                        <img src="{{ $row['photo'] }}" alt="" class="w-10 h-10 rounded-full object-cover object-top border border-slate-700 shrink-0">
+                                        <img src="{{ $row['photo'] }}" @if($row['photo_fallback'] ?? null) data-fallback-src="{{ $row['photo_fallback'] }}" onerror="this.onerror=null;this.src=this.dataset.fallbackSrc" @endif loading="lazy" decoding="async" alt="" class="w-10 h-10 rounded-full object-cover object-top border border-slate-700 shrink-0">
                                         @else
                                         <span class="w-10 h-10 rounded-full bg-amber-500/15 text-amber-300 flex items-center justify-center text-sm font-bold shrink-0" aria-hidden="true">{{ strtoupper(substr($row['student'] ?? '?', 0, 1)) }}</span>
                                         @endif

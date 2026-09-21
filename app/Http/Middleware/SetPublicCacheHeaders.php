@@ -13,10 +13,23 @@ class SetPublicCacheHeaders
         $response = $next($request);
 
         if ($request->isMethod('GET') && $response->isSuccessful()) {
+            // Admin preview responses can contain unpublished results and must never be
+            // stored by a shared edge cache. Anonymous festival GETs do not need a PHP
+            // session; dropping Laravel's Set-Cookie lets Cloudflare cache them.
+            if ($request->user() ?? auth()->user()) {
+                $response->headers->set('Cache-Control', 'private, no-store');
+
+                return $response;
+            }
+
+            if ($request->is('fest') || $request->is('fest/*')) {
+                $response->headers->remove('Set-Cookie');
+            }
+
             if ($request->is('fest/*/live/data') || $request->is('fest/*/scoreboard/data')) {
-                $response->headers->set('Cache-Control', 'no-store');
+                $response->headers->set('Cache-Control', 'public, max-age=0, s-maxage=10, stale-while-revalidate=30');
             } elseif ($request->is('fest/*/live') || $request->is('fest/*/scoreboard') || $request->is('fest/*/tv')) {
-                $response->headers->set('Cache-Control', 'no-cache, max-age=0, must-revalidate');
+                $response->headers->set('Cache-Control', 'public, max-age=10, s-maxage=30, stale-while-revalidate=60');
             } elseif (
                 $request->is('fest/*/results')
                 || $request->is('fest/*/items/*/results')

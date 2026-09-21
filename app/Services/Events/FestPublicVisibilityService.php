@@ -199,7 +199,8 @@ class FestPublicVisibilityService
             'name'               => $showName ? ($participant->student?->name ?? $participant->teacher?->name) : null,
             // Gated on the same $showName check as the name itself — a photo or school
             // identifies a specific competitor just as directly as their name would.
-            'photo'              => $showName ? ($participant->student?->photoDataUri() ?? $participant->teacher?->photoDataUri()) : null,
+            'photo'              => $showName ? ($participant->student?->publicPhotoUrl() ?? $participant->teacher?->publicPhotoUrl()) : null,
+            'photo_fallback'     => $showName ? ($participant->student?->publicPhotoFallbackUrl() ?? $participant->teacher?->publicPhotoFallbackUrl()) : null,
             'school'             => $showName ? $participant->registration?->school?->name : null,
             'item_title'         => $item?->title,
             'category_label'     => $categoryLabel,

@@ -162,6 +162,19 @@ class Teacher extends Model
         ], absolute: false);
     }
 
+    /** Direct S3/CloudFront thumbnail for anonymous, high-traffic public pages. */
+    public function publicPhotoUrl(): ?string
+    {
+        return TenantStorage::directPhotoUrl($this->photo)
+            ?? $this->photoDataUri();
+    }
+
+    /** Full-size fallback for photos uploaded before thumbnail generation existed. */
+    public function publicPhotoFallbackUrl(): ?string
+    {
+        return TenantStorage::directPhotoUrl($this->photo, thumbnail: false);
+    }
+
     /**
      * Cached, downscaled base64 data URI for this teacher's photo — used by ID card
      * PDF generation (FestIdCardService, TrainingIdCardService), which can embed

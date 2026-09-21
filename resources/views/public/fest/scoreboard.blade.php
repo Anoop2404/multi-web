@@ -132,7 +132,7 @@
         root.setAttribute('aria-busy', 'true');
         if (!silent) status.textContent = 'Loading…';
         try {
-            const response = await fetch(urlFor(cat), {headers: {'Accept': 'application/json'}, cache: 'no-store'});
+            const response = await fetch(urlFor(cat), {headers: {'Accept': 'application/json'}});
             if (!response.ok) throw new Error('Refresh failed');
             const data = await response.json();
             content.innerHTML = data.contentHtml;

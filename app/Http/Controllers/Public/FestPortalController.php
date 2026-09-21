@@ -311,43 +311,45 @@ class FestPortalController extends Controller
         $publishedAt = FestResult::whereIn('event_id', $selectedScope['event_ids'])
             ->whereNull('item_id')
             ->max('published_at');
+        $resultsVersion = sha1(implode('|', [
+            (string) $publishedAt,
+            (string) FestEventItem::whereIn('event_id', $selectedScope['event_ids'])->max('results_published_at'),
+            (string) FestMark::whereIn('event_id', $selectedScope['event_ids'])->max('updated_at'),
+        ]));
 
-        // The rest of this method computes every tab's data unconditionally regardless
-        // of $tab (see $tab's only other use, below, and in the returned payload) — so
-        // the computed payload is identical for every ?tab= variant. Caching it once,
-        // shared across every tab, multiplies the benefit of Cloudflare's own per-URL
-        // edge cache rather than paying the ~40-70 query computation separately for each
-        // of the 5 tab query strings. Keyed on publishedAt so a new publish naturally
-        // invalidates it, no explicit cache-busting needed.
-        //
         // Bypassed for ANY authenticated request, not just $isAdminPreview — the
         // championship computation below also runs a per-SIBLING-LEAF
         // isAuthorizedAdminPreview() check (crossPhaseStandingForVisibleLeaves()) that
-        // can broaden the result even when this top-level event/scope is already
-        // published, so $isAdminPreview alone doesn't fully capture when the computed
-        // payload is preview-widened. Any logged-in user hitting this public URL always
-        // gets a fresh, uncached computation; only genuinely anonymous requests share
-        // the cache.
+        // can broaden the result. Anonymous traffic caches the final rendered HTML per
+        // tab instead of serializing a large graph of Eloquent models into Redis. The
+        // old shared model-payload cache was both memory-heavy and could fail while
+        // unserializing on the next tab request.
         $bypassCache = (bool) ($request->user() ?? auth()->user());
 
-        $computeResultsPayload = function () use ($request, $event, $selectedScope, $isPublished, $publishedAt, $scopes) {
-            return $this->buildResultsPayload($request, $event, $selectedScope, $isPublished, $publishedAt, $scopes);
+        $renderResults = function () use ($request, $event, $selectedScope, $isPublished, $publishedAt, $scopes, $tenant, $tab) {
+            $payload = $this->buildResultsPayload($request, $event, $selectedScope, $isPublished, $publishedAt, $scopes);
+
+            return $this->renderPublic('public.fest.results', $tenant, $payload + ['tab' => $tab]);
         };
 
         if ($bypassCache) {
-            $payload = $computeResultsPayload();
-        } else {
-            $cacheKey = 'fest-results-payload:'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.((string) $publishedAt);
-            $payload = Cache::remember($cacheKey, now()->addSeconds(20), $computeResultsPayload);
+            return $renderResults();
         }
 
-        return $this->renderPublic('public.fest.results', $tenant, $payload + ['tab' => $tab]);
+        $cacheKey = 'fest-results-html:v2:'.$event->tenant_id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.$resultsVersion.':'.$tab;
+        $html = $this->rememberPublicHotPath(
+            $cacheKey,
+            120,
+            fn () => $renderResults()->getContent(),
+            waitSeconds: 30,
+        );
+
+        return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
     }
 
     /**
-     * The actual per-tab-agnostic computation for results() — split out so it can be
-     * wrapped in Cache::remember() there without an unwieldy inline closure. See the
-     * caching comment on results() for why this is safe to share across every tab.
+     * The shared results computation. results() caches only the final HTML for the
+     * requested tab, so this method's Eloquent objects never enter the cache store.
      */
     private function buildResultsPayload(Request $request, FestEvent $event, array $selectedScope, bool $isPublished, mixed $publishedAt, array $scopes): array
     {
@@ -377,7 +379,7 @@ class FestPortalController extends Controller
                         }
                     }
                 }
-                $championshipRows = $this->individualChampionship->crossPhaseStandingForVisibleLeaves($championshipRoot, $visibleLeafIds);
+                $championshipRows = $this->individualChampionship->crossPhaseStandingForVisibleLeaves($championshipRoot, $visibleLeafIds, directPhotoUrls: true);
                 // A student's ranked row here is a cross-phase total — their own eye-icon
                 // link must resolve against WHICHEVER leaf they're actually registered in
                 // (findParticipantByRef() requires an exact match), not the single leaf
@@ -385,7 +387,7 @@ class FestPortalController extends Controller
                 // loses the icon.
                 $championshipEventIds = $visibleLeafIds->all();
             } else {
-                $championshipRows = $this->individualChampionship->leaderboardForEvent($event);
+                $championshipRows = $this->individualChampionship->leaderboardForEvent($event, directPhotoUrls: true);
             }
         }
 
@@ -425,6 +427,7 @@ class FestPortalController extends Controller
                     'gender' => \App\Support\FestSportsAgeGroup::genderLabel($row['gender']) ?? $row['gender'],
                     'student' => $row['student']['name'],
                     'photo' => $row['student']['photo'],
+                    'photo_fallback' => $row['student']['photo_fallback'] ?? null,
                     'reg_no' => $row['student']['reg_no'],
                     'school' => $row['school'],
                     'ref' => $link['ref'] ?? null,
@@ -1074,7 +1077,7 @@ public function scoreboardData(Request $request, int $eventId)
         'isAdminPreview' => $isAdminPreview,
         'contentHtml' => view('public.fest.partials.scoreboard-content', $dynamic + compact('event', 'isPublished', 'category', 'isAdminPreview'))->render(),
         'refreshedAt' => now()->toIso8601String(),
-    ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    ])->header('Cache-Control', 'public, max-age=0, s-maxage=10, stale-while-revalidate=30');
 }
 
 /**
@@ -1538,9 +1541,9 @@ public function tv(Request $request, int $eventId)
         }
 
         $publishedFlag = $selectedScope['results_published'] ? '1' : '0';
-        $cacheKey = 'fest-live-payload:'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.$publishedFlag;
+        $cacheKey = 'fest-live-payload:v2:'.$event->tenant_id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.$publishedFlag;
 
-        return Cache::remember($cacheKey, now()->addSeconds(4), $compute);
+        return $this->rememberPublicHotPath($cacheKey, 10, $compute, waitSeconds: 15);
     }
 
     /** @return array<string, mixed> */
@@ -1669,7 +1672,8 @@ public function tv(Request $request, int $eventId)
             'grade_points' => $breakdown['grade_points'],
             'measurement' => trim(($mark->measurement_value ?? '').' '.($mark->measurement_unit ?? '')),
             'participant' => $person?->name,
-            'photo' => $person?->photoDataUri(),
+            'photo' => $person?->publicPhotoUrl(),
+            'photo_fallback' => $person?->publicPhotoFallbackUrl(),
             'reference' => $participant ? $this->visibility->publicReference($event, $participant) : null,
             'school' => $participant?->registration?->school?->name,
         ];
@@ -1693,7 +1697,8 @@ public function tv(Request $request, int $eventId)
 
                     return [
                         'name' => $memberPerson?->name,
-                        'photo' => $memberPerson?->photoDataUri(),
+                        'photo' => $memberPerson?->publicPhotoUrl(),
+                        'photo_fallback' => $memberPerson?->publicPhotoFallbackUrl(),
                     ];
                 })
                 ->values()
@@ -1951,9 +1956,31 @@ public function tv(Request $request, int $eventId)
             return $compute();
         }
 
-        $cacheKey = 'fest-scoreboard-dynamic:'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.($category ?? 'all').':'.($isPublished ? '1' : '0');
+        $cacheKey = 'fest-scoreboard-dynamic:v2:'.$event->tenant_id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.($category ?? 'all').':'.($isPublished ? '1' : '0');
 
-        return Cache::remember($cacheKey, now()->addSeconds(4), $compute);
+        return $this->rememberPublicHotPath($cacheKey, 10, $compute, waitSeconds: 15);
+    }
+
+    /**
+     * Shared-cache single flight for anonymous event-day hot paths. Cache::remember()
+     * alone lets every PHP worker recompute the same cold key at once; under a traffic
+     * spike that turns one expiry into dozens of identical database-heavy renders.
+     */
+    private function rememberPublicHotPath(string $key, int $ttlSeconds, callable $compute, int $waitSeconds = 10): mixed
+    {
+        if (Cache::has($key)) {
+            return Cache::get($key);
+        }
+
+        $remember = fn () => Cache::remember($key, now()->addSeconds($ttlSeconds), $compute);
+
+        try {
+            return Cache::lock('lock:'.$key, max(30, $waitSeconds + 5))->block($waitSeconds, $remember);
+        } catch (\Throwable) {
+            // A request may have filled the key just before our lock timed out. Recheck
+            // before falling back so an unavailable lock driver never breaks the page.
+            return Cache::has($key) ? Cache::get($key) : $remember();
+        }
     }
 
     private function computeScoreboardDynamicData(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished, bool $isAdminPreview = false, ?Request $request = null): array

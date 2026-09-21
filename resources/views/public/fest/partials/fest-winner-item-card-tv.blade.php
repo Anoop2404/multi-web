@@ -40,7 +40,7 @@
             // tv() pre-chunks any roster larger than its own per-slide cap before this
             // partial ever sees it, so $roster here is always small enough to render in
             // full — no "+N more" truncation tile needed.
-            $roster = ($winner['team'] ?? []) ?: [['name' => $winner['participant'], 'photo' => $winner['photo'] ?? null]];
+            $roster = ($winner['team'] ?? []) ?: [['name' => $winner['participant'], 'photo' => $winner['photo'] ?? null, 'photo_fallback' => $winner['photo_fallback'] ?? null]];
         @endphp
         <div class="flex gap-4 p-5 flex-1 min-w-[22rem] border-l border-slate-800 first:border-l-0">
             <div class="shrink-0">
@@ -72,7 +72,7 @@
                     @foreach($roster as $member)
                     <div class="flex flex-col items-center gap-1.5 w-24 min-w-0">
                         @if($member['photo'] ?? null)
-                        <img src="{{ $member['photo'] }}" alt="" class="w-24 h-24 rounded-xl object-cover object-top border-2 border-slate-700/60 shadow-md shadow-black/30">
+                        <img src="{{ $member['photo'] }}" @if($member['photo_fallback'] ?? null) data-fallback-src="{{ $member['photo_fallback'] }}" onerror="this.onerror=null;this.src=this.dataset.fallbackSrc" @endif loading="lazy" decoding="async" alt="" class="w-24 h-24 rounded-xl object-cover object-top border-2 border-slate-700/60 shadow-md shadow-black/30">
                         @else
                         <span class="w-24 h-24 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold text-2xl border-2 border-slate-700/60 shadow-md shadow-black/30">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
                         @endif

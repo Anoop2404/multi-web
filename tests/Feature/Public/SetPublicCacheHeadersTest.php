@@ -87,14 +87,14 @@ class SetPublicCacheHeadersTest extends TestCase
         );
     }
 
-    public function test_the_tv_screen_still_gets_the_no_cache_treatment(): void
+    public function test_the_tv_screen_gets_a_short_edge_cache_without_an_anonymous_session_cookie(): void
     {
-        // tv()'s admin-preview check touches the session, which Laravel's own session
-        // middleware marks by appending 'private' to Cache-Control — pre-existing,
-        // unrelated to this middleware's own directive string.
         $this->assertCacheControl(
-            'no-cache, max-age=0, must-revalidate, private',
+            'public, max-age=10, s-maxage=30, stale-while-revalidate=60',
             "fest/{$this->event->id}/tv",
         );
+
+        $response = $this->get("http://cache-headers-test.test/fest/{$this->event->id}/tv");
+        $this->assertFalse($response->headers->has('Set-Cookie'));
     }
 }

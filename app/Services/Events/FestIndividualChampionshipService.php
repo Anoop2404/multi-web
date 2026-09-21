@@ -32,9 +32,9 @@ class FestIndividualChampionshipService
     ) {}
 
     /** @return Collection<int, array<string, mixed>> */
-    public function leaderboardForEvent(FestEvent $event): Collection
+    public function leaderboardForEvent(FestEvent $event, bool $directPhotoUrls = false): Collection
     {
-        return $this->rankAndFormat($this->pointsForEvent($event));
+        return $this->rankAndFormat($this->pointsForEvent($event), $directPhotoUrls);
     }
 
     /**
@@ -49,7 +49,7 @@ class FestIndividualChampionshipService
      *   (relation), category, gender, points, group_points.
      * @return Collection<int, array<string, mixed>>
      */
-    public function rankAndFormat(Collection $allRows): Collection
+    public function rankAndFormat(Collection $allRows, bool $directPhotoUrls = false): Collection
     {
         // Ranking (both the category+gender rank and overall_rank below) depends on
         // row order — sort explicitly rather than trusting the caller's collection
@@ -86,13 +86,16 @@ class FestIndividualChampionshipService
 
                     return [$row, $rank];
                 });
-            });
+        });
 
         $overallRankByStudent = $allRows->values()->mapWithKeys(fn ($row, int $index) => [$row->student_id => $index + 1]);
+        $schoolNames = Tenant::query()
+            ->whereIn('id', $allRows->pluck('student.tenant_id')->filter()->unique())
+            ->get(['id', 'name', 'type'])
+            ->mapWithKeys(fn (Tenant $school) => [$school->id => $school->name]);
 
-        return $rankedByCategoryAndGender->map(function (array $pair) use ($overallRankByStudent) {
+        return $rankedByCategoryAndGender->map(function (array $pair) use ($overallRankByStudent, $schoolNames, $directPhotoUrls) {
             [$row, $rank] = $pair;
-            $school = Tenant::find($row->student?->tenant_id);
 
             return [
                 'rank'         => $rank,
@@ -105,9 +108,10 @@ class FestIndividualChampionshipService
                     'id'     => $row->student_id,
                     'name'   => $row->student?->name,
                     'reg_no' => $row->student?->reg_no,
-                    'photo'  => $row->student?->photoDataUri(),
+                    'photo'  => $directPhotoUrls ? $row->student?->publicPhotoUrl() : $row->student?->photoDataUri(),
+                    'photo_fallback' => $directPhotoUrls ? $row->student?->publicPhotoFallbackUrl() : null,
                 ],
-                'school' => $school?->name,
+                'school' => $schoolNames[$row->student?->tenant_id] ?? null,
             ];
         })->sortBy([
             ['category', 'asc'],
@@ -124,9 +128,9 @@ class FestIndividualChampionshipService
      *
      * @return Collection<int, array<string, mixed>>
      */
-    public function crossPhaseStanding(FestEvent $hub): Collection
+    public function crossPhaseStanding(FestEvent $hub, bool $directPhotoUrls = false): Collection
     {
-        return $this->rankAndFormat($this->sumAcrossLeaves($this->allPhaseLeaves($hub)));
+        return $this->rankAndFormat($this->sumAcrossLeaves($this->allPhaseLeaves($hub)), $directPhotoUrls);
     }
 
     /**
@@ -140,11 +144,11 @@ class FestIndividualChampionshipService
      * @param  Collection<int, int>  $visibleLeafIds
      * @return Collection<int, array<string, mixed>>
      */
-    public function crossPhaseStandingForVisibleLeaves(FestEvent $hub, Collection $visibleLeafIds): Collection
+    public function crossPhaseStandingForVisibleLeaves(FestEvent $hub, Collection $visibleLeafIds, bool $directPhotoUrls = false): Collection
     {
         $visible = $this->allPhaseLeaves($hub)->filter(fn (FestEvent $leaf) => $visibleLeafIds->contains($leaf->id));
 
-        return $this->rankAndFormat($this->sumAcrossLeaves($visible));
+        return $this->rankAndFormat($this->sumAcrossLeaves($visible), $directPhotoUrls);
     }
 
     /** @return Collection<int, FestEvent> */

@@ -123,6 +123,30 @@ class FestPublicResultsTeamRosterTest extends TestCase
         $response->assertSee('Group');
     }
 
+    public function test_public_results_render_direct_cdn_thumbnail_urls_instead_of_base64_photos(): void
+    {
+        config([
+            'filesystems.disks.s3.key' => 'test-key',
+            'filesystems.disks.s3.secret' => 'test-secret',
+            'filesystems.disks.s3.region' => 'ap-south-1',
+            'filesystems.disks.s3.bucket' => 'test-bucket',
+            'filesystems.disks.s3.url' => 'https://media.example.test',
+            'filesystems.disks.s3.public_url' => 'https://media.example.test',
+            'filesystems.disks.s3.root' => 'domains',
+        ]);
+
+        $student = Student::where('name', 'Anu Krishna')->firstOrFail();
+        $photoPath = 'students/'.$student->tenant_id.'/anu.jpg';
+        $student->update(['photo' => $photoPath]);
+
+        $response = $this->get("http://roster-test.test/fest/{$this->event->id}/results?tab=item");
+
+        $response->assertOk()
+            ->assertSee('https://media.example.test/domains/'.$photoPath.'.thumb.jpg', false)
+            ->assertSee('data-fallback-src="https://media.example.test/domains/'.$photoPath.'"', false)
+            ->assertDontSee('data:image/', false);
+    }
+
     public function test_results_item_tab_shows_the_items_gender_badge(): void
     {
         $item = FestEventItem::create([

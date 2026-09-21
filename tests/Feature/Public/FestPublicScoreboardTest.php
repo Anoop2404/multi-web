@@ -890,7 +890,7 @@ class FestPublicScoreboardTest extends TestCase
             ->assertJsonPath('standingsPublished', false)
             ->assertJsonCount(0, 'scoreboard');
 
-        $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
+        $this->assertStringContainsString('s-maxage=10', $response->headers->get('Cache-Control'));
     }
 
     /**
@@ -943,7 +943,7 @@ class FestPublicScoreboardTest extends TestCase
         $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/scoreboard");
 
         $response->assertOk();
-        $this->assertStringContainsString('no-cache', $response->headers->get('Cache-Control'));
+        $this->assertStringContainsString('s-maxage=30', $response->headers->get('Cache-Control'));
     }
 
     public function test_catalogue_has_search_and_status_discovery_without_phase_navigation(): void
@@ -1081,7 +1081,7 @@ class FestPublicScoreboardTest extends TestCase
             ->assertJsonPath('standingsPublished', true)
             ->assertJsonStructure(['contentHtml', 'refreshedAt']);
         $this->assertStringContainsString('North Star School', $data->json('contentHtml'));
-        $this->assertStringContainsString('no-store', $data->headers->get('Cache-Control'));
+        $this->assertStringContainsString('s-maxage=10', $data->headers->get('Cache-Control'));
     }
 
     /**

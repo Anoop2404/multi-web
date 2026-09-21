@@ -27,7 +27,7 @@
             <li class="p-4 sm:p-5">
                 <div class="flex items-start gap-3">
                     @if($p['photo'] ?? null)
-                    <img src="{{ $p['photo'] }}" alt="" class="w-12 h-12 rounded-xl object-cover object-top border border-slate-700 shrink-0">
+                    <img src="{{ $p['photo'] }}" @if($p['photo_fallback'] ?? null) data-fallback-src="{{ $p['photo_fallback'] }}" onerror="this.onerror=null;this.src=this.dataset.fallbackSrc" @endif loading="lazy" decoding="async" alt="" class="w-12 h-12 rounded-xl object-cover object-top border border-slate-700 shrink-0">
                     @else
                     <span class="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/20 flex items-center justify-center font-bold shrink-0" aria-hidden="true">{{ ($p['show_name'] && $p['name']) ? Str::upper(Str::substr($p['name'], 0, 1)) : '?' }}</span>
                     @endif

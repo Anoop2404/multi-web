@@ -300,6 +300,58 @@ class TenantStorage
     }
 
     /**
+     * Return a browser-facing storage URL without proxying the image through PHP.
+     *
+     * Public fest pages can contain hundreds of participant photos. Reading those
+     * objects into PHP and embedding them as base64 makes the HTML enormous and makes
+     * every cache miss spend CPU on image encoding. This method deliberately performs
+     * no exists()/HEAD request: S3/CloudFront serves the bytes directly to the browser.
+     *
+     * When AWS_PUBLIC_URL is configured it should be the public S3/CloudFront base URL
+     * and a stable, CDN-cacheable URL is returned. Private buckets fall back to a
+     * presigned S3 URL; signing is local and still keeps the image request away from
+     * the app.
+     */
+    public static function directPhotoUrl(?string $relativePath, bool $thumbnail = true): ?string
+    {
+        if (! $relativePath) {
+            return null;
+        }
+
+        if (str_starts_with($relativePath, 'data:image/')) {
+            return $relativePath;
+        }
+
+        if (str_starts_with($relativePath, 'http://') || str_starts_with($relativePath, 'https://')) {
+            return $relativePath;
+        }
+
+        $relativePath = ltrim($relativePath, '/');
+        $path = $thumbnail ? self::thumbnailPath($relativePath) : $relativePath;
+        if (self::isS3Configured()) {
+            try {
+                $storage = Storage::disk('s3');
+
+                // A configured public/CDN URL is stable, so CloudFront and browsers can
+                // collapse thousands of identical requests onto one cached object.
+                if (filled(config('filesystems.disks.s3.public_url'))) {
+                    return $storage->url($path);
+                }
+
+                try {
+                    return $storage->temporaryUrl($path, now()->addHours(6));
+                } catch (\Throwable) {
+                    return $storage->url($path);
+                }
+            } catch (\Throwable) {
+                // Local/test installs continue through the existing data-URI fallback.
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Cache::remember() a photo data URI, guarded by a short-lived lock so a burst of
      * concurrent requests for the same cold cache key (e.g. right after a fest result
      * publishes) don't all redo the S3 fetch + resize at once — only the first request

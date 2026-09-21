@@ -70,4 +70,28 @@ class TenantStorageTest extends TestCase
         Storage::disk('shared')->assertExists($path);
         $this->assertStringStartsWith('students/test-school/', $path);
     }
+
+    public function test_direct_photo_url_uses_the_cdn_thumbnail_without_probing_or_proxying_the_file(): void
+    {
+        config([
+            'filesystems.disks.s3.key' => 'test-key',
+            'filesystems.disks.s3.secret' => 'test-secret',
+            'filesystems.disks.s3.region' => 'ap-south-1',
+            'filesystems.disks.s3.bucket' => 'test-bucket',
+            'filesystems.disks.s3.url' => 'https://media.example.test',
+            'filesystems.disks.s3.public_url' => 'https://media.example.test',
+            'filesystems.disks.s3.root' => 'domains',
+        ]);
+
+        $path = 'students/school-123/photo.jpg';
+
+        $this->assertSame(
+            'https://media.example.test/domains/'.$path.'.thumb.jpg',
+            TenantStorage::directPhotoUrl($path),
+        );
+        $this->assertSame(
+            'https://media.example.test/domains/'.$path,
+            TenantStorage::directPhotoUrl($path, thumbnail: false),
+        );
+    }
 }

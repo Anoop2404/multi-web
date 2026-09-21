@@ -18,10 +18,12 @@ use Illuminate\Support\Facades\Route;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
 Route::middleware([
+    // Keep this outside the session middleware so its response pass runs last and can
+    // remove the anonymous fest session cookie before Cloudflare evaluates cacheability.
+    SetPublicCacheHeaders::class,
     'web',
     InitializeTenancyByRequestHost::class,
     PreventAccessFromCentralDomains::class,
-    SetPublicCacheHeaders::class,
 ])->group(function () {
 
     // Home route is registered in CentralRouteServiceProvider (host-aware central + tenant).

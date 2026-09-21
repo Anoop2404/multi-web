@@ -34,7 +34,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 mt-4">
             @foreach($marks as $row)
             @php
-                $roster = ($row['team'] ?? []) ?: [['name' => $row['participant'], 'photo' => $row['photo'] ?? null]];
+                $roster = ($row['team'] ?? []) ?: [['name' => $row['participant'], 'photo' => $row['photo'] ?? null, 'photo_fallback' => $row['photo_fallback'] ?? null]];
                 $pos = $row['position'];
                 $isLargeTeam = count($roster) > 4;
             @endphp
@@ -51,7 +51,7 @@
                     @foreach($roster as $member)
                     <div class="flex items-center gap-3 min-w-0">
                         @if($member['photo'] ?? null)
-                        <img src="{{ $member['photo'] }}" alt="" class="w-16 h-16 rounded-xl object-cover object-top border-2 border-slate-700/60 shadow-md shadow-black/30 shrink-0">
+                        <img src="{{ $member['photo'] }}" @if($member['photo_fallback'] ?? null) data-fallback-src="{{ $member['photo_fallback'] }}" onerror="this.onerror=null;this.src=this.dataset.fallbackSrc" @endif loading="lazy" decoding="async" alt="" class="w-16 h-16 rounded-xl object-cover object-top border-2 border-slate-700/60 shadow-md shadow-black/30 shrink-0">
                         @else
                         <span class="w-16 h-16 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center font-bold text-lg border-2 border-slate-700/60 shrink-0" aria-hidden="true">{{ strtoupper(substr($member['name'] ?? '?', 0, 1)) }}</span>
                         @endif
