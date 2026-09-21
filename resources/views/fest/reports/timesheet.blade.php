@@ -7,8 +7,10 @@
         /* Same repeating header/footer split as fest.reports.attendance-sheet — see that
            file's own comment for the full reasoning (Chromium's native header/footer vs
            dompdf's baked-in thead/tfoot fallback). */
+        {{-- Chromium (PDF_CONVERTER_URL) ignores this @page rule -- see the matching
+             comment in fest.reports.attendance-sheet for why bumping it is safe here. --}}
         @page {
-            margin: 24px 38px;
+            margin: 116px 38px 24px;
         }
         body {
             font-family: 'DejaVu Sans', Arial, sans-serif;
@@ -186,7 +188,10 @@
 <body>
     @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
 
-<div class="report-header">
+{{-- Position:fixed on the dompdf fallback so it repeats every page -- see the matching
+     comment in fest.reports.attendance-sheet. Left in normal flow on the Chromium path,
+     which already gets its own native repeating header. --}}
+<div class="report-header" @if($isDomPdf ?? true) style="position: fixed; top: -100px; left: 0; right: 0;" @endif>
     @include('partials.pdf-branding-header', [
         'orgName' => $sahodaya->name ?? 'SAHODAYA',
         'logoSrc' => $logo ?? null,
@@ -271,22 +276,6 @@
         }
     @endphp
     <div style="margin-bottom: 18px; @if(empty($isPreview) && ($isDomPdf ?? true) && $sectionIndex > 0) page-break-before: always; @endif">
-        @if(empty($isPreview) && ($isDomPdf ?? true) && $sectionIndex > 0)
-        <div class="report-header">
-            <table class="brand-cell-table">
-                <tr>
-                    @if(!empty($logo))
-                        <td class="logo-cell"><img src="{{ $logo }}" alt=""></td>
-                    @endif
-                    <td class="org-cell">
-                        <div class="org-name">{{ $sahodaya->name ?? 'SAHODAYA' }}</div>
-                        <div class="org-context">{{ $event->title }}</div>
-                    </td>
-                    <td class="doc-badge-cell"><span class="doc-badge">TIMESHEET</span></td>
-                </tr>
-            </table>
-        </div>
-        @endif
         @php
             $firstRow = $rows[0] ?? null;
             $catLabel = $firstRow['item_category'] ?? null;
@@ -307,6 +296,19 @@
         @endif
         <table>
             <thead>
+                @if($rowsByItem->count() > 1)
+                {{-- Backstop for natural page overflow, and needed at all only when this
+                     document covers more than one item -- see the matching comment in
+                     fest.reports.attendance-sheet. --}}
+                <tr class="item-context-row">
+                    <th colspan="7" style="background: #ffffff; color: #0f172a; border: none; padding: 0 0 6px; font-weight: bold; font-size: 11px; text-transform: none; letter-spacing: normal;">
+                        {{ $cleanTitle }}
+                        @if(!empty($metaBadges))
+                            <span style="font-weight: normal; color: #64748b;">&bull; {{ implode(' • ', $metaBadges) }}</span>
+                        @endif
+                    </th>
+                </tr>
+                @endif
                 <tr>
                     <th style="width: 32px;" class="text-center">Sl.No.</th>
                     <th style="width: 60px;" class="text-center">Chest</th>

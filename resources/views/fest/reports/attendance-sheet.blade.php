@@ -18,8 +18,14 @@
            spans, which is also why the SL/Name/... column header repeats).
            The on-screen preview has no concept of pages at all, so it keeps a simple
            normal-flow header/footer shown once at the top/bottom. */
+        {{-- Chromium (PDF_CONVERTER_URL) ignores this @page rule entirely -- its own
+             margin comes from the PHP-side $margin passed to PdfGenerator, sized to fit
+             its native repeating headerTemplate/footerTemplate (see
+             attendanceSheetHeaderFooterTemplates()). This margin only matters for the
+             dompdf fallback, so bumping it to fit .report-header as a fixed, repeating
+             header below is safe either way. --}}
         @page {
-            margin: 24px 38px;
+            margin: 116px 38px 24px;
         }
         body {
             font-family: 'DejaVu Sans', Arial, sans-serif;
@@ -265,7 +271,11 @@
 <body>
     @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
 
-<div class="report-header">
+{{-- On the dompdf fallback, made position:fixed so it repeats on every page -- the
+     Chromium path already gets an equivalent repeating header natively (see the
+     $margin comment above), so it's left in normal flow there instead of stacking a
+     second header underneath Chromium's own. --}}
+<div class="report-header" @if($isDomPdf ?? true) style="position: fixed; top: -100px; left: 0; right: 0;" @endif>
     @include('partials.pdf-branding-header', [
         'orgName' => $sahodaya->name ?? 'SAHODAYA',
         'logoSrc' => $logo ?? null,
@@ -360,22 +370,6 @@
         }
     @endphp
     <div style="margin-bottom: 18px; @if(empty($isPreview) && ($isDomPdf ?? true) && $sectionIndex > 0) page-break-before: always; @endif">
-        @if(empty($isPreview) && ($isDomPdf ?? true) && $sectionIndex > 0)
-        <div class="report-header">
-            <table class="brand-cell-table">
-                <tr>
-                    @if(!empty($logo))
-                        <td class="logo-cell"><img src="{{ $logo }}" alt=""></td>
-                    @endif
-                    <td class="org-cell">
-                        <div class="org-name">{{ $sahodaya->name ?? 'SAHODAYA' }}</div>
-                        <div class="org-context">{{ $event->title }}</div>
-                    </td>
-                    <td class="doc-badge-cell"><span class="doc-badge">ATTENDANCE SHEET</span></td>
-                </tr>
-            </table>
-        </div>
-        @endif
         @php
             $firstRow = $rows[0] ?? null;
             $catLabel = $firstRow['item_category'] ?? null;
@@ -396,6 +390,24 @@
         @endif
         <table>
             <thead>
+                {{-- Backstop for natural (non-chunk-boundary) page overflow within this
+                     item's own table -- dompdf/Chromium both natively reprint <thead> on
+                     every page a table spans, which is what already keeps the Sl/Order/...
+                     column row visible on a continuation page even when .item-heading-bar
+                     above (outside the table, in normal flow) does not repeat. --}}
+                @if($rowsByItem->count() > 1)
+                {{-- Only needed when this document covers more than one item -- with a
+                     single item, the fixed header above already names it via
+                     $singleItemMetaStr, and repeating that again here just overlaps it. --}}
+                <tr class="item-context-row">
+                    <th colspan="{{ $colspan }}" style="background: #ffffff; color: #0f172a; border: none; padding: 0 0 6px; font-weight: bold; font-size: 11px; text-transform: none; letter-spacing: normal;">
+                        {{ $cleanTitle }}
+                        @if(!empty($metaBadges))
+                            <span style="font-weight: normal; color: #64748b;">&bull; {{ implode(' • ', $metaBadges) }}</span>
+                        @endif
+                    </th>
+                </tr>
+                @endif
                 <tr>
                     <th style="width: 28px;" class="text-center">Sl</th>
                     <th style="width: 50px;" class="text-center">Order</th>
