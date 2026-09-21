@@ -10,7 +10,12 @@
          'item' => $item ?? null,              // FestEventItem, omit when not item-scoped
          'categoryLabel' => $categoryLabel ?? null,
          'participantCount' => $count ?? null,  // int, optional
-     ]) --}}
+     ])
+     A caller that has already built its own "Title · Category · Type · Gender · N
+     participants"-shaped string (e.g. from flattened row data rather than a queried
+     FestEventItem) can pass that directly as 'itemLine' instead of 'item' -- same
+     styling, same field order, just skipping the FestEventItem-based construction
+     below. --}}
 @include('partials.pdf-branding-header', [
     'orgName' => $orgName ?? 'Sahodaya',
     'logoSrc' => $logoSrc ?? null,
@@ -30,4 +35,6 @@
         }
     @endphp
     <div style="font-size: 13px; font-weight: 800; color: #0f172a;">{{ implode(' · ', $headingParts) }}</div>
+@elseif(!empty($itemLine))
+    <div style="font-size: 13px; font-weight: 800; color: #0f172a;">{{ $itemLine }}</div>
 @endif

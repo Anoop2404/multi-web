@@ -51,16 +51,19 @@ class PdfGenerator
 
         if ($url) {
             $hasHeaderFooter = $headerTemplate !== null || $footerTemplate !== null;
+            $resolvedMargin = $margin ?? ['top' => '0', 'bottom' => '0', 'left' => '0', 'right' => '0'];
 
             $payload = [
                 'html'            => $html,
                 'printBackground' => true,
-                'margin'          => $margin ?? [
-                    'top'    => '0',
-                    'bottom' => '0',
-                    'left'   => '0',
-                    'right'  => '0',
-                ],
+                // Sent both nested (spec-correct Puppeteer shape) and flat/mm (this
+                // deployment's chrome-print-server.js reads marginTop/Right/Bottom/Left as
+                // plain numbers, not the nested object) -- see marginToMm()'s docblock.
+                'margin'          => $resolvedMargin,
+                'marginTop'       => self::marginToMm($resolvedMargin['top'] ?? 0),
+                'marginRight'     => self::marginToMm($resolvedMargin['right'] ?? 0),
+                'marginBottom'    => self::marginToMm($resolvedMargin['bottom'] ?? 0),
+                'marginLeft'      => self::marginToMm($resolvedMargin['left'] ?? 0),
             ];
 
             if ($hasCustomSize) {
@@ -88,7 +91,7 @@ class PdfGenerator
                         'Content-Disposition' => 'inline; filename="' . $filename . '"',
                     ]);
                 }
-                
+
                 return response()->streamDownload(function () use ($response) {
                     echo $response->body();
                 }, $filename, ['Content-Type' => 'application/pdf']);
@@ -148,16 +151,16 @@ class PdfGenerator
 
         if ($url) {
             $hasHeaderFooter = $headerTemplate !== null || $footerTemplate !== null;
+            $resolvedMargin = $margin ?? ['top' => '0', 'bottom' => '0', 'left' => '0', 'right' => '0'];
 
             $payload = [
                 'html'            => $html,
                 'printBackground' => true,
-                'margin'          => $margin ?? [
-                    'top'    => '0',
-                    'bottom' => '0',
-                    'left'   => '0',
-                    'right'  => '0',
-                ],
+                'margin'          => $resolvedMargin,
+                'marginTop'       => self::marginToMm($resolvedMargin['top'] ?? 0),
+                'marginRight'     => self::marginToMm($resolvedMargin['right'] ?? 0),
+                'marginBottom'    => self::marginToMm($resolvedMargin['bottom'] ?? 0),
+                'marginLeft'      => self::marginToMm($resolvedMargin['left'] ?? 0),
             ];
 
             if ($hasCustomSize) {
@@ -218,5 +221,33 @@ class PdfGenerator
     private static function mmToPoints(float $mm): float
     {
         return $mm * 72 / 25.4;
+    }
+
+    /**
+     * Converts a CSS length string ('32mm', '112px', '1in', or a bare number already in
+     * mm) to a raw millimeter float. Sent alongside the nested `margin` object as flat
+     * marginTop/Right/Bottom/Left fields, since this deployment's external converter
+     * (chrome-print-server.js) reads those flat fields as plain numbers rather than the
+     * nested object Puppeteer's own API expects -- sending both means margins apply
+     * correctly regardless of which shape that service happens to parse.
+     */
+    private static function marginToMm(string|int|float $value): float
+    {
+        if (is_numeric($value)) {
+            return (float) $value;
+        }
+
+        if (preg_match('/^(-?[\d.]+)\s*(px|mm|cm|in)?$/', trim((string) $value), $m)) {
+            $num = (float) $m[1];
+
+            return match ($m[2] ?? 'mm') {
+                'px' => $num * 25.4 / 96,
+                'in' => $num * 25.4,
+                'cm' => $num * 10,
+                default => $num,
+            };
+        }
+
+        return 0.0;
     }
 }

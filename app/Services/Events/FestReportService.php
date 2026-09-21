@@ -1400,7 +1400,13 @@ class FestReportService
         // server.js) — pass its native repeating headerTemplate/footerTemplate instead of
         // relying on any CSS trick. Ignored by the dompdf fallback (only used locally),
         // which gets its own branding baked into the page content — see the blade file.
-        [$headerTemplate, $footerTemplate] = $this->attendanceSheetHeaderFooterTemplates($sahodaya, $logo, $singleItemName, $singleItemMetaStr);
+        [$headerTemplate, $footerTemplate] = \App\Support\PdfChromeHeaderFooter::build([
+            'orgName'    => $sahodaya->name ?? 'SAHODAYA',
+            'logoSrc'    => $logo,
+            'docTitle'   => 'ATTENDANCE SHEET',
+            'eventTitle' => $this->event->title,
+            'itemLine'   => $singleItemMetaStr ?: $singleItemName,
+        ]);
         $itemsLabel = $singleItemName ?? ($bulkItemIds !== null ? count($bulkItemIds).'-items' : 'all-items');
         $filename = ReportFilename::build(
             'attendance-sheet',
@@ -1416,63 +1422,8 @@ class FestReportService
             false,
             $headerTemplate,
             $footerTemplate,
-            ['top' => '112px', 'right' => '38px', 'bottom' => '55px', 'left' => '38px'],
+            ['top' => '32mm', 'right' => '10mm', 'bottom' => '15mm', 'left' => '10mm'],
         );
-    }
-
-    /**
-     * Build Puppeteer header/footer template HTML for the attendance sheet. These are
-     * rendered by Chromium in isolation from the main page (no external/page stylesheet
-     * access), so every style must be inline. `pageNumber`/`totalPages` are special
-     * classes Chromium fills in automatically.
-     *
-     * @return array{0: string, 1: string}
-     */
-    private function attendanceSheetHeaderFooterTemplates(?Tenant $sahodaya, ?string $logo, ?string $singleItemName, ?string $singleItemMetaStr = null): array
-    {
-        $orgName = e($sahodaya->name ?? 'SAHODAYA');
-        $eventTitle = e($this->event->title);
-        $generated = e(now()->format('d M Y, h:i A'));
-        $itemMetaLabel = $singleItemMetaStr ?: ($singleItemName ? e($singleItemName) : null);
-        $itemLine = $itemMetaLabel
-            ? '<div style="font-size:11px; font-weight:800; color:#0f172a; margin-top:2px;">'.$itemMetaLabel.'</div>'
-            : '';
-
-        $logoImg = $logo
-            ? '<img src="'.e($logo).'" style="width:34px;height:34px;object-fit:contain;margin-right:10px;">'
-            : '';
-
-        // Kept in sync by hand with partials/pdf-branding-header.blade.php +
-        // the .event-context-bar block in fest.reports.attendance-sheet —
-        // Chromium renders this template in isolation from the page's own
-        // stylesheet/partials, so it can't simply @include them.
-        $header = <<<HTML
-            <div style="width:100%; font-family:Arial,sans-serif; padding:0 38px; box-sizing:border-box; border-bottom:2px solid #0f172a; padding-bottom:6px;">
-                <div style="display:flex; align-items:center; justify-content:space-between;">
-                    <div style="display:flex; align-items:center;">
-                        {$logoImg}
-                        <div>
-                            <div style="font-size:14px; font-weight:800; color:#0f172a; text-transform:uppercase; letter-spacing:0.3px;">{$orgName}</div>
-                            <div style="font-size:8px; font-weight:600; color:#475569; margin-top:2px;">CBSE Sahodaya Inter-School Competitions &amp; Events</div>
-                        </div>
-                    </div>
-                    <div style="background:#0f172a; color:#fff; padding:4px 10px; border-radius:4px; font-size:8px; font-weight:bold; letter-spacing:0.4px; white-space:nowrap;">ATTENDANCE SHEET</div>
-                </div>
-                <div style="margin-top:5px; padding-top:4px; border-top:1px solid #e2e8f0;">
-                    <div style="font-size:8.5px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.3px;">{$eventTitle}</div>
-                    {$itemLine}
-                </div>
-            </div>
-            HTML;
-
-        $footer = <<<HTML
-            <div style="width:100%; font-family:Arial,sans-serif; font-size:7px; color:#64748b; padding:0 38px; box-sizing:border-box; display:flex; justify-content:space-between; border-top:1px solid #cbd5e1; padding-top:4px;">
-                <span>{$orgName} &bull; {$eventTitle} &bull; Generated {$generated}</span>
-                <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
-            </div>
-            HTML;
-
-        return [$header, $footer];
     }
 
     /**
@@ -1553,7 +1504,13 @@ class FestReportService
                 ->header('Content-Type', 'text/html');
         }
 
-        [$headerTemplate, $footerTemplate] = $this->timesheetHeaderFooterTemplates($sahodaya, $logo, $singleItemName, $singleItemMetaStr);
+        [$headerTemplate, $footerTemplate] = \App\Support\PdfChromeHeaderFooter::build([
+            'orgName'    => $sahodaya->name ?? 'SAHODAYA',
+            'logoSrc'    => $logo,
+            'docTitle'   => 'TIMESHEET',
+            'eventTitle' => $this->event->title,
+            'itemLine'   => $singleItemMetaStr ?: $singleItemName,
+        ]);
         $itemsLabel = $singleItemName ?? ($bulkItemIds !== null ? count($bulkItemIds).'-items' : 'all-items');
         $filename = ReportFilename::build(
             'timesheet',
@@ -1569,58 +1526,8 @@ class FestReportService
             false,
             $headerTemplate,
             $footerTemplate,
-            ['top' => '112px', 'right' => '38px', 'bottom' => '55px', 'left' => '38px'],
+            ['top' => '32mm', 'right' => '10mm', 'bottom' => '15mm', 'left' => '10mm'],
         );
-    }
-
-    /**
-     * Puppeteer header/footer for the timesheet — see attendanceSheetHeaderFooterTemplates()
-     * for why these have to be self-contained inline HTML (Chromium renders them isolated
-     * from the page's own stylesheet).
-     *
-     * @return array{0: string, 1: string}
-     */
-    private function timesheetHeaderFooterTemplates(?Tenant $sahodaya, ?string $logo, ?string $singleItemName, ?string $singleItemMetaStr = null): array
-    {
-        $orgName = e($sahodaya->name ?? 'SAHODAYA');
-        $eventTitle = e($this->event->title);
-        $generated = e(now()->format('d M Y, h:i A'));
-        $itemMetaLabel = $singleItemMetaStr ?: ($singleItemName ? e($singleItemName) : null);
-        $itemLine = $itemMetaLabel
-            ? '<div style="font-size:11px; font-weight:800; color:#0f172a; margin-top:2px;">'.$itemMetaLabel.'</div>'
-            : '';
-
-        $logoImg = $logo
-            ? '<img src="'.e($logo).'" style="width:34px;height:34px;object-fit:contain;margin-right:10px;">'
-            : '';
-
-        $header = <<<HTML
-            <div style="width:100%; font-family:Arial,sans-serif; padding:0 38px; box-sizing:border-box; border-bottom:2px solid #0f172a; padding-bottom:6px;">
-                <div style="display:flex; align-items:center; justify-content:space-between;">
-                    <div style="display:flex; align-items:center;">
-                        {$logoImg}
-                        <div>
-                            <div style="font-size:14px; font-weight:800; color:#0f172a; text-transform:uppercase; letter-spacing:0.3px;">{$orgName}</div>
-                            <div style="font-size:8px; font-weight:600; color:#475569; margin-top:2px;">CBSE Sahodaya Inter-School Competitions &amp; Events</div>
-                        </div>
-                    </div>
-                    <div style="background:#0f172a; color:#fff; padding:4px 10px; border-radius:4px; font-size:8px; font-weight:bold; letter-spacing:0.4px; white-space:nowrap;">TIMESHEET</div>
-                </div>
-                <div style="margin-top:5px; padding-top:4px; border-top:1px solid #e2e8f0;">
-                    <div style="font-size:8.5px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.3px;">{$eventTitle}</div>
-                    {$itemLine}
-                </div>
-            </div>
-            HTML;
-
-        $footer = <<<HTML
-            <div style="width:100%; font-family:Arial,sans-serif; font-size:7px; color:#64748b; padding:0 38px; box-sizing:border-box; display:flex; justify-content:space-between; border-top:1px solid #cbd5e1; padding-top:4px;">
-                <span>{$orgName} &bull; {$eventTitle} &bull; Generated {$generated}</span>
-                <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
-            </div>
-            HTML;
-
-        return [$header, $footer];
     }
 
     private function attendanceSheetSchoolPdf(Request $request): \Symfony\Component\HttpFoundation\Response
