@@ -22,7 +22,12 @@
             </td>
             @if(!empty($docTitle))
                 <td style="text-align: right; vertical-align: middle;">
-                    <div style="display: inline-block; background: #0f172a; color: #ffffff; padding: 4px 10px; border-radius: 4px; font-size: 10.5px; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase;">
+                    {{-- print-color-adjust forces the dark background to actually render --
+                         when this partial is used as Puppeteer's headerTemplate (isolated
+                         from the main page, a different rendering path than dompdf), a
+                         background color on a plain inline-block otherwise gets silently
+                         stripped, leaving only pale text behind with no box at all. --}}
+                    <div style="display: inline-block; background: #0f172a; color: #ffffff; padding: 4px 10px; border-radius: 4px; font-size: 10.5px; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
                         {{ $docTitle }}
                     </div>
                 </td>

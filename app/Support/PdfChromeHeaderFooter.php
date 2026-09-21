@@ -19,8 +19,15 @@ class PdfChromeHeaderFooter
     {
         $headingHtml = view('partials.pdf-report-heading', $heading)->render();
 
+        // -webkit-print-color-adjust/print-color-adjust: exact on the wrapper is a
+        // belt-and-suspenders default so any dark-background element the heading partial
+        // gains in the future renders correctly here too, not just in pdf-branding-
+        // header.blade.php's own docTitle badge (which sets it explicitly, since a value
+        // on this wrapper isn't guaranteed to be inherited by descendants the same way a
+        // normal CSS property would be -- Puppeteer's header/footer iframe applies its
+        // own print rendering rules per element, not just at the document root).
         $header = <<<HTML
-            <div style="width:100%; font-family:Arial,Helvetica,sans-serif; padding:0 28px; box-sizing:border-box;">
+            <div style="width:100%; font-family:Arial,Helvetica,sans-serif; padding:0 28px; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
                 {$headingHtml}
             </div>
             HTML;
