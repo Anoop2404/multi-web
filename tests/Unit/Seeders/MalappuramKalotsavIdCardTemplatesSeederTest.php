@@ -13,7 +13,7 @@ class MalappuramKalotsavIdCardTemplatesSeederTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_idempotently_seeds_both_complete_templates(): void
+    public function test_each_run_creates_a_fresh_pair_of_complete_templates(): void
     {
         $tenantId = (string) Str::uuid();
         $assetDirectory = base_path("storage/app/public/sahodaya/{$tenantId}/id-card-templates");
@@ -21,11 +21,17 @@ class MalappuramKalotsavIdCardTemplatesSeederTest extends TestCase
         try {
             $seeder = new MalappuramKalotsavIdCardTemplatesSeeder;
             $seeder->seedForTenant($tenantId);
+            $firstRunIds = IdCardTemplate::where('tenant_id', $tenantId)->pluck('id');
             $seeder->seedForTenant($tenantId);
 
             $templates = IdCardTemplate::where('tenant_id', $tenantId)->orderBy('title')->get();
 
-            $this->assertCount(2, $templates);
+            $this->assertCount(4, $templates);
+            $this->assertCount(2, $firstRunIds);
+            $this->assertTrue($firstRunIds->every(fn (int $id) => $templates->contains('id', $id)));
+            $this->assertCount(2, $templates->filter(fn (IdCardTemplate $template) => str_ends_with($template->title, '(Copy 2)')));
+            $this->assertSame(4, $templates->pluck('background_path')->unique()->count());
+            $this->assertSame(1, $templates->where('is_active', true)->count());
             $this->assertTrue($templates->every(fn (IdCardTemplate $template) => $template->cards_per_page === 10));
             $this->assertTrue($templates->every(fn (IdCardTemplate $template) => (float) $template->page_width_mm === 480.06));
             $this->assertTrue($templates->every(fn (IdCardTemplate $template) => (float) $template->page_height_mm === 314.96));

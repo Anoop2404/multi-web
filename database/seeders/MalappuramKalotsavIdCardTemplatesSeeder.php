@@ -12,8 +12,8 @@ use Illuminate\Support\Facades\File;
  *
  * The background artwork is copied from database/seeders/assets and every
  * editable overlay remains in layout_json, including the automatic 1–7 item
- * list. Re-running the seeder updates the same two titled templates instead of
- * creating duplicates.
+ * list. Every run creates a fresh pair of templates; subsequent pairs receive
+ * a numbered "Copy" suffix so they are easy to distinguish in the builder.
  *
  * Usage: php artisan db:seed --class=MalappuramKalotsavIdCardTemplatesSeeder
  */
@@ -47,36 +47,100 @@ class MalappuramKalotsavIdCardTemplatesSeeder extends Seeder
 
     public function seedForTenant(string $tenantId): void
     {
+        $copyNumber = $this->nextCopyNumber($tenantId);
+        $createdIds = [];
+
         foreach ($this->templates() as $definition) {
+            $title = $copyNumber === 1
+                ? $definition['title']
+                : $definition['title']." (Copy {$copyNumber})";
+            $backgroundFilename = $this->copyFilename($definition['background_filename'], $copyNumber);
             $backgroundPath = $this->installBackground(
                 $tenantId,
                 $definition['background_asset'],
-                $definition['background_filename'],
+                $backgroundFilename,
             );
 
-            IdCardTemplate::updateOrCreate(
-                [
-                    'tenant_id' => $tenantId,
-                    'title' => $definition['title'],
-                ],
-                [
-                    'event_id' => null,
-                    'item_id' => null,
-                    'audience' => $definition['audience'],
-                    'background_path' => $backgroundPath,
-                    'card_width_mm' => $definition['card_width_mm'],
-                    'card_height_mm' => $definition['card_height_mm'],
-                    'cards_per_page' => 10,
-                    'page_width_mm' => 480.06,
-                    'page_height_mm' => 314.96,
-                    'grid_json' => $definition['grid_json'],
-                    'layout_json' => $definition['layout_json'],
-                    'is_active' => $definition['is_active'],
-                ],
-            );
+            if ($definition['is_active']) {
+                $this->deactivateMatchingScope($tenantId, $definition['audience']);
+            }
+
+            $created = IdCardTemplate::create([
+                'tenant_id' => $tenantId,
+                'title' => $title,
+                'event_id' => null,
+                'item_id' => null,
+                'audience' => $definition['audience'],
+                'background_path' => $backgroundPath,
+                'card_width_mm' => $definition['card_width_mm'],
+                'card_height_mm' => $definition['card_height_mm'],
+                'cards_per_page' => 10,
+                'page_width_mm' => 480.06,
+                'page_height_mm' => 314.96,
+                'grid_json' => $definition['grid_json'],
+                'layout_json' => $definition['layout_json'],
+                'is_active' => $definition['is_active'],
+            ]);
+
+            $createdIds[] = $created->id;
         }
 
-        $this->command?->info('Seeded the two Malappuram Kalotsav student ID-card templates.');
+        $this->command?->info(
+            'Created two new Malappuram Kalotsav student ID-card templates (IDs: '.implode(', ', $createdIds).').'
+        );
+    }
+
+    private function nextCopyNumber(string $tenantId): int
+    {
+        $baseTitle = $this->templates()[0]['title'];
+        $highestCopy = 0;
+
+        IdCardTemplate::query()
+            ->where('tenant_id', $tenantId)
+            ->where(function ($query) use ($baseTitle) {
+                $query->where('title', $baseTitle)
+                    ->orWhere('title', 'like', $baseTitle.' (Copy %');
+            })
+            ->pluck('title')
+            ->each(function (string $title) use ($baseTitle, &$highestCopy) {
+                if ($title === $baseTitle) {
+                    $highestCopy = max($highestCopy, 1);
+
+                    return;
+                }
+
+                if (preg_match('/^'.preg_quote($baseTitle, '/').' \(Copy (\d+)\)$/u', $title, $matches)) {
+                    $highestCopy = max($highestCopy, (int) $matches[1]);
+                }
+            });
+
+        return $highestCopy + 1;
+    }
+
+    private function copyFilename(string $filename, int $copyNumber): string
+    {
+        if ($copyNumber === 1) {
+            return $filename;
+        }
+
+        $extension = pathinfo($filename, PATHINFO_EXTENSION);
+        $basename = pathinfo($filename, PATHINFO_FILENAME);
+
+        return $basename."-copy-{$copyNumber}.{$extension}";
+    }
+
+    private function deactivateMatchingScope(string $tenantId, ?string $audience): void
+    {
+        $query = IdCardTemplate::query()
+            ->where('tenant_id', $tenantId)
+            ->whereNull('event_id')
+            ->whereNull('item_id');
+
+        $audience === null
+            ? $query->whereNull('audience')
+            : $query->where('audience', $audience);
+
+        $query->update(['is_active' => false]);
     }
 
     private function installBackground(string $tenantId, string $asset, string $filename): string
