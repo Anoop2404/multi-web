@@ -776,6 +776,18 @@ class FestIdCardService
             'qr_src'          => $this->qrService->dataUri($qrPayload),
             'footer'          => null,
             'entity_id'       => (string) $p->id,
+            // A student can be registered for several items, but this card is built
+            // per-participation-row, not per-student — item_row_1 carries this row's
+            // own item; the other slots exist for a template author to use (a future
+            // pass could fill 2-7 with the student's full item list, but that needs an
+            // event-wide aggregation query too heavy to run per card in a bulk sheet).
+            'item_row_1'      => $itemTitleClean,
+            'item_row_2'      => null,
+            'item_row_3'      => null,
+            'item_row_4'      => null,
+            'item_row_5'      => null,
+            'item_row_6'      => null,
+            'item_row_7'      => null,
         ];
     }
 

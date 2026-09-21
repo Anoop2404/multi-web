@@ -351,6 +351,13 @@ class IdCardTemplateController extends SahodayaAdminController
             'footer'          => 'Sample footer',
             'photo_src'       => $this->samplePhotoDataUri(),
             'qr_src'          => null,
+            'item_row_1'      => 'Power Point Presentation',
+            'item_row_2'      => 'Elocution English',
+            'item_row_3'      => 'Quiz Junior',
+            'item_row_4'      => 'Painting on the Spot',
+            'item_row_5'      => 'Group Song Malayalam',
+            'item_row_6'      => 'Classical Dance Solo',
+            'item_row_7'      => 'Debate Malayalam',
         ];
     }
 

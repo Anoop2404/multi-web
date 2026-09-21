@@ -52,6 +52,13 @@ class IdCardTemplate extends Model
             'student_class'    => 'Class',
             'schedule'         => 'Schedule line',
             'footer'           => 'Footer text',
+            'item_row_1'       => 'Participating item 1',
+            'item_row_2'       => 'Participating item 2',
+            'item_row_3'       => 'Participating item 3',
+            'item_row_4'       => 'Participating item 4',
+            'item_row_5'       => 'Participating item 5',
+            'item_row_6'       => 'Participating item 6',
+            'item_row_7'       => 'Participating item 7',
         ];
     }
 
