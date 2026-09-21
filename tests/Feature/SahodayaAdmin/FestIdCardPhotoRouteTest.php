@@ -173,4 +173,39 @@ class FestIdCardPhotoRouteTest extends TestCase
         $response->assertOk();
         $this->assertEquals('application/pdf', $response->headers->get('content-type'));
     }
+
+    public function test_die_generator_page_renders_successfully(): void
+    {
+        $response = $this->actingAs($this->sahodayaAdmin)->get(
+            "/sahodaya-admin/{$this->sahodaya->id}/events/{$this->event->id}/id-cards/die"
+        );
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Sahodaya/Events/IdCards/DieGenerator', false)
+            ->has('schools')
+            ->has('volumes')
+            ->has('totalParticipants')
+        );
+    }
+
+    public function test_pdf_die_downloads_single_school_pdf(): void
+    {
+        $response = $this->actingAs($this->sahodayaAdmin)->get(
+            "/sahodaya-admin/{$this->sahodaya->id}/events/{$this->event->id}/id-cards/die/pdf?school_id={$this->school->id}"
+        );
+
+        $response->assertOk();
+        $this->assertEquals('application/pdf', $response->headers->get('content-type'));
+    }
+
+    public function test_pdf_die_downloads_all_schools_pdf(): void
+    {
+        $response = $this->actingAs($this->sahodayaAdmin)->get(
+            "/sahodaya-admin/{$this->sahodaya->id}/events/{$this->event->id}/id-cards/die/pdf"
+        );
+
+        $response->assertOk();
+        $this->assertEquals('application/pdf', $response->headers->get('content-type'));
+    }
 }

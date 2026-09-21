@@ -168,6 +168,7 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
         { label: 'Student item limits', href: `${base}/reports/student-limits`, icon: 'bar-chart', permissions: FEST_VIEW },
         { label: 'Certificates', href: `${base}/certificates`, icon: 'award', permissions: FEST_CERTIFICATES },
         { label: 'ID cards', href: `${base}/id-cards`, icon: 'credit-card', permissions: FEST_VIEW },
+        { label: 'ID cards (Die Cut)', href: `${base}/id-cards/die`, icon: 'grid', permissions: FEST_VIEW },
     ];
 
     if (caps.hasEventFees) {

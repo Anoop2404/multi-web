@@ -319,6 +319,180 @@ class FestIdCardController extends SahodayaAdminController
         );
     }
 
+    public function dieGenerator(Request $request, string $tenantId, FestEvent $event, FestIdCardService $service)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+        $customTemplate = $this->resolveCustomIdCardTemplate($targetEvent, null, 'student');
+
+        $filters = $this->idCardFilters($request);
+        $filters['scope'] = 'event';
+        $filters['include_data_uris'] = false;
+
+        $allSections = $service->cardsGroupedBySchool($targetEvent, $filters);
+
+        $gridLayout = $customTemplate?->gridLayout();
+        $perPage = $gridLayout ? ($gridLayout['cols'] * $gridLayout['rows']) : 4;
+
+        $schoolList = [];
+        $totalParticipants = 0;
+        $totalEstimatedPages = 0;
+
+        foreach ($allSections as $section) {
+            $count = count($section['cards'] ?? []);
+            $pages = (int) ceil($count / max(1, $perPage));
+            $totalParticipants += $count;
+            $totalEstimatedPages += $pages;
+
+            $schoolList[] = [
+                'school_id'         => $section['school_id'] ?? null,
+                'school_name'       => $section['school_name'] ?? 'School',
+                'school_code'       => $section['cards'][0]['school_code'] ?? null,
+                'participant_count' => $count,
+                'page_count'        => $pages,
+            ];
+        }
+
+        // Build volumes: group schools so each volume is ~80–120 pages (or ~400-500 students)
+        $volumes = [];
+        $currentVolumeSchools = [];
+        $currentVolumePages = 0;
+        $currentVolumeStudents = 0;
+        $volumeIndex = 1;
+
+        foreach ($schoolList as $sc) {
+            if ($currentVolumePages > 0 && ($currentVolumePages + $sc['page_count']) > 120) {
+                $volumes[] = [
+                    'volume'         => $volumeIndex++,
+                    'school_count'   => count($currentVolumeSchools),
+                    'student_count'  => $currentVolumeStudents,
+                    'page_count'     => $currentVolumePages,
+                    'school_from'    => $currentVolumeSchools[0]['school_name'],
+                    'school_to'      => end($currentVolumeSchools)['school_name'],
+                    'school_ids'     => array_column($currentVolumeSchools, 'school_id'),
+                ];
+                $currentVolumeSchools = [];
+                $currentVolumePages = 0;
+                $currentVolumeStudents = 0;
+            }
+
+            $currentVolumeSchools[] = $sc;
+            $currentVolumePages += $sc['page_count'];
+            $currentVolumeStudents += $sc['participant_count'];
+        }
+
+        if (! empty($currentVolumeSchools)) {
+            $volumes[] = [
+                'volume'         => $volumeIndex,
+                'school_count'   => count($currentVolumeSchools),
+                'student_count'  => $currentVolumeStudents,
+                'page_count'     => $currentVolumePages,
+                'school_from'    => $currentVolumeSchools[0]['school_name'],
+                'school_to'      => end($currentVolumeSchools)['school_name'],
+                'school_ids'     => array_column($currentVolumeSchools, 'school_id'),
+            ];
+        }
+
+        // Sample preview cards (first 1-2 pages of the first school, or sample cards)
+        $firstSchool = $allSections[0] ?? null;
+        $sampleCards = array_slice($firstSchool['cards'] ?? [], 0, $perPage * 2);
+
+        return $this->inertia('Sahodaya/Events/IdCards/DieGenerator', $this->withEventActivity($event, FestPageActivity::ID_CARDS, [
+            'event'               => $targetEvent->only('id', 'title', 'status', 'event_type'),
+            'sahodaya'            => $this->sahodaya->only('id', 'name', 'logo_url'),
+            'childEvents'         => $this->scopedChildEventOptions($event),
+            'schools'             => $schoolList,
+            'volumes'             => $volumes,
+            'totalParticipants'   => $totalParticipants,
+            'totalSchools'        => count($schoolList),
+            'totalEstimatedPages' => $totalEstimatedPages,
+            'perPage'             => $perPage,
+            'activeTemplate'      => $customTemplate ? [
+                'id'             => $customTemplate->id,
+                'name'           => $customTemplate->name,
+                'card_width_mm'  => $customTemplate->card_width_mm,
+                'card_height_mm' => $customTemplate->card_height_mm,
+                'page_width_mm'  => $customTemplate->page_width_mm,
+                'page_height_mm' => $customTemplate->page_height_mm,
+                'grid_layout'    => $gridLayout,
+                'fields'         => $customTemplate->fields(),
+                'background_url' => $customTemplate->background_path
+                    ? TenantStorage::logoUrl($this->sahodaya, $customTemplate->background_path)
+                    : null,
+            ] : null,
+            'previewCards'        => $sampleCards,
+            'previewSchoolName'   => $firstSchool['school_name'] ?? null,
+        ]));
+    }
+
+    public function pdfDie(Request $request, string $tenantId, FestEvent $event, FestIdCardService $service, PlatformAuditLogger $audit)
+    {
+        @ini_set('memory_limit', '1024M');
+        @set_time_limit(600);
+
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+
+        $filters = $this->idCardFilters($request);
+        $filters['scope'] = 'event';
+        $filters['include_data_uris'] = true;
+        unset($filters['head_id']);
+
+        if ($request->filled('school_id')) {
+            $filters['school_id'] = $request->input('school_id');
+        }
+
+        $allSections = $service->cardsGroupedBySchool($targetEvent, $filters);
+        abort_if($allSections === [], 422, 'No approved participants found for this selection.');
+
+        if ($request->filled('school_ids')) {
+            $allowedSchoolIds = (array) $request->input('school_ids');
+            $sections = array_values(array_filter($allSections, fn ($s) => in_array($s['school_id'], $allowedSchoolIds, true)));
+            abort_if($sections === [], 422, 'No schools match the requested volume.');
+        } else {
+            $sections = $allSections;
+        }
+
+        $totalCards = collect($sections)->sum(fn ($section) => count($section['cards']));
+        $customTemplate = $this->resolveCustomIdCardTemplate($targetEvent, null, 'student');
+
+        $audit->festEvent($targetEvent, FestPageActivity::ID_CARDS, 'fest.id_cards.die_generated', 'Die ID cards PDF generated', [
+            'count'     => $totalCards,
+            'schools'   => count($sections),
+            'volume'    => $request->input('volume'),
+            'school_id' => $request->input('school_id'),
+        ]);
+
+        $slug = str($targetEvent->title)->slug('-');
+        $scopeSuffix = $request->filled('school_id')
+            ? ('school-' . ($sections[0]['school_code'] ?? 'die'))
+            : ($request->filled('volume') ? ('volume-' . $request->input('volume')) : 'die-all');
+
+        $isDomPdf = empty(config('services.pdf_converter.url'));
+        $cards = collect($sections)->flatMap(fn ($section) => $section['cards'])->values()->all();
+
+        $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
+            $targetEvent,
+            $this->sahodaya,
+            $cards,
+            'student',
+            false,
+            $sections,
+            $customTemplate,
+            $isDomPdf,
+        ))->render();
+
+        return \App\Support\PdfGenerator::download(
+            $html,
+            "{$slug}-{$scopeSuffix}-id-cards.pdf",
+            isLandscape: true,
+            pageWidthMm: $customTemplate?->page_width_mm,
+            pageHeightMm: $customTemplate?->page_height_mm,
+        );
+    }
+
     /**
      * Human-readable class/age-bracket or arts-genre label for an item, for display
      * next to the item's title in pickers. Sports events use age_group; everything

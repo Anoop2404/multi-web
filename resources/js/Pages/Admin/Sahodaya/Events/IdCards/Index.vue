@@ -179,6 +179,10 @@
                 <div v-if="audience === 'head' || audience === 'participant'" class="card space-y-3">
                     <h3 class="section-title text-sm">Bulk downloads</h3>
                     <p class="text-xs text-slate-500">Generate bulk PDFs in the active template / die-cut layout. Each school starts on a separate page so sheets can be handed out cleanly.</p>
+                    <Link :href="`${base}/die`" class="btn-primary w-full text-xs py-2 text-center block !bg-emerald-600 hover:!bg-emerald-700 text-white font-bold tracking-wide shadow-sm flex items-center justify-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
+                        Dedicated Die Generator (500–1000 Pages) →
+                    </Link>
                     <a :href="`${base}/pdf-all-schools?audience=student&template=${cardTemplate}&scope=${filters.scope || 'event'}`" class="btn-primary w-full text-sm text-center block !bg-indigo-700 hover:!bg-indigo-800 text-white font-semibold">
                         All schools (die / separate pages) PDF ↓
                     </a>
