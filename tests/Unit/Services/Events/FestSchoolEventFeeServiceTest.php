@@ -921,6 +921,7 @@ class FestSchoolEventFeeServiceTest extends TestCase
             ['Mime', 'Mono Act'],
             collect(range(1, 7))->map(fn ($row) => $sections[0]['cards'][0]['item_row_'.$row])->filter()->all(),
         );
+        $this->assertSame(['Mime', 'Mono Act'], $sections[0]['cards'][0]['participating_items']);
     }
 
     public function test_event_participant_cards_dedupe_by_student(): void
@@ -969,6 +970,7 @@ class FestSchoolEventFeeServiceTest extends TestCase
             ['Mime', 'Mono Act'],
             collect(range(1, 7))->map(fn ($row) => $cards[0]['item_row_'.$row])->filter()->all(),
         );
+        $this->assertSame(['Mime', 'Mono Act'], $cards[0]['participating_items']);
     }
 
     public function test_cards_grouped_by_item_returns_sections(): void
@@ -1036,6 +1038,7 @@ class FestSchoolEventFeeServiceTest extends TestCase
             ['Mono Act', 'Mime'],
             collect(range(1, 7))->map(fn ($row) => $cards[0]['item_row_'.$row])->filter()->values()->all(),
         );
+        $this->assertEqualsCanonicalizing(['Mono Act', 'Mime'], $cards[0]['participating_items']);
         $this->assertNotEmpty($cards[0]['qr_src']);
     }
 

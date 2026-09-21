@@ -164,9 +164,17 @@
                                 <label class="text-[10px] uppercase text-slate-400">Field key</label>
                                 <input v-model.trim="field.key" type="text" maxlength="60" class="field text-sm" placeholder="e.g. school_code">
                             </div>
-                            <div v-if="['text', 'item_row'].includes(field.type)" class="sm:col-span-2">
+                            <div v-if="field.type === 'text'" class="sm:col-span-2">
                                 <label class="text-[10px] uppercase text-slate-400">Data source</label>
                                 <SearchableSelect v-model="field.source" :options="dataSourceSelectOptions" :all-option="false" placeholder="Select data source" />
+                            </div>
+                            <div v-else-if="field.type === 'item_list'" class="sm:col-span-2">
+                                <label class="text-[10px] uppercase text-slate-400">Data source</label>
+                                <input value="Registered participating items (automatic)" disabled class="field text-sm bg-slate-50">
+                            </div>
+                            <div v-else-if="field.type === 'item_row'" class="sm:col-span-2">
+                                <label class="text-[10px] uppercase text-slate-400">Data source</label>
+                                <input value="Legacy single participating-item row" disabled class="field text-sm bg-slate-50">
                             </div>
                             <div v-else-if="['photo', 'qr'].includes(field.type)" class="sm:col-span-2">
                                 <label class="text-[10px] uppercase text-slate-400">Data source</label>
@@ -180,6 +188,16 @@
                                 <label class="text-[10px] uppercase text-slate-400">Item number</label>
                                 <input v-model.number="field.row" type="number" min="1" max="20" class="field text-sm">
                             </div>
+                            <template v-if="field.type === 'item_list'">
+                                <div>
+                                    <label class="text-[10px] uppercase text-slate-400">Maximum items</label>
+                                    <input v-model.number="field.max_items" type="number" min="1" max="7" class="field text-sm">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] uppercase text-slate-400">Columns</label>
+                                    <input v-model.number="field.columns" type="number" min="1" max="2" class="field text-sm">
+                                </div>
+                            </template>
 
                             <div>
                                 <label class="text-[10px] uppercase text-slate-400">Top %</label>
@@ -511,7 +529,7 @@ const fieldTypeOptions = [
     { value: 'static_text', label: 'Static label' },
     { value: 'photo', label: 'Participant photo' },
     { value: 'qr', label: 'QR code' },
-    { value: 'item_row', label: 'Participating-item row' },
+    { value: 'item_list', label: 'Participating items (automatic list)' },
     { value: 'shape', label: 'Shape / ribbon' },
     { value: 'divider', label: 'Divider line' },
 ];
@@ -533,11 +551,12 @@ const fontFamilySelectOptions = computed(() => props.fontFamilyOptions.map(font 
 })));
 
 function fieldTypeLabel(type) {
+    if (type === 'item_row') return 'Legacy participating-item row';
     return fieldTypeOptions.find(option => option.value === type)?.label || type || 'Unconfigured field';
 }
 
 function isTypographyField(field) {
-    return ['text', 'static_text', 'item_row'].includes(field.type);
+    return ['text', 'static_text', 'item_list', 'item_row'].includes(field.type);
 }
 
 function validHexColor(color) {
@@ -557,6 +576,13 @@ function changeFieldType(field, type) {
         field.source = props.dataSourceOptions[field.source] ? field.source : 'name';
         field.font_size ??= 10;
         field.font_family ??= 'Arial';
+    } else if (type === 'item_list') {
+        field.source = 'participating_items';
+        field.font_size ??= 10;
+        field.font_family ??= 'Arial';
+        field.height ??= 10.6;
+        field.columns ??= 2;
+        field.max_items ??= 7;
     } else if (type === 'item_row') {
         field.row ??= 1;
         field.source = String(field.source || '').startsWith('item_row_') ? field.source : `item_row_${field.row}`;

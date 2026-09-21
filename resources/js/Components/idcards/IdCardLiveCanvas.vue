@@ -23,6 +23,19 @@
                          :style="mediaFieldStyle(field, { top: 4, left: 82, width: 14, height: 14 })">
                         QR
                     </div>
+                    <div v-else-if="field.type === 'item_list' && participatingItems(field).length"
+                         class="absolute flex overflow-hidden"
+                         :style="itemListStyle(field)">
+                        <div v-for="(column, columnIndex) in itemColumns(field)" :key="columnIndex"
+                             class="flex min-w-0 flex-1 flex-col"
+                             :style="columnIndex ? { paddingLeft: '1.5%' } : { paddingRight: '1.5%' }">
+                            <div v-for="item in column" :key="item.number"
+                                 class="flex items-center overflow-hidden whitespace-nowrap text-ellipsis"
+                                 :style="{ height: `${100 / itemRowCount(field)}%` }">
+                                {{ item.number }}) {{ item.text }}
+                            </div>
+                        </div>
+                    </div>
                     <div v-else-if="field.type === 'item_row' && sampleValue(field.source)"
                          class="absolute flex items-center overflow-hidden whitespace-nowrap text-ellipsis"
                          :style="itemRowStyle(field)">
@@ -117,6 +130,15 @@ const SAMPLE = {
     schedule: 'Sample schedule line',
     footer: 'Sample footer',
     items_inline: 'Painting Water Colour | Recitation - Malayalam | Essay Writing Malayalam | Light Music - Malayalam | Classical Music - Karnatic',
+    participating_items: [
+        'Power Point Presentation',
+        'Elocution English',
+        'Quiz Junior',
+        'Painting on the Spot',
+        'Group Song Malayalam',
+        'Classical Dance Solo',
+        'Debate Malayalam',
+    ],
     item_row_1: 'Power Point Presentation',
     item_row_2: 'Elocution English',
     item_row_3: 'Quiz Junior',
@@ -190,6 +212,50 @@ function itemRowStyle(field = {}) {
         height: `${field.height ?? 2.4}%`,
         display: 'flex',
         alignItems: 'center',
+    };
+}
+
+function participatingItems(field = {}) {
+    const value = sampleValue(field.source || 'participating_items');
+    const maxItems = Math.max(1, Math.min(7, Number(field.max_items ?? 7)));
+
+    return (Array.isArray(value) ? value : [])
+        .map(item => String(item || '').trim())
+        .filter(Boolean)
+        .slice(0, maxItems)
+        .map((text, index) => ({ number: index + 1, text }));
+}
+
+function itemColumnCount(field = {}) {
+    return Math.max(1, Math.min(2, Number(field.columns ?? 2)));
+}
+
+function itemRowCount(field = {}) {
+    const maxItems = Math.max(1, Math.min(7, Number(field.max_items ?? 7)));
+
+    return Math.max(1, Math.ceil(maxItems / itemColumnCount(field)));
+}
+
+function itemColumns(field = {}) {
+    const items = participatingItems(field);
+    const columns = itemColumnCount(field);
+    const rows = itemRowCount(field);
+
+    return Array.from({ length: columns }, (_, index) => items.slice(index * rows, (index + 1) * rows));
+}
+
+function itemListStyle(field = {}) {
+    return {
+        ...overlayStyle({
+            font_size: 10,
+            font_family: 'Arial',
+            font_weight: 'normal',
+            color: '#ffffff',
+            ...field,
+        }),
+        height: `${field.height ?? 10.6}%`,
+        display: 'flex',
+        alignItems: undefined,
     };
 }
 

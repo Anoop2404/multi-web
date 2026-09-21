@@ -866,6 +866,7 @@ class FestIdCardService
             'footer'          => null,
             'entity_id'       => (string) $p->id,
             'items_inline'    => $itemTitleDisplay,
+            'participating_items' => $itemTitleDisplay ? [$itemTitleDisplay] : [],
             // individualStudentCards() replaces these placeholders with the person's
             // complete, pre-fetched event item list. Keeping row 1 here makes direct
             // participantCard() consumers useful without introducing an N+1 query.
@@ -970,6 +971,7 @@ class FestIdCardService
             $card['item_row_'.$row] = $titles->get($row - 1);
         }
         $card['items_inline'] = $titles->implode(' | ');
+        $card['participating_items'] = $titles->all();
 
         return $card;
     }

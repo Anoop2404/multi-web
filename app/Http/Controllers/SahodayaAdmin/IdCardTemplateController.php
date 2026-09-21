@@ -186,7 +186,7 @@ class IdCardTemplateController extends SahodayaAdminController
             'grid_row_pitch_mm'          => 'nullable|numeric|min:0|max:2000',
             'fields'                  => 'nullable|array',
             'fields.*.key'            => 'nullable|string|max:60',
-            'fields.*.type'           => ['nullable', Rule::in(['text', 'photo', 'qr', 'item_row', 'shape', 'static_text', 'divider'])],
+            'fields.*.type'           => ['nullable', Rule::in(['text', 'photo', 'qr', 'item_list', 'item_row', 'shape', 'static_text', 'divider'])],
             'fields.*.source'         => 'nullable|string|max:60',
             'fields.*.top'            => 'nullable|numeric|min:0|max:100',
             'fields.*.left'           => 'nullable|numeric|min:0|max:100',
@@ -204,6 +204,8 @@ class IdCardTemplateController extends SahodayaAdminController
             // template-configured chrome (column labels, ribbons, gradient items
             // header); 'item_row' is a numbered participating-item row.
             'fields.*.row'            => 'nullable|integer|min:1|max:20',
+            'fields.*.columns'        => 'nullable|integer|min:1|max:2',
+            'fields.*.max_items'      => 'nullable|integer|min:1|max:7',
             'fields.*.text'           => 'nullable|string|max:120',
             'fields.*.color'          => ['nullable', 'string', 'max:20', 'regex:/^#[0-9a-fA-F]{3,8}$/'],
             'fields.*.gradient_from'  => ['nullable', 'string', 'max:20', 'regex:/^#[0-9a-fA-F]{3,8}$/'],
@@ -365,6 +367,15 @@ class IdCardTemplateController extends SahodayaAdminController
             'schedule'        => 'Sample schedule line',
             'footer'          => 'Sample footer',
             'items_inline'    => 'Painting Water Colour | Recitation - Malayalam | Essay Writing Malayalam | Light Music - Malayalam - Girls | Mappillapattu (Boys) (MCS) | Classical Music - Karnatic (Boys)',
+            'participating_items' => [
+                'Power Point Presentation',
+                'Elocution English',
+                'Quiz Junior',
+                'Painting on the Spot',
+                'Group Song Malayalam',
+                'Classical Dance Solo',
+                'Debate Malayalam',
+            ],
             'photo_src'       => $this->samplePhotoDataUri(),
             'qr_src'          => null,
             'item_row_1'      => 'Power Point Presentation',

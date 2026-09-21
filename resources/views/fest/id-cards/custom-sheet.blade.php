@@ -60,6 +60,27 @@
             display: flex; align-items: center;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
+        .card__item-list {
+            position: absolute;
+            overflow: hidden;
+        }
+        .card__item-list table {
+            width: 100%;
+            height: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        .card__item-list td {
+            padding: 0;
+            vertical-align: middle;
+        }
+        .card__item-list td:first-child:not(:last-child) { padding-right: 1.5%; }
+        .card__item-list td + td { padding-left: 1.5%; }
+        .card__item-list-row {
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
         .card__shape {
             position: absolute;
         }

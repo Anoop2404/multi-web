@@ -82,6 +82,7 @@ class DemoTenantsSeeder extends Seeder
 
         $this->command?->line('Seeding fest master catalogs…');
         (new FestCatalogSeeder)->run($malappuram->id);
+        (new MalappuramKalotsavIdCardTemplatesSeeder)->seedForTenant((string) $malappuram->id);
 
         $malappuram->setSetting('logo', '/images/tenants/malappuram-logo.png');
 
