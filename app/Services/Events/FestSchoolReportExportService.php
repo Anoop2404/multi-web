@@ -95,7 +95,7 @@ class FestSchoolReportExportService
             'categoryLabel' => $categoryLabel,
             'rows'          => $rows,
             ...$this->brandingData($event),
-        ])->download("{$slug}-{$itemSlug}-participants.pdf");
+        ], "{$slug}-{$itemSlug}-participants.pdf", true);
     }
 
     /** @param list<array<string, mixed>> $rows */
@@ -154,7 +154,7 @@ class FestSchoolReportExportService
             'school' => $school,
             'rows'   => $rows,
             ...$this->brandingData($event),
-        ])->download("{$slug}-discipline-participation.pdf");
+        ], "{$slug}-discipline-participation.pdf", true);
     }
 
     public function participationPdf(FestEvent $event, Tenant $school, array $used, array $limits): Response
@@ -167,7 +167,7 @@ class FestSchoolReportExportService
             'used'   => $used,
             'limits' => $limits,
             ...$this->brandingData($event),
-        ])->download("{$slug}-participation-limits.pdf");
+        ], "{$slug}-participation-limits.pdf", true);
     }
 
     public function markEntryStatusPdf(FestEvent $event, Tenant $school, array $rows, array $summary): Response

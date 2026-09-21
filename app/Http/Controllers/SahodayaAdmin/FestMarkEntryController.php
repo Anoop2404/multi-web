@@ -1745,6 +1745,9 @@ class FestMarkEntryController extends SahodayaAdminController
      */
     public function bulkComboPdf(Request $request, string $tenantId, FestEvent $event, FestNumberingService $numbering, FestMarkCriteriaService $criteriaService)
     {
+        @ini_set('memory_limit', '1024M');
+        @set_time_limit(600);
+
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $types = collect((array) $request->input('report_types', []))
@@ -1773,18 +1776,21 @@ class FestMarkEntryController extends SahodayaAdminController
         foreach ($types as $type) {
             $extra = in_array($type, ['judge_sheet_no_chest', 'sum_sheet_no_chest'], true) ? ['blank_chest' => 1] : [];
             // attendance_sheet/timesheet go through FestReportService::export(), whose
-            // $this->preview defaults to true unless download=1 is explicitly set (see
-            // its own docblock) -- and attendanceSheetPdf()/timesheetPdf() BOTH return
-            // raw HTML (Content-Type: text/html) instead of a PDF at all when in preview
-            // mode, meant for this same page's own on-screen preview panel. Without this,
-            // every merge silently fed FPDI an HTML page instead of a PDF for these two
-            // types -- confirmed live in production ("Unable to find PDF file header").
-            // The OTHER bulk buttons on this same page already knew to add this; the
-            // combo/merge path just hadn't been taught the same thing.
-            if (in_array($type, ['attendance_sheet', 'timesheet'], true)) {
-                $extra['download'] = 1;
-            }
-            $subRequest = $request->duplicate($baseParams + $extra);
+            // $this->preview defaults to true unless download=1 is explicitly set -- and
+            // attendanceSheetPdf()/timesheetPdf() BOTH return raw HTML (Content-Type: text/html)
+            // when in preview mode. Enforce download=1 and strip preview/inline parameters so
+            // every merged report produces real PDF binary bytes.
+            $subParams = array_merge($request->all(), $baseParams, $extra, [
+                'download' => 1,
+            ]);
+            unset($subParams['preview'], $subParams['inline']);
+            $subRequest = $request->duplicate($subParams);
+            $subRequest->query->remove('preview');
+            $subRequest->query->remove('inline');
+            $subRequest->query->set('download', '1');
+            $subRequest->request->remove('preview');
+            $subRequest->request->remove('inline');
+            $subRequest->request->set('download', '1');
 
             try {
                 $response = match ($type) {
@@ -1793,8 +1799,10 @@ class FestMarkEntryController extends SahodayaAdminController
                     'result_declaration' => $this->resultDeclarationSheet($subRequest, $tenantId, $event, $numbering),
                     'chest_number_list' => app()->makeWith(\App\Http\Controllers\SahodayaAdmin\FestChestNumberController::class, ['request' => $subRequest])
                         ->print($subRequest, $tenantId, $event),
-                    'attendance_sheet' => (new \App\Services\Events\FestReportService($event))->export('attendance-sheet', $subRequest),
-                    'timesheet' => (new \App\Services\Events\FestReportService($event))->export('timesheet', $subRequest),
+                    'attendance_sheet' => tap(new \App\Services\Events\FestReportService($event), fn ($s) => $s->preview = false)
+                        ->export('attendance-sheet', $subRequest),
+                    'timesheet' => tap(new \App\Services\Events\FestReportService($event), fn ($s) => $s->preview = false)
+                        ->export('timesheet', $subRequest),
                     default => null,
                 };
             } catch (\Throwable $e) {
@@ -1807,7 +1815,12 @@ class FestMarkEntryController extends SahodayaAdminController
                 continue;
             }
 
-            $pdfBytesByType[$type] = $this->responseToPdfBytes($response);
+            $bytes = $this->responseToPdfBytes($response);
+            if (str_starts_with(ltrim($bytes), '%PDF')) {
+                $pdfBytesByType[$type] = $bytes;
+            } else {
+                \Illuminate\Support\Facades\Log::warning("bulkComboPdf: skipping non-PDF response for '{$type}'");
+            }
         }
 
         abort_if($pdfBytesByType === [], 422, 'None of the selected reports had anything to include for this selection.');

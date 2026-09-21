@@ -146,6 +146,18 @@ class NotificationService
                 'title' => 'Event registration cancelled',
                 'body_template' => 'Registration for {{event_title}} ({{item_title}}) has been cancelled.',
             ],
+            'fest.registration.withdrawn_admin' => [
+                'title' => 'Event registration withdrawn',
+                'body_template' => '{{school_name}} withdrew registration for {{event_title}} ({{item_title}}).',
+            ],
+            'fest.registration.submitted_admin' => [
+                'title' => 'New registration submitted',
+                'body_template' => '{{school_name}} submitted registration for {{event_title}} ({{item_title}}).',
+            ],
+            'fest.registration.needs_reapproval_admin' => [
+                'title' => 'Registration needs re-approval',
+                'body_template' => 'A roster change for {{event_title}} ({{item_title}}) requires re-approval.',
+            ],
             default => null,
         };
     }
