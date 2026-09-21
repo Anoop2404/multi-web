@@ -6,6 +6,28 @@ use Tests\TestCase;
 
 class FestIdCardCustomCardTest extends TestCase
 {
+    public function test_dynamic_text_format_combines_editable_labels_and_card_values(): void
+    {
+        $html = view('fest.id-cards.partials.custom-card', [
+            'cardWidthMm' => 89,
+            'cardHeightMm' => 135,
+            'backgroundUrl' => null,
+            'card' => [
+                'category' => 'II',
+                'roll_no' => '10495',
+                'gender_upper' => 'FEMALE',
+            ],
+            'fields' => [[
+                'key' => 'student_info_inline',
+                'type' => 'text',
+                'source' => 'student_info_inline',
+                'text_format' => 'CATEGORY: {category} | ROLL NO: {roll_no} | GENDER: {gender_upper}',
+            ]],
+        ])->render();
+
+        $this->assertStringContainsString('CATEGORY: II | ROLL NO: 10495 | GENDER: FEMALE', $html);
+    }
+
     public function test_participating_item_list_numbers_only_the_registered_items(): void
     {
         $html = view('fest.id-cards.partials.custom-card', [

@@ -815,8 +815,8 @@ class FestIdCardService
         // Em spaces survive HTML whitespace collapsing, keeping the three footer
         // groups visibly separated in both browser previews and generated PDFs.
         $studentInfoInline = implode("\u{2003}\u{2003}", array_filter([
-            $categoryDisplay !== '—' ? "CATEGORY : {$categoryDisplay}" : null,
-            $studentRegNo && $studentRegNo !== '—' ? "ROLL No.: {$studentRegNo}" : null,
+            $categoryDisplay !== '—' ? "CATEGORY: {$categoryDisplay}" : null,
+            $rollNo && $rollNo !== '—' ? "ROLL NO: {$rollNo}" : null,
             $genderDisplay !== '' ? "GENDER: ".mb_strtoupper($genderDisplay) : null,
         ]));
 
@@ -829,6 +829,7 @@ class FestIdCardService
             'name'            => $name,
             'initials'        => $this->initials($name),
             'gender'          => $genderDisplay,
+            'gender_upper'    => mb_strtoupper($genderDisplay),
             'photo_url'       => $photoUrl,
             'photo_src'       => $photoSrc,
             'subtitle'        => $schoolDisplay,

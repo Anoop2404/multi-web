@@ -184,6 +184,14 @@
                                 <label class="text-[10px] uppercase text-slate-400">Displayed text</label>
                                 <input v-model="field.text" type="text" maxlength="120" class="field text-sm" placeholder="Static label">
                             </div>
+                            <div v-if="field.type === 'text'" class="sm:col-span-6">
+                                <label class="text-[10px] uppercase text-slate-400">Text format (optional)</label>
+                                <input v-model="field.text_format" type="text" maxlength="255" class="field text-sm"
+                                       placeholder="Example: CATEGORY: {category}  ROLL NO: {roll_no}  GENDER: {gender_upper}">
+                                <p class="mt-1 text-[11px] text-slate-400">
+                                    Use {source_name} placeholders to combine dynamic values and editable labels in one line. Leave blank to show the selected data source directly.
+                                </p>
+                            </div>
                             <div v-if="field.type === 'item_row'">
                                 <label class="text-[10px] uppercase text-slate-400">Item number</label>
                                 <input v-model.number="field.row" type="number" min="1" max="20" class="field text-sm">
@@ -235,7 +243,7 @@
                                 </div>
                                 <div>
                                     <label class="text-[10px] uppercase text-slate-400">Line height</label>
-                                    <input v-model.number="field.line_height" type="number" min="0.8" max="2" step="0.05" class="field text-sm" placeholder="1.25">
+                                    <input v-model.number="field.line_height" type="number" min="0.8" max="2" step="any" class="field text-sm" placeholder="1.25">
                                 </div>
                                 <div>
                                     <label class="text-[10px] uppercase text-slate-400">Text color</label>
@@ -691,6 +699,7 @@ function duplicateField(index) {
 }
 
 function editTemplate(template) {
+    form.clearErrors();
     editingId.value = template.id;
     editingTemplate.value = template;
     form.title = template.title || '';
@@ -718,6 +727,7 @@ function editTemplate(template) {
 }
 
 function cancelEdit() {
+    form.transform(data => data);
     editingId.value = null;
     editingTemplate.value = null;
     form.title = '';
@@ -759,7 +769,10 @@ function upload() {
         return;
     }
 
-    form.post(`/sahodaya-admin/${props.sahodaya.id}/id-card-templates`, options);
+    // An earlier edit posts multipart data with a spoofed PUT method. Reset the
+    // transform explicitly so a later "new template" submission cannot inherit it.
+    form.transform(data => data)
+        .post(`/sahodaya-admin/${props.sahodaya.id}/id-card-templates`, options);
 }
 
 async function remove(template) {

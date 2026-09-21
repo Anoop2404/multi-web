@@ -51,9 +51,9 @@
                     <div v-else-if="field.type === 'divider'" class="absolute"
                          :style="dividerStyle(field)">
                     </div>
-                    <div v-else-if="sampleValue(field.source) !== null" class="absolute overflow-hidden"
+                    <div v-else-if="displayValue(field) !== null" class="absolute overflow-hidden"
                          :style="overlayStyle(field)">
-                        <span :style="field.wrap ? { display: 'block', width: '100%' } : undefined">{{ sampleValue(field.source) }}</span>
+                        <span :style="field.wrap ? { display: 'block', width: '100%' } : undefined">{{ displayValue(field) }}</span>
                     </div>
                 </template>
             </div>
@@ -120,13 +120,14 @@ const SAMPLE = {
     chest_number: '000',
     category: 'III',
     gender: 'Sample',
+    gender_upper: 'FEMALE',
     school_code: 'ABC-001',
     student_reg_no: 'STU/27/10495',
     roll_no: '10495',
     student_seq_id: '10495',
     student_id: 'STU/27/10495',
     student_class: 'X',
-    student_info_inline: 'CATEGORY : II\u2003\u2003ROLL No.: STU/27/10495\u2003\u2003GENDER: FEMALE',
+    student_info_inline: 'CATEGORY: II\u2003\u2003ROLL NO: 10495\u2003\u2003GENDER: FEMALE',
     schedule: 'Sample schedule line',
     footer: 'Sample footer',
     items_inline: 'Painting Water Colour | Recitation - Malayalam | Essay Writing Malayalam | Light Music - Malayalam | Classical Music - Karnatic',
@@ -151,6 +152,15 @@ const SAMPLE = {
 function sampleValue(source) {
     if (!source) return null;
     return SAMPLE[source] ?? null;
+}
+
+function displayValue(field = {}) {
+    if (!field.text_format) return sampleValue(field.source);
+
+    return String(field.text_format).replace(/\{([a-zA-Z0-9_]+)\}/g, (_, source) => {
+        const value = sampleValue(source);
+        return value == null || Array.isArray(value) ? '' : String(value);
+    });
 }
 
 function shapeBackground(field = {}) {

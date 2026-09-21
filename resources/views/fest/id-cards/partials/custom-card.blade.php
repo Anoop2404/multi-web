@@ -11,6 +11,13 @@
             $type = $field['type'] ?? 'text';
             $source = $field['source'] ?? $field['key'] ?? null;
             $value = $source ? ($card[$source] ?? null) : null;
+            if ($type === 'text' && !empty($field['text_format'])) {
+                $value = preg_replace_callback('/\{([a-zA-Z0-9_]+)\}/', function (array $matches) use ($card) {
+                    $replacement = $card[$matches[1]] ?? '';
+
+                    return is_scalar($replacement) ? (string) $replacement : '';
+                }, (string) $field['text_format']);
+            }
         @endphp
 
         @if($type === 'photo')

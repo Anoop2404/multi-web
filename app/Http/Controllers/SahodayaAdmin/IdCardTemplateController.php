@@ -114,14 +114,15 @@ class IdCardTemplateController extends SahodayaAdminController
         $baseDir = 'sahodaya/'.$this->sahodaya->id.'/id-card-templates';
         $disk = TenantStorage::uploadDisk();
 
-        $updates = array_filter([
-            'title'          => $data['title'] ?? null,
-            'card_width_mm'  => $data['card_width_mm'] ?? null,
-            'card_height_mm' => $data['card_height_mm'] ?? null,
-            'cards_per_page' => $data['cards_per_page'] ?? null,
-            'page_width_mm'  => $data['page_width_mm'] ?? null,
-            'page_height_mm' => $data['page_height_mm'] ?? null,
-        ], fn ($v) => $v !== null);
+        // Preserve intentionally-cleared nullable values (title/page size/audience).
+        // array_filter() used to silently discard nulls here, so the form appeared to
+        // save while "A4 / blank" and "All audiences" never actually persisted.
+        $updates = [];
+        foreach (['title', 'audience', 'card_width_mm', 'card_height_mm', 'cards_per_page', 'page_width_mm', 'page_height_mm'] as $key) {
+            if (array_key_exists($key, $data)) {
+                $updates[$key] = $data[$key];
+            }
+        }
 
         if (array_key_exists('fields', $data)) {
             $updates['layout_json'] = $data['fields'];
@@ -139,7 +140,12 @@ class IdCardTemplateController extends SahodayaAdminController
         }
 
         if (array_key_exists('is_active', $data) && $data['is_active']) {
-            $this->deactivateSiblings($template->event_id, $template->item_id, $template->audience, exceptId: $template->id);
+            $this->deactivateSiblings(
+                $template->event_id,
+                $template->item_id,
+                array_key_exists('audience', $updates) ? $updates['audience'] : $template->audience,
+                exceptId: $template->id,
+            );
             $updates['is_active'] = true;
         } elseif (array_key_exists('is_active', $data)) {
             $updates['is_active'] = (bool) $data['is_active'];
@@ -188,6 +194,7 @@ class IdCardTemplateController extends SahodayaAdminController
             'fields.*.key'            => 'nullable|string|max:60',
             'fields.*.type'           => ['nullable', Rule::in(['text', 'photo', 'qr', 'item_list', 'item_row', 'shape', 'static_text', 'divider'])],
             'fields.*.source'         => 'nullable|string|max:60',
+            'fields.*.text_format'    => 'nullable|string|max:255',
             'fields.*.top'            => 'nullable|numeric|min:0|max:100',
             'fields.*.left'           => 'nullable|numeric|min:0|max:100',
             'fields.*.width'          => 'nullable|numeric|min:1|max:100',
@@ -362,8 +369,11 @@ class IdCardTemplateController extends SahodayaAdminController
             'gender'          => 'Sample',
             'school_code'     => 'ABC-001',
             'student_reg_no'  => 'STU/26/0001',
+            'student_seq_id'  => '10203',
+            'roll_no'         => '10203',
             'student_class'   => 'X',
-            'student_info_inline' => "CATEGORY : II\u{2003}\u{2003}ROLL No.: 10203\u{2003}\u{2003}GENDER: FEMALE",
+            'gender_upper'    => 'FEMALE',
+            'student_info_inline' => "CATEGORY: II\u{2003}\u{2003}ROLL NO: 10203\u{2003}\u{2003}GENDER: FEMALE",
             'schedule'        => 'Sample schedule line',
             'footer'          => 'Sample footer',
             'items_inline'    => 'Painting Water Colour | Recitation - Malayalam | Essay Writing Malayalam | Light Music - Malayalam - Girls | Mappillapattu (Boys) (MCS) | Classical Music - Karnatic (Boys)',

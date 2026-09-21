@@ -47,6 +47,7 @@ class IdCardTemplate extends Model
             'chest_number'     => 'Chest number',
             'category'         => 'Category (class/age group)',
             'gender'           => 'Gender',
+            'gender_upper'     => 'Gender (uppercase)',
             'school_code'      => 'School code (Sahodaya prefix + school no.)',
             'student_reg_no'   => "Student's registration no. (e.g. STU/27/10495)",
             'roll_no'          => 'Roll No. (e.g. 10495 / STU/27/10495)',
