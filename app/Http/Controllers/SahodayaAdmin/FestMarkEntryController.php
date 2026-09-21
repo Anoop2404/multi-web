@@ -38,6 +38,7 @@ class FestMarkEntryController extends SahodayaAdminController
 {
     use BuildsItemHeadReportContext;
     use \App\Http\Controllers\SahodayaAdmin\Concerns\ResolvesRegionAwareReportEvent;
+    use \App\Http\Controllers\SahodayaAdmin\Concerns\ParsesBulkSheetFilters;
 
     /**
      * The bulk print panel's selectable report-type checkboxes -- each key maps to one
@@ -48,6 +49,7 @@ class FestMarkEntryController extends SahodayaAdminController
         'judge_sheet', 'judge_sheet_no_chest',
         'sum_sheet', 'sum_sheet_no_chest',
         'result_declaration',
+        'chest_number_list', 'attendance_sheet', 'timesheet',
     ];
 
     public function index(Request $request, string $tenantId, FestEvent $event)
@@ -1492,27 +1494,6 @@ class FestMarkEntryController extends SahodayaAdminController
     private function itemCategoryLabel(FestEventItem $item, array $classGroupLabels): ?string
     {
         return \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels);
-    }
-
-    /**
-     * Shared bulk-selection filters for markEntrySheet()/cumulativeSheet()/
-     * resultDeclarationSheet() -- pick several items at once (a checkbox multi-select on
-     * the Mark Entry page) and/or narrow by phase or competition area/"stage", instead of
-     * only ever downloading one item's sheet or every enabled item in the event. `item_ids`
-     * takes precedence over the pre-existing single `item_id`/"all items" behavior those
-     * methods already had; `phase_id`/`area_id` combine with either (or with no item
-     * selection at all, to mean "every item in this phase/area").
-     *
-     * @return array{0: list<int>, 1: int|null, 2: int|null}
-     */
-    private function parseBulkSheetFilters(Request $request): array
-    {
-        $itemIds = array_values(array_filter(array_map(
-            'intval',
-            array_filter(explode(',', (string) $request->input('item_ids', '')), fn ($v) => $v !== ''),
-        )));
-
-        return [$itemIds, $request->integer('phase_id') ?: null, $request->integer('area_id') ?: null];
     }
 
     /**

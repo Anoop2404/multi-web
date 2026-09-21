@@ -53,6 +53,9 @@
                 <a :href="bulkCumulativeSheetUrl" target="_blank" class="btn-secondary text-xs">📊 Digital Sum Sheet</a>
                 <a :href="bulkCumulativeSheetBlankChestUrl" target="_blank" class="btn-secondary text-xs">📊 Sum Sheet — No Chest No</a>
                 <a :href="bulkResultDeclarationSheetUrl" target="_blank" class="btn-secondary text-xs">📝 Result Declaration Sheet</a>
+                <a :href="bulkChestNumberListUrl" target="_blank" class="btn-secondary text-xs">🔢 Chest Number List</a>
+                <a :href="bulkAttendanceSheetUrl" target="_blank" class="btn-secondary text-xs">📋 Attendance Sheet</a>
+                <a :href="bulkTimesheetUrl" target="_blank" class="btn-secondary text-xs">⏱️ Timesheet</a>
             </div>
             <p v-else class="text-xs text-slate-400">Pick a phase, an area, or one or more items above to enable the download buttons.</p>
 
@@ -119,20 +122,29 @@ const bulkSelectedItemIds = ref([]);
 const bulkPhaseId = ref('');
 const bulkAreaId = ref('');
 
-function bulkSheetUrl(basePath) {
+// `path` is relative to the event base (e.g. 'reports/mark-entry-sheet',
+// 'chest-numbers/print') -- not every bulk-capable report lives under /reports/.
+function bulkSheetUrl(path, extraParams = {}) {
     const params = new URLSearchParams();
     if (bulkSelectedItemIds.value.length) params.set('item_ids', bulkSelectedItemIds.value.join(','));
     if (bulkPhaseId.value) params.set('phase_id', bulkPhaseId.value);
     if (bulkAreaId.value) params.set('area_id', bulkAreaId.value);
+    Object.entries(extraParams).forEach(([key, value]) => params.set(key, value));
     const qs = params.toString();
-    return `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/${basePath}${qs ? `?${qs}` : ''}`;
+    return `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/${path}${qs ? `?${qs}` : ''}`;
 }
 
-const bulkMarkEntrySheetUrl = computed(() => bulkSheetUrl('mark-entry-sheet'));
+const bulkMarkEntrySheetUrl = computed(() => bulkSheetUrl('reports/mark-entry-sheet'));
 const bulkMarkEntrySheetBlankChestUrl = computed(() => `${bulkMarkEntrySheetUrl.value}${bulkMarkEntrySheetUrl.value.includes('?') ? '&' : '?'}blank_chest=1`);
-const bulkCumulativeSheetUrl = computed(() => bulkSheetUrl('mark-criteria-sheet'));
+const bulkCumulativeSheetUrl = computed(() => bulkSheetUrl('reports/mark-criteria-sheet'));
 const bulkCumulativeSheetBlankChestUrl = computed(() => `${bulkCumulativeSheetUrl.value}${bulkCumulativeSheetUrl.value.includes('?') ? '&' : '?'}blank_chest=1`);
-const bulkResultDeclarationSheetUrl = computed(() => bulkSheetUrl('result-declaration-sheet'));
+const bulkResultDeclarationSheetUrl = computed(() => bulkSheetUrl('reports/result-declaration-sheet'));
+// Chest Numbers' print() defaults to a real download (no extra param needed), unlike the
+// generic reports/export/{type} dispatcher below, which defaults to preview and needs
+// download=1 for an actual attachment -- see FestReportService::export()'s $this->preview.
+const bulkChestNumberListUrl = computed(() => bulkSheetUrl('chest-numbers/print'));
+const bulkAttendanceSheetUrl = computed(() => bulkSheetUrl('reports/export/attendance-sheet', { download: 1 }));
+const bulkTimesheetUrl = computed(() => bulkSheetUrl('reports/export/timesheet', { download: 1 }));
 const bulkSelectionActive = computed(() => bulkSelectedItemIds.value.length > 0 || !!bulkPhaseId.value || !!bulkAreaId.value);
 
 const reportTypeOptions = [
@@ -141,6 +153,9 @@ const reportTypeOptions = [
     { key: 'sum_sheet', label: '📊 Digital Sum Sheet', url: () => bulkCumulativeSheetUrl.value },
     { key: 'sum_sheet_no_chest', label: '📊 Sum Sheet — No Chest No', url: () => bulkCumulativeSheetBlankChestUrl.value },
     { key: 'result_declaration', label: '📝 Result Declaration Sheet', url: () => bulkResultDeclarationSheetUrl.value },
+    { key: 'chest_number_list', label: '🔢 Chest Number List', url: () => bulkChestNumberListUrl.value },
+    { key: 'attendance_sheet', label: '📋 Attendance Sheet', url: () => bulkAttendanceSheetUrl.value },
+    { key: 'timesheet', label: '⏱️ Timesheet', url: () => bulkTimesheetUrl.value },
 ];
 const comboSelectedTypes = ref([...props.bulkReportCombo]);
 const savingCombo = ref(false);

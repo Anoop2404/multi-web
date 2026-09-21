@@ -21,6 +21,7 @@ class FestChestNumberController extends SahodayaAdminController
 {
     use BuildsItemHeadReportContext;
     use \App\Http\Controllers\SahodayaAdmin\Concerns\ResolvesRegionAwareReportEvent;
+    use \App\Http\Controllers\SahodayaAdmin\Concerns\ParsesBulkSheetFilters;
 
     public function index(Request $request, string $tenantId, FestEvent $event)
     {
@@ -256,13 +257,15 @@ class FestChestNumberController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $itemId = $request->integer('item_id') ?: null;
+        $bulkItemIds = $this->resolveBulkChestItemIds($event, $request);
+        abort_if($bulkItemIds === [], 404, 'No competition items found.');
         $item = null;
 
-        if ($itemId) {
+        if ($bulkItemIds === null && $itemId) {
             $item = FestEventItem::where('event_id', $event->id)->findOrFail($itemId);
         }
 
-        $rows = $this->chestNumberRows($event, $itemId);
+        $rows = $this->chestNumberRows($event, $itemId, $bulkItemIds ?? []);
 
         $itemCategory = null;
         if ($item && $item->class_group && $item->class_group !== 'open') {
@@ -281,7 +284,11 @@ class FestChestNumberController extends SahodayaAdminController
             'logoSrc'      => TenantBranding::logoEmbedSrc($this->sahodaya),
         ])->render();
 
-        $slug = str($event->title)->slug()->limit(40).($item ? '-'.str($item->title)->slug()->limit(30) : '');
+        $slug = str($event->title)->slug()->limit(40).match (true) {
+            $item !== null => '-'.str($item->title)->slug()->limit(30),
+            $bulkItemIds !== null => '-'.count($bulkItemIds).'-items',
+            default => '',
+        };
         $inline = $request->boolean('inline') || $request->boolean('preview');
 
         return PdfGenerator::download($html, "{$slug}-chest-numbers.pdf", $inline);
@@ -291,7 +298,10 @@ class FestChestNumberController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $rows = $this->chestNumberRows($event, $request->integer('item_id') ?: null);
+        $bulkItemIds = $this->resolveBulkChestItemIds($event, $request);
+        abort_if($bulkItemIds === [], 404, 'No competition items found.');
+
+        $rows = $this->chestNumberRows($event, $request->integer('item_id') ?: null, $bulkItemIds ?? []);
         $filename = str($event->title)->slug()->limit(40)->toString().'-chest-numbers.csv';
 
         return response()->streamDownload(function () use ($rows) {
@@ -439,9 +449,41 @@ class FestChestNumberController extends SahodayaAdminController
     }
 
     /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */
-    private function chestNumberRows(FestEvent $event, ?int $itemId = null)
+    /**
+     * Resolves the Bulk Sheets picker's ?item_ids=/?phase_id=/?area_id= (see
+     * ParsesBulkSheetFilters) to a concrete list of item ids within this event, mirroring
+     * FestMarkEntryController::markEntrySheet()'s bulk query -- scoped to $event->id
+     * directly, not expanded via reportableItemIds(). Returns null when none of those
+     * three params were given at all (single item_id/"every item" behavior unaffected);
+     * an empty array means a filter WAS given but matched nothing.
+     *
+     * @return list<int>|null
+     */
+    private function resolveBulkChestItemIds(FestEvent $event, Request $request): ?array
     {
-        $itemIds = $itemId ? $event->reportableItemIds([$itemId]) : null;
+        [$itemIds, $phaseId, $areaId] = $this->parseBulkSheetFilters($request);
+        if (! $itemIds && ! $phaseId && ! $areaId) {
+            return null;
+        }
+
+        $query = FestEventItem::where('event_id', $event->id);
+        if ($itemIds) {
+            $query->whereIn('id', $itemIds);
+        }
+        if ($phaseId) {
+            $query->where('phase_id', $phaseId);
+        }
+        if ($areaId) {
+            $query->where('area_id', $areaId);
+        }
+
+        return $query->pluck('id')->map(fn ($id) => (int) $id)->all();
+    }
+
+    /** @param list<int> $explicitItemIds */
+    private function chestNumberRows(FestEvent $event, ?int $itemId = null, array $explicitItemIds = [])
+    {
+        $itemIds = $explicitItemIds !== [] ? $explicitItemIds : ($itemId ? $event->reportableItemIds([$itemId]) : null);
 
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
             ->whereIn('event_id', $event->reportableEventIds())

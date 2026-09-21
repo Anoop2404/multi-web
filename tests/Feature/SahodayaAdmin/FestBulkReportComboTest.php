@@ -55,6 +55,23 @@ class FestBulkReportComboTest extends TestCase
         $this->assertSame(['judge_sheet', 'sum_sheet'], SahodayaProfile::where('tenant_id', $sahodaya->id)->first()->bulk_report_combo);
     }
 
+    /** chest_number_list/attendance_sheet/timesheet joined the allow-list alongside the original 5 mark-entry-only types. */
+    public function test_the_newer_chest_number_attendance_and_timesheet_types_are_accepted(): void
+    {
+        [$sahodaya, $event, $admin] = $this->fixture();
+
+        $response = $this->actingAs($admin)->post(
+            "/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/bulk-report-combo",
+            ['report_types' => ['chest_number_list', 'attendance_sheet', 'timesheet']]
+        );
+
+        $response->assertRedirect();
+        $this->assertSame(
+            ['chest_number_list', 'attendance_sheet', 'timesheet'],
+            SahodayaProfile::where('tenant_id', $sahodaya->id)->first()->bulk_report_combo,
+        );
+    }
+
     public function test_an_unknown_report_type_is_rejected(): void
     {
         [$sahodaya, $event, $admin] = $this->fixture();

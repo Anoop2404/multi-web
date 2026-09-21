@@ -29,6 +29,9 @@ use App\Services\Events\Reports\FestReportScope;
 
 class FestReportService
 {
+    use \App\Http\Controllers\SahodayaAdmin\Concerns\ParsesBulkSheetFilters;
+
+
     // Public (was private) so a controller calling renderPdf() directly — bypassing the
     // generic export() dispatcher, which is the only place that used to set this from the
     // request — can still honor ?inline=1/?preview=1 vs ?download=1. See
@@ -64,6 +67,37 @@ class FestReportService
         }
 
         return $ids;
+    }
+
+    /**
+     * Resolves the Bulk Sheets picker's ?item_ids=/?phase_id=/?area_id= (see
+     * ParsesBulkSheetFilters) to a concrete list of item ids across this service's
+     * reportable event scope, for use by attendanceSheetPdf()/timesheetPdf(). Returns null
+     * when none of those three params were given at all (existing single item_id/"every
+     * item" behavior unaffected); an empty array means a filter WAS given but matched
+     * nothing.
+     *
+     * @return list<int>|null
+     */
+    private function resolveBulkItemIds(Request $request): ?array
+    {
+        [$itemIds, $phaseId, $areaId] = $this->parseBulkSheetFilters($request);
+        if (! $itemIds && ! $phaseId && ! $areaId) {
+            return null;
+        }
+
+        $query = FestEventItem::whereIn('event_id', $this->eventIds());
+        if ($itemIds) {
+            $query->whereIn('id', $itemIds);
+        }
+        if ($phaseId) {
+            $query->where('phase_id', $phaseId);
+        }
+        if ($areaId) {
+            $query->where('area_id', $areaId);
+        }
+
+        return $query->pluck('id')->map(fn ($id) => (int) $id)->all();
     }
 
     private function scopedSchoolId(?string $requestedSchoolId): ?string
@@ -301,18 +335,22 @@ class FestReportService
         ?int $studentId = null,
         ?int $teacherId = null,
         bool $approvedOnly = false,
+        array $explicitItemIds = [],
     ) {
         $schoolId = $this->scopedSchoolId($schoolId);
+        // Bulk Sheets picker (item_ids/phase_id/area_id, resolved by the caller via
+        // resolveBulkItemIds()) takes precedence over the single $itemId when given.
+        $resolvedItemIds = $explicitItemIds !== [] ? $explicitItemIds : ($itemId ? $this->itemIdsFor($itemId) : null);
 
         return FestParticipant::query()
             ->when($studentId, fn ($q) => $q->where('student_id', $studentId))
             ->when($teacherId, fn ($q) => $q->where('teacher_id', $teacherId))
-            ->whereHas('registration', function ($q) use ($itemId, $classGroup, $schoolId, $approvedOnly) {
+            ->whereHas('registration', function ($q) use ($resolvedItemIds, $classGroup, $schoolId, $approvedOnly) {
                 $q->whereIn('event_id', $this->eventIds())
                     ->when($this->scope?->isActorRestricted, fn ($q2) => $q2->whereIn('school_id', $this->scope->schoolIds))
                     ->when($approvedOnly, fn ($q2) => $q2->where('status', 'approved'), fn ($q2) => $q2->active())
                     ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId))
-                    ->when($itemId, fn ($q2) => $q2->whereIn('item_id', $this->itemIdsFor($itemId)))
+                    ->when($resolvedItemIds, fn ($q2) => $q2->whereIn('item_id', $resolvedItemIds))
                     ->when($classGroup, fn ($q2) => $q2->whereHas('item', fn ($i) => $i->where('class_group', $classGroup)));
             })
             ->with(['group', 'registration.event', 'registration.item.head', 'registration.school', 'student.schoolClass.classCategory', 'teacher'])
@@ -1240,6 +1278,9 @@ class FestReportService
         // it shown, e.g. to double-check attendance against a printed chest-number list.
         $showChest = $request->boolean('show_chest');
 
+        $bulkItemIds = $this->resolveBulkItemIds($request);
+        abort_if($bulkItemIds === [], 404, 'No competition items found.');
+
         $participants = $this->participantsFlat(
             $request->integer('item_id') ?: null,
             $request->input('class_group'),
@@ -1247,6 +1288,7 @@ class FestReportService
             null,
             null,
             false,
+            $bulkItemIds ?? [],
         )
             ->filter(fn ($p) => $p->participant_role !== 'standby' && ($p->student_id || $p->teacher_id))
             ->values();
@@ -1355,11 +1397,12 @@ class FestReportService
         // relying on any CSS trick. Ignored by the dompdf fallback (only used locally),
         // which gets its own branding baked into the page content — see the blade file.
         [$headerTemplate, $footerTemplate] = $this->attendanceSheetHeaderFooterTemplates($sahodaya, $logo, $singleItemName, $singleItemMetaStr);
+        $itemsLabel = $singleItemName ?? ($bulkItemIds !== null ? count($bulkItemIds).'-items' : 'all-items');
         $filename = ReportFilename::build(
             'attendance-sheet',
             $sahodaya?->name ?? 'Sahodaya',
             $this->event->event_start,
-            [$this->event->title, $singleItemName ?? 'all-items'],
+            [$this->event->title, $itemsLabel],
         );
 
         return $this->renderPdf(
@@ -1438,6 +1481,9 @@ class FestReportService
      */
     private function timesheetPdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
+        $bulkItemIds = $this->resolveBulkItemIds($request);
+        abort_if($bulkItemIds === [], 404, 'No competition items found.');
+
         $participants = $this->participantsFlat(
             $request->integer('item_id') ?: null,
             $request->input('class_group'),
@@ -1445,6 +1491,7 @@ class FestReportService
             null,
             null,
             false,
+            $bulkItemIds ?? [],
         )
             ->filter(fn ($p) => $p->participant_role !== 'standby' && ($p->student_id || $p->teacher_id))
             ->values();
@@ -1500,11 +1547,12 @@ class FestReportService
         }
 
         [$headerTemplate, $footerTemplate] = $this->timesheetHeaderFooterTemplates($sahodaya, $logo, $singleItemName, $singleItemMetaStr);
+        $itemsLabel = $singleItemName ?? ($bulkItemIds !== null ? count($bulkItemIds).'-items' : 'all-items');
         $filename = ReportFilename::build(
             'timesheet',
             $sahodaya?->name ?? 'Sahodaya',
             $this->event->event_start,
-            [$this->event->title, $singleItemName ?? 'all-items'],
+            [$this->event->title, $itemsLabel],
         );
 
         return $this->renderPdf(
