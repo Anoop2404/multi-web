@@ -331,8 +331,6 @@ class FestIdCardController extends SahodayaAdminController
         $filters['scope'] = 'event';
         $filters['include_data_uris'] = false;
 
-        $allSections = $service->cardsGroupedBySchool($targetEvent, $filters);
-
         $gridLayout = $customTemplate?->gridLayout();
         $perPage = $gridLayout ? ($gridLayout['cols'] * $gridLayout['rows']) : 4;
 
