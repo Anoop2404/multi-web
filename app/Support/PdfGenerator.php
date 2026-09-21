@@ -82,7 +82,7 @@ class PdfGenerator
 
             try {
                 $response = Http::connectTimeout(3)
-                    ->timeout((int) config('services.pdf_converter.timeout', 30))
+                    ->timeout((int) config('services.pdf_converter.timeout', 300))
                     ->post($url, $payload);
 
                 if ($response->successful()) {

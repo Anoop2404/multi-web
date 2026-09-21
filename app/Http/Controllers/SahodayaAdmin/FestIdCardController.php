@@ -141,6 +141,7 @@ class FestIdCardController extends SahodayaAdminController
         return \App\Support\PdfGenerator::download(
             $html,
             "{$slug}-{$scopeSuffix}-id-cards.pdf",
+            isLandscape: true,
             pageWidthMm: $customTemplate?->page_width_mm,
             pageHeightMm: $customTemplate?->page_height_mm,
         );
@@ -157,32 +158,34 @@ class FestIdCardController extends SahodayaAdminController
 
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+
         $audience = $request->input('audience', 'student');
         abort_unless($audience === 'student', 422, 'Bulk item PDF is available for student cards only.');
 
         $filters = $this->idCardFilters($request);
         $filters['include_data_uris'] = true;
-        unset($filters['item_id'], $filters['scope']);
-        $sections = $service->cardsGroupedByItem($event, $filters);
+        unset($filters['item_id'], $filters['head_id'], $filters['scope']);
+        $sections = $service->cardsGroupedByItem($targetEvent, $filters);
         abort_if($sections === [], 422, 'No approved participants found for any item.');
 
         $totalCards = collect($sections)->sum(fn ($section) => count($section['cards']));
-        $customTemplate = $this->resolveCustomIdCardTemplate($event, null, 'student');
+        $customTemplate = $this->resolveCustomIdCardTemplate($targetEvent, null, 'student');
 
-        $audit->festEvent($event, FestPageActivity::ID_CARDS, 'fest.id_cards.generated', 'All-item ID cards PDF generated', [
+        $audit->festEvent($targetEvent, FestPageActivity::ID_CARDS, 'fest.id_cards.generated', 'All-item ID cards PDF generated', [
             'audience' => 'student',
             'count'    => $totalCards,
             'items'    => count($sections),
             'template' => $customTemplate ? 'custom:'.$customTemplate->id : $request->input('template', 'standard'),
         ]);
 
-        $slug = str($event->title)->slug('-');
+        $slug = str($targetEvent->title)->slug('-');
 
         $isDomPdf = empty(config('services.pdf_converter.url'));
         $cards = collect($sections)->flatMap(fn($section) => $section['cards'])->values()->all();
         
         $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
-            $event,
+            $targetEvent,
             $this->sahodaya,
             $cards,
             'student',
@@ -195,6 +198,7 @@ class FestIdCardController extends SahodayaAdminController
         return \App\Support\PdfGenerator::download(
             $html,
             "{$slug}-all-items-id-cards.pdf",
+            isLandscape: true,
             pageWidthMm: $customTemplate?->page_width_mm,
             pageHeightMm: $customTemplate?->page_height_mm,
         );
@@ -209,13 +213,15 @@ class FestIdCardController extends SahodayaAdminController
 
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+
         $audience = $request->input('audience', 'student');
         abort_unless($audience === 'student', 422, 'Bulk head PDF is available for student cards only.');
 
         $filters = $this->idCardFilters($request);
         $filters['include_data_uris'] = true;
         unset($filters['item_id'], $filters['head_id'], $filters['scope']);
-        $sections = collect($service->cardsGroupedByHead($event, $filters))
+        $sections = collect($service->cardsGroupedByHead($targetEvent, $filters))
             ->map(fn ($section) => [
                 'item_title' => $section['head_title'],
                 'cards'      => $section['cards'],
@@ -226,22 +232,22 @@ class FestIdCardController extends SahodayaAdminController
         abort_if($sections === [], 422, 'No approved participants found for any item head.');
 
         $totalCards = collect($sections)->sum(fn ($section) => count($section['cards']));
-        $customTemplate = $this->resolveCustomIdCardTemplate($event, null, 'student');
+        $customTemplate = $this->resolveCustomIdCardTemplate($targetEvent, null, 'student');
 
-        $audit->festEvent($event, FestPageActivity::ID_CARDS, 'fest.id_cards.generated', 'All-head ID cards PDF generated', [
+        $audit->festEvent($targetEvent, FestPageActivity::ID_CARDS, 'fest.id_cards.generated', 'All-head ID cards PDF generated', [
             'audience' => 'student',
             'count'    => $totalCards,
             'heads'    => count($sections),
             'template' => $customTemplate ? 'custom:'.$customTemplate->id : $request->input('template', 'standard'),
         ]);
 
-        $slug = str($event->title)->slug('-');
+        $slug = str($targetEvent->title)->slug('-');
 
         $isDomPdf = empty(config('services.pdf_converter.url'));
         $cards = collect($sections)->flatMap(fn($section) => $section['cards'])->values()->all();
 
         $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
-            $event,
+            $targetEvent,
             $this->sahodaya,
             $cards,
             'student',
@@ -254,6 +260,7 @@ class FestIdCardController extends SahodayaAdminController
         return \App\Support\PdfGenerator::download(
             $html,
             "{$slug}-all-heads-id-cards.pdf",
+            isLandscape: true,
             pageWidthMm: $customTemplate?->page_width_mm,
             pageHeightMm: $customTemplate?->page_height_mm,
         );
@@ -266,6 +273,8 @@ class FestIdCardController extends SahodayaAdminController
 
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+
         $audience = $request->input('audience', 'student');
         abort_unless($audience === 'student', 422, 'Bulk school PDF is available for student cards only.');
 
@@ -273,25 +282,25 @@ class FestIdCardController extends SahodayaAdminController
         $filters['include_data_uris'] = true;
         unset($filters['head_id']);
 
-        $sections = $service->cardsGroupedBySchool($event, $filters);
+        $sections = $service->cardsGroupedBySchool($targetEvent, $filters);
         abort_if($sections === [], 422, 'No approved participants found for any school.');
 
         $totalCards = collect($sections)->sum(fn ($section) => count($section['cards']));
-        $customTemplate = $this->resolveCustomIdCardTemplate($event, null, 'student');
+        $customTemplate = $this->resolveCustomIdCardTemplate($targetEvent, null, 'student');
 
-        $audit->festEvent($event, FestPageActivity::ID_CARDS, 'fest.id_cards.generated', 'School-wise bulk ID cards PDF generated', [
+        $audit->festEvent($targetEvent, FestPageActivity::ID_CARDS, 'fest.id_cards.generated', 'School-wise bulk ID cards PDF generated', [
             'audience' => 'student',
             'count'    => $totalCards,
             'schools'  => count($sections),
             'template' => $customTemplate ? 'custom:'.$customTemplate->id : $request->input('template', 'standard'),
         ]);
 
-        $slug = str($event->title)->slug('-');
+        $slug = str($targetEvent->title)->slug('-');
         $isDomPdf = empty(config('services.pdf_converter.url'));
         $cards = collect($sections)->flatMap(fn ($section) => $section['cards'])->values()->all();
 
         $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
-            $event,
+            $targetEvent,
             $this->sahodaya,
             $cards,
             'student',
@@ -304,6 +313,7 @@ class FestIdCardController extends SahodayaAdminController
         return \App\Support\PdfGenerator::download(
             $html,
             "{$slug}-school-wise-id-cards.pdf",
+            isLandscape: true,
             pageWidthMm: $customTemplate?->page_width_mm,
             pageHeightMm: $customTemplate?->page_height_mm,
         );

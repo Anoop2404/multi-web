@@ -163,4 +163,14 @@ class FestIdCardPhotoRouteTest extends TestCase
 
         $response->assertStatus(403);
     }
+
+    public function test_pdf_all_schools_generates_pdf(): void
+    {
+        $response = $this->actingAs($this->sahodayaAdmin)->get(
+            "/sahodaya-admin/{$this->sahodaya->id}/events/{$this->event->id}/id-cards/pdf-all-schools?template=pass&scope=event"
+        );
+
+        $response->assertOk();
+        $this->assertEquals('application/pdf', $response->headers->get('content-type'));
+    }
 }
