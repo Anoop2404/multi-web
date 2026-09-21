@@ -791,19 +791,7 @@ class FestIdCardService
         $schoolDisplay = $this->titleCase($school);
         $itemTitleDisplay = $this->titleCase($itemTitleClean);
         $genderDisplay = $this->titleCase($gender);
-        $studentRegNo = $p->student?->reg_no;
-        if (! $studentRegNo && $p->student) {
-            $studentSchool = $p->student->tenant ?? $p->registration?->school;
-            if ($studentSchool) {
-                try {
-                    $studentRegNo = app(\App\Services\Students\StudentRegistrationNumberGenerator::class)
-                        ->assignMissing($p->student, $studentSchool);
-                } catch (\Throwable $e) {
-                    // Fallback to student ID if generator cannot allocate
-                    $studentRegNo = "STU/".($p->student->id ?? '—');
-                }
-            }
-        }
+        $studentRegNo = $p->student?->reg_no ?: ($p->student ? "STU/{$p->student->id}" : null);
         $studentRegNo = $studentRegNo ?? $p->teacher?->reg_no ?? ($festId !== '—' ? $festId : null);
 
         // Sequence number e.g. 10495 from STU/27/10495
