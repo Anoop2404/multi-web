@@ -705,12 +705,16 @@ class FestIdCardService
         $pureCategory = $ageGroupLabel ?: ($classCategory ?: ($studentClass ? "Class {$studentClass}" : null));
         $itemTitleClean = ($item !== '—' && $item) ? str_replace('_', ' ', $item) : null;
         $categoryDisplay = $pureCategory ? str_replace('_', ' ', $pureCategory) : ($itemTitleClean ?: '—');
-        // ID cards print the category number as a roman numeral ("Category 3 —
-        // Classes 8, 9 & 10" -> "Category III — Classes 8, 9 & 10"), matching how
-        // certificates already show class/category numbers — see
-        // FestCertificateService::toRomanIfNumeric(). Only the first number
-        // converts; non-numeric labels ("Sub Junior") pass through unchanged.
-        $categoryDisplay = $this->numeralizeCategoryNumber($categoryDisplay);
+        // The ID card's Category column is narrow — it shows just the short roman
+        // code ("III"), not the full descriptive label FestClassGroupScheme returns
+        // ("Category 3 — Classes 8, 9 & 10"). Strip the "Category "/"Cat. " prefix
+        // and everything from a dash onward first, matching
+        // FestCertificateService's own category_short/category_roman split, then
+        // roman-numeralize what's left; a non-numeric remainder ("Sub Junior")
+        // passes through unchanged.
+        $categoryShort = preg_replace('/^(category|cat\.?)\s*/i', '', $categoryDisplay);
+        $categoryShort = trim((string) preg_replace('/\s*[—-].*$/', '', $categoryShort));
+        $categoryDisplay = $this->numeralizeCategoryNumber($categoryShort !== '' ? $categoryShort : $categoryDisplay);
 
         $rawGender = strtolower((string) ($p->student?->gender ?? $p->teacher?->gender ?? ''));
         $gender = match (true) {
