@@ -302,10 +302,7 @@
                      fest.reports.attendance-sheet. --}}
                 <tr class="item-context-row">
                     <th colspan="7" style="background: #ffffff; color: #0f172a; border: none; padding: 0 0 6px; font-weight: bold; font-size: 11px; text-transform: none; letter-spacing: normal;">
-                        {{ $cleanTitle }}
-                        @if(!empty($metaBadges))
-                            <span style="font-weight: normal; color: #64748b;">&bull; {{ implode(' • ', $metaBadges) }}</span>
-                        @endif
+                        {{ implode(' · ', array_filter([$cleanTitle, ...$metaBadges])) }}
                     </th>
                 </tr>
                 @endif

@@ -1356,7 +1356,10 @@ class FestReportService
         $sahodaya = Tenant::find($this->event->tenant_id);
         $logo = $sahodaya ? \App\Support\TenantBranding::logoEmbedSrc($sahodaya) : null;
 
-        // Single-item filter → header can name the item with Category, Type, and Gender
+        // Single-item filter → header can name the item with Category, Type, Gender, and
+        // participant count -- same field order/separator as
+        // partials/pdf-report-heading.blade.php, so this report's header matches every
+        // other Bulk Sheets report's header exactly.
         $singleItemName = null;
         $singleItemMetaStr = null;
         if ($rowsByItem->count() === 1) {
@@ -1366,7 +1369,8 @@ class FestReportService
                 $catLabel = $firstItemRow['item_category'] ?? null;
                 $typeLabel = $firstItemRow['item_type'] ?? null;
                 $genderLabel = $firstItemRow['item_gender'] ?? null;
-                $singleItemMetaStr = implode(' • ', array_filter([$singleItemName, $catLabel, $typeLabel, $genderLabel]));
+                $participantCountLabel = count($rowsByItem->first()).' participant'.(count($rowsByItem->first()) === 1 ? '' : 's');
+                $singleItemMetaStr = implode(' · ', array_filter([$singleItemName, $catLabel, $typeLabel, $genderLabel, $participantCountLabel]));
             }
         }
 
@@ -1516,6 +1520,8 @@ class FestReportService
         $sahodaya = Tenant::find($this->event->tenant_id);
         $logo = $sahodaya ? \App\Support\TenantBranding::logoEmbedSrc($sahodaya) : null;
 
+        // Same field order/separator as partials/pdf-report-heading.blade.php -- see
+        // attendanceSheetPdf()'s matching block for the full reasoning.
         $singleItemName = null;
         $singleItemMetaStr = null;
         if ($rowsByItem->count() === 1) {
@@ -1525,7 +1531,8 @@ class FestReportService
                 $catLabel = $firstItemRow['item_category'] ?? null;
                 $typeLabel = $firstItemRow['item_type'] ?? null;
                 $genderLabel = $firstItemRow['item_gender'] ?? null;
-                $singleItemMetaStr = implode(' • ', array_filter([$singleItemName, $catLabel, $typeLabel, $genderLabel]));
+                $participantCountLabel = count($rowsByItem->first()).' participant'.(count($rowsByItem->first()) === 1 ? '' : 's');
+                $singleItemMetaStr = implode(' · ', array_filter([$singleItemName, $catLabel, $typeLabel, $genderLabel, $participantCountLabel]));
             }
         }
 

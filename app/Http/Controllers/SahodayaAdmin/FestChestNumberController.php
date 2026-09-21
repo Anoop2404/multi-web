@@ -303,7 +303,7 @@ class FestChestNumberController extends SahodayaAdminController
         };
         $inline = $request->boolean('inline') || $request->boolean('preview');
 
-        [$headerTemplate, $footerTemplate] = $this->chestNumberHeaderFooterTemplates($event, $orgName, $logoSrc, $item, $itemCategory);
+        [$headerTemplate, $footerTemplate] = $this->chestNumberHeaderFooterTemplates($event, $orgName, $logoSrc, $item, $itemCategory, $item ? count($rows) : 0);
 
         return PdfGenerator::download(
             $html,
@@ -324,7 +324,7 @@ class FestChestNumberController extends SahodayaAdminController
      *
      * @return array{0: string, 1: string}
      */
-    private function chestNumberHeaderFooterTemplates(FestEvent $event, string $orgName, ?string $logoSrc, ?FestEventItem $item, ?string $itemCategory): array
+    private function chestNumberHeaderFooterTemplates(FestEvent $event, string $orgName, ?string $logoSrc, ?FestEventItem $item, ?string $itemCategory, int $participantCount = 0): array
     {
         $orgNameSafe = e($orgName);
         $eventTitle = e($event->title);
@@ -332,7 +332,16 @@ class FestChestNumberController extends SahodayaAdminController
 
         $itemLine = '';
         if ($item) {
-            $itemLabel = e(($item->item_code ? "[{$item->item_code}] " : '').$item->title.($itemCategory ? " — {$itemCategory}" : ''));
+            // Same field order as partials/pdf-report-heading.blade.php's item line --
+            // code+title, category, individual/group, gender, participant count.
+            $parts = array_filter([
+                ($item->item_code ? "[{$item->item_code}] " : '').$item->title,
+                $itemCategory,
+                \App\Support\FestTeamSquadRules::isMultiPerson($item->participant_type) ? 'Group' : 'Individual',
+                \App\Support\FestSportsAgeGroup::genderLabel($item->gender),
+                $participantCount > 0 ? $participantCount.' participant'.($participantCount === 1 ? '' : 's') : null,
+            ]);
+            $itemLabel = e(implode(' · ', $parts));
             $itemLine = '<div style="font-size:11px; font-weight:800; color:#0f172a; margin-top:2px;">'.$itemLabel.'</div>';
         }
 

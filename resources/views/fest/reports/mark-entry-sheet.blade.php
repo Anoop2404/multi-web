@@ -36,12 +36,12 @@
 <body>
     @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
     <div class="pdf-page-header">
-        @include('partials.pdf-branding-header', [
+        @include('partials.pdf-report-heading', [
             'orgName' => $sahodaya->name ?? 'Sahodaya',
             'logoSrc' => $logoSrc ?? null,
             'docTitle' => 'MARK ENTRY SHEET',
+            'eventTitle' => $event->title,
         ])
-        <div style="font-size: 11px; font-weight: 700; color: #475569;">{{ $event->title }}</div>
     </div>
     @foreach($sheets as $sheet)
         <div class="sheet">
