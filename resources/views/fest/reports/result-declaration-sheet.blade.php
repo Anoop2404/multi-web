@@ -26,7 +26,12 @@
         .pdf-page-header { position: fixed; top: -98px; left: 0; right: 0; }
         {{-- Plain text, no dark box -- matches mark-entry-sheet.blade.php's own
              item-context-row styling. --}}
-        .item-context-row th { background: #ffffff; color: #0f172a; border: none; padding: 4px 0 8px; font-weight: bold; font-size: 12px; }
+        {{-- text-transform/letter-spacing must be reset explicitly -- .table th above
+             (the real column-header style, e.g. SL NO/CHEST NO.) sets text-transform:
+             uppercase, and since .item-context-row th doesn't win on specificity alone
+             (same specificity, just declared later), that uppercase silently carried
+             over here too without this. --}}
+        .item-context-row th { background: #ffffff; color: #0f172a; border: none; padding: 4px 0 8px; font-weight: bold; font-size: 12px; text-transform: none; letter-spacing: normal; }
         .item-context-row .item-meta { font-weight: normal; font-size: 10px; color: #64748b; margin-left: 8px; }
     </style>
 </head>
