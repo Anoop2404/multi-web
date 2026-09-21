@@ -46,7 +46,7 @@ class PdfGenerator
         ?float $pageWidthMm = null,
         ?float $pageHeightMm = null,
     ) {
-        $url = config('services.pdf_converter.url');
+        $url = self::resolveConverterUrl(config('services.pdf_converter.url'));
         $hasCustomSize = $pageWidthMm && $pageHeightMm;
 
         if ($url) {
@@ -56,6 +56,7 @@ class PdfGenerator
             $payload = [
                 'html'            => $html,
                 'printBackground' => true,
+                'timeout'         => 120000,
                 // Sent both nested (spec-correct Puppeteer shape) and flat/mm (this
                 // deployment's chrome-print-server.js reads marginTop/Right/Bottom/Left as
                 // plain numbers, not the nested object) -- see marginToMm()'s docblock.
@@ -154,7 +155,7 @@ class PdfGenerator
         ?float $pageWidthMm = null,
         ?float $pageHeightMm = null,
     ): string {
-        $url = config('services.pdf_converter.url');
+        $url = self::resolveConverterUrl(config('services.pdf_converter.url'));
         $hasCustomSize = $pageWidthMm && $pageHeightMm;
 
         if ($url) {
@@ -164,6 +165,7 @@ class PdfGenerator
             $payload = [
                 'html'            => $html,
                 'printBackground' => true,
+                'timeout'         => 120000,
                 'margin'          => $resolvedMargin,
                 'marginTop'       => self::marginToMm($resolvedMargin['top'] ?? 0),
                 'marginRight'     => self::marginToMm($resolvedMargin['right'] ?? 0),
@@ -264,5 +266,26 @@ class PdfGenerator
         }
 
         return 0.0;
+    }
+
+    /**
+     * Normalizes the external PDF converter URL. If a base host/origin was provided
+     * (e.g. 'https://pdf.truecampus.in'), automatically appends '/generate-pdf'
+     * so it doesn't fail with a 404 at the root path.
+     */
+    public static function resolveConverterUrl(?string $url): ?string
+    {
+        if (! $url) {
+            return null;
+        }
+
+        $trimmed = trim($url);
+        $path = parse_url($trimmed, PHP_URL_PATH);
+
+        if ($path === null || $path === '' || $path === '/') {
+            return rtrim($trimmed, '/') . '/generate-pdf';
+        }
+
+        return $trimmed;
     }
 }
