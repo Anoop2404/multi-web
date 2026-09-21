@@ -19,7 +19,13 @@
     </style>
 </head>
 <body>
-    <div class="pdf-page-header" @if($isDomPdf ?? true) style="position: fixed; top: -96px; left: 0; right: 0;" @endif>
+    {{-- On the Chromium path, the controller already supplies an equivalent repeating
+         header natively (see chestNumberHeaderFooterTemplates()), which now actually
+         renders correctly there -- so this in-flow copy is skipped entirely to avoid
+         showing the branding twice. dompdf has no such native mechanism, so it still
+         needs this, made position:fixed to repeat on every page. --}}
+    @if($isDomPdf ?? true)
+    <div class="pdf-page-header" style="position: fixed; top: -96px; left: 0; right: 0;">
         @include('partials.pdf-report-heading', [
             'orgName' => $orgName ?? 'Sahodaya',
             'logoSrc' => $logoSrc ?? null,
@@ -30,6 +36,7 @@
             'participantCount' => !empty($item) ? count($rows) : null,
         ])
     </div>
+    @endif
 
     <table class="data">
         <thead>
