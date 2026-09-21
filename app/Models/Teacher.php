@@ -142,6 +142,27 @@ class Teacher extends Model
         ], absolute: false);
     }
 
+    /** Photo URL for a Sahodaya admin viewing a teacher from one of its schools. */
+    public function sahodayaPhotoUrl(string $sahodayaId): ?string
+    {
+        if (! $this->photo) {
+            return null;
+        }
+
+        if (str_starts_with($this->photo, 'http://') || str_starts_with($this->photo, 'https://')) {
+            return $this->photo;
+        }
+
+        $serveRoute = url(route('sahodaya.teachers.photo', [
+            'tenantId' => $sahodayaId,
+            'teacher'  => $this->id,
+        ], absolute: false));
+
+        $version = $this->updated_at?->timestamp ?? 0;
+
+        return $serveRoute.($version ? '?v='.$version : '');
+    }
+
     /** Photo URL accessible from the teacher portal (own account only). */
     public function portalPhotoUrl(): ?string
     {

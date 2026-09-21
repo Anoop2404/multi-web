@@ -31,10 +31,15 @@ class EnsureSchoolAdmin
             abort(403);
         }
 
-        // Tenant must match
+        // Tenant must match (or user is sahodaya_admin governing this school)
         $tenantId = $request->route('tenantId');
         if ($tenantId && $user->tenant_id !== $tenantId) {
-            abort(403);
+            $isGoverningSahodaya = $user->hasRole('sahodaya_admin')
+                && \App\Models\Tenant::where('id', $tenantId)->where('parent_id', $user->tenant_id)->exists();
+
+            if (! $isGoverningSahodaya) {
+                abort(403);
+            }
         }
 
         if ($user->hasAnyRole(['school_admin', 'school_principal', 'school_vice_principal', 'school_event_coordinator', 'school_sports_coordinator', 'school_kalotsavam_coordinator', 'school_mcq_coordinator', 'school_training_coordinator', 'school_finance_coordinator', 'school_staff']) && ! $user->hasVerifiedEmail()) {

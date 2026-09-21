@@ -16,7 +16,7 @@
         <div class="pass-tile__body">
             <div class="pass-tile__photo-col">
                 <div class="pass-tile__photo-box">
-                    <img v-if="card.photo_url || card.photo_src" :src="card.photo_url || card.photo_src" :alt="card.name" class="pass-tile__photo" loading="lazy">
+                    <img v-if="currentPhotoSrc" :src="currentPhotoSrc" :alt="card.name" class="pass-tile__photo" loading="lazy" @error="handlePhotoError">
                     <span v-else class="pass-tile__initials">{{ card.initials }}</span>
                 </div>
                 <div class="pass-tile__role">{{ passLabel }}</div>
@@ -111,7 +111,7 @@
         <!-- Body -->
         <div class="id-card-tile__body">
             <div class="id-card-tile__portrait">
-                <img v-if="card.photo_url || card.photo_src" :src="card.photo_url || card.photo_src" :alt="card.name" class="id-card-tile__photo" loading="lazy">
+                <img v-if="currentPhotoSrc" :src="currentPhotoSrc" :alt="card.name" class="id-card-tile__photo" loading="lazy" @error="handlePhotoError">
                 <span v-else class="id-card-tile__initials">{{ card.initials }}</span>
             </div>
 
@@ -170,7 +170,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
     card: { type: Object, required: true },
@@ -179,6 +179,34 @@ const props = defineProps({
     eventTitle: { type: String, default: '' },
     variant: { type: String, default: 'premium' },
 });
+
+const photoFallbackAttempted = ref(false);
+const photoHidden = ref(false);
+
+watch(() => props.card, () => {
+    photoFallbackAttempted.value = false;
+    photoHidden.value = false;
+});
+
+const currentPhotoSrc = computed(() => {
+    if (photoHidden.value) {
+        return null;
+    }
+    if (photoFallbackAttempted.value) {
+        return props.card.photo_src && props.card.photo_src !== props.card.photo_url
+            ? props.card.photo_src
+            : null;
+    }
+    return props.card.photo_url || props.card.photo_src || null;
+});
+
+function handlePhotoError() {
+    if (!photoFallbackAttempted.value && props.card.photo_src && props.card.photo_src !== props.card.photo_url) {
+        photoFallbackAttempted.value = true;
+    } else {
+        photoHidden.value = true;
+    }
+}
 
 const clusterInitials = computed(() =>
     props.clusterName

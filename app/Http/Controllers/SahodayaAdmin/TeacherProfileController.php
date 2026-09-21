@@ -117,7 +117,7 @@ class TeacherProfileController extends SahodayaAdminController
             'rejection_reason'  => $teacher->rejection_reason,
             'has_portal_login'  => $teacher->user_id !== null,
             'portal_username'   => $teacher->login_code ?? $teacher->user?->username,
-            'photo_url'         => $teacher->photoUrl(),
+            'photo_url'         => $teacher->sahodayaPhotoUrl($this->sahodaya->id),
             'school_id'         => $school->id,
             'school_name'       => $school->name,
         ];

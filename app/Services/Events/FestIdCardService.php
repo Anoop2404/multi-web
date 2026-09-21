@@ -641,9 +641,9 @@ class FestIdCardService
                 $chestNumber = null;
             }
 
-            $members = $performers->map(function (FestParticipant $p) use ($includeDataUris) {
+            $members = $performers->map(function (FestParticipant $p) use ($includeDataUris, $event) {
                 $name = $p->student?->name ?? $p->teacher?->name ?? 'Member';
-                $photoUrl = $this->portraitUrl($p);
+                $photoUrl = $this->portraitUrl($p, $event);
                 $photoSrc = $this->portraitDataUri($p) ?: ($photoUrl ?: $this->defaultAvatarDataUri('male'));
 
                 return [
@@ -761,8 +761,8 @@ class FestIdCardService
             default                                                                               => 'neutral',
         };
 
-        $photoUrl = $this->portraitUrl($p);
-        $photoSrc = $this->resolveParticipantPhotoSrc($p, $gender, $includeDataUris);
+        $photoUrl = $this->portraitUrl($p, $event);
+        $photoSrc = $this->resolveParticipantPhotoSrc($p, $gender, $includeDataUris, $event);
 
         $eventDate = $this->resolveEventDate($event, $p);
         $venue = $this->resolveVenue($event, $p);
@@ -1172,8 +1172,19 @@ class FestIdCardService
         ]);
     }
 
-    private function portraitUrl(FestParticipant $p): ?string
+    public function portraitUrl(FestParticipant $p, ?FestEvent $event = null): ?string
     {
+        $sahodayaId = $event?->tenant_id
+            ?? $p->registration?->event?->tenant_id
+            ?? request()->route('tenantId');
+
+        if (! $this->hideChestNo && $sahodayaId) {
+            $url = $p->student?->sahodayaPhotoUrl($sahodayaId) ?? $p->teacher?->sahodayaPhotoUrl($sahodayaId);
+            if ($url) {
+                return $url;
+            }
+        }
+
         return $p->student?->photoUrl() ?? $p->teacher?->photoUrl();
     }
 
@@ -1229,7 +1240,7 @@ class FestIdCardService
      * fest-facing renderers (e.g. FestCertificateService) can reuse the same
      * public-disk/data-URI resolution instead of duplicating it.
      */
-    public function resolveParticipantPhotoSrc(FestParticipant $p, string $gender, bool $includeDataUris): string
+    public function resolveParticipantPhotoSrc(FestParticipant $p, string $gender, bool $includeDataUris, ?FestEvent $event = null): string
     {
         if ($includeDataUris) {
             return $this->portraitDataUri($p) ?: $this->defaultAvatarDataUri($gender);
@@ -1254,7 +1265,7 @@ class FestIdCardService
             return $this->portraitDataUri($p) ?: $this->defaultAvatarDataUri($gender);
         }
 
-        return $this->portraitUrl($p) ?: $this->defaultAvatarDataUri($gender);
+        return $this->portraitUrl($p, $event) ?: $this->defaultAvatarDataUri($gender);
     }
 
     /** @param  \Illuminate\Support\Collection<int, int|string>  $participantIds */
