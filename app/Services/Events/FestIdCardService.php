@@ -705,11 +705,12 @@ class FestIdCardService
         $pureCategory = $ageGroupLabel ?: ($classCategory ?: ($studentClass ? "Class {$studentClass}" : null));
         $itemTitleClean = ($item !== '—' && $item) ? str_replace('_', ' ', $item) : null;
         $categoryDisplay = $pureCategory ? str_replace('_', ' ', $pureCategory) : ($itemTitleClean ?: '—');
-        // ID cards print category numbers as roman numerals ("Category 2" -> "Category
-        // II"), matching how certificates already show class/category numbers — see
-        // FestCertificateService::toRomanIfNumeric(). Only the trailing number is
-        // converted, so non-numeric labels ("Sub Junior") pass through unchanged.
-        $categoryDisplay = $this->numeralizeTrailingNumber($categoryDisplay);
+        // ID cards print the category number as a roman numeral ("Category 3 —
+        // Classes 8, 9 & 10" -> "Category III — Classes 8, 9 & 10"), matching how
+        // certificates already show class/category numbers — see
+        // FestCertificateService::toRomanIfNumeric(). Only the first number
+        // converts; non-numeric labels ("Sub Junior") pass through unchanged.
+        $categoryDisplay = $this->numeralizeCategoryNumber($categoryDisplay);
 
         $rawGender = strtolower((string) ($p->student?->gender ?? $p->teacher?->gender ?? ''));
         $gender = match (true) {
@@ -1310,15 +1311,18 @@ class FestIdCardService
     }
 
     /**
-     * Converts a trailing plain number in a label to roman numerals ("Category 2" ->
-     * "Category II"); labels with no trailing number, or a non-numeric one, pass
-     * through unchanged.
+     * Converts just the FIRST plain number in a label to roman numerals
+     * ("Category 2" -> "Category II"). Real category labels aren't always a bare
+     * "Category N" — FestClassGroupScheme produces strings like "Category 3 —
+     * Classes 8, 9 & X", where later numbers (the class list) must stay as digits.
+     * Limiting to one replacement keeps those untouched; a label with no leading
+     * number passes through as-is.
      */
-    private function numeralizeTrailingNumber(string $value): string
+    private function numeralizeCategoryNumber(string $value): string
     {
-        return preg_replace_callback('/(\d+)\s*$/', function (array $m): string {
-            return $this->toRomanNumeral((int) $m[1]) ?? $m[1];
-        }, $value);
+        return preg_replace_callback('/\d+/', function (array $m): string {
+            return $this->toRomanNumeral((int) $m[0]) ?? $m[0];
+        }, $value, 1);
     }
 
     private function toRomanNumeral(int $number): ?string
