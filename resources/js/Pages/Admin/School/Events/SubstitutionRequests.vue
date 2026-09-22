@@ -16,7 +16,7 @@
             <button type="submit" class="btn-primary text-sm" :disabled="form.processing">Submit request</button>
         </form>
 
-        <div class="card overflow-hidden p-0">
+        <div class="card overflow-x-auto p-0">
             <table class="data-table">
                 <thead>
                     <tr>

@@ -9,13 +9,32 @@ use Illuminate\Support\Str;
 
 class EventController extends SchoolAdminController
 {
-    public function index()
+    public function index(Request $request)
     {
-        $events = Event::where('tenant_id', $this->school->id)
-            ->orderBy('start_date')
-            ->paginate(20);
+        $search = trim($request->string('search')->toString());
+        $status = $request->string('status')->toString();
+        $sort = in_array($request->string('sort')->toString(), ['title', 'start_date', 'venue', 'created_at'], true)
+            ? $request->string('sort')->toString()
+            : 'start_date';
+        $dir = $request->string('dir')->toString() === 'desc' ? 'desc' : 'asc';
 
-        return $this->inertia('School/Events/Index', compact('events'));
+        $events = Event::where('tenant_id', $this->school->id)
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($nested) use ($search) {
+                    $nested->where('title', 'like', "%{$search}%")
+                        ->orWhere('venue', 'like', "%{$search}%");
+                });
+            })
+            ->when($status === 'upcoming', fn ($query) => $query->whereDate('start_date', '>=', today()))
+            ->when($status === 'past', fn ($query) => $query->whereDate('start_date', '<', today()))
+            ->orderBy($sort, $dir)
+            ->paginate(20)
+            ->withQueryString();
+
+        return $this->inertia('School/Events/Index', [
+            'events' => $events,
+            'filters' => compact('search', 'status', 'sort', 'dir'),
+        ]);
     }
 
     public function create()

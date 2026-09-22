@@ -16,7 +16,7 @@
                 </button>
                 <div x-show="openSection === {{ $i }}" x-collapse x-cloak>
                     <div class="px-5 pb-5 text-sm text-gray-600 prose max-w-none">
-                        {!! nl2br(e($section['content'] ?? '')) !!}
+                        {!! \App\Support\HtmlSanitizer::richForDisplay($section['content'] ?? '') !!}
                         @if(!empty($section['documents']) && is_array($section['documents']))
                         <div class="mt-3 space-y-2">
                             @foreach($section['documents'] as $doc)

@@ -8,8 +8,8 @@
                 <h2 class="text-3xl font-bold font-heading text-gray-900 mb-4">
                     {{ $config['heading'] ?? 'Join Our School' }}
                 </h2>
-                @if(!empty($config['body']))
-                <div class="text-gray-600 leading-relaxed mb-6">{!! nl2br(e($config['body'])) !!}</div>
+                @if(!empty($config['content']) || !empty($config['body']))
+                <div class="prose max-w-none text-gray-600 leading-relaxed mb-6">{!! \App\Support\HtmlSanitizer::richForDisplay($config['content'] ?? $config['body'] ?? '') !!}</div>
                 @endif
 
                 @if(!empty($config['steps']) && is_array($config['steps']))
@@ -42,6 +42,18 @@
 
             {{-- Key info sidebar --}}
             <div class="bg-gray-50 rounded-2xl p-6 space-y-4">
+                @if(!empty($config['contact_phone']))
+                <div class="flex justify-between gap-4 text-sm border-b border-gray-200 pb-3">
+                    <span class="text-gray-500 font-medium">Phone</span>
+                    <a href="tel:{{ $config['contact_phone'] }}" class="text-right font-semibold" style="color: var(--color-primary)">{{ $config['contact_phone'] }}</a>
+                </div>
+                @endif
+                @if(!empty($config['contact_email']))
+                <div class="flex justify-between gap-4 text-sm border-b border-gray-200 pb-3">
+                    <span class="text-gray-500 font-medium">Email</span>
+                    <a href="mailto:{{ $config['contact_email'] }}" class="break-all text-right font-semibold" style="color: var(--color-primary)">{{ $config['contact_email'] }}</a>
+                </div>
+                @endif
                 @foreach([
                     ['label' => 'Academic Year',   'key' => 'academic_year'],
                     ['label' => 'Age Criteria',    'key' => 'age_criteria'],

@@ -9,13 +9,29 @@ use Illuminate\Http\Request;
 
 class TestimonialController extends SchoolAdminController
 {
-    public function index()
+    public function index(Request $request)
     {
-        $testimonials = Testimonial::where('tenant_id', $this->school->id)
-            ->orderBy('display_order')
-            ->get();
+        $search = trim($request->string('search')->toString());
+        $status = $request->string('status')->toString();
 
-        return $this->inertia('School/Testimonials/Index', compact('testimonials'));
+        $testimonials = Testimonial::where('tenant_id', $this->school->id)
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($nested) use ($search) {
+                    $nested->where('name', 'like', "%{$search}%")
+                        ->orWhere('designation', 'like', "%{$search}%")
+                        ->orWhere('quote', 'like', "%{$search}%");
+                });
+            })
+            ->when($status === 'active', fn ($query) => $query->where('is_active', true))
+            ->when($status === 'hidden', fn ($query) => $query->where('is_active', false))
+            ->orderBy('display_order')
+            ->paginate(20)
+            ->withQueryString();
+
+        return $this->inertia('School/Testimonials/Index', [
+            'testimonials' => $testimonials,
+            'filters' => compact('search', 'status'),
+        ]);
     }
 
     public function store(Request $request)

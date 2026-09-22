@@ -48,6 +48,20 @@
                 </div>
 
                 <FormGrid>
+                    <FormField label="Assigned Hall Ticket Template" class-extra="sm:col-span-2" hint="Select a reusable template from the Hall Ticket Builder, or customize per-exam below.">
+                        <div class="flex items-center gap-2">
+                            <select v-model="designForm.hall_ticket_template_id" class="field flex-1" @change="onTemplateSelect">
+                                <option :value="null">Default template / Per-exam custom design</option>
+                                <option v-for="t in templates" :key="t.id" :value="t.id">
+                                    {{ t.title }} {{ t.is_default ? '(Default)' : '' }}
+                                </option>
+                            </select>
+                            <a :href="`/sahodaya-admin/${sahodaya.id}/mcq/templates/hall-tickets`" target="_blank" class="btn-secondary text-xs shrink-0">
+                                Template Builder ↗
+                            </a>
+                        </div>
+                    </FormField>
+
                     <FormField label="Ticket header title" class-extra="sm:col-span-2">
                         <input v-model="designForm.header_title" class="field" placeholder="Talent Search Examination — Hall Ticket">
                     </FormField>
@@ -198,6 +212,7 @@ const props = defineProps({
     publicUrl: String,
     pendingPaymentsCount: Number,
     exam: Object,
+    templates: { type: Array, default: () => [] },
     registrations: Object,
     hallTicketDesign: Object,
     logoUrl: String,
@@ -256,6 +271,7 @@ function allocateSeats(reallocate = false) {
 }
 
 const designForm = useForm({
+    hall_ticket_template_id: props.exam.hall_ticket_template_id ?? null,
     header_title: props.hallTicketDesign?.header_title ?? '',
     footer_note: props.hallTicketDesign?.footer_note ?? '',
     show_reg_no: props.hallTicketDesign?.show_reg_no ?? true,
@@ -272,6 +288,26 @@ const designForm = useForm({
     report_before_minutes: props.hallTicketDesign?.report_before_minutes ?? 30,
     gate_closure_after_minutes: props.hallTicketDesign?.gate_closure_after_minutes ?? 0,
 });
+
+function onTemplateSelect() {
+    if (!designForm.hall_ticket_template_id) return;
+    const selected = props.templates.find(t => t.id === designForm.hall_ticket_template_id);
+    if (selected?.design_json) {
+        const d = selected.design_json;
+        if (d.header_title) designForm.header_title = d.header_title;
+        if (d.primary_color) designForm.primary_color = d.primary_color;
+        if (d.accent_color) designForm.accent_color = d.accent_color;
+        if (d.layout) designForm.layout = d.layout;
+        if (d.show_reg_no !== undefined) designForm.show_reg_no = d.show_reg_no;
+        if (d.show_school !== undefined) designForm.show_school = d.show_school;
+        if (d.show_photo !== undefined) designForm.show_photo = d.show_photo;
+        if (d.show_qr !== undefined) designForm.show_qr = d.show_qr;
+        if (d.show_signature !== undefined) designForm.show_signature = d.show_signature;
+        if (d.footer_note) designForm.footer_note = d.footer_note;
+        if (d.report_before_minutes !== undefined) designForm.report_before_minutes = d.report_before_minutes;
+        if (d.gate_closure_after_minutes !== undefined) designForm.gate_closure_after_minutes = d.gate_closure_after_minutes;
+    }
+}
 
 watch(() => logoInput.value?.files?.[0], (file) => {
     if (!file) {

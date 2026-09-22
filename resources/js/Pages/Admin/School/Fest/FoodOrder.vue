@@ -104,7 +104,7 @@
                     </form>
                 </div>
 
-                <details v-if="payments.length" class="card card--flush" open>
+                <details v-if="payments.length" class="card card--flush overflow-x-auto" open>
                     <summary class="p-3 cursor-pointer select-none font-bold text-sm">Payments ({{ payments.length }})</summary>
                     <table class="data-table">
                         <thead><tr><th>Receipt</th><th>Amount</th><th>Mode</th><th>Status</th><th>Date</th></tr></thead>

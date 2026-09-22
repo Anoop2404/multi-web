@@ -1,7 +1,7 @@
 <template>
     <SchoolAdminLayout title="Downloads" :school="school" :show-header-title="false">
         <PageHeader title="Downloads" eyebrow="Website"
-            description="School website content and public pages." />
+            description="Upload, search and manage the files visitors can download from your school website." />
 
 
         <div class="space-y-6">
@@ -41,38 +41,48 @@
                 </form>
             </div>
 
-            <!-- Files list -->
-            <div class="card card--flush">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-50 border-b border-gray-100">
-                        <tr>
-                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Title</th>
-                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Category</th>
-                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Year</th>
-                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Active</th>
-                            <th class="px-5 py-3"></th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-50">
-                        <tr v-for="dl in downloads" :key="dl.id" class="hover:bg-gray-50">
-                            <td class="px-5 py-3 font-medium text-gray-800">{{ dl.title }}</td>
-                            <td class="px-5 py-3 text-gray-500 capitalize">{{ dl.category.replace(/_/g,' ') }}</td>
-                            <td class="px-5 py-3 text-gray-400 text-xs">{{ dl.academic_year || '—' }}</td>
-                            <td class="px-5 py-3">
-                                <span :class="dl.is_active ? 'text-green-600' : 'text-gray-300'" class="text-xs font-medium">
-                                    {{ dl.is_active ? '● Active' : '○ Hidden' }}
-                                </span>
-                            </td>
-                            <td class="px-5 py-3 text-right">
-                                <button @click="remove(dl)" class="text-xs text-red-400 hover:underline">Remove</button>
-                            </td>
-                        </tr>
-                        <tr v-if="!downloads.length">
-                            <td colspan="5" class="px-5 py-10 text-center text-gray-400">No files yet.</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+            <SahodayaDataTable
+                label="Website downloads"
+                :columns="columns"
+                :links="downloads.links"
+                :meta="downloads"
+                :has-rows="downloads.data.length > 0"
+                empty="No files found"
+                empty-description="Try clearing the filters, or upload a file using the form above."
+                empty-icon="📁"
+            >
+                <template #toolbar>
+                    <form class="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(14rem,1fr)_12rem_11rem_auto] lg:items-end" @submit.prevent="applyFilters">
+                        <label class="form-label">Search
+                            <input v-model="filterForm.search" type="search" class="field mt-1" placeholder="Title, filename or year">
+                        </label>
+                        <label class="form-label">Category
+                            <SearchableSelect v-model="filterForm.category" class="mt-1" :options="categories" :all-option="true" all-label="All categories" />
+                        </label>
+                        <label class="form-label">Visibility
+                            <SearchableSelect v-model="filterForm.status" class="mt-1" :options="statusOptions" :all-option="true" all-label="All files" :searchable="false" />
+                        </label>
+                        <div class="flex gap-2">
+                            <button type="submit" class="btn-primary text-sm">Apply</button>
+                            <button v-if="hasFilters" type="button" class="btn-ghost text-sm" @click="clearFilters">Clear</button>
+                        </div>
+                    </form>
+                </template>
+
+                <tr v-for="dl in downloads.data" :key="dl.id" class="hover:bg-gray-50">
+                    <td class="px-4 py-3 font-medium text-gray-800">{{ dl.title }}</td>
+                    <td class="px-4 py-3 text-gray-500 capitalize">{{ dl.category.replace(/_/g,' ') }}</td>
+                    <td class="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{{ dl.academic_year || '—' }}</td>
+                    <td class="px-4 py-3">
+                        <span :class="dl.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'" class="rounded-full px-2 py-1 text-xs font-semibold">
+                            {{ dl.is_active ? 'Active' : 'Hidden' }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <button type="button" @click="remove(dl)" class="btn-ghost text-xs text-red-600">Remove</button>
+                    </td>
+                </tr>
+            </SahodayaDataTable>
         </div>
     </SchoolAdminLayout>
 </template>
@@ -81,12 +91,15 @@
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useForm, router } from '@inertiajs/vue3';
+import { computed, reactive } from 'vue';
 import { useConfirm } from '@/composables/useConfirm';
-const { confirm, prompt } = useConfirm();
+import SahodayaDataTable from '@/Components/SahodayaDataTable.vue';
+const { confirm } = useConfirm();
 
 const props = defineProps({
     school:    Object,
-    downloads: { type: Array, default: () => [] },
+    downloads: Object,
+    filters: { type: Object, default: () => ({}) },
 });
 
 const categories = [
@@ -99,6 +112,39 @@ const categories = [
     { value: 'minutes',        label: 'Meeting Minutes' },
     { value: 'other',          label: 'Other' },
 ];
+const statusOptions = [
+    { value: 'active', label: 'Active' },
+    { value: 'hidden', label: 'Hidden' },
+];
+const columns = [
+    { key: 'title', label: 'Title' },
+    { key: 'category', label: 'Category' },
+    { key: 'year', label: 'Year' },
+    { key: 'visibility', label: 'Visibility' },
+    { key: 'actions', label: 'Actions', align: 'right' },
+];
+const filterForm = reactive({
+    search: props.filters.search ?? '',
+    category: props.filters.category ?? '',
+    status: props.filters.status ?? '',
+});
+const hasFilters = computed(() => Boolean(filterForm.search || filterForm.category || filterForm.status));
+const base = `/school-admin/${props.school.id}/downloads`;
+
+function applyFilters() {
+    router.get(base, {
+        search: filterForm.search || undefined,
+        category: filterForm.category || undefined,
+        status: filterForm.status || undefined,
+    }, { preserveState: true, preserveScroll: true, replace: true });
+}
+
+function clearFilters() {
+    filterForm.search = '';
+    filterForm.category = '';
+    filterForm.status = '';
+    applyFilters();
+}
 
 const form = useForm({
     title:         '',

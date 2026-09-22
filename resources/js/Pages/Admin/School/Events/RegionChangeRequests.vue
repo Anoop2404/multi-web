@@ -44,7 +44,7 @@
             </div>
         </div>
 
-        <div class="card overflow-hidden p-0 max-w-3xl">
+        <div class="card overflow-x-auto p-0 max-w-3xl">
             <table class="data-table">
                 <thead>
                     <tr>

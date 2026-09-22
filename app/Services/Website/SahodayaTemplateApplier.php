@@ -89,7 +89,11 @@ class SahodayaTemplateApplier
             if (($draft['mode'] ?? 'full') !== 'style') {
                 $this->deleteSections($site);
                 foreach ($draft['sections'] as $order => $recipe) {
-                    $config = HtmlSanitizer::sanitizeConfig($recipe['config'] ?? []);
+                    $config = HtmlSanitizer::sanitizeSectionConfig(
+                        $recipe['config'] ?? [],
+                        $recipe['section_type'],
+                        $recipe['variant'],
+                    );
                     $layout = $this->validatedLayout($recipe['layout'] ?? $recipe['layout_json'] ?? []);
                     SiteSection::create([
                         'tenant_id' => $site->tenant_id,

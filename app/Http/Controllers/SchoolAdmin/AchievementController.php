@@ -16,14 +16,22 @@ class AchievementController extends SchoolAdminController
         $category = $request->string('category')->toString();
         $level = $request->string('level')->toString();
         $year = $request->string('academic_year')->toString();
+        $search = trim($request->string('search')->toString());
 
         $achievements = Achievement::where('tenant_id', $this->school->id)
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($nested) use ($search) {
+                    $nested->where('title', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%");
+                });
+            })
             ->when($category !== '', fn ($q) => $q->byCategory($category))
             ->when($level !== '', fn ($q) => $q->byLevel($level))
             ->when($year !== '', fn ($q) => $q->byAcademicYear($year))
             ->orderBy('display_order')
             ->orderByDesc('achieved_at')
-            ->get();
+            ->paginate(20)
+            ->withQueryString();
 
         $years = Achievement::where('tenant_id', $this->school->id)
             ->whereNotNull('academic_year')
@@ -40,6 +48,7 @@ class AchievementController extends SchoolAdminController
                 'category' => $category,
                 'level' => $level,
                 'academic_year' => $year,
+                'search' => $search,
             ],
         ]);
     }

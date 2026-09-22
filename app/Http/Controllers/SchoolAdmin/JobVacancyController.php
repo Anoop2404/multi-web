@@ -7,12 +7,30 @@ use Illuminate\Http\Request;
 
 class JobVacancyController extends SchoolAdminController
 {
-    public function index()
+    public function index(Request $request)
     {
-        $vacancies = JobVacancy::where('tenant_id', $this->school->id)
-            ->orderByDesc('created_at')->get();
+        $search = trim($request->string('search')->toString());
+        $status = $request->string('status')->toString();
 
-        return $this->inertia('School/JobVacancies/Index', compact('vacancies'));
+        $vacancies = JobVacancy::where('tenant_id', $this->school->id)
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($nested) use ($search) {
+                    $nested->where('title', 'like', "%{$search}%")
+                        ->orWhere('qualification', 'like', "%{$search}%")
+                        ->orWhere('experience', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%");
+                });
+            })
+            ->when($status === 'active', fn ($query) => $query->where('is_active', true))
+            ->when($status === 'hidden', fn ($query) => $query->where('is_active', false))
+            ->orderByDesc('created_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        return $this->inertia('School/JobVacancies/Index', [
+            'vacancies' => $vacancies,
+            'filters' => compact('search', 'status'),
+        ]);
     }
 
     public function store(Request $request)

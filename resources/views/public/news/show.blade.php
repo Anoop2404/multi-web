@@ -29,7 +29,7 @@
         @endif
 
         <div class="prose prose-gray max-w-none text-gray-700 leading-relaxed">
-            {!! nl2br(e($article->body)) !!}
+            {!! \App\Support\HtmlSanitizer::richForDisplay($article->body) !!}
         </div>
     </div>
 </article>

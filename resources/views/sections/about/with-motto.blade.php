@@ -7,6 +7,18 @@
         </div>
         @endif
 
+        @if(!empty($config['content']) || !empty($config['image']))
+        <div class="grid items-center gap-8 text-left md:grid-cols-2 mb-10">
+            <div class="prose max-w-none text-gray-600">
+                {!! \App\Support\HtmlSanitizer::richForDisplay($config['content'] ?? '') !!}
+            </div>
+            @if(!empty($config['image']))
+            <img loading="lazy" src="{{ $config['image'] }}" alt="{{ $config['heading'] ?? 'About our school' }}"
+                 class="w-full rounded-2xl object-cover shadow-sm">
+            @endif
+        </div>
+        @endif
+
         <div class="grid md:grid-cols-3 gap-8 mb-10">
             @if(!empty($config['history']))
             <div class="bg-white rounded-xl p-6 shadow-sm">
@@ -24,11 +36,11 @@
             </div>
         </div>
 
-        @if(!empty($config['anthem']))
+        @if(!empty($config['anthem_url']) || !empty($config['anthem']))
         <div class="max-w-md mx-auto p-4 rounded-lg border" style="border-color: var(--color-primary);">
             <p class="text-sm font-semibold mb-2" style="color: var(--color-primary)">🎵 School Anthem</p>
             <audio controls class="w-full">
-                <source src="{{ $config['anthem'] }}" type="audio/mpeg">
+                <source src="{{ $config['anthem_url'] ?? $config['anthem'] }}" type="audio/mpeg">
             </audio>
         </div>
         @endif

@@ -5,8 +5,8 @@
         <img loading="lazy" src="{{ $config['photo'] }}" alt="Principal"
              class="w-24 h-24 rounded-full mx-auto my-4 object-cover border-4 border-white/30">
         @endif
-        <blockquote class="text-xl md:text-2xl leading-relaxed italic font-light mt-4">
-            "{{ $config['message_quote'] ?? $config['message'] ?? '' }}"
+        <blockquote class="prose prose-invert max-w-none text-xl md:text-2xl leading-relaxed italic font-light mt-4">
+            {!! \App\Support\HtmlSanitizer::richForDisplay($config['message_quote'] ?? $config['message'] ?? '') !!}
         </blockquote>
         @if(!empty($config['name']))
         <div class="mt-6">

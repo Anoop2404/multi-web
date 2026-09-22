@@ -1,7 +1,7 @@
 <template>
     <SchoolAdminLayout title="Job Vacancies" :school="school" :show-header-title="false">
         <PageHeader title="Job Vacancies" eyebrow="Website"
-            description="School website content and public pages." />
+            description="Publish and manage recruitment opportunities shown on the school website." />
 
 
         <div class="space-y-6">
@@ -59,7 +59,20 @@
 
             <!-- Vacancies list -->
             <div class="space-y-3">
-                <div v-for="vac in vacancies" :key="vac.id"
+                <form class="card grid gap-3 sm:grid-cols-[minmax(14rem,1fr)_11rem_auto] sm:items-end" @submit.prevent="applyFilters">
+                    <label class="form-label">Search
+                        <input v-model="filterForm.search" type="search" class="field mt-1" placeholder="Position, qualification or experience">
+                    </label>
+                    <label class="form-label">Visibility
+                        <SearchableSelect v-model="filterForm.status" class="mt-1" :options="statusOptions" :all-option="true" all-label="All vacancies" :searchable="false" />
+                    </label>
+                    <div class="flex gap-2">
+                        <button type="submit" class="btn-primary text-sm">Apply</button>
+                        <button v-if="hasFilters" type="button" class="btn-ghost text-sm" @click="clearFilters">Clear</button>
+                    </div>
+                </form>
+
+                <div v-for="vac in vacancies.data" :key="vac.id"
                      class="card-list-row justify-between">
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2 mb-1">
@@ -85,9 +98,15 @@
                     </div>
                 </div>
 
-                <div v-if="!vacancies.length"
+                <div v-if="!vacancies.data.length"
                      class="card card--dashed p-10 text-center text-slate-400">
-                    No vacancies posted yet.
+                    <div class="text-3xl" aria-hidden="true">💼</div>
+                    <p class="mt-2 font-semibold text-slate-600">No vacancies found</p>
+                    <p class="mt-1 text-xs">Try clearing the filters, or post a vacancy using the form above.</p>
+                </div>
+
+                <div v-if="vacancies.total" class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+                    <PaginationLinks :links="vacancies.links" :meta="vacancies" />
                 </div>
             </div>
         </div>
@@ -96,17 +115,43 @@
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
-import { ref } from 'vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import PaginationLinks from '@/Components/ui/PaginationLinks.vue';
+import { computed, reactive, ref } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import { useConfirm } from '@/composables/useConfirm';
-const { confirm, prompt } = useConfirm();
+const { confirm } = useConfirm();
 
 const props = defineProps({
     school:    Object,
-    vacancies: { type: Array, default: () => [] },
+    vacancies: Object,
+    filters: { type: Object, default: () => ({}) },
 });
 
 const editing = ref(null);
+const statusOptions = [
+    { value: 'active', label: 'Active' },
+    { value: 'hidden', label: 'Hidden' },
+];
+const filterForm = reactive({
+    search: props.filters.search ?? '',
+    status: props.filters.status ?? '',
+});
+const hasFilters = computed(() => Boolean(filterForm.search || filterForm.status));
+const base = `/school-admin/${props.school.id}/job-vacancies`;
+
+function applyFilters() {
+    router.get(base, {
+        search: filterForm.search || undefined,
+        status: filterForm.status || undefined,
+    }, { preserveState: true, preserveScroll: true, replace: true });
+}
+
+function clearFilters() {
+    filterForm.search = '';
+    filterForm.status = '';
+    applyFilters();
+}
 
 const form = useForm({
     title:         '',

@@ -12,9 +12,10 @@
                 <div v-for="(item, i) in model[field.key]" :key="i"
                      class="border border-gray-100 rounded-lg p-3 space-y-2">
                     <div class="grid sm:grid-cols-2 gap-2">
-                        <div v-for="sub in field.fields" :key="sub.key">
+                        <div v-for="sub in field.fields" :key="sub.key" :class="(sub.type === 'textarea' || sub.type === 'wysiwyg') ? 'sm:col-span-2' : ''">
                             <label class="block text-[10px] font-semibold text-gray-500 mb-0.5">{{ sub.label }}</label>
-                            <input v-if="sub.type !== 'textarea'"
+                            <RichTextEditor v-if="sub.type === 'wysiwyg'" v-model="item[sub.key]" min-height="120px" />
+                            <input v-else-if="sub.type !== 'textarea'"
                                    v-model="item[sub.key]"
                                    :type="inputType(sub.type)"
                                    class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs">
@@ -54,8 +55,13 @@
                 </div>
             </div>
 
+            <!-- Rich text -->
+            <RichTextEditor v-else-if="field.type === 'wysiwyg'"
+                            v-model="model[field.key]" :label="field.label" min-height="160px"
+                            help="Formatted text is cleaned for safe website display." />
+
             <!-- Textarea -->
-            <div v-else-if="field.type === 'textarea' || field.type === 'wysiwyg'">
+            <div v-else-if="field.type === 'textarea'">
                 <label class="block text-xs font-semibold text-gray-600 mb-1">{{ field.label }}</label>
                 <textarea v-model="model[field.key]" rows="3"
                           class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"></textarea>
@@ -72,6 +78,7 @@
 </template>
 
 <script setup>
+import RichTextEditor from '@/Components/ui/RichTextEditor.vue';
 import { reactive, watch } from 'vue';
 
 const props = defineProps({

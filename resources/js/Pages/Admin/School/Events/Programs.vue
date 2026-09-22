@@ -25,7 +25,7 @@
                 <button class="btn-primary">Create</button>
             </form>
 
-            <div class="card card--flush">
+            <div class="card card--flush overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 text-left">
                         <tr>
@@ -83,4 +83,3 @@ function createEvent() {
     form.post(`/school-admin/${props.school.id}/fest-programs`, { preserveScroll: true, onSuccess: () => form.reset() });
 }
 </script>
-

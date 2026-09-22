@@ -3,13 +3,15 @@
         <p v-if="meta" class="text-xs text-gray-500">
             Showing {{ meta.from ?? 0 }}–{{ meta.to ?? 0 }} of {{ meta.total ?? 0 }}
         </p>
-        <nav class="flex flex-wrap gap-1" :class="meta ? '' : 'ml-auto'">
+        <nav class="flex flex-wrap gap-1" :class="meta ? '' : 'ml-auto'" aria-label="Pagination">
             <Link
                 v-for="link in links"
                 :key="link.label"
                 :href="link.url || '#'"
-                class="px-3 py-1 rounded-lg text-sm min-w-[2rem] text-center"
+                preserve-scroll preserve-state
+                class="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg px-2.5 py-1 text-sm"
                 :class="link.active ? 'bg-[#0f3d7a] text-white' : link.url ? 'text-gray-600 hover:bg-gray-100' : 'text-gray-300 pointer-events-none'"
+                :aria-current="link.active ? 'page' : undefined"
                 v-html="link.label"
             />
         </nav>

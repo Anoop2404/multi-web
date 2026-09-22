@@ -17,7 +17,7 @@
             </div>
             <div>
                 <div class="prose max-w-none text-gray-600">
-                    {!! nl2br(e($config['description'] ?? '')) !!}
+                    {!! \App\Support\HtmlSanitizer::richForDisplay($config['description'] ?? '') !!}
                 </div>
                 @if(!empty($config['features']) && is_array($config['features']))
                 <ul class="mt-4 space-y-2">

@@ -1,37 +1,48 @@
 <template>
     <SchoolAdminLayout title="Alumni" :school="school" :show-header-title="false">
         <PageHeader title="Alumni" eyebrow="Website"
-            description="School website content and public pages." />
+            description="Review alumni submissions and control which profiles are approved or featured publicly." />
 
 
         <div class="space-y-4">
             <!-- Filter tabs -->
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
                 <button v-for="tab in tabs" :key="tab.value"
-                        @click="activeTab = tab.value"
-                        :class="activeTab === tab.value ? ' text-white' : 'chip-tab'"
-                        class="px-4 py-1.5 rounded-lg text-xs font-semibold transition">
-                    {{ tab.label }} ({{ counts[tab.value] }})
+                        type="button"
+                        @click="selectStatus(tab.value)"
+                        :aria-pressed="filterForm.status === tab.value"
+                        :class="filterForm.status === tab.value ? 'chip-tab chip-tab--active' : 'chip-tab'">
+                    {{ tab.label }} ({{ counts[tab.value] ?? 0 }})
                 </button>
             </div>
 
-            <!-- Table -->
-            <div class="card card--flush">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-50 border-b border-gray-100">
-                        <tr>
-                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Alumni</th>
-                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Batch</th>
-                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Current Role</th>
-                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
-                            <th class="px-5 py-3"></th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-50">
-                        <tr v-for="a in filtered" :key="a.id" class="hover:bg-gray-50">
+            <SahodayaDataTable
+                label="Alumni submissions"
+                :columns="columns"
+                :links="alumni.links"
+                :meta="alumni"
+                :has-rows="alumni.data.length > 0"
+                empty="No alumni found"
+                empty-description="Try clearing the search or selecting a different status."
+                empty-icon="🎓"
+                min-width-class="min-w-[52rem]"
+            >
+                <template #toolbar>
+                    <form class="flex flex-col gap-3 sm:flex-row sm:items-end" @submit.prevent="applyFilters">
+                        <label class="form-label min-w-0 flex-1">Search
+                            <input v-model="filterForm.search" type="search" class="field mt-1" placeholder="Name, email, batch, role or organisation">
+                        </label>
+                        <div class="flex gap-2">
+                            <button type="submit" class="btn-primary text-sm">Search</button>
+                            <button v-if="hasFilters" type="button" class="btn-ghost text-sm" @click="clearFilters">Clear</button>
+                        </div>
+                    </form>
+                </template>
+
+                        <tr v-for="a in alumni.data" :key="a.id" class="hover:bg-gray-50">
                             <td class="px-5 py-3">
                                 <div class="flex items-center gap-3">
-                                    <img v-if="a.photo" :src="a.photo" class="w-9 h-9 rounded-full object-cover border border-gray-100 shrink-0">
+                                    <img v-if="a.photo_url" :src="a.photo_url" :alt="a.name" class="w-9 h-9 rounded-full object-cover border border-gray-100 shrink-0">
                                     <div class="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-sm shrink-0" v-else>
                                         {{ a.name[0] }}
                                     </div>
@@ -57,42 +68,38 @@
                             </td>
                             <td class="px-5 py-3 text-right">
                                 <div class="flex items-center justify-end gap-2">
-                                    <button @click="approve(a)"
+                                    <button type="button" @click="approve(a)"
                                             :class="a.is_approved ? 'text-amber-500' : 'text-green-600'"
                                             class="text-xs hover:underline">
                                         {{ a.is_approved ? 'Hide' : 'Approve' }}
                                     </button>
-                                    <button @click="feature(a)"
+                                    <button type="button" @click="feature(a)"
                                             class="text-xs text-purple-500 hover:underline">
                                         {{ a.is_featured ? 'Unfeature' : 'Feature' }}
                                     </button>
-                                    <button @click="remove(a)" class="text-xs text-red-400 hover:underline">Delete</button>
+                                    <button type="button" @click="remove(a)" class="text-xs text-red-500 hover:underline">Delete</button>
                                 </div>
                             </td>
                         </tr>
-                        <tr v-if="!filtered.length">
-                            <td colspan="5" class="px-5 py-10 text-center text-gray-400">No alumni found.</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+            </SahodayaDataTable>
         </div>
     </SchoolAdminLayout>
 </template>
 
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
-import { ref, computed } from 'vue';
+import { computed, reactive } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { useConfirm } from '@/composables/useConfirm';
-const { confirm, prompt } = useConfirm();
+import SahodayaDataTable from '@/Components/SahodayaDataTable.vue';
+const { confirm } = useConfirm();
 
 const props = defineProps({
     school: Object,
-    alumni: { type: Array, default: () => [] },
+    alumni: Object,
+    counts: { type: Object, default: () => ({}) },
+    filters: { type: Object, default: () => ({}) },
 });
-
-const activeTab = ref('all');
 
 const tabs = [
     { value: 'all',      label: 'All' },
@@ -101,21 +108,37 @@ const tabs = [
     { value: 'featured', label: 'Featured' },
 ];
 
-const counts = computed(() => ({
-    all:      props.alumni.length,
-    pending:  props.alumni.filter(a => !a.is_approved).length,
-    approved: props.alumni.filter(a => a.is_approved).length,
-    featured: props.alumni.filter(a => a.is_featured).length,
-}));
-
-const filtered = computed(() => {
-    switch (activeTab.value) {
-        case 'pending':  return props.alumni.filter(a => !a.is_approved);
-        case 'approved': return props.alumni.filter(a => a.is_approved);
-        case 'featured': return props.alumni.filter(a => a.is_featured);
-        default:         return props.alumni;
-    }
+const columns = [
+    { key: 'alumni', label: 'Alumni' },
+    { key: 'batch', label: 'Batch' },
+    { key: 'role', label: 'Current role' },
+    { key: 'status', label: 'Status' },
+    { key: 'actions', label: 'Actions', align: 'right' },
+];
+const filterForm = reactive({
+    search: props.filters.search ?? '',
+    status: props.filters.status || 'all',
 });
+const hasFilters = computed(() => Boolean(filterForm.search || (filterForm.status && filterForm.status !== 'all')));
+const base = `/school-admin/${props.school.id}/alumni`;
+
+function applyFilters() {
+    router.get(base, {
+        search: filterForm.search || undefined,
+        status: filterForm.status === 'all' ? undefined : filterForm.status,
+    }, { preserveState: true, preserveScroll: true, replace: true });
+}
+
+function selectStatus(status) {
+    filterForm.status = status;
+    applyFilters();
+}
+
+function clearFilters() {
+    filterForm.search = '';
+    filterForm.status = 'all';
+    applyFilters();
+}
 
 function approve(a) {
     router.patch(`/school-admin/${props.school.id}/alumni/${a.id}/approve`, {}, { preserveScroll: true });

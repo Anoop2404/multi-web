@@ -9,13 +9,13 @@
             <div>
                 <h3 class="text-xl font-bold font-heading mb-4" style="color: var(--color-secondary)">{{ $config['left_title'] ?? 'Our History' }}</h3>
                 <div class="prose max-w-none text-gray-600">
-                    {!! nl2br(e($config['left_content'] ?? '')) !!}
+                    {!! \App\Support\HtmlSanitizer::richForDisplay($config['left_content'] ?? '') !!}
                 </div>
             </div>
             <div>
                 <h3 class="text-xl font-bold font-heading mb-4" style="color: var(--color-secondary)">{{ $config['right_title'] ?? 'Vision & Mission' }}</h3>
                 <div class="prose max-w-none text-gray-600">
-                    {!! nl2br(e($config['right_content'] ?? '')) !!}
+                    {!! \App\Support\HtmlSanitizer::richForDisplay($config['right_content'] ?? '') !!}
                 </div>
                 @if(!empty($config['vision']))
                 <div class="mt-6 p-4 rounded-lg" style="background-color: color-mix(in srgb, var(--color-primary) 10%, transparent)">

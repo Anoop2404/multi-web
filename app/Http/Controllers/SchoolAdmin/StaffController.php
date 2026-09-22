@@ -8,13 +8,30 @@ use Illuminate\Http\Request;
 
 class StaffController extends SchoolAdminController
 {
-    public function index()
+    public function index(Request $request)
     {
-        $staff = StaffMember::where('tenant_id', $this->school->id)
-            ->orderBy('display_order')
-            ->get();
+        $search = trim($request->string('search')->toString());
+        $type = $request->string('type')->toString();
 
-        return $this->inertia('School/Staff/Index', compact('staff'));
+        $staff = StaffMember::where('tenant_id', $this->school->id)
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($nested) use ($search) {
+                    $nested->where('name', 'like', "%{$search}%")
+                        ->orWhere('designation', 'like', "%{$search}%")
+                        ->orWhere('department', 'like', "%{$search}%")
+                        ->orWhere('qualification', 'like', "%{$search}%");
+                });
+            })
+            ->when(in_array($type, ['teaching', 'non-teaching', 'admin'], true), fn ($query) => $query->where('type', $type))
+            ->orderBy('display_order')
+            ->orderBy('name')
+            ->paginate(24)
+            ->withQueryString();
+
+        return $this->inertia('School/Staff/Index', [
+            'staff' => $staff,
+            'filters' => compact('search', 'type'),
+        ]);
     }
 
     public function create()

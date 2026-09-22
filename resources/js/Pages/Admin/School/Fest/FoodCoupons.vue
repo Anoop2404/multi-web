@@ -14,7 +14,7 @@
                class="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium">Print issued coupons</a>
         </form>
 
-        <div class="card card--flush">
+        <div class="card card--flush overflow-x-auto">
             <table class="data-table">
                 <thead>
                     <tr>
@@ -76,4 +76,3 @@ function applyFilter() {
     router.get(`/school-admin/${school.value.id}/food-coupons`, params, { preserveState: true });
 }
 </script>
-

@@ -556,6 +556,7 @@ import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import ExperiencePicker from '@/Components/sahodaya/website/ExperiencePicker.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import ImageUploadField from '@/Components/Website/ImageUploadField.vue';
+import RichTextEditor from '@/Components/ui/RichTextEditor.vue';
 import { ref, reactive, computed, defineComponent, h, onMounted } from 'vue';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -1242,6 +1243,15 @@ const SectionFieldEditor = defineComponent({
                                             previewUrl: props.mediaPreview?.(item[sub.key] ?? '') ?? '',
                                             'onUpdate:modelValue': val => onRepeaterField(field.key, idx, sub.key, val),
                                         })
+                                        : sub.type === 'wysiwyg'
+                                            ? h(RichTextEditor, {
+                                                key: sub.key,
+                                                class: 'sm:col-span-2',
+                                                modelValue: item[sub.key] ?? '',
+                                                label: sub.label,
+                                                minHeight: '120px',
+                                                'onUpdate:modelValue': val => onRepeaterField(field.key, idx, sub.key, val),
+                                            })
                                         : h('div', { key: sub.key, class: sub.type === 'textarea' ? 'sm:col-span-2' : '' }, [
                                         h('label', { class: 'text-[11px] text-gray-400 font-medium' }, sub.label),
                                         sub.type === 'textarea'
@@ -1298,7 +1308,18 @@ const SectionFieldEditor = defineComponent({
                 });
             }
 
-            if (field.type === 'textarea' || field.type === 'wysiwyg') {
+            if (field.type === 'wysiwyg') {
+                return h(RichTextEditor, {
+                    key: field.key,
+                    modelValue: local[field.key] ?? '',
+                    label: field.label,
+                    minHeight: '160px',
+                    help: 'Formatted text is cleaned for safe website display.',
+                    'onUpdate:modelValue': val => onInput(field.key, val),
+                });
+            }
+
+            if (field.type === 'textarea') {
                 return h('div', { key: field.key }, [
                     h('label', { class: 'block text-xs font-bold text-gray-700 mb-1.5' }, field.label),
                     h('textarea', {

@@ -34,7 +34,7 @@
                 </div>
             </div>
 
-            <div v-if="ranking?.length" class="card">
+            <div v-if="ranking?.length" class="card overflow-x-auto">
                 <h3 class="font-semibold text-sm mb-3">Fest points by house (cumulative)</h3>
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
@@ -105,4 +105,3 @@ function assignStudents() {
     });
 }
 </script>
-

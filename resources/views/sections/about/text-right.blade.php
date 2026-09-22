@@ -15,7 +15,7 @@
             <h2 class="text-3xl md:text-4xl font-bold font-heading mb-4" style="color: var(--color-primary)">{{ $config['heading'] }}</h2>
             @endif
             <div class="prose max-w-none text-gray-600">
-                {!! nl2br(e($config['content'] ?? '')) !!}
+                {!! \App\Support\HtmlSanitizer::richForDisplay($config['content'] ?? '') !!}
             </div>
             @if(!empty($config['cta_label']) && !empty($config['cta_url']))
             <a href="{{ $config['cta_url'] }}" class="inline-block mt-6 px-6 py-3 rounded-lg text-white font-semibold transition"

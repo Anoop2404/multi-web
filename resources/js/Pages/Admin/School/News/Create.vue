@@ -27,11 +27,9 @@
                         </div>
                     </div>
 
-                    <div>
-                        <label class="form-label mb-1.5">Content *</label>
-                        <textarea v-model="form.body" rows="12" required
-                                  class="field resize-y"></textarea>
-                    </div>
+                    <RichTextEditor v-model="form.body" label="Content" required
+                        placeholder="Write the article content…" :error="form.errors.body"
+                        help="Use headings, lists and links to make the article easy to read." />
 
                     <ImageUploadField v-model="form.image" label="Featured image" :max-size-mb="4"
                         :error="form.errors.image" help="Landscape image recommended · JPG, PNG, WebP or GIF · up to 4 MB" />
@@ -57,6 +55,7 @@
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import ImageUploadField from '@/Components/Website/ImageUploadField.vue';
+import RichTextEditor from '@/Components/ui/RichTextEditor.vue';
 import { Link, useForm } from '@inertiajs/vue3';
 
 const props = defineProps({ school: Object });

@@ -3,12 +3,14 @@
 namespace Tests\Feature\SchoolAdmin;
 
 use App\Models\Achievement;
+use App\Models\AdmissionEnquiry;
 use App\Models\Alumni;
 use App\Models\BoardResult;
 use App\Models\Download;
 use App\Models\Event;
 use App\Models\GalleryAlbum;
 use App\Models\GalleryItem;
+use App\Models\JobVacancy;
 use App\Models\NewsArticle;
 use App\Models\SiteForm;
 use App\Models\SiteFormSubmission;
@@ -529,6 +531,81 @@ class DynamicPublicWebsiteContentTest extends TestCase
             ->assertDontSee('Our child has grown so much in confidence');
     }
 
+    public function test_news_rich_text_is_sanitized_and_rendered_with_formatting(): void
+    {
+        $this->actingAs($this->admin)->post("/school-admin/{$this->school->id}/news", [
+            'title' => 'Rich Text Article',
+            'body' => '<h2>Science update</h2><p onclick="alert(1)">Our <strong>students</strong> excelled.</p><script>alert(2)</script><a href="javascript:alert(3)">Unsafe link</a><ul><li>Robotics</li></ul>',
+            'category' => 'Campus',
+            'is_featured' => false,
+            'published_at' => now()->subMinute()->toDateTimeString(),
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $article = NewsArticle::where('tenant_id', $this->school->id)
+            ->where('title', 'Rich Text Article')
+            ->firstOrFail();
+
+        $this->assertStringContainsString('<h2>Science update</h2>', $article->body);
+        $this->assertStringContainsString('<strong>students</strong>', $article->body);
+        $this->assertStringNotContainsString('onclick', $article->body);
+        $this->assertStringNotContainsString('<script', $article->body);
+        $this->assertStringNotContainsString('javascript:', $article->body);
+
+        $this->get("http://dynamic-school.sahodaya.test/news/{$article->slug}")
+            ->assertOk()
+            ->assertSee('<h2>Science update</h2>', false)
+            ->assertSee('<strong>students</strong>', false)
+            ->assertSee('<ul><li>Robotics</li></ul>', false)
+            ->assertDontSee('onclick', false)
+            ->assertDontSee('alert(2)', false)
+            ->assertDontSee('javascript:', false);
+    }
+
+    public function test_news_rejects_visually_empty_rich_text(): void
+    {
+        $this->actingAs($this->admin)->post("/school-admin/{$this->school->id}/news", [
+            'title' => 'Empty Article',
+            'body' => '<p><br></p><script>alert(1)</script>',
+            'is_featured' => false,
+        ])->assertSessionHasErrors('body');
+
+        $this->assertDatabaseMissing('news_articles', [
+            'tenant_id' => $this->school->id,
+            'title' => 'Empty Article',
+        ]);
+    }
+
+    public function test_site_builder_rich_text_is_sanitized_and_rendered_as_html(): void
+    {
+        $response = $this->actingAs($this->admin)->postJson(
+            "/school-admin/{$this->school->id}/site-builder/api/sections",
+            [
+                'site_id' => $this->site->id,
+                'section_type' => 'about',
+                'variant' => 'text-left',
+                'is_active' => true,
+                'status' => SiteSection::STATUS_PUBLISHED,
+                'config' => [
+                    'heading' => 'Our Learning Story',
+                    'content' => '<h2>Learning together</h2><p onclick="bad()">A <strong>welcoming</strong> school.</p><script>bad()</script>',
+                ],
+            ],
+        );
+
+        $response->assertCreated();
+        $section = SiteSection::findOrFail($response->json('id'));
+        $this->assertStringContainsString('<strong>welcoming</strong>', $section->config['content']);
+        $this->assertStringNotContainsString('onclick', $section->config['content']);
+        $this->assertStringNotContainsString('<script', $section->config['content']);
+
+        $this->get('http://dynamic-school.sahodaya.test/')
+            ->assertOk()
+            ->assertSee('<h2>Learning together</h2>', false)
+            ->assertSee('<strong>welcoming</strong>', false)
+            ->assertDontSee('onclick', false)
+            ->assertDontSee('bad()', false);
+    }
+
     public function test_school_admin_can_manage_contact_form_fields_and_read_public_submissions(): void
     {
         Mail::fake();
@@ -731,6 +808,210 @@ class DynamicPublicWebsiteContentTest extends TestCase
                 ->component('School/Enquiries/Index', false)
                 ->where('enquiries.data.0.student_name', 'Sara Student')
                 ->where('enquiries.data.0.parent_name', 'Fathima Parent'));
+    }
+
+    public function test_large_admin_content_lists_are_searchable_filterable_and_paginated(): void
+    {
+        NewsArticle::create([
+            'tenant_id' => $this->school->id,
+            'title' => 'Robotics Championship',
+            'slug' => 'robotics-championship',
+            'body' => 'A published technology story.',
+            'category' => 'Campus',
+            'published_at' => now(),
+        ]);
+        NewsArticle::create([
+            'tenant_id' => $this->school->id,
+            'title' => 'Unrelated Draft',
+            'slug' => 'unrelated-draft',
+            'body' => 'Draft content.',
+            'category' => 'General',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/school-admin/{$this->school->id}/news?search=Robotics&status=published&category=Campus")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('articles.data', 1)
+                ->where('articles.data.0.title', 'Robotics Championship')
+                ->where('articles.total', 1)
+                ->where('filters.search', 'Robotics'));
+
+        foreach (range(1, 21) as $index) {
+            NewsArticle::create([
+                'tenant_id' => $this->school->id,
+                'title' => "Archive item {$index}",
+                'slug' => "archive-item-{$index}",
+                'body' => 'Archived news content.',
+                'category' => 'Archive',
+                'published_at' => now()->subDays($index),
+            ]);
+        }
+
+        $this->actingAs($this->admin)
+            ->get("/school-admin/{$this->school->id}/news")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('articles.data', 20)
+                ->where('articles.total', 23)
+                ->where('articles.last_page', 2));
+
+        Event::create([
+            'tenant_id' => $this->school->id,
+            'title' => 'Open House 2027',
+            'slug' => 'open-house-2027',
+            'start_date' => now()->addMonth()->toDateString(),
+            'venue' => 'Main Hall',
+        ]);
+        Event::create([
+            'tenant_id' => $this->school->id,
+            'title' => 'Old Open House',
+            'slug' => 'old-open-house',
+            'start_date' => now()->subMonth()->toDateString(),
+            'venue' => 'Old Hall',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/school-admin/{$this->school->id}/events?search=Open&status=upcoming")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('events.data', 1)
+                ->where('events.data.0.title', 'Open House 2027')
+                ->where('events.total', 1));
+
+        Download::create([
+            'tenant_id' => $this->school->id,
+            'title' => 'Parent Handbook',
+            'file_path' => 'downloads/handbook.pdf',
+            'file_name' => 'handbook.pdf',
+            'file_size' => 100,
+            'category' => 'booklist',
+            'academic_year' => '2026-27',
+            'is_active' => true,
+        ]);
+        Download::create([
+            'tenant_id' => $this->school->id,
+            'title' => 'Archived Handbook',
+            'file_path' => 'downloads/archive.pdf',
+            'file_name' => 'archive.pdf',
+            'file_size' => 100,
+            'category' => 'other',
+            'is_active' => false,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/school-admin/{$this->school->id}/downloads?search=Parent&category=booklist&status=active")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('downloads.data', 1)
+                ->where('downloads.data.0.title', 'Parent Handbook')
+                ->where('downloads.total', 1));
+
+        Achievement::create([
+            'tenant_id' => $this->school->id,
+            'title' => 'National Science Medal',
+            'description' => 'National level recognition.',
+            'category' => 'academic',
+            'level' => 'national',
+            'academic_year' => '2026-27',
+            'is_system_generated' => false,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/school-admin/{$this->school->id}/achievements?search=Science&category=academic&level=national")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('achievements.data', 1)
+                ->where('achievements.data.0.title', 'National Science Medal')
+                ->where('achievements.total', 1));
+
+        Testimonial::create([
+            'tenant_id' => $this->school->id,
+            'name' => 'Amina Parent',
+            'designation' => 'Parent',
+            'quote' => 'Excellent communication.',
+            'rating' => 5,
+            'display_order' => 1,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/school-admin/{$this->school->id}/testimonials?search=Amina&status=active")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('testimonials.data', 1)
+                ->where('testimonials.data.0.name', 'Amina Parent')
+                ->where('testimonials.total', 1));
+
+        Alumni::create([
+            'tenant_id' => $this->school->id,
+            'name' => 'Nihal Engineer',
+            'batch_year' => 2018,
+            'current_role' => 'Engineer',
+            'email' => 'nihal@example.com',
+            'is_approved' => true,
+            'is_featured' => true,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/school-admin/{$this->school->id}/alumni?search=Nihal&status=featured")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('alumni.data', 1)
+                ->where('alumni.data.0.name', 'Nihal Engineer')
+                ->where('counts.featured', 1));
+
+        AdmissionEnquiry::create([
+            'tenant_id' => $this->school->id,
+            'student_name' => 'Sara Student',
+            'class_applying' => '3',
+            'parent_name' => 'Fathima Parent',
+            'phone' => '9876543210',
+            'status' => 'new',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/school-admin/{$this->school->id}/enquiries?search=Fathima&status=new")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('enquiries.data', 1)
+                ->where('enquiries.data.0.student_name', 'Sara Student')
+                ->where('counts.new', 1));
+
+        StaffMember::create([
+            'tenant_id' => $this->school->id,
+            'name' => 'Ravi Mathematics',
+            'designation' => 'Mathematics Teacher',
+            'department' => 'Mathematics',
+            'qualification' => 'MSc, BEd',
+            'type' => 'teaching',
+            'display_order' => 1,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/school-admin/{$this->school->id}/staff?search=Ravi&type=teaching")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('staff.data', 1)
+                ->where('staff.data.0.name', 'Ravi Mathematics')
+                ->where('staff.total', 1));
+
+        JobVacancy::create([
+            'tenant_id' => $this->school->id,
+            'title' => 'Physics Teacher',
+            'qualification' => 'MSc Physics',
+            'experience' => 'Two years',
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/school-admin/{$this->school->id}/job-vacancies?search=Physics&status=active")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('vacancies.data', 1)
+                ->where('vacancies.data.0.title', 'Physics Teacher')
+                ->where('vacancies.total', 1));
     }
 
     private function publishAlFarooqueTemplate(): void

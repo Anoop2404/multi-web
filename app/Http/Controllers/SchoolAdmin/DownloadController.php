@@ -8,14 +8,32 @@ use Illuminate\Http\Request;
 
 class DownloadController extends SchoolAdminController
 {
-    public function index()
+    public function index(Request $request)
     {
+        $search = trim($request->string('search')->toString());
+        $category = $request->string('category')->toString();
+        $status = $request->string('status')->toString();
+
         $downloads = Download::where('tenant_id', $this->school->id)
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($nested) use ($search) {
+                    $nested->where('title', 'like', "%{$search}%")
+                        ->orWhere('file_name', 'like', "%{$search}%")
+                        ->orWhere('academic_year', 'like', "%{$search}%");
+                });
+            })
+            ->when($category !== '', fn ($query) => $query->where('category', $category))
+            ->when($status === 'active', fn ($query) => $query->where('is_active', true))
+            ->when($status === 'hidden', fn ($query) => $query->where('is_active', false))
             ->orderBy('display_order')
             ->orderByDesc('created_at')
-            ->get();
+            ->paginate(25)
+            ->withQueryString();
 
-        return $this->inertia('School/Downloads/Index', compact('downloads'));
+        return $this->inertia('School/Downloads/Index', [
+            'downloads' => $downloads,
+            'filters' => compact('search', 'category', 'status'),
+        ]);
     }
 
     public function store(Request $request)

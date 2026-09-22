@@ -48,7 +48,7 @@
             </h2>
             @if(!empty($config['body']))
             <div class="text-gray-600 leading-relaxed space-y-4">
-                {!! nl2br(e($config['body'])) !!}
+                {!! \App\Support\HtmlSanitizer::richForDisplay($config['body']) !!}
             </div>
             @endif
 

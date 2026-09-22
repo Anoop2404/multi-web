@@ -1,7 +1,7 @@
 <template>
     <SchoolAdminLayout title="Testimonials" :school="school" :show-header-title="false">
         <PageHeader title="Testimonials" eyebrow="Website"
-            description="School website content and public pages." />
+            description="Add, search and manage parent, student and alumni testimonials displayed publicly." />
 
 
         <div class="space-y-6">
@@ -58,21 +58,33 @@
                 </form>
             </div>
 
-            <!-- List -->
-            <div class="card card--flush">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-50 border-b border-gray-100">
-                        <tr>
-                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Name</th>
-                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Designation</th>
-                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Order</th>
-                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Rating</th>
-                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Active</th>
-                            <th class="px-5 py-3"></th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-50">
-                        <tr v-for="t in testimonials" :key="t.id" class="hover:bg-gray-50">
+            <SahodayaDataTable
+                label="Website testimonials"
+                :columns="columns"
+                :links="testimonials.links"
+                :meta="testimonials"
+                :has-rows="testimonials.data.length > 0"
+                empty="No testimonials found"
+                empty-description="Try clearing the filters, or add a testimonial using the form above."
+                empty-icon="⭐"
+                min-width-class="min-w-[54rem]"
+            >
+                <template #toolbar>
+                    <form class="grid gap-3 sm:grid-cols-[minmax(14rem,1fr)_11rem_auto] sm:items-end" @submit.prevent="applyFilters">
+                        <label class="form-label">Search
+                            <input v-model="filterForm.search" type="search" class="field mt-1" placeholder="Name, designation or quote">
+                        </label>
+                        <label class="form-label">Visibility
+                            <SearchableSelect v-model="filterForm.status" class="mt-1" :options="statusOptions" :all-option="true" all-label="All testimonials" :searchable="false" />
+                        </label>
+                        <div class="flex gap-2">
+                            <button type="submit" class="btn-primary text-sm">Apply</button>
+                            <button v-if="hasFilters" type="button" class="btn-ghost text-sm" @click="clearFilters">Clear</button>
+                        </div>
+                    </form>
+                </template>
+
+                        <tr v-for="t in testimonials.data" :key="t.id" class="hover:bg-gray-50">
                             <td class="px-5 py-3">
                                 <div class="flex items-center gap-3">
                                     <img v-if="t.photo_url" :src="t.photo_url" :alt="t.name" class="w-9 h-9 rounded-full object-cover border border-gray-100 shrink-0">
@@ -96,12 +108,7 @@
                                 <button @click="remove(t)" class="text-xs text-red-400 hover:underline">Delete</button>
                             </td>
                         </tr>
-                        <tr v-if="!testimonials.length">
-                            <td colspan="6" class="px-5 py-10 text-center text-gray-400">No testimonials yet.</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+            </SahodayaDataTable>
         </div>
     </SchoolAdminLayout>
 </template>
@@ -109,7 +116,9 @@
 <script setup>
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import ImageUploadField from '@/Components/Website/ImageUploadField.vue';
-import { computed, ref } from 'vue';
+import SahodayaDataTable from '@/Components/SahodayaDataTable.vue';
+import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import { computed, reactive, ref } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -117,11 +126,43 @@ const { confirm } = useConfirm();
 
 const props = defineProps({
     school:       Object,
-    testimonials: { type: Array, default: () => [] },
+    testimonials: Object,
+    filters: { type: Object, default: () => ({}) },
 });
 
 const editing = ref(null);
-const editingItem = computed(() => props.testimonials.find(item => item.id === editing.value) ?? null);
+const editingItem = computed(() => props.testimonials.data.find(item => item.id === editing.value) ?? null);
+const columns = [
+    { key: 'name', label: 'Name' },
+    { key: 'designation', label: 'Designation' },
+    { key: 'order', label: 'Order' },
+    { key: 'rating', label: 'Rating' },
+    { key: 'visibility', label: 'Visibility' },
+    { key: 'actions', label: 'Actions', align: 'right' },
+];
+const statusOptions = [
+    { value: 'active', label: 'Active' },
+    { value: 'hidden', label: 'Hidden' },
+];
+const filterForm = reactive({
+    search: props.filters.search ?? '',
+    status: props.filters.status ?? '',
+});
+const hasFilters = computed(() => Boolean(filterForm.search || filterForm.status));
+const base = `/school-admin/${props.school.id}/testimonials`;
+
+function applyFilters() {
+    router.get(base, {
+        search: filterForm.search || undefined,
+        status: filterForm.status || undefined,
+    }, { preserveState: true, preserveScroll: true, replace: true });
+}
+
+function clearFilters() {
+    filterForm.search = '';
+    filterForm.status = '';
+    applyFilters();
+}
 
 const form = useForm({
     name:          '',

@@ -16,7 +16,7 @@
 
                 <div class="text-slate-600 text-base leading-relaxed space-y-4 font-normal">
                     @if(!empty($config['content']))
-                    {!! nl2br(e($config['content'])) !!}
+                    {!! \App\Support\HtmlSanitizer::richForDisplay($config['content']) !!}
                     @else
                     <p>
                         {{ $tenant->name }} brings together CBSE affiliated institutions across {{ $tenant->region->name ?? 'the region' }} to foster educational excellence, teacher training, academic innovation, and collaborative growth.

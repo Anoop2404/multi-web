@@ -3,20 +3,51 @@
 namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\NewsArticle;
+use App\Support\HtmlSanitizer;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class NewsController extends SchoolAdminController
 {
-    public function index()
+    public function index(Request $request)
     {
-        $articles = NewsArticle::where('tenant_id', $this->school->id)
-            ->orderByDesc('published_at')
-            ->orderByDesc('created_at')
-            ->paginate(20);
+        $search = trim($request->string('search')->toString());
+        $status = $request->string('status')->toString();
+        $category = $request->string('category')->toString();
+        $sort = in_array($request->string('sort')->toString(), ['title', 'category', 'published_at', 'created_at'], true)
+            ? $request->string('sort')->toString()
+            : 'published_at';
+        $dir = $request->string('dir')->toString() === 'asc' ? 'asc' : 'desc';
 
-        return $this->inertia('School/News/Index', compact('articles'));
+        $articles = NewsArticle::where('tenant_id', $this->school->id)
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($nested) use ($search) {
+                    $nested->where('title', 'like', "%{$search}%")
+                        ->orWhere('category', 'like', "%{$search}%");
+                });
+            })
+            ->when($category !== '', fn ($query) => $query->where('category', $category))
+            ->when($status === 'published', fn ($query) => $query->whereNotNull('published_at'))
+            ->when($status === 'draft', fn ($query) => $query->whereNull('published_at'))
+            ->orderBy($sort, $dir)
+            ->orderByDesc('created_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        $categories = NewsArticle::where('tenant_id', $this->school->id)
+            ->whereNotNull('category')
+            ->where('category', '!=', '')
+            ->distinct()
+            ->orderBy('category')
+            ->pluck('category');
+
+        return $this->inertia('School/News/Index', [
+            'articles' => $articles,
+            'categories' => $categories,
+            'filters' => compact('search', 'status', 'category', 'sort', 'dir'),
+        ]);
     }
 
     public function create()
@@ -34,6 +65,8 @@ class NewsController extends SchoolAdminController
             'published_at' => 'nullable|date',
             'image' => 'nullable|image|mimes:jpeg,jpg,png,webp,gif|max:4096',
         ]);
+
+        $data['body'] = $this->sanitizeBody($data['body']);
 
         $data['tenant_id'] = $this->school->id;
         $data['slug'] = Str::slug($data['title']).'-'.Str::random(5);
@@ -68,6 +101,8 @@ class NewsController extends SchoolAdminController
             'image' => 'nullable|image|mimes:jpeg,jpg,png,webp,gif|max:4096',
         ]);
 
+        $data['body'] = $this->sanitizeBody($data['body']);
+
         if ($request->hasFile('image')) {
             $data['image'] = TenantStorage::storeSiteMedia($request->file('image'), $this->school->id);
         }
@@ -84,5 +119,20 @@ class NewsController extends SchoolAdminController
         $news->delete();
 
         return back()->with('success', 'Article deleted.');
+    }
+
+    private function sanitizeBody(string $body): string
+    {
+        $body = HtmlSanitizer::rich($body);
+        $plainText = html_entity_decode(strip_tags($body), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $plainText = preg_replace('/[\s\x{00A0}]+/u', '', $plainText) ?? '';
+
+        if ($plainText === '') {
+            throw ValidationException::withMessages([
+                'body' => 'Please add some article content.',
+            ]);
+        }
+
+        return $body;
     }
 }

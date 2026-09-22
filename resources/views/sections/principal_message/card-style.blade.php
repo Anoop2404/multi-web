@@ -15,7 +15,7 @@
                     {{ $config['heading'] ?? 'From the Principal\'s Desk' }}
                 </h2>
                 <div class="prose max-w-none text-gray-600">
-                    {!! nl2br(e($config['message'] ?? '')) !!}
+                    {!! \App\Support\HtmlSanitizer::richForDisplay($config['message'] ?? '') !!}
                 </div>
                 @if(!empty($config['name']))
                 <div class="mt-6 pt-6 border-t">

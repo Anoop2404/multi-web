@@ -134,6 +134,9 @@ Route::prefix('mcq')->name('mcq-hub.')->group(function () {
     Route::put('/grade-masters/{gradeMaster}', [\App\Http\Controllers\SahodayaAdmin\McqGradeMasterController::class, 'update'])->name('grade-masters.update');
     Route::get('/templates/hall-tickets', [\App\Http\Controllers\SahodayaAdmin\McqTemplateController::class, 'hallTickets'])->name('templates.hall-tickets');
     Route::post('/templates/hall-tickets', [\App\Http\Controllers\SahodayaAdmin\McqTemplateController::class, 'storeHallTicket'])->name('templates.hall-tickets.store');
+    Route::put('/templates/hall-tickets/{template}', [\App\Http\Controllers\SahodayaAdmin\McqTemplateController::class, 'updateHallTicket'])->name('templates.hall-tickets.update');
+    Route::delete('/templates/hall-tickets/{template}', [\App\Http\Controllers\SahodayaAdmin\McqTemplateController::class, 'destroyHallTicket'])->name('templates.hall-tickets.destroy');
+    Route::post('/templates/hall-tickets/{template}/default', [\App\Http\Controllers\SahodayaAdmin\McqTemplateController::class, 'setDefaultHallTicket'])->name('templates.hall-tickets.set-default');
     Route::get('/templates/certificates', [\App\Http\Controllers\SahodayaAdmin\McqTemplateController::class, 'certificates'])->name('templates.certificates');
     Route::post('/templates/certificates', [\App\Http\Controllers\SahodayaAdmin\McqTemplateController::class, 'storeCertificate'])->name('templates.certificates.store');
 });

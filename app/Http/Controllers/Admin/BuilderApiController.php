@@ -56,7 +56,11 @@ class BuilderApiController extends Controller
         $data['tenant_id'] = $tenantId;
         $data['site_id'] = $site->id;
         $data['display_order'] = ((int) $site->sectionQuery()->max('display_order')) + 1;
-        $data['config'] = HtmlSanitizer::sanitizeConfig($data['config'] ?? []);
+        $data['config'] = HtmlSanitizer::sanitizeSectionConfig(
+            $data['config'] ?? [],
+            $data['section_type'],
+            $data['variant'],
+        );
         $data['status'] = $data['status'] ?? SiteSection::STATUS_DRAFT;
         $data['updated_by'] = auth()->id();
 
@@ -96,11 +100,12 @@ class BuilderApiController extends Controller
         // intentionally not supported by this endpoint.
         unset($data['site_id']);
 
+        $newSectionType = $data['section_type'] ?? $section->section_type;
+        $newVariant = $data['variant'] ?? $section->variant;
         if (array_key_exists('config', $data) && is_array($data['config'])) {
-            $data['config'] = HtmlSanitizer::sanitizeConfig($data['config']);
+            $data['config'] = HtmlSanitizer::sanitizeSectionConfig($data['config'], $newSectionType, $newVariant);
         }
 
-        $newVariant = $data['variant'] ?? $section->variant;
         if ($newVariant !== $section->variant) {
             $section->archiveCurrentConfig();
             $data['archived_configs'] = $section->archived_configs;
@@ -132,7 +137,11 @@ class BuilderApiController extends Controller
     {
         $site = $this->resolveSite($request, $tenantId);
         $section = $this->sectionForSite($site, $sectionId);
-        $section->config = HtmlSanitizer::sanitizeConfig($section->config ?? []);
+        $section->config = HtmlSanitizer::sanitizeSectionConfig(
+            $section->config ?? [],
+            $section->section_type,
+            $section->variant,
+        );
         $section->publish();
         $this->bustCache($tenantId);
 
@@ -155,10 +164,15 @@ class BuilderApiController extends Controller
         $section = $this->sectionForSite($site, $sectionId);
         $version = SiteSectionVersion::where('site_section_id', $section->id)->findOrFail($versionId);
 
+        $restoredVariant = $version->variant ?: $section->variant;
         $section->recordVersion('Before restore #'.$versionId);
         $section->update([
-            'variant' => $version->variant ?: $section->variant,
-            'config' => HtmlSanitizer::sanitizeConfig($version->config ?? []),
+            'variant' => $restoredVariant,
+            'config' => HtmlSanitizer::sanitizeSectionConfig(
+                $version->config ?? [],
+                $section->section_type,
+                $restoredVariant,
+            ),
             'layout_json' => $version->layout_json ?? [],
             'status' => SiteSection::STATUS_DRAFT,
             'updated_by' => auth()->id(),

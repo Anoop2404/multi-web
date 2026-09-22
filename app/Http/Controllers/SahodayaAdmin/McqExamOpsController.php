@@ -247,8 +247,14 @@ class McqExamOpsController extends SahodayaAdminController
         $ticketsIssued = McqRegistration::where('exam_id', $exam->id)->whereNotNull('hall_ticket_no')->exists();
         $seating = app(\App\Services\Mcq\McqSeatingService::class);
 
+        $templates = \App\Models\McqHallTicketTemplate::where('tenant_id', $this->sahodaya->id)
+            ->orderByDesc('is_default')
+            ->orderBy('title')
+            ->get(['id', 'title', 'is_default', 'design_json']);
+
         return $this->inertia('Sahodaya/Mcq/HallTickets', [
             'exam'            => $exam,
+            'templates'       => $templates,
             'registrations'   => $registrations,
             'hallTicketDesign'=> $design,
             'logoUrl'         => $logoUrl,
@@ -310,6 +316,7 @@ class McqExamOpsController extends SahodayaAdminController
             'show_signature'      => 'nullable|boolean',
             'report_before_minutes'      => 'nullable|integer|min:0|max:240',
             'gate_closure_after_minutes' => 'nullable|integer|min:0|max:240',
+            'hall_ticket_template_id'    => 'nullable|integer',
         ]);
 
         if (array_key_exists('next_hall_ticket_no', $data) && $data['next_hall_ticket_no'] !== null) {
@@ -353,11 +360,17 @@ class McqExamOpsController extends SahodayaAdminController
 
         $settings = McqHallTicketDesign::mergeIntoSettings($exam->settings_json ?? [], $design);
 
-        $exam->update([
+        $updateFields = [
             'settings_json'       => $settings,
             'hall_instructions'   => $data['hall_instructions'] ?? $exam->hall_instructions,
             'next_hall_ticket_no' => $data['next_hall_ticket_no'] ?? $exam->next_hall_ticket_no,
-        ]);
+        ];
+
+        if (array_key_exists('hall_ticket_template_id', $data)) {
+            $updateFields['hall_ticket_template_id'] = $data['hall_ticket_template_id'] ?: null;
+        }
+
+        $exam->update($updateFields);
 
         return back()->with('success', 'Hall ticket design saved.');
     }

@@ -43,6 +43,17 @@ class HtmlSanitizer
         return self::sanitize($html, self::RICH_TAGS, self::RICH_ATTRS, false);
     }
 
+    /** Render both legacy plain text and current rich HTML without losing line breaks. */
+    public static function richForDisplay(?string $html): string
+    {
+        $clean = self::rich($html);
+        if ($clean === '') {
+            return '';
+        }
+
+        return preg_match('/<[a-z][^>]*>/i', $clean) === 1 ? $clean : nl2br($clean);
+    }
+
     public static function embed(?string $html): string
     {
         if ($html === null || trim($html) === '') {
@@ -74,6 +85,43 @@ class HtmlSanitizer
         }
 
         return $config;
+    }
+
+    /** Sanitize rich fields using the exact schema for a section variant. */
+    public static function sanitizeSectionConfig(array $config, string $sectionType, string $variant): array
+    {
+        $config = self::sanitizeConfig($config);
+
+        return self::sanitizeFields($config, SectionFieldRegistry::fields($sectionType, $variant));
+    }
+
+    /** @param list<array<string, mixed>> $fields */
+    private static function sanitizeFields(array $values, array $fields): array
+    {
+        foreach ($fields as $field) {
+            $key = $field['key'] ?? null;
+            if (! is_string($key) || ! array_key_exists($key, $values)) {
+                continue;
+            }
+
+            if (($field['type'] ?? null) === 'wysiwyg' && is_string($values[$key])) {
+                $values[$key] = self::rich($values[$key]);
+
+                continue;
+            }
+
+            if (($field['type'] ?? null) !== 'repeater' || ! is_array($values[$key])) {
+                continue;
+            }
+
+            $subFields = is_array($field['fields'] ?? null) ? $field['fields'] : [];
+            $values[$key] = array_map(
+                fn ($item) => is_array($item) ? self::sanitizeFields($item, $subFields) : $item,
+                $values[$key],
+            );
+        }
+
+        return $values;
     }
 
     /**
@@ -134,7 +182,8 @@ class HtmlSanitizer
             $tag = strtolower($child->tagName);
 
             // Never unwrap script/style — drop the whole node (including text).
-            if (in_array($tag, ['script', 'style', 'object', 'embed', 'link', 'meta'], true)) {
+            if (in_array($tag, ['script', 'style', 'object', 'embed', 'link', 'meta', 'svg', 'math', 'form', 'input', 'button'], true)
+                || ($tag === 'iframe' && ! $embedMode)) {
                 $node->removeChild($child);
 
                 continue;
@@ -161,7 +210,7 @@ class HtmlSanitizer
                 }
                 if ($name === 'href' || $name === 'src') {
                     $val = trim($attr->value);
-                    if (preg_match('#^\s*javascript:#i', $val) || preg_match('#^\s*data:#i', $val)) {
+                    if (! self::isAllowedUrl($val, $name === 'src' && $embedMode)) {
                         $remove[] = $attr->name;
                     }
                 }
@@ -175,8 +224,8 @@ class HtmlSanitizer
 
             if ($tag === 'a') {
                 $child->setAttribute('rel', 'noopener noreferrer');
-                if ($child->hasAttribute('target') && $child->getAttribute('target') === '_blank') {
-                    // keep
+                if ($child->hasAttribute('target') && ! in_array($child->getAttribute('target'), ['_blank', '_self'], true)) {
+                    $child->removeAttribute('target');
                 }
             }
 
@@ -188,6 +237,20 @@ class HtmlSanitizer
 
             self::walk($child, $allowedTags, $allowedAttrs, $embedMode);
         }
+    }
+
+    private static function isAllowedUrl(string $url, bool $embedSource): bool
+    {
+        $url = preg_replace('/[\x00-\x20\x7F]+/u', '', html_entity_decode(trim($url), ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?? '';
+        if ($url === '') {
+            return false;
+        }
+
+        if ($embedSource) {
+            return str_starts_with(strtolower($url), 'https://');
+        }
+
+        return preg_match('#^(https?://|mailto:|tel:|/|\#)#i', $url) === 1;
     }
 
     private static function isAllowedEmbedSrc(string $src): bool

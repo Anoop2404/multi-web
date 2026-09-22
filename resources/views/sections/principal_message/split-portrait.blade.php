@@ -10,7 +10,7 @@
             @endif
             @if(!empty($config['message']))
             <div class="text-gray-600 leading-relaxed space-y-4">
-                {!! nl2br(e($config['message'])) !!}
+                {!! \App\Support\HtmlSanitizer::richForDisplay($config['message']) !!}
             </div>
             @endif
             <div class="mt-6">

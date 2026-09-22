@@ -23,7 +23,7 @@
                         </svg>
                     </div>
                     <h3 class="text-xl font-bold font-heading mb-3 {{ $bg === 'dark' ? 'text-white' : 'text-gray-900' }}">Our Vision</h3>
-                    <p class="{{ $bg === 'dark' ? 'text-gray-300' : 'text-gray-600' }} leading-relaxed">{{ $config['vision'] }}</p>
+                    <div class="prose max-w-none {{ $bg === 'dark' ? 'text-gray-300' : 'text-gray-600' }} leading-relaxed">{!! \App\Support\HtmlSanitizer::richForDisplay($config['vision']) !!}</div>
                 </div>
                 @endif
 
@@ -38,7 +38,7 @@
                         </svg>
                     </div>
                     <h3 class="text-xl font-bold font-heading mb-3 {{ $bg === 'dark' ? 'text-white' : 'text-gray-900' }}">Our Mission</h3>
-                    <p class="{{ $bg === 'dark' ? 'text-gray-300' : 'text-gray-600' }} leading-relaxed">{{ $config['mission'] }}</p>
+                    <div class="prose max-w-none {{ $bg === 'dark' ? 'text-gray-300' : 'text-gray-600' }} leading-relaxed">{!! \App\Support\HtmlSanitizer::richForDisplay($config['mission']) !!}</div>
                 </div>
                 @endif
             </div>

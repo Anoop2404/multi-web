@@ -20,7 +20,7 @@
             </h2>
             @if(!empty($config['body']))
             <div class="text-gray-600 leading-relaxed mb-6 space-y-4">
-                {!! nl2br(e($config['body'])) !!}
+                {!! \App\Support\HtmlSanitizer::richForDisplay($config['body']) !!}
             </div>
             @endif
 

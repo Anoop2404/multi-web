@@ -1,10 +1,13 @@
 <template>
     <SchoolAdminLayout title="Achievements" :school="school" :show-header-title="false">
         <PageHeader title="Achievements" eyebrow="Website"
-            description="School website content and public pages. Filter by category, level, and academic year." />
+            description="Add and manage awards shown publicly, with search by category, level and academic year." />
 
         <div class="space-y-6">
-            <form class="card flex flex-wrap gap-3 items-end" @submit.prevent="applyFilters">
+            <form class="card grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(13rem,1fr)_11rem_11rem_11rem_auto] lg:items-end" @submit.prevent="applyFilters">
+                <label class="form-label">Search
+                    <input v-model="filterForm.search" type="search" class="field mt-1" placeholder="Title or description">
+                </label>
                 <div>
                     <label class="form-label mb-1.5">Category</label>
                     <SearchableSelect v-model="filterForm.category" :options="categoryOptions" :all-option="true" all-label="All" />
@@ -17,7 +20,10 @@
                     <label class="form-label mb-1.5">Academic year</label>
                     <SearchableSelect v-model="filterForm.academic_year" :options="academicYears" :all-option="true" all-label="All" />
                 </div>
-                <button type="submit" class="btn-primary text-sm">Filter</button>
+                <div class="flex gap-2">
+                    <button type="submit" class="btn-primary text-sm">Filter</button>
+                    <button v-if="hasFilters" type="button" class="btn-ghost text-sm" @click="clearFilters">Clear</button>
+                </div>
             </form>
 
             <div class="card">
@@ -65,20 +71,18 @@
                 </form>
             </div>
 
-            <div class="card card--flush">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-50 border-b border-gray-100">
-                        <tr>
-                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Achievement</th>
-                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Category</th>
-                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Level</th>
-                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Year</th>
-                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Date</th>
-                            <th class="px-5 py-3"></th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-50">
-                        <tr v-for="item in achievements" :key="item.id" class="hover:bg-gray-50">
+            <SahodayaDataTable
+                label="School achievements"
+                :columns="columns"
+                :links="achievements.links"
+                :meta="achievements"
+                :has-rows="achievements.data.length > 0"
+                empty="No achievements found"
+                empty-description="Try clearing the filters, or add an achievement using the form above."
+                empty-icon="🏆"
+                min-width-class="min-w-[58rem]"
+            >
+                        <tr v-for="item in achievements.data" :key="item.id" class="hover:bg-gray-50">
                             <td class="px-5 py-3">
                                 <div class="flex items-center gap-3">
                                     <img v-if="item.image_url" :src="item.image_url" :alt="item.title" class="h-10 w-10 object-cover rounded-lg border border-gray-100">
@@ -111,12 +115,7 @@
                                 <span v-else class="text-xs text-slate-400">Locked</span>
                             </td>
                         </tr>
-                        <tr v-if="!achievements.length">
-                            <td colspan="6" class="px-5 py-10 text-center text-gray-400">No achievements yet.</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+            </SahodayaDataTable>
         </div>
     </SchoolAdminLayout>
 </template>
@@ -126,14 +125,15 @@ import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import ImageUploadField from '@/Components/Website/ImageUploadField.vue';
+import SahodayaDataTable from '@/Components/SahodayaDataTable.vue';
 import { computed, reactive, ref } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import { useConfirm } from '@/composables/useConfirm';
-const { confirm, prompt } = useConfirm();
+const { confirm } = useConfirm();
 
 const props = defineProps({
     school: Object,
-    achievements: { type: Array, default: () => [] },
+    achievements: Object,
     categories: { type: Object, default: () => ({}) },
     levels: { type: Object, default: () => ({}) },
     academicYears: { type: Array, default: () => [] },
@@ -144,12 +144,22 @@ const categoryOptions = computed(() => Object.entries(props.categories).map(([va
 const levelOptions = computed(() => Object.entries(props.levels).map(([value, label]) => ({ value, label })));
 
 const editing = ref(null);
-const editingItem = computed(() => props.achievements.find(item => item.id === editing.value) ?? null);
+const editingItem = computed(() => props.achievements.data.find(item => item.id === editing.value) ?? null);
 const filterForm = reactive({
+    search: props.filters.search || '',
     category: props.filters.category || '',
     level: props.filters.level || '',
     academic_year: props.filters.academic_year || '',
 });
+const hasFilters = computed(() => Object.values(filterForm).some(Boolean));
+const columns = [
+    { key: 'achievement', label: 'Achievement' },
+    { key: 'category', label: 'Category' },
+    { key: 'level', label: 'Level' },
+    { key: 'year', label: 'Year' },
+    { key: 'date', label: 'Date' },
+    { key: 'actions', label: 'Actions', align: 'right' },
+];
 
 const form = useForm({
     title: '',
@@ -162,7 +172,15 @@ const form = useForm({
 });
 
 function applyFilters() {
-    router.get(`/school-admin/${props.school.id}/achievements`, { ...filterForm }, { preserveState: true });
+    router.get(`/school-admin/${props.school.id}/achievements`, { ...filterForm }, { preserveState: true, preserveScroll: true, replace: true });
+}
+
+function clearFilters() {
+    filterForm.search = '';
+    filterForm.category = '';
+    filterForm.level = '';
+    filterForm.academic_year = '';
+    applyFilters();
 }
 
 function startEdit(item) {

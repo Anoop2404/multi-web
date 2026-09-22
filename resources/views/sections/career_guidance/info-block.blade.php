@@ -33,7 +33,7 @@
                 @endif
                 @if(!empty($config['description']))
                 <div class="prose max-w-none text-gray-600 text-sm">
-                    {!! nl2br(e($config['description'])) !!}
+                    {!! \App\Support\HtmlSanitizer::richForDisplay($config['description']) !!}
                 </div>
                 @endif
             </div>

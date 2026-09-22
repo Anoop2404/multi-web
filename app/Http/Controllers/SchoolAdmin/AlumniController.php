@@ -7,13 +7,41 @@ use Illuminate\Http\Request;
 
 class AlumniController extends SchoolAdminController
 {
-    public function index()
+    public function index(Request $request)
     {
-        $alumni = Alumni::where('tenant_id', $this->school->id)
-            ->orderByDesc('created_at')
-            ->get();
+        $search = trim($request->string('search')->toString());
+        $status = $request->string('status')->toString();
 
-        return $this->inertia('School/Alumni/Index', compact('alumni'));
+        $alumni = Alumni::where('tenant_id', $this->school->id)
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($nested) use ($search) {
+                    $nested->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('batch_year', 'like', "%{$search}%")
+                        ->orWhere('current_role', 'like', "%{$search}%")
+                        ->orWhere('current_organisation', 'like', "%{$search}%");
+                });
+            })
+            ->when($status === 'pending', fn ($query) => $query->where('is_approved', false))
+            ->when($status === 'approved', fn ($query) => $query->where('is_approved', true))
+            ->when($status === 'featured', fn ($query) => $query->where('is_featured', true))
+            ->orderByDesc('created_at')
+            ->paginate(25)
+            ->withQueryString();
+
+        $base = Alumni::where('tenant_id', $this->school->id);
+        $counts = [
+            'all' => (clone $base)->count(),
+            'pending' => (clone $base)->where('is_approved', false)->count(),
+            'approved' => (clone $base)->where('is_approved', true)->count(),
+            'featured' => (clone $base)->where('is_featured', true)->count(),
+        ];
+
+        return $this->inertia('School/Alumni/Index', [
+            'alumni' => $alumni,
+            'counts' => $counts,
+            'filters' => compact('search', 'status'),
+        ]);
     }
 
     public function approve(Request $request, string $tenantId, Alumni $alumnus)
