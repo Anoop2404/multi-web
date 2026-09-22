@@ -84,54 +84,89 @@ class RenderContinuousDieIdCardsJob implements ShouldQueue
             $perPage = $gridLayout ? ($gridLayout['cols'] * $gridLayout['rows']) : ($customTemplate?->cards_per_page ?: 4);
             $totalSheets = (int) ceil(count($cards) / $perPage);
 
-            $backgroundUrl = null;
-            if ($customTemplate?->background_path) {
-                $backgroundUrl = TenantStorage::backgroundDataUri($tenant, $customTemplate->background_path)
-                    ?: (($u = TenantStorage::logoUrl($tenant, $customTemplate->background_path)) && ! str_starts_with($u, '/') ? $u : url($u ?? ''));
+            // For ultra-high volume events (up to 4,500+ students / 450 sheets):
+            // Render in safe, memory-bounded chunks of 20 sheets (e.g. 200 cards).
+            // Because each chunk is an exact multiple of $perPage (10 cards),
+            // NO die cut slots are ever wasted between chunks!
+            // Then stitch the chunk PDFs together using FPDI into a single master PDF.
+            $sheetsPerChunk = 20;
+            $cardsPerChunk = $perPage * $sheetsPerChunk;
+            $cardChunks = array_chunk($cards, $cardsPerChunk);
+            $totalChunks = count($cardChunks);
+
+            $pdfChunksBytes = [];
+
+            foreach ($cardChunks as $chunkIdx => $chunkCards) {
+                $chunkNumber = $chunkIdx + 1;
+                $pct = (int) round(($chunkIdx / $totalChunks) * 100);
+
+                $this->updateStatus($tenant, $settingKey, [
+                    'status'           => 'rendering',
+                    'progress_percent' => $pct,
+                    'progress_text'    => "Rendering batch {$chunkNumber} of {$totalChunks} ({$pct}%)...",
+                    'processed_chunks' => $chunkIdx,
+                    'total_chunks'     => $totalChunks,
+                ]);
+
+                $viewData = [
+                    'cards'          => $chunkCards,
+                    'sections'       => null, // Null triggers continuous packing (zero empty padding slots)
+                    'clusterName'    => $tenant->name,
+                    'clusterLogoSrc' => TenantBranding::logoEmbedSrc($tenant),
+                    'eventTitle'     => $event->title,
+                    'audience'       => 'student',
+                    'showTitle'      => false,
+                    'isPdf'          => true,
+                    'backgroundUrl'  => $backgroundUrl,
+                    'fields'         => $customTemplate?->fields() ?? [],
+                    'cardWidthMm'    => $customTemplate?->card_width_mm ?? 90,
+                    'cardHeightMm'   => $customTemplate?->card_height_mm ?? 140,
+                    'cardsPerPage'   => $customTemplate?->cards_per_page ?? 4,
+                    'pageWidthMm'    => $customTemplate?->page_width_mm,
+                    'pageHeightMm'   => $customTemplate?->page_height_mm,
+                    'gridLayout'     => $gridLayout,
+                ];
+
+                $viewName = $customTemplate ? 'fest.id-cards.custom-sheet' : 'fest.id-cards.sheet';
+                $html = view($viewName, $viewData)->render();
+
+                $chunkPdf = PdfGenerator::render(
+                    $html,
+                    isLandscape: true,
+                    pageWidthMm: $customTemplate?->page_width_mm,
+                    pageHeightMm: $customTemplate?->page_height_mm,
+                    timeoutMs: 180000, // 3 minutes per 20-sheet chunk is more than enough
+                );
+
+                if (empty($chunkPdf)) {
+                    throw new \RuntimeException("PDF generation returned empty content for batch {$chunkNumber}.");
+                }
+
+                $pdfChunksBytes[] = $chunkPdf;
+                unset($html, $chunkCards, $viewData);
             }
 
-            $viewData = [
-                'cards'          => $cards,
-                'sections'       => null, // Null triggers continuous packing (zero empty padding slots)
-                'clusterName'    => $tenant->name,
-                'clusterLogoSrc' => TenantBranding::logoEmbedSrc($tenant),
-                'eventTitle'     => $event->title,
-                'audience'       => 'student',
-                'showTitle'      => false,
-                'isPdf'          => true,
-                'backgroundUrl'  => $backgroundUrl,
-                'fields'         => $customTemplate?->fields() ?? [],
-                'cardWidthMm'    => $customTemplate?->card_width_mm ?? 90,
-                'cardHeightMm'   => $customTemplate?->card_height_mm ?? 140,
-                'cardsPerPage'   => $customTemplate?->cards_per_page ?? 4,
-                'pageWidthMm'    => $customTemplate?->page_width_mm,
-                'pageHeightMm'   => $customTemplate?->page_height_mm,
-                'gridLayout'     => $gridLayout,
-            ];
-
-            $viewName = $customTemplate ? 'fest.id-cards.custom-sheet' : 'fest.id-cards.sheet';
-            $html = view($viewName, $viewData)->render();
-
-            $pdfBytes = PdfGenerator::render(
-                $html,
-                isLandscape: true,
-                pageWidthMm: $customTemplate?->page_width_mm,
-                pageHeightMm: $customTemplate?->page_height_mm,
-                timeoutMs: 600000, // 10 minutes max for Chromium render
-            );
-
-            if (empty($pdfBytes)) {
-                throw new \RuntimeException('PDF generation returned empty content.');
+            // Merge all chunk PDFs into one single continuous master PDF
+            if ($totalChunks === 1) {
+                $finalPdfBytes = $pdfChunksBytes[0];
+            } else {
+                $this->updateStatus($tenant, $settingKey, [
+                    'status'        => 'rendering',
+                    'progress_text' => 'Merging all PDF batches into single master file...',
+                ]);
+                $finalPdfBytes = $this->mergePdfChunks($pdfChunksBytes);
             }
 
             $s3Path = "sahodaya/{$tenant->id}/events/{$event->id}/id-cards/die/full-continuous-run.pdf";
-            TenantStorage::disk('s3')->put($s3Path, $pdfBytes, 'public');
+            TenantStorage::disk('s3')->put($s3Path, $finalPdfBytes, 'public');
 
-            $sizeBytes = strlen($pdfBytes);
+            $sizeBytes = strlen($finalPdfBytes);
             $sizeFormatted = round($sizeBytes / (1024 * 1024), 2).' MB';
 
             $this->updateStatus($tenant, $settingKey, [
                 'status'              => 'completed',
+                'progress_percent'    => 100,
+                'progress_text'       => 'Completed',
                 'total_cards'         => count($cards),
                 'total_sheets'        => $totalSheets,
                 'file_path'           => $s3Path,
@@ -154,6 +189,38 @@ class RenderContinuousDieIdCardsJob implements ShouldQueue
                 'status' => 'failed',
                 'error'  => $e->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * Merge multiple raw PDF byte strings into a single continuous PDF string using FPDI.
+     */
+    private function mergePdfChunks(array $pdfChunksBytes): string
+    {
+        $pdf = new \setasign\Fpdi\Fpdi();
+        $tempFiles = [];
+
+        try {
+            foreach ($pdfChunksBytes as $bytes) {
+                $tmpPath = tempnam(sys_get_temp_dir(), 'die_chunk_');
+                file_put_contents($tmpPath, $bytes);
+                $tempFiles[] = $tmpPath;
+
+                $pageCount = $pdf->setSourceFile($tmpPath);
+                for ($i = 1; $i <= $pageCount; $i++) {
+                    $templateId = $pdf->importPage($i);
+                    $size = $pdf->getTemplateSize($templateId);
+                    $orientation = ($size['orientation'] ?? 'P') === 'L' ? 'L' : 'P';
+                    $pdf->AddPage($orientation, [$size['width'], $size['height']]);
+                    $pdf->useTemplate($templateId);
+                }
+            }
+
+            return $pdf->Output('S');
+        } finally {
+            foreach ($tempFiles as $tmpPath) {
+                @unlink($tmpPath);
+            }
         }
     }
 
