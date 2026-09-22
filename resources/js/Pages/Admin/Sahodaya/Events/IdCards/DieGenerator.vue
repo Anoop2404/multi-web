@@ -439,13 +439,27 @@ async function triggerContinuousRender() {
     if (isRenderingOrQueued.value || isTriggeringRender.value) return;
     isTriggeringRender.value = true;
     try {
-        const res = await window.axios.post(`${base}/die/render-continuous`);
-        if (res.data?.success) {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const res = await fetch(`${base}/die/render-continuous`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrf,
+            },
+            credentials: 'same-origin',
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data?.success) {
             continuousState.value = { ...continuousState.value, status: 'queued', error: null };
             startPolling();
+        } else {
+            alert(data?.message || 'Failed to dispatch render job.');
         }
     } catch (e) {
-        alert(e.response?.data?.message || 'Failed to dispatch render job.');
+        alert(e.message || 'Failed to dispatch render job.');
     } finally {
         isTriggeringRender.value = false;
     }
@@ -453,11 +467,20 @@ async function triggerContinuousRender() {
 
 async function checkContinuousStatus() {
     try {
-        const res = await window.axios.get(`${base}/die/continuous-status`);
-        if (res.data?.state) {
-            continuousState.value = res.data.state;
-            if (!['queued', 'rendering'].includes(continuousState.value.status)) {
-                stopPolling();
+        const res = await fetch(`${base}/die/continuous-status`, {
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin',
+        });
+        if (res.ok) {
+            const data = await res.json().catch(() => ({}));
+            if (data?.state) {
+                continuousState.value = data.state;
+                if (!['queued', 'rendering'].includes(continuousState.value.status)) {
+                    stopPolling();
+                }
             }
         }
     } catch (e) {
@@ -476,6 +499,16 @@ function stopPolling() {
         pollTimer = null;
     }
 }
+
+onMounted(() => {
+    if (isRenderingOrQueued.value) {
+        startPolling();
+    }
+});
+
+onUnmounted(() => {
+    stopPolling();
+});
 
 const schoolSearch = ref('');
 const selectedSchoolId = ref(props.schools[0]?.school_id || '');
