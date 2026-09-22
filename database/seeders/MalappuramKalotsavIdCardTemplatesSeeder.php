@@ -27,6 +27,16 @@ class MalappuramKalotsavIdCardTemplatesSeeder extends Seeder
             return;
         }
 
+        $explicitId = env('SAHODAYA_UUID') ?: env('TENANT_ID');
+        if ($explicitId) {
+            $sahodaya = Tenant::find($explicitId);
+            if ($sahodaya) {
+                $sahodaya->run(fn () => $this->seedForTenant((string) $sahodaya->id));
+
+                return;
+            }
+        }
+
         $sahodaya = Tenant::query()
             ->where('type', 'sahodaya')
             ->where(function ($query) {
