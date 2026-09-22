@@ -2,7 +2,12 @@
      viewed from several meters away, not a desktop widget. Kept as its own file rather
      than a shared one with size flags so the regular scoreboard page's card is never
      affected by TV-specific sizing changes. --}}
-<article class="rounded-2xl bg-slate-900 border border-slate-800 shadow-md overflow-hidden">
+{{-- data-title/data-subtitle: a squad item's card can itself run taller than the
+     viewport (a large team's roster wraps to several rows) — tv.blade.php's sticky
+     label reads these to keep naming which item's winners are on screen even while
+     scrolled deep inside this one card, the same way it already does for the section
+     as a whole. --}}
+<article data-tv-winner-item data-title="{{ $itemGroup['item'] }}" data-subtitle="{{ collect([$itemGroup['category_label'] ?? null, $itemGroup['gender_label'] ?? null])->filter()->implode(' · ') }}" class="rounded-2xl bg-slate-900 border border-slate-800 shadow-md overflow-hidden">
     <div class="px-6 py-4 bg-white/5 border-b border-slate-800">
         <div class="flex items-start justify-between gap-4">
             <p class="font-bold text-white text-2xl uppercase">{{ $itemGroup['item'] }}</p>

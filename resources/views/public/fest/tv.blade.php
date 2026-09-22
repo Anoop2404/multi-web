@@ -108,6 +108,7 @@
     const viewport = document.getElementById('tv-viewport');
     const track = document.getElementById('tv-scroll-track');
     const sections = Array.from(document.querySelectorAll('[data-tv-section]'));
+    const winnerItems = Array.from(document.querySelectorAll('[data-tv-winner-item]'));
     const label = document.getElementById('tv-section-label');
     const labelTitle = document.getElementById('tv-section-label-title');
     const labelSubtitle = document.getElementById('tv-section-label-subtitle');
@@ -117,23 +118,43 @@
     const pause = document.querySelector('[data-tv-pause]');
     const fullscreen = document.querySelector('[data-tv-fullscreen]');
 
-    // Whichever section's rows currently sit at (or just above) the top of the
-    // viewport, by scroll position — independent of the dwell/waypoint state machine
-    // below, so it stays correct through prev/next jumps too, not just the automatic
-    // scroll.
-    let activeSection = null;
-    const updateLabel = (scrollY) => {
-        let candidate = sections[0];
-        for (const el of sections) {
+    // Finds the last element (by DOM order) whose offsetTop has already reached the
+    // top of the viewport at this scroll position — i.e. whichever one is "active"
+    // right now. Shared by the section-level and, within a winners section, the
+    // individual-winner-card-level lookup below, since both are just elements
+    // stacked in the same track and use the same offsetTop coordinate space.
+    const activeAt = (elements, scrollY) => {
+        let candidate = elements[0];
+        for (const el of elements) {
             if (el.offsetTop <= scrollY + 1) candidate = el; else break;
         }
-        if (candidate === activeSection) return;
-        activeSection = candidate;
-        const title = candidate?.dataset.title || '';
-        const type = candidate?.dataset.type || '';
+        return candidate;
+    };
+
+    // Whichever section (and, inside a winners section, whichever item's own winner
+    // card) currently sits at or above the top of the viewport, by scroll position —
+    // independent of the dwell/waypoint state machine below, so it stays correct
+    // through prev/next jumps too, not just the automatic scroll. A squad item's
+    // roster can wrap to several rows and make its own card taller than the
+    // viewport, so the section-level "Latest Item Winners" label alone isn't enough
+    // to say which item is actually on screen once scrolled a few rows into one.
+    let activeSection = null;
+    let activeWinnerItem = null;
+    const updateLabel = (scrollY) => {
+        const section = activeAt(sections, scrollY);
+        const type = section?.dataset.type || '';
+        const winnerItem = type === 'winners' ? activeAt(winnerItems, scrollY) : null;
+        if (section === activeSection && winnerItem === activeWinnerItem) return;
+        activeSection = section;
+        activeWinnerItem = winnerItem;
+
+        const title = section?.dataset.title || '';
+        const subtitle = winnerItem
+            ? [winnerItem.dataset.title, winnerItem.dataset.subtitle].filter(Boolean).join(' · ')
+            : (section?.dataset.subtitle || '');
         if (label) label.hidden = ! title;
         if (labelTitle) labelTitle.textContent = title;
-        if (labelSubtitle) labelSubtitle.textContent = candidate?.dataset.subtitle || '';
+        if (labelSubtitle) labelSubtitle.textContent = subtitle;
         if (labelColumns) labelColumns.style.visibility = (type === 'board' || type === 'schools') ? 'visible' : 'hidden';
     };
 
