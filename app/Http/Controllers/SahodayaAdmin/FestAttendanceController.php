@@ -77,19 +77,17 @@ class FestAttendanceController extends SahodayaAdminController
 
         foreach ($participants as $participant) {
             if ($participant->student) {
-                // publicPhotoUrl() -- a stable, browser/CDN-cacheable direct S3 URL (or a
-                // 30-day-cached base64 fallback when S3 isn't configured/publicly accessible)
-                // instead of sahodayaPhotoUrl(), which points at showPhoto() (TenantStorage::
-                // downloadResponse()): a live, uncached S3 existence-check-then-stream on
-                // every single request, no caching at all.
+                // photoDataUri() provides the cached base64 thumbnail (identical to
+                // FestReportService's attendance sheet preview which renders reliably
+                // without external S3/MinIO browser network dependencies).
                 $participant->student->setAttribute(
                     'photo_url',
-                    $participant->student->publicPhotoUrl(),
+                    $participant->student->photoDataUri() ?? $participant->student->publicPhotoUrl(),
                 );
             } elseif ($participant->teacher) {
                 $participant->teacher->setAttribute(
                     'photo_url',
-                    $participant->teacher->publicPhotoUrl(),
+                    $participant->teacher->photoDataUri() ?? $participant->teacher->publicPhotoUrl(),
                 );
             }
         }
