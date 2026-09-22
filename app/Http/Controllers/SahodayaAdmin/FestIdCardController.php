@@ -417,11 +417,42 @@ class FestIdCardController extends SahodayaAdminController
             ] : null,
             'previewCards'              => $sampleCards,
             'previewSchoolName'         => $firstSchool['school_name'] ?? null,
-            'continuousRenderState'     => \App\Models\TenantSetting::where('tenant_id', $this->sahodaya->id)
-                ->where('key', "fest_die_render_event_{$targetEvent->id}")
-                ->value('value'),
+            'continuousRenderState'     => $this->formatContinuousRenderState(
+                \App\Models\TenantSetting::where('tenant_id', $this->sahodaya->id)
+                    ->where('key', "fest_die_render_event_{$targetEvent->id}")
+                    ->value('value'),
+                $targetEvent
+            ),
             'continuousEstimatedSheets' => (int) ceil($totalParticipants / $perPage),
         ]));
+    }
+
+    private function formatContinuousRenderState(?array $state, FestEvent $event): ?array
+    {
+        if (! $state) {
+            return null;
+        }
+
+        if (($state['status'] ?? null) === 'completed' && ! empty($state['file_path'])) {
+            $path = ltrim($state['file_path'], '/');
+            $slug = str($event->title)->slug('-');
+            $filename = "{$slug}-continuous-master-id-cards.pdf";
+
+            if (\App\Support\TenantStorage::isS3Configured()) {
+                try {
+                    $state['s3_preview_url'] = \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl($path, now()->addHours(6), [
+                        'ResponseContentDisposition' => 'inline; filename="' . $filename . '"',
+                    ]);
+                    $state['s3_download_url'] = \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl($path, now()->addHours(6), [
+                        'ResponseContentDisposition' => 'attachment; filename="' . $filename . '"',
+                    ]);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed generating presigned S3 URLs: '.$e->getMessage());
+                }
+            }
+        }
+
+        return $state;
     }
 
     public function dispatchContinuousRender(Request $request, string $tenantId, FestEvent $event)
@@ -460,7 +491,7 @@ class FestIdCardController extends SahodayaAdminController
             ->value('value');
 
         return response()->json([
-            'state' => $state ?: ['status' => 'idle'],
+            'state' => $this->formatContinuousRenderState($state, $targetEvent) ?: ['status' => 'idle'],
         ]);
     }
 

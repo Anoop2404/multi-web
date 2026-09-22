@@ -435,9 +435,12 @@ const isTriggeringRender = ref(false);
 let pollTimer = null;
 
 const continuousStatus = computed(() => continuousState.value?.status || 'idle');
-const isRenderingOrQueued = computed(() => ['queued', 'rendering'].includes(continuousStatus.value));
-const continuousPreviewUrl = computed(() => `${base}/die/continuous-pdf?preview=1`);
-const continuousDownloadUrl = computed(() => `${base}/die/continuous-pdf`);
+const continuousPreviewUrl = computed(() => {
+    return continuousState.value?.s3_preview_url || `${base}/die/master-file?preview=1`;
+});
+const continuousDownloadUrl = computed(() => {
+    return continuousState.value?.s3_download_url || `${base}/die/master-file`;
+});
 
 async function triggerContinuousRender() {
     if (isRenderingOrQueued.value || isTriggeringRender.value) return;

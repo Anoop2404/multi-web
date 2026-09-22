@@ -1401,6 +1401,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/id-cards/die/render-continuous', [\App\Http\Controllers\SahodayaAdmin\FestIdCardController::class, 'dispatchContinuousRender'])->name('id-cards.die-render-continuous');
             Route::get('/{event}/id-cards/die/continuous-status', [\App\Http\Controllers\SahodayaAdmin\FestIdCardController::class, 'continuousRenderStatus'])->name('id-cards.die-continuous-status');
             Route::get('/{event}/id-cards/die/continuous-pdf', [\App\Http\Controllers\SahodayaAdmin\FestIdCardController::class, 'downloadContinuousPdf'])->name('id-cards.die-continuous-pdf');
+            Route::get('/{event}/id-cards/die/master-file', [\App\Http\Controllers\SahodayaAdmin\FestIdCardController::class, 'downloadContinuousPdf'])->name('id-cards.die-master-file');
             Route::get('/{event}/settings/{tab?}', [FestEventSettingsController::class, 'settings'])
                 ->where('tab', 'lifecycle|locks|venues|combo|grades|points|participation|eligibility|fees|registration|numbering|volunteers|records|clone')
                 ->name('settings');
