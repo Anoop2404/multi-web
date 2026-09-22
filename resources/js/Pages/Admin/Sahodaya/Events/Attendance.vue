@@ -71,7 +71,7 @@
                 <ReportItemSearchSelect :items="event.items" :model-value="itemFilter"
                                         label="Competition Item" all-items-label="Select an item"
                                         search-placeholder="Search by item name or code…"
-                                        @select="(id) => { itemFilter = id; }" />
+                                        @select="onItemSelect" />
             </div>
 
             <!-- Toolbar: Bulk Actions & Search -->
@@ -228,7 +228,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { router, useForm, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
@@ -269,6 +269,22 @@ const childEventOptions = computed(() => (props.childEvents ?? []).map((ev) => (
 // SportsSetupSubNav when switching tabs), falling back to the first item
 // only when there's no incoming selection.
 const itemFilter = ref(props.selectedItemId ?? props.event.items?.[0]?.id ?? '');
+
+watch(() => props.selectedItemId, (newId) => {
+    if (newId) {
+        itemFilter.value = newId;
+    }
+});
+
+function onItemSelect(itemId) {
+    if (!itemId || String(itemId) === String(props.selectedItemId)) return;
+    router.get(
+        `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/attendance`,
+        { item_id: itemId },
+        { preserveScroll: true, preserveState: false }
+    );
+}
+
 const showChestOnSheet = ref(false);
 const searchQuery = ref('');
 const showImportModal = ref(false);
