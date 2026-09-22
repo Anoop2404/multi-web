@@ -291,7 +291,9 @@ class FestMarkEntryController extends SahodayaAdminController
             'event'       => $event,
             'items'       => $flatItems,
             'childEvents' => $this->scopedChildEventOptions($event),
-            'phases'      => \App\Models\FestEventPhase::where('event_id', $event->id)->orderBy('sort_order')->get(['id', 'name']),
+            'phases'      => $event->source_phase_id
+                ? collect()
+                : \App\Models\FestEventPhase::where('event_id', $event->id)->orderBy('sort_order')->get(['id', 'name']),
             'competitionAreas' => \App\Models\FestCompetitionArea::where('event_id', $event->id)->orderBy('sort_order')->get(['id', 'name']),
             'bulkReportCombo' => \App\Models\SahodayaProfile::where('tenant_id', $this->sahodaya->id)->first()?->bulk_report_combo ?? [],
         ]));

@@ -24,7 +24,7 @@
                      switcher above (which is a different control: it switches to a whole
                      different child event/region, not a filter within this one), and with
                      both showing the same name it looked like the same control twice. -->
-                <div v-if="phases.length > 1" class="w-48">
+                <div v-if="phases.length > 1 && !event.source_phase_id" class="w-48">
                     <label class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">Phase</label>
                     <SearchableSelect v-model="bulkPhaseId" :options="phases.map((p) => ({ value: String(p.id), label: p.name }))"
                                       :all-option="true" all-label="Any phase" />
