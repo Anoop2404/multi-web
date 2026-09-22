@@ -471,18 +471,19 @@ class FestIdCardController extends SahodayaAdminController
         $targetEvent = $this->regionAwareTargetEvent($request, $event);
         $inline = $request->boolean('preview');
         $s3Path = "sahodaya/{$this->sahodaya->id}/events/{$targetEvent->id}/id-cards/die/full-continuous-run.pdf";
+        $disk = \App\Support\TenantStorage::uploadDisk();
 
-        if (\App\Support\TenantStorage::disk('s3')->exists($s3Path)) {
+        if (\App\Support\TenantStorage::disk($disk)->exists($s3Path)) {
             $slug = str($targetEvent->title)->slug('-');
             $filename = "{$slug}-continuous-master-id-cards.pdf";
 
-            return response()->stream(function () use ($s3Path) {
-                $stream = \App\Support\TenantStorage::disk('s3')->readStream($s3Path);
+            return response()->stream(function () use ($s3Path, $disk) {
+                $stream = \App\Support\TenantStorage::disk($disk)->readStream($s3Path);
                 if (is_resource($stream)) {
                     fpassthru($stream);
                     fclose($stream);
                 } else {
-                    echo \App\Support\TenantStorage::disk('s3')->get($s3Path);
+                    echo \App\Support\TenantStorage::disk($disk)->get($s3Path);
                 }
             }, 200, [
                 'Content-Type'        => 'application/pdf',

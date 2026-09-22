@@ -990,8 +990,8 @@ class TenantStorage
         return array_values(array_unique($disks));
     }
 
-    private static function disk(string $name): Filesystem
+    public static function disk(?string $name = null): Filesystem
     {
-        return Storage::disk($name);
+        return Storage::disk($name ?? self::uploadDisk());
     }
 }

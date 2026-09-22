@@ -16,6 +16,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class RenderContinuousDieIdCardsJob implements ShouldQueue
 {
@@ -163,8 +164,9 @@ class RenderContinuousDieIdCardsJob implements ShouldQueue
                 $finalPdfBytes = $this->mergePdfChunks($pdfChunksBytes);
             }
 
+            $disk = TenantStorage::uploadDisk();
             $s3Path = "sahodaya/{$tenant->id}/events/{$event->id}/id-cards/die/full-continuous-run.pdf";
-            TenantStorage::disk('s3')->put($s3Path, $finalPdfBytes, 'public');
+            TenantStorage::disk($disk)->put($s3Path, $finalPdfBytes, 'public');
 
             $sizeBytes = strlen($finalPdfBytes);
             $sizeFormatted = round($sizeBytes / (1024 * 1024), 2).' MB';
