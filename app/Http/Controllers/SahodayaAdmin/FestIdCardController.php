@@ -439,15 +439,21 @@ class FestIdCardController extends SahodayaAdminController
             $filename = "{$slug}-continuous-master-id-cards.pdf";
 
             if (\App\Support\TenantStorage::isS3Configured()) {
-                try {
-                    $state['s3_preview_url'] = \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl($path, now()->addHours(6), [
-                        'ResponseContentDisposition' => 'inline; filename="' . $filename . '"',
-                    ]);
-                    $state['s3_download_url'] = \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl($path, now()->addHours(6), [
-                        'ResponseContentDisposition' => 'attachment; filename="' . $filename . '"',
-                    ]);
-                } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::warning('Failed generating presigned S3 URLs: '.$e->getMessage());
+                if (! \Illuminate\Support\Facades\Storage::disk('s3')->exists($path)) {
+                    \App\Support\TenantStorage::migrateToS3($path);
+                }
+
+                if (\Illuminate\Support\Facades\Storage::disk('s3')->exists($path)) {
+                    try {
+                        $state['s3_preview_url'] = \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl($path, now()->addHours(6), [
+                            'ResponseContentDisposition' => 'inline; filename="' . $filename . '"',
+                        ]);
+                        $state['s3_download_url'] = \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl($path, now()->addHours(6), [
+                            'ResponseContentDisposition' => 'attachment; filename="' . $filename . '"',
+                        ]);
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning('Failed generating presigned S3 URLs: '.$e->getMessage());
+                    }
                 }
             }
         }
@@ -512,6 +518,10 @@ class FestIdCardController extends SahodayaAdminController
 
         // Try S3 first if configured — redirecting directly to AWS S3 delivers the fastest download with zero server memory overhead
         if (\App\Support\TenantStorage::isS3Configured()) {
+            if (! \Illuminate\Support\Facades\Storage::disk('s3')->exists($relativePath)) {
+                \App\Support\TenantStorage::migrateToS3($relativePath);
+            }
+
             try {
                 if (\Illuminate\Support\Facades\Storage::disk('s3')->exists($relativePath)) {
                     $disposition = ($inline ? 'inline' : 'attachment') . '; filename="' . $filename . '"';

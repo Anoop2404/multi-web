@@ -4,6 +4,32 @@
         <PageHeader title="ID card templates" eyebrow="Tools"
                     description="Upload a custom ID card background and place fields (photo, QR, name, etc.) on it. Scope to a specific event/item/audience, or leave blank for a Sahodaya-wide default." />
 
+        <div v-if="templatePresets.length" class="card mb-6">
+            <div class="mb-4">
+                <h3 class="section-title">Create from a ready-made design</h3>
+                <p class="mt-1 text-sm text-slate-500">
+                    Add any design with one click. It starts inactive, so you can preview and adjust it before using it for ID cards.
+                </p>
+            </div>
+            <div class="grid gap-3 md:grid-cols-3">
+                <button v-for="preset in templatePresets" :key="preset.key" type="button"
+                        class="group rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-indigo-300 hover:bg-indigo-50/40 hover:shadow-sm disabled:cursor-wait disabled:opacity-60"
+                        :disabled="creatingPreset !== null"
+                        @click="createPreset(preset)">
+                    <span class="flex items-start justify-between gap-3">
+                        <span>
+                            <span class="block text-sm font-bold text-slate-900">{{ preset.label }}</span>
+                            <span class="mt-0.5 block text-[11px] font-semibold text-indigo-600">{{ preset.size_label }}</span>
+                        </span>
+                        <span class="rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-700 group-hover:bg-indigo-100">
+                            {{ creatingPreset === preset.key ? 'Creating…' : 'Create' }}
+                        </span>
+                    </span>
+                    <span class="mt-2 block text-xs leading-5 text-slate-500">{{ preset.description }}</span>
+                </button>
+            </div>
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-4 items-start">
         <form @submit.prevent="upload" class="card space-y-4 lg:col-span-7">
             <h3 class="section-title">{{ editingId ? 'Edit ID card template' : 'New ID card template' }}</h3>
@@ -440,9 +466,11 @@ const props = defineProps({
     dataSourceOptions: { type: Object, default: () => ({}) },
     fontFamilyOptions: { type: Array, default: () => [] },
     defaultFields: { type: Array, default: () => [] },
+    templatePresets: { type: Array, default: () => [] },
 });
 
 const editingId = ref(null);
+const creatingPreset = ref(null);
 const { confirm } = useConfirm();
 const editingTemplate = ref(null);
 // Bumped whenever the background <input type=file> must forget its current
@@ -454,6 +482,26 @@ const fileInputKey = ref(0);
 
 function previewUrl(template, mode) {
     return `/sahodaya-admin/${props.sahodaya.id}/id-card-templates/${template.id}/preview?mode=${mode}`;
+}
+
+async function createPreset(preset) {
+    if (!(await confirm({
+        message: `Create a new ${preset.label}? It will remain inactive until you review and activate it.`,
+    }))) return;
+
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/id-card-templates/presets/${preset.key}`,
+        {},
+        {
+            preserveScroll: true,
+            onStart: () => {
+                creatingPreset.value = preset.key;
+            },
+            onFinish: () => {
+                creatingPreset.value = null;
+            },
+        },
+    );
 }
 
 // A native <form target="_blank"> submit (not window.open, which popup blockers

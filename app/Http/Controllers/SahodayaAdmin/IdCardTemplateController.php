@@ -6,6 +6,7 @@ use App\Models\CertificateTemplate;
 use App\Models\FestEvent;
 use App\Models\IdCardTemplate;
 use App\Services\Certificates\CertificateBackgroundConverter;
+use App\Services\Events\IdCardTemplatePresetInstaller;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestItemCategoryLabel;
 use App\Support\TenantStorage;
@@ -14,7 +15,7 @@ use Illuminate\Validation\Rule;
 
 class IdCardTemplateController extends SahodayaAdminController
 {
-    public function index()
+    public function index(IdCardTemplatePresetInstaller $presetInstaller)
     {
         $templates = IdCardTemplate::where('tenant_id', $this->sahodaya->id)
             ->orderByDesc('id')
@@ -54,7 +55,23 @@ class IdCardTemplateController extends SahodayaAdminController
             'dataSourceOptions'  => IdCardTemplate::dataSourceOptions(),
             'fontFamilyOptions'  => CertificateTemplate::fontFamilyOptions(),
             'defaultFields'      => IdCardTemplate::defaultFields(),
+            'templatePresets'    => $presetInstaller->options(),
         ]);
+    }
+
+    public function installPreset(
+        string $tenantId,
+        string $preset,
+        IdCardTemplatePresetInstaller $presetInstaller,
+    ) {
+        abort_unless($presetInstaller->has($preset), 404);
+
+        $template = $presetInstaller->install((string) $this->sahodaya->id, $preset);
+
+        return back()->with(
+            'success',
+            "{$template->title} created. Preview it, make any adjustments, and activate it when ready.",
+        );
     }
 
     public function store(Request $request)
