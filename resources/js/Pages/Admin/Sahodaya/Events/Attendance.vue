@@ -121,7 +121,7 @@
                             </td>
                             <td class="p-3.5">
                                 <div class="w-9 h-9 rounded-full overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center shrink-0">
-                                    <img v-if="row.photo_url" :src="row.photo_url" :alt="row.name" class="w-full h-full object-cover">
+                                    <img v-if="row.photo_url" :src="row.photo_url" :alt="row.name" class="w-full h-full object-cover" @error="row.photo_url = null">
                                     <span v-else class="text-xs text-slate-400 font-semibold">{{ initials(row.name) }}</span>
                                 </div>
                             </td>
@@ -365,7 +365,7 @@ const displayRows = computed(() => {
                 item_gender: formatItemGenderLabel(item),
                 status: statusFor(p),
                 representative: p,
-                photo_url: p.student?.photo_url ?? null,
+                photo_url: p.student?.photo_url ?? p.teacher?.photo_url ?? null,
                 dob: p.student?.dob ?? null,
                 class_name: p.student?.school_class?.name ?? null,
             };
@@ -394,7 +394,7 @@ const displayRows = computed(() => {
             item_gender: formatItemGenderLabel(item),
             status: statusFor(p),
             representative: p,
-            photo_url: p.student?.photo_url ?? null,
+            photo_url: p.student?.photo_url ?? p.teacher?.photo_url ?? null,
             dob: p.student?.dob ?? null,
             class_name: p.student?.school_class?.name ?? null,
         };

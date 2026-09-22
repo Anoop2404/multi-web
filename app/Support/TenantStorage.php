@@ -328,7 +328,7 @@ class TenantStorage
 
         $relativePath = ltrim($relativePath, '/');
         $path = $thumbnail ? self::thumbnailPath($relativePath) : $relativePath;
-        if (self::isS3Configured()) {
+        if (self::isS3BrowserAccessible()) {
             try {
                 $storage = Storage::disk('s3');
 
@@ -822,6 +822,37 @@ class TenantStorage
         return filled(config('filesystems.disks.s3.key'))
             && filled(config('filesystems.disks.s3.secret'))
             && filled(config('filesystems.disks.s3.bucket'));
+    }
+
+    /**
+     * Whether S3/MinIO URLs can be resolved directly by external client browsers.
+     * Returns false if S3 is not configured, or if the endpoint is an internal/loopback
+     * host (e.g. 127.0.0.1:9000, localhost) without an explicit public CDN URL. Handing
+     * a 127.0.0.1 or internal URL to a client browser causes connection refused / mixed content.
+     */
+    public static function isS3BrowserAccessible(): bool
+    {
+        if (! self::isS3Configured()) {
+            return false;
+        }
+
+        if (filled(config('filesystems.disks.s3.public_url'))) {
+            return true;
+        }
+
+        $endpoint = config('filesystems.disks.s3.endpoint');
+        if (filled($endpoint)) {
+            $host = parse_url((string) $endpoint, PHP_URL_HOST);
+            if (in_array($host, ['127.0.0.1', 'localhost', '::1', '0.0.0.0'], true)
+                || str_ends_with((string) $host, '.internal')
+                || str_ends_with((string) $host, '.local')
+                || str_starts_with((string) $host, '10.')
+                || str_starts_with((string) $host, '192.168.')) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** Find which local disk holds a relative path, if any. */

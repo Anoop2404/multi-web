@@ -72,22 +72,24 @@ class FestAttendanceController extends SahodayaAdminController
             // attendees and were showing up as blank rows with no name.
             ->where('participant_role', '!=', 'standby')
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
-            ->with(['registration.item', 'registration.school', 'student.schoolClass', 'teacher', 'group'])
+            ->with(['registration.item', 'registration.school', 'student.schoolClass', 'student.tenant', 'teacher.tenant', 'group'])
             ->get();
 
         foreach ($participants as $participant) {
             if ($participant->student) {
                 // publicPhotoUrl() -- a stable, browser/CDN-cacheable direct S3 URL (or a
-                // 30-day-cached base64 fallback when S3 isn't configured) -- instead of
-                // sahodayaPhotoUrl(), which points at showPhoto() (TenantStorage::
+                // 30-day-cached base64 fallback when S3 isn't configured/publicly accessible)
+                // instead of sahodayaPhotoUrl(), which points at showPhoto() (TenantStorage::
                 // downloadResponse()): a live, uncached S3 existence-check-then-stream on
-                // every single request, no caching at all. That was firing once per row on
-                // every page load (up to dozens at once) and was the main reason this page
-                // was slow to open -- confirmed live: a single photo request alone visibly
-                // hung the tab.
+                // every single request, no caching at all.
                 $participant->student->setAttribute(
                     'photo_url',
                     $participant->student->publicPhotoUrl(),
+                );
+            } elseif ($participant->teacher) {
+                $participant->teacher->setAttribute(
+                    'photo_url',
+                    $participant->teacher->publicPhotoUrl(),
                 );
             }
         }
