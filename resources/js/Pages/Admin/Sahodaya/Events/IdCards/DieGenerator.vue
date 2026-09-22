@@ -435,6 +435,9 @@ const isTriggeringRender = ref(false);
 let pollTimer = null;
 
 const continuousStatus = computed(() => continuousState.value?.status || 'idle');
+const isRenderingOrQueued = computed(() => {
+    return continuousStatus.value === 'rendering' || continuousStatus.value === 'queued';
+});
 const continuousPreviewUrl = computed(() => {
     return continuousState.value?.s3_preview_url || `${base}/die/master-file?preview=1`;
 });
