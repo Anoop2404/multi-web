@@ -1,4 +1,9 @@
 <div class="rounded-2xl border border-slate-800 bg-slate-900 overflow-hidden">
+    {{-- hideHeader: the TV page (tv.blade.php) renders its own copy of this exact
+         header row in a fixed label above the scrolling viewport, kept visible no
+         matter how far the board itself has scrolled — showing this inline header too
+         would just duplicate it right below. --}}
+    @unless($hideHeader ?? false)
     <div class="grid grid-cols-[4.5rem_1fr_repeat(4,5rem)_7rem] gap-2 px-5 py-2 bg-white/5 border-b border-slate-800 text-sm font-extrabold uppercase tracking-wider text-slate-400">
         <span>Rank</span>
         <span>School</span>
@@ -13,6 +18,7 @@
         <span class="flex flex-col items-center justify-center gap-0.5"><span>Grade</span><span class="normal-case text-xs font-semibold tracking-normal text-slate-500">pts</span></span>
         <span class="text-right">Total Points</span>
     </div>
+    @endunless
     <div class="divide-y divide-slate-800/80">
         @php $showMedalRank = $showMedalRank ?? true; @endphp
         @forelse($rows as $row)

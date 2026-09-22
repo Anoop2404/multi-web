@@ -28,21 +28,45 @@
         </div>
     </header>
 
+    {{-- Fixed above the scrolling viewport (not inside it) — a board can run to many
+         rows, and once scrolled a few rows in, the section's own heading would
+         otherwise have scrolled away with it, leaving no indication of which board or
+         category is on screen. JS keeps this in sync with whichever section is
+         currently under the top of the viewport, so the identity stays visible
+         throughout the scroll, not just at the moment it first comes into view. --}}
+    <div id="tv-section-label" class="mb-4 shrink-0" hidden>
+        <div class="flex items-baseline justify-between gap-4 pb-3 border-b border-slate-800">
+            <h2 id="tv-section-label-title" class="text-3xl font-extrabold text-white"></h2>
+            <span id="tv-section-label-subtitle" class="text-lg text-slate-400 font-semibold shrink-0"></span>
+        </div>
+        {{-- Duplicates fest-medal-board.blade.php's own header row markup/grid template
+             verbatim (kept in sync by hand, not shared, so this TV-only fixed label
+             never risks changing that partial's shared layout) — shown only while a
+             board/schools section is active, so it always names what each column
+             means even after the board's own header has scrolled out of view below. --}}
+        {{-- visibility, not the hidden attribute: this row's SPACE must stay reserved
+             even while showing a winners section, or the label bar's own height would
+             change as sections change — shrinking/growing the viewport height JS
+             measured once at load, and throwing off every waypoint computed from it. --}}
+        <div id="tv-section-label-columns" class="grid grid-cols-[4.5rem_1fr_repeat(4,5rem)_7rem] gap-2 px-5 py-2 mt-3 bg-white/5 border border-slate-800 rounded-t-2xl text-sm font-extrabold uppercase tracking-wider text-slate-400" style="visibility:hidden">
+            <span>Rank</span>
+            <span>School</span>
+            <span class="flex flex-col items-center justify-center gap-0.5"><img src="{{ asset('images/fest/medals/rank-1.webp') }}" alt="Points from 1st place" class="w-8 h-8"><span class="normal-case text-xs font-semibold tracking-normal text-slate-500">pts</span></span>
+            <span class="flex flex-col items-center justify-center gap-0.5"><img src="{{ asset('images/fest/medals/rank-2.webp') }}" alt="Points from 2nd place" class="w-8 h-8"><span class="normal-case text-xs font-semibold tracking-normal text-slate-500">pts</span></span>
+            <span class="flex flex-col items-center justify-center gap-0.5"><img src="{{ asset('images/fest/medals/rank-3.webp') }}" alt="Points from 3rd place" class="w-8 h-8"><span class="normal-case text-xs font-semibold tracking-normal text-slate-500">pts</span></span>
+            <span class="flex flex-col items-center justify-center gap-0.5"><span>Grade</span><span class="normal-case text-xs font-semibold tracking-normal text-slate-500">pts</span></span>
+            <span class="text-right">Total Points</span>
+        </div>
+    </div>
+
     <div class="flex-1 relative overflow-hidden" id="tv-viewport">
         <div id="tv-scroll-track">
             @foreach($sections as $section)
-            <section data-tv-section>
-                @if($section['type'] !== 'waiting')
-                <div class="flex items-baseline justify-between gap-4 mb-4">
-                    <h2 class="text-3xl font-extrabold text-white">{{ $section['title'] }}</h2>
-                    @if($section['subtitle'] ?? null)<span class="text-lg text-slate-400 font-semibold shrink-0">{{ $section['subtitle'] }}</span>@endif
-                </div>
-                @endif
-
+            <section data-tv-section data-type="{{ $section['type'] }}" data-title="{{ $section['title'] ?? '' }}" data-subtitle="{{ $section['subtitle'] ?? '' }}">
                 @if($section['type'] === 'board')
-                    @include('public.fest.partials.fest-medal-board', ['rows' => $section['rows']])
+                    @include('public.fest.partials.fest-medal-board', ['rows' => $section['rows'], 'hideHeader' => true])
                 @elseif($section['type'] === 'schools')
-                    @include('public.fest.partials.fest-medal-board', ['rows' => $section['rows'], 'showMedalRank' => false])
+                    @include('public.fest.partials.fest-medal-board', ['rows' => $section['rows'], 'showMedalRank' => false, 'hideHeader' => true])
                 @elseif($section['type'] === 'winners')
                 <div class="grid grid-cols-1 gap-4">
                     @foreach($section['items'] as $itemGroup)
@@ -80,10 +104,34 @@
     const viewport = document.getElementById('tv-viewport');
     const track = document.getElementById('tv-scroll-track');
     const sections = Array.from(document.querySelectorAll('[data-tv-section]'));
+    const label = document.getElementById('tv-section-label');
+    const labelTitle = document.getElementById('tv-section-label-title');
+    const labelSubtitle = document.getElementById('tv-section-label-subtitle');
+    const labelColumns = document.getElementById('tv-section-label-columns');
     const prev = document.querySelector('[data-tv-prev]');
     const next = document.querySelector('[data-tv-next]');
     const pause = document.querySelector('[data-tv-pause]');
     const fullscreen = document.querySelector('[data-tv-fullscreen]');
+
+    // Whichever section's rows currently sit at (or just above) the top of the
+    // viewport, by scroll position — independent of the dwell/waypoint state machine
+    // below, so it stays correct through prev/next jumps too, not just the automatic
+    // scroll.
+    let activeSection = null;
+    const updateLabel = (scrollY) => {
+        let candidate = sections[0];
+        for (const el of sections) {
+            if (el.offsetTop <= scrollY + 1) candidate = el; else break;
+        }
+        if (candidate === activeSection) return;
+        activeSection = candidate;
+        const title = candidate?.dataset.title || '';
+        const type = candidate?.dataset.type || '';
+        if (label) label.hidden = ! title;
+        if (labelTitle) labelTitle.textContent = title;
+        if (labelSubtitle) labelSubtitle.textContent = candidate?.dataset.subtitle || '';
+        if (labelColumns) labelColumns.style.visibility = (type === 'board' || type === 'schools') ? 'visible' : 'hidden';
+    };
 
     const speedPxPerSec = parseFloat(root.dataset.scrollSpeed) || 55;
     const dwellMs = parseInt(root.dataset.dwellMs, 10) || 2500;
@@ -111,9 +159,16 @@
     // "waiting" card) — just poll for new data at a similar cadence to the old
     // single-slide fallback, so the screen notices results appearing.
     if (sections.length <= 1) {
+        updateLabel(0);
         setTimeout(() => window.location.reload(), 30000);
         return;
     }
+
+    // Settle the label bar into its real, final layout (title + reserved column-header
+    // row space) BEFORE measuring the viewport below — otherwise the bar's height
+    // would still be in its initial hidden/collapsed markup state, and every
+    // measurement taken here would go stale the instant setY() first shows it.
+    updateLabel(0);
 
     const maxScrollY = Math.max(0, track.scrollHeight - viewport.clientHeight);
 
@@ -131,6 +186,7 @@
     if (maxScrollY <= 0) {
         // Every section already fits on screen at once — nothing to scroll, just
         // refresh periodically to pick up new data.
+        updateLabel(0);
         setTimeout(() => window.location.reload(), 30000);
         return;
     }
@@ -162,6 +218,7 @@
     const setY = (value) => {
         y = value;
         track.style.transform = `translateY(${-y}px)`;
+        updateLabel(y);
     };
 
     const jumpTo = (index) => {
@@ -198,6 +255,7 @@
         requestAnimationFrame(tick);
     };
 
+    setY(0);
     lastFrame = performance.now();
     requestAnimationFrame(tick);
 
