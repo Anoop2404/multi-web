@@ -7,7 +7,6 @@ use App\Models\FestEventItem;
 use App\Models\FestEventPhase;
 use App\Models\FestMark;
 use App\Models\FestParticipant;
-use App\Models\FestPhaseScoreSnapshot;
 use App\Models\FestRegistration;
 use App\Models\FestResult;
 use App\Models\SchoolClass;
@@ -133,7 +132,6 @@ class FestPublicScoreboardTest extends TestCase
         $response->assertSee("/fest/{$this->north->id}/schedule", false);
         $response->assertSee("/fest/{$this->north->id}/scoreboard", false);
         $response->assertSee("/fest/{$this->north->id}/results", false);
-        $response->assertSee("/fest/{$this->north->id}/live", false);
         $response->assertDontSee('aria-label="Event scoreboard scope"', false);
     }
 
@@ -166,7 +164,8 @@ class FestPublicScoreboardTest extends TestCase
             ->assertSee('North Star School')
             ->assertSee('25');
         $this->get("http://public-scoreboard.test/fest/{$event->id}/results")->assertOk();
-        $this->get("http://public-scoreboard.test/fest/{$event->id}/live")->assertOk();
+        $this->get("http://public-scoreboard.test/fest/{$event->id}/live")
+            ->assertRedirect("http://public-scoreboard.test/fest/{$event->id}/scoreboard");
     }
 
     public function test_region_event_scoreboards_are_isolated_and_hub_is_not_public(): void
@@ -880,42 +879,6 @@ class FestPublicScoreboardTest extends TestCase
             ->assertOk();
     }
 
-    public function test_unpublished_standings_do_not_leak_through_live_json(): void
-    {
-        $this->north->update(['results_published' => false, 'status' => 'ongoing']);
-
-        $response = $this->getJson("http://public-scoreboard.test/fest/{$this->north->id}/live/data");
-
-        $response->assertOk()
-            ->assertJsonPath('standingsPublished', false)
-            ->assertJsonCount(0, 'scoreboard');
-
-        $this->assertStringContainsString('s-maxage=10', $response->headers->get('Cache-Control'));
-    }
-
-    /**
-     * schoolMedalTally() (feeds /live's combined board) never checked
-     * excluded_overall_categories at all — an excluded category's podium finish still
-     * counted in gold/silver/bronze even though that same combined board's Total Points
-     * correctly left it out.
-     */
-    public function test_live_medal_tally_excludes_an_admin_excluded_category(): void
-    {
-        $this->hub->update(['aggregation_config' => array_merge(
-            $this->hub->aggregation_config ?? [],
-            ['excluded_overall_categories' => ['hs']],
-        )]);
-
-        $this->markCategoryWinner($this->north, $this->northSchool, 'Excluded HS Winner');
-
-        $response = $this->getJson("http://public-scoreboard.test/fest/{$this->north->id}/live/data");
-
-        $response->assertOk();
-        $row = collect($response->json('scoreboard'))->firstWhere('school_id', $this->northSchool->id);
-        $this->assertNotNull($row, 'North Star School must still appear on the combined board.');
-        $this->assertSame(0, $row['gold'], 'The excluded category\'s gold finish must not be tallied.');
-    }
-
     public function test_unpublished_child_does_not_leak_when_hub_is_published(): void
     {
         $this->north->update(['results_published' => false, 'status' => 'ongoing']);
@@ -931,11 +894,6 @@ class FestPublicScoreboardTest extends TestCase
         // disabled, so the results endpoint denies access without exposing any rows.
         $this->get("http://public-scoreboard.test/fest/{$this->north->id}/results")
             ->assertForbidden();
-
-        $this->getJson("http://public-scoreboard.test/fest/{$this->north->id}/live/data")
-            ->assertOk()
-            ->assertJsonPath('standingsPublished', false)
-            ->assertJsonCount(0, 'scoreboard');
     }
 
     public function test_scoreboard_page_has_event_day_cache_policy(): void
@@ -1637,117 +1595,6 @@ class FestPublicScoreboardTest extends TestCase
             '/text-amber-300 text-lg">0</', $row,
             "The merged source category's gold medal must count toward the target category's own board."
         );
-    }
-
-    /**
-     * Same bug class as the TV regression test above, but for the /live page's
-     * cumulative-championship path (FestCumulativeChampionshipService::publicStanding(),
-     * a precomputed FestPhaseScoreSnapshot rather than crossPhaseScoreboard()'s live sum)
-     * — schoolMedalTally() stayed scoped to only the current phase's own marks even when
-     * the total_points shown already carries an earlier phase's points forward via
-     * opening_points, so an earlier-phase medal silently dropped out of gold/silver/bronze.
-     */
-    public function test_live_medal_tally_includes_medals_from_earlier_phase_in_cumulative_total(): void
-    {
-        $hub = FestEvent::create([
-            'tenant_id' => $this->sahodaya->id, 'title' => 'Phased Kalotsav Live', 'event_type' => 'kalolsavam',
-            'status' => 'ongoing', 'schedule_published' => true,
-        ]);
-        $hubPhase1 = FestEventPhase::create(['event_id' => $hub->id, 'name' => 'Phase 1', 'code' => 'P1', 'sort_order' => 1]);
-        $hubPhase2 = FestEventPhase::create(['event_id' => $hub->id, 'name' => 'Phase 2', 'code' => 'P2', 'sort_order' => 2]);
-
-        $leaf1 = FestEvent::create([
-            'tenant_id' => $this->sahodaya->id, 'title' => 'Phased Kalotsav Live - Phase 1', 'event_type' => 'kalolsavam',
-            'parent_event_id' => $hub->id, 'source_phase_id' => $hubPhase1->id,
-            'status' => 'ongoing', 'schedule_published' => true, 'results_published' => true,
-        ]);
-        $leaf2 = FestEvent::create([
-            'tenant_id' => $this->sahodaya->id, 'title' => 'Phased Kalotsav Live - Phase 2', 'event_type' => 'kalolsavam',
-            'parent_event_id' => $hub->id, 'source_phase_id' => $hubPhase2->id,
-            'status' => 'ongoing', 'schedule_published' => true, 'results_published' => true,
-        ]);
-
-        $school = $this->school('Cumulative Cross Phase School');
-
-        // The school's only medal is earned in Phase 1.
-        $item = FestEventItem::create([
-            'event_id' => $leaf1->id, 'title' => 'Phase 1 Item', 'category' => 'literary', 'class_group' => 'hs',
-            'participant_type' => 'individual', 'is_enabled' => true, 'results_published_at' => now(),
-        ]);
-        $registration = FestRegistration::create(['event_id' => $leaf1->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
-        $participant = FestParticipant::create(['registration_id' => $registration->id, 'event_id' => $leaf1->id, 'participant_type' => 'student']);
-        FestMark::create(['event_id' => $leaf1->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'grade' => 'A', 'position' => 1, 'score' => 90]);
-
-        // A closed Phase 1 -> Phase 2 cumulative snapshot: the school's Phase 1 medal
-        // already carried forward into Phase 2's opening_points/closing_points.
-        FestPhaseScoreSnapshot::create([
-            'root_event_id' => $hub->id, 'phase_id' => $hubPhase2->id, 'school_id' => $school->id,
-            'championship_category_key' => 'overall', 'version' => 1,
-            'opening_points' => 10, 'current_points' => 0, 'closing_points' => 10, 'rank' => 1,
-            'locked_at' => now(),
-        ]);
-
-        $response = $this->get("http://public-scoreboard.test/fest/{$leaf2->id}/live");
-        $html = $response->getContent();
-
-        $response->assertOk()->assertSee('Cumulative Cross Phase School');
-
-        $row = substr($html, strpos($html, 'Cumulative Cross Phase School'));
-        $this->assertDoesNotMatchRegularExpression('/text-amber-300 text-sm">0</', $row, 'gold must not be 0 — the Phase 1 medal must be counted, not dropped.');
-        $this->assertMatchesRegularExpression('/text-amber-300 text-sm">\d+</', $row);
-    }
-
-    /**
-     * Regression test: /live's livePayload() built its own scoreboard-fetching logic
-     * (cumulativeChampionship snapshot, else plain single-scope scoreboard()) and never
-     * got the crossPhaseScoreboard() fallback that tv()/scoreboardDynamicData() already
-     * have — so a school viewing /live on a phase leaf saw only that ONE phase's
-     * isolated total (here: 0, no marks of its own), while /tv and /scoreboard for the
-     * exact same event correctly showed the cross-phase combined total. Same school,
-     * different pages, different numbers, no visible reason why.
-     */
-    public function test_live_shows_cross_phase_combined_total_not_just_this_phase_alone(): void
-    {
-        $hub = FestEvent::create([
-            'tenant_id' => $this->sahodaya->id, 'title' => 'Phased Kalotsav Live Merge', 'event_type' => 'kalolsavam',
-            'status' => 'ongoing', 'schedule_published' => true,
-        ]);
-        $hubPhase1 = FestEventPhase::create(['event_id' => $hub->id, 'name' => 'Phase 1', 'code' => 'P1', 'sort_order' => 1]);
-        $hubPhase2 = FestEventPhase::create(['event_id' => $hub->id, 'name' => 'Phase 2', 'code' => 'P2', 'sort_order' => 2]);
-
-        $leaf1 = FestEvent::create([
-            'tenant_id' => $this->sahodaya->id, 'title' => 'Phased Kalotsav Live Merge - Phase 1', 'event_type' => 'kalolsavam',
-            'parent_event_id' => $hub->id, 'source_phase_id' => $hubPhase1->id,
-            'status' => 'ongoing', 'schedule_published' => true, 'results_published' => true,
-        ]);
-        $leaf1Phase = FestEventPhase::create(['event_id' => $leaf1->id, 'source_phase_id' => $hubPhase1->id, 'name' => 'Phase 1', 'code' => 'P1', 'sort_order' => 1]);
-
-        $leaf2 = FestEvent::create([
-            'tenant_id' => $this->sahodaya->id, 'title' => 'Phased Kalotsav Live Merge - Phase 2', 'event_type' => 'kalolsavam',
-            'parent_event_id' => $hub->id, 'source_phase_id' => $hubPhase2->id,
-            'status' => 'ongoing', 'schedule_published' => true, 'results_published' => true,
-        ]);
-        FestEventPhase::create(['event_id' => $leaf2->id, 'source_phase_id' => $hubPhase2->id, 'name' => 'Phase 2', 'code' => 'P2', 'sort_order' => 1]);
-
-        $school = $this->school('Live Merge School');
-
-        // All of this school's points come from Phase 1 — Phase 2 (leaf2) itself has
-        // no items or marks for this school at all.
-        $item = FestEventItem::create([
-            'event_id' => $leaf1->id, 'title' => 'Phase 1 Item', 'phase_id' => $leaf1Phase->id,
-            'category' => 'literary', 'class_group' => 'hs', 'participant_type' => 'individual',
-            'is_enabled' => true, 'results_published_at' => now(),
-        ]);
-        $registration = FestRegistration::create(['event_id' => $leaf1->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
-        $participant = FestParticipant::create(['registration_id' => $registration->id, 'event_id' => $leaf1->id, 'participant_type' => 'student']);
-        FestMark::create(['event_id' => $leaf1->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'grade' => 'A', 'position' => 1, 'score' => 90]);
-
-        // Viewing Phase 2's own /live page must still show this school (its combined
-        // total is > 0, carried from Phase 1) — not omit it as if it scored nothing in
-        // the hub at all.
-        $response = $this->get("http://public-scoreboard.test/fest/{$leaf2->id}/live");
-
-        $response->assertOk()->assertSee('Live Merge School');
     }
 
     private function school(string $name): Tenant

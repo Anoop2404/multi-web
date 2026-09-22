@@ -75,7 +75,6 @@
         </div>
 
         <footer class="pt-6 border-t border-slate-800 text-center flex flex-wrap justify-center gap-5 text-xs">
-            <a href="{{ route('tenant.fest.live', ['event' => $event->id]) }}" class="text-amber-400 font-semibold hover:underline">{{ $event->status === 'completed' ? 'Results hub' : 'Live event view' }} →</a>
             <a href="{{ route('tenant.fest.show', ['event' => $event->id]) }}" class="text-slate-400 hover:text-white">← Event page</a>
         </footer>
     </div>

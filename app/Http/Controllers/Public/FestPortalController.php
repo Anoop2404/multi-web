@@ -850,6 +850,13 @@ class FestPortalController extends Controller
                 ->all());
     }
 
+    /**
+     * Handles both the full event schedule and a single item's schedule (via ?item=)
+     * — merged from a formerly separate itemSchedule() action. Both called the same
+     * mapScheduleRows() helper with itemSchedule() just passing a narrower $itemId;
+     * itemSchedule()'s own route is kept below as a redirect for existing bookmarks/
+     * shared links, but the actual query work now only ever runs here, once, cached.
+     */
     public function schedule(Request $request, int $eventId)
     {
         $tenant = $this->resolveTenant();
@@ -865,26 +872,38 @@ class FestPortalController extends Controller
         abort_unless($selectedScope['schedule_published'] || $isAdminPreview, 404);
         $scopes = [$selectedScope];
 
-        $schedules = $this->mapScheduleRows($event, null, $selectedScope['event_ids'], $isAdminPreview);
+        $item = null;
+        $categoryLabel = null;
+        $genderLabel = null;
+        $itemIdParam = $request->integer('item') ?: null;
+
+        if ($itemIdParam) {
+            $item = FestEventItem::findOrFail($itemIdParam);
+            abort_unless((int) $item->event_id === (int) $event->id, 404);
+            $categoryLabel = FestItemCategoryLabel::resolve($item, FestClassGroupScheme::labels(null, $event->rootEvent()), config('fest_item_taxonomy.arts_category', []));
+            $genderLabel = \App\Support\FestSportsAgeGroup::genderLabel($item->gender);
+        }
+
+        $cacheKey = 'fest-schedule:v1:'.$event->tenant_id.':'.$event->id.':'.($item->id ?? 'all').':'.($isAdminPreview ? '1' : '0');
+        $compute = fn () => $this->mapScheduleRows($event, $item?->id, $selectedScope['event_ids'], $isAdminPreview);
+        $schedules = $isAdminPreview
+            ? $compute() // admin preview must never be cached/shared — same reasoning as every other isAdminPreview bypass in this controller.
+            : $this->rememberPublicHotPath($cacheKey, 30, $compute);
 
         return $this->renderPublic('public.fest.schedule', $tenant, compact(
-            'event', 'schedules', 'scopes', 'selectedScope'
+            'event', 'schedules', 'scopes', 'selectedScope', 'item', 'categoryLabel', 'genderLabel'
         ) + ['isAdminPreview' => $isAdminPreview]);
     }
 
+    /** Kept only so existing /items/{item}/schedule links (bookmarks, shared URLs) keep working — see schedule(). */
     public function itemSchedule(Request $request, int $eventId, FestEventItem $item)
     {
-        $tenant = $this->resolveTenant();
-        $event = $this->findEvent($tenant->id, $eventId);
-        abort_unless((int) $item->event_id === (int) $event->id, 404);
-        $isAdminPreview = $this->isAuthorizedAdminPreview($request, $event);
-        EventLifecycleGate::allowPublicSchedule($event, $isAdminPreview);
+        abort_unless((int) $item->event_id === (int) $eventId, 404);
 
-        $schedules = $this->mapScheduleRows($event, $item->id, [$event->id], $isAdminPreview);
-        $categoryLabel = FestItemCategoryLabel::resolve($item, FestClassGroupScheme::labels(null, $event->rootEvent()), config('fest_item_taxonomy.arts_category', []));
-        $genderLabel = \App\Support\FestSportsAgeGroup::genderLabel($item->gender);
-
-        return $this->renderPublic('public.fest.item-schedule', $tenant, compact('event', 'item', 'schedules', 'categoryLabel', 'genderLabel') + ['isAdminPreview' => $isAdminPreview]);
+        return redirect()->route('tenant.fest.schedule', array_filter([
+            'event' => $eventId,
+            'item' => $item->id,
+        ]), 301);
     }
 
     public function itemResults(Request $request, int $eventId, FestEventItem $item)
@@ -1500,151 +1519,7 @@ public function tv(Request $request, int $eventId)
 
     public function live(Request $request, int $eventId)
     {
-        $tenant = $this->resolveTenant();
-        $event = $this->findEvent($tenant->id, $eventId);
-        $selectedScope = $this->operationalEvents->directScope($event);
-
-        $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
-
-        return $this->renderPublic('public.fest.live', $tenant, array_merge(
-            ['event' => $event, 'selectedScope' => $selectedScope, 'scopes' => [$selectedScope], 'isAdminPreview' => $isAdminPreview],
-            $this->livePayload($request, $event, $selectedScope)
-        ));
-    }
-
-    public function liveData(Request $request, int $eventId)
-    {
-        $tenant = $this->resolveTenant();
-        $event = $this->findEvent($tenant->id, $eventId);
-        $selectedScope = $this->operationalEvents->directScope($event);
-
-        return response()->json($this->livePayload($request, $event, $selectedScope));
-    }
-
-    /**
-     * Cache::remember() wraps computeLivePayload() below — hot path behind both live()
-     * (full page) and liveData() (the JSON endpoint public viewers poll). Bypassed for
-     * ANY authenticated request, same reasoning as scoreboardDynamicData()'s cache: the
-     * cross-phase branch inside (crossPhaseScoreboard()/crossPhaseVisibleEventIds())
-     * runs a per-sibling-leaf isAuthorizedAdminPreview() check that can broaden the
-     * result independent of this event's own admin-preview state.
-     *
-     * @return array<string, mixed>
-     */
-    private function livePayload(Request $request, FestEvent $event, array $selectedScope): array
-    {
-        $bypassCache = (bool) ($request->user() ?? auth()->user());
-        $compute = fn () => $this->computeLivePayload($request, $event, $selectedScope);
-
-        if ($bypassCache) {
-            return $compute();
-        }
-
-        $publishedFlag = $selectedScope['results_published'] ? '1' : '0';
-        $cacheKey = 'fest-live-payload:v2:'.$event->tenant_id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.$publishedFlag;
-
-        return $this->rememberPublicHotPath($cacheKey, 10, $compute, waitSeconds: 15);
-    }
-
-    /** @return array<string, mixed> */
-    private function computeLivePayload(Request $request, FestEvent $event, array $selectedScope): array
-    {
-        $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
-        $isPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
-
-        $ctx = EventContext::for($event);
-        $categories = $this->scoreboards->categories($event, $selectedScope);
-        $categoryLinks = collect($categories)->map(fn (string $key) => [
-            'key' => $key,
-            'label' => $this->scoreboards->categoryLabel($event, $key),
-            'url' => route('tenant.fest.scoreboard', [
-                'event' => $event->id,
-                'category' => $key,
-            ]),
-        ])->all();
-
-        $nowSlot = FestSchedule::whereIn('event_id', $selectedScope['event_ids'])
-            ->whereNotNull('scheduled_at')
-            ->where('scheduled_at', '<=', now())
-            ->orderByDesc('scheduled_at')
-            ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.event', 'participant.registration.item'])
-            ->first();
-
-        $nowPerforming = null;
-        if ($nowSlot?->participant) {
-            $nowPerforming = $this->visibility->formatPublicParticipant($event, $nowSlot->participant, $nowSlot, null, $isAdminPreview);
-            $nowPerforming['item_title'] = $nowSlot->item?->title;
-            // Same reasoning as the item_title override above: this widget is anchored to the
-            // schedule slot's own item, not necessarily the registration's item, so recompute
-            // the category label from the same $nowSlot->item rather than trusting the one
-            // formatPublicParticipant() derived from the participant's registration.
-            $nowPerforming['category_label'] = FestItemCategoryLabel::resolve(
-                $nowSlot->item,
-                FestClassGroupScheme::labels(null, $event->rootEvent()),
-                config('fest_item_taxonomy.arts_category', [])
-            );
-            $nowPerforming['gender_label'] = \App\Support\FestSportsAgeGroup::genderLabel($nowSlot->item?->gender);
-        }
-
-        $scoreboard = [];
-        if ($isPublished) {
-            $cumulativeStanding = $this->cumulativeChampionship->publicStanding($event);
-            $rawScoreboard = $cumulativeStanding['rows']
-                ?? ($selectedScope['results_published']
-                    ? $this->scoreboards->scoreboard($event, $selectedScope)
-                    : $this->scoreboards->provisionalScoreboard($event, $selectedScope));
-
-            // Same "this phase/region's own board is isolated to just that scope" gap
-            // that tv()/scoreboardDynamicData() already close via crossPhaseScoreboard()
-            // — without this, /live silently stayed single-phase even once another phase
-            // became visible, while /tv and /scoreboard (same event) showed the real
-            // cross-phase combined total. Same school, three pages, three different
-            // numbers, with nothing on screen explaining why.
-            if ($cumulativeStanding === null) {
-                $crossPhaseBoard = $this->crossPhaseScoreboard($event, null, $request);
-                if ($crossPhaseBoard !== null) {
-                    $rawScoreboard = $crossPhaseBoard;
-                }
-            }
-
-            // Same class of bug as tv()'s $marks scoping: when the board above reflects a
-            // combined (cumulative-championship or cross-phase) total, the medal tally
-            // needs the same combined scope, or a medal earned outside this one phase
-            // silently disappears from gold/silver/bronze even though it's still counted
-            // in the total.
-            $medalEventIds = match (true) {
-                $cumulativeStanding !== null => $this->cumulativeChampionshipEventIds($event) ?? $selectedScope['event_ids'],
-                default => $this->crossPhaseVisibleEventIds($event, $request) ?? $selectedScope['event_ids'],
-            };
-            $medalTally = $this->schoolMedalTally($event, $medalEventIds);
-            $scoreboard = collect($rawScoreboard)
-                ->map(fn (array $row) => $row + [
-                    'gold' => $medalTally[$row['school_id']]['gold'] ?? 0,
-                    'silver' => $medalTally[$row['school_id']]['silver'] ?? 0,
-                    'bronze' => $medalTally[$row['school_id']]['bronze'] ?? 0,
-                ])
-                ->values()
-                ->all();
-        }
-
-        return [
-            'scoreboard' => $scoreboard,
-            'standingsPublished' => $isPublished,
-            'standingsProvisional' => $isAdminPreview,
-            'isAdminPreview' => $isAdminPreview,
-            // Same toggle as the TV screen's Overall Standings slide and the Scoreboard
-            // page's "All Categories" tab — when off, only the per-category links below
-            // stand in for standings here.
-            'showOverallStandings' => $event->tv_show_overall_standings ?? true,
-            'categoryLinks' => $categoryLinks,
-            'houseScoreboard' => $isPublished
-                ? $ctx->scoreboardByHouse()
-                : [],
-            'nowPerforming' => $nowPerforming,
-            'athleticRecords' => $this->publicAthleticRecords($event),
-            'recentBreaks' => $this->recentRecordBreaks($event, 5, $isAdminPreview),
-            'refreshedAt' => now()->toIso8601String(),
-        ];
+        return redirect()->route('tenant.fest.scoreboard', ['event' => $eventId], 301);
     }
 
     /** @return array<string, mixed> */
@@ -1724,40 +1599,6 @@ public function tv(Request $request, int $eventId)
         }
 
         return $category;
-    }
-
-    /**
-     * Gold/silver/bronze win-counts per school, keyed by school_id — same source marks
-     * tv() uses for its medal columns (top-3 marks, scoped to published items), pulled
-     * out here so livePayload() can show the same breakdown without duplicating the
-     * query inline a second time. Always feeds the combined "All Categories" board (the
-     * only board /live shows), so it honors excluded_overall_categories the same way
-     * that combined total already does — without this, an excluded category's podium
-     * finishes still showed up in gold/silver/bronze next to a Total Points that
-     * correctly left them out.
-     */
-    private function schoolMedalTally(FestEvent $event, array $eventIds): Collection
-    {
-        $excludedCategories = FestOverallCategoryExclusion::excluded($event->rootEvent());
-
-        return FestMark::whereIn('event_id', $eventIds)
-            ->whereIn('position', [1, 2, 3])
-            ->with(['participant.registration.item', 'item'])
-            // Unconditional: an item's own results_published_at is the only thing that
-            // makes its marks visible to the public — see the note on results()'s $marks
-            // query above.
-            ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
-            ->get()
-            ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
-            ->filter(fn (FestMark $m) => ! $excludedCategories
-                || ! in_array(FestOverallCategoryExclusion::categoryKeyForItem($event, $m->item), $excludedCategories, true))
-            ->unique(fn (FestMark $m) => $m->deduplicationKey())
-            ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
-            ->map(fn ($group) => [
-                'gold' => $group->where('position', 1)->count(),
-                'silver' => $group->where('position', 2)->count(),
-                'bronze' => $group->where('position', 3)->count(),
-            ]);
     }
 
     /**
@@ -1887,46 +1728,6 @@ public function tv(Request $request, int $eventId)
                 || $this->isAuthorizedAdminPreview($request, $leaf));
 
             foreach ($visibleLeaves as $leaf) {
-                $eventIds[] = $leaf->id;
-            }
-        }
-
-        return $eventIds ?: null;
-    }
-
-    /**
-     * The event_ids of every leaf across every phase up to and including $event's own
-     * phase (by sort_order) — the scope that FestCumulativeChampionshipService's
-     * FestPhaseScoreSnapshot.closing_points was built from (opening_points carries
-     * every earlier phase's total forward; see FestCumulativeChampionshipService::
-     * publicStanding()'s row mapping). Unlike crossPhaseVisibleEventIds(), this
-     * deliberately does NOT re-check each leaf's own results_published — the snapshot
-     * is an already-computed admin artifact, not something recomputed live per
-     * request, so matching its own scope means including every phase it drew from
-     * regardless of that phase's current public-visibility flag. Returns null when
-     * $event isn't a phase leaf at all.
-     *
-     * @return list<int>|null
-     */
-    private function cumulativeChampionshipEventIds(FestEvent $event): ?array
-    {
-        if (! $event->parent_event_id || ! $event->source_phase_id) {
-            return null;
-        }
-
-        $currentPhase = FestEventPhase::find($event->source_phase_id);
-        if (! $currentPhase) {
-            return null;
-        }
-
-        $hub = $event->rootEvent();
-        $phasesUpToCurrent = FestEventPhase::where('event_id', $hub->id)
-            ->where('sort_order', '<=', $currentPhase->sort_order)
-            ->get();
-
-        $eventIds = [];
-        foreach ($phasesUpToCurrent as $phase) {
-            foreach (FestEvent::where('parent_event_id', $hub->id)->where('source_phase_id', $phase->id)->get() as $leaf) {
                 $eventIds[] = $leaf->id;
             }
         }

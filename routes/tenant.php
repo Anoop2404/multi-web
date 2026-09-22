@@ -90,7 +90,6 @@ Route::middleware([
         Route::get('/{event}/tv', [FestPortalController::class, 'tv'])->name('tv');
         Route::get('/{event}/manual', [FestPortalController::class, 'manual'])->name('manual');
         Route::get('/{event}/live', [FestPortalController::class, 'live'])->name('live');
-        Route::get('/{event}/live/data', [FestPortalController::class, 'liveData'])->name('live.data');
         Route::get('/{event}/records', [FestPortalController::class, 'records'])->name('records');
         Route::get('/{event}/search', [FestPortalController::class, 'search'])->name('search');
         Route::get('/{event}/participant/{ref}', [FestPortalController::class, 'participant'])->name('participant');
