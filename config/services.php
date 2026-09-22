@@ -42,6 +42,7 @@ return [
     'pdf_converter' => [
         'url' => env('PDF_CONVERTER_URL'),
         'timeout' => env('PDF_CONVERTER_TIMEOUT', 300),
+        'connect_timeout' => env('PDF_CONVERTER_CONNECT_TIMEOUT', 15),
     ],
 
 ];

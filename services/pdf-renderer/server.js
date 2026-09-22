@@ -92,6 +92,9 @@ app.post('/render', async (req, res) => {
         landscape = false,
         printBackground = true,
         format = 'A4',
+        width,
+        height,
+        timeout = 120000,
         margin,
         displayHeaderFooter = false,
         headerTemplate,
@@ -112,6 +115,14 @@ app.post('/render', async (req, res) => {
         page.setDefaultNavigationTimeout(NAV_TIMEOUT_MS);
         await page.setViewport({ width: 1200, height: 1000 });
         await page.setContent(html, { waitUntil: 'networkidle0', timeout: NAV_TIMEOUT_MS });
+        // ID-card previews are regular screen HTML. Rendering the PDF with the same
+        // media type keeps typography, wrapping and gradients aligned with the preview.
+        await page.emulateMediaType('screen');
+        await page.evaluate(async () => {
+            if (document.fonts && document.fonts.ready) {
+                await document.fonts.ready;
+            }
+        });
 
         // Give the template's own client-side fit-text pass a chance to finish shrinking/
         // truncating overflowing fields before capture. Best-effort: a template with no
@@ -125,10 +136,18 @@ app.post('/render', async (req, res) => {
 
         const pdfOptions = {
             printBackground,
-            format,
             landscape,
             margin: margin || { top: '0', bottom: '0', left: '0', right: '0' },
+            preferCSSPageSize: true,
+            timeout: Math.max(1000, Number(timeout) || 120000),
         };
+
+        if (width && height) {
+            pdfOptions.width = width;
+            pdfOptions.height = height;
+        } else {
+            pdfOptions.format = format;
+        }
 
         if (displayHeaderFooter) {
             pdfOptions.displayHeaderFooter = true;

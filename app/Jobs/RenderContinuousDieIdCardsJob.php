@@ -143,6 +143,7 @@ class RenderContinuousDieIdCardsJob implements ShouldQueue
                     pageWidthMm: $customTemplate?->page_width_mm,
                     pageHeightMm: $customTemplate?->page_height_mm,
                     timeoutMs: 180000, // 3 minutes per 20-sheet chunk is more than enough
+                    requireBrowserRenderer: true,
                 );
 
                 if (empty($chunkPdf)) {

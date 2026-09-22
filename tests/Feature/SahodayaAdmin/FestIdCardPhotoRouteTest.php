@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\Events\FestIdCardService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -30,6 +31,16 @@ class FestIdCardPhotoRouteTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        config(['services.pdf_converter.url' => 'https://pdf.example.test/render']);
+        Http::fake([
+            'https://pdf.example.test/render' => Http::response(
+                '%PDF-browser-rendered',
+                200,
+                ['Content-Type' => 'application/pdf'],
+            ),
+        ]);
+
         $this->seed(RolesAndPermissionsSeeder::class);
 
         $this->sahodaya = Tenant::create([

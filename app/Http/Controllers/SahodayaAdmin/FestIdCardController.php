@@ -127,7 +127,6 @@ class FestIdCardController extends SahodayaAdminController
             default => $data['audience'],
         };
 
-        $isDomPdf = empty(config('services.pdf_converter.url'));
         $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
             $targetEvent,
             $this->sahodaya,
@@ -136,7 +135,7 @@ class FestIdCardController extends SahodayaAdminController
             false,
             null,
             $customTemplate,
-            $isDomPdf,
+            true,
         ))->render();
 
         return \App\Support\PdfGenerator::download(
@@ -145,6 +144,7 @@ class FestIdCardController extends SahodayaAdminController
             isLandscape: true,
             pageWidthMm: $customTemplate?->page_width_mm,
             pageHeightMm: $customTemplate?->page_height_mm,
+            requireBrowserRenderer: true,
         );
     }
 
@@ -182,7 +182,6 @@ class FestIdCardController extends SahodayaAdminController
 
         $slug = str($targetEvent->title)->slug('-');
 
-        $isDomPdf = empty(config('services.pdf_converter.url'));
         $cards = collect($sections)->flatMap(fn($section) => $section['cards'])->values()->all();
         
         $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
@@ -193,7 +192,7 @@ class FestIdCardController extends SahodayaAdminController
             false,
             null,
             $customTemplate,
-            $isDomPdf,
+            true,
         ))->render();
 
         return \App\Support\PdfGenerator::download(
@@ -202,6 +201,7 @@ class FestIdCardController extends SahodayaAdminController
             isLandscape: true,
             pageWidthMm: $customTemplate?->page_width_mm,
             pageHeightMm: $customTemplate?->page_height_mm,
+            requireBrowserRenderer: true,
         );
     }
 
@@ -244,7 +244,6 @@ class FestIdCardController extends SahodayaAdminController
 
         $slug = str($targetEvent->title)->slug('-');
 
-        $isDomPdf = empty(config('services.pdf_converter.url'));
         $cards = collect($sections)->flatMap(fn($section) => $section['cards'])->values()->all();
 
         $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
@@ -255,7 +254,7 @@ class FestIdCardController extends SahodayaAdminController
             false,
             null,
             $customTemplate,
-            $isDomPdf,
+            true,
         ))->render();
 
         return \App\Support\PdfGenerator::download(
@@ -264,6 +263,7 @@ class FestIdCardController extends SahodayaAdminController
             isLandscape: true,
             pageWidthMm: $customTemplate?->page_width_mm,
             pageHeightMm: $customTemplate?->page_height_mm,
+            requireBrowserRenderer: true,
         );
     }
 
@@ -297,7 +297,6 @@ class FestIdCardController extends SahodayaAdminController
         ]);
 
         $slug = str($targetEvent->title)->slug('-');
-        $isDomPdf = empty(config('services.pdf_converter.url'));
         $cards = collect($sections)->flatMap(fn ($section) => $section['cards'])->values()->all();
 
         $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
@@ -308,7 +307,7 @@ class FestIdCardController extends SahodayaAdminController
             false,
             $sections,
             $customTemplate,
-            $isDomPdf,
+            true,
         ))->render();
 
         return \App\Support\PdfGenerator::download(
@@ -317,6 +316,7 @@ class FestIdCardController extends SahodayaAdminController
             isLandscape: true,
             pageWidthMm: $customTemplate?->page_width_mm,
             pageHeightMm: $customTemplate?->page_height_mm,
+            requireBrowserRenderer: true,
         );
     }
 
@@ -654,7 +654,6 @@ class FestIdCardController extends SahodayaAdminController
             ? ('school-' . ($sections[0]['school_code'] ?? 'die'))
             : ($request->filled('volume') ? ('volume-' . $request->input('volume')) : 'die-all');
 
-        $isDomPdf = empty(config('services.pdf_converter.url'));
         $cards = collect($sections)->flatMap(fn ($section) => $section['cards'])->values()->all();
 
         $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
@@ -665,7 +664,7 @@ class FestIdCardController extends SahodayaAdminController
             false,
             $sections,
             $customTemplate,
-            $isDomPdf,
+            true,
         ))->render();
 
         return \App\Support\PdfGenerator::download(
@@ -675,6 +674,7 @@ class FestIdCardController extends SahodayaAdminController
             isLandscape: true,
             pageWidthMm: $customTemplate?->page_width_mm,
             pageHeightMm: $customTemplate?->page_height_mm,
+            requireBrowserRenderer: true,
         );
     }
 

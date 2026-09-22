@@ -9,7 +9,7 @@ use App\Models\Student;
 use App\Models\Tenant;
 use App\Services\Events\FestIdCardService;
 use App\Services\School\SchoolDocumentDownloadGateService;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Support\PdfGenerator;
 use Illuminate\Http\Request;
 
 trait DownloadsStudentFestIdCard
@@ -99,18 +99,18 @@ trait DownloadsStudentFestIdCard
         $filename = "{$slug}-{$regSlug}-id-card.pdf";
         $customTemplate = $this->resolveCustomIdCardTemplate($event, $filters['item_id'] ?? null, 'student');
 
-        $isDomPdf = empty(config('services.pdf_converter.url'));
         $html = view(
             $this->idCardSheetView($request, $customTemplate),
-            $this->idCardViewData($event, $cluster, $cards, 'student', false, null, $customTemplate, $isDomPdf),
+            $this->idCardViewData($event, $cluster, $cards, 'student', false, null, $customTemplate, true),
         )->render();
 
-        return \App\Support\PdfGenerator::download(
+        return PdfGenerator::download(
             $html,
             $filename,
             $request->boolean('inline'),
             pageWidthMm: $customTemplate?->page_width_mm,
             pageHeightMm: $customTemplate?->page_height_mm,
+            requireBrowserRenderer: true,
         );
     }
 }

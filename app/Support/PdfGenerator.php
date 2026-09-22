@@ -2,38 +2,39 @@
 
 namespace App\Support;
 
-use Illuminate\Support\Facades\Http;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class PdfGenerator
 {
     /**
      * @param  ?string  $headerTemplate  Puppeteer header/footer templates are rendered
-     *                                    by Chromium's own print pipeline, isolated from
-     *                                    the page content — a self-contained HTML
-     *                                    fragment with inline styles (external/page
-     *                                    stylesheets don't apply). Supports the special
-     *                                    classes `pageNumber`/`totalPages`/`date`/`title`/
-     *                                    `url`, which Chromium fills in automatically.
-     *                                    This is the one repeat-per-page mechanism that's
-     *                                    actually native to the renderer, rather than a
-     *                                    CSS trick layered on top of the page content.
-     *                                    Only used when PDF_CONVERTER_URL (the external
-     *                                    Chromium/Puppeteer service) is active; ignored
-     *                                    on the dompdf fallback.
+     *                                   by Chromium's own print pipeline, isolated from
+     *                                   the page content — a self-contained HTML
+     *                                   fragment with inline styles (external/page
+     *                                   stylesheets don't apply). Supports the special
+     *                                   classes `pageNumber`/`totalPages`/`date`/`title`/
+     *                                   `url`, which Chromium fills in automatically.
+     *                                   This is the one repeat-per-page mechanism that's
+     *                                   actually native to the renderer, rather than a
+     *                                   CSS trick layered on top of the page content.
+     *                                   Only used when PDF_CONVERTER_URL (the external
+     *                                   Chromium/Puppeteer service) is active; ignored
+     *                                   on the dompdf fallback.
      * @param  ?string  $footerTemplate  Same rules as $headerTemplate.
      * @param  ?array{top?: string, right?: string, bottom?: string, left?: string}  $margin
-     *                                    Page margins as CSS length strings (e.g. "70px").
-     *                                    Needs to be large enough to fit the header/footer
-     *                                    templates when those are supplied — Chromium
-     *                                    reserves exactly this much space for them and
-     *                                    won't let page content overlap it.
-     * @param  ?float  $pageWidthMm      Custom physical page size — already oriented (the
-     *                                    wider figure for landscape), overriding the A4
-     *                                    default. Both this and $pageHeightMm must be set
-     *                                    together; $isLandscape is ignored when they are,
-     *                                    since the dimensions already encode orientation.
-     * @param  ?float  $pageHeightMm     See $pageWidthMm.
+     *                                                                                        Page margins as CSS length strings (e.g. "70px").
+     *                                                                                        Needs to be large enough to fit the header/footer
+     *                                                                                        templates when those are supplied — Chromium
+     *                                                                                        reserves exactly this much space for them and
+     *                                                                                        won't let page content overlap it.
+     * @param  ?float  $pageWidthMm  Custom physical page size — already oriented (the
+     *                               wider figure for landscape), overriding the A4
+     *                               default. Both this and $pageHeightMm must be set
+     *                               together; $isLandscape is ignored when they are,
+     *                               since the dimensions already encode orientation.
+     * @param  ?float  $pageHeightMm  See $pageWidthMm.
      */
     public static function download(
         string $html,
@@ -45,26 +46,28 @@ class PdfGenerator
         ?array $margin = null,
         ?float $pageWidthMm = null,
         ?float $pageHeightMm = null,
+        bool $requireBrowserRenderer = false,
     ) {
         $url = self::resolveConverterUrl(config('services.pdf_converter.url'));
         $hasCustomSize = $pageWidthMm && $pageHeightMm;
+        $browserFailure = $url ? null : 'The browser PDF converter is not configured.';
 
         if ($url) {
             $hasHeaderFooter = $headerTemplate !== null || $footerTemplate !== null;
             $resolvedMargin = $margin ?? ['top' => '0', 'bottom' => '0', 'left' => '0', 'right' => '0'];
 
             $payload = [
-                'html'            => $html,
+                'html' => $html,
                 'printBackground' => true,
-                'timeout'         => 120000,
+                'timeout' => 120000,
                 // Sent both nested (spec-correct Puppeteer shape) and flat/mm (this
                 // deployment's chrome-print-server.js reads marginTop/Right/Bottom/Left as
                 // plain numbers, not the nested object) -- see marginToMm()'s docblock.
-                'margin'          => $resolvedMargin,
-                'marginTop'       => self::marginToMm($resolvedMargin['top'] ?? 0),
-                'marginRight'     => self::marginToMm($resolvedMargin['right'] ?? 0),
-                'marginBottom'    => self::marginToMm($resolvedMargin['bottom'] ?? 0),
-                'marginLeft'      => self::marginToMm($resolvedMargin['left'] ?? 0),
+                'margin' => $resolvedMargin,
+                'marginTop' => self::marginToMm($resolvedMargin['top'] ?? 0),
+                'marginRight' => self::marginToMm($resolvedMargin['right'] ?? 0),
+                'marginBottom' => self::marginToMm($resolvedMargin['bottom'] ?? 0),
+                'marginLeft' => self::marginToMm($resolvedMargin['left'] ?? 0),
             ];
 
             if ($hasCustomSize) {
@@ -82,7 +85,7 @@ class PdfGenerator
             }
 
             try {
-                $response = Http::connectTimeout(3)
+                $response = Http::connectTimeout((int) config('services.pdf_converter.connect_timeout', 15))
                     ->timeout((int) config('services.pdf_converter.timeout', 300))
                     ->post($url, $payload);
 
@@ -92,7 +95,7 @@ class PdfGenerator
                             echo $response->body();
                         }, 200, [
                             'Content-Type' => 'application/pdf',
-                            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+                            'Content-Disposition' => 'inline; filename="'.$filename.'"',
                         ]);
                     }
 
@@ -100,9 +103,17 @@ class PdfGenerator
                         echo $response->body();
                     }, $filename, ['Content-Type' => 'application/pdf']);
                 }
+
+                $browserFailure = 'The browser PDF converter returned HTTP '.$response->status().'.';
+                Log::warning($browserFailure);
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('External PDF generation failed, falling back to DomPDF: ' . $e->getMessage());
+                $browserFailure = 'The browser PDF converter could not be reached: '.$e->getMessage();
+                Log::warning($browserFailure);
             }
+        }
+
+        if ($requireBrowserRenderer) {
+            throw new \RuntimeException($browserFailure ?? 'Browser PDF generation failed.');
         }
 
         // Fallback to DomPDF
@@ -155,23 +166,25 @@ class PdfGenerator
         ?float $pageWidthMm = null,
         ?float $pageHeightMm = null,
         int $timeoutMs = 300000,
+        bool $requireBrowserRenderer = false,
     ): string {
         $url = self::resolveConverterUrl(config('services.pdf_converter.url'));
         $hasCustomSize = $pageWidthMm && $pageHeightMm;
+        $browserFailure = $url ? null : 'The browser PDF converter is not configured.';
 
         if ($url) {
             $hasHeaderFooter = $headerTemplate !== null || $footerTemplate !== null;
             $resolvedMargin = $margin ?? ['top' => '0', 'bottom' => '0', 'left' => '0', 'right' => '0'];
 
             $payload = [
-                'html'            => $html,
+                'html' => $html,
                 'printBackground' => true,
-                'timeout'         => $timeoutMs,
-                'margin'          => $resolvedMargin,
-                'marginTop'       => self::marginToMm($resolvedMargin['top'] ?? 0),
-                'marginRight'     => self::marginToMm($resolvedMargin['right'] ?? 0),
-                'marginBottom'    => self::marginToMm($resolvedMargin['bottom'] ?? 0),
-                'marginLeft'      => self::marginToMm($resolvedMargin['left'] ?? 0),
+                'timeout' => $timeoutMs,
+                'margin' => $resolvedMargin,
+                'marginTop' => self::marginToMm($resolvedMargin['top'] ?? 0),
+                'marginRight' => self::marginToMm($resolvedMargin['right'] ?? 0),
+                'marginBottom' => self::marginToMm($resolvedMargin['bottom'] ?? 0),
+                'marginLeft' => self::marginToMm($resolvedMargin['left'] ?? 0),
             ];
 
             if ($hasCustomSize) {
@@ -190,7 +203,7 @@ class PdfGenerator
 
             try {
                 $httpTimeout = (int) max(config('services.pdf_converter.timeout', 300), ceil($timeoutMs / 1000) + 30);
-                $response = Http::connectTimeout(3)
+                $response = Http::connectTimeout((int) config('services.pdf_converter.connect_timeout', 15))
                     ->timeout($httpTimeout)
                     ->post($url, $payload);
 
@@ -198,10 +211,16 @@ class PdfGenerator
                     return $response->body();
                 }
 
-                \Illuminate\Support\Facades\Log::warning('External PDF generation failed with status ' . $response->status() . ', falling back to DomPDF');
+                $browserFailure = 'The browser PDF converter returned HTTP '.$response->status().'.';
+                Log::warning($browserFailure);
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('External PDF render failed, falling back to DomPDF: ' . $e->getMessage());
+                $browserFailure = 'The browser PDF converter could not be reached: '.$e->getMessage();
+                Log::warning($browserFailure);
             }
+        }
+
+        if ($requireBrowserRenderer) {
+            throw new \RuntimeException($browserFailure ?? 'Browser PDF generation failed.');
         }
 
         // Fallback to DomPDF
@@ -285,7 +304,7 @@ class PdfGenerator
         $path = parse_url($trimmed, PHP_URL_PATH);
 
         if ($path === null || $path === '' || $path === '/') {
-            return rtrim($trimmed, '/') . '/generate-pdf';
+            return rtrim($trimmed, '/').'/generate-pdf';
         }
 
         return $trimmed;
