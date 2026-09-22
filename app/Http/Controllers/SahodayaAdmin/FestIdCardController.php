@@ -470,26 +470,78 @@ class FestIdCardController extends SahodayaAdminController
 
         $targetEvent = $this->regionAwareTargetEvent($request, $event);
         $inline = $request->boolean('preview');
-        $s3Path = "sahodaya/{$this->sahodaya->id}/events/{$targetEvent->id}/id-cards/die/full-continuous-run.pdf";
-        $disk = \App\Support\TenantStorage::uploadDisk();
+        $settingKey = "fest_die_render_event_{$targetEvent->id}";
+        $state = \App\Models\TenantSetting::where('tenant_id', $this->sahodaya->id)
+            ->where('key', $settingKey)
+            ->value('value');
 
-        if (\App\Support\TenantStorage::disk($disk)->exists($s3Path)) {
-            $slug = str($targetEvent->title)->slug('-');
-            $filename = "{$slug}-continuous-master-id-cards.pdf";
+        $relativePath = ltrim($state['file_path'] ?? "sahodaya/{$this->sahodaya->id}/events/{$targetEvent->id}/id-cards/die/full-continuous-run.pdf", '/');
+        $slug = str($targetEvent->title)->slug('-');
+        $filename = "{$slug}-continuous-master-id-cards.pdf";
 
-            return response()->stream(function () use ($s3Path, $disk) {
-                $stream = \App\Support\TenantStorage::disk($disk)->readStream($s3Path);
-                if (is_resource($stream)) {
-                    fpassthru($stream);
-                    fclose($stream);
-                } else {
-                    echo \App\Support\TenantStorage::disk($disk)->get($s3Path);
+        // Try S3 first if configured — redirecting directly to AWS S3 delivers the fastest download with zero server memory overhead
+        if (\App\Support\TenantStorage::isS3Configured()) {
+            try {
+                if (\Illuminate\Support\Facades\Storage::disk('s3')->exists($relativePath)) {
+                    $disposition = ($inline ? 'inline' : 'attachment') . '; filename="' . $filename . '"';
+                    $s3Url = \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl(
+                        $relativePath,
+                        now()->addHours(2),
+                        ['ResponseContentDisposition' => $disposition]
+                    );
+
+                    return redirect()->away($s3Url);
                 }
-            }, 200, [
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed generating S3 temporaryUrl for continuous die PDF: '.$e->getMessage());
+            }
+        }
+
+        // Try across candidate disks
+        $candidateDisks = array_values(array_unique(array_filter([
+            \App\Support\TenantStorage::uploadDisk(),
+            's3',
+            \App\Support\TenantStorage::SHARED_DISK,
+            'local',
+            'public',
+        ])));
+
+        foreach ($candidateDisks as $diskName) {
+            try {
+                $storage = \Illuminate\Support\Facades\Storage::disk($diskName);
+                if ($storage->exists($relativePath)) {
+                    return response()->stream(function () use ($storage, $relativePath) {
+                        $stream = $storage->readStream($relativePath);
+                        if (is_resource($stream)) {
+                            fpassthru($stream);
+                            fclose($stream);
+                        } else {
+                            echo $storage->get($relativePath);
+                        }
+                    }, 200, [
+                        'Content-Type'        => 'application/pdf',
+                        'Content-Disposition' => ($inline ? 'inline' : 'attachment') . '; filename="' . $filename . '"',
+                    ]);
+                }
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        $localPath = storage_path('app/shared/' . $relativePath);
+        if (file_exists($localPath)) {
+            return response()->file($localPath, [
                 'Content-Type'        => 'application/pdf',
                 'Content-Disposition' => ($inline ? 'inline' : 'attachment') . '; filename="' . $filename . '"',
             ]);
         }
+
+        \Illuminate\Support\Facades\Log::error("Continuous Die PDF not found on any disk: {$relativePath}", [
+            'tenant'     => $this->sahodaya->id,
+            'event'      => $targetEvent->id,
+            'state'      => $state,
+            'triedDisks' => $candidateDisks,
+        ]);
 
         abort(404, 'Master PDF has not been generated yet. Please generate it from the Die Generator page.');
     }

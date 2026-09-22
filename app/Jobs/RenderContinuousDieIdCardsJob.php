@@ -164,9 +164,21 @@ class RenderContinuousDieIdCardsJob implements ShouldQueue
                 $finalPdfBytes = $this->mergePdfChunks($pdfChunksBytes);
             }
 
-            $disk = TenantStorage::uploadDisk();
             $s3Path = "sahodaya/{$tenant->id}/events/{$event->id}/id-cards/die/full-continuous-run.pdf";
-            TenantStorage::disk($disk)->put($s3Path, $finalPdfBytes, 'public');
+
+            if (TenantStorage::isS3Configured()) {
+                try {
+                    Storage::disk('s3')->put($s3Path, $finalPdfBytes, 'public');
+                } catch (\Throwable $e) {
+                    Log::warning('Failed saving continuous die PDF to S3: '.$e->getMessage());
+                }
+            }
+
+            try {
+                TenantStorage::disk()->put($s3Path, $finalPdfBytes, 'public');
+            } catch (\Throwable $e) {
+                Log::warning('Failed saving continuous die PDF to upload disk: '.$e->getMessage());
+            }
 
             $sizeBytes = strlen($finalPdfBytes);
             $sizeFormatted = round($sizeBytes / (1024 * 1024), 2).' MB';
