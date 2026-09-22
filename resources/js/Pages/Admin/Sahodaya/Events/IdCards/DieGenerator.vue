@@ -58,6 +58,96 @@
             </div>
         </div>
 
+        <!-- Zero-Waste Continuous Master PDF (Queue-Rendered to AWS S3) -->
+        <div class="card mb-6 border-2 border-emerald-300 bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-950 text-white shadow-lg overflow-hidden">
+            <div class="p-5 flex flex-wrap items-center justify-between gap-4 border-b border-emerald-800/40">
+                <div class="space-y-1">
+                    <div class="flex items-center gap-2">
+                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                            Zero-Waste Continuous Flow
+                        </span>
+                        <!-- Status Badge -->
+                        <span v-if="continuousStatus === 'completed'" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500 text-slate-950 flex items-center gap-1.5 shadow-sm">
+                            <span class="w-1.5 h-1.5 rounded-full bg-slate-950"></span>
+                            Ready in AWS S3
+                        </span>
+                        <span v-else-if="continuousStatus === 'rendering'" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-500 text-white flex items-center gap-1.5 shadow-sm animate-pulse">
+                            <svg class="animate-spin -ml-0.5 mr-1 h-3 w-3 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            Rendering in Queue...
+                        </span>
+                        <span v-else-if="continuousStatus === 'queued'" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-400 text-slate-950 flex items-center gap-1.5 shadow-sm">
+                            Queued in Background
+                        </span>
+                        <span v-else-if="continuousStatus === 'failed'" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500 text-white flex items-center gap-1.5 shadow-sm">
+                            Failed (Click to Retry)
+                        </span>
+                        <span v-else class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                            Not Generated Yet
+                        </span>
+                    </div>
+                    <h2 class="text-lg font-black tracking-tight text-white">
+                        Full Event Master PDF (Zero Die Waste)
+                    </h2>
+                    <p class="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                        Packs all students continuously without empty padding gaps between schools. Eliminates wasted die slots on paper and merges all {{ totalParticipants.toLocaleString() }} students into a single master PDF stored on AWS S3.
+                    </p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" @click="triggerContinuousRender"
+                            :disabled="isRenderingOrQueued || isTriggeringRender"
+                            class="btn-primary text-xs !py-2.5 !px-4 flex items-center gap-2 !bg-emerald-500 hover:!bg-emerald-600 !text-slate-950 font-bold disabled:opacity-50 transition shadow">
+                        <svg v-if="!isRenderingOrQueued" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+                        <span v-if="continuousStatus === 'completed'">Regenerate Master PDF</span>
+                        <span v-else-if="isRenderingOrQueued">Rendering in Queue...</span>
+                        <span v-else>Generate Master PDF (Queue)</span>
+                    </button>
+
+                    <template v-if="continuousStatus === 'completed'">
+                        <a :href="continuousPreviewUrl" target="_blank" rel="noopener"
+                           class="btn-secondary !bg-white/10 hover:!bg-white/20 !text-white !border-white/20 text-xs !py-2.5 !px-3.5 flex items-center gap-1.5 transition">
+                            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            Preview PDF
+                        </a>
+                        <a :href="continuousDownloadUrl"
+                           class="btn-secondary !bg-white !text-slate-950 hover:!bg-slate-100 !border-transparent text-xs !py-2.5 !px-4 flex items-center gap-1.5 font-bold shadow transition">
+                            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                            Download Master PDF (Instant)
+                        </a>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="px-5 py-3.5 bg-black/30 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                <div>
+                    <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Total Students</span>
+                    <strong class="text-sm text-white">{{ totalParticipants.toLocaleString() }} students</strong>
+                </div>
+                <div>
+                    <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Continuous Sheets</span>
+                    <strong class="text-sm text-emerald-400">
+                        {{ continuousEstimatedSheets }} sheets
+                        <span v-if="totalEstimatedPages > continuousEstimatedSheets" class="text-[10px] text-emerald-300 font-normal">
+                            (saves {{ totalEstimatedPages - continuousEstimatedSheets }} sheets!)
+                        </span>
+                    </strong>
+                </div>
+                <div>
+                    <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">File Size</span>
+                    <strong class="text-sm text-white">{{ continuousState.file_size_formatted || '—' }}</strong>
+                </div>
+                <div>
+                    <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Last Rendered</span>
+                    <strong class="text-sm text-amber-300">{{ continuousState.rendered_at_human || 'Never' }}</strong>
+                </div>
+            </div>
+            
+            <div v-if="continuousStatus === 'failed'" class="px-5 py-2.5 bg-rose-950/80 border-t border-rose-800 text-xs text-rose-200">
+                Render error: {{ continuousState.error || 'Failed during PDF layout. Please try regenerating.' }}
+            </div>
+        </div>
+
         <!-- Volume Downloads for 500-1000 Pages -->
         <div class="card mb-6 border-2 border-indigo-100 shadow-sm overflow-hidden">
             <div class="p-5 bg-gradient-to-r from-indigo-900 to-slate-900 text-white flex flex-wrap items-center justify-between gap-4">
@@ -303,7 +393,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import PageHeader from '@/Components/ui/PageHeader.vue';
@@ -328,11 +418,64 @@ const props = defineProps({
     previewCards: { type: Array, default: () => [] },
     previewSchoolName: { type: String, default: null },
     activityLogs: { type: Array, default: () => [] },
+    continuousRenderState: { type: Object, default: null },
+    continuousEstimatedSheets: { type: Number, default: 0 },
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/id-cards`;
 const standardIdCardsUrl = base;
 const templatesUrl = `/sahodaya-admin/${props.sahodaya.id}/id-card-templates`;
+
+const continuousState = ref(props.continuousRenderState || { status: 'idle' });
+const isTriggeringRender = ref(false);
+let pollTimer = null;
+
+const continuousStatus = computed(() => continuousState.value?.status || 'idle');
+const isRenderingOrQueued = computed(() => ['queued', 'rendering'].includes(continuousStatus.value));
+const continuousPreviewUrl = computed(() => `${base}/die/continuous-pdf?preview=1`);
+const continuousDownloadUrl = computed(() => `${base}/die/continuous-pdf`);
+
+async function triggerContinuousRender() {
+    if (isRenderingOrQueued.value || isTriggeringRender.value) return;
+    isTriggeringRender.value = true;
+    try {
+        const res = await window.axios.post(`${base}/die/render-continuous`);
+        if (res.data?.success) {
+            continuousState.value = { ...continuousState.value, status: 'queued', error: null };
+            startPolling();
+        }
+    } catch (e) {
+        alert(e.response?.data?.message || 'Failed to dispatch render job.');
+    } finally {
+        isTriggeringRender.value = false;
+    }
+}
+
+async function checkContinuousStatus() {
+    try {
+        const res = await window.axios.get(`${base}/die/continuous-status`);
+        if (res.data?.state) {
+            continuousState.value = res.data.state;
+            if (!['queued', 'rendering'].includes(continuousState.value.status)) {
+                stopPolling();
+            }
+        }
+    } catch (e) {
+        // ignore network hiccups
+    }
+}
+
+function startPolling() {
+    stopPolling();
+    pollTimer = setInterval(checkContinuousStatus, 3000);
+}
+
+function stopPolling() {
+    if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+    }
+}
 
 const schoolSearch = ref('');
 const selectedSchoolId = ref(props.schools[0]?.school_id || '');
@@ -405,6 +548,13 @@ onMounted(() => {
     if (activePreviewCards.value.length === 0 && selectedSchoolId.value) {
         loadSchoolPreview();
     }
+    if (isRenderingOrQueued.value) {
+        startPolling();
+    }
+});
+
+onUnmounted(() => {
+    stopPolling();
 });
 
 function volumeDownloadUrl(vol) {

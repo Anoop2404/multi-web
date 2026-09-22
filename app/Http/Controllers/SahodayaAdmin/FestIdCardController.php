@@ -415,9 +415,82 @@ class FestIdCardController extends SahodayaAdminController
                     ? TenantStorage::logoUrl($this->sahodaya, $customTemplate->background_path)
                     : null,
             ] : null,
-            'previewCards'        => $sampleCards,
-            'previewSchoolName'   => $firstSchool['school_name'] ?? null,
+            'previewCards'              => $sampleCards,
+            'previewSchoolName'         => $firstSchool['school_name'] ?? null,
+            'continuousRenderState'     => \App\Models\TenantSetting::where('tenant_id', $this->sahodaya->id)
+                ->where('key', "fest_die_render_event_{$targetEvent->id}")
+                ->value('value'),
+            'continuousEstimatedSheets' => (int) ceil($totalParticipants / $perPage),
         ]));
+    }
+
+    public function dispatchContinuousRender(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+        $settingKey = "fest_die_render_event_{$targetEvent->id}";
+
+        \App\Models\TenantSetting::updateOrCreate(
+            ['tenant_id' => $this->sahodaya->id, 'key' => $settingKey],
+            ['value' => [
+                'status'    => 'queued',
+                'queued_at' => now()->toIso8601String(),
+                'error'     => null,
+            ]]
+        );
+
+        \App\Jobs\RenderContinuousDieIdCardsJob::dispatch($this->sahodaya->id, $targetEvent->id);
+
+        return response()->json([
+            'success' => true,
+            'status'  => 'queued',
+            'message' => 'Continuous master PDF render dispatched to queue.',
+        ]);
+    }
+
+    public function continuousRenderStatus(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+        $settingKey = "fest_die_render_event_{$targetEvent->id}";
+        $state = \App\Models\TenantSetting::where('tenant_id', $this->sahodaya->id)
+            ->where('key', $settingKey)
+            ->value('value');
+
+        return response()->json([
+            'state' => $state ?: ['status' => 'idle'],
+        ]);
+    }
+
+    public function downloadContinuousPdf(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+        $inline = $request->boolean('preview');
+        $s3Path = "sahodaya/{$this->sahodaya->id}/events/{$targetEvent->id}/id-cards/die/full-continuous-run.pdf";
+
+        if (\App\Support\TenantStorage::disk('s3')->exists($s3Path)) {
+            $slug = str($targetEvent->title)->slug('-');
+            $filename = "{$slug}-continuous-master-id-cards.pdf";
+
+            return response()->stream(function () use ($s3Path) {
+                $stream = \App\Support\TenantStorage::disk('s3')->readStream($s3Path);
+                if (is_resource($stream)) {
+                    fpassthru($stream);
+                    fclose($stream);
+                } else {
+                    echo \App\Support\TenantStorage::disk('s3')->get($s3Path);
+                }
+            }, 200, [
+                'Content-Type'        => 'application/pdf',
+                'Content-Disposition' => ($inline ? 'inline' : 'attachment') . '; filename="' . $filename . '"',
+            ]);
+        }
+
+        abort(404, 'Master PDF has not been generated yet. Please generate it from the Die Generator page.');
     }
 
     public function pdfDie(Request $request, string $tenantId, FestEvent $event, FestIdCardService $service, PlatformAuditLogger $audit)

@@ -154,6 +154,7 @@ class PdfGenerator
         ?array $margin = null,
         ?float $pageWidthMm = null,
         ?float $pageHeightMm = null,
+        int $timeoutMs = 300000,
     ): string {
         $url = self::resolveConverterUrl(config('services.pdf_converter.url'));
         $hasCustomSize = $pageWidthMm && $pageHeightMm;
@@ -165,7 +166,7 @@ class PdfGenerator
             $payload = [
                 'html'            => $html,
                 'printBackground' => true,
-                'timeout'         => 120000,
+                'timeout'         => $timeoutMs,
                 'margin'          => $resolvedMargin,
                 'marginTop'       => self::marginToMm($resolvedMargin['top'] ?? 0),
                 'marginRight'     => self::marginToMm($resolvedMargin['right'] ?? 0),
@@ -188,8 +189,9 @@ class PdfGenerator
             }
 
             try {
+                $httpTimeout = (int) max(config('services.pdf_converter.timeout', 300), ceil($timeoutMs / 1000) + 30);
                 $response = Http::connectTimeout(3)
-                    ->timeout((int) config('services.pdf_converter.timeout', 300))
+                    ->timeout($httpTimeout)
                     ->post($url, $payload);
 
                 if ($response->successful()) {
