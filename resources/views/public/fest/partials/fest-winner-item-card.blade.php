@@ -1,11 +1,22 @@
 <article class="rounded-2xl bg-slate-900 border border-slate-800 shadow-md overflow-hidden">
     <div class="px-4 py-2.5 bg-white/5 border-b border-slate-800">
         <p class="font-bold text-white text-sm uppercase">{{ $itemGroup['item'] }}</p>
-        {{-- Category + gender disambiguate items that share the same title across
-             different categories/genders (e.g. "Extempore - English" run separately for
-             Category 1 Boys and Category 3 Girls). --}}
-        @if(($itemGroup['category_label'] ?? null) || ($itemGroup['gender_label'] ?? null))
-        <p class="text-[11px] text-amber-300/80 font-semibold">{{ collect([$itemGroup['category_label'] ?? null, $itemGroup['gender_label'] ?? null])->filter()->implode(' · ') }}</p>
+        {{-- Category + gender + individual/group disambiguate items that share the
+             same title across different categories/genders/modes (e.g. "Extempore -
+             English" run separately for Category 1 Boys and Category 3 Girls) and
+             show at a glance whether this is a solo or team result. --}}
+        @if(($itemGroup['category_label'] ?? null) || ($itemGroup['gender_label'] ?? null) || ($itemGroup['participant_type'] ?? null))
+        <div class="flex flex-wrap gap-1 mt-1">
+            @if($itemGroup['category_label'] ?? null)
+            <span class="rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-300 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5">{{ $itemGroup['category_label'] }}</span>
+            @endif
+            @if($itemGroup['gender_label'] ?? null)
+            <span class="rounded-full border border-slate-700 bg-white/5 text-slate-300 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5">{{ $itemGroup['gender_label'] }}</span>
+            @endif
+            @if($itemGroup['participant_type'] ?? null)
+            <span class="rounded-full border border-sky-500/30 bg-sky-500/10 text-sky-300 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5">{{ $itemGroup['participant_type'] }}</span>
+            @endif
+        </div>
         @endif
         @if($itemGroup['head'])<p class="text-[11px] text-white/40">{{ $itemGroup['head'] }}</p>@endif
     </div>
