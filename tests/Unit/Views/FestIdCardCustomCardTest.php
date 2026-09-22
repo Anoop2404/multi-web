@@ -6,6 +6,26 @@ use Tests\TestCase;
 
 class FestIdCardCustomCardTest extends TestCase
 {
+    public function test_gradient_shape_keeps_a_solid_background_fallback_for_pdf_rendering(): void
+    {
+        $html = view('fest.id-cards.partials.custom-card', [
+            'cardWidthMm' => 90,
+            'cardHeightMm' => 135,
+            'backgroundUrl' => null,
+            'card' => [],
+            'fields' => [[
+                'key' => 'ribbon_shape',
+                'type' => 'shape',
+                'gradient_from' => '#e2b916',
+                'gradient_to' => '#ca08e3',
+            ]],
+        ])->render();
+
+        $this->assertStringContainsString('background-color:#ca08e3', $html);
+        $this->assertStringContainsString('background-image:linear-gradient(to right, #e2b916, #ca08e3)', $html);
+        $this->assertStringNotContainsString('background:linear-gradient', $html);
+    }
+
     public function test_dynamic_text_format_combines_editable_labels_and_card_values(): void
     {
         $html = view('fest.id-cards.partials.custom-card', [

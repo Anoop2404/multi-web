@@ -84,14 +84,17 @@
             @endif
         @elseif($type === 'shape')
             @php
-                $bg = !empty($field['gradient_from']) && !empty($field['gradient_to'])
-                    ? 'linear-gradient(to right, '.$field['gradient_from'].', '.$field['gradient_to'].')'
-                    : ($field['color'] ?? '#DCEBFB');
+                $hasGradient = !empty($field['gradient_from']) && !empty($field['gradient_to']);
+                // Dompdf does not paint CSS gradients. Keep a solid fallback behind the
+                // browser gradient so ribbons remain visible in downloaded PDFs.
+                $solidBg = $field['color'] ?? $field['gradient_to'] ?? $field['gradient_from'] ?? '#DCEBFB';
             @endphp
             <div class="card__shape" style="
                 top:{{ $field['top'] ?? 0 }}%; left:{{ $field['left'] ?? 0 }}%;
                 width:{{ $field['width'] ?? 20 }}%; height:{{ $field['height'] ?? 10 }}%;
-                border-radius:{{ $field['radius'] ?? 0 }}mm; background:{{ $bg }};
+                border-radius:{{ $field['radius'] ?? 0 }}mm;
+                background-color:{{ $solidBg }};
+                @if($hasGradient) background-image:linear-gradient(to right, {{ $field['gradient_from'] }}, {{ $field['gradient_to'] }}); @endif
                 @if(!empty($field['rotation'])) transform:rotate({{ (float) $field['rotation'] }}deg); transform-origin:center center; @endif
             "></div>
         @elseif($type === 'static_text')
