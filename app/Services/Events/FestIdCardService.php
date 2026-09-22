@@ -453,6 +453,7 @@ class FestIdCardService
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
             ->with([
                 'student.tenant',
+                'student.schoolClass',
                 'teacher.tenant',
                 'registration.item.head',
                 'registration.school',
@@ -581,7 +582,7 @@ class FestIdCardService
         $query = FestParticipant::whereIn('registration_id', $registrationIds)
             ->where('participant_role', '!=', 'standby')
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
-            ->with(['student.tenant', 'teacher.tenant', 'registration.item.head', 'registration.school', 'registration.event.sourcePhase', 'registration.event.region']);
+            ->with(['student.tenant', 'student.schoolClass', 'teacher.tenant', 'registration.item.head', 'registration.school', 'registration.event.sourcePhase', 'registration.event.region']);
 
         if (is_array($participantIds) && $participantIds !== []) {
             $query->whereIn('id', $participantIds);
@@ -658,7 +659,7 @@ class FestIdCardService
             }
         })
             ->where('participant_role', '!=', 'standby')
-            ->with(['student.tenant', 'teacher.tenant', 'registration.item.head', 'registration.school', 'registration.event.sourcePhase', 'registration.event.region']);
+            ->with(['student.tenant', 'student.schoolClass', 'teacher.tenant', 'registration.item.head', 'registration.school', 'registration.event.sourcePhase', 'registration.event.region']);
 
         if (is_array($participantIds) && $participantIds !== []) {
             $query->whereIn('id', $participantIds);
@@ -828,15 +829,30 @@ class FestIdCardService
         }
 
         $studentClass = $p->student?->schoolClass?->name ?? $p->student?->class ?? null;
-        $classCategory = null;
-        if ($itemModel?->class_group) {
-            $schemeLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
-            $classCategory = \App\Support\FestClassGroupScheme::resolveItemLabel($schemeLabels, $itemModel->class_group);
-        }
-
         $studentClassLabel = $studentClass
             ? (preg_match('/^class\b/i', $studentClass) ? $studentClass : "Class {$studentClass}")
             : null;
+
+        $classCategory = null;
+        $schemeLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
+
+        // 1. Primary: If the participant is a student, resolve their competition category
+        // directly from their enrolled student class and the event's assigned category scheme.
+        // This ensures students participating in open/group items (like Margam Kali, Group Song,
+        // Patriotic Song, etc.) are correctly assigned their true student category (e.g. Category 2 / 3)
+        // rather than being mislabeled as "Category 5 (Group Items)".
+        if ($p->student) {
+            $studentGroupKey = \App\Support\FestStudentClassResolver::classGroupForStudent($p->student, $event->rootEvent());
+            if ($studentGroupKey && $studentGroupKey !== 'open') {
+                $classCategory = \App\Support\FestClassGroupScheme::resolveItemLabel($schemeLabels, $studentGroupKey);
+            }
+        }
+
+        // 2. Secondary: If not resolved from student class, use the item's class group
+        if (! $classCategory && $itemModel?->class_group) {
+            $classCategory = \App\Support\FestClassGroupScheme::resolveItemLabel($schemeLabels, $itemModel->class_group);
+        }
+
         $pureCategory = $ageGroupLabel ?: ($classCategory ?: $studentClassLabel);
         $itemTitleClean = ($item !== '—' && $item) ? str_replace('_', ' ', $item) : null;
         $categoryDisplay = $pureCategory ? str_replace('_', ' ', $pureCategory) : ($itemTitleClean ?: '—');

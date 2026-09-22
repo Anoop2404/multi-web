@@ -49,7 +49,13 @@ class FestStudentClassResolver
 
     public static function classNumberFromStudent(Student $student): ?int
     {
-        return self::classNumberFromName($student->schoolClass?->name);
+        $className = $student->schoolClass?->name ?? $student->class ?? null;
+        if (! filled($className) && $student->exists && ! $student->relationLoaded('schoolClass')) {
+            $student->loadMissing('schoolClass');
+            $className = $student->schoolClass?->name ?? $student->class ?? null;
+        }
+
+        return self::classNumberFromName($className);
     }
 
     public static function kalolsavClassGroup(?int $classNumber): ?string
