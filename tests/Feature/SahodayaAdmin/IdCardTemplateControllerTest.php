@@ -6,6 +6,7 @@ use App\Models\IdCardTemplate;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Support\TenancyDatabase;
+use App\Support\TenantStorage;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -94,5 +95,56 @@ class IdCardTemplateControllerTest extends TestCase
             'CATEGORY: {category} | ROLL NO: {roll_no} | GENDER: {gender_upper}',
             $template->layout_json[0]['text_format'],
         );
+    }
+
+    public function test_admin_can_create_an_inactive_ready_made_template_from_the_builder(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'Preset Test Sahodaya',
+            'subdomain' => 'preset-test',
+            'is_active' => true,
+        ]);
+
+        $admin = User::factory()->create([
+            'tenant_id' => $sahodaya->id,
+            'email_verified_at' => now(),
+        ]);
+        $admin->assignRole('sahodaya_admin');
+
+        if (TenancyDatabase::enabled()) {
+            TenancyDatabase::initializeForTenant($sahodaya);
+        }
+
+        $directory = "sahodaya/{$sahodaya->id}/id-card-templates";
+
+        try {
+            $response = $this->actingAs($admin)->post(
+                "/sahodaya-admin/{$sahodaya->id}/id-card-templates/presets/template-3",
+            );
+
+            $response->assertRedirect();
+            $response->assertSessionHasNoErrors();
+            $response->assertSessionHas('success');
+
+            $template = IdCardTemplate::query()
+                ->where('tenant_id', $sahodaya->id)
+                ->where('title', 'Kalotsav 2026-27 Student ID — Template 3')
+                ->firstOrFail();
+
+            $this->assertFalse($template->is_active);
+            $this->assertSame(90, $template->card_width_mm);
+            $this->assertSame(135, $template->card_height_mm);
+            $this->assertTrue(TenantStorage::exists($template->background_path));
+            $this->assertSame(
+                270,
+                collect($template->fields())->firstWhere('key', 'badge_value')['rotation'],
+            );
+        } finally {
+            TenantStorage::disk()->deleteDirectory($directory);
+        }
     }
 }

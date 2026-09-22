@@ -3,9 +3,9 @@
 namespace Tests\Unit\Seeders;
 
 use App\Models\IdCardTemplate;
+use App\Support\TenantStorage;
 use Database\Seeders\MalappuramKalotsavIdCardTemplatesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -16,7 +16,7 @@ class MalappuramKalotsavIdCardTemplatesSeederTest extends TestCase
     public function test_each_run_creates_a_fresh_set_of_three_complete_templates(): void
     {
         $tenantId = (string) Str::uuid();
-        $assetDirectory = base_path("storage/app/public/sahodaya/{$tenantId}/id-card-templates");
+        $assetDirectory = "sahodaya/{$tenantId}/id-card-templates";
 
         try {
             $seeder = new MalappuramKalotsavIdCardTemplatesSeeder;
@@ -38,7 +38,7 @@ class MalappuramKalotsavIdCardTemplatesSeederTest extends TestCase
             $this->assertTrue($templates->every(fn (IdCardTemplate $template) => $template->grid_json['cols'] === 5 && $template->grid_json['rows'] === 2));
             $this->assertTrue($templates->every(fn (IdCardTemplate $template) => collect($template->fields())->where('type', 'item_list')->count() === 1));
             $this->assertTrue($templates->every(fn (IdCardTemplate $template) => collect($template->fields())->where('type', 'item_row')->isEmpty()));
-            $this->assertTrue($templates->every(fn (IdCardTemplate $template) => is_file(base_path('storage/app/public/'.$template->background_path))));
+            $this->assertTrue($templates->every(fn (IdCardTemplate $template) => TenantStorage::exists($template->background_path)));
 
             $templateThree = $templates->firstWhere('title', 'Kalotsav 2026-27 Student ID — Template 3');
             $this->assertNotNull($templateThree);
@@ -49,7 +49,7 @@ class MalappuramKalotsavIdCardTemplatesSeederTest extends TestCase
                 collect($templateThree->fields())->firstWhere('key', 'student_info_divider')['orientation'],
             );
         } finally {
-            File::deleteDirectory($assetDirectory);
+            TenantStorage::disk()->deleteDirectory($assetDirectory);
         }
     }
 }

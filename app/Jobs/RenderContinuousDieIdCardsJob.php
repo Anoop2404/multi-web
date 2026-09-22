@@ -166,18 +166,31 @@ class RenderContinuousDieIdCardsJob implements ShouldQueue
 
             $s3Path = "sahodaya/{$tenant->id}/events/{$event->id}/id-cards/die/full-continuous-run.pdf";
 
-            if (TenantStorage::isS3Configured()) {
+            // 1. Always save to local shared storage first so it is guaranteed present on the server
+            try {
+                Storage::disk(TenantStorage::SHARED_DISK)->put($s3Path, $finalPdfBytes);
+            } catch (\Throwable $e) {
+                Log::warning('Failed saving continuous die PDF to shared disk: '.$e->getMessage());
+            }
+
+            // 2. Also save to upload disk if different
+            $uploadDisk = TenantStorage::uploadDisk();
+            if ($uploadDisk !== TenantStorage::SHARED_DISK && $uploadDisk !== 's3') {
                 try {
-                    Storage::disk('s3')->put($s3Path, $finalPdfBytes, 'public');
+                    Storage::disk($uploadDisk)->put($s3Path, $finalPdfBytes);
                 } catch (\Throwable $e) {
-                    Log::warning('Failed saving continuous die PDF to S3: '.$e->getMessage());
+                    Log::warning("Failed saving continuous die PDF to {$uploadDisk} disk: ".$e->getMessage());
                 }
             }
 
-            try {
-                TenantStorage::disk()->put($s3Path, $finalPdfBytes, 'public');
-            } catch (\Throwable $e) {
-                Log::warning('Failed saving continuous die PDF to upload disk: '.$e->getMessage());
+            // 3. Save directly to AWS S3 without ACLs ('public') for direct presigned streaming
+            if (TenantStorage::isS3Configured()) {
+                try {
+                    // Do NOT pass 'public' ACL as modern S3 buckets disable ACLs by default (BucketOwnerEnforced)
+                    Storage::disk('s3')->put($s3Path, $finalPdfBytes);
+                } catch (\Throwable $e) {
+                    Log::error('Failed saving continuous die PDF to S3: '.$e->getMessage());
+                }
             }
 
             $sizeBytes = strlen($finalPdfBytes);

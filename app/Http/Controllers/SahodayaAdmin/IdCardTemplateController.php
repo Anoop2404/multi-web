@@ -64,6 +64,7 @@ class IdCardTemplateController extends SahodayaAdminController
         string $preset,
         IdCardTemplatePresetInstaller $presetInstaller,
     ) {
+        abort_unless($tenantId === (string) $this->sahodaya->id, 403);
         abort_unless($presetInstaller->has($preset), 404);
 
         $template = $presetInstaller->install((string) $this->sahodaya->id, $preset);

@@ -438,22 +438,28 @@ class FestIdCardController extends SahodayaAdminController
             $slug = str($event->title)->slug('-');
             $filename = "{$slug}-continuous-master-id-cards.pdf";
 
-            if (\App\Support\TenantStorage::isS3Configured()) {
-                if (! \Illuminate\Support\Facades\Storage::disk('s3')->exists($path)) {
-                    \App\Support\TenantStorage::migrateToS3($path);
-                }
+            $existsOnS3 = \App\Support\TenantStorage::isS3Configured() && \Illuminate\Support\Facades\Storage::disk('s3')->exists($path);
+            $localDisk = \App\Support\TenantStorage::findLocalDisk($path);
 
-                if (\Illuminate\Support\Facades\Storage::disk('s3')->exists($path)) {
-                    try {
-                        $state['s3_preview_url'] = \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl($path, now()->addHours(6), [
-                            'ResponseContentDisposition' => 'inline; filename="' . $filename . '"',
-                        ]);
-                        $state['s3_download_url'] = \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl($path, now()->addHours(6), [
-                            'ResponseContentDisposition' => 'attachment; filename="' . $filename . '"',
-                        ]);
-                    } catch (\Throwable $e) {
-                        \Illuminate\Support\Facades\Log::warning('Failed generating presigned S3 URLs: '.$e->getMessage());
-                    }
+            if (! $existsOnS3 && $localDisk && \App\Support\TenantStorage::isS3Configured()) {
+                \App\Support\TenantStorage::migrateToS3($path);
+                $existsOnS3 = \Illuminate\Support\Facades\Storage::disk('s3')->exists($path);
+            }
+
+            if (! $existsOnS3 && ! $localDisk) {
+                // File does not physically exist on any disk
+                $state['status'] = 'idle';
+                $state['error'] = 'Previous master PDF file is no longer on storage. Please generate it again.';
+            } elseif ($existsOnS3) {
+                try {
+                    $state['s3_preview_url'] = \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl($path, now()->addHours(6), [
+                        'ResponseContentDisposition' => 'inline; filename="' . $filename . '"',
+                    ]);
+                    $state['s3_download_url'] = \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl($path, now()->addHours(6), [
+                        'ResponseContentDisposition' => 'attachment; filename="' . $filename . '"',
+                    ]);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed generating presigned S3 URLs: '.$e->getMessage());
                 }
             }
         }
@@ -577,14 +583,32 @@ class FestIdCardController extends SahodayaAdminController
             ]);
         }
 
-        \Illuminate\Support\Facades\Log::error("Continuous Die PDF not found on any disk: {$relativePath}", [
+        \Illuminate\Support\Facades\Log::warning("Continuous Die PDF not found on any disk: {$relativePath}", [
             'tenant'     => $this->sahodaya->id,
             'event'      => $targetEvent->id,
             'state'      => $state,
             'triedDisks' => $candidateDisks,
         ]);
 
-        abort(404, 'Master PDF has not been generated yet. Please generate it from the Die Generator page.');
+        $dieGeneratorUrl = "/sahodaya-admin/{$this->sahodaya->id}/events/{$targetEvent->id}/id-cards/die";
+
+        return response(
+            '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Master PDF Not Ready</title>' .
+            '<meta name="viewport" content="width=device-width, initial-scale=1">' .
+            '<style>body{font-family:system-ui,-apple-system,sans-serif;background:#0f172a;color:#f8fafc;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;}' .
+            '.card{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:36px;max-width:500px;text-align:center;box-shadow:0 15px 35px rgba(0,0,0,0.5);}' .
+            'h1{font-size:20px;font-weight:700;margin-bottom:12px;color:#f59e0b;}' .
+            'p{color:#94a3b8;font-size:14px;line-height:1.6;margin-bottom:24px;}' .
+            'a{display:inline-block;background:#10b981;color:#022c22;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;transition:background 0.2s;}' .
+            'a:hover{background:#059669;color:#ffffff;}</style></head><body>' .
+            '<div class="card">' .
+            '<h1>Master PDF Needs Generation</h1>' .
+            '<p>The master continuous PDF has not been generated or the previous render was not saved to storage. Please click the button below to open the Die Generator and click <strong>"Generate Master PDF"</strong>.</p>' .
+            '<a href="' . $dieGeneratorUrl . '">Go to Die Generator</a>' .
+            '</div></body></html>',
+            200,
+            ['Content-Type' => 'text/html']
+        );
     }
 
     public function pdfDie(Request $request, string $tenantId, FestEvent $event, FestIdCardService $service, PlatformAuditLogger $audit)
