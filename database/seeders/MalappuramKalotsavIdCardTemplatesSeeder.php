@@ -8,11 +8,11 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\File;
 
 /**
- * Installs the two approved Malappuram Kalotsav student ID-card designs.
+ * Installs the three approved Kalotsav student ID-card designs.
  *
  * The background artwork is copied from database/seeders/assets and every
  * editable overlay remains in layout_json, including the automatic 1–7 item
- * list. Every run creates a fresh pair of templates; subsequent pairs receive
+ * list. Every run creates a fresh set of templates; subsequent sets receive
  * a numbered "Copy" suffix so they are easy to distinguish in the builder.
  *
  * Usage: php artisan db:seed --class=MalappuramKalotsavIdCardTemplatesSeeder
@@ -96,7 +96,7 @@ class MalappuramKalotsavIdCardTemplatesSeeder extends Seeder
         }
 
         $this->command?->info(
-            'Created two new Malappuram Kalotsav student ID-card templates (IDs: '.implode(', ', $createdIds).').'
+            'Created three new Kalotsav student ID-card templates (IDs: '.implode(', ', $createdIds).').'
         );
     }
 
@@ -208,6 +208,24 @@ class MalappuramKalotsavIdCardTemplatesSeeder extends Seeder
                 ],
                 'layout_json' => $this->templateTwoFields(),
             ],
+            [
+                'title' => 'Kalotsav 2026-27 Student ID — Template 3',
+                'audience' => 'student',
+                'is_active' => false,
+                'background_asset' => 'kalotsav-student-id-template-3.png',
+                'background_filename' => 'kalotsav-student-id-template-3.png',
+                'card_width_mm' => 90,
+                'card_height_mm' => 135,
+                'grid_json' => [
+                    'cols' => 5,
+                    'rows' => 2,
+                    'first_col_center_mm' => 54.036,
+                    'first_row_center_mm' => 87.96,
+                    'col_pitch_mm' => 92.958,
+                    'row_pitch_mm' => 138.938,
+                ],
+                'layout_json' => $this->templateThreeFields(),
+            ],
         ];
     }
 
@@ -244,11 +262,29 @@ class MalappuramKalotsavIdCardTemplatesSeeder extends Seeder
             ['key' => 'photo', 'type' => 'photo', 'source' => 'photo_src', 'top' => 27.4, 'left' => 27.95, 'width' => 35, 'height' => 23.07],
             ['key' => 'badge_value', 'type' => 'text', 'source' => 'school_code', 'top' => 39.2, 'left' => 88.5, 'width' => 14, 'height' => 3.4, 'font_size' => 10, 'font_family' => 'Arial', 'font_weight' => 'bold', 'align' => 'center', 'color' => '#12345a', 'rotation' => 270],
             ['key' => 'name', 'type' => 'text', 'source' => 'name', 'top' => 56.8, 'left' => 19, 'width' => 58, 'height' => 8.7, 'font_size' => 16, 'font_family' => 'Arial', 'font_weight' => 'bold', 'align' => 'center', 'color' => '#ffffff', 'line_height' => 1.08, 'wrap' => true],
-            ['key' => 'school_label', 'type' => 'static_text', 'text' => 'SCHOOL NAME', 'top' => 69.8, 'left' => 10, 'width' => 80, 'font_size' => 10, 'font_family' => 'Arial', 'font_weight' => 'bold', 'align' => 'center', 'color' => '#333333'],
-            ['key' => 'school_name', 'type' => 'text', 'source' => 'subtitle', 'top' => 71.3, 'left' => 8, 'width' => 84, 'height' => 3.8, 'font_size' => 13, 'font_family' => 'Arial', 'font_weight' => 'normal', 'align' => 'center', 'color' => '#333333', 'line_height' => 1.1, 'wrap' => true],
+            ['key' => 'school_label', 'type' => 'static_text', 'text' => 'SCHOOL NAME', 'top' => 67.3, 'left' => 4, 'width' => 92, 'height' => 2.3, 'font_size' => 11, 'font_family' => 'Arial', 'font_weight' => 'bold', 'align' => 'center', 'color' => '#333333', 'line_height' => 1],
+            ['key' => 'school_name', 'type' => 'text', 'source' => 'subtitle', 'top' => 69.8, 'left' => 4, 'width' => 92, 'height' => 5.5, 'font_size' => 10, 'font_family' => 'Arial', 'font_weight' => 'normal', 'align' => 'center', 'color' => '#333333', 'line_height' => 1.08, 'wrap' => true],
             ['key' => 'student_info_inline', 'type' => 'text', 'source' => 'student_info_inline', 'text_format' => "CATEGORY: {category}\u{2003}\u{2003}ROLL NO: {roll_no}\u{2003}\u{2003}GENDER: {gender_upper}", 'top' => 78, 'left' => 4.5, 'width' => 91, 'height' => 3, 'font_size' => 10, 'font_family' => 'Arial', 'font_weight' => 'bold', 'align' => 'center', 'color' => '#ffffff', 'line_height' => 1, 'wrap' => false],
             ['key' => 'items_header_label', 'type' => 'static_text', 'text' => 'PARTICIPATING ITEMS', 'top' => 81.8, 'left' => 10, 'width' => 80, 'height' => 2.2, 'font_size' => 10, 'font_family' => 'Arial', 'font_weight' => 'bold', 'align' => 'center', 'color' => '#ffffff', 'line_height' => 1],
             ['key' => 'participating_items', 'type' => 'item_list', 'source' => 'participating_items', 'top' => 84.55, 'left' => 5.5, 'width' => 89, 'height' => 10.3, 'font_size' => 10, 'font_family' => 'Arial', 'font_weight' => 'normal', 'font_style' => 'normal', 'align' => 'left', 'color' => '#ffffff', 'line_height' => 1.15, 'columns' => 2, 'max_items' => 7],
+        ];
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function templateThreeFields(): array
+    {
+        return [
+            ['key' => 'photo', 'type' => 'photo', 'source' => 'photo_src', 'top' => 30.9, 'left' => 33.5, 'width' => 33, 'height' => 21.6],
+            ['key' => 'badge_value', 'type' => 'text', 'source' => 'school_code', 'top' => 39.5, 'left' => 86.5, 'width' => 16, 'height' => 3, 'font_size' => 8, 'font_family' => 'Arial', 'font_weight' => 'bold', 'align' => 'center', 'color' => '#312e81', 'rotation' => 270],
+            ['key' => 'name_pointer', 'type' => 'shape', 'top' => 63.6, 'left' => 47.6, 'width' => 4.8, 'height' => 3.2, 'rotation' => 45, 'color' => '#d51bb1'],
+            ['key' => 'ribbon_shape', 'type' => 'shape', 'top' => 55.2, 'left' => 22.8, 'width' => 54.4, 'height' => 9.4, 'radius' => 2.4, 'gradient_from' => '#e2b916', 'gradient_to' => '#ca08e3'],
+            ['key' => 'name', 'type' => 'text', 'source' => 'name', 'top' => 55.6, 'left' => 24.5, 'width' => 51, 'height' => 8.4, 'font_size' => 13, 'font_family' => 'Arial', 'font_weight' => 'bold', 'align' => 'center', 'color' => '#ffffff', 'line_height' => 1.05, 'wrap' => true],
+            ['key' => 'school_label', 'type' => 'static_text', 'text' => 'SCHOOL NAME', 'top' => 67.4, 'left' => 10, 'width' => 80, 'height' => 2.3, 'font_size' => 12, 'font_family' => 'Arial', 'font_weight' => 'bold', 'align' => 'center', 'color' => '#111827', 'line_height' => 1],
+            ['key' => 'school_name', 'type' => 'text', 'source' => 'subtitle', 'top' => 69.8, 'left' => 6, 'width' => 88, 'height' => 4.2, 'font_size' => 10, 'font_family' => 'Arial', 'font_weight' => 'normal', 'align' => 'center', 'color' => '#111827', 'line_height' => 1.05, 'wrap' => true],
+            ['key' => 'student_info_divider', 'type' => 'divider', 'orientation' => 'horizontal', 'top' => 75, 'left' => 8, 'width' => 84, 'color' => '#4b5563'],
+            ['key' => 'student_info_inline', 'type' => 'text', 'source' => 'student_info_inline', 'text_format' => "CATEGORY: {category}\u{2003}\u{2003}REG NO: {roll_no}\u{2003}\u{2003}GENDER: {gender_upper}", 'top' => 76.2, 'left' => 5, 'width' => 90, 'height' => 3.1, 'font_size' => 11, 'font_family' => 'Arial', 'font_weight' => 'bold', 'align' => 'center', 'color' => '#111827', 'line_height' => 1, 'wrap' => false],
+            ['key' => 'items_header_label', 'type' => 'static_text', 'text' => 'PARTICIPATING ITEMS', 'top' => 81, 'left' => 10, 'width' => 80, 'height' => 2.4, 'font_size' => 11, 'font_family' => 'Arial', 'font_weight' => 'bold', 'align' => 'center', 'color' => '#111827', 'line_height' => 1],
+            ['key' => 'participating_items', 'type' => 'item_list', 'source' => 'participating_items', 'top' => 84, 'left' => 7, 'width' => 86, 'height' => 10.5, 'font_size' => 10, 'font_family' => 'Arial', 'font_weight' => 'normal', 'font_style' => 'normal', 'align' => 'left', 'color' => '#111827', 'line_height' => 1.15, 'columns' => 2, 'max_items' => 7],
         ];
     }
 }

@@ -13,7 +13,7 @@ class MalappuramKalotsavIdCardTemplatesSeederTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_each_run_creates_a_fresh_pair_of_complete_templates(): void
+    public function test_each_run_creates_a_fresh_set_of_three_complete_templates(): void
     {
         $tenantId = (string) Str::uuid();
         $assetDirectory = base_path("storage/app/public/sahodaya/{$tenantId}/id-card-templates");
@@ -26,11 +26,11 @@ class MalappuramKalotsavIdCardTemplatesSeederTest extends TestCase
 
             $templates = IdCardTemplate::where('tenant_id', $tenantId)->orderBy('title')->get();
 
-            $this->assertCount(4, $templates);
-            $this->assertCount(2, $firstRunIds);
+            $this->assertCount(6, $templates);
+            $this->assertCount(3, $firstRunIds);
             $this->assertTrue($firstRunIds->every(fn (int $id) => $templates->contains('id', $id)));
-            $this->assertCount(2, $templates->filter(fn (IdCardTemplate $template) => str_ends_with($template->title, '(Copy 2)')));
-            $this->assertSame(4, $templates->pluck('background_path')->unique()->count());
+            $this->assertCount(3, $templates->filter(fn (IdCardTemplate $template) => str_ends_with($template->title, '(Copy 2)')));
+            $this->assertSame(6, $templates->pluck('background_path')->unique()->count());
             $this->assertSame(1, $templates->where('is_active', true)->count());
             $this->assertTrue($templates->every(fn (IdCardTemplate $template) => $template->cards_per_page === 10));
             $this->assertTrue($templates->every(fn (IdCardTemplate $template) => (float) $template->page_width_mm === 480.06));
@@ -39,6 +39,15 @@ class MalappuramKalotsavIdCardTemplatesSeederTest extends TestCase
             $this->assertTrue($templates->every(fn (IdCardTemplate $template) => collect($template->fields())->where('type', 'item_list')->count() === 1));
             $this->assertTrue($templates->every(fn (IdCardTemplate $template) => collect($template->fields())->where('type', 'item_row')->isEmpty()));
             $this->assertTrue($templates->every(fn (IdCardTemplate $template) => is_file(base_path('storage/app/public/'.$template->background_path))));
+
+            $templateThree = $templates->firstWhere('title', 'Kalotsav 2026-27 Student ID — Template 3');
+            $this->assertNotNull($templateThree);
+            $this->assertSame(90, $templateThree->card_width_mm);
+            $this->assertSame(135, $templateThree->card_height_mm);
+            $this->assertSame(
+                'horizontal',
+                collect($templateThree->fields())->firstWhere('key', 'student_info_divider')['orientation'],
+            );
         } finally {
             File::deleteDirectory($assetDirectory);
         }
