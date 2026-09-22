@@ -31,7 +31,6 @@ use App\Support\FestCategoryMerge;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestItemCategoryLabel;
 use App\Support\FestOverallCategoryExclusion;
-use App\Support\FestTeamSquadRules;
 use App\Support\TenantBranding;
 use App\Support\TenantStorage;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -1234,198 +1233,79 @@ public function tv(Request $request, int $eventId)
 
     $dynamic = $this->scoreboardDynamicData($event, $selectedScope, null, $isPublished, $isAdminPreview, $request);
 
-    // Pre-chunked into fixed-size, non-scrolling pages server-side — nobody is at the
-    // TV to scroll a tall list, so "Page N of M" slides stand in for scroll the same
-    // way pagination would on a normal page. 1 item/page: with 2+ side by side, CSS
-    // grid's default row-stretch makes a short 1-position card match its taller
-    // 2-position row-mate, so a page's height was driven by whichever item happened
-    // to share its row — measured a page hit 1555px in a 1080px viewport this way.
-    // One item per page removes the row-mate entirely, so each slide is exactly its
-    // own item's height.
-    // fest-medal-board.blade.php's rows were enlarged for venue-distance legibility
-    // (the previous sizing — 11px/9px header labels, 14-16px row text — was unreadable
-    // from more than a couple of meters away). At that larger size each row measures
-    // ~91px tall on the fixed 1920x1080 canvas; 9 rows (the old count, calibrated for
-    // the smaller text) now overflows past the visible canvas and clips the bottom
-    // schools entirely. 5 rows is what the enlarged rows actually fit, measured against
-    // the canvas's fixed height minus the header/title/controls chrome.
-    $boardsPerPage = 5;
-    $winnersPerPage = 1;
-    $slides = [];
+    // The TV now scrolls continuously through one tall column instead of rotating
+    // fixed-height slides, so none of the old "how many rows/tiles fit in a 1080px
+    // slide" pagination is needed any more — every board and roster below renders in
+    // full. fest-winner-item-card-tv.blade.php's roster grid is already an auto-fill
+    // CSS grid, so a team larger than one row just wraps to more rows on its own.
+    $sections = [];
 
-    // The TV rotates through "Latest Item Winners" before standings — dozens of
-    // published items (a full event can publish 50+) meant it could take many minutes
-    // of rotation just to cycle the winners slides once before ever reaching a
-    // standings board. $dynamic['latestWinners'] is already sorted most-recently-
-    // updated-item-first, so the newest 10 are exactly "what just got published" —
-    // the thing people at the venue actually want to see; older results are still on
-    // the school/item pages, just not worth this screen's limited rotation time.
+    // The TV leads with "Latest Item Winners" before standings — dozens of published
+    // items (a full event can publish 50+) would make one full scroll loop take a long
+    // time if it tried to show every result. $dynamic['latestWinners'] is already
+    // sorted most-recently-updated-item-first, so the newest 10 are exactly "what just
+    // got published" — the thing people at the venue actually want to see; older
+    // results are still on the school/item pages, just not worth this screen's limited
+    // loop time.
     $recentItemsForTv = 10;
-
-    // A squad/team item's roster can run anywhere from 2 (a duet) to 25+ (a band), and
-    // 2-3 winning positions sharing one slide side by side (fest-winner-item-card-tv.
-    // blade.php's flex-wrap columns) squeezes each team into a fraction of the width —
-    // cramped and, at large enough rosters, tiles could even overflow their column.
-    // Split such an item's winners across one slide per position, AND split any single
-    // position's own roster into pages of $rosterPerPage, so nobody's photo is ever
-    // dropped behind a "+N more" tile — a large team just takes a couple of extra,
-    // clearly-labeled slides instead. Individual items (a roster of one) never hit
-    // either path and render exactly as before.
-    //
-    // 9, not a rounder number: fest-winner-item-card-tv.blade.php's roster tiles are
-    // w-24 (6rem), which at this page's 26px root font-size render at 156px — at that
-    // size, exactly 9 fit across one row of the available width (measured directly
-    // against the compiled CSS, not estimated). A 10th tile wraps to a second row, and
-    // a second row of tiles NEVER fits the remaining vertical space on the fixed
-    // 1920x1080 canvas (overflows by ~190px, not a close call) — so this cap must keep
-    // every roster page to a single row, not just "small enough to usually fit".
-    $rosterPerPage = 9;
-
-    // Ties are not artificially broken, so an individual item can have any number of
-    // winners sharing position 1 (or 2, 3). Each winner column below is a flat
-    // min-w-[22rem]; measured against the compiled CSS, 3 fit across one row with
-    // margin to spare (89px), but a 4th always wraps to a second row that overflows
-    // the fixed canvas by ~266px — not a close call, and the same overflow whether
-    // it's 4, 5, or 6 tied winners, since the wrap point never moves. So an individual
-    // item's winners get the same treatment as a squad item's oversized roster: split
-    // into pages of $winnersPerSlide, reusing the same split_position/split_total
-    // "Slide X of Y" mechanism. This only ever fires on a tie beyond gold/silver/
-    // bronze — the common 1-3 winner case renders exactly as before, one slide, no
-    // badge. Squad items never need this: they already get one winner per slide
-    // below regardless of count, so their winner columns never share a row at all.
-    $winnersPerSlide = 3;
 
     $tvWinnerItems = collect($dynamic['latestWinners'])
         ->take($recentItemsForTv)
-        ->flatMap(function (array $itemGroup) use ($rosterPerPage, $winnersPerSlide) {
-            $isSquadItem = FestTeamSquadRules::isMultiPerson($itemGroup['participant_type'] ?? null);
-            if (! $isSquadItem) {
-                $winners = collect($itemGroup['winners']);
-
-                if ($winners->count() <= $winnersPerSlide) {
-                    return [$itemGroup];
-                }
-
-                $chunks = $winners->chunk($winnersPerSlide)->values();
-                $total = $chunks->count();
-
-                return $chunks
-                    ->map(fn ($chunk, int $i) => [
-                        'winners' => $chunk->values()->all(),
-                        'split_position' => $i + 1,
-                        'split_total' => $total,
-                    ] + $itemGroup)
-                    ->all();
-            }
-
-            // Expand each winning position into one slide per $rosterPerPage-sized
-            // chunk of its roster — a position whose roster already fits on one slide
-            // expands to exactly one entry, so a normal 2-12 member team is completely
-            // unaffected by this step. roster_total/roster_range travel with every
-            // chunk so the card can say "Members 1-9 of 12" instead of just showing 9
-            // photos with no indication there's a 10th, 11th, 12th anywhere — "Result 5
-            // of 6" alone doesn't tell a viewer whether 6 means six winning positions or
-            // six roster pages of one team.
-            $slidesForItem = collect($itemGroup['winners'])
-                ->flatMap(function (array $winner) use ($rosterPerPage) {
+        ->map(function (array $itemGroup) {
+            $itemGroup['winners'] = collect($itemGroup['winners'])
+                ->map(function (array $winner) {
+                    // roster_total feeds the card's "N members" badge for a squad/team
+                    // winner (see fest-winner-item-card-tv.blade.php) — null for an
+                    // individual item, where a member count adds nothing.
                     $team = $winner['team'] ?? null;
-                    $rosterTotal = $team ? count($team) : null;
 
-                    if (! $team || $rosterTotal <= $rosterPerPage) {
-                        return [['roster_total' => $rosterTotal, 'roster_pages' => 1] + $winner];
-                    }
-
-                    $chunks = array_chunk($team, $rosterPerPage);
-
-                    return collect($chunks)
-                        ->map(fn (array $chunk, int $i) => [
-                            'team' => $chunk,
-                            'roster_total' => $rosterTotal,
-                            'roster_pages' => count($chunks),
-                            // Precomputed here (not in the view) because it needs
-                            // $rosterPerPage, which the view has no business knowing —
-                            // it's a display-count concern, not the card's to decide.
-                            'roster_range' => [$i * $rosterPerPage + 1, $i * $rosterPerPage + count($chunk)],
-                        ] + $winner)
-                        ->all();
+                    return ($team ? ['roster_total' => count($team)] : []) + $winner;
                 })
-                ->values();
-
-            // Nothing needed splitting (one position, roster fit on one slide) — same
-            // shape as an individual item, no "Result 1 of 1" clutter. roster_total is
-            // still attached to the single winner so the card can show a plain "N
-            // members" badge even when nothing was split.
-            if ($slidesForItem->count() <= 1) {
-                return [['winners' => $slidesForItem->all()] + $itemGroup];
-            }
-
-            $total = $slidesForItem->count();
-
-            // split_position/split_total tell the card it's one of several consecutive
-            // slides for the same item, so it can show "Result 2 of 3" — without this a
-            // viewer had no way to know two slides in a row sharing a title were related,
-            // rather than, say, a coincidence or a glitch.
-            return $slidesForItem
-                ->map(fn (array $winner, int $i) => [
-                    'winners' => [$winner],
-                    'split_position' => $i + 1,
-                    'split_total' => $total,
-                ] + $itemGroup)
+                ->values()
                 ->all();
+
+            return $itemGroup;
         })
         ->values()
         ->all();
 
-    // Order: latest results first, then standings — a result that just got published
-    // is the thing people at the venue actually want to see right away (who just won
-    // the item that was on stage a minute ago), not buried behind however many
-    // standings pages happen to exist. $dynamic['latestWinners'] is already sorted
-    // most-recently-updated-item-first, so the very first slide is the newest result.
-    $winnerPages = array_chunk($tvWinnerItems, $winnersPerPage);
-    foreach ($winnerPages as $i => $page) {
-        $slides[] = [
+    if ($tvWinnerItems) {
+        $sections[] = [
             'type' => 'winners',
             'title' => 'Latest Item Winners',
-            'subtitle' => count($winnerPages) > 1 ? 'Page '.($i + 1).' of '.count($winnerPages) : null,
-            'items' => $page,
+            'items' => $tvWinnerItems,
         ];
     }
 
     $provisionalSuffix = $isPublished ? '' : ' · Provisional';
 
-    // tv_show_overall_standings only hides the fest-wide slide — category-wise boards
-    // below always rotate regardless, and $overallBoard itself still feeds the
+    // tv_show_overall_standings only hides the fest-wide section — category-wise
+    // boards below always show regardless, and $overallBoard itself still feeds the
     // "nothing published yet" fallback check further down.
-    if ($event->tv_show_overall_standings ?? true) {
-        $overallPages = array_chunk($overallBoard, $boardsPerPage);
-        foreach ($overallPages as $i => $page) {
-            $slides[] = [
-                'type' => 'board',
-                'title' => 'Overall Standings',
-                'subtitle' => (count($overallPages) > 1 ? 'Page '.($i + 1).' of '.count($overallPages) : 'All Categories').$provisionalSuffix,
-                'rows' => $page,
-            ];
-        }
+    if (($event->tv_show_overall_standings ?? true) && $overallBoard) {
+        $sections[] = [
+            'type' => 'board',
+            'title' => 'Overall Standings',
+            'subtitle' => trim('All Categories'.$provisionalSuffix, ' ·') ?: null,
+            'rows' => $overallBoard,
+        ];
     }
 
-    // Capped to the top 2 pages (top 10 schools at $boardsPerPage=5) — a category board
-    // can run to 20-30+ schools on a busy event, and cycling through every one of them
-    // for every category ate into how often the TV got back to the boards people
-    // actually care about (Overall Standings, Latest Item Winners). The top 10 is what a
-    // category board is really for; unlike Overall Standings there's no "everyone
-    // deserves to see their own row" expectation here.
-    $categoryBoardPageCap = 2;
+    // Capped to the top 15 schools — a category board can run to 20-30+ schools on a
+    // busy event, and scrolling every one of them for every category made the loop
+    // back to the boards people actually care about (Overall Standings, Latest Item
+    // Winners) take too long. The top 15 is what a category board is really for;
+    // unlike Overall Standings there's no "everyone deserves to see their own row"
+    // expectation here.
+    $categoryBoardRowCap = 15;
 
     foreach ($categoryBoards as $board) {
-        $categoryPages = array_slice(array_chunk($board['rows'], $boardsPerPage), 0, $categoryBoardPageCap);
-        foreach ($categoryPages as $i => $page) {
-            $slides[] = [
-                'type' => 'board',
-                'title' => $board['label'].' Standings',
-                'subtitle' => trim((count($categoryPages) > 1 ? 'Page '.($i + 1).' of '.count($categoryPages) : '').$provisionalSuffix, ' ·') ?: null,
-                'rows' => $page,
-            ];
-        }
+        $sections[] = [
+            'type' => 'board',
+            'title' => $board['label'].' Standings',
+            'subtitle' => trim((count($board['rows']) > $categoryBoardRowCap ? 'Top '.$categoryBoardRowCap : '').$provisionalSuffix, ' ·') ?: null,
+            'rows' => array_slice($board['rows'], 0, $categoryBoardRowCap),
+        ];
     }
 
     // Only fall back to a schools-only roster when there's truly nothing published
@@ -1467,35 +1347,28 @@ public function tv(Request $request, int $eventId)
             ])
             ->all();
 
-        $schoolPages = array_chunk($rowsFor($registrations), $boardsPerPage);
-        foreach ($schoolPages as $i => $page) {
-            $slides[] = [
-                'type' => 'schools',
-                'title' => 'Participating Schools',
-                'subtitle' => count($schoolPages) > 1 ? 'Page '.($i + 1).' of '.count($schoolPages) : 'All Categories',
-                'rows' => $page,
-            ];
-        }
+        $sections[] = [
+            'type' => 'schools',
+            'title' => 'Participating Schools',
+            'subtitle' => 'All Categories',
+            'rows' => $rowsFor($registrations),
+        ];
 
         foreach ($categories as $key) {
             $categoryRows = $rowsFor($registrations->filter(fn ($r) => $r->item?->{$categoryColumn} === $key));
             if (! $categoryRows) {
                 continue;
             }
-            $categoryPages = array_chunk($categoryRows, $boardsPerPage);
-            foreach ($categoryPages as $i => $page) {
-                $slides[] = [
-                    'type' => 'schools',
-                    'title' => $this->scoreboards->categoryLabel($event, $key).' — Participating Schools',
-                    'subtitle' => count($categoryPages) > 1 ? 'Page '.($i + 1).' of '.count($categoryPages) : null,
-                    'rows' => $page,
-                ];
-            }
+            $sections[] = [
+                'type' => 'schools',
+                'title' => $this->scoreboards->categoryLabel($event, $key).' — Participating Schools',
+                'rows' => $categoryRows,
+            ];
         }
     }
 
-        if (! $slides) {
-            $slides[] = ['type' => 'waiting'];
+        if (! $sections) {
+            $sections[] = ['type' => 'waiting'];
         }
 
         return $this->renderPublic('public.fest.tv', $tenant, [
@@ -1503,7 +1376,7 @@ public function tv(Request $request, int $eventId)
             'selectedScope' => $selectedScope,
             'isPublished' => $isPublished,
             'isAdminPreview' => $isAdminPreview,
-            'slides' => $slides,
+            'sections' => $sections,
             'pageSeo' => ['title' => $event->title.' — Results Display'],
         ]);
     }

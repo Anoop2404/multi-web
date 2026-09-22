@@ -6,18 +6,6 @@
     <div class="px-6 py-4 bg-white/5 border-b border-slate-800">
         <div class="flex items-start justify-between gap-4">
             <p class="font-bold text-white text-2xl uppercase">{{ $itemGroup['item'] }}</p>
-            {{-- Set by FestPortalController::tv() when a large team roster and/or
-                 multiple winning positions needed more than one slide for this item —
-                 without this, a viewer has no way to tell two consecutive slides
-                 sharing a title are part of the same result rather than a coincidence.
-                 Labeled "Slide", not "Result": split_total counts every SLIDE this item
-                 needed (each roster page counts too), not how many positions were
-                 awarded — "Result 5 of 6" next to a single bronze medal icon reads as
-                 "6 results?", when the medal icon already says which placement this is
-                 and the "Members X of Y" badge below says which roster page. --}}
-            @if(($itemGroup['split_total'] ?? 1) > 1)
-            <span class="shrink-0 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-sm font-bold uppercase tracking-wide px-3 py-1">Slide {{ $itemGroup['split_position'] }} of {{ $itemGroup['split_total'] }}</span>
-            @endif
         </div>
         {{-- Category + gender disambiguate items that share the same title across
              different categories/genders (e.g. "Extempore - English" run separately for
@@ -28,18 +16,12 @@
         @if($itemGroup['head'])<p class="text-sm text-white/40 mt-0.5">{{ $itemGroup['head'] }}</p>@endif
     </div>
     {{-- flex-wrap, not divide-y: multiple awarded positions for the same item sit side by
-         side in one row (wrapping only if there's genuinely no room), instead of stacking
-         each position's whole block underneath the last. In practice this only ever
-         renders one winner per slide once split_total > 1 — tv() has already broken a
-         multi-position or oversized-roster item into separate slides by then — but stays
-         multi-capable so a 2-3 position item whose rosters are small still renders
-         exactly as it always has, side by side on one slide. --}}
+         side in one row, wrapping to further rows only when there's genuinely no room —
+         a large team's own roster grid below wraps the same way, so nothing here needs
+         to be pre-split by the controller. --}}
     <div class="flex flex-wrap">
         @foreach($itemGroup['winners'] as $winner)
         @php
-            // tv() pre-chunks any roster larger than its own per-slide cap before this
-            // partial ever sees it, so $roster here is always small enough to render in
-            // full — no "+N more" truncation tile needed.
             $roster = ($winner['team'] ?? []) ?: [['name' => $winner['participant'], 'photo' => $winner['photo'] ?? null, 'photo_fallback' => $winner['photo_fallback'] ?? null]];
         @endphp
         <div class="flex gap-4 p-5 flex-1 min-w-[22rem] border-l border-slate-800 first:border-l-0">
@@ -83,22 +65,9 @@
                 <div class="flex items-center gap-3 mt-3">
                     <p class="text-base text-slate-400 uppercase">{{ $winner['school'] }}</p>
                     {{-- roster_total is only set for a squad/team item's winner (see tv()) —
-                         null for an individual item, where a member count adds nothing.
-                         roster_pages > 1 means THIS slide only shows part of the full
-                         roster (tv() paginates an oversized team, see roster_range's own
-                         comment) — "Members 1-9 of 12" says so explicitly, rather than
-                         showing 9 photos with no hint that a 10th, 11th, 12th exist. When
-                         nothing needed splitting, a plain "12 members" still answers "how
-                         big is this team" for a viewer who only caught this slide for a
-                         few seconds. --}}
+                         null for an individual item, where a member count adds nothing. --}}
                     @if(($winner['roster_total'] ?? null) > 1)
-                    <span class="shrink-0 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-sm font-bold px-3 py-1">
-                        @if(($winner['roster_pages'] ?? 1) > 1)
-                            Members {{ $winner['roster_range'][0] }}–{{ $winner['roster_range'][1] }} of {{ $winner['roster_total'] }}
-                        @else
-                            {{ $winner['roster_total'] }} members
-                        @endif
-                    </span>
+                    <span class="shrink-0 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-sm font-bold px-3 py-1">{{ $winner['roster_total'] }} members</span>
                     @endif
                 </div>
             </div>

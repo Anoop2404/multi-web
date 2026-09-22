@@ -1043,13 +1043,13 @@ class FestPublicScoreboardTest extends TestCase
     }
 
     /**
-     * $boardsPerPage was 9 (fine at the old, small row sizing) — once fest-medal-board.
-     * blade.php's rows were enlarged for venue-distance legibility (see the TV medal
-     * board font-size fixes), 9 rows no longer fit the fixed 1920x1080 canvas without
-     * clipping the bottom schools, so it dropped to 5. This fixture is sized to that
-     * new boundary: 5 schools fit page 1, the 6th spills to page 2.
+     * The TV now scrolls continuously instead of paginating into fixed-height slides,
+     * so a board's row count no longer forces a "Page N of M" split — every school
+     * renders in one continuous Overall Standings section. Display controls (pause/
+     * fullscreen/prev/next) still appear once there's more than one section to move
+     * between — here, the standings section plus a published item's winners section.
      */
-    public function test_tv_paginates_five_school_rows_and_exposes_display_controls(): void
+    public function test_tv_overall_standings_shows_all_schools_unpaginated_and_exposes_display_controls(): void
     {
         foreach (range(2, 6) as $rank) {
             $school = $this->school("TV School {$rank}");
@@ -1062,18 +1062,32 @@ class FestPublicScoreboardTest extends TestCase
             ]);
         }
 
+        $item = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'Solo Song', 'category' => 'performing',
+            'class_group' => 'hs', 'participant_type' => 'individual', 'is_enabled' => true,
+            'results_published_at' => now(),
+        ]);
+        $this->markItemWinner($this->north, $item, $this->northSchool);
+
         $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/tv");
         $html = $response->getContent();
 
         $response->assertOk()
             ->assertSee('Results Display')
-            ->assertSee('Page 1 of 2')
-            ->assertSee('Page 2 of 2')
+            ->assertSee('Overall Standings')
             ->assertSee('data-tv-pause', false)
             ->assertSee('data-tv-fullscreen', false)
             ->assertSee('data-tv-prev', false)
-            ->assertSee('data-tv-next', false);
-        $this->assertSame(2, substr_count($html, '<section data-tv-slide'));
+            ->assertSee('data-tv-next', false)
+            ->assertDontSee('Page 1 of', false);
+
+        // The published item's own category board repeats the same FestResult-derived
+        // standings, so schools can legitimately appear more than once on the page —
+        // what this test actually guards is that every school still appears SOMEWHERE,
+        // unpaginated, not that it appears exactly once.
+        foreach (array_merge(['North Star School'], array_map(fn ($rank) => "TV School {$rank}", range(2, 6))) as $name) {
+            $this->assertStringContainsString($name, $html, "{$name} must appear on the page — nothing may be cut off by pagination.");
+        }
     }
 
     /**
@@ -1114,14 +1128,12 @@ class FestPublicScoreboardTest extends TestCase
     }
 
     /**
-     * A squad/team item's roster can run to several members, so 2+ winning positions
-     * sharing one TV slide side by side squeezed each team into a fraction of the
-     * width and shrank its photos — cramped, and at large enough rosters the tiles
-     * could even overlap (fest-winner-item-card-tv.blade.php's grid track squeeze).
-     * tv() now splits such an item's winners across one slide per position instead, so
-     * each team gets the whole slide's width. Individual items are unaffected.
+     * A team item with 2+ winning positions renders them side by side in one winner
+     * card (fest-winner-item-card-tv.blade.php's flex-wrap columns) — no more per-
+     * position slide splitting now that the TV scrolls continuously instead of
+     * paginating; a card too wide for one row just wraps to a second row on its own.
      */
-    public function test_tv_splits_a_team_items_multiple_winning_positions_across_separate_slides(): void
+    public function test_tv_shows_multiple_winning_positions_for_a_team_item_without_splitting(): void
     {
         $item = FestEventItem::create([
             'event_id' => $this->north->id, 'title' => 'Group Dance', 'category' => 'performing',
@@ -1147,31 +1159,27 @@ class FestPublicScoreboardTest extends TestCase
         // the raw HTML keeps the stored mixed case.
         $response->assertOk()
             ->assertSee('Gold Team Member')
-            ->assertSee('Silver Team Member');
+            ->assertSee('Silver Team Member')
+            ->assertDontSee('Slide', false);
         $this->assertSame(1, substr_count($html, 'Gold Team Member'));
         $this->assertSame(1, substr_count($html, 'Silver Team Member'));
-        $response->assertSee('Slide 1 of 2')->assertSee('Slide 2 of 2');
 
-        // Each slide starts at its own <section data-tv-slide> — the gold and silver
-        // teams must land in DIFFERENT ones, not share a slide.
-        $goldSlideStart = strrpos(substr($html, 0, strpos($html, 'Gold Team Member')), '<section data-tv-slide');
-        $silverSlideStart = strrpos(substr($html, 0, strpos($html, 'Silver Team Member')), '<section data-tv-slide');
-        $this->assertNotSame($goldSlideStart, $silverSlideStart, 'Gold and silver teams must be on separate slides, not squeezed onto one.');
-
-        $goldSlide = substr($html, $goldSlideStart, $silverSlideStart - $goldSlideStart);
-        $this->assertStringNotContainsString('Silver Team Member', $goldSlide, "The gold team's own slide must not also show the silver team.");
+        // Both positions must render inside the SAME winner card (one <article>), side
+        // by side, not split into separate cards.
+        $cardStart = strrpos(substr($html, 0, strpos($html, 'Gold Team Member')), '<article');
+        $cardEnd = strpos($html, '</article>', $cardStart);
+        $card = substr($html, $cardStart, $cardEnd - $cardStart);
+        $this->assertStringContainsString('Silver Team Member', $card, "The gold and silver teams must share one winner card.");
     }
 
     /**
      * A band item's roster can run to 25 members (a duet or small team stays at 2-12) —
-     * far more than one slide can show without the old "+N more" tile hiding most of
-     * the roster. tv() now paginates a single position's oversized roster across
-     * multiple slides ($rosterPerPage=9 — every roster tile at this page's font-size
-     * fits 9 across one row of the canvas; a 10th forces a second row that never fits
-     * the remaining vertical space) instead of truncating it, so every member still
-     * gets shown — just across a couple of clearly-labeled extra slides.
+     * far more than the old fixed-height slide could show without a "+N more" tile
+     * hiding most of the roster. The TV's continuous scroll removes that height limit
+     * entirely: fest-winner-item-card-tv.blade.php's roster grid is an auto-fill CSS
+     * grid, so all 25 members render in one card, wrapping to as many rows as needed.
      */
-    public function test_tv_splits_a_large_bands_roster_across_multiple_slides_without_truncating(): void
+    public function test_tv_shows_a_large_bands_full_roster_without_truncating(): void
     {
         $item = FestEventItem::create([
             'event_id' => $this->north->id, 'title' => 'School Band', 'category' => 'performing',
@@ -1195,26 +1203,18 @@ class FestPublicScoreboardTest extends TestCase
         for ($i = 1; $i <= 25; $i++) {
             $this->assertSame(1, substr_count($html, "Band Member {$i}<"), "Band Member {$i} must appear exactly once — never dropped behind a \"+N more\" tile.");
         }
-        $this->assertStringNotContainsString('more</span>', $html, 'A "+N more" truncation tile must never appear — a large roster pages instead of truncating.');
-
-        // 25 members / 12 per slide = 3 slides (12 + 12 + 1).
-        $response->assertSee('Slide 1 of 3')->assertSee('Slide 2 of 3')->assertSee('Slide 3 of 3');
-
-        // Member 1 (first slide) and Member 25 (last slide) must land on different slides.
-        $firstMemberSlideStart = strrpos(substr($html, 0, strpos($html, 'Band Member 1<')), '<section data-tv-slide');
-        $lastMemberSlideStart = strrpos(substr($html, 0, strpos($html, 'Band Member 25<')), '<section data-tv-slide');
-        $this->assertNotSame($firstMemberSlideStart, $lastMemberSlideStart, "The band's roster must span multiple slides, not one overflowing slide.");
+        $this->assertStringNotContainsString('more</span>', $html, 'A "+N more" truncation tile must never appear — the roster grid wraps instead of truncating.');
+        $response->assertDontSee('Slide', false)->assertSee('25 members');
     }
 
     /**
-     * Real production bug: a 12-member team (e.g. a Kolkali group) rendered on one
-     * slide at 9 tiles/row wraps to a second row — and a second row of roster tiles
-     * never fits the remaining vertical space on the fixed 1920x1080 canvas (overflows
-     * by ~190px, measured directly against the compiled CSS). $rosterPerPage=9 keeps
-     * every roster page to a single row, so 12 members must split into two slides
-     * (9 + 3) rather than one overflowing slide of 12.
+     * A 12-member team (e.g. a Kolkali group) wraps to a second row of roster tiles at
+     * 9-per-row — under the old fixed-height slide that second row would never have
+     * fit, forcing a split across two slides. The TV's continuous scroll has no such
+     * height limit, so the roster's auto-fill grid just wraps to a second row in place
+     * and all 12 members render together in one card.
      */
-    public function test_tv_splits_a_twelve_member_roster_that_would_wrap_to_a_second_row(): void
+    public function test_tv_shows_a_twelve_member_roster_wrapping_to_a_second_row(): void
     {
         $item = FestEventItem::create([
             'event_id' => $this->north->id, 'title' => 'Kolkali', 'category' => 'performing',
@@ -1238,18 +1238,7 @@ class FestPublicScoreboardTest extends TestCase
         for ($i = 1; $i <= 12; $i++) {
             $this->assertSame(1, substr_count($html, "Kolkali Member {$i}<"), "Kolkali Member {$i} must appear exactly once.");
         }
-
-        // 12 members / 9 per slide = 2 slides (9 + 3) — never one slide of 12.
-        $response->assertSee('Slide 1 of 2')->assertSee('Slide 2 of 2');
-        $response->assertDontSee('Slide 1 of 1');
-
-        // Each slide only ever shows part of the 12-member roster — "Members 1-9 of 12"
-        // says so explicitly, rather than 9 photos with no hint a 10th-12th exist.
-        $response->assertSee('Members 1–9 of 12', false)->assertSee('Members 10–12 of 12', false);
-
-        $member1SlideStart = strrpos(substr($html, 0, strpos($html, 'Kolkali Member 1<')), '<section data-tv-slide');
-        $member12SlideStart = strrpos(substr($html, 0, strpos($html, 'Kolkali Member 12<')), '<section data-tv-slide');
-        $this->assertNotSame($member1SlideStart, $member12SlideStart, 'Members 1 and 12 must land on different slides — a single slide of 12 wraps to an overflowing second row.');
+        $response->assertDontSee('Slide', false)->assertSee('12 members');
     }
 
     /**
@@ -1290,22 +1279,23 @@ class FestPublicScoreboardTest extends TestCase
 
         $response->assertOk()->assertSee('2 members');
 
-        $soloSlideStart = strrpos(substr($html, 0, strpos($html, 'Solo Singer')), '<section data-tv-slide');
-        $soloSlideEnd = strpos($html, '<section data-tv-slide', $soloSlideStart + 1) ?: strlen($html);
-        $soloSlide = substr($html, $soloSlideStart, $soloSlideEnd - $soloSlideStart);
-        $this->assertStringNotContainsString('members', $soloSlide, 'An individual item must not show a member-count badge.');
+        // Isolate the solo item's own winner card (one <article>) — it must not show
+        // a member-count badge, even though the duet's card elsewhere on the same
+        // continuous-scroll winners section does.
+        $soloCardStart = strrpos(substr($html, 0, strpos($html, 'Solo Singer')), '<article');
+        $soloCardEnd = strpos($html, '</article>', $soloCardStart);
+        $soloCard = substr($html, $soloCardStart, $soloCardEnd - $soloCardStart);
+        $this->assertStringNotContainsString('members', $soloCard, 'An individual item must not show a member-count badge.');
     }
 
     /**
      * Ties are not artificially broken, so an individual item can have more than 3
      * winners sharing positions 1-3 (e.g. four students all placed first). Each
-     * winner column is a flat min-w-[22rem]; measured against the compiled CSS, only
-     * 3 fit across one row — a 4th wraps to a second row that overflows the fixed
-     * canvas. tv() now splits an individual item's winners into pages of 3, the same
-     * way it already splits a squad item's winning positions, so a tie never renders
-     * a clipped second row.
+     * winner column is a flat min-w-[22rem]; only 3 fit across one row, so a 4th wraps
+     * to a second row within the same winner card — the continuous-scroll TV has no
+     * fixed-height slide to overflow, so nothing needs splitting into separate cards.
      */
-    public function test_tv_splits_an_individual_items_more_than_three_tied_winners_across_slides(): void
+    public function test_tv_shows_more_than_three_tied_winners_for_an_individual_item_without_splitting(): void
     {
         $item = FestEventItem::create([
             'event_id' => $this->north->id, 'title' => 'Anchoring (Single)', 'category' => 'performing',
@@ -1324,24 +1314,19 @@ class FestPublicScoreboardTest extends TestCase
         $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/tv");
         $html = $response->getContent();
 
-        $response->assertOk();
+        $response->assertOk()->assertDontSee('Slide', false);
         foreach (['Tied Winner One', 'Tied Winner Two', 'Tied Winner Three', 'Tied Winner Four'] as $name) {
             $this->assertSame(1, substr_count($html, $name), "{$name} must appear exactly once.");
         }
 
-        // 4 tied winners / 3 per slide = 2 slides (3 + 1) — never one overflowing slide.
-        $response->assertSee('Slide 1 of 2')->assertSee('Slide 2 of 2');
-
-        $firstSlideStart = strrpos(substr($html, 0, strpos($html, 'Tied Winner One')), '<section data-tv-slide');
-        $fourthSlideStart = strrpos(substr($html, 0, strpos($html, 'Tied Winner Four')), '<section data-tv-slide');
-        $this->assertNotSame($firstSlideStart, $fourthSlideStart, 'The 4th tied winner must land on a different slide than the first three — a single slide of 4 wraps to an overflowing second row.');
-
-        $firstSlideEnd = strpos($html, '<section data-tv-slide', $firstSlideStart + 1) ?: strlen($html);
-        $firstSlide = substr($html, $firstSlideStart, $firstSlideEnd - $firstSlideStart);
-        $this->assertStringContainsString('Tied Winner One', $firstSlide);
-        $this->assertStringContainsString('Tied Winner Two', $firstSlide);
-        $this->assertStringContainsString('Tied Winner Three', $firstSlide);
-        $this->assertStringNotContainsString('Tied Winner Four', $firstSlide, "The first slide's 3 winners must not also include the 4th.");
+        // All 4 tied winners must render inside the SAME winner card (one <article>),
+        // wrapping to a second row of columns rather than splitting into separate cards.
+        $cardStart = strrpos(substr($html, 0, strpos($html, 'Tied Winner One')), '<article');
+        $cardEnd = strpos($html, '</article>', $cardStart);
+        $card = substr($html, $cardStart, $cardEnd - $cardStart);
+        foreach (['Tied Winner One', 'Tied Winner Two', 'Tied Winner Three', 'Tied Winner Four'] as $name) {
+            $this->assertStringContainsString($name, $card, "{$name} must be in the single shared winner card.");
+        }
     }
 
     /**
@@ -1383,19 +1368,19 @@ class FestPublicScoreboardTest extends TestCase
     }
 
     /**
-     * A category board can run to 20-30+ schools on a busy event, and cycling through
-     * every one of them for every category ate into how often the TV got back to the
-     * boards people actually care about (Overall Standings, Latest Item Winners). Each
-     * category board is now capped to the top 2 pages (top 10 schools at
-     * $boardsPerPage=5) — the Overall Standings board is uncapped, since "everyone
-     * deserves to see their own row" applies there but not to a per-category breakdown.
+     * A category board can run to 20-30+ schools on a busy event, and scrolling
+     * through every one of them for every category made the loop back to the boards
+     * people actually care about (Overall Standings, Latest Item Winners) take too
+     * long. Each category board is now capped to the top 15 schools — the Overall
+     * Standings board is uncapped, since "everyone deserves to see their own row"
+     * applies there but not to a per-category breakdown.
      */
-    public function test_tv_category_board_caps_to_top_ten_schools(): void
+    public function test_tv_category_board_caps_to_top_fifteen_schools(): void
     {
-        // 12 schools, each with its own 'hs' item so every school's rank is deterministic
+        // 20 schools, each with its own 'hs' item so every school's rank is deterministic
         // (position 1 in every item, but a descending score re-derives to descending
         // grade points — see markCategoryWinner()'s own comment on this).
-        for ($i = 1; $i <= 12; $i++) {
+        for ($i = 1; $i <= 20; $i++) {
             $school = $this->school("Category Cap School {$i}");
             $item = FestEventItem::create([
                 'event_id' => $this->north->id, 'title' => "Category Cap Item {$i}", 'category' => 'literary',
@@ -1409,12 +1394,12 @@ class FestPublicScoreboardTest extends TestCase
 
         $response = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/tv");
         $html = $response->getContent();
-        $response->assertOk();
+        $response->assertOk()->assertSee('Top 15', false);
 
-        // The category board's own slides are whichever come after its "... Standings"
-        // title through the end of the document (nothing else follows them) — isolates
+        // The category board's own section is whichever comes after its "... Standings"
+        // title through the end of the document (nothing else follows it) — isolates
         // this assertion to just the category board, not the uncapped Overall Standings
-        // slides earlier on the same page. Names/labels render visually uppercase via
+        // section earlier on the same page. Names/labels render visually uppercase via
         // CSS (text-transform), not server-side — the raw HTML keeps the stored case.
         // 'hs' resolves to "Category 3 — Classes 8, 9 & 10" under this fixture's default
         // class-group scheme (not a literal "HS" label) — every item's own winner card
@@ -1426,13 +1411,12 @@ class FestPublicScoreboardTest extends TestCase
         $this->assertNotFalse($categoryBoardStart, "Expected the 'hs' category board (Category 3) to render.");
         $categoryBoardHtml = substr($html, $categoryBoardStart);
 
-        // All 12 schools tie at the same points here (position=1, same grade — the
+        // All 20 schools tie at the same points here (position=1, same grade — the
         // grade/position pair is what actually drives points, not the score value used
-        // above only to keep marks distinguishable), so which 10 schools land on the
+        // above only to keep marks distinguishable), so which 15 schools land on the
         // capped board isn't deterministic — only the COUNT is what this test checks.
         preg_match_all('/title="(Category Cap School \d+)"/', $categoryBoardHtml, $matches);
-        $this->assertCount(10, array_unique($matches[1]), 'Exactly 10 schools (the 2-page cap at 5/page) must appear on the category board, not all 12.');
-        $this->assertStringNotContainsString('Page 3 of', $categoryBoardHtml, 'Must never paginate past the 2-page cap.');
+        $this->assertCount(15, array_unique($matches[1]), 'Exactly 15 schools (the top-15 cap) must appear on the category board, not all 20.');
     }
 
     /**
