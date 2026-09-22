@@ -84,6 +84,12 @@ class RenderContinuousDieIdCardsJob implements ShouldQueue
             $perPage = $gridLayout ? ($gridLayout['cols'] * $gridLayout['rows']) : ($customTemplate?->cards_per_page ?: 4);
             $totalSheets = (int) ceil(count($cards) / $perPage);
 
+            $backgroundUrl = null;
+            if ($customTemplate?->background_path) {
+                $backgroundUrl = TenantStorage::backgroundDataUri($tenant, $customTemplate->background_path)
+                    ?: (($u = TenantStorage::logoUrl($tenant, $customTemplate->background_path)) && ! str_starts_with($u, '/') ? $u : url($u ?? ''));
+            }
+
             // For ultra-high volume events (up to 4,500+ students / 450 sheets):
             // Render in safe, memory-bounded chunks of 20 sheets (e.g. 200 cards).
             // Because each chunk is an exact multiple of $perPage (10 cards),
