@@ -91,6 +91,10 @@
                     <p class="text-xs text-slate-300 max-w-2xl leading-relaxed">
                         Packs all students continuously without empty padding gaps between schools. Eliminates wasted die slots on paper and merges all {{ totalParticipants.toLocaleString() }} students into a single master PDF stored on AWS S3.
                     </p>
+                    <div v-if="continuousStatus === 'rendering' && continuousState.progress_text" class="flex items-center gap-2 pt-1 text-xs text-indigo-300 font-medium">
+                        <svg class="animate-spin h-3.5 w-3.5 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <span>{{ continuousState.progress_text }}</span>
+                    </div>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
