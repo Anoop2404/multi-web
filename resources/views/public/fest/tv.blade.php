@@ -37,7 +37,18 @@
     <div id="tv-section-label" class="mb-2 shrink-0" hidden>
         <div class="flex items-baseline justify-between gap-4 pb-1.5 border-b border-slate-800">
             <h2 id="tv-section-label-title" class="text-xl font-extrabold text-white"></h2>
-            <span id="tv-section-label-subtitle" class="text-sm text-slate-400 font-semibold shrink-0"></span>
+            <div class="flex items-center gap-2 justify-end shrink-0">
+                {{-- The currently-active winner card's own item name (empty/unused for
+                     board/schools sections) — plain text, not a badge, since item
+                     titles run too long to read as a pill. --}}
+                <span id="tv-section-label-item-name" class="text-base font-bold text-white uppercase"></span>
+                {{-- One badge for a board/schools section's own subtitle ("All
+                     Categories", "Top 15 · Provisional"), or up to three (category/
+                     gender/individual-or-group) for the active winner item — built in
+                     JS from whichever element's dataset is active, see updateLabel()
+                     below. --}}
+                <div id="tv-section-label-badges" class="flex flex-wrap gap-1.5 justify-end"></div>
+            </div>
         </div>
         {{-- Duplicates fest-medal-board.blade.php's own header row markup/grid template
              verbatim (kept in sync by hand, not shared, so this TV-only fixed label
@@ -111,8 +122,14 @@
     const winnerItems = Array.from(document.querySelectorAll('[data-tv-winner-item]'));
     const label = document.getElementById('tv-section-label');
     const labelTitle = document.getElementById('tv-section-label-title');
-    const labelSubtitle = document.getElementById('tv-section-label-subtitle');
+    const labelItemName = document.getElementById('tv-section-label-item-name');
+    const labelBadges = document.getElementById('tv-section-label-badges');
     const labelColumns = document.getElementById('tv-section-label-columns');
+    const badgeTone = {
+        category: 'rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs font-bold uppercase tracking-wide px-2.5 py-1',
+        gender: 'rounded-full border border-slate-700 bg-white/5 text-slate-300 text-xs font-bold uppercase tracking-wide px-2.5 py-1',
+        type: 'rounded-full border border-sky-500/30 bg-sky-500/10 text-sky-300 text-xs font-bold uppercase tracking-wide px-2.5 py-1',
+    };
     const prev = document.querySelector('[data-tv-prev]');
     const next = document.querySelector('[data-tv-next]');
     const pause = document.querySelector('[data-tv-pause]');
@@ -149,13 +166,29 @@
         activeWinnerItem = winnerItem;
 
         const title = section?.dataset.title || '';
-        const subtitle = winnerItem
-            ? [winnerItem.dataset.title, winnerItem.dataset.subtitle].filter(Boolean).join(' · ')
-            : (section?.dataset.subtitle || '');
         if (label) label.hidden = ! title;
         if (labelTitle) labelTitle.textContent = title;
-        if (labelSubtitle) labelSubtitle.textContent = subtitle;
         if (labelColumns) labelColumns.style.visibility = (type === 'board' || type === 'schools') ? 'visible' : 'hidden';
+
+        if (labelItemName) labelItemName.textContent = winnerItem ? (winnerItem.dataset.title || '') : '';
+
+        if (labelBadges) {
+            labelBadges.innerHTML = '';
+            const chips = winnerItem
+                ? [
+                    [winnerItem.dataset.category, badgeTone.category],
+                    [winnerItem.dataset.gender, badgeTone.gender],
+                    [winnerItem.dataset.participantType, badgeTone.type],
+                ]
+                : [[section?.dataset.subtitle, badgeTone.gender]];
+            chips.forEach(([text, cls]) => {
+                if (! text) return;
+                const chip = document.createElement('span');
+                chip.className = cls;
+                chip.textContent = text;
+                labelBadges.appendChild(chip);
+            });
+        }
     };
 
     const speedPxPerSec = parseFloat(root.dataset.scrollSpeed) || 55;
