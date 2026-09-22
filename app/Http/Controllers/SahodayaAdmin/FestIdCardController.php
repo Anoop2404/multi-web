@@ -344,7 +344,8 @@ class FestIdCardController extends SahodayaAdminController
             $totalEstimatedPages += $sc['page_count'];
         }
 
-        // Build volumes: group schools so each volume is ~80–120 pages (or ~400-500 students)
+        // Build volumes: group schools into safe batches (~15-20 sheets or ~150-200 students per volume)
+        // to ensure Chromium PDF generation completes in 10-15s and never hits Nginx 60s/120s gateway timeouts.
         $volumes = [];
         $currentVolumeSchools = [];
         $currentVolumePages = 0;
@@ -352,7 +353,10 @@ class FestIdCardController extends SahodayaAdminController
         $volumeIndex = 1;
 
         foreach ($schoolList as $sc) {
-            if ($currentVolumePages > 0 && ($currentVolumePages + $sc['page_count']) > 120) {
+            if ($currentVolumePages > 0 && (
+                ($currentVolumePages + $sc['page_count']) > 20
+                || ($currentVolumeStudents + $sc['participant_count']) > 200
+            )) {
                 $volumes[] = [
                     'volume'         => $volumeIndex++,
                     'school_count'   => count($currentVolumeSchools),
