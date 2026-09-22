@@ -7,24 +7,24 @@
        per-frame updates and fight the animation instead of smoothing it. */
     #tv-viewport { position: relative; overflow: hidden; }
     #tv-scroll-track { position: absolute; top: 0; left: 0; right: 0; }
-    [data-tv-section] { padding-bottom: 3rem; }
+    [data-tv-section] { padding-bottom: 2rem; }
     [data-tv-section]:last-child { padding-bottom: 0; }
     @media (max-height: 800px) {
-        #tv-root { padding-top: .75rem; padding-bottom: .75rem; }
-        [data-tv-header] { margin-bottom: .75rem; padding-bottom: .5rem; }
-        [data-tv-title] { font-size: 1.5rem; margin-top: .125rem; }
-        [data-tv-controls] { margin-top: .5rem; }
+        #tv-root { padding-top: .5rem; padding-bottom: .5rem; }
+        [data-tv-header] { margin-bottom: .5rem; padding-bottom: .375rem; }
+        [data-tv-title] { font-size: 1.25rem; margin-top: .125rem; }
+        [data-tv-controls] { margin-top: .375rem; }
     }
 </style>
-<div class="px-10 py-5 h-full flex flex-col" id="tv-root" data-scroll-speed="55" data-dwell-ms="2500" data-min-loop-ms="60000" data-max-loop-ms="240000">
-    <header data-tv-header class="flex items-start justify-between gap-8 mb-5 pb-4 border-b border-slate-800 shrink-0">
+<div class="px-8 py-3 h-full flex flex-col" id="tv-root" data-scroll-speed="55" data-dwell-ms="2500" data-min-loop-ms="60000" data-max-loop-ms="240000">
+    <header data-tv-header class="flex items-start justify-between gap-8 mb-3 pb-2 border-b border-slate-800 shrink-0">
         <div class="min-w-0">
-            <p class="text-amber-400 font-extrabold uppercase tracking-widest text-lg">{{ $tenant->name ?? 'Sahodaya' }} · Results Display</p>
-            <h1 data-tv-title class="text-4xl font-extrabold font-heading text-white mt-1 leading-tight line-clamp-2">{{ $event->title }}</h1>
+            <p class="text-amber-400 font-extrabold uppercase tracking-widest text-sm">{{ $tenant->name ?? 'Sahodaya' }} · Results Display</p>
+            <h1 data-tv-title class="text-2xl font-extrabold font-heading text-white leading-tight line-clamp-1">{{ $event->title }}</h1>
         </div>
         <div class="text-right shrink-0">
-            <div id="tv-clock" class="text-4xl font-mono font-extrabold text-amber-400 tracking-wider">--:--:--</div>
-            <p class="text-lg text-slate-400 mt-1">{{ $event->status === 'completed' ? 'Final results' : ($isPublished ? 'Published results' : 'Provisional — not yet published') }}</p>
+            <div id="tv-clock" class="text-2xl font-mono font-extrabold text-amber-400 tracking-wider">--:--:--</div>
+            <p class="text-sm text-slate-400">{{ $event->status === 'completed' ? 'Final results' : ($isPublished ? 'Published results' : 'Provisional — not yet published') }}</p>
         </div>
     </header>
 
@@ -34,10 +34,10 @@
          category is on screen. JS keeps this in sync with whichever section is
          currently under the top of the viewport, so the identity stays visible
          throughout the scroll, not just at the moment it first comes into view. --}}
-    <div id="tv-section-label" class="mb-4 shrink-0" hidden>
-        <div class="flex items-baseline justify-between gap-4 pb-3 border-b border-slate-800">
-            <h2 id="tv-section-label-title" class="text-3xl font-extrabold text-white"></h2>
-            <span id="tv-section-label-subtitle" class="text-lg text-slate-400 font-semibold shrink-0"></span>
+    <div id="tv-section-label" class="mb-2 shrink-0" hidden>
+        <div class="flex items-baseline justify-between gap-4 pb-1.5 border-b border-slate-800">
+            <h2 id="tv-section-label-title" class="text-xl font-extrabold text-white"></h2>
+            <span id="tv-section-label-subtitle" class="text-sm text-slate-400 font-semibold shrink-0"></span>
         </div>
         {{-- Duplicates fest-medal-board.blade.php's own header row markup/grid template
              verbatim (kept in sync by hand, not shared, so this TV-only fixed label
@@ -48,14 +48,18 @@
              even while showing a winners section, or the label bar's own height would
              change as sections change — shrinking/growing the viewport height JS
              measured once at load, and throwing off every waypoint computed from it. --}}
-        <div id="tv-section-label-columns" class="grid grid-cols-[4.5rem_1fr_repeat(4,5rem)_7rem] gap-2 px-5 py-2 mt-3 bg-white/5 border border-slate-800 rounded-t-2xl text-sm font-extrabold uppercase tracking-wider text-slate-400" style="visibility:hidden">
-            <span>Rank</span>
-            <span>School</span>
-            <span class="flex flex-col items-center justify-center gap-0.5"><img src="{{ asset('images/fest/medals/rank-1.webp') }}" alt="Points from 1st place" class="w-8 h-8"><span class="normal-case text-xs font-semibold tracking-normal text-slate-500">pts</span></span>
-            <span class="flex flex-col items-center justify-center gap-0.5"><img src="{{ asset('images/fest/medals/rank-2.webp') }}" alt="Points from 2nd place" class="w-8 h-8"><span class="normal-case text-xs font-semibold tracking-normal text-slate-500">pts</span></span>
-            <span class="flex flex-col items-center justify-center gap-0.5"><img src="{{ asset('images/fest/medals/rank-3.webp') }}" alt="Points from 3rd place" class="w-8 h-8"><span class="normal-case text-xs font-semibold tracking-normal text-slate-500">pts</span></span>
-            <span class="flex flex-col items-center justify-center gap-0.5"><span>Grade</span><span class="normal-case text-xs font-semibold tracking-normal text-slate-500">pts</span></span>
-            <span class="text-right">Total Points</span>
+        {{-- Column widths must match fest-medal-board.blade.php's actual row grid
+             exactly (grid-cols-[4.5rem_1fr_repeat(4,5rem)_7rem]) or this header
+             visually misaligns with the real rows scrolling underneath it — only the
+             row's own height/padding shrinks here, not its column widths. --}}
+        <div id="tv-section-label-columns" class="grid grid-cols-[4.5rem_1fr_repeat(4,5rem)_7rem] gap-2 px-5 py-1 mt-1.5 bg-white/5 border border-slate-800 rounded-t-xl text-xs font-extrabold uppercase tracking-wider text-slate-400" style="visibility:hidden">
+            <span class="self-center">Rank</span>
+            <span class="self-center">School</span>
+            <span class="flex items-center justify-center gap-1"><img src="{{ asset('images/fest/medals/rank-1.webp') }}" alt="Points from 1st place" class="w-5 h-5"><span class="normal-case text-[0.65rem] font-semibold tracking-normal text-slate-500">pts</span></span>
+            <span class="flex items-center justify-center gap-1"><img src="{{ asset('images/fest/medals/rank-2.webp') }}" alt="Points from 2nd place" class="w-5 h-5"><span class="normal-case text-[0.65rem] font-semibold tracking-normal text-slate-500">pts</span></span>
+            <span class="flex items-center justify-center gap-1"><img src="{{ asset('images/fest/medals/rank-3.webp') }}" alt="Points from 3rd place" class="w-5 h-5"><span class="normal-case text-[0.65rem] font-semibold tracking-normal text-slate-500">pts</span></span>
+            <span class="flex items-center justify-center gap-1"><span>Grade</span><span class="normal-case text-[0.65rem] font-semibold tracking-normal text-slate-500">pts</span></span>
+            <span class="self-center text-right">Total Points</span>
         </div>
     </div>
 
@@ -85,14 +89,14 @@
         </div>
     </div>
 
-    <div data-tv-controls class="flex items-center justify-center gap-3 mt-4 shrink-0" aria-label="Display controls">
+    <div data-tv-controls class="flex items-center justify-center gap-2 mt-2 shrink-0" aria-label="Display controls">
         @if(count($sections) > 1)
-        <button type="button" data-tv-prev class="w-11 h-11 rounded-xl border border-slate-700 bg-slate-900 text-white/70 hover:text-white hover:border-amber-500/50 text-lg" aria-label="Previous section">←</button>
-        <button type="button" data-tv-pause class="min-w-28 h-11 rounded-xl border border-slate-700 bg-slate-900 px-3 text-sm font-bold text-white/70 hover:text-white hover:border-amber-500/50" aria-pressed="false">Pause</button>
+        <button type="button" data-tv-prev class="w-8 h-8 rounded-lg border border-slate-700 bg-slate-900 text-white/70 hover:text-white hover:border-amber-500/50 text-sm" aria-label="Previous section">←</button>
+        <button type="button" data-tv-pause class="min-w-24 h-8 rounded-lg border border-slate-700 bg-slate-900 px-3 text-xs font-bold text-white/70 hover:text-white hover:border-amber-500/50" aria-pressed="false">Pause</button>
         @endif
-        <button type="button" data-tv-fullscreen class="min-w-28 h-11 rounded-xl border border-slate-700 bg-slate-900 px-3 text-sm font-bold text-white/70 hover:text-white hover:border-amber-500/50">Fullscreen</button>
+        <button type="button" data-tv-fullscreen class="min-w-24 h-8 rounded-lg border border-slate-700 bg-slate-900 px-3 text-xs font-bold text-white/70 hover:text-white hover:border-amber-500/50">Fullscreen</button>
         @if(count($sections) > 1)
-        <button type="button" data-tv-next class="w-11 h-11 rounded-xl border border-slate-700 bg-slate-900 text-white/70 hover:text-white hover:border-amber-500/50 text-lg" aria-label="Next section">→</button>
+        <button type="button" data-tv-next class="w-8 h-8 rounded-lg border border-slate-700 bg-slate-900 text-white/70 hover:text-white hover:border-amber-500/50 text-sm" aria-label="Next section">→</button>
         @endif
     </div>
 </div>
