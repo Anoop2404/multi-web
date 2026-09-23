@@ -87,7 +87,7 @@ const nav = computed(() => visibleStateNav(stateEventWorkspaceNav(props.event.id
 
 // Only the Overview exists so far; the rest land with their phases. Listed here rather than guessed
 // from the nav so a half-built screen can never be linked to by accident.
-const READY = ['', '/slots', '/reports'];
+const READY = ['', '/slots', '/reports', '/settings', '/items', '/venues', '/staff'];
 function isReady(href) {
     const tail = href.replace(`/admin/state/fest/${props.event.id}`, '');
     return READY.includes(tail);

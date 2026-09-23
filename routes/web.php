@@ -164,6 +164,29 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
                 ->middleware('state.fest:view')
                 ->name('overview');
 
+            $config = \App\Http\Controllers\StateAdmin\Fest\StateEventConfigController::class;
+
+            // Settings change how the event behaves — windows, locking, what the public sees — so
+            // they sit behind the settings capability, not catalog.
+            Route::middleware('state.fest:settings')->group(function () use ($config) {
+                Route::get('/{event}/settings', [$config, 'settings'])->name('settings');
+                Route::post('/{event}/settings', [$config, 'saveSettings'])->name('settings.save');
+                Route::get('/{event}/staff', [$config, 'staff'])->name('staff');
+                Route::post('/{event}/staff', [$config, 'storeStaff'])->name('staff.store');
+                Route::delete('/{event}/staff/{staff}', [$config, 'destroyStaff'])->name('staff.destroy');
+            });
+
+            Route::middleware('state.fest:catalog')->group(function () use ($config) {
+                Route::get('/{event}/items', [$config, 'items'])->name('items');
+            });
+
+            // Venues belong to the schedule: whoever plans where items happen manages the places.
+            Route::middleware('state.fest:schedule')->group(function () use ($config) {
+                Route::get('/{event}/venues', [$config, 'venues'])->name('venues');
+                Route::post('/{event}/venues', [$config, 'storeVenue'])->name('venues.store');
+                Route::delete('/{event}/venues/{venue}', [$config, 'destroyVenue'])->name('venues.destroy');
+            });
+
             // Reports are read-only, so a report user reaches them without any write capability.
             Route::middleware('state.fest:reports')->group(function () {
                 Route::get('/{event}/reports', [\App\Http\Controllers\StateAdmin\Fest\StateReportController::class, 'index'])->name('reports');
