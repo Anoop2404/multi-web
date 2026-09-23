@@ -303,11 +303,20 @@ class StateQualifierReviewController extends Controller
         $result = $materializer->materializeApprovedIntake($intake);
 
         $program = FestStateProgram::find($intake->state_program_id);
-        $sahodaya = Tenant::query()->where('type', 'sahodaya')->find($intake->source_tenant_id);
-        if ($program && $sahodaya && $intake->entries()->where('status', 'approved')->exists()) {
-            // Fixed per-Sahodaya fee by default; calculateDemandFor() honours a program that
-            // deliberately opts into per-item billing instead.
-            $remittances->calculateDemandFor($program, $sahodaya);
+        if ($program && $intake->entries()->where('status', 'approved')->exists()) {
+            $sahodaya = Tenant::query()->where('type', 'sahodaya')->find($intake->source_tenant_id);
+
+            if ($sahodaya) {
+                // Fixed per-Sahodaya fee by default; calculateDemandFor() honours a program that
+                // deliberately opts into per-item billing instead.
+                $remittances->calculateDemandFor($program, $sahodaya);
+            } else {
+                // An outside Sahodaya is not a Tenant — its intakes are keyed "external:{uuid}", so
+                // the lookup above returns null. It still takes part and still owes the fixed fee;
+                // raising no demand at all is how every outside Sahodaya was silently billed
+                // nothing.
+                $remittances->calculateFixedDemandForSource($program, (string) $intake->source_tenant_id);
+            }
         }
 
         return back()->with(

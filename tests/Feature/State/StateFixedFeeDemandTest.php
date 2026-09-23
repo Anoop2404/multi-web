@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\State;
 
+use App\Models\ExternalSahodaya;
 use App\Models\FestStateProgram;
 use App\Models\FestStateProgramItem;
 use App\Models\State\StateQualifierEntry;
@@ -119,6 +120,26 @@ class StateFixedFeeDemandTest extends TestCase
 
         // 1000 base + 4 x 250 item fee
         $this->assertSame('2000.00', (string) $remittance->amount);
+    }
+
+    public function test_an_outside_sahodaya_is_billed_the_same_fixed_fee(): void
+    {
+        // An outside Sahodaya is not a Tenant — its intakes and remittances are keyed
+        // "external:{uuid}". It still takes part in the State event, so it still owes the fee;
+        // approval used to raise a demand only when the source resolved to a Tenant, which billed
+        // every outside Sahodaya nothing at all.
+        $program = $this->program(['sahodaya_registration_fee' => 1000]);
+        $outside = ExternalSahodaya::create([
+            'state_program_id' => $program->id, 'name' => 'Kasaragod Sahodaya',
+            'district' => 'KASARAGOD', 'access_code' => 'KSGD'.Str::upper(Str::random(4)), 'status' => 'active',
+        ]);
+
+        $remittance = app(StateRemittanceService::class)
+            ->calculateFixedDemandForSource($program, 'external:'.$outside->id);
+
+        $this->assertSame('1000.00', (string) $remittance->amount);
+        $this->assertSame('external:'.$outside->id, $remittance->sahodaya_id);
+        $this->assertSame(1, $remittance->lines()->count());
     }
 
     public function test_a_submitted_remittance_is_never_silently_recalculated(): void

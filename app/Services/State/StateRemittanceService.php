@@ -84,8 +84,21 @@ class StateRemittanceService
      */
     public function calculateFixedDemand(FestStateProgram $program, Tenant $sahodaya): StateRemittance
     {
+        return $this->calculateFixedDemandForSource($program, $sahodaya->id);
+    }
+
+    /**
+     * Same fixed demand, addressed by the intake's source key rather than a Tenant, because a
+     * Sahodaya that has not been promoted yet is not a tenant at all: its intakes and its
+     * remittances are both keyed "external:{uuid}" (see ExternalIntakeService::openDraftIntake and
+     * the portal's own fee submission). It still takes part in the State event, so it still owes
+     * the fixed fee — approval used to raise a demand only when the source resolved to a Tenant,
+     * which silently billed nothing to every outside Sahodaya.
+     */
+    public function calculateFixedDemandForSource(FestStateProgram $program, string $sourceKey): StateRemittance
+    {
         $remittance = StateRemittance::firstOrNew([
-            'sahodaya_id'   => $sahodaya->id,
+            'sahodaya_id'   => $sourceKey,
             'academic_year' => $program->academic_year ?? '2026-2027',
             'title'         => "{$program->title} — State Remittance Demand",
         ]);
@@ -101,7 +114,7 @@ class StateRemittanceService
         $approvedCount = StateQualifierEntry::where('status', 'approved')
             ->whereHas('intake', fn ($query) => $query
                 ->where('state_program_id', $program->id)
-                ->where('source_tenant_id', $sahodaya->id))
+                ->where('source_tenant_id', $sourceKey))
             ->count();
 
         $remittance->fill([
