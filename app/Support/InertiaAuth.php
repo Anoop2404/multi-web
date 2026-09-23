@@ -67,14 +67,8 @@ class InertiaAuth
 
         $path = parse_url($url, PHP_URL_PATH) ?? $url;
 
-        if (method_exists($user, 'isSuperAdmin') && ! $user->isSuperAdmin()) {
-            if (in_array($path, ['/dashboard', '/schools', '/tenants', '/states', '/announcements'], true)
-                || str_starts_with($path, '/schools/')
-                || str_starts_with($path, '/tenants/')
-                || str_starts_with($path, '/states/')
-                || str_starts_with($path, '/announcements/')) {
-                return true;
-            }
+        if (method_exists($user, 'isSuperAdmin') && ! $user->isSuperAdmin() && self::requiresSuperAdmin($path)) {
+            return true;
         }
 
         if (method_exists($user, 'hasAnyRole') && $user->hasAnyRole(['school_admin', 'school_staff', 'school_principal', 'school_vice_principal'])) {
@@ -84,6 +78,25 @@ class InertiaAuth
         }
 
         return false;
+    }
+
+    /**
+     * A stale `url.intended` pointing at a route now (or still) behind 'super.admin'
+     * must never be honored for a non-superadmin — otherwise a login just bounces
+     * them straight into EnsureSuperAdmin's 403 with no way to reach their own
+     * dashboard. Matched against the live route table instead of a hardcoded path
+     * list, since that list silently fell behind as super.admin-gated prefixes
+     * (builder, master-data, skin-presets, billing) were added later.
+     */
+    private static function requiresSuperAdmin(string $path): bool
+    {
+        try {
+            $route = app('router')->getRoutes()->match(Request::create($path, 'GET'));
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return in_array('super.admin', $route->gatherMiddleware(), true);
     }
 
     private static function isSameOrigin(Request $request, string $url): bool
