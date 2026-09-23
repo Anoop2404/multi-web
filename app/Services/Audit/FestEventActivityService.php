@@ -19,9 +19,9 @@ class FestEventActivityService
     }
 
     /** @return array{logs: Collection<int, array<string, mixed>>, total: int} */
-    public function forEvent(FestEvent $event, int $limit = 200, ?string $page = null, ?int $itemId = null, ?string $search = null, int $offset = 0): array
+    public function forEvent(FestEvent $event, int $limit = 200, ?string $page = null, ?int $itemId = null, ?string $search = null, int $offset = 0, ?string $schoolId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
-        return $this->query($event, $page, $limit, $itemId, $search, $offset);
+        return $this->query($event, $page, $limit, $itemId, $search, $offset, $schoolId, $dateFrom, $dateTo);
     }
 
     /** @return list<array<string, mixed>> */
@@ -75,9 +75,10 @@ class FestEventActivityService
     }
 
     /** @return array{logs: Collection<int, array<string, mixed>>, total: int} */
-    private function query(FestEvent $event, ?string $page, int $limit, ?int $itemId = null, ?string $search = null, int $offset = 0): array
+    private function query(FestEvent $event, ?string $page, int $limit, ?int $itemId = null, ?string $search = null, int $offset = 0, ?string $schoolId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $morph = (new FestEvent)->getMorphClass();
+        $registrationMorph = (new FestRegistration)->getMorphClass();
         $eventId = (string) $event->id;
         $reportableEventIds = $event->reportableEventIds();
 
@@ -99,6 +100,19 @@ class FestEventActivityService
                 ->all();
         }
 
+        $schoolParticipantIds = [];
+        $schoolRegistrationIds = [];
+        if ($schoolId !== null && $schoolId !== '') {
+            $schoolParticipantIds = FestParticipant::whereHas('registration', fn ($q) => 
+                $q->whereIn('event_id', $reportableEventIds)->where('school_id', $schoolId)
+            )->pluck('id')->all();
+
+            $schoolRegistrationIds = FestRegistration::whereIn('event_id', $reportableEventIds)
+                ->where('school_id', $schoolId)
+                ->pluck('id')
+                ->all();
+        }
+
         $builder = AuditLog::query()
             ->with('user:id,name,email')
             ->where(function ($q) use ($morph, $eventId, $reportableEventIds) {
@@ -106,11 +120,34 @@ class FestEventActivityService
                     $q2->where('subject_type', $morph)->where('subject_id', $eventId);
                 })->orWhereIn('properties->event_id', $reportableEventIds);
             })
+            ->when($dateFrom !== null && $dateFrom !== '', fn ($q) => $q->whereDate('created_at', '>=', $dateFrom))
+            ->when($dateTo !== null && $dateTo !== '', fn ($q) => $q->whereDate('created_at', '<=', $dateTo))
             ->when($page !== null && $page !== '', fn ($q) => $q->where('properties->page', $page))
             ->when($itemId !== null, function ($q) use ($itemId) {
                 $q->where(function ($q2) use ($itemId) {
                     $q2->where('properties->item_id', $itemId)
                        ->orWhere('properties->item_id', (string) $itemId);
+                });
+            })
+            ->when($schoolId !== null && $schoolId !== '', function ($q) use ($schoolId, $schoolParticipantIds, $schoolRegistrationIds, $registrationMorph) {
+                $q->where(function ($q2) use ($schoolId, $schoolParticipantIds, $schoolRegistrationIds, $registrationMorph) {
+                    $q2->where('properties->school_id', $schoolId)
+                       ->orWhere('properties->school_id', (string) $schoolId);
+
+                    if (! empty($schoolRegistrationIds)) {
+                        $q2->orWhere(function ($q3) use ($registrationMorph, $schoolRegistrationIds) {
+                            $q3->where('subject_type', $registrationMorph)
+                               ->whereIn('subject_id', $schoolRegistrationIds);
+                        });
+                    }
+
+                    if (! empty($schoolParticipantIds)) {
+                        foreach ($schoolParticipantIds as $pid) {
+                            $q2->orWhere('properties->participant_id', $pid)
+                               ->orWhere('properties->participant_id', (string) $pid)
+                               ->orWhere('description', 'LIKE', "%participant #{$pid}%");
+                        }
+                    }
                 });
             })
             ->when($search !== null && $search !== '', function ($q) use ($search, $searchParticipantIds) {
@@ -331,6 +368,7 @@ class FestEventActivityService
                 'chest_no'      => $chestNo,
                 'participant'   => $personName,
                 'school'        => $schoolName,
+                'school_id'     => isset($props['school_id']) ? (string) $props['school_id'] : ($participant?->registration?->school_id ? (string) $participant->registration->school_id : ($registration?->school_id ? (string) $registration->school_id : null)),
                 'reg_no'        => $regNo,
                 'reason'        => $props['reason'] ?? null,
                 'ip_address'    => $log->ip_address,
@@ -341,6 +379,10 @@ class FestEventActivityService
                 'created_at'    => $log->created_at?->toIso8601String(),
             ];
         });
+
+        if ($schoolId !== null && $schoolId !== '') {
+            $mapped = $mapped->filter(fn ($row) => ($row['school_id'] ?? null) === (string) $schoolId)->values();
+        }
 
         if ($search !== null && $search !== '') {
             $rawTerms = array_filter(explode(' ', strtolower(trim($search))));

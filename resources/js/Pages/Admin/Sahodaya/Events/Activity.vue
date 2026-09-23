@@ -2,25 +2,54 @@
     <SahodayaEventsLayout :title="`${event.title} — Activity`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Activity log`" eyebrow="Activity log"
-                    description="All actions across this event, filterable by item, category, chest #, school, IP, or keywords." />
+                    description="All actions across this event, filterable by item, category, school, chest #, IP, dates, or keywords.">
+            <template #actions>
+                <button
+                    @click="exportCsv"
+                    type="button"
+                    class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition"
+                    :title="hasActiveFilters ? 'Download filtered logs matching your current filters as CSV' : 'Download all activity logs as CSV'">
+                    <span>📥</span>
+                    <span>{{ hasActiveFilters ? 'Download Filtered Logs' : 'Download All Logs' }} (CSV)</span>
+                    <span v-if="pagination.total > 0" class="rounded-full bg-emerald-800/80 px-2 py-0.5 text-[10px] font-mono">
+                        {{ pagination.total.toLocaleString() }}
+                    </span>
+                </button>
+            </template>
+        </PageHeader>
 
         <SportsSetupSubNav v-if="event.event_type === 'sports'" :sahodaya-id="sahodaya.id" :event-id="event.id" active="activity" :event="event" />
         <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="activity" />
 
         <!-- Filters Bar -->
-        <div class="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div class="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Search Keywords</label>
-                    <input v-model="searchQuery" @input="onSearchInput" type="search" placeholder="Chest #, reg #, participant, school, IP..." class="w-full rounded-xl border-slate-300 text-xs shadow-sm focus:border-amber-500 focus:ring-amber-500" />
+                    <input v-model="searchQuery" @input="onSearchInput" type="search" placeholder="Chest #, reg #, student, school, IP..." class="w-full rounded-xl border-slate-300 text-xs shadow-sm focus:border-amber-500 focus:ring-amber-500" />
                 </div>
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Filter by Item & Category</label>
                     <SearchableSelect v-model="selectedItem" @change="() => applyFilters(1)" :options="itemOptions" :all-option="true" :all-label="`All Items (${items.length})`" class="w-full" placeholder="All Items" search-placeholder="Search items…" />
                 </div>
                 <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Filter by Page</label>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Filter by School</label>
+                    <SearchableSelect v-model="selectedSchool" @change="() => applyFilters(1)" :options="schoolOptions" :all-option="true" :all-label="`All Schools (${schools.length})`" class="w-full" placeholder="All Schools" search-placeholder="Search schools…" />
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Filter by Module / Page</label>
                     <SearchableSelect v-model="selectedPage" @change="() => applyFilters(1)" :options="pageOptions" :all-option="true" all-label="All Pages" class="w-full" placeholder="All Pages" search-placeholder="Search pages…" />
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 pt-1 border-t border-slate-100 items-end">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">From Date</label>
+                    <input v-model="dateFrom" @change="() => applyFilters(1)" type="date" class="w-full rounded-xl border-slate-300 text-xs shadow-sm focus:border-amber-500 focus:ring-amber-500" />
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">To Date</label>
+                    <input v-model="dateTo" @change="() => applyFilters(1)" type="date" class="w-full rounded-xl border-slate-300 text-xs shadow-sm focus:border-amber-500 focus:ring-amber-500" />
                 </div>
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Logs to Display</label>
@@ -32,14 +61,39 @@
                         <option value="all">View All (up to 5,000)</option>
                     </select>
                 </div>
-                <div class="flex items-end gap-2">
+                <div class="flex items-center gap-2">
                     <button v-if="hasActiveFilters" @click="clearFilters" type="button" class="flex-1 rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 transition text-center">
-                        Reset
+                        Reset Filters
                     </button>
-                    <button @click="exportCsv" type="button" class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition whitespace-nowrap shadow-sm" title="Export matching logs as CSV">
+                    <button @click="exportCsv" type="button" class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition whitespace-nowrap shadow-sm" :title="hasActiveFilters ? 'Download filtered logs as CSV' : 'Download all logs as CSV'">
                         <span>📥</span> Export CSV
                     </button>
                 </div>
+            </div>
+
+            <!-- Active Filters Summary Chips -->
+            <div v-if="hasActiveFilters" class="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-xs">
+                <span class="text-slate-400 font-medium text-[11px] uppercase tracking-wider">Active Filters:</span>
+                <span v-if="searchQuery && searchQuery.toLowerCase().trim() !== 'all'" class="inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-200 px-2 py-0.5 text-amber-800 font-medium">
+                    Search: "{{ searchQuery }}"
+                    <button @click="clearSearch" type="button" class="hover:text-amber-950 font-bold ml-0.5">×</button>
+                </span>
+                <span v-if="selectedItem" class="inline-flex items-center gap-1 rounded-md bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-indigo-800 font-medium">
+                    Item: {{ activeItemTitle }}
+                    <button @click="clearItem" type="button" class="hover:text-indigo-950 font-bold ml-0.5">×</button>
+                </span>
+                <span v-if="selectedSchool" class="inline-flex items-center gap-1 rounded-md bg-blue-50 border border-blue-200 px-2 py-0.5 text-blue-800 font-medium">
+                    School: {{ activeSchoolName }}
+                    <button @click="clearSchool" type="button" class="hover:text-blue-950 font-bold ml-0.5">×</button>
+                </span>
+                <span v-if="selectedPage" class="inline-flex items-center gap-1 rounded-md bg-slate-100 border border-slate-300 px-2 py-0.5 text-slate-800 font-medium">
+                    Page: {{ pageLabels[selectedPage] || selectedPage }}
+                    <button @click="clearPage" type="button" class="hover:text-slate-950 font-bold ml-0.5">×</button>
+                </span>
+                <span v-if="dateFrom || dateTo" class="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-emerald-800 font-medium">
+                    Date: {{ dateFrom || 'Start' }} → {{ dateTo || 'Now' }}
+                    <button @click="clearDates" type="button" class="hover:text-emerald-950 font-bold ml-0.5">×</button>
+                </span>
             </div>
         </div>
 
@@ -292,7 +346,10 @@ const props = defineProps({
 
 const searchQuery = ref(props.filters?.q ?? '');
 const selectedItem = ref(props.filters?.item_id ?? null);
+const selectedSchool = ref(props.filters?.school_id ?? null);
 const selectedPage = ref(props.filters?.page ?? null);
+const dateFrom = ref(props.filters?.date_from ?? '');
+const dateTo = ref(props.filters?.date_to ?? '');
 const selectedLimit = ref(props.filters?.limit ?? '200');
 
 const selectedLog = ref(null);
@@ -301,7 +358,10 @@ const hasActiveFilters = computed(() => {
     const q = searchQuery.value?.trim();
     return (!!q && q.toLowerCase() !== 'all')
         || selectedItem.value !== null
+        || selectedSchool.value !== null
         || selectedPage.value !== null
+        || !!dateFrom.value
+        || !!dateTo.value
         || selectedLimit.value !== '200';
 });
 
@@ -310,7 +370,22 @@ const itemOptions = computed(() => props.items.map(it => ({
     label: `${it.item_code ? `[${it.item_code}] ` : ''}${it.title}${it.category ? ` — ${it.category}` : ''}`,
 })));
 
+const schoolOptions = computed(() => props.schools.map(s => ({
+    value: s.id,
+    label: s.name,
+})));
+
 const pageOptions = computed(() => Object.entries(props.pageLabels || {}).map(([key, label]) => ({ value: key, label })));
+
+const activeItemTitle = computed(() => {
+    const found = props.items.find(i => i.id === selectedItem.value);
+    return found ? `${found.item_code ? `[${found.item_code}] ` : ''}${found.title}` : selectedItem.value;
+});
+
+const activeSchoolName = computed(() => {
+    const found = props.schools.find(s => s.id === selectedSchool.value);
+    return found ? found.name : selectedSchool.value;
+});
 
 const visiblePages = computed(() => {
     const total = props.pagination?.last_page || 1;
@@ -377,7 +452,10 @@ function applyFilters(page = 1) {
         {
             q: (qVal && qVal.toLowerCase() !== 'all') ? qVal : undefined,
             item_id: selectedItem.value || undefined,
+            school_id: selectedSchool.value || undefined,
             page: selectedPage.value || undefined,
+            date_from: dateFrom.value || undefined,
+            date_to: dateTo.value || undefined,
             limit: selectedLimit.value !== '200' ? selectedLimit.value : undefined,
             p: page > 1 ? page : undefined,
         },
@@ -394,10 +472,39 @@ function changeLimit() {
     applyFilters(1);
 }
 
+function clearSearch() {
+    searchQuery.value = '';
+    applyFilters(1);
+}
+
+function clearItem() {
+    selectedItem.value = null;
+    applyFilters(1);
+}
+
+function clearSchool() {
+    selectedSchool.value = null;
+    applyFilters(1);
+}
+
+function clearPage() {
+    selectedPage.value = null;
+    applyFilters(1);
+}
+
+function clearDates() {
+    dateFrom.value = '';
+    dateTo.value = '';
+    applyFilters(1);
+}
+
 function clearFilters() {
     searchQuery.value = '';
     selectedItem.value = null;
+    selectedSchool.value = null;
     selectedPage.value = null;
+    dateFrom.value = '';
+    dateTo.value = '';
     selectedLimit.value = '200';
     applyFilters(1);
 }
@@ -408,7 +515,10 @@ function exportCsv() {
     params.set('export', 'csv');
     if (qVal && qVal.toLowerCase() !== 'all') params.set('q', qVal);
     if (selectedItem.value) params.set('item_id', selectedItem.value);
+    if (selectedSchool.value) params.set('school_id', selectedSchool.value);
     if (selectedPage.value) params.set('page', selectedPage.value);
+    if (dateFrom.value) params.set('date_from', dateFrom.value);
+    if (dateTo.value) params.set('date_to', dateTo.value);
 
     window.location.href = `${window.location.pathname}?${params.toString()}`;
 }

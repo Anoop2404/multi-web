@@ -19,6 +19,9 @@ class FestEventActivityController extends SahodayaAdminController
 
         $page = $request->input('page') ?: null;
         $itemId = $request->integer('item_id') ?: null;
+        $schoolId = $request->input('school_id') ?: null;
+        $dateFrom = $request->input('date_from') ?: null;
+        $dateTo = $request->input('date_to') ?: null;
         $search = $request->input('q') ?: null;
         if ($search !== null && strtolower(trim($search)) === 'all') {
             $search = null;
@@ -26,10 +29,17 @@ class FestEventActivityController extends SahodayaAdminController
 
         $activityService = app(FestEventActivityService::class);
 
-        // CSV Export
+        // CSV Export based on active filters
         if ($request->boolean('export') || $request->input('export') === 'csv') {
-            $result = $activityService->forEvent($event, 10000, $page, $itemId, $search, 0);
-            return $this->exportCsv($result['logs'], $event);
+            $result = $activityService->forEvent($event, 10000, $page, $itemId, $search, 0, $schoolId, $dateFrom, $dateTo);
+            return $this->exportCsv($result['logs'], $event, [
+                'page'      => $page,
+                'item_id'   => $itemId,
+                'school_id' => $schoolId,
+                'date_from' => $dateFrom,
+                'date_to'   => $dateTo,
+                'search'    => $search,
+            ]);
         }
 
         $limitInput = strtolower(trim((string) $request->input('limit', '200')));
@@ -43,7 +53,7 @@ class FestEventActivityController extends SahodayaAdminController
             $offset = ($pageNum - 1) * $perPage;
         }
 
-        $result = $activityService->forEvent($event, $perPage, $page, $itemId, $search, $offset);
+        $result = $activityService->forEvent($event, $perPage, $page, $itemId, $search, $offset, $schoolId, $dateFrom, $dateTo);
 
         $logs = $result['logs']
             ->map(fn (array $log) => array_merge($log, [
@@ -86,11 +96,14 @@ class FestEventActivityController extends SahodayaAdminController
             'items'        => $items,
             'schools'      => $schools,
             'filters'      => [
-                'page'    => $page,
-                'item_id' => $itemId,
-                'q'       => $request->input('q') ?: null,
-                'limit'   => $limitInput,
-                'p'       => $pageNum,
+                'page'      => $page,
+                'item_id'   => $itemId,
+                'school_id' => $schoolId,
+                'date_from' => $dateFrom,
+                'date_to'   => $dateTo,
+                'q'         => $request->input('q') ?: null,
+                'limit'     => $limitInput,
+                'p'         => $pageNum,
             ],
             'pagination'   => [
                 'total'        => $total,
@@ -105,10 +118,26 @@ class FestEventActivityController extends SahodayaAdminController
 
     /**
      * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $logs
+     * @param  array<string, mixed>  $filters
      */
-    protected function exportCsv($logs, FestEvent $event): StreamedResponse
+    protected function exportCsv($logs, FestEvent $event, array $filters = []): StreamedResponse
     {
-        $filename = str($event->title)->slug()->limit(40) . '-activity-log-' . now()->format('Ymd-His') . '.csv';
+        $parts = [str($event->title)->slug()->limit(25)];
+        if (! empty($filters['page'])) {
+            $parts[] = str($filters['page'])->slug()->limit(15);
+        }
+        if (! empty($filters['item_id'])) {
+            $parts[] = "item-{$filters['item_id']}";
+        }
+        if (! empty($filters['school_id'])) {
+            $parts[] = 'school';
+        }
+        if (! empty($filters['search'])) {
+            $parts[] = 'search-' . str($filters['search'])->slug()->limit(15);
+        }
+        $parts[] = 'activity-log';
+        $parts[] = now()->format('Ymd-His');
+        $filename = implode('-', $parts) . '.csv';
 
         return response()->streamDownload(function () use ($logs) {
             $out = fopen('php://output', 'w');
