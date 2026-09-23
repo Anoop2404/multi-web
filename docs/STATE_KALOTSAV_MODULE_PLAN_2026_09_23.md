@@ -54,7 +54,7 @@ Sahodaya keeps **one canonical identity** — never counted twice.
 | 2 | State application shell — sidebar, event workspace, tabs, permissions, event switcher, shared filter bar, activity log | ✅ **built 2026-09-23** (activity log tab pending) |
 | 3 | Program and event configuration | ✅ **built 2026-09-23** — slots, settings/windows, venues & stages, event staff, item catalog. Grade/point rules deferred to Phase 7, where they are used |
 | 4 | Qualifier and registration workflow | ✅ **complete 2026-09-23** — submissions, scrutiny, approvals, registrations, teams & squads, substitutions, quota and window enforcement |
-| 5 | Pre-event operations — chest numbers, ID/admit cards, scheduling, clashes, performance order, green room, attendance sheets, judge assignment | not started |
+| 5 | Pre-event operations | ✅ **mostly built 2026-09-23** — schedule, clashes, green room, chest numbers. ID/admit cards, printable bulk sheets and judge assignment outstanding |
 | 6 | Event conduct — attendance, judge portal, mark entry, panel aggregation, bulk import, corrections, stage progress | thin version exists |
 | 7 | Results and appeals — item calculation, provisional publishing, appeals, final publishing, Sahodaya points and ranking, School drill-down, public results | thin version exists |
 | 8 | Report centre — `StateFestReportCatalog`, **menu-reachable reports only** (scope narrowed 2026-09-23), PDF/Excel/CSV, **catalog parity tests** | ✅ **built 2026-09-23** — 13 live, 9 awaiting later phases |
@@ -429,3 +429,65 @@ Sahodaya and School, standbys excluded from the size check, under-size flagging,
 the standby/leader guards, request-not-applied, approval mechanics including the inherited chest
 number, refusal requiring a note and changing nothing, double-decision and double-substitution
 guards, the duplicate-substitute check, the closed window, and capability gating.
+
+
+---
+
+## Phase 5 — built 2026-09-23
+
+Nothing in the State stack carried a **time** before this. The pre-module workspace could record
+marks but not say when an item was held — so clashes could not be detected, performance order had
+nothing to order against, and the sheets printed in that order could not be produced.
+
+Times are stored as a **date plus three times**, not timestamps: that is how a schedule is published
+and argued about — *"Folk Dance, 21st, report 9:30, stage at 10:00"*. The finish is derived from the
+duration when not set by hand, which is what makes overlap detection possible at all.
+
+### Clash detection
+
+Four kinds, and deliberately not the Sahodaya module's, because the competing unit differs:
+
+| Kind | Why it matters here |
+|---|---|
+| **Participant** | The same person in two overlapping items — the State's worst case, since a Kalotsavam participant routinely enters several |
+| **Team** | Distinguished from individual: moving one child is easy, moving six is a different conversation |
+| **Venue** | Two items on one stage at once |
+| **Sahodaya load** | **Advisory, not an error** — a large contingent can genuinely staff four stages, and only the State office knows which can |
+
+Judgement calls worth recording:
+
+- Participants are matched **on name within a School**. Two children of the same name at one school
+  is a false positive — the right way round, since a scrutineer would rather check an extra row than
+  miss a real clash.
+- **Touching slots do not overlap.** Finishing at 11:00 and starting at 11:00 is a schedule.
+- **Standbys are excluded** — they are not competing for that time.
+- **Unscheduled items cannot clash**, so a half-built schedule produces no noise.
+
+### Chest numbers
+
+Allocated **in a block per Sahodaya**, because that is how a contingent arrives, is seated and is
+called — one sheet covers numbers 150–189.
+
+The property that matters more than the numbering scheme: **a number, once issued, never moves.**
+Assigning fills gaps only, so running it again after entries are added cannot renumber anyone already
+on a printed sheet. A manual number that duplicates another is refused **by name** ("55 already
+belongs to One") rather than silently taking it. Standbys are not numbered until substituted in, when
+they inherit the number being vacated — which is also why Phase 4 releases it on withdrawal.
+
+The register puts unnumbered participants **last**, since it is used to find gaps.
+
+### Reports unblocked
+
+**Item Venue & Time Schedule** and **Schedule Clash Report** declared themselves blocked on Phase 5;
+both now read this data and are available. That loop closing is the catalog working as intended.
+
+**Tests:** `tests/Feature/State/StateScheduleTest.php` — 16 covering each clash kind, the
+touching-slots and different-day non-clashes, standby exclusion, team-vs-individual, stage
+double-booking, unscheduled items, per-Sahodaya blocks, never reissuing a number, skipping taken
+numbers, duplicate refusal, register ordering, green-room performance order, screen rendering and
+capability gating, and the two newly available reports.
+
+### Outstanding in Phase 5
+
+ID and admit cards, printable bulk sheets (attendance, timesheet, judge sheets — the third report
+still blocked), and judge assignment, which belongs with Phase 6's conduct work.
