@@ -1499,6 +1499,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/houses/{house}/assign', [FestHouseController::class, 'assignSchool'])->name('houses.assign');
             Route::delete('/{event}/houses/{house}', [FestHouseController::class, 'destroyHouse'])->name('houses.destroy');
             Route::get('/{event}/appeals', [FestAppealController::class, 'index'])->name('appeals.index');
+            Route::get('/{event}/appeals/wildcard/students', [FestAppealController::class, 'studentsForWildcard'])->name('appeals.wildcard-students');
+            Route::post('/{event}/appeals/wildcard', [FestAppealController::class, 'storeWildcard'])->name('appeals.store-wildcard');
             Route::post('/{event}/appeals/{appeal}/resolve', [FestAppealController::class, 'resolve'])->name('appeals.resolve');
             Route::post('/{event}/appeals/{appeal}/mark-fee-paid', [FestAppealController::class, 'markFeePaid'])->name('appeals.mark-fee-paid');
             Route::post('/{event}/participants/{participant}/disqualify', [FestAppealController::class, 'disqualify'])->name('participants.disqualify');

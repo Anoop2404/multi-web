@@ -79,6 +79,35 @@
             </div>
 
             <aside class="min-w-0 space-y-4">
+                <FormSection title="Create wildcard entry" hint="Grants a slot on a school's behalf, immediately — no separate review step.">
+                    <p class="text-xs text-slate-500 -mt-1 mb-3">
+                        Use this for a student who missed a normal registration —
+                        Sahodaya round or State round. Unlike a school's own wildcard
+                        request, this creates the entry already approved.
+                    </p>
+                    <div v-if="!event.appeals_open" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2.5 py-2 mb-3">
+                        Appeals are closed for this event — open them under Event settings → Locks before creating a wildcard entry.
+                    </div>
+                    <form @submit.prevent="submitWildcard" class="space-y-3">
+                        <SearchableSelect v-model="wildcardForm.appeal_type" :options="wildcardTypeOptions"
+                                          :all-option="false" :required="true" />
+                        <SearchableSelect v-model="wildcardForm.school_id" :options="schoolOptions"
+                                          :all-option="true" all-label="Select school" :required="true"
+                                          @update:modelValue="onWildcardSchoolChange" />
+                        <SearchableSelect v-model="wildcardForm.student_id" :options="wildcardStudentOptions"
+                                          :all-option="true" :all-label="wildcardStudentsLoading ? 'Loading students…' : 'Select student'"
+                                          :required="true" :disabled="!wildcardForm.school_id || wildcardStudentsLoading" />
+                        <SearchableSelect v-model="wildcardForm.item_id" :options="wildcardItemOptions"
+                                          :all-option="true" all-label="Select item" :required="true" />
+                        <textarea v-model="wildcardForm.reason" class="field text-sm h-20" placeholder="Reason *" required></textarea>
+                        <p v-if="wildcardError" class="text-xs text-red-600">{{ wildcardError }}</p>
+                        <button type="submit" class="btn-primary w-full text-sm"
+                                :disabled="wildcardSubmitting || !event.appeals_open">
+                            {{ wildcardSubmitting ? 'Creating…' : 'Create & approve' }}
+                        </button>
+                    </form>
+                </FormSection>
+
                 <FormSection title="Disqualify participant" hint="Administrative disqualification (not an appeal).">
                     <form @submit.prevent="submitDisqualify" class="space-y-3">
                         <SearchableSelect v-model="disqualifyForm.participant_id" :options="disqualifyCandidates"
@@ -127,11 +156,14 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import FestEventWorkflowStepper from '@/Components/sahodaya/FestEventWorkflowStepper.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import { studentDisplayName } from '@/support/studentDisplay.js';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, appeals: Array, disqualified: Array,
     disqualifyCandidates: { type: Array, default: () => [] },
+    wildcardItems: { type: Array, default: () => [] },
+    wildcardSchools: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
 });
 
@@ -140,6 +172,65 @@ const filterStatus = ref('');
 const resolveModal = ref(null);
 const resolveForm = reactive({ resolution_note: '' });
 const disqualifyForm = reactive({ participant_id: '', reason: '' });
+
+const wildcardTypeOptions = [
+    { value: 'sahodaya_wildcard', label: 'Wildcard — Sahodaya-level slot' },
+    { value: 'state_wildcard', label: 'Wildcard — State-level slot' },
+];
+const schoolOptions = computed(() => props.wildcardSchools.map(s => ({ value: s.id, label: s.name })));
+const wildcardItemOptions = computed(() => props.wildcardItems.map(i => ({
+    value: i.id,
+    // Many items share the same title (e.g. "Bharatanatyam" run once per
+    // category/gender) — without these, the picker is a wall of identical names
+    // with no way to tell which one is meant.
+    label: [i.title, i.category_label, i.type_label, i.gender_label, i.item_code].filter(Boolean).join(' · '),
+})));
+
+const wildcardForm = reactive({ appeal_type: 'sahodaya_wildcard', school_id: '', student_id: '', item_id: '', reason: '' });
+const wildcardStudents = ref([]);
+const wildcardStudentsLoading = ref(false);
+const wildcardSubmitting = ref(false);
+const wildcardError = ref('');
+const wildcardStudentOptions = computed(() =>
+    wildcardStudents.value.map(s => ({ value: s.id, label: `${studentDisplayName(s)}${s.reg_no ? ' — ' + s.reg_no : ''}` }))
+);
+
+// Fetched per-school on demand rather than preloading every school's roster —
+// a Sahodaya can have hundreds of schools, so that list stays event-item-sized
+// (wildcardItems) but never school-roster-sized until a school is actually picked.
+async function onWildcardSchoolChange(schoolId) {
+    wildcardForm.student_id = '';
+    wildcardStudents.value = [];
+    if (! schoolId) return;
+
+    wildcardStudentsLoading.value = true;
+    try {
+        const response = await fetch(`${base}/appeals/wildcard/students?school_id=${encodeURIComponent(schoolId)}`, {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        });
+        wildcardStudents.value = response.ok ? await response.json() : [];
+    } finally {
+        wildcardStudentsLoading.value = false;
+    }
+}
+
+function submitWildcard() {
+    wildcardError.value = '';
+    wildcardSubmitting.value = true;
+    router.post(`${base}/appeals/wildcard`, { ...wildcardForm }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            wildcardForm.school_id = '';
+            wildcardForm.student_id = '';
+            wildcardForm.item_id = '';
+            wildcardForm.reason = '';
+            wildcardStudents.value = [];
+        },
+        onError: (errors) => { wildcardError.value = Object.values(errors)[0] ?? 'Could not create the wildcard entry.'; },
+        onFinish: () => { wildcardSubmitting.value = false; },
+    });
+}
 
 const filteredAppeals = computed(() => {
     if (!filterStatus.value) return props.appeals ?? [];
