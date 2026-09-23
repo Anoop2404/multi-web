@@ -31,12 +31,20 @@ use App\Models\Tenant;
  */
 class StateParticipationLimitService
 {
+    /**
+     * Approved entries this Sahodaya already holds for an item.
+     *
+     * Matches on the canonical identity where the intake has one, and on the raw submission key
+     * otherwise — a Sahodaya promoted mid-season submitted under two different raw keys, and
+     * counting those separately would hand it a second full allowance.
+     */
     public function sahodayaApprovedCount(string $itemId, string $sahodayaId, array $excludeEntryIds = []): int
     {
         return StateQualifierEntry::where('item_id', $itemId)
             ->where('status', 'approved')
             ->when($excludeEntryIds, fn ($q) => $q->whereNotIn('id', $excludeEntryIds))
-            ->whereHas('intake', fn ($q) => $q->where('source_tenant_id', $sahodayaId))
+            ->whereHas('intake', fn ($q) => $q->where('sahodaya_id', $sahodayaId)
+                ->orWhere('source_tenant_id', $sahodayaId))
             ->count();
     }
 
@@ -52,9 +60,11 @@ class StateParticipationLimitService
      * Slots one Sahodaya gets for this item: the explicit override if set, else the item's
      * qualify_count. Null means uncapped.
      */
-    public function slotsPerSahodaya(FestStateProgramItem $item): ?int
+    public function slotsPerSahodaya(FestStateProgramItem $item, ?string $sahodayaId = null): ?int
     {
-        return $item->max_per_school ?: ($item->qualify_count ?: null);
+        // Delegated so the three levels — Sahodaya override, item override, item default — are
+        // resolved in exactly one place (Services\State\Fest\StateSlotService).
+        return app(\App\Services\State\Fest\StateSlotService::class)->slotsFor($item, $sahodayaId);
     }
 
     /** @return list<string> violation messages; empty means the approval is allowed */
@@ -69,8 +79,9 @@ class StateParticipationLimitService
             return [];
         }
 
-        $sahodayaId = $entry->intake?->source_tenant_id;
-        $slots = $this->slotsPerSahodaya($item);
+        // Canonical identity first, raw key as the fallback for intakes predating the directory.
+        $sahodayaId = $entry->intake?->sahodaya_id ?: $entry->intake?->source_tenant_id;
+        $slots = $this->slotsPerSahodaya($item, $entry->intake?->sahodaya_id);
         $errors = [];
 
         if ($slots && $sahodayaId) {
@@ -104,7 +115,7 @@ class StateParticipationLimitService
             return [];
         }
 
-        $sahodayaId = $intake->source_tenant_id;
+        $sahodayaId = $intake->sahodaya_id ?: $intake->source_tenant_id;
         $errors = [];
 
         foreach ($pending as $itemId => $entries) {
@@ -115,7 +126,7 @@ class StateParticipationLimitService
 
             $excludeIds = $entries->pluck('id')->all();
             $batchCount = $entries->count();
-            $slots = $this->slotsPerSahodaya($item);
+            $slots = $this->slotsPerSahodaya($item, $intake->sahodaya_id);
 
             if ($slots) {
                 $existing = $this->sahodayaApprovedCount($itemId, $sahodayaId, $excludeIds);

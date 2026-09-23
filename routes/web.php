@@ -163,6 +163,14 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
             Route::get('/{event}', [\App\Http\Controllers\StateAdmin\Fest\StateFestWorkspaceController::class, 'overview'])
                 ->middleware('state.fest:view')
                 ->name('overview');
+
+            // Slots decide who may compete, so they sit behind the catalog capability rather than
+            // plain view — a report user or mark operator can see the workspace but not move a quota.
+            Route::middleware('state.fest:catalog')->group(function () {
+                Route::get('/{event}/slots', [\App\Http\Controllers\StateAdmin\Fest\StateSlotController::class, 'index'])->name('slots');
+                Route::post('/{event}/slots/sahodaya', [\App\Http\Controllers\StateAdmin\Fest\StateSlotController::class, 'setSahodayaSlots'])->name('slots.sahodaya');
+                Route::post('/{event}/slots/item', [\App\Http\Controllers\StateAdmin\Fest\StateSlotController::class, 'setItemSlots'])->name('slots.item');
+            });
         });
 
         Route::prefix('state-users')->name('state-users.')->group(function () {

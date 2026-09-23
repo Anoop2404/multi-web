@@ -104,6 +104,11 @@ class StateFestWorkspaceController extends Controller
      *
      * @return list<string>
      */
+    public function permissionsForRequest(Request $request): array
+    {
+        return $this->permissionsFor($request);
+    }
+
     private function permissionsFor(Request $request): array
     {
         $user = $request->user();
