@@ -52,7 +52,7 @@ Sahodaya keeps **one canonical identity** — never counted twice.
 |---|---|---|
 | 1 | State identity foundation — canonical managed/external identity, Sahodaya + School name snapshots, migration, backfill, promoted-external de-duplication, shared directory resolver | ✅ **built 2026-09-23** |
 | 2 | State application shell — sidebar, event workspace, tabs, permissions, event switcher, shared filter bar, activity log | ✅ **built 2026-09-23** (activity log tab pending) |
-| 3 | Program and event configuration — items, categories, eligibility, per-Sahodaya slots, windows, grade/point rules, venues, staff | partial — **Sahodaya Slots built 2026-09-23**; items/eligibility/windows/grades/venues/staff outstanding |
+| 3 | Program and event configuration | ✅ **built 2026-09-23** — slots, settings/windows, venues & stages, event staff, item catalog. Grade/point rules deferred to Phase 7, where they are used |
 | 4 | Qualifier and registration workflow — submissions, scrutiny, approvals, registrations, teams, substitutions, quota enforcement, external parity | partial (intake queue, slots) |
 | 5 | Pre-event operations — chest numbers, ID/admit cards, scheduling, clashes, performance order, green room, attendance sheets, judge assignment | not started |
 | 6 | Event conduct — attendance, judge portal, mark entry, panel aggregation, bulk import, corrections, stage progress | thin version exists |
@@ -242,10 +242,49 @@ changing what approval allows without affecting the next Sahodaya, clearing retu
 figure, the audit trail's contents, the spec's mandatory "team registration consumes one slot", the
 matrix's used/available/exceeded, and one allowance for a promoted Sahodaya.
 
-### Still outstanding in Phase 3
+### The rest of Phase 3 — built 2026-09-23
 
-Items & Catalog, Categories & Eligibility, event dates and windows (qualifier submission, scrutiny,
-publication), Grade Master and rank points, Venues & Stages, Event Staff.
+**Venues and stages** did not exist on the State side at all: the pre-module workspace had judges and
+marks but nowhere to say where an item is held, so Phase 5 had nothing to schedule against. A stage
+belongs to a venue through a self-reference rather than its own table — a venue, a stage inside it, a
+green room and a reporting desk are all "a place with a capacity and someone responsible", and the
+schedule only ever asks which place. Only a stage or room can host an item. Deleting a venue that
+still holds stages is refused: orphaning them into an event with no parent reads as data loss.
+
+**Event staff are deliberately not user accounts.** Most are present for three days and never sign
+in, so a name and phone is the minimum; `user_id` is set only for the few who also hold a login.
+
+**Settings** live in `state_fest_events.settings` rather than thirty nullable columns.
+`results_published` and `scoring_locked` stay as columns — they gate writes on a hot path and are
+queried, not merely read. Unknown keys are dropped on save, so a typo in a form field cannot quietly
+become a setting nothing reads.
+
+**The windows change behaviour rather than documenting intent.** A window with no dates is **open** —
+an event nobody has configured must not find its workflow silently shut — and a closed one explains
+itself in terms the Sahodaya can act on: *"Qualifier submission closed on 10 Jan 2026, 17:00."*
+Public visibility is kept separate from `results_published`, so results can be final internally
+before they are public.
+
+**The Items tab** shows the *effective* per-Sahodaya allowance so the catalog and the Slots tab
+cannot disagree, and links to Slots for changes, where usage and history live.
+
+**Fixed while building:** `state_fest_events.id` is an auto-increment integer, and the first version
+of the venue/staff tables declared `state_event_id` as a uuid. Postgres refuses that comparison
+outright rather than merely failing to join.
+
+**Deferred on purpose:** Grade Master and rank-point rules move to Phase 7, where results actually
+consume them — building the configuration before anything reads it invites two sources of truth.
+Categories and eligibility are carried on the items themselves (`class_group`, `gender`,
+`participant_type`, group sizes) and are surfaced on the Items tab; a separate eligibility screen
+only earns its place once Phase 4 has rules to enforce.
+
+**Tests:** `tests/Feature/State/StateEventConfigTest.php` — window open/closed/not-yet-open and the
+wording of each, unknown keys dropped, venue nesting and the self-containment and cross-event
+guards, refusing to delete a venue that still holds stages, staff without a login, capability gating
+(a mark operator can open the workspace but not reconfigure it), and the Items tab agreeing with
+Slots.
+
+All seven workspace tabs now render: Overview, Settings, Items, Slots, Venues, Staff, Reports.
 
 
 ---
