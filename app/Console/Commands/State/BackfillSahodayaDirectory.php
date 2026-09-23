@@ -24,6 +24,7 @@ class BackfillSahodayaDirectory extends Command
 {
     protected $signature = 'state:backfill-sahodaya-directory
         {--dry-run : Print what would be written and exit}
+        {--all     : Also seed a directory row for every Sahodaya tenant and outside Sahodaya, not only those that have submitted an intake}
         {--force   : Re-resolve rows that already carry a canonical id}
         {--state=  : State code (e.g. KL) or uuid to stamp on directory rows that have none}';
 
@@ -64,6 +65,19 @@ class BackfillSahodayaDirectory extends Command
             $this->line("Stamped state on {$programs} program(s), {$events} event(s), {$intakes} intake(s) and {$externals} outside-Sahodaya row(s).");
         }
 
+
+        // Phase 11 of the module plan. Without --all the directory only ever holds Sahodayas that
+        // have already submitted something, so the State admin's Sahodaya filter lists three of
+        // twenty-two and an operator concludes the rest are missing from the platform. Seeding the
+        // whole directory up front is what makes the filter, the slot matrix and the catering roster
+        // usable before the first intake arrives.
+        if ($this->option('all')) {
+            $seeded = $this->seedEveryKnownSahodaya($directory, $dryRun);
+
+            $this->line(($dryRun ? 'Would create ' : 'Created ')."{$seeded['created']} directory row(s) "
+                ."({$seeded['tenants']} Sahodaya tenant(s), {$seeded['externals']} outside Sahodaya/Sahodayas seen).");
+            $this->newLine();
+        }
 
         $query = StateQualifierIntake::query()
             ->when(! $force, fn ($q) => $q->whereNull('sahodaya_id'));
@@ -144,6 +158,57 @@ class BackfillSahodayaDirectory extends Command
         $this->info("Linked {$resolved} Sahodaya identity/identities. Directory now holds ".StateSahodaya::count().' row(s).');
 
         return $unresolved ? Command::FAILURE : Command::SUCCESS;
+    }
+
+    /**
+     * Seed the directory from the platform's own records rather than from intakes.
+     *
+     * A promoted Sahodaya is deliberately resolved through its ExternalSahodaya row rather than its
+     * tenant: linkPromotedTenant() folds the two into the single external-origin identity, so
+     * seeding tenants first would create a second row for the same Sahodaya that later has to be
+     * absorbed. Externals first, tenants second, and a tenant already linked is skipped.
+     *
+     * @return array{created: int, tenants: int, externals: int}
+     */
+    private function seedEveryKnownSahodaya(StateSahodayaDirectory $directory, bool $dryRun): array
+    {
+        $before = StateSahodaya::count();
+
+        $externals = \App\Models\ExternalSahodaya::query()->get();
+        foreach ($externals as $external) {
+            if ($dryRun) {
+                continue;
+            }
+
+            $sahodaya = $directory->forExternal($external, $external->state_id);
+
+            // A promoted Sahodaya carries both identities on one row, so the tenant link is written
+            // here rather than left for the tenant pass to duplicate.
+            if ($external->tenant_id && ! $sahodaya->tenant_id) {
+                $sahodaya->forceFill(['tenant_id' => $external->tenant_id])->save();
+            }
+        }
+
+        $tenants = \App\Models\Tenant::query()
+            ->where('type', 'sahodaya')
+            ->whereNotNull('state_id')
+            // Already represented by the external pass above.
+            ->whereNotIn('id', $externals->pluck('tenant_id')->filter())
+            ->get();
+
+        foreach ($tenants as $tenant) {
+            if ($dryRun) {
+                continue;
+            }
+
+            $directory->forTenant($tenant, $tenant->state_id);
+        }
+
+        return [
+            'created' => $dryRun ? $externals->count() + $tenants->count() : StateSahodaya::count() - $before,
+            'tenants' => $tenants->count(),
+            'externals' => $externals->count(),
+        ];
     }
 
     /** Resolution without the create, so --dry-run genuinely writes nothing. */

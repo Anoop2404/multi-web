@@ -49,6 +49,42 @@ class StateResultService
             ]);
         }
 
+        $ranking = $this->ranking($event, $item);
+        $isGroup = $this->isGroupItem($item);
+
+        DB::connection('state')->transaction(function () use ($ranking, $event, $isGroup) {
+            foreach ($ranking as $row) {
+                $row['mark']->forceFill([
+                    'position' => $row['position'],
+                    'points' => $this->grades->pointsForGradePosition($event, $row['mark']->grade, $row['position'], $isGroup),
+                    'status' => 'ranked',
+                ])->save();
+            }
+        });
+
+        $ties = $ranking->where('tied', true)->count();
+
+        $result->forceFill([
+            'status' => $result->status === StateItemResult::PUBLISHED ? StateItemResult::PUBLISHED : StateItemResult::PROVISIONAL,
+            'computed_at' => now(),
+            'ranked_count' => $ranking->count(),
+            'tie_count' => $ties,
+        ])->save();
+
+        return ['ranked' => $ranking->count(), 'ties' => $ties];
+    }
+
+    /**
+     * The ranking an item's marks imply, computed and returned without being written.
+     *
+     * Split out of computeItem() so the same rule can be checked against what is already stored
+     * without changing it — Phase 11's pre-cutover verification needs to compare, not recompute, and
+     * a second implementation of the tie rule would drift from this one within a season.
+     *
+     * @return Collection<int, array{mark: StateFestMark, participant_id: int, position: int, tied: bool}>
+     */
+    public function ranking(StateFestEvent $event, FestStateProgramItem $item): Collection
+    {
         $marks = StateFestMark::where('state_event_id', $event->id)
             ->whereIn('registration_id', StateFestRegistration::where('state_event_id', $event->id)
                 ->where('item_id', $item->id)->select('id'))
@@ -56,43 +92,37 @@ class StateResultService
             ->sortByDesc(fn (StateFestMark $m) => (float) $m->score)
             ->values();
 
-        $isGroup = in_array($item->participant_type, ['group', 'team', 'pair', 'trio'], true);
-
         $position = 0;
         $seen = 0;
         $previousScore = null;
-        $ties = 0;
+        $rows = collect();
 
-        DB::connection('state')->transaction(function () use ($marks, $event, $isGroup, &$position, &$seen, &$previousScore, &$ties) {
-            foreach ($marks as $mark) {
-                $seen++;
-                $score = (float) $mark->score;
+        foreach ($marks as $mark) {
+            $seen++;
+            $score = (float) $mark->score;
+            $tied = $previousScore !== null && $score >= $previousScore;
 
-                if ($previousScore === null || $score < $previousScore) {
-                    // Skipped positions after a tie: two firsts are followed by a third.
-                    $position = $seen;
-                } else {
-                    $ties++;
-                }
-
-                $previousScore = $score;
-
-                $mark->forceFill([
-                    'position' => $position,
-                    'points' => $this->grades->pointsForGradePosition($event, $mark->grade, $position, $isGroup),
-                    'status' => 'ranked',
-                ])->save();
+            if (! $tied) {
+                // Skipped positions after a tie: two firsts are followed by a third.
+                $position = $seen;
             }
-        });
 
-        $result->forceFill([
-            'status' => $result->status === StateItemResult::PUBLISHED ? StateItemResult::PUBLISHED : StateItemResult::PROVISIONAL,
-            'computed_at' => now(),
-            'ranked_count' => $marks->count(),
-            'tie_count' => $ties,
-        ])->save();
+            $previousScore = $score;
 
-        return ['ranked' => $marks->count(), 'ties' => $ties];
+            $rows->push([
+                'mark' => $mark,
+                'participant_id' => (int) $mark->participant_id,
+                'position' => $position,
+                'tied' => $tied,
+            ]);
+        }
+
+        return $rows;
+    }
+
+    private function isGroupItem(FestStateProgramItem $item): bool
+    {
+        return in_array($item->participant_type, ['group', 'team', 'pair', 'trio'], true);
     }
 
     public function publishItem(StateFestEvent $event, FestStateProgramItem $item, array $context = []): StateItemResult

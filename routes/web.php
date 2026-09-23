@@ -126,7 +126,11 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
             Route::get('/{stateProgram}/winners/export', [\App\Http\Controllers\Admin\KalotsavStateController::class, 'exportWinners'])->name('winners.export');
         });
 
-        Route::prefix('state-workspace')->name('state.')->group(function () {
+        // The middleware is inert until state.module_switched is on (Phase 11's cutover); with it on,
+        // these paths redirect into the module so existing bookmarks and links keep working.
+        Route::prefix('state-workspace')->name('state.')
+            ->middleware(\App\Http\Middleware\RedirectStateWorkspaceToModule::class)
+            ->group(function () {
             Route::get('/qualifiers', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'index'])->name('qualifiers.index');
             Route::post('/qualifiers/intake', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'storeIntake'])->name('qualifiers.store-intake');
             Route::get('/qualifiers/{intake}', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'show'])->name('qualifiers.show');

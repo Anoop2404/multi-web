@@ -163,7 +163,7 @@ class StateCertificateController extends Controller
         StateScope::assertOwns($event->state_id);
         abort_unless($certificate->state_event_id === $event->id, 404);
 
-        return $renderer->stream($certificate, $event);
+        return $this->rendering(fn () => $renderer->stream($certificate, $event));
     }
 
     /**
@@ -187,11 +187,29 @@ class StateCertificateController extends Controller
             ->orderBy('sahodaya_name')->orderBy('certificate_number')
             ->get();
 
-        $pack = $renderer->zip($certificates, $event);
+        return $this->rendering(function () use ($renderer, $certificates, $event) {
+            $pack = $renderer->zip($certificates, $event);
 
-        return response()->download($pack['path'], $pack['filename'], [
-            'Content-Type' => 'application/zip',
-        ])->deleteFileAfterSend(true);
+            return response()->download($pack['path'], $pack['filename'], [
+                'Content-Type' => 'application/zip',
+            ])->deleteFileAfterSend(true);
+        });
+    }
+
+    /**
+     * Certificates require the browser renderer — DomPDF reflows a fixed certificate layout into
+     * something nobody approved — so when that service is down the answer is "come back in a minute",
+     * not a 500 and not a misprinted certificate. 503 rather than 500 because the request was fine
+     * and retrying is the right thing to do.
+     */
+    private function rendering(callable $render)
+    {
+        try {
+            return $render();
+        } catch (\RuntimeException $e) {
+            abort(503, 'Certificates are printed by the document service, which is not responding right now. '
+                .$e->getMessage().' Nothing was changed — try again shortly.');
+        }
     }
 
     public function detectStale(Request $request, StateFestEvent $event, StateCertificateService $certificates)

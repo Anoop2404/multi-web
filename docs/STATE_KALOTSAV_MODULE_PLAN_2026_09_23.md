@@ -54,13 +54,13 @@ Sahodaya keeps **one canonical identity** — never counted twice.
 | 2 | State application shell — sidebar, event workspace, tabs, permissions, event switcher, shared filter bar, activity log | ✅ **built 2026-09-23** (activity log tab pending) |
 | 3 | Program and event configuration | ✅ **built 2026-09-23** — slots, settings/windows, venues & stages, event staff, item catalog. Grade/point rules deferred to Phase 7, where they are used |
 | 4 | Qualifier and registration workflow | ✅ **complete 2026-09-23** — submissions, scrutiny, approvals, registrations, teams & squads, substitutions, quota and window enforcement |
-| 5 | Pre-event operations | ✅ **mostly built 2026-09-23** — schedule, clashes, green room, chest numbers. ID/admit cards, printable bulk sheets and judge assignment outstanding |
-| 6 | Event conduct | ✅ **built 2026-09-23** — attendance with corrections, mark entry, panel aggregation, conduct audit. Judge portal and bulk import outstanding |
-| 7 | Results and appeals | ✅ **built 2026-09-23** — item calculation, provisional/published/locked, Sahodaya points and ranking, School drill-down, individual championship, appeals. Public portal outstanding |
-| 8 | Report centre — `StateFestReportCatalog`, **menu-reachable reports only** (scope narrowed 2026-09-23), PDF/Excel/CSV, **catalog parity tests** | ✅ **built 2026-09-23** — 13 live, 9 awaiting later phases |
-| 9 | Certificates | ✅ **mostly built 2026-09-23** — eligibility, generation, batches, tally, verification, stale detection and regeneration. PDF rendering and ZIP packs outstanding |
-| 10 | Finance and services — State fees and remittance, ledger, receipts, appeal fees, catering, volunteers | partial (fixed fee done) |
-| 11 | Migration and UAT — backfill, result comparison, managed + external testing, load tests, pilot, route switch, temporary redirects | not started |
+| 5 | Pre-event operations | ✅ **complete 2026-09-24** — schedule, clashes, green room, chest numbers, printed sheets (attendance, timesheet, judge, green room), ID/admit cards |
+| 6 | Event conduct | ✅ **complete 2026-09-24** — attendance with corrections, mark entry, panel aggregation, conduct audit, judge portal with sheet submission, bulk mark import |
+| 7 | Results and appeals | ✅ **complete 2026-09-24** — item calculation, provisional/published/locked, Sahodaya points and ranking, School drill-down, individual championship, appeals, public portal |
+| 8 | Report centre — `StateFestReportCatalog`, **menu-reachable reports only** (scope narrowed 2026-09-23), PDF/Excel/CSV, **catalog parity tests** | ✅ **complete 2026-09-24** — 28 reports, all live |
+| 9 | Certificates | ✅ **complete 2026-09-24** — eligibility, generation, batches, tally, verification, stale detection, regeneration, PDF rendering via the browser service, ZIP packs foldered by Sahodaya |
+| 10 | Finance and services — State fees and remittance, ledger, receipts, appeal fees, catering, volunteers | ✅ **complete 2026-09-24** — fixed per-Sahodaya fee, appeal fees, catering sittings with entitlement and issue, volunteer duty rosters |
+| 11 | Migration and UAT — backfill, result comparison, managed + external testing, load tests, pilot, route switch, temporary redirects | ✅ **built 2026-09-24** — full directory backfill, `state:verify-module`, cutover flag with redirects, local UAT sweep. Pilot and load test are operational steps, not code |
 
 Sports-only reports (House Ranking, Athletic Records) must be explicitly marked **"Not applicable to
 State Kalotsav"** rather than silently appearing.
@@ -615,3 +615,137 @@ number for an unchanged regeneration, verification by number or code, staleness 
 *and* from a corrected name, supersede-not-overwrite, appeal outcomes reopening results and staling
 certificates, fee refund/forfeit, locked results left alone, decisions requiring reasons, no
 double-decision, and capability gating (a certificate operator cannot open appeals or results).
+
+
+---
+
+## Phases 5, 6, 7, 9, 10 completed and Phase 11 — built 2026-09-24
+
+### Printed sheets and cards (Phase 5)
+
+`StatePrintService` produces the paper an event actually runs on: attendance sheets, stage
+timesheets, judge sheets, green-room call lists and participant cards. Two decisions matter more than
+layout.
+
+**Rows are in the order competitors are called** — chest number, falling back to Sahodaya so a sheet
+printed before numbering is still usable — and **both the Sahodaya and the School appear on every
+row**, because the person holding the sheet is looking for a contingent while the person asked about
+a result is asked about a school.
+
+**The judge sheet carries neither.** No Sahodaya, no School, no name — chest numbers only. A panel
+that knows which contingent a performance came from is the exact failure the chest-number system
+exists to prevent, and it matters more at State level, where the competing units are institutions
+with a standing rivalry.
+
+**Cards are one per person, not one per entry.** Chest numbers are unique per event, so a participant
+entered for four items holds four numbers; the card lists every item with the number to wear for it.
+Handing someone four cards is how three end up in a bag and the wrong number is worn on stage. Two
+people with the same name from different schools are two people and get their own cards.
+
+This unblocked `attendance-sheet`, the last report in the catalog. **All 28 reports are now live.**
+
+### Judge portal and bulk import (Phase 6)
+
+A judge sees chest numbers and their own scores. Panel members do not see each other's marks before
+aggregation, so one judge's number cannot anchor another's.
+
+**A sheet cannot be submitted while any entry is unscored**, and the unscored chest numbers are named.
+A partial sheet declared final is how an item ends up aggregated with a missing judge, which is not
+recoverable after publication without reopening the item. **Editing a score after submitting reopens
+the sheet** rather than changing it silently.
+
+The CSV import matches on **item code and chest number** — the two things written on a paper sheet.
+Names are not accepted as an identifier: two participants from different Sahodayas share a name often
+enough that matching on it would silently award the wrong person. The **judge is chosen, not inferred
+from who is uploading**, and must be on that item's panel, because a clerk typing up three paper
+sheets has to land each under the judge who scored it or aggregation averages one judge three times.
+**Nothing is written unless the whole file validates**, and every error is reported at once.
+
+### Public portal (Phase 7)
+
+Fail-closed on two independent gates: the section's own visibility setting, and the item's own
+published result. So an operator can compute and check every ranking internally with nothing leaking,
+and can stage the schedule publicly before any result exists — the ordinary sequence, not an edge
+case. An unreleased section **404s rather than rendering empty**: "not published yet" and "no results"
+are different answers and the public should not have to guess which one they are looking at.
+
+**Placings and grades are published; marks are not.** A mark out of 100 invites argument about a
+judgement that is already final.
+
+Certificate verification is deliberately **not** gated on any of it — a certificate in someone's hand
+is already public, and refusing to confirm it helps nobody. A stale or superseded certificate reports
+itself as such rather than as valid, so a corrected result cannot keep circulating on paper.
+
+`/admin/state/fest/{event}/public-portal` is the operator's side of this, gated by `publish` rather
+than `settings`: releasing results is the one action here that cannot be taken back quietly, and it
+should not be one checkbox among thirty on a form whose Save button also changes phone numbers.
+
+### Certificate delivery (Phase 9)
+
+Rendering goes through the configured Chromium service with `requireBrowserRenderer`, **never
+DomPDF** — a certificate is a fixed-size laid-out page and DomPDF reflows it into something nobody
+approved. A **stale certificate is refused rather than printed**. Packs are ZIPs foldered by Sahodaya
+(the unit a pack is handed to) with a CSV manifest, because a pack of PDFs with no index cannot be
+reconciled against the tally report six weeks later. Capped at 500 per pack.
+
+When the service is down the answer is a **503 saying so**, not a 500 and not a misprinted
+certificate.
+
+### Catering and duty rosters (Phase 10)
+
+**Meals are counted by Sahodaya**, which is how a State Kalotsav actually caters: the kitchen is told
+"Kottayam, 180 lunches" because the contingent arrives and eats together. Per-participant coupons
+exist in theory and are abandoned by the second day everywhere.
+
+**Entitlement and issue are separate stored numbers.** Entitlement is computed from who competes that
+day — a person entered for three items eats one lunch — plus an escort allowance; issue is what the
+counter handed over. The gap between them is the only figure anyone argues about afterwards, so it is
+stored rather than derived. Issuing over the entitlement is **recorded as a variance, not refused**:
+the counter's job is not to turn away hungry people, and the State's job is to see the gap.
+
+Rosters refuse to put one person in two places in a session, and report **stages scheduled with
+nobody on duty** — the whole point of keeping a roster.
+
+### Cutover (Phase 11)
+
+**`state:backfill-sahodaya-directory --all`** seeds the directory from the platform's own records
+rather than only from submissions. Without it the directory holds only Sahodayas that have already
+sent something — three of twenty-three locally — and an operator concludes the rest are missing from
+the platform. A promoted Sahodaya resolves through its external row, not its tenant, so it stays one
+identity rather than becoming two rows that later need absorbing. Run against real local data: the
+directory went from 3 rows to 23, 20 of them promoted.
+
+**`state:verify-module`** compares the rankings already stored against what the module computes from
+the same marks, and reports the data conditions that make a screen read wrongly rather than break —
+registrations with no canonical Sahodaya, entries with no chest number, items with entries but no
+schedule, marks against entries not marked present, stale certificates, directory rows with no state.
+Each line names the fix, because "17 registrations have no Sahodaya" without the command to run is a
+fact nobody can act on.
+
+This forced a real change: `computeItem()` **writes** the positions it works out, so a verification
+pass built on it could never fail. The ranking rule is now `StateResultService::ranking()`, pure and
+returning what it computes; `computeItem()` persists that. One source of truth for the tie rule,
+which would otherwise drift within a season.
+
+**`state.module_switched`** (env `STATE_MODULE_SWITCHED`, default false) is the switch. While false
+both stacks stay reachable and nothing in flight breaks. With it on, old `/admin/state-workspace/fest/*`
+links redirect into the module — **302, not 301**, because a permanent redirect is cached by browsers
+and would survive the setting being turned back off mid-event, which is the one thing the switch
+exists to allow. Only paths with a module equivalent redirect; **POSTs never do**, since a redirected
+POST loses its body and a form submitted mid-cutover would silently do nothing.
+
+**Local UAT, 2026-09-24:** every one of the 55 module and public pages returned 200 against the real
+local data (1 event, 28 registrations, 23 Sahodayas), and the CSV/XLS/PDF downloads all produced
+valid files — the attendance sheet came out as a 3-page PDF.
+
+**Not verified here:** the Chromium PDF service (`daria.net.in:3001`) is unreachable from this
+sandbox, so certificate PDFs and ZIP packs were exercised only as far as HTML — the template renders
+with its QR embedded, and `PdfGenerator` is the same path the Sahodaya module already uses in
+production. The printed sheets fell back to DomPDF locally and produced valid output, which is the
+intended resilience. Certificates deliberately do not fall back.
+
+Load testing and a pilot event remain — both are operational steps against production data rather
+than code.
+
+**Tests:** `StatePrintAndPublicPortalTest` (19), `StateJudgePortalAndImportTest` (21),
+`StateHospitalityTest` (16), `StateModuleCutoverTest` (12). The full State suite is **291 passing**.
