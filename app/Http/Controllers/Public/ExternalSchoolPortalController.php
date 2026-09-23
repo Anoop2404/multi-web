@@ -7,6 +7,7 @@ use App\Models\ExternalSchool;
 use App\Models\FestStateProgramItem;
 use App\Models\State\StateQualifierEntry;
 use App\Services\State\ExternalIntakeService;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -37,6 +38,7 @@ class ExternalSchoolPortalController extends Controller
 
         abort_unless($school->isActive(), 403, 'This account has been disabled. Contact your Sahodaya coordinator.');
         abort_unless($school->sahodaya?->isActive(), 403, 'Your Sahodaya\'s access has been disabled. Contact the State Kalolsavam office.');
+        $this->abortIfPromoted($school);
 
         $this->establishSession($request, $school);
 
@@ -51,6 +53,7 @@ class ExternalSchoolPortalController extends Controller
         abort_if(! $school, 404, 'Access code not recognized.');
         abort_unless($school->isActive(), 403, 'This access code has been disabled. Contact your Sahodaya coordinator.');
         abort_unless($school->sahodaya?->isActive(), 403, 'Your Sahodaya\'s access has been disabled. Contact the State Kalolsavam office.');
+        $this->abortIfPromoted($school);
 
         $this->establishSession($request, $school);
 
@@ -82,6 +85,7 @@ class ExternalSchoolPortalController extends Controller
     public function store(Request $request, ExternalIntakeService $service)
     {
         $school = $request->attributes->get('externalSchool');
+        $this->abortIfPromoted($school);
 
         $data = $request->validate([
             'item_code'    => 'required|string|max:20',
@@ -111,11 +115,37 @@ class ExternalSchoolPortalController extends Controller
 
     public function destroy(Request $request, StateQualifierEntry $entry, ExternalIntakeService $service)
     {
+        $this->abortIfPromoted($request->attributes->get('externalSchool'));
+
         $school = $request->attributes->get('externalSchool');
 
         $service->removeEntry($school, $entry);
 
         return back()->with('success', 'Entry removed.');
+    }
+
+    /**
+     * Once the parent Sahodaya has been promoted to a tenant, this school belongs in that
+     * Sahodaya's own database and its entries reach the State through the normal nomination path.
+     * Letting it keep writing here would fork the roster with nothing to reconcile it against —
+     * see docs/STATE_ADMIN_TENANT_PROMOTION_AND_UAT_PLAN_2026_09_23.md §5.3.
+     */
+    private function abortIfPromoted(?ExternalSchool $school): void
+    {
+        $sahodaya = $school?->sahodaya;
+
+        if (! $sahodaya?->isPromoted()) {
+            return;
+        }
+
+        // Same reasoning as the Sahodaya portal: a generic 403 page is a dead end. Send them back
+        // to the login screen with an explanation they can act on.
+        throw new HttpResponseException(
+            redirect()->route('state.external.school.login')->withErrors([
+                'username' => "{$sahodaya->name} now runs on the platform. Ask your Sahodaya "
+                    .'coordinator for your new school login — entries added here would not reach the State.',
+            ])
+        );
     }
 
     private function establishSession(Request $request, ExternalSchool $school): void
