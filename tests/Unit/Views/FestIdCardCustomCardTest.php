@@ -6,7 +6,7 @@ use Tests\TestCase;
 
 class FestIdCardCustomCardTest extends TestCase
 {
-    public function test_gradient_shape_keeps_a_solid_background_fallback_for_pdf_rendering(): void
+    public function test_gradient_shape_renders_svg_linear_gradient_for_pdf_rendering(): void
     {
         $html = view('fest.id-cards.partials.custom-card', [
             'cardWidthMm' => 90,
@@ -21,8 +21,6 @@ class FestIdCardCustomCardTest extends TestCase
             ]],
         ])->render();
 
-        $this->assertStringContainsString('background-color:#ca08e3', $html);
-        $this->assertStringContainsString('background-image:linear-gradient(to right, #e2b916, #ca08e3)', $html);
         $this->assertStringContainsString('<linearGradient', $html);
         $this->assertStringContainsString('stop-color="#e2b916"', $html);
         $this->assertStringContainsString('stop-color="#ca08e3"', $html);

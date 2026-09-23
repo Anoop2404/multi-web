@@ -95,8 +95,8 @@
                 top:{{ $field['top'] ?? 0 }}%; left:{{ $field['left'] ?? 0 }}%;
                 width:{{ $field['width'] ?? 20 }}%; height:{{ $field['height'] ?? 10 }}%;
                 border-radius:{{ $radiusMm }}mm;
-                background-color:{{ $solidBg }};
-                @if($hasGradient) background-image:linear-gradient(to right, {{ $field['gradient_from'] }}, {{ $field['gradient_to'] }}); @endif
+                overflow: hidden;
+                @if(!$hasGradient) background-color:{{ $solidBg }}; @endif
                 @if(!empty($field['rotation'])) transform:rotate({{ (float) $field['rotation'] }}deg); transform-origin:center center; @endif
             ">
                 @if($hasGradient)
