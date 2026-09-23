@@ -11,7 +11,7 @@ class StateFestRegistration extends StateModel
 
     protected $fillable = [
         'state_event_id', 'qualifier_entry_id', 'school_id', 'school_name',
-        'sahodaya_id', 'item_id', 'item_code', 'status', 'meta',
+        'sahodaya_id', 'sahodaya_name', 'item_id', 'item_code', 'status', 'meta',
     ];
 
     protected $casts = [

@@ -191,6 +191,11 @@ class SahodayaPromotionService
                 'promoted_at'      => now(),
             ])->save();
 
+            // Keep the State's canonical identity single: attach the new tenant to the directory
+            // row that already carries this Sahodaya's submissions, rather than letting a second
+            // identity appear the next time it submits and double-count it in standings and fees.
+            app(StateSahodayaDirectory::class)->linkPromotedTenant($ext->fresh(), $tenant);
+
             $this->audit->log(
                 'sahodaya.promoted',
                 "Promoted outside Sahodaya \"{$ext->name}\" to tenant {$tenant->name}",
@@ -268,6 +273,10 @@ class SahodayaPromotionService
                 $this->checklist->markComplete($tenant, 'portal_admin_created', $actorId);
                 $step('admin', "Admin login {$admin['username']} ready");
             }
+
+            // Repairs the canonical-identity link if the original promotion got as far as creating
+            // the tenant but failed before recording it in the State directory.
+            app(StateSahodayaDirectory::class)->linkPromotedTenant($ext->fresh(), $tenant);
 
             $ext->forceFill([
                 'promotion_status' => ExternalSahodaya::PROMOTION_READY,

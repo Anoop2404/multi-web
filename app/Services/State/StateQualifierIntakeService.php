@@ -39,10 +39,20 @@ class StateQualifierIntakeService
             // without each call site needing to know about state scoping.
             $stateId = FestStateProgram::find($payload['state_program_id'])?->state_id;
 
+            // Canonical Sahodaya identity, resolved once at the door. Everything downstream — slot
+            // usage, standings, fees, reports — groups on this rather than on the raw source key,
+            // which changes when an outside Sahodaya is promoted to a tenant and would otherwise
+            // split one body into two. Unresolvable keys (a manual intake typed against an id that
+            // matches nothing) are recorded without an identity rather than rejected, so intake
+            // never becomes the thing that fails.
+            $sahodaya = app(StateSahodayaDirectory::class)->resolveOrNull($sourceTenantId, $stateId);
+
             $intake = StateQualifierIntake::create([
                 'state_program_id' => $payload['state_program_id'],
                 'state_id'         => $stateId,
                 'source_tenant_id' => $sourceTenantId,
+                'sahodaya_id'      => $sahodaya?->id,
+                'sahodaya_name'    => $sahodaya?->name,
                 'source_event_id'  => $payload['source_event_id'] ?? 0,
                 'idempotency_key'  => $idempotencyKey,
                 'status'           => 'received',

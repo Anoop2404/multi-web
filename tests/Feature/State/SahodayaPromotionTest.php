@@ -40,6 +40,9 @@ class SahodayaPromotionTest extends TestCase
         // SahodayaSiteTemplate::apply() gives every new Sahodaya a free TenantSubscription and
         // throws without the plan, so promotion genuinely depends on this being seeded.
         Artisan::call('db:seed', ['--class' => 'SubscriptionPlanSeeder']);
+        // Promotion now links the promoted Sahodaya into the State's canonical directory, so the
+        // State schema has to exist for it.
+        Artisan::call('state:migrate');
 
         $this->state = PlatformState::create(['code' => 'KL', 'name' => 'Kerala', 'is_active' => true]);
 

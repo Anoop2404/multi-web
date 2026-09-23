@@ -33,7 +33,12 @@ class StateQualifierMaterializationService
                             [
                                 'school_id' => $entry->school_id,
                                 'school_name' => $entry->school_name,
-                                'sahodaya_id' => $intake->source_tenant_id,
+                                // Canonical directory id, not the raw source key: a Sahodaya
+                                // promoted between events must stay one body in standings and
+                                // reports. Falls back to the raw key only for an intake that
+                                // predates the directory and could not be resolved.
+                                'sahodaya_id' => $intake->sahodaya_id ?: $intake->source_tenant_id,
+                                'sahodaya_name' => $intake->sahodaya_name,
                                 'item_id' => $entry->item_id,
                                 'item_code' => $entry->item_code,
                                 'status' => 'approved',
