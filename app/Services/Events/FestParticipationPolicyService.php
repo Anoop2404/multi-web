@@ -57,11 +57,23 @@ class FestParticipationPolicyService
 
     private function eventPolicy(int $eventId, ?string $classGroup): ?FestParticipationPolicy
     {
+        // No class_group context (e.g. the whole-event student-limits report, which
+        // aggregates across every class group) must resolve only the default
+        // (class_group IS NULL) policy row — the previous ->when($classGroup, ...) here
+        // skipped the filter entirely for a null $classGroup, leaving every class-
+        // specific row in the result set too, and orderByRaw('class_group IS NULL')
+        // sorts those non-null rows FIRST, so ->first() silently returned an arbitrary
+        // class-specific policy (whichever sorted first, no tiebreaker) instead of the
+        // event's actual default limits.
         return FestParticipationPolicy::where('event_id', $eventId)
             ->where('is_active', true)
-            ->when($classGroup, fn ($q) => $q->where(fn ($q2) => $q2
-                ->where('class_group', $classGroup)
-                ->orWhereNull('class_group')))
+            ->where(function ($q) use ($classGroup) {
+                if ($classGroup) {
+                    $q->where('class_group', $classGroup)->orWhereNull('class_group');
+                } else {
+                    $q->whereNull('class_group');
+                }
+            })
             ->orderByRaw('class_group IS NULL')
             ->first();
     }

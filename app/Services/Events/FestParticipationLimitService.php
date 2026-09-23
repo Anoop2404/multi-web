@@ -250,9 +250,19 @@ class FestParticipationLimitService
             // these blank vs. types 0 must get identical behavior in both the report and
             // actual registration blocking, not the report flagging everyone as over a
             // "cap of zero" while registration enforces nothing at all.
-            $individualLimit = (! empty($onStageLimit) || ! empty($offStageLimit))
-                ? (int) ($onStageLimit ?: 0) + (int) ($offStageLimit ?: 0)
-                : null;
+            //
+            // max_total_per_student ("Total Individual / Student" in the participation
+            // policy settings) is the admin-configured combined on-stage+off-stage cap —
+            // it must win here whenever it's actually set, matching what validateStudent()
+            // enforces at registration time. Only fall back to summing the separate
+            // on-stage/off-stage limits when no combined total was configured at all, so
+            // the badge still shows *something* useful for a policy that only set those two.
+            $maxTotalPerStudent = $policy['max_total_per_student'] ?? null;
+            $individualLimit = ! empty($maxTotalPerStudent)
+                ? (int) $maxTotalPerStudent
+                : ((! empty($onStageLimit) || ! empty($offStageLimit))
+                    ? (int) ($onStageLimit ?: 0) + (int) ($offStageLimit ?: 0)
+                    : null);
 
             $dimension = fn (int $used, $limit) => [
                 'used'    => $used,

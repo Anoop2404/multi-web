@@ -230,6 +230,71 @@ class FestParticipationLimitServiceTest extends TestCase
         $this->assertSame($schoolId, $allSchoolsRows[0]['school_id']);
     }
 
+    /**
+     * Regression: the "Individual" badge used to ignore max_total_per_student
+     * ("Total Individual / Student" in the settings UI) entirely and fabricate its
+     * own limit by summing max_onstage_per_student + max_offstage_per_student
+     * (3+3=6 here) — an admin who set an explicit combined total cap saw a
+     * completely different, unconfigured number on the report.
+     */
+    public function test_individual_badge_uses_the_configured_total_cap_not_a_fabricated_sum(): void
+    {
+        [$event, $schoolId] = $this->fixture(['max_onstage_per_student' => 3, 'max_offstage_per_student' => 3, 'max_total_per_student' => 5]);
+        $studentId = 1;
+
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Onstage', 'item_code' => 'IND1', 'stage_type' => 'on_stage', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $this->registerStudentFor($event, $schoolId, $studentId, $item);
+
+        $service = new FestParticipationLimitService($event);
+        $row = $service->studentLimitReportRows($schoolId)[0];
+
+        $this->assertSame(5, $row['individual']['limit'], 'Individual badge must show the configured max_total_per_student (5), not on-stage+off-stage (3+3=6)');
+    }
+
+    /**
+     * When no combined total cap was ever configured (0/blank), the badge still
+     * needs *some* limit to show — falls back to on-stage+off-stage summed, the
+     * only behavior the badge had before max_total_per_student was wired in above.
+     */
+    public function test_individual_badge_falls_back_to_summed_onstage_offstage_when_no_total_cap_is_set(): void
+    {
+        [$event, $schoolId] = $this->fixture(['max_onstage_per_student' => 3, 'max_offstage_per_student' => 4, 'max_total_per_student' => 0]);
+        $studentId = 1;
+
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Onstage', 'item_code' => 'IND2', 'stage_type' => 'on_stage', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $this->registerStudentFor($event, $schoolId, $studentId, $item);
+
+        $service = new FestParticipationLimitService($event);
+        $row = $service->studentLimitReportRows($schoolId)[0];
+
+        $this->assertSame(7, $row['individual']['limit'], 'with no total cap configured, Individual falls back to on-stage(3) + off-stage(4) = 7');
+    }
+
+    /**
+     * Directly answers "is the registration lock broken too, the same way the report
+     * badge was": validateRegistration() checks max_total_per_student independently
+     * of the report's own (separately buggy) Individual badge math, so actual
+     * registration enforcement was never affected by that display bug.
+     */
+    public function test_registration_lock_correctly_blocks_once_the_total_cap_is_reached(): void
+    {
+        [$event, $schoolId] = $this->fixture(['max_total_per_student' => 2, 'max_onstage_per_student' => 0, 'max_offstage_per_student' => 0]);
+        $studentId = 1;
+
+        $first = FestEventItem::create(['event_id' => $event->id, 'title' => 'Item 1', 'item_code' => 'LOCK1', 'stage_type' => 'on_stage', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $second = FestEventItem::create(['event_id' => $event->id, 'title' => 'Item 2', 'item_code' => 'LOCK2', 'stage_type' => 'off_stage', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $third = FestEventItem::create(['event_id' => $event->id, 'title' => 'Item 3', 'item_code' => 'LOCK3', 'stage_type' => 'on_stage', 'participant_type' => 'individual', 'is_enabled' => true]);
+
+        $this->registerStudentFor($event, $schoolId, $studentId, $first);
+        $this->registerStudentFor($event, $schoolId, $studentId, $second);
+
+        $service = new FestParticipationLimitService($event);
+        $errors = $service->validateRegistration($third, $schoolId, [$studentId]);
+
+        $this->assertNotEmpty($errors, 'a 3rd item must be blocked once the total cap of 2 is already used');
+        $this->assertStringContainsString('total', strtolower($errors[0]));
+    }
+
     public function test_a_limit_of_zero_means_not_set_in_both_the_report_and_registration_blocking(): void
     {
         // A limit of 0 (vs. blank/null) is reachable through the settings form
