@@ -618,8 +618,27 @@ slots never blocks another. New coverage: `tests/Feature/State/StateSlotsPerItem
 - **Item 2 — projection into the State event.** Blocked on **D1**: whether approved qualifiers
   become registrations inside a State *tenant* (reusing the fest module) or rows in the `state_*`
   tables decides what this service even writes.
-- **Item 4 — remittance fee demand.** `StateRemittanceService::calculateDemand()` exists with no UI.
-  Independent of D1.
+- **Item 4 — ✅ remittance fee demand.** Built, and the rule turned out to be simpler than the plan
+  assumed. **The State charges a Sahodaya a fixed fee, not a per-participant one** (operator
+  instruction, 2026-09-23): a Sahodaya sending 40 qualifiers owes exactly what one sending 4 owes.
+
+  The plan's §7.4 described wiring `calculateDemand()`, but approval was *already* calling
+  `calculateDemandFromApprovedQualifiers()`, which bills the flat registration fee **plus each
+  item's fee × approved entries** — on the seeded Kerala 2026 program that is a ₹1,550 demand over
+  17 itemized lines where the rule says ₹1,000 flat.
+
+  `calculateDemandFor()` now dispatches on the state level's `fee_model` and produces a single-line
+  fixed demand, recording the approved count in `source_breakdown` for audit without letting it
+  affect the amount. An **unset** `fee_model` bills the fixed fee rather than falling through to
+  per-item, because the per-item rates live in the same config and a blank setting must not quietly
+  invoice against them. A program that genuinely wants itemized billing opts in with
+  `fee_model=per_item`; that path is untouched. The idempotency guard is preserved — a demand
+  already submitted or verified is never recalculated.
+
+  The State remittance panel had no billing selector at all and its help text described the
+  itemized formula as though it were the only one. It now offers the choice and explains whichever
+  is active. The local Kerala 2026 program was switched to `flat_school`, which took its demand from
+  ₹1,550/17 lines to ₹1,000/1 line. Covered by `tests/Feature/State/StateFixedFeeDemandTest.php`.
 
 ### 6.2 Original specification
 
