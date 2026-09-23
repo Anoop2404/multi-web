@@ -193,14 +193,15 @@ class FestParticipationLimitServiceTest extends TestCase
         $this->assertStringContainsString('writing items', implode(' ', $errors));
     }
 
-    public function test_student_limit_report_rows_count_offstage_and_exclude_group_from_total(): void
+    public function test_student_limit_report_rows_exclude_group_from_individual_but_include_it_in_total(): void
     {
-        [$event, $schoolId] = $this->fixture(['max_total_per_student' => 4]);
+        // Individual (on-stage + off-stage only) and Total (individual + group,
+        // combined) are deliberately different figures -- group items must never
+        // leak into Individual's own count, but they DO belong in Total, which is
+        // meant to be the genuinely combined view across both buckets.
+        [$event, $schoolId] = $this->fixture(['max_total_per_student' => 4, 'max_group_per_student' => 2]);
         $studentId = 1;
 
-        // 2 on-stage individual, 1 off-stage individual, 2 group -- total should be
-        // on_stage + off_stage only (3), never including the group items (which would
-        // make it 5 and wrongly trip the max_total_per_student=4 cap).
         $onStage1 = FestEventItem::create(['event_id' => $event->id, 'title' => 'Onstage A', 'item_code' => 'OSA', 'stage_type' => 'on_stage', 'participant_type' => 'individual', 'is_enabled' => true]);
         $onStage2 = FestEventItem::create(['event_id' => $event->id, 'title' => 'Onstage B', 'item_code' => 'OSB', 'stage_type' => 'on_stage', 'participant_type' => 'individual', 'is_enabled' => true]);
         $offStage = FestEventItem::create(['event_id' => $event->id, 'title' => 'Offstage A', 'item_code' => 'OFA', 'stage_type' => 'off_stage', 'participant_type' => 'individual', 'is_enabled' => true]);
@@ -220,13 +221,15 @@ class FestParticipationLimitServiceTest extends TestCase
         $this->assertSame(2, $row['on_stage']['used'], 'on-stage count should be exactly the 2 on-stage individual items');
         $this->assertSame(1, $row['off_stage']['used'], 'off-stage count should be exactly the 1 off-stage individual item');
         $this->assertSame(2, $row['group']['used'], 'group count should be both group items, regardless of their own stage_type');
-        $this->assertSame(3, $row['total']['used'], 'total must be on_stage + off_stage only (2+1=3) -- group items must never leak into total');
-        $this->assertFalse($row['total']['exceeds'], 'total=3 must not exceed max_total_per_student=4');
+        $this->assertSame(3, $row['individual']['used'], 'Individual must be on_stage + off_stage only (2+1=3) -- group items must never leak into it');
+        $this->assertSame(5, $row['total']['used'], 'Total must be individual + group combined (3+2=5)');
+        $this->assertSame(6, $row['total']['limit'], 'Total limit must be individual cap (4) + group cap (2) summed');
+        $this->assertFalse($row['total']['exceeds'], 'total=5 must not exceed the combined cap of 6');
 
         // Cross-check against studentLimitReportRows("all schools") mode too.
         $allSchoolsRows = $service->studentLimitReportRows(null);
         $this->assertCount(1, $allSchoolsRows);
-        $this->assertSame(3, $allSchoolsRows[0]['total']['used']);
+        $this->assertSame(5, $allSchoolsRows[0]['total']['used']);
         $this->assertSame($schoolId, $allSchoolsRows[0]['school_id']);
     }
 
@@ -295,13 +298,67 @@ class FestParticipationLimitServiceTest extends TestCase
         $this->assertStringContainsString('total', strtolower($errors[0]));
     }
 
+    /**
+     * The whole point of Total being individual+group combined instead of a bare
+     * duplicate of Individual: a student can sit comfortably under both the
+     * Individual cap and the Group cap on their own, yet still be over their real
+     * combined workload -- something the old "Total = max_total_per_student only"
+     * math could never surface, since it was identical to Individual's own number.
+     */
+    public function test_total_flags_a_student_over_the_combined_cap_even_when_neither_bucket_alone_exceeds_its_own(): void
+    {
+        [$event, $schoolId] = $this->fixture(['max_total_per_student' => 3, 'max_group_per_student' => 2]);
+        $studentId = 1;
+
+        $onStage = FestEventItem::create(['event_id' => $event->id, 'title' => 'Onstage', 'item_code' => 'COMB1', 'stage_type' => 'on_stage', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $offStage = FestEventItem::create(['event_id' => $event->id, 'title' => 'Offstage', 'item_code' => 'COMB2', 'stage_type' => 'off_stage', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $group1 = FestEventItem::create(['event_id' => $event->id, 'title' => 'Group A', 'item_code' => 'COMB3', 'participant_type' => 'group', 'min_group_size' => 1, 'max_group_size' => 10, 'is_enabled' => true]);
+        $group2 = FestEventItem::create(['event_id' => $event->id, 'title' => 'Group B', 'item_code' => 'COMB4', 'participant_type' => 'group', 'min_group_size' => 1, 'max_group_size' => 10, 'is_enabled' => true]);
+
+        foreach ([$onStage, $offStage, $group1, $group2] as $item) {
+            $this->registerStudentFor($event, $schoolId, $studentId, $item);
+        }
+
+        $service = new FestParticipationLimitService($event);
+        $row = $service->studentLimitReportRows($schoolId)[0];
+
+        $this->assertSame(2, $row['individual']['used']);
+        $this->assertFalse($row['individual']['exceeds'], 'individual (2) is within its own cap (3)');
+        $this->assertSame(2, $row['group']['used']);
+        $this->assertFalse($row['group']['exceeds'], 'group (2) is within its own cap (2)');
+        $this->assertSame(4, $row['total']['used'], 'total is individual(2) + group(2) = 4');
+        $this->assertSame(5, $row['total']['limit'], 'total cap is individual(3) + group(2) = 5');
+        $this->assertFalse($row['total']['exceeds'], 'still under the combined cap here -- see the next assertion for the boundary case');
+
+        // One more on-stage item (not group, so group's own cap of 2 stays
+        // untouched) tips total to exactly 5 -- individual's own cap (also 3, since
+        // it reads the same max_total_per_student) sits right at its own boundary
+        // too, so this isolates the combined-cap boundary from either bucket's own.
+        $onStage2 = FestEventItem::create(['event_id' => $event->id, 'title' => 'Onstage 2', 'item_code' => 'COMB5', 'stage_type' => 'on_stage', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $this->registerStudentFor($event, $schoolId, $studentId, $onStage2);
+        $row = (new FestParticipationLimitService($event))->studentLimitReportRows($schoolId)[0];
+        $this->assertSame(3, $row['individual']['used']);
+        $this->assertFalse($row['individual']['exceeds'], '3 used against individual\'s own cap of 3 is at the limit, not over it');
+        $this->assertFalse($row['group']['exceeds'], 'group is untouched, still 2 against its own cap of 2');
+        $this->assertSame(5, $row['total']['used']);
+        $this->assertFalse($row['total']['exceeds'], '5 used against a combined cap of 5 is at the limit, not over it');
+    }
+
     public function test_a_limit_of_zero_means_not_set_in_both_the_report_and_registration_blocking(): void
     {
         // A limit of 0 (vs. blank/null) is reachable through the settings form
         // (nullable|integer|min:0) -- it must mean the same thing everywhere: no cap,
         // not "block everything" in the report while registration lets everything
-        // through, or vice versa.
-        [$event, $schoolId] = $this->fixture(['max_total_per_student' => 0, 'max_onstage_per_student' => 0]);
+        // through, or vice versa. Every dimension that could otherwise backfill
+        // Total's own combined limit (on-stage/off-stage fallback, group) is zeroed
+        // too, so Total's null-limit assertion below genuinely means "nothing capped
+        // anywhere", not just "the total field itself was blank".
+        [$event, $schoolId] = $this->fixture([
+            'max_total_per_student' => 0,
+            'max_onstage_per_student' => 0,
+            'max_offstage_per_student' => 0,
+            'max_group_per_student' => 0,
+        ]);
         $studentId = 1;
 
         $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Onstage', 'item_code' => 'OSZ', 'stage_type' => 'on_stage', 'participant_type' => 'individual', 'is_enabled' => true]);

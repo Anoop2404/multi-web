@@ -2,7 +2,7 @@
     <SahodayaEventsLayout :title="`${event.title} — Student item limits`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Student Item Limits`" eyebrow="Reports"
-                    description="Per-student on-stage, off-stage, individual (combined) and group item usage vs limits — combined across every phase and region of this fest.">
+                    description="Per-student on-stage, off-stage, Individual (on-stage + off-stage) and Group item usage vs limits, plus Total (Individual + Group combined) — combined across every phase and region of this fest.">
             <template #actions>
                 <ReportDownloadButtons :pdf-url="pdfUrl" :xls-url="xlsUrl" />
             </template>
@@ -66,8 +66,12 @@
             </div>
         </div>
 
+        <div class="flex items-center justify-between gap-3 mb-3 text-xs text-slate-500 font-medium">
+            <span>{{ pageRangeLabel }}</span>
+        </div>
+
         <div class="space-y-4">
-            <div v-for="st in filteredRows" :key="st.student_id" class="card p-0 overflow-hidden shadow-sm border"
+            <div v-for="st in pagedRows" :key="st.student_id" class="card p-0 overflow-hidden shadow-sm border"
                  :class="st.exceeds_any ? 'border-rose-300' : 'border-slate-200'">
                 <div class="px-5 py-3.5 bg-slate-50/90 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
                     <div class="flex items-center gap-3">
@@ -85,9 +89,9 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <LimitBadge label="On-stage" :dim="st.on_stage" />
                         <LimitBadge label="Off-stage" :dim="st.off_stage" />
-                        <LimitBadge label="Individual" :dim="st.individual" emphasize />
+                        <LimitBadge label="Individual" :dim="st.individual" emphasize title="On-stage + off-stage combined" />
                         <LimitBadge label="Group" :dim="st.group" />
-                        <LimitBadge label="Total" :dim="st.total" />
+                        <LimitBadge label="Total" :dim="st.total" emphasize title="Individual + Group combined" />
                         <button type="button"
                                 class="px-2.5 py-1 rounded-full text-xs font-bold border inline-flex items-center gap-1.5 bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                                 @click="toggleExpanded(st.student_id)">
@@ -132,6 +136,18 @@
             <div v-if="!filteredRows.length" class="card p-12 text-center text-slate-400">
                 <p class="font-semibold">No students match your search.</p>
             </div>
+        </div>
+
+        <div v-if="pageCount > 1" class="flex items-center justify-center gap-2 mt-5">
+            <button type="button" class="px-3 py-1.5 rounded-lg text-xs font-bold border bg-white text-slate-600 border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">
+                ← Prev
+            </button>
+            <span class="text-xs font-semibold text-slate-500 px-2">Page {{ currentPage }} of {{ pageCount }}</span>
+            <button type="button" class="px-3 py-1.5 rounded-lg text-xs font-bold border bg-white text-slate-600 border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    :disabled="currentPage === pageCount" @click="goToPage(currentPage + 1)">
+                Next →
+            </button>
         </div>
 
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />
@@ -198,7 +214,10 @@ function applyFilter() {
 }
 
 const searchQuery = ref('');
-const onlyExceeding = ref(false);
+// Defaults to true: with a fest this size (thousands of students), the students who
+// actually need an admin's attention are the ones over a limit -- opening on the
+// full unfiltered list buried that handful of rows under everyone else every time.
+const onlyExceeding = ref(true);
 const expandedIds = ref(new Set());
 
 function isExpanded(studentId) {
@@ -230,12 +249,39 @@ const filteredRows = computed(() => {
     return rows;
 });
 
+// Client-side: every row (including the largest fests' full student list) already
+// arrives in one payload per filter/Apply, so this only controls how many of the
+// already-loaded, already-filtered rows render as cards at once -- thousands of
+// expandable cards in the DOM at a time was the actual slowdown, not the network.
+const pageSize = 25;
+const currentPage = ref(1);
+const pageCount = computed(() => Math.max(1, Math.ceil(filteredRows.value.length / pageSize)));
+const pagedRows = computed(() => {
+    const start = (currentPage.value - 1) * pageSize;
+    return filteredRows.value.slice(start, start + pageSize);
+});
+const pageRangeLabel = computed(() => {
+    const total = filteredRows.value.length;
+    if (! total) return '0 students';
+    const start = (currentPage.value - 1) * pageSize + 1;
+    const end = Math.min(currentPage.value * pageSize, total);
+    return `${start}–${end} of ${total} students`;
+});
+
+// A new search term or toggling "only exceeding" changes which rows exist at all --
+// staying on, say, page 4 of a now much-shorter list would just show an empty page.
+watch([searchQuery, onlyExceeding], () => { currentPage.value = 1; });
+
+function goToPage(page) {
+    currentPage.value = Math.min(Math.max(1, page), pageCount.value);
+}
+
 function dimensionLabel(dimension) {
     return { on_stage: 'On-stage', off_stage: 'Off-stage', group: 'Group' }[dimension] ?? '—';
 }
 
 const LimitBadge = {
-    props: { label: String, dim: Object, emphasize: Boolean },
+    props: { label: String, dim: Object, emphasize: Boolean, title: String },
     setup(props) {
         return () => {
             const dim = props.dim ?? { used: 0, limit: null, exceeds: false };
@@ -245,7 +291,7 @@ const LimitBadge = {
                 : props.emphasize
                     ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
                     : 'bg-slate-50 text-slate-600 border-slate-200';
-            return h('span', { class: `${base} ${tone}` }, [
+            return h('span', { class: `${base} ${tone}`, title: props.title }, [
                 `${props.label}: ${dim.used}`,
                 dim.limit !== null ? h('span', { class: 'font-normal opacity-70' }, `/ ${dim.limit}`) : null,
             ]);

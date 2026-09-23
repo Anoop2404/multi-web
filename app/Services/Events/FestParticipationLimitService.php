@@ -272,9 +272,22 @@ class FestParticipationLimitService
 
             $onStage = $dimension($onStageUsed, $onStageLimit);
             $offStage = $dimension($offStageUsed, $offStageLimit);
+            $groupLimit = $policy['max_group_per_student'] ?? null;
             $individual = $dimension($onStageUsed + $offStageUsed, $individualLimit);
-            $group = $dimension($groupUsed, $policy['max_group_per_student'] ?? null);
-            $total = $dimension($totalUsed, $policy['max_total_per_student'] ?? null);
+            $group = $dimension($groupUsed, $groupLimit);
+            // Total is the genuinely combined figure across BOTH buckets — Individual's
+            // own usage/cap plus Group's, summed on both sides. It used to just re-read
+            // max_total_per_student a second time, making it a bare duplicate of the
+            // Individual badge; the summary header's own "Over individual (combined)"
+            // vs "Over group" stat split already implied these two were meant to roll up
+            // into one combined figure here, not repeat one of them verbatim. $totalUsed
+            // (on-stage + off-stage, excluding group and any excludedFromTotalCount
+            // items — see the loop above) still anchors the individual side so that
+            // per-item exclusion rule keeps applying.
+            $totalLimit = (! empty($individualLimit) || ! empty($groupLimit))
+                ? (int) ($individualLimit ?: 0) + (int) ($groupLimit ?: 0)
+                : null;
+            $total = $dimension($totalUsed + $groupUsed, $totalLimit);
 
             $rows[] = [
                 'student_id'  => (int) $studentId,
