@@ -252,6 +252,7 @@ class FestEventActivityService
 
         $mapped = $logs->map(function (AuditLog $log) use ($participantsMap, $marksMap, $itemsMap, $registrationsMap, $registrationMorph, $event, $scoreboards, $gradePointService, $itemResultsService) {
             $props = $log->properties ?? [];
+            $registration = null;
 
             if ($log->subject_type === $registrationMorph && $log->subject_id !== null) {
                 $registration = $registrationsMap->get((int) $log->subject_id);
