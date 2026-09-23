@@ -179,10 +179,16 @@ class StateQualifierIntakeTest extends TestCase
         $this->assertSame('pending', $second->fresh()->status);
     }
 
-    public function test_review_entry_blocks_when_qualify_count_would_be_exceeded_globally(): void
+    public function test_review_entry_blocks_a_sahodayas_entry_beyond_its_slots_but_not_another_sahodayas(): void
     {
+        // qualify_count is the per-Sahodaya slot count ("top N from each Sahodaya"), which is how
+        // both paths that produce entries already read it — FestStateQualifierPayloadBuilder filters
+        // a managed Sahodaya's winners to positions <= qualify_count within its own event, and
+        // ExternalIntakeService caps an outside Sahodaya's entries across its own schools. This
+        // check used to read it as a state-wide total, so with 19+ Sahodayas submitting it approved
+        // the first N entries in all of Kerala and refused every Sahodaya after that.
         $program = FestStateProgram::create([
-            'title' => 'Global Limit Test Program', 'event_type' => 'kalolsavam',
+            'title' => 'Slot Limit Test Program', 'event_type' => 'kalolsavam',
             'conduct_levels' => ['state'], 'status' => 'published',
         ]);
         $item = FestStateProgramItem::create([
@@ -195,6 +201,11 @@ class StateQualifierIntakeTest extends TestCase
             'state_program_id' => $program->id, 'source_event_id' => 1,
             'entries' => [['school_id' => 'sch-a', 'student_name' => 'A', 'item_id' => $item->id, 'item_code' => $item->item_code]],
         ], 'tenant-a');
+        // A second intake from the SAME Sahodaya — a re-submission — must count against the first.
+        $intakeA2 = $service->receive('qualify-count-key-a2', [
+            'state_program_id' => $program->id, 'source_event_id' => 1,
+            'entries' => [['school_id' => 'sch-a2', 'student_name' => 'A2', 'item_id' => $item->id, 'item_code' => $item->item_code]],
+        ], 'tenant-a');
         $intakeB = $service->receive('qualify-count-key-b', [
             'state_program_id' => $program->id, 'source_event_id' => 1,
             'entries' => [['school_id' => 'sch-b', 'student_name' => 'B', 'item_id' => $item->id, 'item_code' => $item->item_code]],
@@ -203,14 +214,18 @@ class StateQualifierIntakeTest extends TestCase
         $service->reviewEntry($intakeA, $intakeA->entries()->sole(), 'approved');
 
         try {
-            $service->reviewEntry($intakeB, $intakeB->entries()->sole(), 'approved');
-            $this->fail('Expected a global qualify_count breach exception.');
+            $service->reviewEntry($intakeA2, $intakeA2->entries()->sole(), 'approved');
+            $this->fail('Expected the same Sahodaya\'s second entry to breach its slot limit.');
         } catch (HttpException $e) {
             $this->assertSame(422, $e->getStatusCode());
-            $this->assertStringContainsString('state-wide', $e->getMessage());
+            $this->assertStringContainsString('per Sahodaya', $e->getMessage());
         }
 
-        $this->assertSame('pending', $intakeB->entries()->sole()->fresh()->status);
+        $this->assertSame('pending', $intakeA2->entries()->sole()->fresh()->status);
+
+        // A different Sahodaya has slots of its own and must go through.
+        $service->reviewEntry($intakeB, $intakeB->entries()->sole(), 'approved');
+        $this->assertSame('approved', $intakeB->entries()->sole()->fresh()->status);
     }
 
     public function test_bulk_approve_rejects_whole_intake_when_any_pending_entry_would_breach_a_limit(): void

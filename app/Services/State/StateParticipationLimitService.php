@@ -9,9 +9,21 @@ use App\Models\State\StateQualifierIntake;
 use App\Models\Tenant;
 
 /**
- * Enforces FestStateProgramItem.max_per_school (a per-Sahodaya cap) and
- * qualify_count (a state-wide global cap across all Sahodayas) against
- * StateQualifierEntry approvals. Counts are taken at the entry level, not
+ * Enforces the per-Sahodaya slot limit for an item against StateQualifierEntry approvals.
+ *
+ * Both caps are per Sahodaya. qualify_count is "how many qualify from each Sahodaya" — the State
+ * Kalotsavam's two-slots-per-item rule, which every seeded item encodes as qualify_count = 2 — and
+ * max_per_school is an explicit override for items that qualify fewer (English One Act Play is
+ * top-1). max_per_school wins when both are set.
+ *
+ * qualify_count used to be read here as a state-WIDE cap while the two paths that produce entries
+ * both read it as per-Sahodaya: FestStateQualifierPayloadBuilder filters a managed Sahodaya's
+ * winners to positions <= qualify_count within that Sahodaya's own event, and
+ * ExternalIntakeService caps an outside Sahodaya's entries per item "across all schools" under it.
+ * The State Programs UI says the same thing ("Top 2"). With 19+ Sahodayas submitting, the
+ * state-wide reading approved the first two entries in all of Kerala and refused every Sahodaya
+ * after that — so the rule the operator configured as "two slots each" silently became "two slots
+ * for the whole state". Aligned here with the other two consumers and the UI. Counts are taken at the entry level, not
  * StateFestRegistration, because entries reach `approved` (via reviewEntry()
  * or the bulk intake approve()) before materialization ever creates a
  * registration — counting registrations would let two still-open intakes
@@ -36,6 +48,15 @@ class StateParticipationLimitService
             ->count();
     }
 
+    /**
+     * Slots one Sahodaya gets for this item: the explicit override if set, else the item's
+     * qualify_count. Null means uncapped.
+     */
+    public function slotsPerSahodaya(FestStateProgramItem $item): ?int
+    {
+        return $item->max_per_school ?: ($item->qualify_count ?: null);
+    }
+
     /** @return list<string> violation messages; empty means the approval is allowed */
     public function validateEntryApproval(StateQualifierEntry $entry): array
     {
@@ -49,22 +70,15 @@ class StateParticipationLimitService
         }
 
         $sahodayaId = $entry->intake?->source_tenant_id;
+        $slots = $this->slotsPerSahodaya($item);
         $errors = [];
 
-        if ($item->max_per_school && $sahodayaId) {
+        if ($slots && $sahodayaId) {
             $current = $this->sahodayaApprovedCount($entry->item_id, $sahodayaId, [$entry->id]);
-            if ($current + 1 > $item->max_per_school) {
-                $errors[] = "'{$item->title}' allows at most {$item->max_per_school} ".
-                    ($item->max_per_school === 1 ? 'entry' : 'entries').
+            if ($current + 1 > $slots) {
+                $errors[] = "'{$item->title}' allows at most {$slots} ".
+                    ($slots === 1 ? 'entry' : 'entries').
                     " per Sahodaya; this Sahodaya already has {$current} approved for it.";
-            }
-        }
-
-        if ($item->qualify_count) {
-            $current = $this->globalApprovedCount($entry->item_id, [$entry->id]);
-            if ($current + 1 > $item->qualify_count) {
-                $errors[] = "'{$item->title}' only qualifies {$item->qualify_count} entries state-wide; ".
-                    "{$current} are already approved.";
             }
         }
 
@@ -101,20 +115,13 @@ class StateParticipationLimitService
 
             $excludeIds = $entries->pluck('id')->all();
             $batchCount = $entries->count();
+            $slots = $this->slotsPerSahodaya($item);
 
-            if ($item->max_per_school) {
+            if ($slots) {
                 $existing = $this->sahodayaApprovedCount($itemId, $sahodayaId, $excludeIds);
-                if ($existing + $batchCount > $item->max_per_school) {
-                    $errors[] = "'{$item->title}' allows at most {$item->max_per_school} per Sahodaya; ".
+                if ($existing + $batchCount > $slots) {
+                    $errors[] = "'{$item->title}' allows at most {$slots} per Sahodaya; ".
                         "approving this intake would bring this Sahodaya to ".($existing + $batchCount).'.';
-                }
-            }
-
-            if ($item->qualify_count) {
-                $existingGlobal = $this->globalApprovedCount($itemId, $excludeIds);
-                if ($existingGlobal + $batchCount > $item->qualify_count) {
-                    $errors[] = "'{$item->title}' only qualifies {$item->qualify_count} entries state-wide; ".
-                        "approving this intake would bring the total to ".($existingGlobal + $batchCount).'.';
                 }
             }
         }
@@ -123,7 +130,7 @@ class StateParticipationLimitService
     }
 
     /**
-     * Per Sahodaya x item: approved count vs. max_per_school.
+     * Per Sahodaya x item: approved count vs. the Sahodaya's slots for that item.
      *
      * @return list<array<string, mixed>>
      */
@@ -149,7 +156,10 @@ class StateParticipationLimitService
 
         return $grouped->map(function ($row) use ($items, $sahodayas) {
             $item = $items->get($row->item_id);
-            $max = $item?->max_per_school;
+            // slotsPerSahodaya(), not max_per_school: that column is null on every seeded item, so
+            // reading it alone reported "Unlimited" for all 140 items while qualify_count = 2 was
+            // the rule actually in force.
+            $max = $item ? $this->slotsPerSahodaya($item) : null;
 
             return [
                 'sahodaya_id' => $row->sahodaya_id,
@@ -165,7 +175,12 @@ class StateParticipationLimitService
     }
 
     /**
-     * Per item: global approved count vs. qualify_count.
+     * Per item across the whole state: approved total, how many Sahodayas entered it, and the
+     * slots each of them gets.
+     *
+     * The cap is per Sahodaya, so the state-wide ceiling for an item is slots x the number of
+     * Sahodayas that entered it — comparing the state total directly against qualify_count (as this
+     * used to) flagged every popular item as "over limit" the moment a third Sahodaya submitted.
      *
      * @return list<array<string, mixed>>
      */
@@ -176,7 +191,7 @@ class StateParticipationLimitService
             ->where('state_qualifier_entries.status', 'approved')
             ->where('state_qualifier_intakes.state_program_id', $program->id)
             ->whereNotNull('state_qualifier_entries.item_id')
-            ->selectRaw('state_qualifier_entries.item_id as item_id, count(*) as approved_count')
+            ->selectRaw('state_qualifier_entries.item_id as item_id, count(*) as approved_count, count(distinct state_qualifier_intakes.source_tenant_id) as sahodaya_count')
             ->groupBy('state_qualifier_entries.item_id')
             ->get();
 
@@ -189,16 +204,22 @@ class StateParticipationLimitService
 
         return $grouped->map(function ($row) use ($items) {
             $item = $items->get($row->item_id);
-            $cap = $item?->qualify_count;
+            $cap = $item ? $this->slotsPerSahodaya($item) : null;
+
+            $sahodayaCount = (int) $row->sahodaya_count;
+            $ceiling = $cap ? $cap * max($sahodayaCount, 1) : null;
 
             return [
                 'item_id' => $row->item_id,
                 'item_title' => $item?->title ?? $row->item_id,
                 'item_code' => $item?->item_code,
                 'approved_count' => (int) $row->approved_count,
+                'sahodaya_count' => $sahodayaCount,
+                'slots_per_sahodaya' => $cap,
                 'qualify_count' => $cap,
-                'utilization_pct' => $cap ? round(($row->approved_count / $cap) * 100, 1) : null,
-                'exceeds' => $cap ? $row->approved_count > $cap : false,
+                'state_ceiling' => $ceiling,
+                'utilization_pct' => $ceiling ? round(($row->approved_count / $ceiling) * 100, 1) : null,
+                'exceeds' => $ceiling ? $row->approved_count > $ceiling : false,
             ];
         })->sortByDesc('exceeds')->values()->all();
     }
