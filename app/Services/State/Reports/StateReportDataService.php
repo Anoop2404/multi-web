@@ -52,6 +52,7 @@ class StateReportDataService
             'school-contribution'    => $this->schoolContribution($event, $filters),
             'item-wise-results'      => $this->itemWiseResults($event, $filters),
             'individual-championship' => $this->individualChampionship($event),
+            'certificate-tally'      => $this->certificateTally($event, $filters),
             'item-schedule'          => $this->itemSchedule($event),
             'schedule-clashes'       => $this->scheduleClashes($event),
             'sahodaya-fee-summary'   => $this->feeSummary($event),
@@ -359,6 +360,30 @@ class StateReportDataService
         return [
             'title' => 'Mark Entry Status',
             'headers' => ['Item', 'Registrations', 'Marks entered', 'Outstanding', 'Status'],
+            'rows' => $rows,
+        ];
+    }
+
+    private function certificateTally(StateFestEvent $event, array $filters): array
+    {
+        $rows = \App\Models\State\StateCertificate::where('state_event_id', $event->id)
+            ->when($filters['sahodaya_id'] ?? null, fn ($q, $v) => $q->where('sahodaya_id', $v))
+            ->get()
+            ->groupBy(fn ($c) => ($c->sahodaya_name ?: 'Unattributed').'||'.($c->school_name ?: '—').'||'.$c->type)
+            ->map(function ($group, $key) {
+                [$sahodaya, $school, $type] = explode('||', $key);
+
+                return [
+                    $sahodaya, $school, $type, $group->count(),
+                    // Stale ones are the point of the report: they need reprinting.
+                    $group->where('status', 'stale')->count(),
+                    $group->whereNotNull('printed_at')->count(),
+                ];
+            })->sortBy(fn ($r) => [$r[0], $r[1]])->values()->all();
+
+        return [
+            'title' => 'Certificate Tally',
+            'headers' => ['Sahodaya', 'School', 'Type', 'Issued', 'Stale', 'Printed'],
             'rows' => $rows,
         ];
     }

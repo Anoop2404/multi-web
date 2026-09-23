@@ -265,8 +265,8 @@ class StateFestReportCatalog
                 'group' => self::GROUP_PRINT,
                 'formats' => ['pdf', 'xls'],
                 'filters' => ['sahodaya_id'],
-                'available' => false,
-                'blocked_by' => 'Certificates (Phase 9).',
+                'description' => 'Certificates issued by Sahodaya, School, item and type, with stale ones flagged.',
+                'available' => true,
             ],
         ];
     }

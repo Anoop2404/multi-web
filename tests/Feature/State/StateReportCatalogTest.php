@@ -129,9 +129,16 @@ class StateReportCatalogTest extends TestCase
 
     public function test_opening_an_unavailable_report_explains_itself_rather_than_showing_an_empty_table(): void
     {
-        // Certificates are Phase 9, so this one still declares itself blocked.
+        // Whichever report is still waiting on a later phase — named dynamically so this test does
+        // not have to be edited each time one is unblocked.
+        $blocked = collect(StateFestReportCatalog::reports())->firstWhere('available', false);
+
+        if (! $blocked) {
+            $this->markTestSkipped('Every catalogued report is available.');
+        }
+
         $response = $this->actingAs($this->admin(), 'platform')
-            ->get("http://superadmin.test/admin/state/fest/{$this->event->id}/reports/certificate-tally");
+            ->get("http://superadmin.test/admin/state/fest/{$this->event->id}/reports/{$blocked['id']}");
 
         // 409, not 404: the report exists, its data does not yet.
         $response->assertStatus(409);

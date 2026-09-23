@@ -183,6 +183,19 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
             });
 
             $conduct = \App\Http\Controllers\StateAdmin\Fest\StateConductController::class;
+            $certs = \App\Http\Controllers\StateAdmin\Fest\StateCertificateController::class;
+
+            Route::middleware('state.fest:appeals')->group(function () use ($certs) {
+                Route::get('/{event}/appeals', [$certs, 'appeals'])->name('appeals');
+                Route::post('/{event}/appeals', [$certs, 'submitAppeal'])->name('appeals.submit');
+                Route::post('/{event}/appeals/decide', [$certs, 'decideAppeal'])->name('appeals.decide');
+            });
+
+            Route::middleware('state.fest:certificates')->group(function () use ($certs) {
+                Route::get('/{event}/certificates', [$certs, 'certificates'])->name('certificates');
+                Route::post('/{event}/certificates/generate', [$certs, 'generate'])->name('certificates.generate');
+                Route::post('/{event}/certificates/detect-stale', [$certs, 'detectStale'])->name('certificates.detect-stale');
+            });
 
             Route::middleware('state.fest:attendance')->group(function () use ($conduct) {
                 Route::get('/{event}/attendance', [$conduct, 'attendance'])->name('attendance');
