@@ -155,6 +155,16 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
         Route::get('/sahodayas', [TenantController::class, 'indexSahodayas'])->name('sahodayas.index');
         Route::get('/sahodayas/export-admin-credentials', [TenantController::class, 'exportSahodayaAdminCredentials'])->name('sahodayas.export-admin-credentials');
 
+        // ── State Kalotsav module (docs/STATE_KALOTSAV_MODULE_PLAN_2026_09_23.md) ──────────────
+        // Its own controllers under StateAdmin\Fest, its own permissions, its own pages. The older
+        // /admin/state-workspace/* routes stay until Phase 11 switches over, so nothing in flight
+        // breaks while the module is built out.
+        Route::prefix('state/fest')->name('state.fest.')->group(function () {
+            Route::get('/{event}', [\App\Http\Controllers\StateAdmin\Fest\StateFestWorkspaceController::class, 'overview'])
+                ->middleware('state.fest:view')
+                ->name('overview');
+        });
+
         Route::prefix('state-users')->name('state-users.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Admin\StateUserController::class, 'index'])->name('index');
             Route::get('/export-credentials', [\App\Http\Controllers\Admin\StateUserController::class, 'exportCredentials'])->name('export-credentials');

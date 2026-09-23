@@ -24,7 +24,8 @@ class BackfillSahodayaDirectory extends Command
 {
     protected $signature = 'state:backfill-sahodaya-directory
         {--dry-run : Print what would be written and exit}
-        {--force   : Re-resolve rows that already carry a canonical id}';
+        {--force   : Re-resolve rows that already carry a canonical id}
+        {--state=  : State code (e.g. KL) or uuid to stamp on directory rows that have none}';
 
     protected $description = 'Build the canonical State Sahodaya directory and stamp it onto existing intakes and registrations';
 
@@ -32,6 +33,37 @@ class BackfillSahodayaDirectory extends Command
     {
         $dryRun = (bool) $this->option('dry-run');
         $force = (bool) $this->option('force');
+
+        // Programs and tenants created before multi-state carry a null state_id, so directory rows
+        // derived from them inherit one — and a state-scoped user then sees nothing at all. Stamping
+        // is explicit rather than guessed from "there is only one state", which would do the wrong
+        // thing the day there are two.
+        if ($stateCode = $this->option('state')) {
+            $stateId = \App\Models\PlatformState::query()
+                ->when(\Illuminate\Support\Str::isUuid($stateCode),
+                    fn ($q) => $q->where('id', $stateCode),
+                    fn ($q) => $q->whereRaw('upper(code) = ?', [strtoupper(trim($stateCode))]))
+                ->value('id');
+
+            if (! $stateId) {
+                $this->error("No state matches \"{$stateCode}\".");
+
+                return Command::FAILURE;
+            }
+
+            $stamped = StateSahodaya::whereNull('state_id')->update(['state_id' => $stateId]);
+            $this->line("Stamped state on {$stamped} directory row(s) that had none.");
+
+            // The whole State module scopes on state, so a program or event left with a null one is
+            // invisible to every state user — they fail closed and see a 403 on their own event.
+            // Stamped together with the directory so the chain is consistent in one pass.
+            $programs = \App\Models\FestStateProgram::whereNull('state_id')->update(['state_id' => $stateId]);
+            $events = \App\Models\State\StateFestEvent::whereNull('state_id')->update(['state_id' => $stateId]);
+            $intakes = \App\Models\State\StateQualifierIntake::whereNull('state_id')->update(['state_id' => $stateId]);
+            $externals = \App\Models\ExternalSahodaya::whereNull('state_id')->update(['state_id' => $stateId]);
+            $this->line("Stamped state on {$programs} program(s), {$events} event(s), {$intakes} intake(s) and {$externals} outside-Sahodaya row(s).");
+        }
+
 
         $query = StateQualifierIntake::query()
             ->when(! $force, fn ($q) => $q->whereNull('sahodaya_id'));

@@ -56,6 +56,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'state.admin'       => \App\Http\Middleware\EnsureStateAdmin::class,
             'state.judge.portal' => \App\Http\Middleware\EnsureStateJudgePortal::class,
             'state.domain'      => \App\Http\Middleware\EnsureStateDomainContext::class,
+            'state.fest'        => \App\Http\Middleware\EnsureStateFestPermission::class,
             'fest.event.ops'    => \App\Http\Middleware\EnsureFestEventOps::class,
             'fest.discipline'   => \App\Http\Middleware\EnsureFestDisciplineAdmin::class,
             'group.admin'       => \App\Http\Middleware\EnsureGroupAdmin::class,
