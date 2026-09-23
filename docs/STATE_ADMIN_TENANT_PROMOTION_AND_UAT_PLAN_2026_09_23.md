@@ -570,7 +570,58 @@ Once `external_sahodayas.tenant_id` is set:
 
 ---
 
-## 6. Phase 4 — Winner registration into the State (the actual flow)
+## 6. Phase 4 — Winner registration into the State (the actual flow) — PARTLY BUILT (2026-09-23)
+
+Items 1, 3 and 4 below do not depend on decision **D1**; item 2 (projecting approved qualifiers
+into a State event) does, and is deliberately not built. Item 3 turned out to contain a live bug
+and was done first.
+
+### 6.0 ✅ The per-Sahodaya slot limit (item 3) — fixed
+
+§2a recorded that `max_per_school` had no UI and that the cap was only enforced at State approval.
+Building it surfaced something worse: **the three places that apply the cap did not agree on what it
+means.**
+
+| Where | Reading of `qualify_count` |
+|---|---|
+| `FestStateQualifierPayloadBuilder` (managed Sahodaya nominates) | per Sahodaya — positions ≤ N within that Sahodaya's own event |
+| `ExternalIntakeService` (outside Sahodaya types entries) | per Sahodaya — "across all schools" under it |
+| State Programs UI ("Top 2") | per Sahodaya |
+| **`StateParticipationLimitService` (State approves)** | **state-wide total** |
+
+Every item on the seeded Kerala 2026 program has `qualify_count = 2` and `max_per_school = null`,
+so with 19 promoted Sahodayas submitting, approval would have accepted **the first two entries in
+all of Kerala** and refused every Sahodaya after that — the operator's "two slots each" silently
+becoming "two slots for the whole state". Demonstrated by a failing test before the fix.
+
+Fixed: approval counts per Sahodaya; the effective cap is `max_per_school ?: qualify_count`, so
+`max_per_school` remains the explicit override for items that qualify fewer (English One Act Play is
+top-1). The participation report inherited the same confusion — its compliance table checked
+`max_per_school` alone and therefore showed "Unlimited" for all 140 items, and its utilization table
+compared a state total against a per-Sahodaya cap; compliance now uses the effective cap and
+utilization reports a ceiling of slots × the Sahodayas that entered.
+
+Neither cap had any UI at all — it could only be set by direct DB write. The item editor now has
+**Slots per Sahodaya** plus an **Override slots** field, and the item list shows the effective
+figure.
+
+Two existing tests encoded the state-wide reading using two different Sahodayas. Their actual
+subject was a different race (an entry approved through `reviewEntry()` is not yet materialized into
+a registration, so counting must happen at entry level); that is preserved by making both intakes
+belong to the *same* Sahodaya, and each gained a counterpart asserting that one Sahodaya filling its
+slots never blocks another. New coverage: `tests/Feature/State/StateSlotsPerItemTest.php`.
+
+### 6.1 Still to do in this phase
+
+- **Item 1 — unified intake queue.** Label each intake tenant-sourced vs external, show district,
+  filter by both. Independent of D1.
+- **Item 2 — projection into the State event.** Blocked on **D1**: whether approved qualifiers
+  become registrations inside a State *tenant* (reusing the fest module) or rows in the `state_*`
+  tables decides what this service even writes.
+- **Item 4 — remittance fee demand.** `StateRemittanceService::calculateDemand()` exists with no UI.
+  Independent of D1.
+
+### 6.2 Original specification
 
 Two intake paths converge on one State ledger. Both must work simultaneously during the
 transition.
