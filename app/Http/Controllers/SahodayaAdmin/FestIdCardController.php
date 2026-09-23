@@ -6,6 +6,7 @@ use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsFestIdCardResponses;
 use App\Http\Controllers\SahodayaAdmin\Concerns\ResolvesRegionAwareReportEvent;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
+use App\Models\FestParticipant;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestPageActivity;
 use App\Support\TenantStorage;
@@ -48,8 +49,50 @@ class FestIdCardController extends SahodayaAdminController
             'heads'  => $service->headOptions($targetEvent),
             'meta'   => $service->indexMeta($targetEvent),
             'schools'=> $service->schoolOptions($targetEvent),
+            'students'=> $this->queryStudents($targetEvent),
             'childEvents' => $this->scopedChildEventOptions($event),
         ]));
+    }
+
+    public function studentsJson(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+
+        return response()->json([
+            'students' => $this->queryStudents($targetEvent, $request->input('school_id')),
+        ]);
+    }
+
+    private function queryStudents(FestEvent $targetEvent, ?string $schoolId = null): array
+    {
+        return FestParticipant::whereHas('registration', fn ($q) => $q
+            ->whereIn('event_id', $targetEvent->reportableEventIds())
+            ->when($schoolId, fn ($sq) => $sq->where('school_id', $schoolId))
+            ->active())
+            ->where('participant_role', '!=', 'standby')
+            ->whereNotNull('student_id')
+            ->with(['student:id,name,admission_number', 'registration.school:id,name'])
+            ->get()
+            ->map(function (FestParticipant $p) use ($schoolId) {
+                $s = $p->student;
+                if (! $s) {
+                    return null;
+                }
+                $schoolName = ! $schoolId && $p->registration?->school?->name ? " — {$p->registration->school->name}" : '';
+                $adm = $s->admission_number ? " ({$s->admission_number})" : '';
+
+                return [
+                    'id'        => $s->id,
+                    'name'      => "{$s->name}{$adm}{$schoolName}",
+                    'school_id' => $p->registration?->school_id,
+                ];
+            })
+            ->filter()
+            ->unique('id')
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->all();
     }
 
     public function cardsJson(Request $request, string $tenantId, FestEvent $event, FestIdCardService $service)

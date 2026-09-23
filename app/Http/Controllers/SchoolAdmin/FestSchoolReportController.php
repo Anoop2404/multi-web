@@ -909,6 +909,24 @@ class FestSchoolReportController extends SchoolAdminController
             'levels'      => $levels,
             'defaultLevelId' => $defaultLevelId,
             'downloadGate' => $downloadGate,
+            'students'    => FestParticipant::whereHas('registration', fn ($q) => $q
+                ->whereIn('event_id', $event->reportableEventIds())
+                ->where('school_id', $this->school->id)
+                ->active())
+                ->where('participant_role', '!=', 'standby')
+                ->whereNotNull('student_id')
+                ->with('student:id,name,admission_number')
+                ->get()
+                ->pluck('student')
+                ->filter()
+                ->unique('id')
+                ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+                ->map(fn ($s) => [
+                    'id'   => $s->id,
+                    'name' => $s->admission_number ? "{$s->name} ({$s->admission_number})" : $s->name,
+                ])
+                ->values()
+                ->all(),
         ]);
     }
 

@@ -573,6 +573,9 @@ class FestIdCardService
         if (! empty($filters['item_id'])) {
             $regQuery->whereIn('item_id', $event->reportableItemIds([(int) $filters['item_id']]));
         }
+        if (! empty($filters['student_id'])) {
+            $regQuery->whereHas('participants', fn ($p) => $p->where('student_id', (int) $filters['student_id']));
+        }
 
         $registrationIds = $regQuery->pluck('id');
         if ($registrationIds->isEmpty()) {

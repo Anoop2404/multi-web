@@ -37,20 +37,6 @@
                         </button>
                     </div>
                     <p class="text-xs text-slate-500">{{ activeType.hint }}</p>
-
-                    <div v-if="!isKalolsavam" class="pt-2 border-t border-slate-100">
-                        <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Card style</h4>
-                        <div class="flex flex-wrap gap-2">
-                            <button v-for="t in templates" :key="t.id" type="button"
-                                    class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition"
-                                    :class="cardTemplate === t.id
-                                        ? 'bg-[#0f3d7a] text-white border-[#0f3d7a]'
-                                        : 'bg-white border-slate-200 text-slate-700'"
-                                    @click="cardTemplate = t.id">
-                                {{ t.label }}
-                            </button>
-                        </div>
-                    </div>
                 </div>
 
                 <div v-if="audience === 'head' || audience === 'participant'" class="card space-y-4">
@@ -62,22 +48,24 @@
                     </div>
 
                     <div class="grid sm:grid-cols-3 gap-3">
-                        <FormField v-if="!isKalolsavam" label="Card scope">
-                            <SearchableSelect v-model="filters.scope" :all-option="false"
-                                :options="[
-                                    { value: 'event', label: 'Event Pass (Event-wise)' },
-                                    { value: 'item', label: 'Item Pass (Item-wise)' },
-                                    { value: 'head', label: 'Discipline Pass (Head-wise)' },
-                                ]"
-                                @change="loadPreview" />
-                        </FormField>
                         <FormField label="School filter">
                             <SearchableSelect v-model="filters.school_id" :options="schools"
                                 :all-option="true" all-label="All schools"
                                 search-placeholder="Type school name to search…"
-                                @change="loadPreview" />
+                                @change="onSchoolChange" />
                         </FormField>
-                        <FormField v-if="!isKalolsavam" label="Item filter (optional)">
+                        <FormField label="Student filter (optional)">
+                            <SearchableSelect
+                                v-model="filters.student_id"
+                                :options="filteredStudents"
+                                :all-option="true"
+                                all-label="All students"
+                                placeholder="All students"
+                                search-placeholder="Type student name to search…"
+                                @change="loadPreview"
+                            />
+                        </FormField>
+                        <FormField label="Item filter (optional)">
                             <SearchableSelect
                                 v-model="filters.item_id"
                                 :options="itemOptions"
@@ -154,12 +142,10 @@
                         <li><strong>Approved Participants</strong> — one card per student; items listed on card</li>
                         <li><strong>Volunteers</strong> — event-day volunteer passes</li>
                         <li><strong>Staff</strong> — portal users on event staff duty</li>
-                        <li v-if="cardTemplate === 'pass'">85.6 × 54 mm portrait cards (credit-card size)</li>
-                        <li v-else>99 × 85 mm landscape cards</li>
-                        <li v-if="cardTemplate === 'pass'"><strong>10 cards per A4 page</strong> (2 × 5 grid)</li>
-                        <li v-else><strong>4 cards per A4 page</strong> (2 × 2 grid)</li>
-                        <li v-if="cardTemplate !== 'pass'">QR code for gate verification</li>
-                        <li v-else>No QR code — name/photo/duty only</li>
+                        <li>138 × 86 mm landscape cards</li>
+                        <li><strong>4 cards per A4 page</strong> (2 × 2 grid)</li>
+                        <li>Print on standard A4 paper</li>
+                        <li>Cut along outer border guides</li>
                     </ul>
                 </div>
 
@@ -183,13 +169,13 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
                         Dedicated Die Generator (500–1000 Pages) →
                     </Link>
-                    <a :href="`${base}/pdf-all-schools?audience=student&template=${cardTemplate}&scope=${filters.scope || 'event'}`" class="btn-primary w-full text-sm text-center block !bg-indigo-700 hover:!bg-indigo-800 text-white font-semibold">
+                    <a :href="`${base}/pdf-all-schools?audience=student&template=pass&scope=event`" class="btn-primary w-full text-sm text-center block !bg-indigo-700 hover:!bg-indigo-800 text-white font-semibold">
                         All schools (die / separate pages) PDF ↓
                     </a>
-                    <a :href="`${base}/pdf-all-items?audience=student&template=${cardTemplate}`" class="btn-secondary w-full text-sm text-center block">
+                    <a :href="`${base}/pdf-all-items?audience=student&template=pass`" class="btn-secondary w-full text-sm text-center block">
                         All items — one PDF ↓
                     </a>
-                    <a :href="`${base}/pdf-all-heads?audience=student&template=${cardTemplate}`" class="btn-secondary w-full text-sm text-center block">
+                    <a :href="`${base}/pdf-all-heads?audience=student&template=pass`" class="btn-secondary w-full text-sm text-center block">
                         All heads — one PDF ↓
                     </a>
                 </div>
@@ -212,6 +198,7 @@ import { isKalolsavamEvent } from '@/support/festEventType.js';
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, items: { type: Array, default: () => [] }, meta: Object, schools: Array,
+    students: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
     childEvents: { type: Array, default: () => [] },
 });
@@ -223,16 +210,11 @@ function switchSportEvent(value) {
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/id-cards`;
 const audience = ref('head');
 const isKalolsavam = computed(() => isKalolsavamEvent(props.event));
-const cardTemplate = ref(isKalolsavamEvent(props.event) ? 'pass' : 'premium');
-const filters = reactive({ scope: 'event', school_id: '', item_id: '' });
+const cardTemplate = ref('pass');
+const filters = reactive({ scope: 'event', school_id: '', student_id: '', item_id: '' });
+const studentList = ref(props.students ?? []);
 const previewCards = ref([]);
 const loading = ref(false);
-
-const templates = [
-    { id: 'premium', label: 'Premium' },
-    { id: 'standard', label: 'Standard' },
-    { id: 'pass', label: 'Participant Pass' },
-];
 
 const types = computed(() => [
     {
@@ -280,11 +262,30 @@ function apiAudience() {
     return audience.value === 'head' ? 'student' : audience.value;
 }
 
+const filteredStudents = computed(() => studentList.value);
+
+async function onSchoolChange() {
+    filters.student_id = '';
+    if (filters.school_id) {
+        try {
+            const res = await fetch(`${base}/students?school_id=${encodeURIComponent(filters.school_id)}`);
+            const data = await res.json();
+            studentList.value = data.students ?? [];
+        } catch {
+            studentList.value = (props.students ?? []).filter(s => String(s.school_id) === String(filters.school_id));
+        }
+    } else {
+        studentList.value = props.students ?? [];
+    }
+    loadPreview();
+}
+
 function queryString() {
     const p = new URLSearchParams({ template: cardTemplate.value, audience: apiAudience() });
     if (audience.value === 'head' || audience.value === 'participant') {
-        p.set('scope', filters.scope || 'event');
+        p.set('scope', 'event');
         if (filters.school_id) p.set('school_id', filters.school_id);
+        if (filters.student_id) p.set('student_id', filters.student_id);
         if (filters.item_id) p.set('item_id', filters.item_id);
     }
     return p.toString();
@@ -303,8 +304,9 @@ async function loadPreview() {
     try {
         const params = new URLSearchParams({ audience: apiAudience() });
         if (audience.value === 'head' || audience.value === 'participant') {
-            params.set('scope', filters.scope || 'event');
+            params.set('scope', 'event');
             if (filters.school_id) params.set('school_id', filters.school_id);
+            if (filters.student_id) params.set('student_id', filters.student_id);
             if (filters.item_id) params.set('item_id', filters.item_id);
         }
         const res = await fetch(`${base}/cards?${params.toString()}`, {

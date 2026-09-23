@@ -8,7 +8,7 @@
                 <span v-if="card.phase_name" class="pass-tile__tagline">{{ card.phase_name }}</span>
             </div>
             <div class="pass-tile__event">
-                <span class="pass-tile__event-name">Kalotsav</span>
+                <span class="pass-tile__event-name">{{ programLabel }}</span>
                 <span v-if="card.academic_year" class="pass-tile__event-year">{{ card.academic_year }}</span>
             </div>
         </header>
@@ -219,6 +219,11 @@ const clusterInitials = computed(() =>
 );
 
 const isStaffOrVolunteer = computed(() => ['staff', 'volunteer'].includes(props.card.audience));
+
+const programLabel = computed(() => {
+    return props.card.program_label
+        || (props.card.is_sports || props.card.event_type === 'sports' ? 'Sports Meet' : 'Kalotsav');
+});
 
 const passLabel = computed(() => {
     if (props.card.role_title) return props.card.role_title;
