@@ -5,8 +5,11 @@ namespace App\Http\Controllers\SahodayaAdmin;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\Tenant;
+use App\Services\Audit\FestEventActivityService;
+use App\Services\Events\PublicFestScoreboardService;
 use App\Support\FestPageActivity;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FestEventActivityController extends SahodayaAdminController
 {
@@ -17,16 +20,44 @@ class FestEventActivityController extends SahodayaAdminController
         $page = $request->input('page') ?: null;
         $itemId = $request->integer('item_id') ?: null;
         $search = $request->input('q') ?: null;
+        if ($search !== null && strtolower(trim($search)) === 'all') {
+            $search = null;
+        }
 
-        $logs = app(\App\Services\Audit\FestEventActivityService::class)
-            ->forEvent($event, 200, $page, $itemId, $search)
+        $activityService = app(FestEventActivityService::class);
+
+        // CSV Export
+        if ($request->boolean('export') || $request->input('export') === 'csv') {
+            $result = $activityService->forEvent($event, 10000, $page, $itemId, $search, 0);
+            return $this->exportCsv($result['logs'], $event);
+        }
+
+        $limitInput = strtolower(trim((string) $request->input('limit', '200')));
+        if ($limitInput === 'all') {
+            $perPage = 5000;
+            $pageNum = 1;
+            $offset = 0;
+        } else {
+            $perPage = in_array((int) $limitInput, [50, 100, 200, 500], true) ? (int) $limitInput : 200;
+            $pageNum = max(1, (int) ($request->input('p') ?: 1));
+            $offset = ($pageNum - 1) * $perPage;
+        }
+
+        $result = $activityService->forEvent($event, $perPage, $page, $itemId, $search, $offset);
+
+        $logs = $result['logs']
             ->map(fn (array $log) => array_merge($log, [
                 'page_label' => FestPageActivity::label($log['page'] ?? null),
             ]))
             ->values()
             ->all();
 
-        $scoreboards = app(\App\Services\Events\PublicFestScoreboardService::class);
+        $total = $result['total'];
+        $lastPage = $limitInput === 'all' ? 1 : ($perPage > 0 ? (int) ceil($total / $perPage) : 1);
+        $from = $total > 0 ? $offset + 1 : 0;
+        $to = min($offset + count($logs), $total);
+
+        $scoreboards = app(PublicFestScoreboardService::class);
         $items = FestEventItem::where('event_id', $event->id)
             ->orderBy('display_order')
             ->orderBy('title')
@@ -57,8 +88,75 @@ class FestEventActivityController extends SahodayaAdminController
             'filters'      => [
                 'page'    => $page,
                 'item_id' => $itemId,
-                'q'       => $search,
+                'q'       => $request->input('q') ?: null,
+                'limit'   => $limitInput,
+                'p'       => $pageNum,
+            ],
+            'pagination'   => [
+                'total'        => $total,
+                'per_page'     => $limitInput === 'all' ? 'all' : $perPage,
+                'current_page' => $pageNum,
+                'last_page'    => $lastPage,
+                'from'         => $from,
+                'to'           => $to,
             ],
         ]);
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $logs
+     */
+    protected function exportCsv($logs, FestEvent $event): StreamedResponse
+    {
+        $filename = str($event->title)->slug()->limit(40) . '-activity-log-' . now()->format('Ymd-His') . '.csv';
+
+        return response()->streamDownload(function () use ($logs) {
+            $out = fopen('php://output', 'w');
+            fputs($out, "\xEF\xBB\xBF");
+
+            fputcsv($out, [
+                'Date & Time',
+                'Page',
+                'Action',
+                'Description',
+                'Item Code',
+                'Item Title',
+                'Category',
+                'School',
+                'Chest #',
+                'Participant',
+                'Reg #',
+                'User Name',
+                'User Email',
+                'Actor Type',
+                'IP Address',
+                'Reason',
+                'Details / Properties',
+            ]);
+
+            foreach ($logs as $log) {
+                fputcsv($out, [
+                    $log['created_at'] ?? '',
+                    FestPageActivity::label($log['page'] ?? null),
+                    $log['action'] ?? '',
+                    $log['description'] ?? '',
+                    $log['item_code'] ?? '',
+                    $log['item_title'] ?? '',
+                    $log['item_category'] ?? '',
+                    $log['school'] ?? '',
+                    $log['chest_no'] ?? '',
+                    $log['participant'] ?? '',
+                    $log['reg_no'] ?? '',
+                    $log['user']['name'] ?? 'System',
+                    $log['user']['email'] ?? '',
+                    $log['actor_type'] ?? '',
+                    $log['ip_address'] ?? '',
+                    $log['reason'] ?? '',
+                    !empty($log['properties']) ? json_encode($log['properties'], JSON_UNESCAPED_UNICODE) : '',
+                ]);
+            }
+
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 }

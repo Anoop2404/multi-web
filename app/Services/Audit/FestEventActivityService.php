@@ -15,13 +15,13 @@ class FestEventActivityService
     /** @return Collection<int, array<string, mixed>> */
     public function forPage(FestEvent $event, string $page, int $limit = 20): Collection
     {
-        return $this->query($event, $page, $limit);
+        return $this->query($event, $page, $limit)['logs'];
     }
 
-    /** @return Collection<int, array<string, mixed>> */
-    public function forEvent(FestEvent $event, int $limit = 20, ?string $page = null, ?int $itemId = null, ?string $search = null): Collection
+    /** @return array{logs: Collection<int, array<string, mixed>>, total: int} */
+    public function forEvent(FestEvent $event, int $limit = 200, ?string $page = null, ?int $itemId = null, ?string $search = null, int $offset = 0): array
     {
-        return $this->query($event, $page, $limit, $itemId, $search);
+        return $this->query($event, $page, $limit, $itemId, $search, $offset);
     }
 
     /** @return list<array<string, mixed>> */
@@ -74,19 +74,16 @@ class FestEventActivityService
             ->all();
     }
 
-    /** @return Collection<int, array<string, mixed>> */
-    private function query(FestEvent $event, ?string $page, int $limit, ?int $itemId = null, ?string $search = null): Collection
+    /** @return array{logs: Collection<int, array<string, mixed>>, total: int} */
+    private function query(FestEvent $event, ?string $page, int $limit, ?int $itemId = null, ?string $search = null, int $offset = 0): array
     {
         $morph = (new FestEvent)->getMorphClass();
         $eventId = (string) $event->id;
-        // A hub event's own activity log needs to include what happened under its region
-        // children too — registrations, marks, attendance, and chest-number actions are all
-        // logged against the CHILD region's event id (that's the event the action actually
-        // ran against), never the hub's. Every other hub-aware admin page (chest numbers,
-        // marks, reports) already scopes this way; this query previously matched only the
-        // exact hub id, so a hub's Activity Log page could never show any region activity —
-        // "no logged actions" even when the region logs plainly existed.
         $reportableEventIds = $event->reportableEventIds();
+
+        if ($search !== null && strtolower(trim($search)) === 'all') {
+            $search = null;
+        }
 
         $searchParticipantIds = [];
         if ($search !== null && $search !== '') {
@@ -102,7 +99,7 @@ class FestEventActivityService
                 ->all();
         }
 
-        $logs = AuditLog::query()
+        $builder = AuditLog::query()
             ->with('user:id,name,email')
             ->where(function ($q) use ($morph, $eventId, $reportableEventIds) {
                 $q->where(function ($q2) use ($morph, $eventId) {
@@ -132,10 +129,18 @@ class FestEventActivityService
                         }
                     }
                 });
-            })
-            ->latest()
-            ->limit($limit)
-            ->get();
+            });
+
+        $totalCount = (clone $builder)->count();
+
+        $query = (clone $builder)->latest();
+        if ($offset > 0) {
+            $query->offset($offset);
+        }
+        if ($limit > 0) {
+            $query->limit($limit);
+        }
+        $logs = $query->get();
 
         // Batch resolve missing participant details from description regex or properties
         $missingParticipantIds = [];
@@ -366,6 +371,9 @@ class FestEventActivityService
             })->values();
         }
 
-        return $mapped;
+        return [
+            'logs'  => $mapped,
+            'total' => $totalCount,
+        ];
     }
 }
