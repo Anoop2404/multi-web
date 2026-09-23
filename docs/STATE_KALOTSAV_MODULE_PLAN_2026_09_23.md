@@ -57,7 +57,7 @@ Sahodaya keeps **one canonical identity** — never counted twice.
 | 5 | Pre-event operations — chest numbers, ID/admit cards, scheduling, clashes, performance order, green room, attendance sheets, judge assignment | not started |
 | 6 | Event conduct — attendance, judge portal, mark entry, panel aggregation, bulk import, corrections, stage progress | thin version exists |
 | 7 | Results and appeals — item calculation, provisional publishing, appeals, final publishing, Sahodaya points and ranking, School drill-down, public results | thin version exists |
-| 8 | Report centre — `StateFestReportCatalog`, ~100 reports across before/during/after, PDF/Excel/CSV, background exports, **catalog parity tests** | not started |
+| 8 | Report centre — `StateFestReportCatalog`, **menu-reachable reports only** (scope narrowed 2026-09-23), PDF/Excel/CSV, **catalog parity tests** | ✅ **built 2026-09-23** — 13 live, 9 awaiting later phases |
 | 9 | Certificates — templates, eligibility, merit/participation, batches, tally, Sahodaya/School packs, verification, stale regeneration | not started |
 | 10 | Finance and services — State fees and remittance, ledger, receipts, appeal fees, catering, volunteers | partial (fixed fee done) |
 | 11 | Migration and UAT — backfill, result comparison, managed + external testing, load tests, pilot, route switch, temporary redirects | not started |
@@ -246,3 +246,56 @@ matrix's used/available/exceeded, and one allowance for a promoted Sahodaya.
 
 Items & Catalog, Categories & Eligibility, event dates and windows (qualifier submission, scrutiny,
 publication), Grade Master and rank points, Venues & Stages, Event Staff.
+
+
+---
+
+## Phase 8 — built 2026-09-23, scope narrowed
+
+**Scope decision (operator, 2026-09-23): only the reports reachable from the sidebar and from a
+workspace tab — not the ~100-report inventory in the spec.**
+
+That matches what the Sahodaya module actually exposes: `sahodayaEventNav.js` puts **11 named report
+pages plus a hub** in its Outputs section, out of **96** export permutations in `FestReportCatalog`.
+A report nobody can reach from a menu is a maintenance cost with no user.
+
+`app/Support/StateFestReportCatalog.php` holds **22 reports** across the spec's six groups:
+
+| Group | Live now | Waiting |
+|---|---|---|
+| Before Event | 9 | 3 (scheduling) |
+| During Event | 2 | — |
+| After Event | — | 5 (results/points) |
+| Certificates & Print | — | 2 |
+| Finance & Audit | 1 | — |
+
+**Unavailable reports say which phase they wait on** and return **409 with that reason**, rather
+than rendering an empty table — an empty table reads as "nobody registered", not "this does not
+exist yet". Sports-only reports (House Ranking, Athletic Records) and School invoices are recorded
+in `notApplicable()` **with a reason** rather than silently absent, since the State bills the
+Sahodaya, not the School.
+
+**Data rules honoured.** Every query reads State operational tables only; the certified qualifier
+snapshot is the source of truth, which is what makes these reproducible after an event when a tenant
+may have been renamed, deactivated or promoted. Grouping is on the canonical Sahodaya identity so a
+promoted Sahodaya appears once, and School is carried through every row as a displayed value.
+
+**Downloads** are CSV, Excel and PDF, declared per report, anything else refused with 422. CSV goes
+through `CsvSafety` rather than `fputcsv` — a participant or school name starting with `=`, `+` or
+`@` is a formula injection the moment the file opens in Excel.
+
+**Found while building:** a registration can exist without an intake, and therefore without a
+Sahodaya (the direct fixture noted in Phase 1). Those rows are labelled "Unattributed" rather than
+rendered blank, which looked like corrupt data in the first CSV export.
+
+**Access:** behind `state.fest:reports`, so a read-only report user reaches every report and a mark
+operator reaches none — both asserted.
+
+**Verified against the local data:** registration master 28 rows, Sahodaya participation 3,
+Sahodaya × School matrix 4, item counts 140, slot usage 17, fee summary 3; CSV/XLS/PDF all stream.
+
+**The parity contract** (`StateReportCatalogTest`, 11 tests / 128 assertions) is the spec's
+"catalog parity test prevents silently missing State reports": every menu-reachable Sahodaya report
+has a State counterpart or a recorded reason; every report declares a known group and valid formats;
+every unavailable one says which phase it waits on; every available one renders and downloads in
+each format it offers; and both the Sahodaya and the School appear in the registration master.
