@@ -183,7 +183,15 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
             });
 
             Route::middleware('state.fest:registrations')->group(function () use ($scrutiny) {
+                $teams = \App\Http\Controllers\StateAdmin\Fest\StateTeamController::class;
+
                 Route::get('/{event}/registrations', [$scrutiny, 'registrations'])->name('registrations');
+                Route::get('/{event}/teams', [$teams, 'teams'])->name('teams');
+                Route::post('/{event}/teams/leader', [$teams, 'setLeader'])->name('teams.leader');
+                Route::post('/{event}/teams/standby', [$teams, 'setStandby'])->name('teams.standby');
+                Route::get('/{event}/substitutions', [$teams, 'substitutions'])->name('substitutions');
+                Route::post('/{event}/substitutions', [$teams, 'requestSubstitution'])->name('substitutions.request');
+                Route::post('/{event}/substitutions/decide', [$teams, 'decideSubstitution'])->name('substitutions.decide');
             });
 
             // Settings change how the event behaves — windows, locking, what the public sees — so
