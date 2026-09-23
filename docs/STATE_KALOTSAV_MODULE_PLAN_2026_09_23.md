@@ -53,7 +53,7 @@ Sahodaya keeps **one canonical identity** — never counted twice.
 | 1 | State identity foundation — canonical managed/external identity, Sahodaya + School name snapshots, migration, backfill, promoted-external de-duplication, shared directory resolver | ✅ **built 2026-09-23** |
 | 2 | State application shell — sidebar, event workspace, tabs, permissions, event switcher, shared filter bar, activity log | ✅ **built 2026-09-23** (activity log tab pending) |
 | 3 | Program and event configuration | ✅ **built 2026-09-23** — slots, settings/windows, venues & stages, event staff, item catalog. Grade/point rules deferred to Phase 7, where they are used |
-| 4 | Qualifier and registration workflow | ✅ **built 2026-09-23** — submissions, scrutiny, approvals, registrations, quota enforcement, window enforcement. Substitutions schema in; its screen and Teams & Squads outstanding |
+| 4 | Qualifier and registration workflow | ✅ **complete 2026-09-23** — submissions, scrutiny, approvals, registrations, teams & squads, substitutions, quota and window enforcement |
 | 5 | Pre-event operations — chest numbers, ID/admit cards, scheduling, clashes, performance order, green room, attendance sheets, judge assignment | not started |
 | 6 | Event conduct — attendance, judge portal, mark entry, panel aggregation, bulk import, corrections, stage progress | thin version exists |
 | 7 | Results and appeals — item calculation, provisional publishing, appeals, final publishing, Sahodaya points and ranking, School drill-down, public results | thin version exists |
@@ -395,7 +395,37 @@ required note, the append-only log, slot enforcement at approval, reserve accept
 same-item rule, finalise/reopen guards, closed-window refusal, batch continuation past a quota
 breach, capability gating, and both names on every row.
 
-### Outstanding in Phase 4
+### Teams, squads and substitutions — built 2026-09-23
 
-Teams & Squads management, and the Substitutions screen — the tables ship with this migration, but
-the flow belongs with team management, since a substitution is usually a team member changing.
+A team entry is a registration with several participants, and what was missing is **which of them is
+which**. A group item needs a leader to report to the stage and sign for the team, and **standbys**
+who travel but do not compete unless substituted in. Without the distinction a standby is
+indistinguishable from a competitor, which breaks both the team-size check and the chest-number
+allocation Phase 5 will do.
+
+Team size is checked against the item's `min_group_size`/`max_group_size` **with standbys excluded**,
+and a wrong-sized team is flagged rather than silently accepted.
+
+**A substitution is not an edit.** Replacing a participant after certification is a decision with a
+reason, evidence, a deadline and an approver — so the request is stored, decided, and only then
+applied:
+
+- Approving **withdraws** the original rather than deleting it; the record must show who replaced whom.
+- The substitute **inherits the vacated role** (leader) and the chest number.
+- Refusing requires a note, because the Sahodaya reads it.
+- **Substitutions close with the scrutiny window** — after the State has finished deciding who
+  competes, a change of participant is an appeal, not a correction.
+
+Eligibility is revalidated at request time: a substitute already in the entry is a duplicate rather
+than a replacement, and a participant already substituted cannot be substituted again.
+
+**Found by the tests:** `(state_event_id, chest_number)` is unique, so the substitute could not
+inherit a number the withdrawn original still held. The number is now released on withdrawal and
+reassigned — it is already printed on attendance sheets and ID cards, so issuing a different one
+would invalidate them.
+
+**Tests:** `tests/Feature/State/StateTeamSubstitutionTest.php` — 14 covering team listing with
+Sahodaya and School, standbys excluded from the size check, under-size flagging, leader transfer and
+the standby/leader guards, request-not-applied, approval mechanics including the inherited chest
+number, refusal requiring a note and changing nothing, double-decision and double-substitution
+guards, the duplicate-substitute check, the closed window, and capability gating.
