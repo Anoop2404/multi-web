@@ -613,8 +613,14 @@ slots never blocks another. New coverage: `tests/Feature/State/StateSlotsPerItem
 
 ### 6.1 Still to do in this phase
 
-- **Item 1 — unified intake queue.** Label each intake tenant-sourced vs external, show district,
-  filter by both. Independent of D1.
+- **Item 1 — ✅ unified intake queue.** Built. The queue previously rendered a raw
+  `source_tenant_id` and nothing else — no Sahodaya name, no district, no way to separate the two
+  paths. Rows now carry the Sahodaya's name, a source label, district, program and an entry
+  breakdown by status, with filters for search / source / status / district. Intakes live on the
+  `state` connection and their sources on the central one, so sources are resolved in one bulk
+  lookup per kind (not a query per row) and the district/search filters are applied as an id
+  whitelist that collapses to "match nothing" when empty. Covered by
+  `tests/Feature/State/UnifiedIntakeQueueTest.php`.
 - **Item 2 — projection into the State event.** Blocked on **D1**: whether approved qualifiers
   become registrations inside a State *tenant* (reusing the fest module) or rows in the `state_*`
   tables decides what this service even writes.
