@@ -193,7 +193,6 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import IdCardPreviewTile from '@/Components/fest/IdCardPreviewTile.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
-import { isKalolsavamEvent } from '@/support/festEventType.js';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
@@ -209,7 +208,6 @@ function switchSportEvent(value) {
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/id-cards`;
 const audience = ref('head');
-const isKalolsavam = computed(() => isKalolsavamEvent(props.event));
 const cardTemplate = ref('pass');
 const filters = reactive({ scope: 'event', school_id: '', student_id: '', item_id: '' });
 const studentList = ref(props.students ?? []);

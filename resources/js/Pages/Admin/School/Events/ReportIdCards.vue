@@ -138,7 +138,6 @@ import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import IdCardPreviewTile from '@/Components/fest/IdCardPreviewTile.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
-import { isKalolsavamEvent } from '@/support/festEventType.js';
 
 const props = defineProps({
     school: Object,
