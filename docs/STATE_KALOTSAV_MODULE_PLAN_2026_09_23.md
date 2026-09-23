@@ -53,7 +53,7 @@ Sahodaya keeps **one canonical identity** — never counted twice.
 | 1 | State identity foundation — canonical managed/external identity, Sahodaya + School name snapshots, migration, backfill, promoted-external de-duplication, shared directory resolver | ✅ **built 2026-09-23** |
 | 2 | State application shell — sidebar, event workspace, tabs, permissions, event switcher, shared filter bar, activity log | ✅ **built 2026-09-23** (activity log tab pending) |
 | 3 | Program and event configuration | ✅ **built 2026-09-23** — slots, settings/windows, venues & stages, event staff, item catalog. Grade/point rules deferred to Phase 7, where they are used |
-| 4 | Qualifier and registration workflow — submissions, scrutiny, approvals, registrations, teams, substitutions, quota enforcement, external parity | partial (intake queue, slots) |
+| 4 | Qualifier and registration workflow | ✅ **built 2026-09-23** — submissions, scrutiny, approvals, registrations, quota enforcement, window enforcement. Substitutions schema in; its screen and Teams & Squads outstanding |
 | 5 | Pre-event operations — chest numbers, ID/admit cards, scheduling, clashes, performance order, green room, attendance sheets, judge assignment | not started |
 | 6 | Event conduct — attendance, judge portal, mark entry, panel aggregation, bulk import, corrections, stage progress | thin version exists |
 | 7 | Results and appeals — item calculation, provisional publishing, appeals, final publishing, Sahodaya points and ranking, School drill-down, public results | thin version exists |
@@ -338,3 +338,64 @@ Sahodaya × School matrix 4, item counts 140, slot usage 17, fee summary 3; CSV/
 has a State counterpart or a recorded reason; every report declares a known group and valid formats;
 every unavailable one says which phase it waits on; every available one renders and downloads in
 each format it offers; and both the Sahodaya and the School appear in the registration master.
+
+
+---
+
+## Phase 4 — built 2026-09-23
+
+### The gap that mattered
+
+Scrutiny had **two** outcomes, approved and rejected. That loses the one a State office needs most —
+*"this is wrong, fix it and send it back"* — and forces a scrutineer to reject a whole package over
+one missing date of birth. A rejected intake is closed, so the Sahodaya then cannot correct it.
+
+Now four outcomes: **approved**, **rejected**, **returned**, **documents_requested** (held pending
+evidence, not judged). The two open outcomes *require* a note, because the Sahodaya reads it and
+otherwise has nothing to act on.
+
+### Decisions are a log, not a column
+
+Every decision appends to `state_entry_reviews`. The entry keeps its current status for queries; the
+log keeps the history — an appeal asks who decided what and when, and a status column overwritten
+three times cannot answer that.
+
+- **Finalising is refused** while entries are pending, returned or awaiting documents: closing the
+  intake would strand them, since a finalised intake cannot be edited.
+- **Reopening is itself a recorded decision.**
+- **Accepting a reserve is two recorded decisions**, not a swap — the original withdrawn, the reserve
+  approved — so the log reads as what happened. A reserve must come from the same submission and the
+  same item.
+
+### The Phase 3 windows now bite
+
+Once the scrutiny window closes, decisions are refused **with the date it closed**. That is the
+window doing work rather than documenting a deadline.
+
+### Batch behaviour
+
+Approval is still held to the Sahodaya's slot allowance, and a bulk decision **continues past** an
+entry that breaches it, naming the ones refused rather than losing the batch. Scrutiny is done fifty
+rows at a time; losing the work to one bad row is how a deadline gets missed.
+
+### Screens
+
+**Sahodaya Submissions** (package level — managed/outside badge, schools, per-status counts),
+**Scrutiny** (entry by entry, bulk decisions, **the allowance shown beside each decision** so nobody
+approves blind, plus the decision history), **Pending Approvals** across all submissions, and
+**All Registrations** with the spec's full filter set — Sahodaya, School, item, individual/team,
+managed/external, status, participant search.
+
+**Sahodaya and School appear on every row throughout**, per §3.B.
+
+Live on the local data: 4 submissions, 28 registrations, 26 pending entries.
+
+**Tests:** `tests/Feature/State/StateScrutinyTest.php` — 15 covering return-for-correction, the
+required note, the append-only log, slot enforcement at approval, reserve acceptance and its
+same-item rule, finalise/reopen guards, closed-window refusal, batch continuation past a quota
+breach, capability gating, and both names on every row.
+
+### Outstanding in Phase 4
+
+Teams & Squads management, and the Substitutions screen — the tables ship with this migration, but
+the flow belongs with team management, since a substitution is usually a team member changing.
