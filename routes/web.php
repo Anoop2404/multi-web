@@ -165,6 +165,26 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
                 ->name('overview');
 
             $config = \App\Http\Controllers\StateAdmin\Fest\StateEventConfigController::class;
+            $scrutiny = \App\Http\Controllers\StateAdmin\Fest\StateScrutinyController::class;
+
+            // Reading submissions is a qualifier capability; deciding on them is scrutiny. A
+            // scrutiny officer holds both, a report user neither.
+            Route::middleware('state.fest:qualifiers')->group(function () use ($scrutiny) {
+                Route::get('/{event}/submissions', [$scrutiny, 'submissions'])->name('submissions');
+            });
+
+            Route::middleware('state.fest:scrutiny')->group(function () use ($scrutiny) {
+                Route::get('/{event}/scrutiny/{intake}', [$scrutiny, 'scrutiny'])->name('scrutiny');
+                Route::post('/{event}/scrutiny/{intake}/decide', [$scrutiny, 'decide'])->name('scrutiny.decide');
+                Route::post('/{event}/scrutiny/{intake}/reserve', [$scrutiny, 'acceptReserve'])->name('scrutiny.reserve');
+                Route::post('/{event}/scrutiny/{intake}/finalise', [$scrutiny, 'finalise'])->name('scrutiny.finalise');
+                Route::post('/{event}/scrutiny/{intake}/reopen', [$scrutiny, 'reopen'])->name('scrutiny.reopen');
+                Route::get('/{event}/pending', [$scrutiny, 'pending'])->name('pending');
+            });
+
+            Route::middleware('state.fest:registrations')->group(function () use ($scrutiny) {
+                Route::get('/{event}/registrations', [$scrutiny, 'registrations'])->name('registrations');
+            });
 
             // Settings change how the event behaves — windows, locking, what the public sees — so
             // they sit behind the settings capability, not catalog.

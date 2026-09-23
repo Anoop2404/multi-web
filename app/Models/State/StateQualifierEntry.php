@@ -11,6 +11,7 @@ class StateQualifierEntry extends StateModel
         'school_id', 'school_name', 'item_id', 'item_code', 'item_name',
         'student_name', 'roll_number', 'class_name', 'position', 'grade', 'points',
         'partition_key', 'qualifier_type', 'status', 'meta',
+        'review_note', 'reviewed_at', 'reviewed_by_user_id', 'is_reserve',
     ];
 
     protected $casts = [
