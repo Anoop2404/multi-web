@@ -29,6 +29,26 @@ class FestEventActivityController extends SahodayaAdminController
 
         $activityService = app(FestEventActivityService::class);
 
+        // PDF Export based on active filters
+        if ($request->input('export') === 'pdf') {
+            $result = $activityService->forEvent($event, 1000, $page, $itemId, $search, 0, $schoolId, $dateFrom, $dateTo);
+            $mapped = $result['logs']->map(fn (array $log) => array_merge($log, [
+                'page_label' => FestPageActivity::label($log['page'] ?? null),
+            ]))->values()->all();
+
+            return $this->exportPdf($mapped, $event, [
+                'page'        => $page,
+                'page_label'  => $page ? FestPageActivity::label($page) : null,
+                'item_id'     => $itemId,
+                'item_title'  => $itemId ? FestEventItem::find($itemId)?->title : null,
+                'school_id'   => $schoolId,
+                'school_name' => $schoolId ? Tenant::find($schoolId)?->name : null,
+                'date_from'   => $dateFrom,
+                'date_to'     => $dateTo,
+                'search'      => $search,
+            ]);
+        }
+
         // CSV Export based on active filters
         if ($request->boolean('export') || $request->input('export') === 'csv') {
             $result = $activityService->forEvent($event, 10000, $page, $itemId, $search, 0, $schoolId, $dateFrom, $dateTo);
@@ -187,5 +207,39 @@ class FestEventActivityController extends SahodayaAdminController
 
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $logs
+     * @param  array<string, mixed>  $filters
+     */
+    protected function exportPdf(array $logs, FestEvent $event, array $filters = []): \Symfony\Component\HttpFoundation\Response
+    {
+        $parts = [str($event->title)->slug()->limit(25)];
+        if (! empty($filters['page'])) {
+            $parts[] = str($filters['page'])->slug()->limit(15);
+        }
+        if (! empty($filters['item_id'])) {
+            $parts[] = "item-{$filters['item_id']}";
+        }
+        if (! empty($filters['school_id'])) {
+            $parts[] = 'school';
+        }
+        if (! empty($filters['search'])) {
+            $parts[] = 'search-' . str($filters['search'])->slug()->limit(15);
+        }
+        $parts[] = 'activity-log';
+        $parts[] = now()->format('Ymd-His');
+        $filename = implode('-', $parts) . '.pdf';
+
+        $html = view('reports.fest-activity-log-pdf', [
+            'event'       => $event,
+            'sahodaya'    => $this->sahodaya,
+            'logs'        => $logs,
+            'filters'     => $filters,
+            'generatedAt' => now()->format('d M Y, h:i A'),
+        ])->render();
+
+        return \App\Support\PdfGenerator::download($html, $filename, request()->boolean('preview'), true);
     }
 }

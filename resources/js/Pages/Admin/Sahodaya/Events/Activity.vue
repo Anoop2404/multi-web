@@ -4,17 +4,30 @@
         <PageHeader :title="`${event.title} — Activity log`" eyebrow="Activity log"
                     description="All actions across this event, filterable by item, category, school, chest #, IP, dates, or keywords.">
             <template #actions>
-                <button
-                    @click="exportCsv"
-                    type="button"
-                    class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition"
-                    :title="hasActiveFilters ? 'Download filtered logs matching your current filters as CSV' : 'Download all activity logs as CSV'">
-                    <span>📥</span>
-                    <span>{{ hasActiveFilters ? 'Download Filtered Logs' : 'Download All Logs' }} (CSV)</span>
-                    <span v-if="pagination.total > 0" class="rounded-full bg-emerald-800/80 px-2 py-0.5 text-[10px] font-mono">
-                        {{ pagination.total.toLocaleString() }}
-                    </span>
-                </button>
+                <div class="flex items-center gap-2">
+                    <button
+                        @click="exportPdf(false)"
+                        type="button"
+                        class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 transition"
+                        :title="hasActiveFilters ? 'Download filtered logs matching your current filters as PDF' : 'Download all activity logs as PDF'">
+                        <span>📄</span>
+                        <span>{{ hasActiveFilters ? 'Download Filtered' : 'Download All' }} (PDF)</span>
+                        <span v-if="pagination.total > 0" class="rounded-full bg-indigo-800/80 px-2 py-0.5 text-[10px] font-mono">
+                            {{ pagination.total.toLocaleString() }}
+                        </span>
+                    </button>
+                    <button
+                        @click="exportCsv"
+                        type="button"
+                        class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition"
+                        :title="hasActiveFilters ? 'Download filtered logs matching your current filters as CSV' : 'Download all activity logs as CSV'">
+                        <span>📥</span>
+                        <span>{{ hasActiveFilters ? 'Download Filtered' : 'Download All' }} (CSV)</span>
+                        <span v-if="pagination.total > 0" class="rounded-full bg-emerald-800/80 px-2 py-0.5 text-[10px] font-mono">
+                            {{ pagination.total.toLocaleString() }}
+                        </span>
+                    </button>
+                </div>
             </template>
         </PageHeader>
 
@@ -65,8 +78,11 @@
                     <button v-if="hasActiveFilters" @click="clearFilters" type="button" class="flex-1 rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 transition text-center">
                         Reset Filters
                     </button>
+                    <button @click="exportPdf(false)" type="button" class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-indigo-300 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-800 hover:bg-indigo-100 transition whitespace-nowrap shadow-sm" :title="hasActiveFilters ? 'Download filtered logs as PDF' : 'Download all logs as PDF'">
+                        <span>📄</span> PDF
+                    </button>
                     <button @click="exportCsv" type="button" class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition whitespace-nowrap shadow-sm" :title="hasActiveFilters ? 'Download filtered logs as CSV' : 'Download all logs as CSV'">
-                        <span>📥</span> Export CSV
+                        <span>📥</span> CSV
                     </button>
                 </div>
             </div>
@@ -507,6 +523,21 @@ function clearFilters() {
     dateTo.value = '';
     selectedLimit.value = '200';
     applyFilters(1);
+}
+
+function exportPdf(preview = false) {
+    const qVal = searchQuery.value?.trim();
+    const params = new URLSearchParams();
+    params.set('export', 'pdf');
+    if (preview) params.set('preview', '1');
+    if (qVal && qVal.toLowerCase() !== 'all') params.set('q', qVal);
+    if (selectedItem.value) params.set('item_id', selectedItem.value);
+    if (selectedSchool.value) params.set('school_id', selectedSchool.value);
+    if (selectedPage.value) params.set('page', selectedPage.value);
+    if (dateFrom.value) params.set('date_from', dateFrom.value);
+    if (dateTo.value) params.set('date_to', dateTo.value);
+
+    window.open(`${window.location.pathname}?${params.toString()}`, '_blank');
 }
 
 function exportCsv() {
