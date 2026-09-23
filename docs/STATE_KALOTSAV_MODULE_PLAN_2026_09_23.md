@@ -51,7 +51,7 @@ Sahodaya keeps **one canonical identity** — never counted twice.
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | State identity foundation — canonical managed/external identity, Sahodaya + School name snapshots, migration, backfill, promoted-external de-duplication, shared directory resolver | ✅ **built 2026-09-23** |
-| 2 | State application shell — sidebar, event workspace, tabs, permissions, event switcher, shared filter bar, activity log | not started |
+| 2 | State application shell — sidebar, event workspace, tabs, permissions, event switcher, shared filter bar, activity log | ✅ **built 2026-09-23** (activity log tab pending) |
 | 3 | Program and event configuration — items, categories, eligibility, per-Sahodaya slots, windows, grade/point rules, venues, staff | partial (slots done) |
 | 4 | Qualifier and registration workflow — submissions, scrutiny, approvals, registrations, teams, substitutions, quota enforcement, external parity | partial (intake queue, slots) |
 | 5 | Pre-event operations — chest numbers, ID/admit cards, scheduling, clashes, performance order, green room, attendance sheets, judge assignment | not started |
@@ -123,3 +123,80 @@ unresolvable key not breaking intake, and per-state scoping failing closed.
 **Carried forward.** Promotion now touches the State connection; if that database is unavailable a
 promotion fails loudly and is resumable with `--retry-failed`, which is deliberate — a silent
 failure here would reintroduce the double-count this phase exists to prevent.
+
+
+---
+
+## Phase 2 — built 2026-09-23
+
+### Permissions (spec §13)
+
+The State had two roles, enforced by refusing `state_staff` every non-GET request. That cannot
+express the separations the module requires — a mark operator who must never publish, a certificate
+operator who must never alter a result.
+
+`app/Support/StateFestPermissions.php` defines the 18 `state.fest.*` capabilities and the role
+matrix over them, seeded for both guards:
+
+| Role | Holds |
+|---|---|
+| `state_admin` | all 18 |
+| `state_staff` | view, reports |
+| `state_mark_operator` | view, attendance, marks — **no results, no publish** |
+| `state_certificate_operator` | view, certificates, reports — **no results, no marks** |
+| `state_scrutiny_officer` | view, qualifiers, scrutiny, registrations, reports |
+| `state_report_user` | view, reports (read-only) |
+
+`EnsureStateFestPermission` gates routes as `state.fest:marks` and **names the missing capability**
+when it refuses, because these roles exist so an operator can be told what they are not trusted with.
+
+**Found while building:** `EnsureStateAdmin` recognised only `state_admin`/`state_staff`, so every
+new operator role authenticated successfully and was then refused at the door of its own workspace.
+It now accepts every State role; `state_staff` keeps its blunt read-only rule, which predates the
+matrix.
+
+### Navigation
+
+`resources/js/support/stateFestNav.js` — deliberately **not** derived from `sahodayaEventNav.js`.
+The two modules compete different organizations, and sharing a nav file is the first step toward
+sharing the queries behind it. The main sidebar plus the 6-section / 38-item event workspace.
+
+Every item carries the capability gating its screen, and `visibleStateNav()` **drops** what a role
+cannot open rather than disabling it — an operator is not shown a map of what they are not trusted
+with. Verified: a mark operator's sidebar is `Event Home (Overview) | Competition (Attendance, Mark
+Entry)` and nothing else.
+
+### Workspace shell
+
+`StateAdmin\Fest\StateFestWorkspaceController` renders event header, **event switcher**,
+capability-filtered sidebar, and the **shared filter bar** (`StateFilterBar.vue`) enforcing the
+spec's hierarchy — Sahodaya primary, School a dependent second level whose select stays disabled
+until a Sahodaya is chosen, because a School filter without one silently matches nothing.
+
+Tabs whose screens arrive with later phases render as plainly pending rather than linking to a 404.
+
+**Overview is real, not a placeholder.** Counts come only from State operational tables:
+participation grouped on the canonical Sahodaya identity (so a promoted Sahodaya appears once),
+schools counted from the certified qualifier snapshot rather than by reading tenant databases, plus
+intake/scrutiny and attendance/mark progress. Scheduling and certificate figures are **left out**
+rather than shown as a zero that would read as "nothing to do".
+
+Live figures on the local data: 2 Sahodayas (1 managed, 1 from outside), 4 schools, 28 registrations,
+4 submissions with 2 awaiting scrutiny, 53 entries (26 pending / 27 approved).
+
+### A data gap this surfaced
+
+Programs, events, intakes and outside-Sahodaya rows created before multi-state carry a **null
+`state_id`**, which makes them invisible to every state user — they fail closed and 403 on their own
+event. `state:backfill-sahodaya-directory --state=KL` now stamps the whole chain in one pass
+(3 programs, 1 event, 5 intakes, 21 outside-Sahodaya rows locally), and a superadmin — unscoped
+everywhere else — is no longer scoped to an event's state for the Sahodaya filter list.
+
+### Not yet built in this phase
+
+The Activity Log tab (spec §2.A.8). It needs a State-scoped read over the audit log, which belongs
+with the audit work in Phase 8 rather than being stubbed here.
+
+**Tests:** `tests/Feature/State/StateFestWorkspaceTest.php` — the matrix separations, that the roles
+seed with exactly those permissions, workspace access per role, cross-state refusal, canonical
+Sahodaya counting, and that the capability middleware refuses a mark operator asked to publish.
