@@ -56,9 +56,9 @@ Sahodaya keeps **one canonical identity** — never counted twice.
 | 4 | Qualifier and registration workflow | ✅ **complete 2026-09-23** — submissions, scrutiny, approvals, registrations, teams & squads, substitutions, quota and window enforcement |
 | 5 | Pre-event operations | ✅ **mostly built 2026-09-23** — schedule, clashes, green room, chest numbers. ID/admit cards, printable bulk sheets and judge assignment outstanding |
 | 6 | Event conduct | ✅ **built 2026-09-23** — attendance with corrections, mark entry, panel aggregation, conduct audit. Judge portal and bulk import outstanding |
-| 7 | Results and appeals | ✅ **mostly built 2026-09-23** — item calculation, provisional/published/locked, Sahodaya points and ranking, School drill-down, individual championship. Appeals and the public portal outstanding |
+| 7 | Results and appeals | ✅ **built 2026-09-23** — item calculation, provisional/published/locked, Sahodaya points and ranking, School drill-down, individual championship, appeals. Public portal outstanding |
 | 8 | Report centre — `StateFestReportCatalog`, **menu-reachable reports only** (scope narrowed 2026-09-23), PDF/Excel/CSV, **catalog parity tests** | ✅ **built 2026-09-23** — 13 live, 9 awaiting later phases |
-| 9 | Certificates — templates, eligibility, merit/participation, batches, tally, Sahodaya/School packs, verification, stale regeneration | not started |
+| 9 | Certificates | ✅ **mostly built 2026-09-23** — eligibility, generation, batches, tally, verification, stale detection and regeneration. PDF rendering and ZIP packs outstanding |
 | 10 | Finance and services — State fees and remittance, ledger, receipts, appeal fees, catering, volunteers | partial (fixed fee done) |
 | 11 | Migration and UAT — backfill, result comparison, managed + external testing, load tests, pilot, route switch, temporary redirects | not started |
 
@@ -562,3 +562,56 @@ publish-before-compute refusal, capability separation, and the newly available r
 ### Outstanding
 
 Phase 6: judge portal and bulk mark import. Phase 7: appeals and the public portal.
+
+
+---
+
+## Phases 7 (appeals) and 9 (certificates) — built 2026-09-23
+
+Built together because they are one story from opposite ends: **an appeal is how a published result
+changes, and a changed result is what makes a certificate wrong.**
+
+### Appeals
+
+Upholding one does **three things at once**, and doing fewer leaves the event inconsistent:
+
+1. records the decision,
+2. takes the item's result **off public view**, so the corrected ranking is not published by accident,
+3. marks **every certificate printed from that item stale**.
+
+A **locked** result is deliberately left alone — locking is a statement that the result is final, and
+reopening it should be a person's act rather than a side effect of a decision elsewhere.
+
+The **fee follows the outcome** — upheld refunds, dismissed forfeits — because leaving that to a
+separate manual step is how a refund gets forgotten. A decision **without recorded reasons is
+refused**: an appeal is precisely the thing that gets questioned later.
+
+### Certificates
+
+A certificate saying second place after an appeal moved the competitor to first is **worse than no
+certificate**. So each one stores a **fingerprint of the result it was printed from** and is marked
+stale the moment that no longer matches. Detection runs *when the result changes*, with
+`detectStale()` as a safety net for changes that did not route through appeals.
+
+The fingerprint deliberately covers the **printed name, School and Sahodaya** as well as the
+position — a corrected spelling is also a reason to reprint.
+
+**Numbers are allocated once and never reused**, a regenerated certificate included. The number is
+what a verification page is asked about, so a superseded certificate keeps its own and verification
+can say it was replaced. Regenerating an *unchanged* certificate issues nothing.
+
+**Eligibility is computed, not asserted**, and anyone who does not qualify is listed *with the
+reason* — "the item's result is not published yet", "placed 4 — merit certificates go to the first
+three" — because generating for someone ineligible produces a document that must be withdrawn by hand.
+
+Every certificate carries **both the Sahodaya and the School**, which is what is printed on it and
+what a verification page has to show years later.
+
+**Reports: 21 of 22 live.** The last waits on printable bulk sheets.
+
+**Tests:** `tests/Feature/State/StateAppealCertificateTest.php` — 15 covering eligibility before
+publication, the first-three rule and its stated reasons, both names on the certificate, no second
+number for an unchanged regeneration, verification by number or code, staleness from a changed result
+*and* from a corrected name, supersede-not-overwrite, appeal outcomes reopening results and staling
+certificates, fee refund/forfeit, locked results left alone, decisions requiring reasons, no
+double-decision, and capability gating (a certificate operator cannot open appeals or results).
