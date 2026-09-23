@@ -129,4 +129,38 @@ class StandaloneSchoolLoginTest extends TestCase
 
         $this->assertAuthenticatedAs($admin);
     }
+
+    /**
+     * Regression for a real prod incident: a stale `url.intended` left over from an
+     * earlier, unrelated unauthenticated hit on a super.admin-gated URL (e.g. someone
+     * following a bookmarked /billing link) used to survive login and send a plain
+     * school admin straight into EnsureSuperAdmin's 403 — bouncing them back to
+     * /school-login with "Superadmin access required." instead of their own dashboard.
+     * See InertiaAuth::isInvalidIntendedForUser().
+     */
+    public function test_standalone_school_admin_login_discards_a_stale_superadmin_intended_url(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $school = $this->createSchool('standalone-stale-intended');
+        $admin = User::factory()->create([
+            'tenant_id' => $school->id,
+            'email' => 'admin@standalone-stale.test',
+            'email_verified_at' => now(),
+        ]);
+        $admin->assignRole('school_admin');
+
+        // Simulate the leftover guest-redirect state from an earlier, unrelated visit
+        // to a super.admin-only URL on this same domain.
+        $this->withSession(['url.intended' => 'http://standalone-stale-intended.sahodaya.test/admin/billing']);
+
+        $this->withHeader('referer', 'http://standalone-stale-intended.sahodaya.test/school-login')
+            ->post('http://standalone-stale-intended.sahodaya.test/login', [
+                'email' => 'admin@standalone-stale.test',
+                'password' => 'password',
+            ])
+            ->assertRedirect("/school-admin/{$school->id}");
+
+        $this->assertAuthenticatedAs($admin);
+    }
 }
