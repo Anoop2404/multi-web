@@ -160,8 +160,8 @@ class StateFestReportCatalog
                 'group' => self::GROUP_BEFORE,
                 'formats' => ['pdf', 'csv'],
                 'filters' => ['date', 'venue_id'],
-                'available' => false,
-                'blocked_by' => 'Scheduling (Phase 5) — there are no venues, stages or item times yet.',
+                'description' => 'Every scheduled item with its date, reporting and start time, and stage.',
+                'available' => true,
             ],
             [
                 'id' => 'schedule-clashes',
@@ -169,8 +169,8 @@ class StateFestReportCatalog
                 'group' => self::GROUP_BEFORE,
                 'formats' => ['pdf', 'csv'],
                 'filters' => ['sahodaya_id'],
-                'available' => false,
-                'blocked_by' => 'Scheduling (Phase 5) — clashes cannot be detected before items have times.',
+                'description' => 'Participants entered for overlapping items, stages double-booked, and Sahodaya overlaps.',
+                'available' => true,
             ],
             [
                 'id' => 'attendance-sheet',

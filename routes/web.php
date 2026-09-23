@@ -210,9 +210,22 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
 
             // Venues belong to the schedule: whoever plans where items happen manages the places.
             Route::middleware('state.fest:schedule')->group(function () use ($config) {
+                $sched = \App\Http\Controllers\StateAdmin\Fest\StateScheduleController::class;
+
                 Route::get('/{event}/venues', [$config, 'venues'])->name('venues');
                 Route::post('/{event}/venues', [$config, 'storeVenue'])->name('venues.store');
                 Route::delete('/{event}/venues/{venue}', [$config, 'destroyVenue'])->name('venues.destroy');
+
+                Route::get('/{event}/schedule', [$sched, 'schedule'])->name('schedule');
+                Route::post('/{event}/schedule', [$sched, 'saveSchedule'])->name('schedule.save');
+                Route::get('/{event}/clashes', [$sched, 'clashes'])->name('clashes');
+                Route::get('/{event}/green-room', [$sched, 'greenRoom'])->name('green-room');
+
+                // Chest numbers sit with the schedule rather than registrations: they are allocated
+                // once the field is settled, and every printed sheet depends on them.
+                Route::get('/{event}/chest-numbers', [$sched, 'chestNumbers'])->name('chest-numbers');
+                Route::post('/{event}/chest-numbers/assign', [$sched, 'assignChestNumbers'])->name('chest-numbers.assign');
+                Route::post('/{event}/chest-numbers/set', [$sched, 'setChestNumber'])->name('chest-numbers.set');
             });
 
             // Reports are read-only, so a report user reaches them without any write capability.

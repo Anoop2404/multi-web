@@ -47,6 +47,8 @@ class StateReportDataService
             'pending-approvals'      => $this->pendingApprovals($event, $filters),
             'attendance-status'      => $this->attendanceStatus($event, $filters),
             'mark-entry-status'      => $this->markEntryStatus($event, $filters),
+            'item-schedule'          => $this->itemSchedule($event),
+            'schedule-clashes'       => $this->scheduleClashes($event),
             'sahodaya-fee-summary'   => $this->feeSummary($event),
             default => throw new InvalidArgumentException("No State report data for \"{$reportId}\"."),
         };
@@ -352,6 +354,45 @@ class StateReportDataService
         return [
             'title' => 'Mark Entry Status',
             'headers' => ['Item', 'Registrations', 'Marks entered', 'Outstanding', 'Status'],
+            'rows' => $rows,
+        ];
+    }
+
+    private function itemSchedule(StateFestEvent $event): array
+    {
+        $rows = app(\App\Services\State\Fest\StateScheduleService::class)->scheduleFor($event)
+            ->filter(fn (array $r) => $r['is_scheduled'])
+            ->map(fn (array $r) => [
+                $r['item_code'], $r['title'], $r['scheduled_on'],
+                $r['reporting_at'] ?? '—', $r['starts_at'] ?? '—', $r['ends_at'] ?? '—',
+                $r['venue_name'] ?? '—', $r['participants'],
+            ])->values()->all();
+
+        return [
+            'title' => 'Item Venue & Time Schedule',
+            'headers' => ['Code', 'Item', 'Date', 'Report', 'Start', 'Finish', 'Stage', 'Entries'],
+            'rows' => $rows,
+        ];
+    }
+
+    private function scheduleClashes(StateFestEvent $event): array
+    {
+        $clashes = app(\App\Services\State\Fest\StateScheduleService::class)->clashes($event);
+        $rows = [];
+
+        foreach ($clashes['participant'] as $c) {
+            $rows[] = [ucfirst($c['kind']), $c['name'], $c['sahodaya'], $c['school'], $c['date'], $c['a'], $c['b']];
+        }
+        foreach ($clashes['venue'] as $c) {
+            $rows[] = ['Stage', $c['venue'], '—', '—', $c['date'], $c['a'], $c['b']];
+        }
+        foreach ($clashes['sahodaya'] as $c) {
+            $rows[] = ['Sahodaya load', '—', $c['sahodaya'], '—', $c['date'], $c['a'], $c['b']];
+        }
+
+        return [
+            'title' => 'Schedule Clash Report',
+            'headers' => ['Kind', 'Who', 'Sahodaya', 'School', 'Date', 'Item A', 'Item B'],
             'rows' => $rows,
         ];
     }
