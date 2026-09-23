@@ -52,7 +52,7 @@ Sahodaya keeps **one canonical identity** — never counted twice.
 |---|---|---|
 | 1 | State identity foundation — canonical managed/external identity, Sahodaya + School name snapshots, migration, backfill, promoted-external de-duplication, shared directory resolver | ✅ **built 2026-09-23** |
 | 2 | State application shell — sidebar, event workspace, tabs, permissions, event switcher, shared filter bar, activity log | ✅ **built 2026-09-23** (activity log tab pending) |
-| 3 | Program and event configuration — items, categories, eligibility, per-Sahodaya slots, windows, grade/point rules, venues, staff | partial (slots done) |
+| 3 | Program and event configuration — items, categories, eligibility, per-Sahodaya slots, windows, grade/point rules, venues, staff | partial — **Sahodaya Slots built 2026-09-23**; items/eligibility/windows/grades/venues/staff outstanding |
 | 4 | Qualifier and registration workflow — submissions, scrutiny, approvals, registrations, teams, substitutions, quota enforcement, external parity | partial (intake queue, slots) |
 | 5 | Pre-event operations — chest numbers, ID/admit cards, scheduling, clashes, performance order, green room, attendance sheets, judge assignment | not started |
 | 6 | Event conduct — attendance, judge portal, mark entry, panel aggregation, bulk import, corrections, stage progress | thin version exists |
@@ -200,3 +200,49 @@ with the audit work in Phase 8 rather than being stubbed here.
 **Tests:** `tests/Feature/State/StateFestWorkspaceTest.php` — the matrix separations, that the roles
 seed with exactly those permissions, workspace access per role, cross-state refusal, canonical
 Sahodaya counting, and that the capability middleware refuses a mark operator asked to publish.
+
+
+---
+
+## Phase 3 (in progress) — Sahodaya Slots, built 2026-09-23
+
+The spec asks for this as a tab of its own rather than a field inside each item form, and that is
+right: slots decide who may compete, so they need to be seen across every item at once, with usage
+beside them and every change recorded.
+
+**Three levels, most specific first** — and all three are per Sahodaya:
+
+1. a Sahodaya's override for that item — `state_sahodaya_item_slots` **(new)**
+2. the item's own figure — `FestStateProgramItem.max_per_school`
+3. the item default — `FestStateProgramItem.qualify_count`
+
+Level 1 was the missing one: there was no way to grant a single Sahodaya an extra place on a single
+item, or hold it to fewer after a ruling, without moving the figure for everybody.
+
+**Overrides key on the canonical directory id** from Phase 1, so they survive promotion. Enforcement
+now counts approved entries on that identity too, matching either the canonical id or the raw
+submission key — a Sahodaya that submitted before *and* after its promotion used two different raw
+keys, and counting those separately handed it a second full allowance for every item. Covered by
+`test_a_promoted_sahodaya_gets_one_allowance_not_two`.
+
+**Change history is part of the screen.** Every change appends to `state_slot_audit_entries` with
+who, from what, to what and why; the table is never updated or deleted from. A quota that moved and
+left no trace is exactly what an appeal will ask about.
+
+**Practical shaping.** The matrix returns only cells carrying an override or some usage — 140 items
+across 22 Sahodayas is 3,080 cells, almost all empty. Team items are marked as consuming one slot per
+entry, not one per member. The tab sits behind `state.fest:catalog`, so a report user or mark
+operator can open the workspace without being able to move a quota.
+
+**Live on the local data:** 140 items, 16 with entries or overrides, per-Sahodaya usage resolving
+correctly (Recitation-Malayalam: Malappuram 1/2, Thrissur 2/2).
+
+**Tests** — `tests/Feature/State/StateSlotOverrideTest.php`: three-level fallback, an override
+changing what approval allows without affecting the next Sahodaya, clearing returning to the item
+figure, the audit trail's contents, the spec's mandatory "team registration consumes one slot", the
+matrix's used/available/exceeded, and one allowance for a promoted Sahodaya.
+
+### Still outstanding in Phase 3
+
+Items & Catalog, Categories & Eligibility, event dates and windows (qualifier submission, scrutiny,
+publication), Grade Master and rank points, Venues & Stages, Event Staff.
