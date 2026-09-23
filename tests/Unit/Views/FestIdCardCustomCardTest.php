@@ -23,6 +23,9 @@ class FestIdCardCustomCardTest extends TestCase
 
         $this->assertStringContainsString('background-color:#ca08e3', $html);
         $this->assertStringContainsString('background-image:linear-gradient(to right, #e2b916, #ca08e3)', $html);
+        $this->assertStringContainsString('<linearGradient', $html);
+        $this->assertStringContainsString('stop-color="#e2b916"', $html);
+        $this->assertStringContainsString('stop-color="#ca08e3"', $html);
         $this->assertStringNotContainsString('background:linear-gradient', $html);
     }
 

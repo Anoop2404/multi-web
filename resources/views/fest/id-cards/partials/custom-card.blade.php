@@ -88,15 +88,29 @@
                 // Dompdf does not paint CSS gradients. Keep a solid fallback behind the
                 // browser gradient so ribbons remain visible in downloaded PDFs.
                 $solidBg = $field['color'] ?? $field['gradient_to'] ?? $field['gradient_from'] ?? '#DCEBFB';
+                $gradId = 'g_'.substr(md5(($field['gradient_from'] ?? '').($field['gradient_to'] ?? '').($field['top'] ?? '').($field['left'] ?? '')), 0, 8);
+                $radiusMm = (float) ($field['radius'] ?? 0);
             @endphp
             <div class="card__shape" style="
                 top:{{ $field['top'] ?? 0 }}%; left:{{ $field['left'] ?? 0 }}%;
                 width:{{ $field['width'] ?? 20 }}%; height:{{ $field['height'] ?? 10 }}%;
-                border-radius:{{ $field['radius'] ?? 0 }}mm;
+                border-radius:{{ $radiusMm }}mm;
                 background-color:{{ $solidBg }};
                 @if($hasGradient) background-image:linear-gradient(to right, {{ $field['gradient_from'] }}, {{ $field['gradient_to'] }}); @endif
                 @if(!empty($field['rotation'])) transform:rotate({{ (float) $field['rotation'] }}deg); transform-origin:center center; @endif
-            "></div>
+            ">
+                @if($hasGradient)
+                    <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style="display:block;width:100%;height:100%;position:absolute;top:0;left:0;border-radius:{{ $radiusMm }}mm;">
+                        <defs>
+                            <linearGradient id="{{ $gradId }}" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="{{ $field['gradient_from'] }}" />
+                                <stop offset="100%" stop-color="{{ $field['gradient_to'] }}" />
+                            </linearGradient>
+                        </defs>
+                        <rect width="100" height="100" rx="{{ $radiusMm > 0 ? 8 : 0 }}" ry="{{ $radiusMm > 0 ? 8 : 0 }}" fill="url(#{{ $gradId }})" />
+                    </svg>
+                @endif
+            </div>
         @elseif($type === 'static_text')
             @if(!empty($field['text']))
                 @php $wrap = (bool) ($field['wrap'] ?? false); @endphp

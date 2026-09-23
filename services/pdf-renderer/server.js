@@ -86,7 +86,7 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok', active, queued: waiters.length });
 });
 
-app.post('/render', async (req, res) => {
+app.post(['/render', '/generate-pdf'], async (req, res) => {
     const {
         html,
         landscape = false,

@@ -8,10 +8,21 @@
             size: {{ ($pageWidthMm ?? null) && ($pageHeightMm ?? null) ? $pageWidthMm.'mm '.$pageHeightMm.'mm' : 'A4 portrait' }};
             margin: {{ ($gridLayout ?? null) ? '0' : '6mm' }};
         }
-        * { box-sizing: border-box; }
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+        }
         .die-page { position: relative; width: 100%; }
         .die-card-slot { position: absolute; }
-        body { font-family: Arial, DejaVu Sans, sans-serif; color: #1e293b; margin: 0; }
+        body {
+            font-family: Arial, DejaVu Sans, sans-serif;
+            color: #1e293b;
+            margin: 0;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
         .sheet-title { text-align: center; font-size: 11px; font-weight: bold; color: #475569; margin-bottom: 4mm; }
         .section-title { font-size: 10px; font-weight: bold; color: #475569; margin: 3mm 0 2mm; }
         .grid { width: 100%; border-collapse: separate; border-spacing: 3mm 3mm; }
@@ -23,6 +34,8 @@
             page-break-inside: avoid;
             background: #fff;
             position: relative;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
         }
         .card__bg {
             position: absolute;
@@ -37,15 +50,18 @@
             text-overflow: ellipsis;
         }
         .card__field--wrap {
-            display: flex;
-            align-items: center;
+            display: table !important;
             white-space: normal;
             text-overflow: clip;
             overflow-wrap: anywhere;
+            box-sizing: border-box;
         }
         .card__field--wrap > span {
-            display: block;
-            width: 100%;
+            display: table-cell !important;
+            vertical-align: middle !important;
+            width: 100% !important;
+            height: 100% !important;
+            text-align: inherit;
         }
         .card__photo, .card__qr {
             position: absolute;
@@ -83,6 +99,8 @@
         }
         .card__shape {
             position: absolute;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
         }
         .card__divider {
             position: absolute;
@@ -96,6 +114,31 @@
             height: 0;
         }
         .page-break { page-break-after: always; }
+        @media print {
+            @page {
+                size: {{ ($pageWidthMm ?? null) && ($pageHeightMm ?? null) ? $pageWidthMm.'mm '.$pageHeightMm.'mm' : 'A4 portrait' }};
+                margin: {{ ($gridLayout ?? null) ? '0' : '6mm' }} !important;
+            }
+            html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+            .page-break {
+                page-break-after: always !important;
+                break-after: page !important;
+            }
+            .die-page {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            .card {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+        }
     </style>
 </head>
 <body>
