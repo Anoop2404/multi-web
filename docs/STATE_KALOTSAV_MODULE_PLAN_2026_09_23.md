@@ -55,8 +55,8 @@ Sahodaya keeps **one canonical identity** — never counted twice.
 | 3 | Program and event configuration | ✅ **built 2026-09-23** — slots, settings/windows, venues & stages, event staff, item catalog. Grade/point rules deferred to Phase 7, where they are used |
 | 4 | Qualifier and registration workflow | ✅ **complete 2026-09-23** — submissions, scrutiny, approvals, registrations, teams & squads, substitutions, quota and window enforcement |
 | 5 | Pre-event operations | ✅ **mostly built 2026-09-23** — schedule, clashes, green room, chest numbers. ID/admit cards, printable bulk sheets and judge assignment outstanding |
-| 6 | Event conduct — attendance, judge portal, mark entry, panel aggregation, bulk import, corrections, stage progress | thin version exists |
-| 7 | Results and appeals — item calculation, provisional publishing, appeals, final publishing, Sahodaya points and ranking, School drill-down, public results | thin version exists |
+| 6 | Event conduct | ✅ **built 2026-09-23** — attendance with corrections, mark entry, panel aggregation, conduct audit. Judge portal and bulk import outstanding |
+| 7 | Results and appeals | ✅ **mostly built 2026-09-23** — item calculation, provisional/published/locked, Sahodaya points and ranking, School drill-down, individual championship. Appeals and the public portal outstanding |
 | 8 | Report centre — `StateFestReportCatalog`, **menu-reachable reports only** (scope narrowed 2026-09-23), PDF/Excel/CSV, **catalog parity tests** | ✅ **built 2026-09-23** — 13 live, 9 awaiting later phases |
 | 9 | Certificates — templates, eligibility, merit/participation, batches, tally, Sahodaya/School packs, verification, stale regeneration | not started |
 | 10 | Finance and services — State fees and remittance, ledger, receipts, appeal fees, catering, volunteers | partial (fixed fee done) |
@@ -491,3 +491,74 @@ capability gating, and the two newly available reports.
 
 ID and admit cards, printable bulk sheets (attendance, timesheet, judge sheets — the third report
 still blocked), and judge assignment, which belongs with Phase 6's conduct work.
+
+
+---
+
+## Phases 6 and 7 — built 2026-09-23
+
+### Conduct (Phase 6)
+
+Two rules run through it:
+
+- **An absent competitor cannot be scored.** Marking someone absent and then entering a mark for
+  them is the commonest way a disputed result is created, so the mark is refused rather than quietly
+  stored.
+- **Every change after the first is recorded.** Attendance corrected from absent to present, or a
+  mark edited after entry, is exactly what an appeal turns on. Marking for the *first* time is not a
+  correction and is not logged — otherwise the log is noise.
+
+**Panel aggregation follows the event's rules**, not a constant: a three-judge panel averages, a
+five-judge panel often drops the highest and lowest first. Dropping is skipped when it would leave
+nothing, so a two-judge panel configured to drop still produces a mark. An **incomplete panel is
+aggregated anyway** — a panel that lost a judge still has to produce a result — but the participants
+are named so the office decides whether to accept it.
+
+*Found while building:* `state_attendances.participant_id` is NOT NULL, but attendance is taken per
+**entry** — a team reports together and is present or absent as one. The entry is anchored to its
+leader, falling back to the first competing member.
+
+### Results and standings (Phase 7)
+
+**Publication was event-wide** — a single flag, so the State could publish everything or nothing. A
+Kalotsavam publishes item by item over three days, and an item under appeal has to be held back
+without freezing the other 139. `state_item_results` now carries the state per item:
+
+| State | Meaning |
+|---|---|
+| `draft` | not computed |
+| `provisional` | computed, visible to the office, **not public** |
+| `published` | visible publicly |
+| `locked` | final; refuses recomputation |
+
+Withdrawing a published result **requires a reason**, because it has already been seen.
+
+**Ranking** gives equal scores the same position and skips the next — two firsts are followed by a
+third, which is how a result sheet reads — and counts the ties, since a tie for first is a decision
+before publishing.
+
+**Standings are the module's defining difference.** Points aggregate to the **Sahodaya**, the
+competing organization at State level, while the School each participant came from is carried through
+so a Sahodaya's total breaks down by the Schools that earned it. **The School is never a row in the
+ranking.** Only published items count — a provisional ranking is the office's working view, and
+letting it move the table would change a Sahodaya's position with nothing announced. Grouping is on
+the canonical identity from Phase 1, so a promoted Sahodaya appears once with one total.
+
+**Computing and publishing are separate capabilities**, so a scrutineer can correct a ranking without
+releasing it, and a mark operator can do neither.
+
+### Reports
+
+Five more reports unblocked themselves: **20 of the 22 catalogued reports are now live**, the
+remaining two waiting on certificates.
+
+**Tests:** `tests/Feature/State/StateConductResultTest.php` — 14 covering correction logging (and
+not logging a first mark), refusing a mark for an absent competitor, the scoring lock, panel
+averaging and extreme-dropping, incomplete panels, shared positions with skipped ranks, standings
+counting only published items, **points aggregating to the Sahodaya with School contributions
+reconciling to the total**, locked results refusing recomputation, withdrawal requiring a reason,
+publish-before-compute refusal, capability separation, and the newly available reports.
+
+### Outstanding
+
+Phase 6: judge portal and bulk mark import. Phase 7: appeals and the public portal.
