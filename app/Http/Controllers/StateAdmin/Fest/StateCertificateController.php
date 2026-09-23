@@ -10,6 +10,7 @@ use App\Models\State\StateCertificateBatch;
 use App\Models\State\StateFestEvent;
 use App\Models\State\StateSahodaya;
 use App\Services\State\Fest\StateAppealService;
+use App\Services\State\Fest\StateCertificateRenderer;
 use App\Services\State\Fest\StateCertificateService;
 use App\Support\StateScope;
 use Illuminate\Http\Request;
@@ -108,6 +109,19 @@ class StateCertificateController extends Controller
             'tally' => $certificates->tally($event),
             'items' => FestStateProgramItem::where('state_program_id', $event->state_program_id)
                 ->orderBy('title')->get(['id', 'item_code', 'title']),
+            'issued' => StateCertificate::where('state_event_id', $event->id)
+                ->when($type, fn ($q) => $q->where('type', $type))
+                ->when($filters['sahodaya_id'] ?? null, fn ($q, $v) => $q->where('sahodaya_id', $v))
+                ->when($filters['item_id'] ?? null, fn ($q, $v) => $q->where('item_id', $v))
+                ->orderBy('sahodaya_name')->orderBy('certificate_number')
+                ->limit(500)->get()
+                ->map(fn (StateCertificate $c) => [
+                    'id' => $c->id, 'number' => $c->certificate_number, 'recipient' => $c->recipient_name,
+                    'sahodaya' => $c->sahodaya_name, 'school' => $c->school_name,
+                    'item' => $c->item_name ?: $c->item_code, 'position' => $c->position, 'grade' => $c->grade,
+                    'status' => $c->status, 'printed_at' => $c->printed_at?->toDateTimeString(),
+                    'printUrl' => "/admin/state/fest/{$event->id}/certificates/{$c->id}/print",
+                ]),
             'batches' => StateCertificateBatch::where('state_event_id', $event->id)
                 ->orderByDesc('created_at')->limit(20)->get()
                 ->map(fn (StateCertificateBatch $b) => [
@@ -118,6 +132,7 @@ class StateCertificateController extends Controller
             'actionUrls' => [
                 'generate' => "/admin/state/fest/{$event->id}/certificates/generate",
                 'detectStale' => "/admin/state/fest/{$event->id}/certificates/detect-stale",
+                'pack' => "/admin/state/fest/{$event->id}/certificates/pack",
             ],
             'baseUrl' => "/admin/state/fest/{$event->id}/certificates",
         ]);
@@ -140,6 +155,43 @@ class StateCertificateController extends Controller
 
         return back()->with('success', "{$result['generated']} generated"
             .($result['skipped'] ? ", {$result['skipped']} already current" : '').'.');
+    }
+
+    /** One certificate, inline, so it can be checked before a pack of 400 is sent to a printer. */
+    public function print(Request $request, StateFestEvent $event, StateCertificate $certificate, StateCertificateRenderer $renderer)
+    {
+        StateScope::assertOwns($event->state_id);
+        abort_unless($certificate->state_event_id === $event->id, 404);
+
+        return $renderer->stream($certificate, $event);
+    }
+
+    /**
+     * A print pack as a ZIP, foldered by Sahodaya. Filters are the same ones the page already offers,
+     * so whatever the operator is looking at is what they get.
+     */
+    public function pack(Request $request, StateFestEvent $event, StateCertificateRenderer $renderer)
+    {
+        StateScope::assertOwns($event->state_id);
+
+        $filters = $request->validate([
+            'type' => ['nullable', Rule::in(array_keys(StateCertificate::TYPES))],
+            'sahodaya_id' => 'nullable|uuid',
+            'item_id' => 'nullable|uuid',
+        ]);
+
+        $certificates = StateCertificate::where('state_event_id', $event->id)
+            ->when($filters['type'] ?? null, fn ($q, $v) => $q->where('type', $v))
+            ->when($filters['sahodaya_id'] ?? null, fn ($q, $v) => $q->where('sahodaya_id', $v))
+            ->when($filters['item_id'] ?? null, fn ($q, $v) => $q->where('item_id', $v))
+            ->orderBy('sahodaya_name')->orderBy('certificate_number')
+            ->get();
+
+        $pack = $renderer->zip($certificates, $event);
+
+        return response()->download($pack['path'], $pack['filename'], [
+            'Content-Type' => 'application/zip',
+        ])->deleteFileAfterSend(true);
     }
 
     public function detectStale(Request $request, StateFestEvent $event, StateCertificateService $certificates)

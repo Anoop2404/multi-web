@@ -172,14 +172,59 @@ class StateFestReportCatalog
                 'description' => 'Participants entered for overlapping items, stages double-booked, and Sahodaya overlaps.',
                 'available' => true,
             ],
+
+            // ── Printed sheets ──────────────────────────────────────────────────────────────
+            // These are not tables of data but paper the event runs on, so they carry
+            // kind => 'sheet': one section per item, in performance order, with room to write.
             [
                 'id' => 'attendance-sheet',
                 'label' => 'Attendance Sheet by Item',
                 'group' => self::GROUP_PRINT,
+                'kind' => 'sheet',
                 'formats' => ['pdf'],
                 'filters' => ['item_id', 'sahodaya_id'],
-                'available' => false,
-                'blocked_by' => 'Scheduling (Phase 5) — sheets are printed in performance order.',
+                'description' => 'One signature row per entry, in chest-number order, grouped by item.',
+                'available' => true,
+            ],
+            [
+                'id' => 'timesheet',
+                'label' => 'Stage Timesheet',
+                'group' => self::GROUP_PRINT,
+                'kind' => 'sheet',
+                'formats' => ['pdf'],
+                'filters' => ['item_id', 'sahodaya_id'],
+                'description' => 'Start and finish times per competitor, for the stage to fill in.',
+                'available' => true,
+            ],
+            [
+                'id' => 'judge-sheet',
+                'label' => 'Judge Score Sheet',
+                'group' => self::GROUP_PRINT,
+                'kind' => 'sheet',
+                'formats' => ['pdf'],
+                'filters' => ['item_id'],
+                'description' => 'Chest numbers only — the panel does not see which Sahodaya a performance came from.',
+                'available' => true,
+            ],
+            [
+                'id' => 'green-room-sheet',
+                'label' => 'Green Room Call List',
+                'group' => self::GROUP_PRINT,
+                'kind' => 'sheet',
+                'formats' => ['pdf'],
+                'filters' => ['item_id', 'sahodaya_id'],
+                'description' => 'Reporting order per item, for the green room to tick off arrivals.',
+                'available' => true,
+            ],
+            [
+                'id' => 'participant-cards',
+                'label' => 'ID / Admit Cards',
+                'group' => self::GROUP_PRINT,
+                'kind' => 'cards',
+                'formats' => ['pdf'],
+                'filters' => ['item_id', 'sahodaya_id'],
+                'description' => 'One card per participant with chest number, Sahodaya and School — eight to a page.',
+                'available' => true,
             ],
 
             // ── During the event ────────────────────────────────────────────────────────────
@@ -255,6 +300,26 @@ class StateFestReportCatalog
                 'group' => self::GROUP_FINANCE,
                 'formats' => ['pdf', 'xls', 'csv'],
                 'filters' => ['sahodaya_id'],
+                'available' => true,
+            ],
+
+            // ── Logistics ───────────────────────────────────────────────────────────────────
+            [
+                'id' => 'catering-summary',
+                'label' => 'Catering Summary',
+                'group' => self::GROUP_FINANCE,
+                'formats' => ['pdf', 'xls', 'csv'],
+                'filters' => [],
+                'description' => 'Meals entitled and issued per sitting, with the variance the kitchen is billed on.',
+                'available' => true,
+            ],
+            [
+                'id' => 'duty-roster',
+                'label' => 'Volunteer & Official Duty Roster',
+                'group' => self::GROUP_FINANCE,
+                'formats' => ['pdf', 'xls', 'csv'],
+                'filters' => [],
+                'description' => 'Who is on duty, where, session by session.',
                 'available' => true,
             ],
 

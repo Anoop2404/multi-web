@@ -11,7 +11,10 @@ use App\Models\State\StateFestMark;
 use App\Models\State\StateFestRegistration;
 use App\Models\State\StateSahodaya;
 use App\Services\State\Fest\StateConductService;
+use App\Services\State\Fest\StateJudgePortalService;
+use App\Services\State\Fest\StateMarkImportService;
 use App\Services\State\Fest\StateResultService;
+use App\Support\CsvSafety;
 use App\Support\StateScope;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -119,8 +122,13 @@ class StateConductController extends Controller
                     'grade' => $marks->get($p->id)?->grade,
                     'position' => $marks->get($p->id)?->position,
                 ]))->values(),
+            // Who is on the panel and whether they have submitted: mark entry without this is
+            // guesswork about whether an item is ready to aggregate.
+            'panel' => $itemId ? app(StateJudgePortalService::class)->panel($event, $itemId) : [],
             'actionUrls' => [
                 'aggregate' => "/admin/state/fest/{$event->id}/marks/aggregate",
+                'import' => "/admin/state/fest/{$event->id}/marks/import",
+                'template' => "/admin/state/fest/{$event->id}/marks/import-template",
             ],
             'baseUrl' => "/admin/state/fest/{$event->id}/marks",
         ]);
@@ -138,6 +146,56 @@ class StateConductController extends Controller
             "{$result['aggregated']} mark(s) aggregated."
                 .($result['incomplete'] ? ' Incomplete panels for: '.implode(', ', $result['incomplete']).'.' : ''),
         );
+    }
+
+    /**
+     * Import a panel's marks from a spreadsheet, on behalf of one named judge.
+     *
+     * The judge is chosen, not inferred from who is uploading: a clerk typing up three paper sheets
+     * must land each one under the judge who actually scored it, or aggregation averages one judge's
+     * marks three times.
+     */
+    public function importMarks(Request $request, StateFestEvent $event, StateMarkImportService $import)
+    {
+        StateScope::assertOwns($event->state_id);
+
+        $data = $request->validate([
+            'judge_user_id' => 'required|integer',
+            'file' => 'required|file|mimes:csv,txt|max:4096',
+            'dry_run' => 'nullable|boolean',
+        ]);
+
+        $rows = array_map('str_getcsv', array_filter(
+            preg_split("/\r\n|\n|\r/", file_get_contents($data['file']->getRealPath())),
+            fn ($line) => trim($line) !== '',
+        ));
+
+        $result = $import->import($event, (int) $data['judge_user_id'], $rows, (bool) ($data['dry_run'] ?? false));
+
+        if ($data['dry_run'] ?? false) {
+            return back()->with('success', count($result['rows']).' row(s) matched an entry. Nothing was saved — uncheck "check only" to apply.');
+        }
+
+        return back()->with('success', "{$result['applied']} mark(s) imported.");
+    }
+
+    /** A pre-filled sheet: every entry that has a chest number, with a blank score column. */
+    public function importTemplate(Request $request, StateFestEvent $event, StateMarkImportService $import)
+    {
+        StateScope::assertOwns($event->state_id);
+
+        $filters = $request->validate(['item_id' => 'nullable|uuid']);
+        $rows = $import->template($event, $filters['item_id'] ?? null);
+        $filename = \Str::slug($event->name.' mark import').'.csv';
+
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            CsvSafety::fputcsv($out, StateMarkImportService::HEADERS);
+            foreach ($rows as $row) {
+                CsvSafety::fputcsv($out, $row);
+            }
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv']);
     }
 
     public function results(Request $request, StateFestEvent $event, StateResultService $results)

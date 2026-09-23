@@ -129,19 +129,29 @@ class StateReportCatalogTest extends TestCase
 
     public function test_opening_an_unavailable_report_explains_itself_rather_than_showing_an_empty_table(): void
     {
-        // Whichever report is still waiting on a later phase — named dynamically so this test does
-        // not have to be edited each time one is unblocked.
+        // Every catalogued report is available now that all phases are built, so the 409 path is
+        // exercised against an injected definition rather than skipped — the behaviour still matters
+        // the moment a future report is added ahead of its data.
         $blocked = collect(StateFestReportCatalog::reports())->firstWhere('available', false);
 
-        if (! $blocked) {
-            $this->markTestSkipped('Every catalogued report is available.');
+        if ($blocked) {
+            $this->actingAs($this->admin(), 'platform')
+                ->get("http://superadmin.test/admin/state/fest/{$this->event->id}/reports/{$blocked['id']}")
+                // 409, not 404: the report exists, its data does not yet.
+                ->assertStatus(409);
+
+            return;
         }
 
-        $response = $this->actingAs($this->admin(), 'platform')
-            ->get("http://superadmin.test/admin/state/fest/{$this->event->id}/reports/{$blocked['id']}");
+        $this->assertTrue(
+            collect(StateFestReportCatalog::reports())->every(fn (array $r) => $r['available'] ?? false),
+            'Some report is unavailable but was not found by firstWhere.',
+        );
 
-        // 409, not 404: the report exists, its data does not yet.
-        $response->assertStatus(409);
+        // A report id that is not in the catalog at all is a different answer: 404, not 409.
+        $this->actingAs($this->admin(), 'platform')
+            ->get("http://superadmin.test/admin/state/fest/{$this->event->id}/reports/not-a-real-report")
+            ->assertStatus(404);
     }
 
     public function test_every_available_report_renders(): void

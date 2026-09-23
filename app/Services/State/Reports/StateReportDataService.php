@@ -56,8 +56,63 @@ class StateReportDataService
             'item-schedule'          => $this->itemSchedule($event),
             'schedule-clashes'       => $this->scheduleClashes($event),
             'sahodaya-fee-summary'   => $this->feeSummary($event),
+            'catering-summary'       => $this->cateringSummary($event),
+            'duty-roster'            => $this->dutyRoster($event),
             default => throw new InvalidArgumentException("No State report data for \"{$reportId}\"."),
         };
+    }
+
+    /**
+     * Meals per sitting. Entitlement and issue side by side, because the variance between them is
+     * the figure the caterer invoices on and the figure the State queries.
+     *
+     * @return array{title: string, headers: list<string>, rows: list<list<string>>}
+     */
+    private function cateringSummary(StateFestEvent $event): array
+    {
+        $summary = app(\App\Services\State\Fest\StateHospitalityService::class)->cateringSummary($event);
+
+        $rows = collect($summary['sessions'])->map(fn (array $s) => [
+            (string) $s['served_on'],
+            (string) $s['session'],
+            (string) ($s['venue'] ?? ''),
+            (string) ($s['menu'] ?? ''),
+            (string) $s['sahodayas'],
+            (string) $s['entitled'],
+            (string) $s['issued'],
+            (string) ($s['issued'] - $s['entitled']),
+        ])->all();
+
+        // Totalled in the export itself: this report is printed and handed over, and a total added
+        // by hand afterwards is a total nobody can check.
+        if ($rows) {
+            $rows[] = ['', 'Total', '', '', '', (string) $summary['totals']['entitled'],
+                (string) $summary['totals']['issued'], (string) $summary['totals']['variance']];
+        }
+
+        return [
+            'title' => 'Catering Summary',
+            'headers' => ['Date', 'Sitting', 'Venue', 'Menu', 'Sahodayas', 'Entitled', 'Issued', 'Variance'],
+            'rows' => $rows,
+        ];
+    }
+
+    /**
+     * @return array{title: string, headers: list<string>, rows: list<list<string>>}
+     */
+    private function dutyRoster(StateFestEvent $event): array
+    {
+        $roster = app(\App\Services\State\Fest\StateHospitalityService::class)->roster($event);
+
+        return [
+            'title' => 'Volunteer & Official Duty Roster',
+            'headers' => ['Date', 'Session', 'Name', 'Role', 'Place', 'Duty', 'Phone'],
+            'rows' => $roster->map(fn (array $d) => [
+                (string) $d['duty_on'], (string) $d['session'], (string) $d['staff'],
+                (string) ($d['role'] ?? ''), (string) ($d['venue'] ?? ''),
+                (string) ($d['duty'] ?? ''), (string) ($d['phone'] ?? ''),
+            ])->all(),
+        ];
     }
 
     /** Registrations for this event, with the standard Sahodaya → School filters applied. */

@@ -32,6 +32,62 @@ class StateEventConfigController extends Controller
         ]);
     }
 
+    /**
+     * What the public can currently see, and the switches that decide it.
+     *
+     * Separate from Settings on purpose: releasing results is the one action on this module that
+     * cannot be taken back quietly, and it should not be one checkbox among thirty on a form whose
+     * Save button also changes contact phone numbers.
+     */
+    public function publicPortal(Request $request, StateFestEvent $event, \App\Services\State\Fest\StatePublicPortalService $portal)
+    {
+        StateScope::assertOwns($event->state_id);
+
+        $visibility = $portal->visibility($event);
+
+        return Inertia::render('State/Fest/PublicPortal', $this->shell($request, $event) + [
+            'visibility' => $visibility,
+            'counts' => [
+                'scheduled_items' => \App\Models\State\StateItemSchedule::where('state_event_id', $event->id)->count(),
+                'published_items' => \App\Models\State\StateItemResult::where('state_event_id', $event->id)
+                    ->whereIn('status', [\App\Models\State\StateItemResult::PUBLISHED, \App\Models\State\StateItemResult::LOCKED])->count(),
+                'public_results' => $visibility['results'] ? $portal->results($event)->count() : 0,
+                'ranked_sahodayas' => $visibility['ranking'] ? $portal->ranking($event)->count() : 0,
+            ],
+            'links' => [
+                'home' => url('/state/kalotsav'),
+                'schedule' => url("/state/kalotsav/{$event->id}/schedule"),
+                'results' => url("/state/kalotsav/{$event->id}/results"),
+                'ranking' => url("/state/kalotsav/{$event->id}/ranking"),
+                'verify' => url('/state/certificates/verify'),
+            ],
+            'actionUrls' => [
+                'save' => "/admin/state/fest/{$event->id}/public-portal",
+                'settings' => "/admin/state/fest/{$event->id}/settings",
+            ],
+        ]);
+    }
+
+    /**
+     * Change only what the public sees. Gated by the publish capability rather than settings, so
+     * releasing results is a distinct trust from configuring the event — and nothing else on the
+     * settings form can move through this endpoint.
+     */
+    public function savePublicVisibility(Request $request, StateFestEvent $event, StateEventSettings $settings)
+    {
+        StateScope::assertOwns($event->state_id);
+
+        $data = $request->validate([
+            'public_schedule_visible' => 'required|boolean',
+            'public_results_visible'  => 'required|boolean',
+            'public_ranking_visible'  => 'required|boolean',
+        ]);
+
+        $settings->update($event, $data);
+
+        return back()->with('success', 'Public visibility updated.');
+    }
+
     public function saveSettings(Request $request, StateFestEvent $event, StateEventSettings $settings)
     {
         StateScope::assertOwns($event->state_id);

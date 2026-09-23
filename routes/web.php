@@ -195,6 +195,8 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
                 Route::get('/{event}/certificates', [$certs, 'certificates'])->name('certificates');
                 Route::post('/{event}/certificates/generate', [$certs, 'generate'])->name('certificates.generate');
                 Route::post('/{event}/certificates/detect-stale', [$certs, 'detectStale'])->name('certificates.detect-stale');
+                Route::get('/{event}/certificates/pack', [$certs, 'pack'])->name('certificates.pack');
+                Route::get('/{event}/certificates/{certificate}/print', [$certs, 'print'])->name('certificates.print');
             });
 
             Route::middleware('state.fest:attendance')->group(function () use ($conduct) {
@@ -205,6 +207,8 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
             Route::middleware('state.fest:marks')->group(function () use ($conduct) {
                 Route::get('/{event}/marks', [$conduct, 'marks'])->name('marks');
                 Route::post('/{event}/marks/aggregate', [$conduct, 'aggregate'])->name('marks.aggregate');
+                Route::get('/{event}/marks/import-template', [$conduct, 'importTemplate'])->name('marks.import-template');
+                Route::post('/{event}/marks/import', [$conduct, 'importMarks'])->name('marks.import');
             });
 
             // Computing a result is a results capability; publishing one is its own, so a
@@ -215,7 +219,12 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
                 Route::post('/{event}/results/compute', [$conduct, 'resultAction'])->defaults('action', 'compute')->name('results.compute');
             });
 
-            Route::middleware('state.fest:publish')->group(function () use ($conduct) {
+            Route::middleware('state.fest:publish')->group(function () use ($conduct, $config) {
+                // The public portal is a publish concern, not a settings one: it decides what the
+                // outside world sees, and only that.
+                Route::get('/{event}/public-portal', [$config, 'publicPortal'])->name('public-portal');
+                Route::post('/{event}/public-portal', [$config, 'savePublicVisibility'])->name('public-portal.save');
+
                 Route::post('/{event}/results/publish', [$conduct, 'resultAction'])->defaults('action', 'publish')->name('results.publish');
                 Route::post('/{event}/results/unpublish', [$conduct, 'resultAction'])->defaults('action', 'unpublish')->name('results.unpublish');
                 Route::post('/{event}/results/lock', [$conduct, 'resultAction'])->defaults('action', 'lock')->name('results.lock');
@@ -245,6 +254,21 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
 
             Route::middleware('state.fest:catalog')->group(function () use ($config) {
                 Route::get('/{event}/items', [$config, 'items'])->name('items');
+            });
+
+            // Catering and duty rosters are event logistics, so they sit with settings and staff
+            // rather than with anything that decides who competes or what they score.
+            Route::middleware('state.fest:settings')->group(function () {
+                $hospitality = \App\Http\Controllers\StateAdmin\Fest\StateHospitalityController::class;
+
+                Route::get('/{event}/catering', [$hospitality, 'catering'])->name('catering');
+                Route::post('/{event}/catering/sessions', [$hospitality, 'saveSession'])->name('catering.sessions');
+                Route::post('/{event}/catering/freeze', [$hospitality, 'freeze'])->name('catering.freeze');
+                Route::post('/{event}/catering/issue', [$hospitality, 'issue'])->name('catering.issue');
+
+                Route::get('/{event}/volunteers', [$hospitality, 'volunteers'])->name('volunteers');
+                Route::post('/{event}/volunteers/duties', [$hospitality, 'assignDuty'])->name('volunteers.duties.assign');
+                Route::delete('/{event}/volunteers/duties/{duty}', [$hospitality, 'removeDuty'])->name('volunteers.duties.remove');
             });
 
             // Venues belong to the schedule: whoever plans where items happen manages the places.
@@ -2163,6 +2187,40 @@ Route::prefix('state/external')->name('state.external.')->middleware(['web', 'th
 Route::get('/state/results', [\App\Http\Controllers\Public\StatePublicResultsController::class, 'index'])
     ->middleware(['web', 'throttle:60,1'])
     ->name('state.public-results');
+
+// ── Public State Kalotsav portal (Phase 7 of docs/STATE_KALOTSAV_MODULE_PLAN_2026_09_23.md) ──────
+// No auth: schedules, released results and standings are for parents, schools and the press. Every
+// page checks its own publication setting, so an unreleased section 404s instead of rendering empty.
+// Throttled because these are the only State pages a crawler can reach.
+Route::middleware(['web', 'throttle:60,1'])->group(function () {
+    $portal = \App\Http\Controllers\Public\StateFestPortalController::class;
+
+    Route::get('/state/kalotsav', [$portal, 'home'])->name('state.public.home');
+    Route::get('/state/kalotsav/{event}/schedule', [$portal, 'schedule'])->name('state.public.schedule');
+    Route::get('/state/kalotsav/{event}/results', [$portal, 'results'])->name('state.public.results');
+    Route::get('/state/kalotsav/{event}/ranking', [$portal, 'ranking'])->name('state.public.ranking');
+    Route::get('/state/kalotsav/{event}/sahodaya/{sahodaya}', [$portal, 'sahodaya'])->name('state.public.sahodaya');
+
+    // Verification is deliberately outside the event prefix: the code is what someone has in hand,
+    // and they should not need to know which event issued it.
+    Route::get('/state/certificates/verify', [$portal, 'verify'])->name('state.public.verify');
+    Route::get('/state/certificates/verify/{code}', [$portal, 'verify'])->name('state.public.verify.code');
+});
+
+// Judge portal for the State Kalotsav module. Separate from portal/state-judge (the older stack,
+// which stays until Phase 11): this one goes through StateConductService, so it honours scoring
+// locks and shows the panel chest numbers only.
+Route::prefix('portal/state-fest-judge')
+    ->name('portal.state-fest-judge.')
+    ->middleware(['web', 'auth', 'password.change', 'state.judge.portal'])
+    ->group(function () {
+        $judge = \App\Http\Controllers\Portal\StateFestJudgeController::class;
+
+        Route::get('/', [$judge, 'index'])->name('dashboard');
+        Route::get('/{event}/items/{item}', [$judge, 'sheet'])->name('sheet');
+        Route::post('/{event}/items/{item}/score', [$judge, 'score'])->name('score');
+        Route::post('/{event}/items/{item}/submit', [$judge, 'submit'])->name('submit');
+    });
 
 Route::get('/sports/entry-form', function (\Illuminate\Http\Request $request) {
     if ($request->has('inertia') || $request->wantsJson()) {

@@ -37,7 +37,7 @@
                             <p class="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">{{ section.section }}</p>
                             <ul class="space-y-0.5">
                                 <li v-for="item in section.items" :key="item.href">
-                                    <Link v-if="isReady(item.href)" :href="item.href"
+                                    <Link v-if="isReady(item)" :href="item.href"
                                           class="block rounded-lg px-2 py-1.5 text-xs font-medium transition"
                                           :class="isActive(item) ? 'bg-[color:var(--brand-navy)] text-white' : 'text-slate-600 hover:bg-slate-100'">
                                         {{ item.label }}
@@ -87,9 +87,17 @@ const nav = computed(() => visibleStateNav(stateEventWorkspaceNav(props.event.id
 
 // Only the Overview exists so far; the rest land with their phases. Listed here rather than guessed
 // from the nav so a half-built screen can never be linked to by accident.
-const READY = ['', '/slots', '/reports', '/settings', '/items', '/venues', '/staff', '/submissions', '/scrutiny', '/registrations', '/pending', '/teams', '/substitutions', '/schedule', '/clashes', '/green-room', '/chest-numbers', '/attendance', '/marks', '/results', '/leaderboard', '/appeals', '/certificates'];
-function isReady(href) {
-    const tail = href.replace(`/admin/state/fest/${props.event.id}`, '');
+const READY = ['', '/slots', '/reports', '/settings', '/items', '/venues', '/staff', '/submissions', '/scrutiny', '/registrations', '/pending', '/teams', '/substitutions', '/schedule', '/clashes', '/green-room', '/chest-numbers', '/attendance', '/marks', '/results', '/leaderboard', '/appeals', '/certificates', '/catering', '/volunteers', '/public-portal'];
+function isReady(item) {
+    const href = typeof item === 'string' ? item : item.href;
+
+    // A link outside the workspace (the judge portal) is always live — it is not one of this
+    // event's tabs, so the READY list has nothing to say about it.
+    if (typeof item !== 'string' && item.external) return true;
+
+    // Query strings carry a preselected filter, not a different screen: /reports?group=print is the
+    // reports tab. Stripped before matching so those links are not treated as unbuilt.
+    const tail = href.replace(`/admin/state/fest/${props.event.id}`, '').split('?')[0];
     return READY.includes(tail);
 }
 

@@ -103,7 +103,7 @@ export function stateEventWorkspaceNav(eventId) {
                 { label: 'Teams & Squads', href: `${base}/teams`, icon: 'users', permission: STATE_FEST.REGISTRATIONS },
                 { label: 'Substitutions', href: `${base}/substitutions`, icon: 'refresh', permission: STATE_FEST.REGISTRATIONS },
                 { label: 'Chest Numbers', href: `${base}/chest-numbers`, icon: 'hash', permission: STATE_FEST.REGISTRATIONS },
-                { label: 'ID & Admit Cards', href: `${base}/id-cards`, icon: 'credit-card', permission: STATE_FEST.REGISTRATIONS },
+                { label: 'ID & Admit Cards', href: `${base}/reports/participant-cards`, icon: 'credit-card', permission: STATE_FEST.REPORTS },
             ],
         },
         {
@@ -113,7 +113,7 @@ export function stateEventWorkspaceNav(eventId) {
                 { label: 'Performance Order', href: `${base}/performance-order`, icon: 'list', permission: STATE_FEST.SCHEDULE },
                 { label: 'Schedule Clashes', href: `${base}/clashes`, icon: 'alert-triangle', permission: STATE_FEST.SCHEDULE },
                 { label: 'Green Room', href: `${base}/green-room`, icon: 'monitor', permission: STATE_FEST.SCHEDULE },
-                { label: 'Bulk Sheets', href: `${base}/bulk-sheets`, icon: 'printer', permission: STATE_FEST.SCHEDULE },
+                { label: 'Printed Sheets', href: `${base}/reports?group=print`, icon: 'printer', permission: STATE_FEST.REPORTS },
             ],
         },
         {
@@ -138,6 +138,7 @@ export function stateEventWorkspaceNav(eventId) {
                 { label: 'Payment Ledger', href: `${base}/ledger`, icon: 'book', permission: STATE_FEST.FINANCE },
                 { label: 'Catering & Food', href: `${base}/catering`, icon: 'coffee', permission: STATE_FEST.CATERING },
                 { label: 'Volunteers & Officials', href: `${base}/volunteers`, icon: 'users', permission: STATE_FEST.SETTINGS },
+                { label: 'Judge Portal', href: '/portal/state-fest-judge', icon: 'user-check', permission: STATE_FEST.JUDGES, external: true },
             ],
         },
         {
@@ -145,7 +146,7 @@ export function stateEventWorkspaceNav(eventId) {
             items: [
                 { label: 'Reports', href: `${base}/reports`, icon: 'file-text', permission: STATE_FEST.REPORTS },
                 { label: 'Certificates', href: `${base}/certificates`, icon: 'award', permission: STATE_FEST.CERTIFICATES },
-                { label: 'Public Results', href: `${base}/public-results`, icon: 'globe', permission: STATE_FEST.PUBLISH },
+                { label: 'Public Portal', href: `${base}/public-portal`, icon: 'globe', permission: STATE_FEST.PUBLISH },
             ],
         },
     ];

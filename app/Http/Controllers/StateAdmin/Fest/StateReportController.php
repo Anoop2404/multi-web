@@ -5,9 +5,11 @@ namespace App\Http\Controllers\StateAdmin\Fest;
 use App\Http\Controllers\Controller;
 use App\Models\State\StateFestEvent;
 use App\Models\State\StateSahodaya;
+use App\Services\State\Fest\StatePrintService;
 use App\Services\State\Reports\StateReportDataService;
 use App\Support\CsvSafety;
 use App\Support\ExcelExport;
+use App\Support\PdfGenerator;
 use App\Support\StateFestReportCatalog;
 use App\Support\StateScope;
 use Illuminate\Http\Request;
@@ -52,7 +54,12 @@ class StateReportController extends Controller
         StateScope::assertOwns($event->state_id);
         $definition = $this->definitionFor($report);
 
-        $built = $data->build($report, $event, $this->filters($request));
+        // A printed sheet has no table to preview — it is paper, with a section per item and blank
+        // columns to write in. Previewing it as a summary (what will print, how many pages of it)
+        // is more honest than rendering the blank columns on screen.
+        $built = $this->isPrintable($definition)
+            ? $this->sheetSummary($definition, $event, $this->filters($request))
+            : $data->build($report, $event, $this->filters($request));
 
         return Inertia::render('State/Fest/ReportPreview', [
             'event' => ['id' => $event->id, 'name' => $event->name],
@@ -72,13 +79,17 @@ class StateReportController extends Controller
         ]);
     }
 
-    public function download(Request $request, StateFestEvent $event, string $report, StateReportDataService $data): StreamedResponse
+    public function download(Request $request, StateFestEvent $event, string $report, StateReportDataService $data)
     {
         StateScope::assertOwns($event->state_id);
         $definition = $this->definitionFor($report);
 
         $format = $request->query('format', $definition['formats'][0] ?? 'csv');
         abort_unless(in_array($format, $definition['formats'], true), 422, "This report does not offer a {$format} download.");
+
+        if ($this->isPrintable($definition)) {
+            return $this->printable($definition, $event, $this->filters($request));
+        }
 
         $built = $data->build($report, $event, $this->filters($request));
         $filename = \Str::slug($event->name.' '.$built['title']);
@@ -119,6 +130,76 @@ class StateReportController extends Controller
         );
 
         return $definition;
+    }
+
+    private function isPrintable(array $definition): bool
+    {
+        return in_array($definition['kind'] ?? 'table', ['sheet', 'cards'], true);
+    }
+
+    /**
+     * Render a printed sheet or a set of cards. Both go through the configured browser renderer when
+     * one is available, because these lay out in a grid and DomPDF's flow breaks the card grid — but
+     * neither is allowed to fail outright if the renderer is down, since a sheet printed by DomPDF is
+     * still a usable sheet.
+     */
+    private function printable(array $definition, StateFestEvent $event, array $filters)
+    {
+        $print = app(StatePrintService::class);
+        $filename = \Str::slug($event->name.' '.$definition['label']).'.pdf';
+        $shared = ['eventName' => $event->name, 'generated' => now()->format('d M Y, H:i')];
+
+        if (($definition['kind'] ?? null) === 'cards') {
+            $html = view('state.print.cards', $shared + ['cards' => $print->cards($event, $filters)])->render();
+
+            return PdfGenerator::download($html, $filename, margin: ['top' => '8mm', 'right' => '8mm', 'bottom' => '8mm', 'left' => '8mm']);
+        }
+
+        $sheet = match ($definition['id']) {
+            'attendance-sheet' => $print->attendanceSheet($event, $filters),
+            'timesheet' => $print->timesheet($event, $filters),
+            'judge-sheet' => $print->judgeSheet($event, $filters),
+            'green-room-sheet' => $print->greenRoomSheet($event, $filters),
+            default => abort(404, 'No such printed sheet.'),
+        };
+
+        $html = view('state.print.sheet', $shared + $sheet)->render();
+
+        return PdfGenerator::download($html, $filename, margin: ['top' => '12mm', 'right' => '10mm', 'bottom' => '12mm', 'left' => '10mm']);
+    }
+
+    /**
+     * What a printed sheet will contain, as a table: the operator wants to know an item is scheduled
+     * and how many entries it has before sending 40 pages to a printer.
+     *
+     * @return array{title: string, headers: list<string>, rows: list<list<string>>}
+     */
+    private function sheetSummary(array $definition, StateFestEvent $event, array $filters): array
+    {
+        $print = app(StatePrintService::class);
+
+        if (($definition['kind'] ?? null) === 'cards') {
+            return [
+                'title' => $definition['label'],
+                'headers' => ['Participant', 'Class', 'Sahodaya', 'School', 'Items & chest numbers'],
+                'rows' => $print->cards($event, $filters)
+                    ->map(fn (array $c) => [
+                        $c['name'], (string) $c['class_name'], (string) $c['sahodaya'], (string) $c['school'],
+                        collect($c['entries'])->map(fn (array $e) => $e['item_code'].' '.($e['chest_number'] ?: '—'))->implode(', '),
+                    ])->all(),
+            ];
+        }
+
+        $sheet = $print->attendanceSheet($event, $filters);
+
+        return [
+            'title' => $definition['label'].' — what will print',
+            'headers' => ['Item', 'Date', 'Start', 'Venue', 'Entries'],
+            'rows' => collect($sheet['groups'])->map(fn (array $g) => [
+                (string) $g['item_code'], (string) ($g['when'] ?? 'Not scheduled'),
+                (string) ($g['starts_at'] ?? '—'), (string) ($g['venue'] ?? 'No venue'), (string) $g['count'],
+            ])->all(),
+        ];
     }
 
     private function csv(string $filename, array $headers, array $rows): StreamedResponse
