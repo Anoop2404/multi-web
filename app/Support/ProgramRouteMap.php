@@ -112,6 +112,20 @@ class ProgramRouteMap
         return ucfirst(str_replace('-', ' ', $slug));
     }
 
+    public static function labelForEventType(?string $eventType): string
+    {
+        if (! $eventType) {
+            return 'Kalotsav';
+        }
+
+        $slug = self::slugFromEventType($eventType);
+        if ($slug) {
+            return self::labelForSlug($slug);
+        }
+
+        return ucwords(str_replace(['_', '-'], ' ', $eventType));
+    }
+
     /** @return list<string> */
     public static function festProgramSlugs(): array
     {

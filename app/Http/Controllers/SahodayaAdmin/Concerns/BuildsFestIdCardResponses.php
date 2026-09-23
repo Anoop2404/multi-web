@@ -70,6 +70,9 @@ trait BuildsFestIdCardResponses
             'audience'       => $audience,
             'showTitle'      => $showTitle,
             'isPdf'          => $isPdf,
+            'eventType'      => $event->event_type,
+            'isSports'       => $event->event_type === 'sports',
+            'programLabel'   => $event->event_type === 'sports' ? 'Sports Meet' : (\App\Support\ProgramRouteMap::labelForEventType($event->event_type) ?: 'Kalotsav'),
         ];
 
         if (! $customTemplate) {

@@ -26,6 +26,9 @@
     $academicYear = $card['academic_year'] ?? null;
     $roleLabel = $card['role_title'] ?? ucfirst(strtolower($card['role_label'] ?? 'Participant'));
     $passLabel = $card['role_title'] ?? ucwords(strtolower($card['role_label'] ?? 'Participant'));
+    $eventProgramName = $card['program_label']
+        ?? ($programLabel ?? null)
+        ?? (!empty($card['is_sports']) || ($card['event_type'] ?? null) === 'sports' ? 'Sports Meet' : 'Kalotsav');
 @endphp
 <div class="id-card">
     <div class="card-header">
@@ -43,7 +46,7 @@
         </div>
 
         <div class="event-branding">
-            <div class="event-name">Kalotsav</div>
+            <div class="event-name">{{ $eventProgramName }}</div>
             @if($academicYear)
                 <div class="event-year">{{ $academicYear }}</div>
             @endif

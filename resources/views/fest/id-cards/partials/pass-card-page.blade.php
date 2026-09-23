@@ -5,6 +5,8 @@
             'clusterName' => $clusterName,
             'clusterLogoSrc' => $clusterLogoSrc,
             'eventTitle' => $eventTitle,
+            'programLabel' => $programLabel ?? null,
+            'isSports' => $isSports ?? false,
         ])
     @endforeach
 </div>

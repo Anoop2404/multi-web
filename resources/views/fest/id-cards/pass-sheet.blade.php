@@ -283,14 +283,14 @@
         @php $chunks = array_chunk($section['cards'] ?? [], \App\Support\FestIdCardTemplates::PASS_CARDS_PER_PAGE); @endphp
         @foreach($chunks as $pageIndex => $pageCards)
             @if($pageIndex > 0)<div class="page-break"></div>@endif
-            @include($pagePartial, ['pageCards' => $pageCards, 'clusterName' => $clusterName, 'clusterLogoSrc' => $clusterLogoSrc ?? null, 'eventTitle' => $eventTitle])
+            @include($pagePartial, ['pageCards' => $pageCards, 'clusterName' => $clusterName, 'clusterLogoSrc' => $clusterLogoSrc ?? null, 'eventTitle' => $eventTitle, 'programLabel' => $programLabel ?? null, 'isSports' => $isSports ?? false])
         @endforeach
     @endforeach
 @else
     @php $chunks = array_chunk($cards ?? [], \App\Support\FestIdCardTemplates::PASS_CARDS_PER_PAGE); @endphp
     @foreach($chunks as $pageIndex => $pageCards)
         @if($pageIndex > 0)<div class="page-break"></div>@endif
-        @include($pagePartial, ['pageCards' => $pageCards, 'clusterName' => $clusterName, 'clusterLogoSrc' => $clusterLogoSrc ?? null, 'eventTitle' => $eventTitle])
+        @include($pagePartial, ['pageCards' => $pageCards, 'clusterName' => $clusterName, 'clusterLogoSrc' => $clusterLogoSrc ?? null, 'eventTitle' => $eventTitle, 'programLabel' => $programLabel ?? null, 'isSports' => $isSports ?? false])
     @endforeach
 @endif
 

@@ -786,6 +786,9 @@ class FestIdCardService
                 'event_name'      => $event->title,
                 'phase_name'      => $phaseName,
                 'academic_year'   => $this->resolveEventYearLabel($event),
+                'event_type'      => $event->event_type,
+                'is_sports'       => $event->event_type === 'sports',
+                'program_label'   => $this->resolveEventProgramLabel($event),
                 'event_date'      => $eventDate,
                 'venue'           => $venue,
                 'sahodaya_name'   => $event->tenant?->name ?? (\App\Models\Tenant::where('id', $event->tenant_id)->value('name') ?? 'Sahodaya'),
@@ -951,7 +954,9 @@ class FestIdCardService
             'event_date'      => $eventDate,
             'venue'           => $venue,
             'dob'             => $dob,
+            'event_type'      => $event->event_type,
             'is_sports'       => $isSports,
+            'program_label'   => $this->resolveEventProgramLabel($event),
             'sahodaya_name'   => $sahodayaName,
             'category'        => $categoryDisplay,
             'items_display'   => $itemTitleDisplay,
@@ -1435,6 +1440,9 @@ class FestIdCardService
                 'footer'          => $event->title,
                 'entity_id'       => (string) $v->id,
                 'academic_year'   => $this->resolveEventYearLabel($event),
+                'event_type'      => $event->event_type,
+                'is_sports'       => $event->event_type === 'sports',
+                'program_label'   => $this->resolveEventProgramLabel($event),
             ];
         })->values()->all();
     }
@@ -1482,12 +1490,28 @@ class FestIdCardService
                 'footer'          => $event->title,
                 'entity_id'       => (string) $a->id,
                 'academic_year'   => $this->resolveEventYearLabel($event),
+                'event_type'      => $event->event_type,
+                'is_sports'       => $event->event_type === 'sports',
+                'program_label'   => $this->resolveEventProgramLabel($event),
             ];
         })->values()->all();
     }
 
+    public function resolveEventProgramLabel(FestEvent $event): string
+    {
+        if ($event->event_type === 'sports') {
+            return 'Sports Meet';
+        }
+
+        if (in_array($event->event_type, ['kalolsavam', 'kalotsav', 'art_fest'], true)) {
+            return 'Kalotsav';
+        }
+
+        return \App\Support\ProgramRouteMap::labelForEventType($event->event_type) ?: 'Kalotsav';
+    }
+
     /**
-     * "Kalotsav {year}" heading on the Participant Pass card face. Prefers the
+     * Program header and academic year on the Participant Pass card face. Prefers the
      * event's own academic-year record ("2026-27"); falls back to the plain
      * calendar year off the event's start date when no academic year is set.
      */
