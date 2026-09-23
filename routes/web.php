@@ -164,6 +164,13 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
                 ->middleware('state.fest:view')
                 ->name('overview');
 
+            // Reports are read-only, so a report user reaches them without any write capability.
+            Route::middleware('state.fest:reports')->group(function () {
+                Route::get('/{event}/reports', [\App\Http\Controllers\StateAdmin\Fest\StateReportController::class, 'index'])->name('reports');
+                Route::get('/{event}/reports/{report}', [\App\Http\Controllers\StateAdmin\Fest\StateReportController::class, 'show'])->name('reports.show');
+                Route::get('/{event}/reports/{report}/download', [\App\Http\Controllers\StateAdmin\Fest\StateReportController::class, 'download'])->name('reports.download');
+            });
+
             // Slots decide who may compete, so they sit behind the catalog capability rather than
             // plain view — a report user or mark operator can see the workspace but not move a quota.
             Route::middleware('state.fest:catalog')->group(function () {
