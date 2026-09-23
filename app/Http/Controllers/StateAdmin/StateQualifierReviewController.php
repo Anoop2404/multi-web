@@ -180,7 +180,9 @@ class StateQualifierReviewController extends Controller
         $program = FestStateProgram::find($intake->state_program_id);
         $sahodaya = Tenant::query()->where('type', 'sahodaya')->find($intake->source_tenant_id);
         if ($program && $sahodaya && $intake->entries()->where('status', 'approved')->exists()) {
-            $remittances->calculateDemandFromApprovedQualifiers($program, $sahodaya);
+            // Fixed per-Sahodaya fee by default; calculateDemandFor() honours a program that
+            // deliberately opts into per-item billing instead.
+            $remittances->calculateDemandFor($program, $sahodaya);
         }
 
         return back()->with(

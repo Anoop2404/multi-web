@@ -502,19 +502,29 @@
                     <div v-if="form.conduct_levels.includes('state')" class="p-5 rounded-2xl bg-[color:var(--brand-blue)]/10 border border-[color:var(--brand-blue)]/20 space-y-3">
                         <div>
                             <h3 class="text-sm font-bold text-[color:var(--brand-navy)] uppercase tracking-wider">State remittance rate</h3>
-                            <p class="text-xs text-[color:var(--brand-blue)]">Charged to each Sahodaya for every qualifier accepted into the State event.</p>
+                            <p class="text-xs text-[color:var(--brand-blue)]">Charged to each Sahodaya that sends qualifiers to the State event.</p>
                         </div>
                         <div class="grid sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Billing</label>
+                                <SearchableSelect v-model="form.level_fees.state.fee_model" :all-option="false" class="w-full" :options="[
+                                    { value: 'flat_school', label: 'Fixed fee per Sahodaya' },
+                                    { value: 'per_item', label: 'Per item × approved entries' },
+                                ]" />
+                            </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-700 mb-1">Sahodaya registration fee (₹, flat)</label>
                                 <input v-model.number="form.level_fees.state.sahodaya_registration_fee" type="number" min="0" class="w-full px-3.5 py-2 rounded-xl border border-[color:var(--brand-blue)]/30 text-sm font-medium">
                             </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1">Fee per accepted nominee/team (₹, legacy)</label>
-                                <input v-model.number="form.level_fees.state.individual_amount" type="number" min="0" class="w-full px-3.5 py-2 rounded-xl border border-[color:var(--brand-blue)]/30 text-sm font-medium">
-                            </div>
                         </div>
-                        <p class="text-xs text-slate-500">Actual demand = registration fee + each item's own fee × approved entries. Set per-item fees on the program's items.</p>
+                        <p v-if="form.level_fees.state.fee_model !== 'per_item'" class="text-xs text-slate-500">
+                            Every Sahodaya owes this one amount, whatever the number of qualifiers it sends. Per-item
+                            fees on the program's items are ignored.
+                        </p>
+                        <p v-else class="text-xs text-slate-500">
+                            Demand = registration fee + each item's own fee × approved entries. Set per-item fees on
+                            the program's items.
+                        </p>
                     </div>
 
                     <!-- Participation Policies -->
