@@ -40,7 +40,16 @@
         .card__bg {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
+            @if(!empty($backgroundUrl))
+            background-image: url('{{ $backgroundUrl }}');
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            @else
             object-fit: cover;
+            @endif
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
         }
         .card__field {
             position: absolute;

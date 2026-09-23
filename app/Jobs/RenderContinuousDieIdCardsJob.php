@@ -92,11 +92,11 @@ class RenderContinuousDieIdCardsJob implements ShouldQueue
             }
 
             // For ultra-high volume events (up to 4,500+ students / 450 sheets):
-            // Render in safe, memory-bounded chunks of 20 sheets (e.g. 200 cards).
+            // Render in safe, memory-bounded chunks of 10 sheets (e.g. 100 cards).
             // Because each chunk is an exact multiple of $perPage (10 cards),
             // NO die cut slots are ever wasted between chunks!
             // Then stitch the chunk PDFs together using FPDI into a single master PDF.
-            $sheetsPerChunk = 20;
+            $sheetsPerChunk = 10;
             $cardsPerChunk = $perPage * $sheetsPerChunk;
             $cardChunks = array_chunk($cards, $cardsPerChunk);
             $totalChunks = count($cardChunks);

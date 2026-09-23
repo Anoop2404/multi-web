@@ -283,6 +283,147 @@ class FestResultsController extends SahodayaAdminController
     }
 
     /**
+     * Event-wide "Top 3 Winners" list — grouped by item, showing participants / teams
+     * holding 1st, 2nd, or 3rd rank (position IN (1, 2, 3)).
+     * For group/team events, resultRowsForItem() already combines the team members into
+     * a single row under their school, and we additionally deduplicate/combine by
+     * (school + position) so a team is strictly a single entry with a single rank.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function topThreeWinnerData(FestEvent $event): array
+    {
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
+
+        $items = FestEventItem::with('event:id,tenant_id')
+            ->where('event_id', $event->id)
+            ->where('is_enabled', true)
+            ->orderBy('display_order')
+            ->orderBy('title')
+            ->get(['id', 'event_id', 'title', 'item_code', 'category', 'class_group', 'age_group', 'gender', 'participant_type']);
+
+        $service = app(FestItemResultsService::class);
+        $resultItems = [];
+
+        foreach ($items as $item) {
+            $rows = $service->resultRowsForItem($event, $item->id);
+
+            // Filter down to positions 1, 2, 3
+            $winners = collect($rows)
+                ->filter(fn ($row) => in_array($row['position'] ?? null, [1, 2, 3], true))
+                ->sortBy(fn ($row) => (int) $row['position'])
+                ->values();
+
+            $isGroup = strtolower((string) $item->participant_type) !== 'individual';
+
+            if ($isGroup && $winners->isNotEmpty()) {
+                // For group/team events, combine members from the same school with the same position
+                // into a single rank row with all team student names combined
+                $winners = $winners->groupBy(fn ($row) => ($row['school'] ?? '') . ':' . $row['position'])
+                    ->map(function ($teamRows) {
+                        $first = $teamRows->first();
+                        $allNames = $teamRows->flatMap(function ($r) {
+                            return explode(' & ', (string) ($r['name'] ?? ''));
+                        })->map(fn ($n) => trim($n))->filter()->unique()->values()->all();
+
+                        $namesString = !empty($allNames) ? implode(' & ', $allNames) : ($first['name'] ?? 'Team Entry');
+
+                        return [
+                            'position' => (int) $first['position'],
+                            'chest_no' => $first['chest_no'] ?? null,
+                            'name'     => $namesString,
+                            'school'   => $first['school'] ?? '',
+                            'grade'    => $first['grade'] ?? null,
+                            'score'    => $first['score'] ?? null,
+                            'reg_no'   => $first['reg_no'] ?? null,
+                        ];
+                    })
+                    ->sortBy('position')
+                    ->values();
+            } else {
+                $winners = $winners->map(fn ($row) => [
+                    'position' => (int) $row['position'],
+                    'chest_no' => $row['chest_no'] ?? null,
+                    'name'     => $row['name'] ?? '',
+                    'school'   => $row['school'] ?? '',
+                    'grade'    => $row['grade'] ?? null,
+                    'score'    => $row['score'] ?? null,
+                    'reg_no'   => $row['reg_no'] ?? null,
+                ]);
+            }
+
+            $winnerList = $winners->values()->all();
+
+            if (empty($winnerList)) {
+                continue;
+            }
+
+            $resultItems[] = [
+                'item_id'        => $item->id,
+                'item_code'      => $item->item_code,
+                'title'          => $item->title,
+                'category_label' => \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels),
+                'type_label'     => \App\Support\FestItemCategoryLabel::typeLabel($item->participant_type),
+                'gender_label'   => \App\Support\FestItemCategoryLabel::genderLabel($item->gender),
+                'is_group'       => $isGroup,
+                'winners'        => $winnerList,
+            ];
+        }
+
+        return $resultItems;
+    }
+
+    public function downloadTopThreeWinners(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $event = $this->regionAwareTargetEvent($request, $event);
+        $itemsData = $this->topThreeWinnerData($event);
+
+        if ($request->boolean('csv')) {
+            $flatRows = [];
+            $slNo = 1;
+            foreach ($itemsData as $item) {
+                foreach ($item['winners'] as $winner) {
+                    $flatRows[] = [
+                        $slNo++,
+                        $item['item_code'] ?? '—',
+                        $item['title'],
+                        $item['category_label'] ?? '',
+                        $item['type_label'] ?? '',
+                        $item['gender_label'] ?? '',
+                        $winner['position'],
+                        $winner['chest_no'] ?? '',
+                        $winner['name'],
+                        $winner['school'],
+                        $winner['grade'] ?? '',
+                        $winner['score'] !== null ? (string) $winner['score'] : '',
+                    ];
+                }
+            }
+
+            return \App\Support\ExcelExport::download(
+                str($event->title)->slug()->limit(50).'-top-3-winners',
+                ['Sl No', 'Item Code', 'Item Title', 'Category', 'Type', 'Gender', 'Rank', 'Chest No', 'Participant / Team', 'School', 'Grade', 'Score'],
+                $flatRows,
+                \App\Support\ExcelExport::generatedOnNote(),
+            );
+        }
+
+        $html = view('fest.reports.top-three-winners', [
+            'event'   => $event,
+            'items'   => $itemsData,
+            'orgName' => $this->sahodaya->name,
+            'logoSrc' => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+        ])->render();
+
+        $filename = str($event->title)->slug()->limit(50).'-top-3-winners.pdf';
+        $preview = $request->boolean('preview') || $request->boolean('inline');
+
+        return \App\Support\PdfGenerator::download($html, $filename, $preview, isLandscape: false);
+    }
+
+    /**
      * Base64 data URI for a rank-1/2/3 medal image — dompdf (the PDF backend used here)
      * often refuses a bare local file path under its chroot check, so images need to be
      * embedded inline the same way TenantBranding::logoEmbedSrc() does for the org logo.

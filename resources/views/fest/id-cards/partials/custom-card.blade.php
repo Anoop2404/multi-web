@@ -3,7 +3,7 @@
 @endphp
 <div class="card" style="width:{{ $cardWidthMm }}mm;height:{{ $cardHeightMm }}mm;">
     @if(!empty($backgroundUrl))
-        <img src="{{ $backgroundUrl }}" alt="" class="card__bg">
+        <div class="card__bg"></div>
     @endif
 
     @foreach($fields as $field)

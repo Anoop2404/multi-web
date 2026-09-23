@@ -1306,6 +1306,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/results/items/{item}/download', [FestResultsController::class, 'downloadItemResults'])->name('results.items.download');
             Route::get('/{event}/results/items/{item}/winners', [FestResultsController::class, 'downloadItemWinners'])->name('results.items.winners');
             Route::get('/{event}/results/first-rank-winners', [FestResultsController::class, 'downloadFirstRankWinners'])->name('results.first-rank-winners');
+            Route::get('/{event}/results/top-three-winners', [FestResultsController::class, 'downloadTopThreeWinners'])->name('results.top-three-winners');
             Route::post('/{event}/results/publish', [FestResultsController::class, 'publish'])->name('results.publish');
             Route::post('/{event}/results/unpublish', [FestResultsController::class, 'unpublish'])->name('results.unpublish');
             Route::post('/{event}/results/items/bulk-publish', [FestResultsController::class, 'bulkPublishItems'])->name('results.items.bulk-publish');

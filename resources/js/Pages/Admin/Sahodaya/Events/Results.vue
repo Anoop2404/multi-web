@@ -4,8 +4,10 @@
         <PageHeader :title="pageTitle" eyebrow="Results"
                     :description="pageDescription">
             <template #actions>
-                <a :href="firstRankWinnersUrl()" target="_blank" class="btn-secondary text-sm">🥇 1st Rank Winners (PDF)</a>
-                <a :href="firstRankWinnersUrl(true)" target="_blank" class="btn-secondary text-sm">CSV</a>
+                <a :href="topThreeWinnersUrl()" target="_blank" class="btn-primary text-sm">🏆 Top 3 Winners (PDF)</a>
+                <a :href="topThreeWinnersUrl(true)" target="_blank" class="btn-secondary text-sm">Top 3 CSV</a>
+                <a :href="firstRankWinnersUrl()" target="_blank" class="btn-secondary text-sm">🥇 1st Rank (PDF)</a>
+                <a :href="firstRankWinnersUrl(true)" target="_blank" class="btn-secondary text-sm">1st Rank CSV</a>
             </template>
         </PageHeader>
 
@@ -575,6 +577,10 @@ function downloadWinnersUrl(row, preview = false, blank = false) {
     if (blank) q.set('blank', '1');
     const qs = q.toString();
     return `${props.resultsBaseUrl}/items/${itemId}/winners${qs ? `?${qs}` : ''}`;
+}
+
+function topThreeWinnersUrl(csv = false) {
+    return `${props.resultsBaseUrl}/top-three-winners${csv ? '?csv=1' : ''}`;
 }
 
 function firstRankWinnersUrl(csv = false) {
