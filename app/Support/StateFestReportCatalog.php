@@ -207,8 +207,8 @@ class StateFestReportCatalog
                 'group' => self::GROUP_AFTER,
                 'formats' => ['pdf', 'xls', 'csv'],
                 'filters' => [],
-                'available' => false,
-                'blocked_by' => 'Results and points (Phase 7) — Sahodaya standings are not computed yet.',
+                'description' => 'Points, medal counts and rank per Sahodaya, from published results.',
+                'available' => true,
             ],
             [
                 'id' => 'category-sahodaya-points',
@@ -216,8 +216,8 @@ class StateFestReportCatalog
                 'group' => self::GROUP_AFTER,
                 'formats' => ['pdf', 'xls'],
                 'filters' => [],
-                'available' => false,
-                'blocked_by' => 'Results and points (Phase 7).',
+                'description' => 'Sahodaya points broken down by item category.',
+                'available' => true,
             ],
             [
                 'id' => 'school-contribution',
@@ -225,8 +225,8 @@ class StateFestReportCatalog
                 'group' => self::GROUP_AFTER,
                 'formats' => ['pdf', 'xls'],
                 'filters' => ['sahodaya_id'],
-                'available' => false,
-                'blocked_by' => 'Results and points (Phase 7).',
+                'description' => 'Which Schools earned a Sahodaya\'s points.',
+                'available' => true,
             ],
             [
                 'id' => 'item-wise-results',
@@ -234,8 +234,8 @@ class StateFestReportCatalog
                 'group' => self::GROUP_AFTER,
                 'formats' => ['pdf', 'xls', 'csv'],
                 'filters' => ['item_id'],
-                'available' => false,
-                'blocked_by' => 'Results publication (Phase 7).',
+                'description' => 'Positions and grades per item, for published items.',
+                'available' => true,
             ],
             [
                 'id' => 'individual-championship',
@@ -243,8 +243,8 @@ class StateFestReportCatalog
                 'group' => self::GROUP_AFTER,
                 'formats' => ['pdf', 'xls'],
                 'filters' => ['category'],
-                'available' => false,
-                'blocked_by' => 'Results and points (Phase 7).',
+                'description' => 'Highest-scoring participants, with their School and Sahodaya.',
+                'available' => true,
             ],
 
             // ── Finance ─────────────────────────────────────────────────────────────────────

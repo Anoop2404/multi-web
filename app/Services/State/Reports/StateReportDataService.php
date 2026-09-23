@@ -47,6 +47,11 @@ class StateReportDataService
             'pending-approvals'      => $this->pendingApprovals($event, $filters),
             'attendance-status'      => $this->attendanceStatus($event, $filters),
             'mark-entry-status'      => $this->markEntryStatus($event, $filters),
+            'overall-sahodaya-ranking' => $this->sahodayaRanking($event),
+            'category-sahodaya-points' => $this->categorySahodayaPoints($event),
+            'school-contribution'    => $this->schoolContribution($event, $filters),
+            'item-wise-results'      => $this->itemWiseResults($event, $filters),
+            'individual-championship' => $this->individualChampionship($event),
             'item-schedule'          => $this->itemSchedule($event),
             'schedule-clashes'       => $this->scheduleClashes($event),
             'sahodaya-fee-summary'   => $this->feeSummary($event),
@@ -355,6 +360,121 @@ class StateReportDataService
             'title' => 'Mark Entry Status',
             'headers' => ['Item', 'Registrations', 'Marks entered', 'Outstanding', 'Status'],
             'rows' => $rows,
+        ];
+    }
+
+    private function results(): \App\Services\State\Fest\StateResultService
+    {
+        return app(\App\Services\State\Fest\StateResultService::class);
+    }
+
+    private function sahodayaRanking(StateFestEvent $event): array
+    {
+        return [
+            'title' => 'Overall Sahodaya Ranking',
+            'headers' => ['Rank', 'Sahodaya', 'District', 'Source', 'Points', '1st', '2nd', '3rd', 'Items'],
+            'rows' => $this->results()->sahodayaStandings($event)->map(fn (array $r) => [
+                $r['rank'], $r['sahodaya'], $r['district'] ?? '',
+                $r['origin'] === 'external' ? 'Outside' : 'On platform',
+                $r['points'], $r['firsts'], $r['seconds'], $r['thirds'], $r['items'],
+            ])->all(),
+        ];
+    }
+
+    /** Points per Sahodaya split by item category — the same totals, cut the other way. */
+    private function categorySahodayaPoints(StateFestEvent $event): array
+    {
+        $items = FestStateProgramItem::where('state_program_id', $event->state_program_id)
+            ->get()->keyBy('id');
+
+        $registrations = StateFestRegistration::where('state_event_id', $event->id)->get()->keyBy('id');
+
+        $rows = \App\Models\State\StateFestMark::where('state_event_id', $event->id)
+            ->whereNotNull('position')->get()
+            ->groupBy(function ($mark) use ($registrations, $items) {
+                $registration = $registrations[$mark->registration_id] ?? null;
+                $category = $items[$registration?->item_id ?? '']->class_group ?? 'Uncategorised';
+
+                return ($registration->sahodaya_name ?? 'Unattributed').'||'.$category;
+            })
+            ->map(function ($group, $key) {
+                [$sahodaya, $category] = explode('||', $key);
+
+                return [$sahodaya, $category, (int) $group->sum('points'), $group->count()];
+            })
+            ->sortBy(fn ($r) => [$r[0], $r[1]])->values()->all();
+
+        return [
+            'title' => 'Category-wise Sahodaya Points',
+            'headers' => ['Sahodaya', 'Category', 'Points', 'Entries'],
+            'rows' => $rows,
+        ];
+    }
+
+    private function schoolContribution(StateFestEvent $event, array $filters): array
+    {
+        $sahodayas = $filters['sahodaya_id'] ?? null
+            ? StateSahodaya::where('id', $filters['sahodaya_id'])->get()
+            : StateSahodaya::query()->forState($event->state_id)->get();
+
+        $rows = [];
+
+        foreach ($sahodayas as $sahodaya) {
+            foreach ($this->results()->schoolContribution($event, $sahodaya->id) as $row) {
+                $rows[] = [$sahodaya->name, $row['school'], $row['points'], $row['firsts'], $row['entries']];
+            }
+        }
+
+        return [
+            'title' => 'School Contribution to Sahodaya Points',
+            'headers' => ['Sahodaya', 'School', 'Points', '1st', 'Entries'],
+            'rows' => $rows,
+        ];
+    }
+
+    private function itemWiseResults(StateFestEvent $event, array $filters): array
+    {
+        $registrations = StateFestRegistration::where('state_event_id', $event->id)
+            ->when($filters['item_id'] ?? null, fn ($q, $v) => $q->where('item_id', $v))
+            ->with('participants')->get()->keyBy('id');
+
+        // Only published items: a provisional ranking is the office's working view.
+        $published = \App\Models\State\StateItemResult::where('state_event_id', $event->id)
+            ->whereIn('status', ['published', 'locked'])->pluck('item_id');
+
+        $rows = \App\Models\State\StateFestMark::where('state_event_id', $event->id)
+            ->whereIn('registration_id', $registrations->keys())
+            ->whereNotNull('position')->get()
+            ->filter(fn ($m) => $published->contains($registrations[$m->registration_id]->item_id ?? null))
+            ->sortBy([fn ($a, $b) => strcmp($a->item_code ?? '', $b->item_code ?? ''), fn ($a, $b) => $a->position <=> $b->position])
+            ->map(function ($mark) use ($registrations) {
+                $registration = $registrations[$mark->registration_id];
+                $participant = $registration->participants->firstWhere('id', $mark->participant_id);
+
+                return [
+                    $registration->item_code, $mark->position,
+                    $participant->student_name ?? '—',
+                    $registration->sahodaya_name, $registration->school_name,
+                    $mark->grade, $mark->score, $mark->points,
+                ];
+            })->values()->all();
+
+        return [
+            'title' => 'Item-wise Top Results',
+            'headers' => ['Item', 'Position', 'Participant', 'Sahodaya', 'School', 'Grade', 'Score', 'Points'],
+            'rows' => $rows,
+        ];
+    }
+
+    private function individualChampionship(StateFestEvent $event): array
+    {
+        return [
+            'title' => 'Individual Championship',
+            'headers' => ['Participant', 'Class', 'Sahodaya', 'School', 'Points', '1st', 'Items'],
+            'rows' => $this->results()->individualChampionship($event)->map(fn (array $r) => [
+                $r['participant'], $r['class_name'] ?? '', $r['sahodaya'], $r['school'],
+                $r['points'], $r['firsts'], $r['items'],
+            ])->all(),
         ];
     }
 

@@ -182,6 +182,32 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
                 Route::get('/{event}/pending', [$scrutiny, 'pending'])->name('pending');
             });
 
+            $conduct = \App\Http\Controllers\StateAdmin\Fest\StateConductController::class;
+
+            Route::middleware('state.fest:attendance')->group(function () use ($conduct) {
+                Route::get('/{event}/attendance', [$conduct, 'attendance'])->name('attendance');
+                Route::post('/{event}/attendance', [$conduct, 'markAttendance'])->name('attendance.mark');
+            });
+
+            Route::middleware('state.fest:marks')->group(function () use ($conduct) {
+                Route::get('/{event}/marks', [$conduct, 'marks'])->name('marks');
+                Route::post('/{event}/marks/aggregate', [$conduct, 'aggregate'])->name('marks.aggregate');
+            });
+
+            // Computing a result is a results capability; publishing one is its own, so a
+            // scrutineer can correct a ranking without releasing it.
+            Route::middleware('state.fest:results')->group(function () use ($conduct) {
+                Route::get('/{event}/results', [$conduct, 'results'])->name('results');
+                Route::get('/{event}/leaderboard', [$conduct, 'leaderboard'])->name('leaderboard');
+                Route::post('/{event}/results/compute', [$conduct, 'resultAction'])->defaults('action', 'compute')->name('results.compute');
+            });
+
+            Route::middleware('state.fest:publish')->group(function () use ($conduct) {
+                Route::post('/{event}/results/publish', [$conduct, 'resultAction'])->defaults('action', 'publish')->name('results.publish');
+                Route::post('/{event}/results/unpublish', [$conduct, 'resultAction'])->defaults('action', 'unpublish')->name('results.unpublish');
+                Route::post('/{event}/results/lock', [$conduct, 'resultAction'])->defaults('action', 'lock')->name('results.lock');
+            });
+
             Route::middleware('state.fest:registrations')->group(function () use ($scrutiny) {
                 $teams = \App\Http\Controllers\StateAdmin\Fest\StateTeamController::class;
 
