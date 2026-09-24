@@ -14,7 +14,7 @@
 
         <div class="card">
             <BatchMasterList :selected-item="selectedItem" :batches="batches" :registrations="registrations"
-                              :assign-url="`${base}/reporting-batches/assign`" :create-url="`${base}/reporting-batches`"
+                              :assign-url="`${base}/reporting-batches/assign`"
                               :batch-base-url="`${base}/reporting-batches`"
                               selectable v-model="selectedRegIds" searchable v-model:search="search" />
         </div>

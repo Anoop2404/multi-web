@@ -44,13 +44,10 @@ class FestItemReportingBatchController extends SahodayaAdminController
             ->groupBy('item_id')
             ->pluck('assigned_count', 'item_id');
 
-        $batchCounts = FestItemReportingBatch::where('event_id', $event->id)
-            ->selectRaw('item_id, count(*) as batch_count')
-            ->groupBy('item_id')
-            ->pluck('batch_count', 'item_id');
+        $batchCount = FestItemReportingBatch::where('event_id', $event->id)->count();
 
         $items = $event->items()->orderBy('title')->get(['id', 'title', 'item_code', 'category', 'gender', 'stage_type'])
-            ->map(function (FestEventItem $item) use ($regCounts, $assignedCounts, $batchCounts) {
+            ->map(function (FestEventItem $item) use ($regCounts, $assignedCounts, $batchCount) {
                 $regCount = (int) ($regCounts[$item->id] ?? 0);
                 $assignedCount = (int) ($assignedCounts[$item->id] ?? 0);
 
@@ -62,7 +59,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
                     'gender_label'       => \App\Support\FestSportsAgeGroup::genderLabel($item->gender),
                     'is_group'           => app(FestNumberingService::class)->isGroupItem($item),
                     'registration_count' => $regCount,
-                    'batch_count'        => (int) ($batchCounts[$item->id] ?? 0),
+                    'batch_count'        => $batchCount,
                     'assigned_count'     => $assignedCount,
                     'unassigned_count'   => $regCount - $assignedCount,
                 ];
@@ -72,15 +69,16 @@ class FestItemReportingBatchController extends SahodayaAdminController
 
         $itemId = $request->integer('item_id') ?: null;
         $selectedItem = null;
-        $batches = [];
         $registrations = [];
+        // Batches are a common roster for the whole event, so the list (and the Batch Master
+        // modal that manages it) doesn't need an item selected to be useful.
+        $batches = $this->batchesForEvent($event);
 
         if ($itemId) {
             $itemModel = FestEventItem::where('event_id', $event->id)->find($itemId);
             abort_unless($itemModel, 404);
 
             $selectedItem = $this->itemSummary($itemModel, $items, $regCounts);
-            $batches = $this->batchesForItem($event, $itemId);
             $registrations = $this->registrationRows($event, $itemModel);
         }
 
@@ -126,7 +124,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Events/ReportingBatchMaster', [
             'event'         => $event,
             'selectedItem'  => $this->itemSummary($itemModel),
-            'batches'       => $this->batchesForItem($event, $itemId),
+            'batches'       => $this->batchesForEvent($event),
             'registrations' => $this->registrationRows($event, $itemModel),
         ]);
     }
@@ -141,7 +139,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
         $itemModel = FestEventItem::where('event_id', $event->id)->find($itemId);
         abort_unless($itemModel, 404);
 
-        $batches = $this->batchesForItem($event, $itemId);
+        $batches = $this->batchesForEvent($event);
         $registrations = $this->registrationRows($event, $itemModel);
 
         $grouped = collect($registrations)->groupBy(fn ($row) => $row['reporting_batch_id'] ?? 'unassigned');
@@ -159,6 +157,11 @@ class FestItemReportingBatchController extends SahodayaAdminController
 
         $orgName = $this->sahodaya->name;
         $logoSrc = \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya);
+        // Chromium's own header/footer templates render in a reserved margin band, isolated
+        // from page content -- the blade's in-content position:fixed div (dompdf's technique)
+        // sits inside the same content box the table rows flow into on the Chromium path, so
+        // it overlaps the first rows instead of sitting above them. Keep the two mutually
+        // exclusive: dompdf gets the in-content div, Chromium gets headerTemplate below.
         $isDomPdf = empty(config('services.pdf_converter.url'));
         $participantCount = collect($sections)->sum(fn ($s) => count($s['rows']));
 
@@ -200,20 +203,18 @@ class FestItemReportingBatchController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $data = $request->validate([
-            'item_id'    => ['required', 'integer', Rule::exists('fest_event_items', 'id')->where('event_id', $event->id)],
             'label'      => 'required|string|max:255',
             'report_at'  => 'nullable|date',
             'sort_order' => 'nullable|integer',
         ]);
 
         $data['event_id'] = $event->id;
-        $data['sort_order'] = $data['sort_order'] ?? ((int) FestItemReportingBatch::where('item_id', $data['item_id'])->max('sort_order') + 1);
+        $data['sort_order'] = $data['sort_order'] ?? ((int) FestItemReportingBatch::where('event_id', $event->id)->max('sort_order') + 1);
 
         $batch = FestItemReportingBatch::create($data);
 
         $audit->festEvent($event, FestPageActivity::REPORTING_BATCHES, 'fest.reporting_batch.created', "Created reporting batch {$batch->label}", [
             'batch_id' => $batch->id,
-            'item_id'  => $batch->item_id,
         ]);
 
         return back()->with('success', "Batch '{$batch->label}' created.");
@@ -260,7 +261,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
 
         $data = $request->validate([
             'item_id'          => ['required', 'integer', Rule::exists('fest_event_items', 'id')->where('event_id', $event->id)],
-            'batch_id'         => ['nullable', 'integer', Rule::exists('fest_item_reporting_batches', 'id')->where('event_id', $event->id)->where('item_id', $request->input('item_id'))],
+            'batch_id'         => ['nullable', 'integer', Rule::exists('fest_item_reporting_batches', 'id')->where('event_id', $event->id)],
             'registration_ids' => 'required|array',
             'registration_ids.*' => ['integer', Rule::exists('fest_registrations', 'id')->where('event_id', $event->id)->where('item_id', $request->input('item_id'))],
         ]);
@@ -354,16 +355,15 @@ class FestItemReportingBatchController extends SahodayaAdminController
             'gender_label'       => \App\Support\FestSportsAgeGroup::genderLabel($item->gender),
             'is_group'           => app(FestNumberingService::class)->isGroupItem($item),
             'registration_count' => $count,
-            'batch_count'        => FestItemReportingBatch::where('item_id', $item->id)->count(),
+            'batch_count'        => FestItemReportingBatch::where('event_id', $item->event_id)->count(),
             'assigned_count'     => $assigned,
             'unassigned_count'   => $count - $assigned,
         ];
     }
 
-    private function batchesForItem(FestEvent $event, int $itemId): \Illuminate\Support\Collection
+    private function batchesForEvent(FestEvent $event): \Illuminate\Support\Collection
     {
         return FestItemReportingBatch::where('event_id', $event->id)
-            ->where('item_id', $itemId)
             ->withCount('registrations')
             ->orderBy('sort_order')
             ->get();

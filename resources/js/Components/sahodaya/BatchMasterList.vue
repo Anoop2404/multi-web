@@ -1,28 +1,9 @@
 <template>
     <div class="space-y-6">
-        <div class="flex flex-wrap items-center gap-2">
-            <input v-if="searchable" :value="modelSearch" @input="$emit('update:search', $event.target.value)"
+        <div v-if="searchable" class="flex flex-wrap items-center gap-2">
+            <input :value="modelSearch" @input="$emit('update:search', $event.target.value)"
                    type="search" class="field text-sm flex-1 min-w-[200px]" placeholder="Search by team/participant name or school…">
-            <button v-if="createUrl" type="button" class="btn-secondary text-sm shrink-0" @click="showAdd = true">+ Add batch (e.g. Batch {{ batches.length + 1 }})</button>
         </div>
-
-        <form v-if="showAdd" @submit.prevent="createBatch" class="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-            <input v-model="addForm.label" class="field text-sm" placeholder="Batch name (e.g. Batch 1)" required>
-            <div class="grid sm:grid-cols-2 gap-2">
-                <label class="text-xs text-slate-500 block">
-                    Report time
-                    <input v-model="addForm.report_at" type="datetime-local" class="field text-sm mt-0.5">
-                </label>
-                <label class="text-xs text-slate-500 block">
-                    Sort order (lower reports first)
-                    <input v-model.number="addForm.sort_order" type="number" class="field text-sm mt-0.5" placeholder="Auto if left blank">
-                </label>
-            </div>
-            <div class="flex gap-2">
-                <button type="submit" class="btn-primary text-sm" :disabled="addForm.processing">Add batch</button>
-                <button type="button" class="btn-ghost text-sm" @click="showAdd = false">Cancel</button>
-            </div>
-        </form>
 
         <div v-if="selectable" class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-2">
             <span class="text-xs text-slate-500 pl-1">{{ modelValue.length }} selected</span>
@@ -39,31 +20,30 @@
         <div v-else-if="groups.every((g) => g.rows.length === 0)" class="text-sm text-slate-400">No registrations match your search.</div>
 
         <div v-for="group in groups" :key="group.key" v-show="group.rows.length" class="space-y-2">
-            <div class="flex items-center justify-between gap-2 border-b border-slate-200 pb-1.5">
-                <div v-if="editingBatchId === group.batch?.id" class="flex-1 space-y-2 py-1">
-                    <div class="grid sm:grid-cols-3 gap-2">
-                        <input v-model="editForm.label" class="field !py-1 !text-xs">
-                        <input v-model="editForm.report_at" type="datetime-local" class="field !py-1 !text-xs">
-                        <input v-model.number="editForm.sort_order" type="number" class="field !py-1 !text-xs" placeholder="Sort order">
-                    </div>
-                    <div class="flex gap-2">
-                        <button type="button" class="text-xs font-semibold text-[#0f3d7a]" @click="saveEdit(group.batch)">Save</button>
-                        <button type="button" class="text-xs text-slate-500" @click="editingBatchId = null">Cancel</button>
-                    </div>
+            <div class="flex items-center justify-between gap-2 border-b border-slate-200 pb-1.5 flex-wrap">
+                <div v-if="editingTimeFor === group.batch?.id" class="flex flex-wrap items-center gap-2 py-0.5">
+                    <h5 class="font-semibold text-slate-800">{{ group.batch.label }}</h5>
+                    <input v-model="timeForm.report_at" type="datetime-local" class="field !py-1 !text-xs w-auto">
+                    <button type="button" class="btn-primary !py-1 !px-2.5 text-xs" @click="saveTime(group.batch)">Save</button>
+                    <button type="button" class="btn-ghost !py-1 !px-2.5 text-xs" @click="editingTimeFor = null">Cancel</button>
                 </div>
-                <template v-else>
-                    <div>
-                        <h5 class="font-semibold text-slate-800">{{ group.batch ? group.batch.label : 'Unassigned' }}</h5>
-                        <p v-if="group.batch?.report_at" class="text-xs text-slate-500">Reports: {{ formatDateTime(group.batch.report_at) }}</p>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                        <span class="text-xs text-slate-400">{{ group.rows.length }} registration(s)</span>
-                        <template v-if="group.batch && batchBaseUrl">
-                            <button type="button" class="text-xs font-semibold text-[#0f3d7a]" @click="startEdit(group.batch)">Edit</button>
-                            <button type="button" class="text-xs text-red-600" @click="removeBatch(group.batch)">Remove</button>
-                        </template>
-                    </div>
-                </template>
+                <div v-else class="flex flex-wrap items-center gap-2">
+                    <h5 class="font-semibold text-slate-800">{{ group.batch ? group.batch.label : 'Unassigned' }}</h5>
+                    <template v-if="group.batch">
+                        <span v-if="group.batch.report_at"
+                              class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                            🕐 {{ formatDateTime(group.batch.report_at) }}
+                        </span>
+                        <span v-else
+                              class="inline-flex items-center gap-1 rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                            No report time
+                        </span>
+                        <button type="button" class="text-xs font-semibold text-[#0f3d7a] hover:underline" @click="startEditTime(group.batch)">
+                            {{ group.batch.report_at ? 'Edit time' : '+ Set time' }}
+                        </button>
+                    </template>
+                </div>
+                <span class="text-xs text-slate-400 shrink-0">{{ group.rows.length }} registration(s)</span>
             </div>
 
             <table class="w-full text-sm">
@@ -108,15 +88,13 @@
 
 <script setup>
 import { computed, reactive, ref } from 'vue';
-import { router, useForm } from '@inertiajs/vue3';
-import { useConfirm } from '@/composables/useConfirm';
+import { router } from '@inertiajs/vue3';
 
 const props = defineProps({
     selectedItem: { type: Object, default: null },
     batches: { type: Array, default: () => [] },
     registrations: { type: Array, default: () => [] },
     assignUrl: { type: String, required: true },
-    createUrl: { type: String, default: null },
     batchBaseUrl: { type: String, default: null },
     selectable: { type: Boolean, default: false },
     modelValue: { type: Array, default: () => [] },
@@ -125,18 +103,15 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:modelValue', 'update:search']);
-const { confirm } = useConfirm();
 
 const moving = reactive(new Set());
-const showAdd = ref(false);
-const addForm = useForm({ item_id: props.selectedItem?.id ?? null, label: '', report_at: '', sort_order: null });
 const modelSearch = computed(() => props.search);
-
-const editingBatchId = ref(null);
-const editForm = reactive({ label: '', report_at: '', sort_order: null });
 
 const bulkBatchId = ref('');
 const bulkMoving = ref(false);
+
+const editingTimeFor = ref(null);
+const timeForm = reactive({ report_at: '' });
 
 const filteredRegistrations = computed(() => {
     const q = props.search.trim().toLowerCase();
@@ -206,6 +181,21 @@ function moveRow(row, value) {
     });
 }
 
+function startEditTime(batch) {
+    editingTimeFor.value = batch.id;
+    timeForm.report_at = batch.report_at ? batch.report_at.slice(0, 16) : '';
+}
+
+function saveTime(batch) {
+    if (!props.batchBaseUrl) return;
+
+    router.put(`${props.batchBaseUrl}/${batch.id}`, { report_at: timeForm.report_at || null }, {
+        preserveScroll: true,
+        preserveState: true,
+        onSuccess: () => { editingTimeFor.value = null; },
+    });
+}
+
 function bulkAssign() {
     if (!props.selectedItem || props.modelValue.length === 0) return;
 
@@ -220,44 +210,5 @@ function bulkAssign() {
         onSuccess: () => emit('update:modelValue', []),
         onFinish: () => { bulkMoving.value = false; },
     });
-}
-
-function createBatch() {
-    if (!props.selectedItem || !props.createUrl) return;
-
-    addForm.item_id = props.selectedItem.id;
-    addForm.post(props.createUrl, {
-        preserveScroll: true,
-        onSuccess: () => {
-            addForm.reset('label', 'report_at', 'sort_order');
-            showAdd.value = false;
-        },
-    });
-}
-
-function startEdit(batch) {
-    editingBatchId.value = batch.id;
-    Object.assign(editForm, {
-        label: batch.label,
-        report_at: batch.report_at ? batch.report_at.slice(0, 16) : '',
-        sort_order: batch.sort_order,
-    });
-}
-
-function saveEdit(batch) {
-    if (!props.batchBaseUrl) return;
-
-    router.put(`${props.batchBaseUrl}/${batch.id}`, { ...editForm }, {
-        preserveScroll: true,
-        preserveState: true,
-        onSuccess: () => { editingBatchId.value = null; },
-    });
-}
-
-async function removeBatch(batch) {
-    if (!props.batchBaseUrl) return;
-    if (!(await confirm({ message: `Remove batch "${batch.label}"? Its registrations become unassigned, nothing else changes.` }))) return;
-
-    router.delete(`${props.batchBaseUrl}/${batch.id}`, { preserveScroll: true });
 }
 </script>

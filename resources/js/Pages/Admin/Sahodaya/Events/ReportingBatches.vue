@@ -5,6 +5,7 @@
                     :description="`Pick an item with more than ${minRegistrations} registrations, then split its teams/participants into ordered batches so they don't all report at once — Batch 1 reports/performs first, then Batch 2, and so on.`">
             <template #actions>
                 <Link :href="`${eventBase}/school-distances`" class="btn-secondary text-sm">📏 School distances</Link>
+                <button type="button" class="btn-secondary text-sm" @click="showBatchMaster = true">🗂️ Batch master</button>
                 <button type="button" class="btn-secondary text-sm" @click="showSettings = true">⚙️ Settings</button>
             </template>
         </PageHeader>
@@ -66,7 +67,7 @@
                 </div>
 
                 <BatchMasterList :selected-item="selectedItem" :batches="batches" :registrations="registrations"
-                                  :assign-url="`${base}/assign`" :create-url="base" :batch-base-url="base"
+                                  :assign-url="`${base}/assign`" :batch-base-url="base"
                                   selectable v-model="selectedRegIds" searchable v-model:search="regSearch" />
             </div>
         </div>
@@ -86,6 +87,9 @@
                 </button>
             </template>
         </Modal>
+
+        <BatchMasterModal :show="showBatchMaster" :batches="batches" :create-url="base" :batch-base-url="base"
+                           @close="showBatchMaster = false" />
     </SahodayaEventsLayout>
 </template>
 
@@ -96,6 +100,7 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import BatchMasterList from '@/Components/sahodaya/BatchMasterList.vue';
+import BatchMasterModal from '@/Components/sahodaya/BatchMasterModal.vue';
 import Modal from '@/Components/ui/Modal.vue';
 
 const props = defineProps({
@@ -119,6 +124,7 @@ const minRegistrations = props.minRegistrations;
 const selectedRegIds = ref([]);
 const regSearch = ref('');
 const showSettings = ref(false);
+const showBatchMaster = ref(false);
 
 const settingsForm = useForm({ reporting_batch_min_registrations: props.minRegistrations });
 
