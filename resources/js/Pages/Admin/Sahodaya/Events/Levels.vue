@@ -283,6 +283,9 @@
                                     Submit regional/district winners to the Central State Competition portal. If a committee has certified a
                                     nomination batch below, that curated list is used instead of raw results.
                                 </p>
+                                <Link :href="`${base}/state-winners`" class="btn-secondary text-xs justify-center !py-2 w-full !bg-white hover:!bg-amber-100 !border-amber-300 !text-amber-900 block text-center">
+                                    Register Winners for State
+                                </Link>
                                 <Link :href="`${base}/state-nomination`" class="btn-secondary text-xs justify-center !py-2 w-full !bg-white hover:!bg-amber-100 !border-amber-300 !text-amber-900 block text-center">
                                     Review &amp; Nominate for State
                                 </Link>

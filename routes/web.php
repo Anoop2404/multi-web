@@ -1391,6 +1391,20 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/state-nomination/select', [\App\Http\Controllers\SahodayaAdmin\FestStateNominationController::class, 'select'])->name('state-nomination.select');
             Route::delete('/{event}/state-nomination/selections/{selection}', [\App\Http\Controllers\SahodayaAdmin\FestStateNominationController::class, 'unselect'])->name('state-nomination.unselect');
             Route::post('/{event}/state-nomination/certify', [\App\Http\Controllers\SahodayaAdmin\FestStateNominationController::class, 'certify'])->name('state-nomination.certify');
+
+            // Item-driven State winner registration. Writes the same nomination batch the workspace
+            // above does, so the two cannot send State two different answers.
+            Route::prefix('/{event}/state-winners')->name('state-winners.')->group(function () {
+                $winners = \App\Http\Controllers\SahodayaAdmin\FestStateWinnerRegistrationController::class;
+
+                Route::get('/', [$winners, 'index'])->name('index');
+                Route::post('/choose', [$winners, 'choose'])->name('choose');
+                Route::delete('/selections/{selection}', [$winners, 'remove'])->name('remove');
+                Route::post('/decline', [$winners, 'decline'])->name('decline');
+                Route::delete('/declines/{selection}', [$winners, 'withdrawDecline'])->name('declines.withdraw');
+                Route::post('/auto-fill', [$winners, 'autoFill'])->name('auto-fill');
+                Route::post('/register', [$winners, 'register'])->name('register');
+            });
             Route::post('/{event}/spawn-school-rounds', [FestEventController::class, 'spawnSchoolRounds'])->name('spawn-school-rounds');
             Route::post('/{event}/link-school-round', [FestEventController::class, 'linkSchoolRound'])->name('link-school-round');
             Route::post('/{event}/promote-discipline-events', [FestEventController::class, 'promoteDisciplineEvents'])->name('promote-discipline-events');
