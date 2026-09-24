@@ -2166,10 +2166,11 @@ class FestReportService
             ->get()
             ->keyBy('school_id');
 
-        // Reuses the Unique Participant Counts report's own per-school tally rather than
-        // re-walking participants here, so this always agrees with that report instead of
-        // drifting out of sync with a second, slightly-different counting pass.
-        $uniqueCounts = collect($this->uniqueParticipantCategoryReport($schoolId)['rows'])->keyBy('school_id');
+        // Deliberately narrower than uniqueParticipantCategoryReport()'s own active() scope
+        // (which also counts proof_uploaded/pending_proof/partial registrations) — a team
+        // manager's headcount should reflect registrations that are either fully approved
+        // or at least submitted, not ones still stuck earlier in the fee/proof workflow.
+        $uniqueCounts = $this->approvedOrSubmittedUniqueStudentCountsBySchool($schoolId);
 
         return $schools->map(function ($school) use ($managers, $uniqueCounts) {
             $m = $managers->get($school->id);
@@ -2197,7 +2198,7 @@ class FestReportService
                 'school_id'            => $school->id,
                 'school_name'          => $school->name,
                 'school_prefix'        => $school->school_prefix ?? '',
-                'unique_student_count' => $uniqueCounts->get($school->id)['total_unique_participants'] ?? 0,
+                'unique_student_count' => $uniqueCounts[$school->id] ?? 0,
                 'manager_name_1'       => $managerName1 ?? '',
                 'manager_phone_1'      => $managerPhone1 ?? '',
                 'manager_email_1'      => $managerEmail1 ?? '',
@@ -2211,12 +2212,48 @@ class FestReportService
         });
     }
 
+    /**
+     * Per-school unique student counts for the Students column next to each Team Manager —
+     * a student is counted once even if registered for several items, and only a
+     * registration that is 'approved' or 'submitted' (the school has actually put it in)
+     * counts, not one still stuck earlier in the fee/proof workflow (proof_uploaded,
+     * pending_proof, partial) — narrower than FestRegistration::active(), which counts
+     * those too.
+     *
+     * @return array<string, int> school_id => count
+     */
+    private function approvedOrSubmittedUniqueStudentCountsBySchool(?string $schoolId): array
+    {
+        $participants = FestParticipant::query()
+            ->whereHas('registration', function ($q) use ($schoolId) {
+                $q->whereIn('event_id', $this->eventIds())
+                    ->whereIn('status', ['approved', 'submitted'])
+                    ->when($this->scope?->isActorRestricted, fn ($q2) => $q2->whereIn('school_id', $this->scope->schoolIds))
+                    ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId));
+            })
+            ->with('registration:id,school_id')
+            ->get(['id', 'registration_id', 'student_id', 'teacher_id']);
+
+        $bySchool = [];
+        foreach ($participants as $p) {
+            $studentEntityId = $p->student_id ?: ($p->teacher_id ? 't:'.$p->teacher_id : null);
+            if (! $studentEntityId) {
+                continue;
+            }
+
+            $sId = (string) ($p->registration?->school_id ?? 'unknown');
+            $bySchool[$sId][$studentEntityId] = true;
+        }
+
+        return array_map('count', $bySchool);
+    }
+
     private function teamManagersXls(Request $request): StreamedResponse
     {
         $data = $this->teamManagersData($request->input('school_id'));
 
         $rows = $data->map(fn ($r) => [
-            $r->school_name,
+            mb_strtoupper($r->school_name),
             $r->unique_student_count,
             $r->manager_name_1,
             $r->manager_phone_1,

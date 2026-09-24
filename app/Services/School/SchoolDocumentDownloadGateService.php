@@ -47,6 +47,15 @@ class SchoolDocumentDownloadGateService
             ->exists();
     }
 
+    /** A Sahodaya admin's explicit event-wide switch (FeesTab.vue's "Download gates" section) —
+     *  independent of and stronger than fee status: blocks every school's ID card downloads for
+     *  this event regardless of what festEventFeeCleared() below would otherwise say, e.g. while
+     *  chest numbers, photos, or results are still being finalized. */
+    public function idCardDownloadsDisabled(FestEvent $event): bool
+    {
+        return (bool) ($event->fee_settings['id_card_downloads_disabled'] ?? false);
+    }
+
     /**
      * @param  ?int  $headId  When given and the event bills sports_composite fees per Event Head,
      *                        only that head's fee needs to be paid — a school can clear Athletics
@@ -73,6 +82,10 @@ class SchoolDocumentDownloadGateService
      */
     public function festEventFeeCleared(FestEvent $event, Tenant $school, ?int $headId = null, ?int $phaseId = null, ?int $batchId = null, string $documentType = 'default'): bool
     {
+        if ($documentType === 'id_card' && $this->idCardDownloadsDisabled($event)) {
+            return false;
+        }
+
         if ($documentType === 'id_card' && (bool) ($event->fee_settings['id_card_allowed_with_pending_fees'] ?? false)) {
             return true;
         }
@@ -124,6 +137,10 @@ class SchoolDocumentDownloadGateService
 
     public function assertFestEventFeeForDownloads(FestEvent $event, Tenant $school, ?int $headId = null, ?int $phaseId = null, ?int $batchId = null, string $documentType = 'default'): void
     {
+        if ($documentType === 'id_card' && $this->idCardDownloadsDisabled($event)) {
+            abort(422, 'ID card downloads have been disabled by your Sahodaya for this event. Contact your Sahodaya admin.');
+        }
+
         $this->assertMembershipFeeForDownloads($school);
 
         if ($this->festEventFeeCleared($event, $school, $headId, $phaseId, $batchId, $documentType)) {
@@ -165,6 +182,23 @@ class SchoolDocumentDownloadGateService
         $membershipCleared = $this->membershipFeeCleared($school);
         $eventFeeCleared = $event ? $this->festEventFeeCleared($event, $school, $headId, $phaseId, $batchId, $documentType) : null;
         $mcqFeeCleared = $exam ? $this->mcqExamFeeCleared($exam, $school) : null;
+
+        // Checked ahead of every fee status below: an admin explicitly disabling ID card
+        // downloads is a distinct reason from "a fee is pending" and must never be
+        // described to the school as a payment problem to go fix.
+        if ($event && $documentType === 'id_card' && $this->idCardDownloadsDisabled($event)) {
+            return [
+                'blocked'             => true,
+                'reason'              => 'ID card downloads have been disabled by your Sahodaya for this event.',
+                'membership_cleared'  => $membershipCleared,
+                'event_fee_cleared'   => $eventFeeCleared,
+                'mcq_fee_cleared'     => $mcqFeeCleared,
+                'links'               => [
+                    'membership' => "/school-admin/{$school->id}/registration",
+                    'payments'   => "/school-admin/{$school->id}/payments",
+                ],
+            ];
+        }
 
         $reason = null;
         if (! $membershipCleared) {

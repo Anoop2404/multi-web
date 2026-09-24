@@ -77,6 +77,7 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
     const {
         coordinatorMode = false,
         isSports = false,
+        idCardDownloadsDisabled = false,
     } = options;
 
     const program = schoolProgramBySlug(programSlug);
@@ -129,8 +130,13 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
     if (isSports) {
         workflowItems.push({ label: 'Entry Form', href: `${eventBase}/games-entry-form`, icon: 'file-text' });
     }
+    // Hidden entirely (not just gated on click) once a Sahodaya admin disables ID card
+    // downloads for this event — matching FestSchoolReportController::idCards()'s own
+    // abort_if() so a school can't even land on a page every button on which is blocked.
+    if (!idCardDownloadsDisabled) {
+        workflowItems.push({ label: 'ID Cards', href: `${reportsBase}/id-cards`, icon: 'credit-card' });
+    }
     workflowItems.push(
-        { label: 'ID Cards', href: `${reportsBase}/id-cards`, icon: 'credit-card' },
         { label: 'Clash requests', href: `${eventBase}/clash-requests`, icon: 'alert-circle' },
         { label: 'Substitutions', href: `${eventBase}/substitution-requests`, icon: 'repeat' },
         { label: 'Fest day view', href: `${programBase}/fest-day/${eventId}`, icon: 'calendar' },

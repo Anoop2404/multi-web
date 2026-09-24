@@ -863,6 +863,17 @@ class FestSchoolReportController extends SchoolAdminController
     public function idCards(Request $request, string $tenantId, FestEvent $event, string $program, FestIdCardService $service)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        // A Sahodaya admin who disabled ID card downloads for this event (FeesTab.vue's
+        // "Download gates" section) means schools shouldn't reach the ID Cards workspace at
+        // all, not just have its download buttons blocked once they're on it -- the nav link
+        // itself is hidden too (schoolEventNav.js), this is the matching direct-URL guard.
+        abort_if(
+            app(SchoolDocumentDownloadGateService::class)->idCardDownloadsDisabled($event),
+            403,
+            'ID card downloads have been disabled by your Sahodaya for this event.',
+        );
+
         $service->hideChestNo = true;
 
         $meta = SchoolFestProgram::meta($program);
