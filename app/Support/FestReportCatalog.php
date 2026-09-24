@@ -279,8 +279,8 @@ class FestReportCatalog
         // unlike every other export above. See FestReportController::studentLimits()'s docblock.
         'student-limits-pdf'            => ['dataset' => 'registration', 'supported_scopes' => ['self'], 'supports_competition_phase' => false],
         'student-limits-xls'            => ['dataset' => 'registration', 'supported_scopes' => ['self'], 'supports_competition_phase' => false],
-        'team-managers'                 => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
-        'team-managers-pdf'             => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'team-managers'                 => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'team-managers-pdf'             => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'unique-participants-pdf'       => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'unique-participants-xls'       => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
     ];
@@ -443,6 +443,51 @@ class FestReportCatalog
             $sep = str_contains($href, '?') ? '&' : '?';
 
             return "{$href}{$sep}region_id={$regionId}";
+        };
+
+        return array_map(function (array $row) use ($append) {
+            if (isset($row['href'])) {
+                $row['href'] = $append($row['href']);
+            }
+            if (isset($row['previewHref'])) {
+                $row['previewHref'] = $append($row['previewHref']);
+            }
+
+            return $row;
+        }, $rows);
+    }
+
+    /**
+     * Generalizes withRegionParam() above to every scope param the Downloads page's own
+     * "Competition phase" / "Region" / "Registration level" selector (Apply report scope)
+     * can produce. Without this, that selector was cosmetic for the main export tiles: it
+     * re-rendered the page's own school/item lists with the chosen scope, but every
+     * Download PDF/Excel button still linked to the export's plain, unscoped URL — always
+     * falling back to whatever FestReportScopeResolver's default is for that event shape
+     * (for a phased_regional_billing event, that's every phase+region leg combined). Team
+     * Managers has no interactive preview page of its own to carry a scope forward the way
+     * uniqueParticipants() does for its own PDF/Excel links, so its Download buttons on
+     * this page were the only way to reach it at all, and could never be narrowed to one
+     * phase or region even though the underlying scope machinery already understands
+     * competition_phase_id the moment something bothers to pass it (see
+     * FestReportController::reportScope(), which reads it unconditionally).
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @param  array<string, mixed>  $params
+     * @return list<array<string, mixed>>
+     */
+    public static function withScopeParams(array $rows, array $params): array
+    {
+        $params = array_filter($params, fn ($v) => $v !== null && $v !== '');
+        if ($params === []) {
+            return $rows;
+        }
+
+        $query = http_build_query($params);
+        $append = function (string $href) use ($query): string {
+            $sep = str_contains($href, '?') ? '&' : '?';
+
+            return "{$href}{$sep}{$query}";
         };
 
         return array_map(function (array $row) use ($append) {
