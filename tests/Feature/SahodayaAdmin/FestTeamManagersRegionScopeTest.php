@@ -18,28 +18,15 @@ use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
- * Team Managers (and the Unique Participant Counts it embeds) already declared
- * 'supported_scopes' => [..., 'region'] in FestReportCatalog's UI metadata, but the id
- * was missing from REGION_ID_AWARE_IDS. Two things follow from that list specifically:
- *
- *  1. Downloads.vue's per-region sections (regionChildrenWithExports) build each
- *     region's own tile href straight off that child event's own id — UNLESS the export
- *     id is in this list, in which case FestReportCatalog::regionScopedRows() swaps it
- *     for the hub's own route with an explicit ?region_id= instead (same fix already
- *     applied to item-counts, student-wise, etc. — see REGION_ID_AWARE_IDS' own
- *     docblock). Without the id listed, "Team Managers" inside a region's own downloads
- *     section linked to the child directly instead of through that established,
- *     tested-safe path.
- *  2. FestReportController::export()'s generic dispatcher only calls
- *     regionAwareTargetEvent() for listed ids — belt-and-braces alongside #1, since an
- *     admin (or a saved link) hitting the hub URL with ?region_id= by hand, rather than
- *     through a Downloads.vue tile, should get the same containment.
- *
- * (?region_id= on the hub's own URL was already correctly contained before this fix too
- * — FestReportController::reportScope() resolves a proper region-scoped FestReportScope
- * off that param independently of this list — so this test's first case would pass
- * either way; it's kept as a straightforward end-to-end sanity check, while the second
- * case is what actually regresses without the id in the list.)
+ * ?region_id= on the hub's own Team Managers export URL is correctly contained to that
+ * one region regardless of REGION_ID_AWARE_IDS membership -- FestReportController::
+ * reportScope() resolves a proper region-scoped FestReportScope off that param
+ * independently of the list, since it reads region_id straight off the request either
+ * way. team-managers/team-managers-pdf are deliberately NOT in that list (see its own
+ * docblock in FestReportCatalog) precisely because the alternative -- routing every hit
+ * through regionAwareTargetEvent() -- detaches ANY leaf from its parent even with no
+ * ?region_id= at all, which silently combines every other leg's students into a plain,
+ * unscoped visit (the far more common way this report is actually reached).
  */
 class FestTeamManagersRegionScopeTest extends TestCase
 {
@@ -114,7 +101,17 @@ class FestTeamManagersRegionScopeTest extends TestCase
         $this->assertStringNotContainsString('Region B Manager', $content);
     }
 
-    public function test_downloads_page_routes_a_regions_team_managers_tile_through_the_hub_with_region_id(): void
+    /**
+     * Superseded expectation (2026-09-24): team-managers/team-managers-pdf were removed
+     * from REGION_ID_AWARE_IDS again the same day (see FestReportCatalog's own docblock)
+     * because routing every hit through regionAwareTargetEvent() detached ANY leaf from
+     * its parent even with no ?region_id= at all, silently combining every other leg's
+     * students into a plain, unscoped visit. Direct child-id access is now correct on its
+     * own -- FestReportController::reportScope() lands on 'self' for a leg with its real,
+     * undetached parent_event_id -- so this region section's tile linking straight at the
+     * child's own id (not rerouted through the hub) is the desired behavior, not a gap.
+     */
+    public function test_downloads_page_region_tile_links_directly_to_the_child_leg(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);
 
@@ -154,10 +151,7 @@ class FestTeamManagersRegionScopeTest extends TestCase
 
         $href = $teamManagersTile['href'] ?? $teamManagersTile['previewHref'] ?? null;
         $this->assertNotNull($href);
-        $this->assertStringContainsString("/events/{$hub->id}/", $href,
-            'Must route through the hub (regionScopedRows() swap), not the child event\'s own id.');
-        $this->assertStringContainsString("region_id={$regionA->id}", $href);
-        $this->assertStringNotContainsString("/events/{$childA->id}/", $href);
+        $this->assertStringContainsString("/events/{$childA->id}/", $href);
     }
 
     private function registerOneStudent(Tenant $school, FestEvent $event, string $studentName): void

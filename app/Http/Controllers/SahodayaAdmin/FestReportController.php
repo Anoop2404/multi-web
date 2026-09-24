@@ -573,7 +573,15 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $target = $this->regionAwareTargetEvent($request, $event);
+        // Only reroute through regionAwareTargetEvent() when a region was actually asked
+        // for -- that method also unconditionally detaches ANY leaf from its parent even
+        // with no ?region_id= at all, which then fools reportScope()'s own mode fallback
+        // (parent_event_id === null => 'combined') into silently combining every other
+        // phase+region leg's students in, the moment an admin opens this report directly
+        // on one specific leg (the normal way it's reached). A bare visit now means
+        // exactly that leg; ?region_id= and ?scope_mode=combined&competition_phase_id=
+        // still work, since reportScope() reads both straight off the request regardless.
+        $target = $request->integer('region_id') ? $this->regionAwareTargetEvent($request, $event) : $event;
         $service = $this->scopedReportService($request, $target);
         $schoolId = $request->input('school_id');
         $report = $service->uniqueParticipantCategoryReport($schoolId);
