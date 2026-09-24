@@ -273,8 +273,21 @@ class FestReportController extends SahodayaAdminController
         $allowedPhases = EventLifecycleGate::allowedReportPhases($event);
         $currentPhase = EventLifecycleGate::currentReportPhase($event);
 
+        // Carries forward whatever the "Competition phase" / "Region" / "Registration
+        // level" selector above was set to (scopeParams() in Downloads.vue) into every
+        // export tile's own href -- see FestReportCatalog::withScopeParams()'s docblock
+        // for why this was previously a no-op for exports (like Team Managers) that have
+        // no interactive preview page of their own to carry a scope through instead.
         $exports = array_values(array_filter(
-            FestReportCatalog::exportsWithPreview($tenantId, $event->id),
+            FestReportCatalog::withScopeParams(
+                FestReportCatalog::exportsWithPreview($tenantId, $event->id),
+                [
+                    'scope_mode' => $request->input('scope_mode'),
+                    'competition_phase_id' => $request->integer('competition_phase_id') ?: null,
+                    'region_id' => $request->integer('region_id') ?: null,
+                    'registration_batch_id' => $request->integer('registration_batch_id') ?: null,
+                ],
+            ),
             fn ($exp) => ($exp['phase'] ?? 'before') === $phase
                 && in_array($exp['phase'] ?? 'before', $allowedPhases, true)
         ));
