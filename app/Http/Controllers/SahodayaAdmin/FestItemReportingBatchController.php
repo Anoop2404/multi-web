@@ -49,7 +49,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
             ->groupBy('item_id')
             ->pluck('batch_count', 'item_id');
 
-        $items = $event->items()->orderBy('title')->get(['id', 'title', 'item_code', 'category', 'stage_type'])
+        $items = $event->items()->orderBy('title')->get(['id', 'title', 'item_code', 'category', 'gender', 'stage_type'])
             ->map(function (FestEventItem $item) use ($regCounts, $assignedCounts, $batchCounts) {
                 $regCount = (int) ($regCounts[$item->id] ?? 0);
                 $assignedCount = (int) ($assignedCounts[$item->id] ?? 0);
@@ -58,7 +58,8 @@ class FestItemReportingBatchController extends SahodayaAdminController
                     'id'                 => $item->id,
                     'title'              => $item->title,
                     'item_code'          => $item->item_code,
-                    'category'           => $item->category,
+                    'category'           => $item->category && $item->category !== 'open' ? $item->category : null,
+                    'gender_label'       => \App\Support\FestSportsAgeGroup::genderLabel($item->gender),
                     'is_group'           => app(FestNumberingService::class)->isGroupItem($item),
                     'registration_count' => $regCount,
                     'batch_count'        => (int) ($batchCounts[$item->id] ?? 0),
@@ -349,7 +350,8 @@ class FestItemReportingBatchController extends SahodayaAdminController
             'id'                 => $item->id,
             'title'              => $item->title,
             'item_code'          => $item->item_code,
-            'category'           => $item->category,
+            'category'           => $item->category && $item->category !== 'open' ? $item->category : null,
+            'gender_label'       => \App\Support\FestSportsAgeGroup::genderLabel($item->gender),
             'is_group'           => app(FestNumberingService::class)->isGroupItem($item),
             'registration_count' => $count,
             'batch_count'        => FestItemReportingBatch::where('item_id', $item->id)->count(),

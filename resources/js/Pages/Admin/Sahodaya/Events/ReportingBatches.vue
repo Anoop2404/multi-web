@@ -25,7 +25,7 @@
                         @click="jumpToItem(item.id)">
                     <div class="font-semibold truncate">{{ item.title }}</div>
                     <div class="text-xs mb-1.5" :class="selectedItem?.id === item.id ? 'text-white/70' : 'text-slate-400'">
-                        {{ item.item_code || '' }}
+                        {{ itemSubtitle(item) }}
                     </div>
                     <div class="flex flex-wrap gap-1">
                         <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold border"
@@ -127,6 +127,17 @@ function saveSettings() {
         preserveScroll: true,
         onSuccess: () => { showSettings.value = false; },
     });
+}
+
+function itemSubtitle(item) {
+    const parts = [
+        item.item_code,
+        item.category,
+        item.gender_label,
+        item.is_group ? 'Group' : 'Individual',
+    ].filter(Boolean);
+
+    return parts.join(' · ');
 }
 
 function jumpToItem(itemId) {
