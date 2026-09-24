@@ -864,6 +864,11 @@ class TenantController extends Controller
             'tenantType'       => $type,
             'pageTitle'        => $pageTitle,
             'createUrl'        => $createUrl,
+            // Sahodayas only, superadmin only: a school shares its parent's database, so it has
+            // nothing of its own to provision.
+            'databasesUrl'     => $type === 'sahodaya' && $request->user()?->isSuperAdmin()
+                ? route('admin.sahodayas.databases.index')
+                : null,
             'readOnly'         => $readOnly,
             'tenantBaseDomain' => config('tenancy.tenant_base_domain'),
             'filters'          => array_merge(['search' => '', 'status' => 'all'], $filters),

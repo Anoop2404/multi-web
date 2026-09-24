@@ -386,6 +386,20 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
     })->name('dashboard');
 
     Route::get('/sahodayas/create', [TenantController::class, 'createSahodaya'])->name('sahodayas.create');
+
+    // Which Sahodayas have a working dedicated database, and creating the ones that do not.
+    // Superadmin only: creating a Postgres database is not a State office action, and it is not
+    // reversible from here.
+    Route::prefix('sahodayas/databases')->name('sahodayas.databases.')->group(function () {
+        $databases = \App\Http\Controllers\Admin\SahodayaDatabaseController::class;
+
+        Route::get('/', [$databases, 'index'])->name('index');
+        Route::post('/provision-all', [$databases, 'provisionAll'])->name('provision-all');
+        // The Sahodaya id travels in the body, not the path: a tenant id in the URL is picked up by
+        // path-based tenant resolution, and posting a school id there bounces to the login page
+        // instead of reaching this controller's 404.
+        Route::post('/provision', [$databases, 'provision'])->name('provision');
+    });
     Route::get('/schools', [TenantController::class, 'indexSchools'])->name('schools.index');
     Route::get('/schools/export-admin-credentials', [TenantController::class, 'exportSchoolAdminCredentials'])->name('schools.export-admin-credentials');
     Route::get('/schools/create', [TenantController::class, 'createSchool'])->name('schools.create');
