@@ -63,8 +63,15 @@ class FestItemReportingBatchController extends SahodayaAdminController
             ->groupBy('item_id')
             ->map(fn ($rows) => $rows->pluck('reporting_batch_id')->unique()->count());
 
-        $items = $event->items()->orderBy('title')->get(['id', 'title', 'item_code', 'category', 'gender', 'stage_type'])
-            ->map(function (FestEventItem $item) use ($regCounts, $assignedCounts, $usedBatchCounts) {
+        // "Category" here means the item's class/age bracket (e.g. "Category 1 — Classes
+        // 3 & 4"), not the internal arts-genre tag on $item->category -- see
+        // FestItemCategoryLabel's docblock. class_group/age_group weren't even being
+        // selected before, so this was silently showing the wrong thing (dance/music/
+        // drama) instead of the class category admins actually care about here.
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
+
+        $items = $event->items()->orderBy('title')->get(['id', 'title', 'item_code', 'category', 'class_group', 'age_group', 'gender', 'stage_type'])
+            ->map(function (FestEventItem $item) use ($regCounts, $assignedCounts, $usedBatchCounts, $classGroupLabels) {
                 $regCount = (int) ($regCounts[$item->id] ?? 0);
                 $assignedCount = (int) ($assignedCounts[$item->id] ?? 0);
 
@@ -72,7 +79,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
                     'id'                 => $item->id,
                     'title'              => $item->title,
                     'item_code'          => $item->item_code,
-                    'category'           => $item->category && $item->category !== 'open' ? $item->category : null,
+                    'category'           => \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels),
                     'gender_label'       => \App\Support\FestSportsAgeGroup::genderLabel($item->gender),
                     'is_group'           => app(FestNumberingService::class)->isGroupItem($item),
                     'registration_count' => $regCount,
@@ -165,6 +172,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
 
         $batches = $this->batchesForEvent($event);
         $sections = $this->sectionsForItem($event, $itemModel, $batches);
+        $categoryLabel = \App\Support\FestItemCategoryLabel::resolve($itemModel, \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent()));
 
         $orgName = $this->sahodaya->name;
         $logoSrc = \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya);
@@ -177,13 +185,14 @@ class FestItemReportingBatchController extends SahodayaAdminController
         $participantCount = collect($sections)->sum(fn ($s) => count($s['rows']));
 
         $html = view('fest.reporting-batches-print', [
-            'event'    => $event,
-            'item'     => $itemModel,
-            'isGroup'  => app(FestNumberingService::class)->isGroupItem($itemModel),
-            'sections' => $sections,
-            'orgName'  => $orgName,
-            'logoSrc'  => $logoSrc,
-            'isDomPdf' => $isDomPdf,
+            'event'         => $event,
+            'item'          => $itemModel,
+            'categoryLabel' => $categoryLabel,
+            'isGroup'       => app(FestNumberingService::class)->isGroupItem($itemModel),
+            'sections'      => $sections,
+            'orgName'       => $orgName,
+            'logoSrc'       => $logoSrc,
+            'isDomPdf'      => $isDomPdf,
         ])->render();
 
         $slug = \Illuminate\Support\Str::slug($itemModel->title ?: 'item');
@@ -195,6 +204,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
             'docTitle'         => 'REPORTING BATCHES',
             'eventTitle'       => $event->title,
             'item'             => $itemModel,
+            'categoryLabel'    => $categoryLabel,
             'participantCount' => $participantCount > 0 ? $participantCount : null,
         ]);
 
@@ -228,10 +238,13 @@ class FestItemReportingBatchController extends SahodayaAdminController
             ->values();
 
         $numberingService = app(FestNumberingService::class);
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
         $itemsData = $items->map(fn (FestEventItem $item) => [
-            'item'     => $item,
-            'isGroup'  => $numberingService->isGroupItem($item),
-            'sections' => $this->sectionsForItem($event, $item, $batches),
+            'item'          => $item,
+            'isGroup'       => $numberingService->isGroupItem($item),
+            'categoryLabel' => \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels),
+            'genderLabel'   => \App\Support\FestSportsAgeGroup::genderLabel($item->gender),
+            'sections'      => $this->sectionsForItem($event, $item, $batches),
         ])->values()->all();
 
         $orgName = $this->sahodaya->name;
@@ -512,11 +525,13 @@ class FestItemReportingBatchController extends SahodayaAdminController
             ->distinct('reporting_batch_id')
             ->count('reporting_batch_id');
 
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $item->event->rootEvent());
+
         return [
             'id'                 => $item->id,
             'title'              => $item->title,
             'item_code'          => $item->item_code,
-            'category'           => $item->category && $item->category !== 'open' ? $item->category : null,
+            'category'           => \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels),
             'gender_label'       => \App\Support\FestSportsAgeGroup::genderLabel($item->gender),
             'is_group'           => app(FestNumberingService::class)->isGroupItem($item),
             'registration_count' => $count,
