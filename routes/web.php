@@ -1195,12 +1195,15 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/phases/assign-items', [\App\Http\Controllers\SahodayaAdmin\FestEventPhaseController::class, 'assignItems'])->name('phases.assign-items');
             Route::post('/{event}/phases/regions', [\App\Http\Controllers\SahodayaAdmin\FestEventPhaseController::class, 'storeRegion'])->name('phases.regions.store');
             Route::get('/{event}/reporting-batches', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'index'])->name('reporting-batches.index');
+            Route::post('/{event}/reporting-batches/settings', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'updateSettings'])->name('reporting-batches.settings');
             Route::get('/{event}/reporting-batches/batch-master', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'batchMaster'])->name('reporting-batches.batch-master');
             Route::get('/{event}/reporting-batches/print', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'print'])->name('reporting-batches.print');
             Route::post('/{event}/reporting-batches', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'store'])->name('reporting-batches.store');
             Route::put('/{event}/reporting-batches/{batch}', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'update'])->name('reporting-batches.update');
             Route::delete('/{event}/reporting-batches/{batch}', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'destroy'])->name('reporting-batches.destroy');
             Route::post('/{event}/reporting-batches/assign', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'assignRegistrations'])->name('reporting-batches.assign');
+            Route::get('/{event}/school-distances', [\App\Http\Controllers\SahodayaAdmin\FestSchoolDistanceController::class, 'index'])->name('school-distances.index');
+            Route::post('/{event}/school-distances', [\App\Http\Controllers\SahodayaAdmin\FestSchoolDistanceController::class, 'save'])->name('school-distances.save');
             Route::post('/{event}/registration-batches', [\App\Http\Controllers\SahodayaAdmin\FestRegistrationBatchController::class, 'store'])->name('registration-batches.store');
             Route::put('/{event}/registration-batches/{batch}', [\App\Http\Controllers\SahodayaAdmin\FestRegistrationBatchController::class, 'update'])->name('registration-batches.update');
             Route::delete('/{event}/registration-batches/{batch}', [\App\Http\Controllers\SahodayaAdmin\FestRegistrationBatchController::class, 'destroy'])->name('registration-batches.destroy');
@@ -1541,6 +1544,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
                 Route::get('/{event}/reports/item-counts', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemCounts'])->name('reports.item-counts');
                 Route::get('/{event}/reports/school-participation', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'schoolParticipation'])->name('reports.school-participation');
                 Route::get('/{event}/reports/unique-participants', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'uniqueParticipants'])->name('reports.unique-participants');
+                Route::get('/{event}/reports/team-managers', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'teamManagers'])->name('reports.team-managers');
                 Route::get('/{event}/reports/discipline-registration', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'disciplineRegistration'])->name('reports.discipline-registration');
                 Route::get('/{event}/reports/head-wise-participants', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'headWiseParticipants'])->name('reports.head-wise-participants');
                 Route::get('/{event}/reports/area-wise-participants', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'areaWiseParticipants'])->name('reports.area-wise-participants');
