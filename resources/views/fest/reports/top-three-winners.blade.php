@@ -227,7 +227,8 @@
                         <tr>
                             <th style="width: 55px;" class="center">Rank</th>
                             <th style="width: 65px;" class="center">Chest #</th>
-                            <th style="width: 44%;">Participant / Team</th>
+                            <th style="width: 70px;" class="center">Student ID</th>
+                            <th style="width: 38%;">Participant / Team</th>
                             <th>School Name</th>
                             <th style="width: 50px;" class="center">Grade</th>
                         </tr>
@@ -245,6 +246,7 @@
                                     </span>
                                 </td>
                                 <td class="center chest-text">{{ $winner['chest_no'] ?? '—' }}</td>
+                                <td class="center chest-text">{{ $winner['student_id'] ?? '—' }}</td>
                                 <td>
                                     <div class="name-bold">{{ $winner['name'] }}</div>
                                     @if(!empty($item['is_group']))

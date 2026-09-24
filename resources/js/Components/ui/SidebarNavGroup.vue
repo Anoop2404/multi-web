@@ -16,6 +16,7 @@
                               :icon="item.icon"
                               :label="item.label"
                               :badge="item.badge ?? 0"
+                              :target="item.target ?? null"
                               :active="itemActive(item)" />
         </div>
     </div>
