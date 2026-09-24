@@ -62,6 +62,18 @@
             color: #64748b;
             display: block;
         }
+        .on-file {
+            color: #b45309;
+        }
+        .count-badge {
+            display: inline-block;
+            min-width: 20px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: #eff6ff;
+            color: #1e40af;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -75,9 +87,10 @@
         <thead>
             <tr>
                 <th style="width: 4%;">#</th>
-                <th style="width: 36%;">School</th>
-                <th style="width: 30%;">Team Manager 1</th>
-                <th style="width: 30%;">Team Manager 2</th>
+                <th style="width: 30%;">School</th>
+                <th style="width: 10%;" class="text-center">Students</th>
+                <th style="width: 28%;">Team Manager 1</th>
+                <th style="width: 28%;">Team Manager 2</th>
             </tr>
         </thead>
         <tbody>
@@ -87,12 +100,23 @@
                     <td>
                         <span class="font-bold">{{ $row->school_name }}</span>
                     </td>
+                    <td class="text-center">
+                        <span class="count-badge">{{ $row->unique_student_count }}</span>
+                    </td>
                     <td>
                         @if($row->manager_name_1)
                             <span class="font-bold manager-name">{{ $row->manager_name_1 }}</span>
                         @endif
                         @if($row->manager_phone_1)
                             <span>📞 {{ $row->manager_phone_1 }}</span>
+                        @endif
+                        @if($row->manager_role_1 === 'Events Coordinator (on file)')
+                            <span class="manager-role on-file">{{ $row->manager_role_1 }}</span>
+                        @elseif($row->manager_role_1)
+                            <span class="manager-role">{{ $row->manager_role_1 }}</span>
+                        @endif
+                        @if(!$row->manager_name_1 && !$row->manager_phone_1)
+                            <span class="manager-role">Not entered</span>
                         @endif
                     </td>
                     <td>
@@ -106,7 +130,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="4" class="text-center" style="padding: 20px;">No school team managers recorded.</td>
+                    <td colspan="5" class="text-center" style="padding: 20px;">No school team managers recorded.</td>
                 </tr>
             @endforelse
         </tbody>

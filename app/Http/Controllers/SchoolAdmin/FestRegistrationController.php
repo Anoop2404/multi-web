@@ -38,6 +38,7 @@ use App\Support\FestClassGroupScheme;
 use App\Support\FestSportsAgeGroup;
 use App\Support\FestTeamSquadRules;
 use App\Support\ProgramRouteMap;
+use App\Support\SchoolEventCoordinator;
 use App\Support\SchoolFestProgram;
 use App\Services\Students\StudentEditLockService;
 use App\Services\Students\StudentVerificationGate;
@@ -208,7 +209,7 @@ class FestRegistrationController extends SchoolAdminController
             'studentEditLock' => app(StudentEditLockService::class)->metaForSchool($this->school),
             'focusEventId'    => $focusEventId,
             'profile'         => $this->eventPaymentProfileProp(),
-            'teamManagers'    => $focusEventId ? \App\Models\FestSchoolTeamManager::where('event_id', $focusEventId)->where('school_id', $this->school->id)->first() : null,
+            'teamManagers'    => $focusEventId ? $this->teamManagersProp((int) $focusEventId) : null,
         ]);
     }
 
@@ -226,6 +227,45 @@ class FestRegistrationController extends SchoolAdminController
         return $profile ? array_merge($profile->toArray(), [
             'payment_details_text' => $profile->paymentDetailsText(),
         ]) : null;
+    }
+
+    /**
+     * Team Manager 1 pre-fills from the school's own Events Coordinator (named on its
+     * membership application, App\Support\SchoolEventCoordinator) whenever the school
+     * hasn't entered a dedicated team manager for this event yet — same fallback the
+     * Sahodaya-side team managers report uses (FestReportService::teamManagersData()), so
+     * the school sees the same default their Sahodaya would otherwise see a blank row for,
+     * and can just confirm or overwrite it instead of retyping a contact already on file.
+     * Always an array (never the bare model or null) so the modal's form always has
+     * something to initialise from, even when there's no saved row and no coordinator either.
+     */
+    private function teamManagersProp(int $eventId): array
+    {
+        $saved = \App\Models\FestSchoolTeamManager::where('event_id', $eventId)
+            ->where('school_id', $this->school->id)
+            ->first();
+
+        $data = [
+            'manager_name_1'  => $saved?->manager_name_1,
+            'manager_phone_1' => $saved?->manager_phone_1,
+            'manager_email_1' => $saved?->manager_email_1,
+            'manager_role_1'  => $saved?->manager_role_1,
+            'manager_name_2'  => $saved?->manager_name_2,
+            'manager_phone_2' => $saved?->manager_phone_2,
+            'manager_email_2' => $saved?->manager_email_2,
+            'manager_role_2'  => $saved?->manager_role_2,
+            'notes'           => $saved?->notes,
+        ];
+
+        if (blank($data['manager_name_1']) && blank($data['manager_phone_1'])
+            && ($coordinator = SchoolEventCoordinator::forSchool($this->school))) {
+            $data['manager_name_1']  = $coordinator['name'];
+            $data['manager_phone_1'] = $coordinator['phone'];
+            $data['manager_email_1'] = $coordinator['email'];
+            $data['manager_role_1']  = 'Events Coordinator (on file)';
+        }
+
+        return $data;
     }
 
     /**
@@ -396,7 +436,7 @@ class FestRegistrationController extends SchoolAdminController
                 'focusEventId'     => $event->id,
                 'singleEventMode'  => true,
                 'profile'          => $this->eventPaymentProfileProp(),
-                'teamManagers'     => \App\Models\FestSchoolTeamManager::where('event_id', $event->id)->where('school_id', $this->school->id)->first(),
+                'teamManagers'     => $this->teamManagersProp($event->id),
             ],
         ));
     }

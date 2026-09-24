@@ -22,6 +22,7 @@ use App\Support\FestItemCategoryLabel;
 use App\Support\FestStudentClassResolver;
 use App\Support\PdfGenerator;
 use App\Support\ReportFilename;
+use App\Support\SchoolEventCoordinator;
 use App\Support\TenantBranding;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -2159,28 +2160,53 @@ class FestReportService
 
         $schools = Tenant::whereIn('id', $participatingSchoolIds)
             ->orderBy('name')
-            ->get(['id', 'name', 'school_prefix']);
+            ->get(['id', 'name', 'school_prefix', 'application_payload']);
 
         $managers = \App\Models\FestSchoolTeamManager::whereIn('event_id', $this->eventIds())
             ->get()
             ->keyBy('school_id');
 
-        return $schools->map(function ($school) use ($managers) {
+        // Reuses the Unique Participant Counts report's own per-school tally rather than
+        // re-walking participants here, so this always agrees with that report instead of
+        // drifting out of sync with a second, slightly-different counting pass.
+        $uniqueCounts = collect($this->uniqueParticipantCategoryReport($schoolId)['rows'])->keyBy('school_id');
+
+        return $schools->map(function ($school) use ($managers, $uniqueCounts) {
             $m = $managers->get($school->id);
 
+            $managerName1  = $m?->manager_name_1;
+            $managerPhone1 = $m?->manager_phone_1;
+            $managerEmail1 = $m?->manager_email_1;
+            $managerRole1  = $m?->manager_role_1;
+
+            // Most schools have not filled in a dedicated team manager yet — rather than
+            // leaving the row blank, fall back to the Events Coordinator already on file
+            // from the school's own membership application, so there is still someone to
+            // call. Only kicks in when NEITHER a name nor a phone was entered, so a manager
+            // row that's mid-filled-in is never overwritten.
+            if (blank($managerName1) && blank($managerPhone1)) {
+                if ($coordinator = SchoolEventCoordinator::forSchool($school)) {
+                    $managerName1  = $coordinator['name'];
+                    $managerPhone1 = $coordinator['phone'];
+                    $managerEmail1 = $coordinator['email'];
+                    $managerRole1  = 'Events Coordinator (on file)';
+                }
+            }
+
             return (object) [
-                'school_id'       => $school->id,
-                'school_name'     => $school->name,
-                'school_prefix'   => $school->school_prefix ?? '',
-                'manager_name_1'  => $m?->manager_name_1 ?? '',
-                'manager_phone_1' => $m?->manager_phone_1 ?? '',
-                'manager_email_1' => $m?->manager_email_1 ?? '',
-                'manager_role_1'  => $m?->manager_role_1 ?? '',
-                'manager_name_2'  => $m?->manager_name_2 ?? '',
-                'manager_phone_2' => $m?->manager_phone_2 ?? '',
-                'manager_email_2' => $m?->manager_email_2 ?? '',
-                'manager_role_2'  => $m?->manager_role_2 ?? '',
-                'notes'           => $m?->notes ?? '',
+                'school_id'            => $school->id,
+                'school_name'          => $school->name,
+                'school_prefix'        => $school->school_prefix ?? '',
+                'unique_student_count' => $uniqueCounts->get($school->id)['total_unique_participants'] ?? 0,
+                'manager_name_1'       => $managerName1 ?? '',
+                'manager_phone_1'      => $managerPhone1 ?? '',
+                'manager_email_1'      => $managerEmail1 ?? '',
+                'manager_role_1'       => $managerRole1 ?? '',
+                'manager_name_2'       => $m?->manager_name_2 ?? '',
+                'manager_phone_2'      => $m?->manager_phone_2 ?? '',
+                'manager_email_2'      => $m?->manager_email_2 ?? '',
+                'manager_role_2'       => $m?->manager_role_2 ?? '',
+                'notes'                => $m?->notes ?? '',
             ];
         });
     }
@@ -2191,6 +2217,7 @@ class FestReportService
 
         $rows = $data->map(fn ($r) => [
             $r->school_name,
+            $r->unique_student_count,
             $r->manager_name_1,
             $r->manager_phone_1,
             $r->manager_email_1,
@@ -2203,7 +2230,7 @@ class FestReportService
         ]);
 
         return ExcelExport::download($this->slug().'-team-managers', [
-            'School Name',
+            'School Name', 'Unique Students',
             'Manager 1 Name', 'Manager 1 Phone', 'Manager 1 Email', 'Manager 1 Role',
             'Manager 2 Name', 'Manager 2 Phone', 'Manager 2 Email', 'Manager 2 Role',
             'Notes',

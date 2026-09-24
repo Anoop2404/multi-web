@@ -1,5 +1,6 @@
 <template>
     <Link :href="href"
+          :target="target"
           :class="[
               'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition w-full border-l-2',
               active
@@ -25,5 +26,11 @@ defineProps({
     label: { type: String, required: true },
     active: { type: Boolean, default: false },
     badge: { type: Number, default: 0 },
+    // A raw export/preview URL (PDF, CSV) returns a plain, non-Inertia response — an
+    // Inertia <Link> visiting one falls back to a full browser navigation that replaces
+    // the whole SPA. Passing target="_blank" (see schoolEventNav.js's "Team Managers"
+    // entry) makes Inertia treat it as a plain external link opened in a new tab instead,
+    // same as every other report-download link in this app already does with a bare <a>.
+    target: { type: String, default: null },
 });
 </script>

@@ -5,9 +5,11 @@
                     :description="pageDescription">
             <template #actions>
                 <a :href="topThreeWinnersUrl()" target="_blank" class="btn-primary text-sm">🏆 Top 3 Winners (PDF)</a>
-                <a :href="topThreeWinnersUrl(true)" target="_blank" class="btn-secondary text-sm">Top 3 CSV</a>
+                <a :href="topThreeWinnersUrl('csv')" target="_blank" class="btn-secondary text-sm">Top 3 CSV</a>
+                <a :href="topThreeWinnersUrl('docx')" target="_blank" class="btn-secondary text-sm">Top 3 Word</a>
                 <a :href="firstRankWinnersUrl()" target="_blank" class="btn-secondary text-sm">🥇 1st Rank (PDF)</a>
-                <a :href="firstRankWinnersUrl(true)" target="_blank" class="btn-secondary text-sm">1st Rank CSV</a>
+                <a :href="firstRankWinnersUrl('csv')" target="_blank" class="btn-secondary text-sm">1st Rank CSV</a>
+                <a :href="firstRankWinnersUrl('docx')" target="_blank" class="btn-secondary text-sm">1st Rank Word</a>
             </template>
         </PageHeader>
 
@@ -579,12 +581,12 @@ function downloadWinnersUrl(row, preview = false, blank = false) {
     return `${props.resultsBaseUrl}/items/${itemId}/winners${qs ? `?${qs}` : ''}`;
 }
 
-function topThreeWinnersUrl(csv = false) {
-    return `${props.resultsBaseUrl}/top-three-winners${csv ? '?csv=1' : ''}`;
+function topThreeWinnersUrl(format = null) {
+    return `${props.resultsBaseUrl}/top-three-winners${format ? `?${format}=1` : ''}`;
 }
 
-function firstRankWinnersUrl(csv = false) {
-    return `${props.resultsBaseUrl}/first-rank-winners${csv ? '?csv=1' : ''}`;
+function firstRankWinnersUrl(format = null) {
+    return `${props.resultsBaseUrl}/first-rank-winners${format ? `?${format}=1` : ''}`;
 }
 
 function formatWindow(row) {

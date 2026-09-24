@@ -21,6 +21,8 @@ use App\Services\Events\FestPhaseAdvancementService;
 use App\Services\Events\FestQualificationService;
 use App\Services\Events\FestRegionPartitionService;
 use App\Support\FestPageActivity;
+use App\Support\StudentIdFormat;
+use App\Support\WordExport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
@@ -244,8 +246,9 @@ class FestResultsController extends SahodayaAdminController
                     // resultRowsForItem() already joins every team member's name with
                     // " & " for a group/team item's single winning entry -- exactly the
                     // roster this needs, just under the one 'name' field.
-                    'name'    => $row['name'],
-                    'school'  => $row['school'],
+                    'name'       => $row['name'],
+                    'school'     => $row['school'],
+                    'student_id' => StudentIdFormat::shortId($row['reg_no'] ?? null),
                 ]);
         })->values()->all();
     }
@@ -257,14 +260,26 @@ class FestResultsController extends SahodayaAdminController
         $event = $this->regionAwareTargetEvent($request, $event);
         $rows = $this->firstRankWinnerRows($event);
 
+        $headers = ['Item', 'Category', 'Type', 'Gender', 'Student ID', 'Winner / Team', 'School'];
+        $tableRows = collect($rows)->map(fn ($r) => [
+            $r['item'], $r['category_label'] ?? '', $r['type_label'] ?? '', $r['gender_label'] ?? '',
+            $r['student_id'] ?? '', $r['name'], $r['school'] ?? '',
+        ]);
+
         if ($request->boolean('csv')) {
             return \App\Support\ExcelExport::download(
                 str($event->title)->slug()->limit(50).'-first-rank-winners',
-                ['Item', 'Category', 'Type', 'Gender', 'Winner / Team', 'School'],
-                collect($rows)->map(fn ($r) => [
-                    $r['item'], $r['category_label'] ?? '', $r['type_label'] ?? '', $r['gender_label'] ?? '',
-                    $r['name'], $r['school'] ?? '',
-                ]),
+                $headers,
+                $tableRows,
+                \App\Support\ExcelExport::generatedOnNote(),
+            );
+        }
+
+        if ($request->boolean('docx')) {
+            return WordExport::download(
+                str($event->title)->slug()->limit(50).'-first-rank-winners',
+                $event->title.' — 1st Rank Winners',
+                [['headers' => $headers, 'rows' => $tableRows]],
                 \App\Support\ExcelExport::generatedOnNote(),
             );
         }
@@ -329,26 +344,28 @@ class FestResultsController extends SahodayaAdminController
                         $namesString = !empty($allNames) ? implode(' & ', $allNames) : ($first['name'] ?? 'Team Entry');
 
                         return [
-                            'position' => (int) $first['position'],
-                            'chest_no' => $first['chest_no'] ?? null,
-                            'name'     => $namesString,
-                            'school'   => $first['school'] ?? '',
-                            'grade'    => $first['grade'] ?? null,
-                            'score'    => $first['score'] ?? null,
-                            'reg_no'   => $first['reg_no'] ?? null,
+                            'position'   => (int) $first['position'],
+                            'chest_no'   => $first['chest_no'] ?? null,
+                            'name'       => $namesString,
+                            'school'     => $first['school'] ?? '',
+                            'grade'      => $first['grade'] ?? null,
+                            'score'      => $first['score'] ?? null,
+                            'reg_no'     => $first['reg_no'] ?? null,
+                            'student_id' => StudentIdFormat::shortId($first['reg_no'] ?? null),
                         ];
                     })
                     ->sortBy('position')
                     ->values();
             } else {
                 $winners = $winners->map(fn ($row) => [
-                    'position' => (int) $row['position'],
-                    'chest_no' => $row['chest_no'] ?? null,
-                    'name'     => $row['name'] ?? '',
-                    'school'   => $row['school'] ?? '',
-                    'grade'    => $row['grade'] ?? null,
-                    'score'    => $row['score'] ?? null,
-                    'reg_no'   => $row['reg_no'] ?? null,
+                    'position'   => (int) $row['position'],
+                    'chest_no'   => $row['chest_no'] ?? null,
+                    'name'       => $row['name'] ?? '',
+                    'school'     => $row['school'] ?? '',
+                    'grade'      => $row['grade'] ?? null,
+                    'score'      => $row['score'] ?? null,
+                    'reg_no'     => $row['reg_no'] ?? null,
+                    'student_id' => StudentIdFormat::shortId($row['reg_no'] ?? null),
                 ]);
             }
 
@@ -380,7 +397,7 @@ class FestResultsController extends SahodayaAdminController
         $event = $this->regionAwareTargetEvent($request, $event);
         $itemsData = $this->topThreeWinnerData($event);
 
-        if ($request->boolean('csv')) {
+        if ($request->boolean('csv') || $request->boolean('docx')) {
             $flatRows = [];
             $slNo = 1;
             foreach ($itemsData as $item) {
@@ -394,6 +411,7 @@ class FestResultsController extends SahodayaAdminController
                         $item['gender_label'] ?? '',
                         $winner['position'],
                         $winner['chest_no'] ?? '',
+                        $winner['student_id'] ?? '',
                         $winner['name'],
                         $winner['school'],
                         $winner['grade'] ?? '',
@@ -402,9 +420,20 @@ class FestResultsController extends SahodayaAdminController
                 }
             }
 
+            $headers = ['Sl No', 'Item Code', 'Item Title', 'Category', 'Type', 'Gender', 'Rank', 'Chest No', 'Student ID', 'Participant / Team', 'School', 'Grade', 'Score'];
+
+            if ($request->boolean('docx')) {
+                return WordExport::download(
+                    str($event->title)->slug()->limit(50).'-top-3-winners',
+                    $event->title.' — Top 3 Winners',
+                    [['headers' => $headers, 'rows' => $flatRows]],
+                    \App\Support\ExcelExport::generatedOnNote(),
+                );
+            }
+
             return \App\Support\ExcelExport::download(
                 str($event->title)->slug()->limit(50).'-top-3-winners',
-                ['Sl No', 'Item Code', 'Item Title', 'Category', 'Type', 'Gender', 'Rank', 'Chest No', 'Participant / Team', 'School', 'Grade', 'Score'],
+                $headers,
                 $flatRows,
                 \App\Support\ExcelExport::generatedOnNote(),
             );

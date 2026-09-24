@@ -19,10 +19,6 @@
                 <button v-if="events.length" type="button" class="btn-secondary text-sm" @click="showBulkImport = !showBulkImport">
                     Import CSV
                 </button>
-                <button v-if="focusEvent?.id" type="button" class="btn-secondary text-sm flex items-center gap-1.5" @click="openTeamManagersModal">
-                    <span>👔</span>
-                    <span>{{ teamManagers?.manager_name_1 ? 'Edit Team Managers' : 'Team Managers' }}</span>
-                </button>
                 <a :href="`${programBase}/reports`" class="btn-secondary text-sm">All events reports →</a>
             </template>
         </PageHeader>
@@ -71,6 +67,7 @@
                     <h4 class="font-semibold text-slate-900 text-sm">School Contingent Team Managers</h4>
                     <p v-if="teamManagers?.manager_name_1" class="text-xs text-slate-600 mt-0.5">
                         <span class="font-medium text-slate-800">Manager 1:</span> {{ teamManagers.manager_name_1 }} ({{ teamManagers.manager_phone_1 || 'No phone' }})
+                        <span v-if="teamManagers.manager_role_1 === 'Events Coordinator (on file)'" class="ml-1 text-amber-700">— from your Events Coordinator, review &amp; save to confirm</span>
                         <span v-if="teamManagers.manager_name_2" class="ml-2 pl-2 border-l border-slate-200"><span class="font-medium text-slate-800">Manager 2:</span> {{ teamManagers.manager_name_2 }} ({{ teamManagers.manager_phone_2 || 'No phone' }})</span>
                     </p>
                     <p v-else class="text-xs text-amber-700 mt-0.5">

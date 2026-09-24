@@ -36,6 +36,7 @@
                     <th style="width: 100px;">Category</th>
                     <th style="width: 70px;">Type</th>
                     <th style="width: 60px;">Gender</th>
+                    <th style="width: 80px;">Student ID</th>
                     <th>Winner / Team</th>
                     <th>School</th>
                 </tr>
@@ -47,6 +48,7 @@
                     <td class="head-cell">{{ $row['category_label'] ?? '—' }}</td>
                     <td class="head-cell">{{ $row['type_label'] ?? '—' }}</td>
                     <td class="head-cell">{{ $row['gender_label'] ?? '—' }}</td>
+                    <td class="head-cell">{{ $row['student_id'] ?? '—' }}</td>
                     <td class="name">{{ $row['name'] ?? '' }}</td>
                     <td>{{ strtoupper($row['school'] ?? '') }}</td>
                 </tr>

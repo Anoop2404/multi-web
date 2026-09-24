@@ -385,6 +385,15 @@ class FestReportCatalog
         'student-wise', 'student-wise-report', 'student-wise-pdf',
         'item-wise', 'item-participants',
         'numbering-register', 'pending-approvals',
+        // Third retrofit pass (2026-09-24): School Team Managers & Contingent Officials
+        // and Unique Participant Counts both already declared
+        // 'supported_scopes' => [..., 'region'] below — Downloads.vue was offering a
+        // region tab that silently did nothing, since only membership in THIS list
+        // actually reroutes through regionAwareTargetEvent()/regionScopedRows(). Both
+        // read participants/registrations the same reportableEventIds()-combining way
+        // as every id above.
+        'team-managers', 'team-managers-pdf',
+        'unique-participants-pdf', 'unique-participants-xls',
     ];
 
     /**
