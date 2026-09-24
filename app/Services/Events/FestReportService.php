@@ -2277,10 +2277,12 @@ class FestReportService
     private function teamManagersPdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $data = $this->teamManagersData($request->input('school_id'));
+        $isDomPdf = empty(config('services.pdf_converter.url'));
 
         $bladeData = [
-            'event'   => $this->event,
-            'schools' => $data,
+            'event'    => $this->event,
+            'schools'  => $data,
+            'isDomPdf' => $isDomPdf,
             ...$this->brandingData(),
         ];
 
@@ -2291,6 +2293,27 @@ class FestReportService
                 ->header('Content-Type', 'text/html');
         }
 
-        return $this->renderPdf('fest.reports.team-managers', $bladeData, $this->slug().'-team-managers.pdf');
+        // Branding + page numbering repeating on every page (this report regularly runs
+        // to 5+ pages for a large Sahodaya) needs Chromium's own header/footer iframe —
+        // a plain in-page header only ever renders once, at the top of page 1 (dompdf's
+        // position:fixed trick, used for the "Generated on" timestamp below, doesn't
+        // extend to arbitrary content like a logo/title block). Ignored by the dompdf
+        // fallback, which keeps the in-page header from the Blade view itself instead —
+        // see its own $isDomPdf check.
+        [$headerTemplate, $footerTemplate] = \App\Support\PdfChromeHeaderFooter::build([
+            'orgName'    => $bladeData['orgName'],
+            'logoSrc'    => $bladeData['logoSrc'],
+            'docTitle'   => 'School Team Managers',
+            'eventTitle' => $this->event->title,
+        ]);
+
+        return $this->renderPdf(
+            'fest.reports.team-managers',
+            $bladeData,
+            $this->slug().'-team-managers.pdf',
+            false,
+            $headerTemplate,
+            $footerTemplate,
+        );
     }
 }
