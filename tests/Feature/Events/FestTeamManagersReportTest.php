@@ -293,4 +293,47 @@ class FestTeamManagersReportTest extends TestCase
         // The table itself must still render regardless.
         $this->assertStringContainsString('VIEW RENDER SCHOOL', $chromeHtml);
     }
+
+    /**
+     * The registration sheet is a physical sign-in form for the registration desk --
+     * same rows as the team managers report, but the student count is left blank for
+     * the desk to fill in by hand (see teamManagersRegistrationSheetPdf()'s own
+     * docblock) and a signature column is added.
+     */
+    public function test_registration_sheet_leaves_the_count_blank_and_adds_a_signature_column(): void
+    {
+        $sahodaya = Tenant::create([
+            'type' => 'sahodaya', 'name' => 'Reg Sheet Sahodaya', 'subdomain' => 'reg-sheet-'.uniqid(),
+        ]);
+        $schoolTenant = Tenant::create([
+            'type' => 'school', 'name' => 'Reg Sheet School', 'subdomain' => 'reg-sheet-school-'.uniqid(),
+            'parent_id' => $sahodaya->id, 'school_prefix' => 'RSS',
+        ]);
+        $event = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Reg Sheet Kalotsav', 'event_type' => 'kalotsav',
+            'fee_settings' => ['fee_model' => 'none'],
+        ]);
+        FestRegistration::create([
+            'tenant_id' => $schoolTenant->id, 'event_id' => $event->id, 'school_id' => $schoolTenant->id, 'status' => 'submitted',
+        ]);
+        FestSchoolTeamManager::create([
+            'tenant_id' => $sahodaya->id, 'event_id' => $event->id, 'school_id' => $schoolTenant->id,
+            'manager_name_1' => 'Reg Sheet Manager', 'manager_phone_1' => '9123456789',
+        ]);
+
+        $reportService = new FestReportService($event);
+        $row = $reportService->teamManagersData()->first();
+        $this->assertSame(0, $row->unique_student_count, 'No approved/submitted participants were registered for this fixture.');
+
+        // export() with no 'download' param defaults to preview mode -- the plain HTML
+        // response, not an actual PDF conversion.
+        $response = $reportService->export('team-managers-registration-sheet', new Request());
+        $html = $response->getContent();
+
+        $this->assertStringContainsString('Reg Sheet Manager', $html);
+        $this->assertStringContainsString('>Signature<', $html);
+        $this->assertStringContainsString('blank-box', $html);
+        // The count cell must stay empty, not render the system's own count value.
+        $this->assertStringNotContainsString('count-badge', $html);
+    }
 }

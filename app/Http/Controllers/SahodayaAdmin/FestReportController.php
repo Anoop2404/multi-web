@@ -620,6 +620,7 @@ class FestReportController extends SahodayaAdminController
             'schools' => $service->schools(),
             'pdfUrl'  => "{$exportBase}/team-managers-pdf".($exportParams ? "?{$exportParams}" : ''),
             'xlsUrl'  => "{$exportBase}/team-managers".($exportParams ? "?{$exportParams}" : ''),
+            'registrationSheetUrl' => "{$exportBase}/team-managers-registration-sheet".($exportParams ? "?{$exportParams}" : ''),
         ])));
     }
 

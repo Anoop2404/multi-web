@@ -174,6 +174,7 @@ class FestReportCatalog
             ['id' => 'student-limits-xls', 'label' => 'Student Item Limits (Excel)', 'format' => 'xls', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'team-managers', 'label' => 'School Team Managers & Contingent Officials (Excel)', 'format' => 'xls', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'team-managers-pdf', 'label' => 'School Team Managers & Contingent Officials (PDF)', 'format' => 'pdf', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
+            ['id' => 'team-managers-registration-sheet', 'label' => 'Team Manager Registration Sheet — Sign-In (PDF)', 'format' => 'pdf', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'unique-participants-pdf', 'label' => 'Unique Participant Counts (PDF)', 'format' => 'pdf', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'unique-participants-xls', 'label' => 'Unique Participant Counts (Excel)', 'format' => 'xls', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
         ];
@@ -281,6 +282,7 @@ class FestReportCatalog
         'student-limits-xls'            => ['dataset' => 'registration', 'supported_scopes' => ['self'], 'supports_competition_phase' => false],
         'team-managers'                 => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'team-managers-pdf'             => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
+        'team-managers-registration-sheet' => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'unique-participants-pdf'       => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'unique-participants-xls'       => ['dataset' => 'registration', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
     ];
