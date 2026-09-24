@@ -80,8 +80,17 @@
     </style>
 </head>
 <body>
-    @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
-    @include('partials.pdf-branding-header', ['orgName' => $orgName ?? 'Sahodaya', 'logoSrc' => $logoSrc ?? null])
+    {{-- Both skipped for the Chromium/Puppeteer path (production) -- its own
+         headerTemplate/footerTemplate (PdfChromeHeaderFooter::build(), passed by
+         FestReportService::teamManagersPdf()) repeats branding, "Generated on", and
+         page numbering on every page instead of only the first (a plain in-page
+         header only ever renders once, at the top of page 1). Still included for the
+         dompdf fallback and the on-screen preview, neither of which get a Chromium
+         header/footer at all. --}}
+    @if($isDomPdf ?? true)
+        @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
+        @include('partials.pdf-branding-header', ['orgName' => $orgName ?? 'Sahodaya', 'logoSrc' => $logoSrc ?? null])
+    @endif
 
     <h2>School Team Managers</h2>
     <div class="meta">{{ $event->title }}</div>
