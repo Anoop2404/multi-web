@@ -80,20 +80,21 @@
     </style>
 </head>
 <body>
-    {{-- Both skipped for the Chromium/Puppeteer path (production) -- its own
-         headerTemplate/footerTemplate (PdfChromeHeaderFooter::build(), passed by
-         FestReportService::teamManagersPdf()) repeats branding, "Generated on", and
-         page numbering on every page instead of only the first (a plain in-page
-         header only ever renders once, at the top of page 1). Still included for the
-         dompdf fallback and the on-screen preview, neither of which get a Chromium
-         header/footer at all. --}}
-    @if($isDomPdf ?? true)
+    {{-- Skipped only for an actual Chromium/Puppeteer-converted download (production) --
+         its own headerTemplate/footerTemplate (PdfChromeHeaderFooter::build(), passed by
+         FestReportService::teamManagersPdf()) already repeats branding, the title, and
+         page numbering on every page instead of only the first (a plain in-page header
+         only ever renders once, at the top of page 1) -- showing both here doubled up
+         and overlapped the two. Still needed for the dompdf fallback AND for the preview
+         (?inline=1), since the preview renders this Blade view directly and never goes
+         through the Chromium header/footer at all, even when the converter is
+         configured. --}}
+    @if(($isDomPdf ?? true) || ($preview ?? false))
         @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
         @include('partials.pdf-branding-header', ['orgName' => $orgName ?? 'Sahodaya', 'logoSrc' => $logoSrc ?? null])
+        <h2>School Team Managers</h2>
+        <div class="meta">{{ $event->title }}</div>
     @endif
-
-    <h2>School Team Managers</h2>
-    <div class="meta">{{ $event->title }}</div>
 
     <table>
         <thead>

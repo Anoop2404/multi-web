@@ -2283,6 +2283,11 @@ class FestReportService
             'event'    => $this->event,
             'schools'  => $data,
             'isDomPdf' => $isDomPdf,
+            // The preview render never goes through PdfChromeHeaderFooter (it returns
+            // the Blade view's own HTML directly, below) even when the Chromium
+            // converter is otherwise configured -- so the view's in-page title/branding
+            // must still show for a preview, not just for the dompdf fallback.
+            'preview'  => $this->preview,
             ...$this->brandingData(),
         ];
 

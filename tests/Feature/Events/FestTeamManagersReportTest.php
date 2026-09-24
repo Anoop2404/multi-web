@@ -250,4 +250,47 @@ class FestTeamManagersReportTest extends TestCase
         // Only the 'approved' and 'submitted' students count -- 2, not 6.
         $this->assertSame(2, $row->unique_student_count);
     }
+
+    /**
+     * When a Chromium/Puppeteer converter is configured (production), the actual PDF
+     * download must NOT also render the in-page title/branding block -- the converter's
+     * own headerTemplate/footerTemplate (PdfChromeHeaderFooter) already repeats them on
+     * every page. Rendering both produced a visibly doubled, overlapping header on the
+     * downloaded PDF. The dompdf fallback and the on-screen preview never get a
+     * Chromium header/footer at all, so they must still show the in-page one.
+     */
+    public function test_pdf_view_skips_its_own_title_only_for_an_actual_chromium_converted_download(): void
+    {
+        $event = (object) ['title' => 'View Render Kalotsav'];
+        $schools = collect([(object) [
+            'school_name' => 'View Render School', 'school_prefix' => 'VRS', 'unique_student_count' => 3,
+            'manager_name_1' => 'Some Manager', 'manager_phone_1' => '9000000000', 'manager_role_1' => null,
+            'manager_name_2' => null, 'manager_phone_2' => null,
+        ]]);
+        $base = ['event' => $event, 'schools' => $schools, 'orgName' => 'Test Sahodaya', 'logoSrc' => null];
+
+        // dompdf fallback (isDomPdf=true) -- in-page title must show.
+        $domPdfHtml = view('fest.reports.team-managers', [...$base, 'isDomPdf' => true, 'preview' => false])->render();
+        $this->assertStringContainsString('<h2>School Team Managers</h2>', $domPdfHtml);
+        $this->assertStringContainsString('Test Sahodaya', $domPdfHtml);
+
+        // On-screen preview with the converter configured (isDomPdf=false) -- preview
+        // never goes through the Chromium header/footer, so the in-page title must
+        // still show even though isDomPdf says a converter is available.
+        $previewHtml = view('fest.reports.team-managers', [...$base, 'isDomPdf' => false, 'preview' => true])->render();
+        $this->assertStringContainsString('<h2>School Team Managers</h2>', $previewHtml);
+        $this->assertStringContainsString('Test Sahodaya', $previewHtml);
+
+        // The actual Chromium-converted download (isDomPdf=false, preview=false) --
+        // the converter's own header already carries the title/branding, so the
+        // in-page block must be skipped here specifically.
+        $chromeHtml = view('fest.reports.team-managers', [...$base, 'isDomPdf' => false, 'preview' => false])->render();
+        // The <title> tag (page metadata, not a visible heading) legitimately still
+        // says "School Team Managers Report" -- check the actual in-page <h2> heading
+        // specifically, not the substring anywhere in the document.
+        $this->assertStringNotContainsString('<h2>School Team Managers</h2>', $chromeHtml);
+        $this->assertStringNotContainsString('Test Sahodaya', $chromeHtml);
+        // The table itself must still render regardless.
+        $this->assertStringContainsString('VIEW RENDER SCHOOL', $chromeHtml);
+    }
 }
