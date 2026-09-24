@@ -19,6 +19,7 @@ class FestRegistration extends Model
         'event_id', 'item_id', 'school_id', 'origin_school_id', 'mode', 'status',
         'fee_receipt_id', 'submitted_at',
         'rejection_reason', 'rejected_at', 'rejected_by_user_id',
+        'reporting_batch_id',
     ];
 
     protected $casts = [
@@ -66,6 +67,11 @@ class FestRegistration extends Model
     public function participants(): HasMany
     {
         return $this->hasMany(FestParticipant::class, 'registration_id');
+    }
+
+    public function reportingBatch(): BelongsTo
+    {
+        return $this->belongsTo(FestItemReportingBatch::class, 'reporting_batch_id');
     }
 
     public function scopeActive($query)

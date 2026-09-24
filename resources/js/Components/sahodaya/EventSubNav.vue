@@ -46,7 +46,7 @@ const staffPermissions = computed(() => page.props.staffPermissions ?? []);
 // currently selected (from this page's own Inertia props) onto each of those four
 // hrefs so it survives a tab switch instead of making the admin re-pick it.
 const currentItemId = computed(() => page.props.selectedItemId ?? null);
-const ITEM_AWARE_KEYS = ['chest-numbers', 'attendance', 'marks', 'results'];
+const ITEM_AWARE_KEYS = ['chest-numbers', 'attendance', 'marks', 'results', 'reporting-batches'];
 
 function withCurrentItem(href, key) {
     if (!currentItemId.value || !ITEM_AWARE_KEYS.includes(key)) {
@@ -72,6 +72,7 @@ const tabs = computed(() => {
         { key: 'registrations', label: 'Registrations', icon: '📝', href: `${base.value}/registrations`, permissions: FEST_REGISTRATIONS },
         { key: 'fees', label: 'Event Fees', icon: '💳', href: `${base.value}/fees`, permissions: FEST_FINANCE },
         { key: 'chest-numbers', label: 'Chest Numbers', icon: '🔢', href: `${base.value}/chest-numbers`, permissions: FEST_MANAGE },
+        { key: 'reporting-batches', label: 'Reporting Batches', icon: '⏱️', href: `${base.value}/reporting-batches`, permissions: FEST_MANAGE },
         { key: 'attendance', label: 'Attendance', icon: '📋', href: `${base.value}/attendance`, permissions: FEST_REGISTRATIONS },
         { key: 'marks', label: 'Marks', icon: '✍️', href: `${base.value}/marks`, permissions: FEST_MARKS },
         { key: 'bulk-sheets', label: 'Bulk Sheets', icon: '🖨️', href: `${base.value}/bulk-sheets`, permissions: FEST_MARKS },

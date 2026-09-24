@@ -1393,6 +1393,13 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::delete('/{event}/phases/{phase}', [\App\Http\Controllers\SahodayaAdmin\FestEventPhaseController::class, 'destroy'])->name('phases.destroy');
             Route::post('/{event}/phases/assign-items', [\App\Http\Controllers\SahodayaAdmin\FestEventPhaseController::class, 'assignItems'])->name('phases.assign-items');
             Route::post('/{event}/phases/regions', [\App\Http\Controllers\SahodayaAdmin\FestEventPhaseController::class, 'storeRegion'])->name('phases.regions.store');
+            Route::get('/{event}/reporting-batches', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'index'])->name('reporting-batches.index');
+            Route::get('/{event}/reporting-batches/batch-master', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'batchMaster'])->name('reporting-batches.batch-master');
+            Route::get('/{event}/reporting-batches/print', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'print'])->name('reporting-batches.print');
+            Route::post('/{event}/reporting-batches', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'store'])->name('reporting-batches.store');
+            Route::put('/{event}/reporting-batches/{batch}', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'update'])->name('reporting-batches.update');
+            Route::delete('/{event}/reporting-batches/{batch}', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'destroy'])->name('reporting-batches.destroy');
+            Route::post('/{event}/reporting-batches/assign', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'assignRegistrations'])->name('reporting-batches.assign');
             Route::post('/{event}/registration-batches', [\App\Http\Controllers\SahodayaAdmin\FestRegistrationBatchController::class, 'store'])->name('registration-batches.store');
             Route::put('/{event}/registration-batches/{batch}', [\App\Http\Controllers\SahodayaAdmin\FestRegistrationBatchController::class, 'update'])->name('registration-batches.update');
             Route::delete('/{event}/registration-batches/{batch}', [\App\Http\Controllers\SahodayaAdmin\FestRegistrationBatchController::class, 'destroy'])->name('registration-batches.destroy');

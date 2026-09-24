@@ -131,6 +131,7 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
         items: [
             { label: 'Stage schedule', href: `${base}/schedule`, icon: 'calendar', permissions: FEST_SCHEDULE },
             { label: 'Item scheduling', href: `${base}/schedule/items`, icon: 'map-pin', permissions: FEST_SCHEDULE },
+            { label: 'Reporting batches', href: `${base}/reporting-batches`, icon: 'users', permissions: FEST_SCHEDULE },
         ],
     });
 
