@@ -86,7 +86,12 @@ class StudentDashboardController extends Controller
                 'status'   => $r->status,
                 'event'    => $r->event?->only('id', 'title'),
                 'item'     => $r->item?->only('id', 'title'),
-                'chest_no' => $r->participants->first()?->chest_no,
+                // Schools/students never see chest numbers for Sahodaya events on their
+                // own pages, regardless of the event's chest_reveal_mode -- that gate
+                // (FestIdCardService's hideChestNo) is about printed ID cards/hall
+                // tickets leaking a number before stage entry; the portal is a different
+                // surface and stays hidden here unconditionally.
+                'chest_no' => null,
             ]);
 
         $mcqExams = $this->mcqExamsFor($student);
@@ -147,7 +152,7 @@ class StudentDashboardController extends Controller
                 'status'      => $e->status,
             ]);
 
-        $sportsProfile = app(StudentSportsProfileService::class)->forStudent($student, $tenantId, 'portal');
+        $sportsProfile = app(StudentSportsProfileService::class)->forStudent($student, $tenantId, 'portal', revealChestNo: false);
 
         return inertia('Portal/Student/Dashboard', [
             'school'        => $school->only('id', 'name'),
@@ -320,7 +325,9 @@ class StudentDashboardController extends Controller
                 return [
                     'event_title'  => $p->registration?->event?->title,
                     'item_title'   => $p->registration?->item?->title,
-                    'chest_no'     => $p->chest_no,
+                    // See the dashboard registrations list above -- chest numbers stay
+                    // off the student portal unconditionally for Sahodaya events.
+                    'chest_no'     => null,
                     'level_reg'    => $p->level_registration_number,
                     'order'        => $schedule?->sort_order,
                     'scheduled_at' => $schedule?->scheduled_at?->toIso8601String(),
@@ -354,7 +361,9 @@ class StudentDashboardController extends Controller
                 'points'      => ($p->mark && $p->registration?->event)
                     ? $gradePointService->pointsForMark($p->registration->event, $p->mark)
                     : null,
-                'chest_no'    => $p->chest_no,
+                // See festDaySlots() above -- chest numbers stay off the student portal
+                // unconditionally for Sahodaya events.
+                'chest_no'    => null,
             ]);
     }
 

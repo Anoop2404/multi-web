@@ -19,7 +19,7 @@ class StudentSportsProfileService
     ) {}
 
     /** @return array{sports_events: list<array<string, mixed>>, other_fest: list<array<string, mixed>>} */
-    public function forStudent(Student $student, string $schoolId, string $context = 'school'): array
+    public function forStudent(Student $student, string $schoolId, string $context = 'school', bool $revealChestNo = true): array
     {
         $school = Tenant::find($schoolId);
 
@@ -61,7 +61,7 @@ class StudentSportsProfileService
 
             if ($event->event_type !== 'sports') {
                 $otherFest->push(array_merge(
-                    $this->otherFestRow($participant),
+                    $this->otherFestRow($participant, $revealChestNo),
                     ['id_cards' => $school ? $this->idCardLinks($event, $student, $school, $context) : null],
                 ));
 
@@ -110,7 +110,8 @@ class StudentSportsProfileService
                 'item_title'        => $item->title,
                 'sport_discipline'  => $item->sport_discipline,
                 'registration_status' => $registration->status,
-                'chest_no'          => $participant->chest_no,
+                // See otherFestRow() -- chest numbers only show for the Sahodaya admin.
+                'chest_no'          => $revealChestNo ? $participant->chest_no : null,
                 'fest_id'           => $participant->level_registration_number,
                 'competition_start' => $this->windowResolver->effectiveCompetitionStart($item)?->format('Y-m-d'),
                 'competition_end'   => $this->windowResolver->effectiveCompetitionEnd($item)?->format('Y-m-d'),
@@ -387,7 +388,7 @@ class StudentSportsProfileService
     }
 
     /** @return array<string, mixed> */
-    private function otherFestRow(FestParticipant $participant): array
+    private function otherFestRow(FestParticipant $participant, bool $revealChestNo = true): array
     {
         $registration = $participant->registration;
 
@@ -397,7 +398,10 @@ class StudentSportsProfileService
             'event_type'  => $registration->event?->event_type,
             'item_title'  => $registration->item?->title,
             'status'      => $registration->status,
-            'chest_no'    => $participant->chest_no,
+            // Chest numbers for Sahodaya events only show on the Sahodaya admin's
+            // student profile -- neither the school admin nor the student portal see
+            // them (see StudentDashboardController::festDaySlots()).
+            'chest_no'    => $revealChestNo ? $participant->chest_no : null,
             'fest_id'     => $participant->level_registration_number,
             'mark'        => $participant->mark?->only(['grade', 'position', 'score']),
         ];

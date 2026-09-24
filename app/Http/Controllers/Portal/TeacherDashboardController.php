@@ -46,7 +46,10 @@ class TeacherDashboardController extends Controller
                 return [
                     'event_title'  => $p->registration?->event?->title,
                     'item_title'   => $p->registration?->item?->title,
-                    'chest_no'     => $p->chest_no,
+                    // Same rule as the student portal -- chest numbers stay off it
+                    // unconditionally for Sahodaya events (see
+                    // StudentDashboardController::festDaySlots()).
+                    'chest_no'     => null,
                     'level_reg'    => $p->level_registration_number,
                     'scheduled_at' => $schedule?->scheduled_at?->toIso8601String(),
                     'stage'        => $schedule?->stage,
@@ -220,7 +223,7 @@ class TeacherDashboardController extends Controller
                 'grade'       => $p->mark?->grade,
                 'position'    => $p->mark?->position,
                 'score'       => $p->mark?->score,
-                'chest_no'    => $p->chest_no,
+                'chest_no'    => null,
             ]);
 
         $participantIds = FestParticipant::where('teacher_id', $teacher->id)
@@ -250,7 +253,7 @@ class TeacherDashboardController extends Controller
                 return [
                     'event_title'  => $p->registration?->event?->title,
                     'item_title'   => $p->registration?->item?->title,
-                    'chest_no'     => $p->chest_no,
+                    'chest_no'     => null,
                     'level_reg'    => $p->level_registration_number,
                     'scheduled_at' => $schedule?->scheduled_at?->toIso8601String(),
                     'stage'        => $schedule?->stage,

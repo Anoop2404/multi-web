@@ -138,7 +138,11 @@ class GroupAdminController extends Controller
                 'reg_no'       => $p->student?->reg_no,
                 'event_title'  => $p->registration?->event?->title,
                 'item_title'   => $p->registration?->item?->title,
-                'chest_no'     => $p->chest_no,
+                // school_admin can reach this same portal (EnsureGroupAdmin) -- chest
+                // numbers stay off it for the same reason as the student portal and the
+                // school's own Fest Day page (StudentDashboardController::festDaySlots(),
+                // FestRegistrationController::festDay()).
+                'chest_no'     => null,
                 'level_reg'    => $p->level_registration_number,
                 'scheduled_at' => $schedule?->scheduled_at?->toIso8601String(),
                 'stage'        => $schedule?->stage,

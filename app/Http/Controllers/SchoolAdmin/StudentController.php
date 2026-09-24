@@ -108,7 +108,8 @@ class StudentController extends SchoolAdminController
             'verifiedBy:id,name,email',
         ]);
 
-        $sportsProfile = app(StudentSportsProfileService::class)->forStudent($student, $this->school->id);
+        // Chest numbers for Sahodaya events stay off every school-facing page.
+        $sportsProfile = app(StudentSportsProfileService::class)->forStudent($student, $this->school->id, revealChestNo: false);
 
         return $this->inertia('School/Students/Show', [
             'student'           => $this->profilePayload($student),
