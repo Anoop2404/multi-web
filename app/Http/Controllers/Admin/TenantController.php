@@ -29,6 +29,7 @@ use App\Support\SahodayaNavVisibility;
 use App\Support\SahodayaSiteTemplate;
 use App\Support\TenancyDatabase;
 use App\Support\TenantBranding;
+use App\Support\StateScope;
 use App\Support\TenantDomainSync;
 use App\Services\Auth\UserCredentialService;
 use Illuminate\Http\Request;
@@ -823,6 +824,21 @@ class TenantController extends Controller
             ->when(($filters['status'] ?? 'all') === 'inactive', fn ($q) => $q->where('is_active', false))
             ->orderBy('name');
 
+        // The Sahodaya list is reachable by state_admin/state_staff (admin.sahodayas.* is behind
+        // EnsureStateAdmin, unlike admin.schools.* and admin.tenants.*, which are superadmin-only),
+        // but nothing scoped it — so a state admin saw every other state's Sahodayas too. Same
+        // data-isolation gap FRD-13 Finding A closed for programs and remittances, and it got
+        // sharper once promotion started turning the state's master list into real tenants with
+        // contact details attached.
+        //
+        // Fails closed like the rest of the state admin: a state user with no state assigned, or
+        // tenants with no state_id yet, see nothing rather than everything. Superadmin is never
+        // scoped. Legacy tenants predate tenants.state_id, so they need backfilling to appear —
+        // promotions stamp it when run with --state.
+        if ($type === 'sahodaya' && StateScope::shouldScope($request)) {
+            StateScope::apply($query, 'state_id', $request);
+        }
+
         if ($type === 'school') {
             $query->with('parent:id,name');
         } else {
@@ -848,6 +864,11 @@ class TenantController extends Controller
             'tenantType'       => $type,
             'pageTitle'        => $pageTitle,
             'createUrl'        => $createUrl,
+            // Sahodayas only, superadmin only: a school shares its parent's database, so it has
+            // nothing of its own to provision.
+            'databasesUrl'     => $type === 'sahodaya' && $request->user()?->isSuperAdmin()
+                ? route('admin.sahodayas.databases.index')
+                : null,
             'readOnly'         => $readOnly,
             'tenantBaseDomain' => config('tenancy.tenant_base_domain'),
             'filters'          => array_merge(['search' => '', 'status' => 'all'], $filters),

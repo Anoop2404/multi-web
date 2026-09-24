@@ -31,7 +31,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     }
 
     protected $fillable = [
-        'id', 'type', 'name', 'domain', 'subdomain',
+        'id', 'type', 'state_id', 'name', 'domain', 'subdomain',
         'parent_id', 'plan', 'is_active', 'fest_registration_closed',
         'school_prefix', 'school_no', 'membership_status', 'is_non_affiliated', 'is_appeal_pool', 'renewal_status', 'application_payload', 'prefixes_locked',
         'school_setup_wizard_dismissed', 'nav_overrides',
@@ -53,7 +53,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     public static function getCustomColumns(): array
     {
         return [
-            'id', 'type', 'name', 'domain', 'subdomain', 'parent_id', 'plan', 'is_active',
+            'id', 'type', 'state_id', 'name', 'domain', 'subdomain', 'parent_id', 'plan', 'is_active',
             'fest_registration_closed',
             'school_prefix', 'school_no', 'membership_status', 'is_non_affiliated', 'is_appeal_pool', 'renewal_status', 'application_payload', 'prefixes_locked',
             'school_setup_wizard_dismissed', 'nav_overrides',
@@ -75,6 +75,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     // ── Relationships ────────────────────────────────────────────────────────
 
     public function parent()       { return $this->belongsTo(Tenant::class, 'parent_id'); }
+    public function state()        { return $this->belongsTo(PlatformState::class, 'state_id'); }
     public function children()     { return $this->hasMany(Tenant::class, 'parent_id'); }
     public function subscription() { return $this->hasOne(TenantSubscription::class, 'tenant_id'); }
     public function settings()     { return $this->hasMany(TenantSetting::class, 'tenant_id'); }
@@ -100,6 +101,19 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     public function sahodayaProfile() { return $this->hasOne(SahodayaProfile::class, 'tenant_id'); }
     public function registrations()   { return $this->hasMany(Registration::class, 'school_id'); }
     public function submissions()     { return $this->hasMany(SchoolYearSubmission::class, 'school_id'); }
+
+    /**
+     * Scope to one state. Mirrors Support\StateScope::apply(), but takes the id explicitly so
+     * console commands and services can scope outside a request. Pass null (a state user with no state assigned — see
+     * EnsureStateAdmin) and it matches nothing, so state-scoped listings fail closed
+     * the same way the rest of the state admin does rather than leaking every tenant.
+     */
+    public function scopeForState($query, ?string $stateId)
+    {
+        return $stateId === null
+            ? $query->whereRaw('1 = 0')
+            : $query->where('state_id', $stateId);
+    }
 
     /**
      * A school's printable "code" for ID cards etc. — {Sahodaya prefix}-{permanent

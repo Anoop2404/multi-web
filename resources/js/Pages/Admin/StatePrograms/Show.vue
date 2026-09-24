@@ -214,7 +214,7 @@
                                 { value: 'team', label: 'Team' },
                             ]" />
 
-                            <input v-model.number="itemForm.qualify_count" type="number" min="1" class="px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium" placeholder="State Qualifiers (default 2)">
+                            <input v-model.number="itemForm.qualify_count" type="number" min="1" class="px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium" placeholder="Slots per Sahodaya (default 2)">
                         </div>
                         <div class="flex justify-end">
                             <button type="submit" class="px-5 py-2 rounded-xl bg-[color:var(--brand-navy)] hover:bg-[color:var(--brand-navy-hover)] text-white font-bold text-xs transition">
@@ -320,8 +320,9 @@
                                         {{ item.fee_amount != null ? '₹' + item.fee_amount : '—' }}
                                     </td>
                                     <td class="py-3 px-4 text-center">
-                                        <span class="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-xs">
-                                            Top {{ item.qualify_count ?? 2 }}
+                                        <span class="px-2.5 py-0.5 rounded-full font-bold text-xs"
+                                              :class="item.max_per_school ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'">
+                                            {{ item.max_per_school || item.qualify_count || 2 }} per Sahodaya
                                         </span>
                                     </td>
                                     <td class="py-3 px-4 text-right">
@@ -431,8 +432,15 @@
                                 </div>
 
                                 <div>
-                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Qualifiers to State</label>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Slots per Sahodaya</label>
                                     <input v-model.number="editItemForm.qualify_count" type="number" min="1" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium" placeholder="2">
+                                    <p class="mt-1 text-[11px] text-slate-500">How many entries each Sahodaya may send for this item.</p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Override slots</label>
+                                    <input v-model.number="editItemForm.max_per_school" type="number" min="1" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium" placeholder="Leave blank">
+                                    <p class="mt-1 text-[11px] text-slate-500">Wins over the value above — use for items that qualify fewer, e.g. top-1.</p>
                                 </div>
 
                                 <div>
@@ -494,19 +502,29 @@
                     <div v-if="form.conduct_levels.includes('state')" class="p-5 rounded-2xl bg-[color:var(--brand-blue)]/10 border border-[color:var(--brand-blue)]/20 space-y-3">
                         <div>
                             <h3 class="text-sm font-bold text-[color:var(--brand-navy)] uppercase tracking-wider">State remittance rate</h3>
-                            <p class="text-xs text-[color:var(--brand-blue)]">Charged to each Sahodaya for every qualifier accepted into the State event.</p>
+                            <p class="text-xs text-[color:var(--brand-blue)]">Charged to each Sahodaya that sends qualifiers to the State event.</p>
                         </div>
                         <div class="grid sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Billing</label>
+                                <SearchableSelect v-model="form.level_fees.state.fee_model" :all-option="false" class="w-full" :options="[
+                                    { value: 'flat_school', label: 'Fixed fee per Sahodaya' },
+                                    { value: 'per_item', label: 'Per item × approved entries' },
+                                ]" />
+                            </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-700 mb-1">Sahodaya registration fee (₹, flat)</label>
                                 <input v-model.number="form.level_fees.state.sahodaya_registration_fee" type="number" min="0" class="w-full px-3.5 py-2 rounded-xl border border-[color:var(--brand-blue)]/30 text-sm font-medium">
                             </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-700 mb-1">Fee per accepted nominee/team (₹, legacy)</label>
-                                <input v-model.number="form.level_fees.state.individual_amount" type="number" min="0" class="w-full px-3.5 py-2 rounded-xl border border-[color:var(--brand-blue)]/30 text-sm font-medium">
-                            </div>
                         </div>
-                        <p class="text-xs text-slate-500">Actual demand = registration fee + each item's own fee × approved entries. Set per-item fees on the program's items.</p>
+                        <p v-if="form.level_fees.state.fee_model !== 'per_item'" class="text-xs text-slate-500">
+                            Every Sahodaya owes this one amount, whatever the number of qualifiers it sends. Per-item
+                            fees on the program's items are ignored.
+                        </p>
+                        <p v-else class="text-xs text-slate-500">
+                            Demand = registration fee + each item's own fee × approved entries. Set per-item fees on
+                            the program's items.
+                        </p>
                     </div>
 
                     <!-- Participation Policies -->
@@ -864,6 +882,7 @@ const itemForm = useForm({
     participant_type: 'individual',
     fee_amount: null,
     qualify_count: null,
+    max_per_school: null,
 });
 
 const catalogSearch = ref('');
@@ -939,6 +958,7 @@ const editItemForm = useForm({
     stage_type: 'on_stage',
     gender: 'open',
     qualify_count: 2,
+    max_per_school: null,
     fee_amount: null,
     min_group_size: null,
     max_group_size: null,
@@ -955,6 +975,7 @@ function openEditItemModal(item) {
     editItemForm.stage_type = item.stage_type ?? 'on_stage';
     editItemForm.gender = item.gender ?? 'open';
     editItemForm.qualify_count = item.qualify_count ?? 2;
+    editItemForm.max_per_school = item.max_per_school ?? null;
     editItemForm.fee_amount = item.fee_amount ?? null;
     editItemForm.min_group_size = item.min_group_size ?? null;
     editItemForm.max_group_size = item.max_group_size ?? null;

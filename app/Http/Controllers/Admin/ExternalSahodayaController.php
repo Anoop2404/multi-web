@@ -7,6 +7,7 @@ use App\Models\ExternalSahodaya;
 use App\Models\FestStateProgram;
 use App\Services\State\ExternalIntakeService;
 use App\Support\StateScope;
+use App\Support\TenantDomainSync;
 use Illuminate\Http\Request;
 
 /**
@@ -19,10 +20,24 @@ class ExternalSahodayaController extends Controller
     public function index(FestStateProgram $stateProgram)
     {
         StateScope::assertOwns($stateProgram->state_id);
+        // The tenant relation is what tells this page which rows have been promoted and are no
+        // longer reachable by access code — without it the page hands out codes for Sahodayas that
+        // have already moved onto the platform (see the promotion pipeline in
+        // docs/STATE_ADMIN_TENANT_PROMOTION_AND_UAT_PLAN_2026_09_23.md §4).
         $sahodayas = ExternalSahodaya::where('state_program_id', $stateProgram->id)
             ->withCount('schools')
+            ->with('tenant:id,name,subdomain,domain,is_active')
+            ->orderBy('district')
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(function (ExternalSahodaya $sahodaya) {
+                $row = $sahodaya->toArray();
+                $row['tenant_url'] = $sahodaya->tenant
+                    ? TenantDomainSync::publicUrl($sahodaya->tenant)
+                    : null;
+
+                return $row;
+            });
 
         return inertia('StatePrograms/ExternalSahodayas', [
             'program'   => $stateProgram,

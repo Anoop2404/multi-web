@@ -146,6 +146,9 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
         { label: 'Grade Points Master', href: `${base}/rank-points`, icon: 'arrow-up-circle', permissions: FEST_SETTINGS },
         { label: 'Results & publish', href: `${base}/results`, icon: 'award', permissions: FEST_RESULTS },
         { label: 'Leaderboard', href: `${base}/leaderboard`, icon: 'bar-chart', permissions: FEST_RESULTS },
+        // Trophies over groups of items — "Dance Champion" and the like. A settings permission
+        // rather than a results one: creating a trophy decides what is awarded, not who won.
+        { label: 'Prize categories', href: `${base}/prizes`, icon: 'award', permissions: FEST_SETTINGS },
     ];
 
     if (caps.championship) {

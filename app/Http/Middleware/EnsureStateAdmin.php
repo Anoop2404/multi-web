@@ -23,13 +23,19 @@ class EnsureStateAdmin
             return $next($request);
         }
 
-        $isStateUser = $user->hasAnyRole(['state_admin', 'state_staff'])
+        // Every State role, not just the original two: the module added scrutiny officers, mark
+        // operators, certificate operators and report users, and without this they authenticate
+        // successfully and are then refused at the door of their own workspace.
+        $isStateUser = $user->hasAnyRole(\App\Support\StateFestPermissions::roles())
             || (method_exists($user, 'isStateUser') && $user->isStateUser());
 
         if (! $isStateUser) {
             abort(403, 'State admin access required.');
         }
 
+        // state_staff predates the capability matrix and is still enforced bluntly as read-only.
+        // The newer operator roles are governed by state.fest.* instead — a mark operator has to be
+        // able to POST marks, and what it may not do is expressed as a missing capability.
         $isStaff = $user->hasRole('state_staff')
             || (method_exists($user, 'hasStateStaffRole') && $user->hasStateStaffRole());
 

@@ -8,6 +8,7 @@ use App\Models\State\StateQualifierIntake;
 use App\Services\State\StateQualifierIntakeService;
 use App\Services\State\StateQualifierMaterializationService;
 use App\Services\State\StateRemittanceService;
+use App\Models\ExternalSahodaya;
 use App\Models\FestStateProgram;
 use App\Models\Tenant;
 use App\Support\StateScope;
@@ -16,17 +17,42 @@ use Inertia\Inertia;
 
 class StateQualifierReviewController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $intakes = StateScope::apply(StateQualifierIntake::withCount('entries'))
+        $filters = $request->validate([
+            'source'   => 'nullable|in:all,tenant,external',
+            'status'   => 'nullable|string|max:20',
+            'program'  => 'nullable|uuid',
+            'district' => 'nullable|string|max:120',
+            'search'   => 'nullable|string|max:120',
+        ]);
+
+        $source = $filters['source'] ?? 'all';
+        $district = trim((string) ($filters['district'] ?? ''));
+        $search = trim((string) ($filters['search'] ?? ''));
+
+        $query = StateScope::apply(StateQualifierIntake::withCount('entries'))
             ->where('status', '!=', 'draft')
-            ->orderByDesc('created_at')
-            ->paginate(20);
+            ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
+            ->when($filters['program'] ?? null, fn ($q, $program) => $q->where('state_program_id', $program))
+            // The two intake paths are distinguished by a prefix on source_tenant_id: an outside
+            // Sahodaya's intake is "external:{uuid}" (ExternalIntakeService::openDraftIntake), a
+            // managed Sahodaya's is the bare tenant uuid.
+            ->when($source === 'external', fn ($q) => $q->where('source_tenant_id', 'like', 'external:%'))
+            ->when($source === 'tenant', fn ($q) => $q->where('source_tenant_id', 'not like', 'external:%'))
+            ->orderByDesc('created_at');
+
+        // District and free-text search resolve against central tables (tenants /
+        // external_sahodayas) that the state connection cannot join to, so they are applied as an
+        // id whitelist rather than SQL on the intake query.
+        if ($district !== '' || $search !== '') {
+            $query->whereIn('source_tenant_id', $this->sourceIdsMatching($district, $search));
+        }
+
+        $intakes = $query->paginate(20)->withQueryString();
+
         $routePrefix = request()->routeIs('state.portal.*') ? 'state.portal' : 'admin.state';
-        $intakes->getCollection()->each(fn (StateQualifierIntake $intake) => $intake->setAttribute(
-            'review_url',
-            route("{$routePrefix}.qualifiers.show", $intake, false),
-        ));
+        $this->decorateIntakes($intakes->getCollection(), $routePrefix);
 
         $statePrograms = StateScope::apply(FestStateProgram::orderByDesc('created_at'))->get(['id', 'title', 'event_type']);
         $sahodayas = Tenant::query()->where('type', 'sahodaya')->orderBy('name')->get(['id', 'name']);
@@ -35,10 +61,109 @@ class StateQualifierReviewController extends Controller
             'intakes' => $intakes,
             'statePrograms' => $statePrograms,
             'sahodayas' => $sahodayas,
+            'filters' => [
+                'source'   => $source,
+                'status'   => $filters['status'] ?? null,
+                'program'  => $filters['program'] ?? null,
+                'district' => $district !== '' ? $district : null,
+                'search'   => $search !== '' ? $search : null,
+            ],
+            'districts' => ExternalSahodaya::query()
+                ->whereNotNull('district')
+                ->distinct()
+                ->orderBy('district')
+                ->pluck('district')
+                ->values(),
             'actionUrls' => [
                 'storeIntake' => route("{$routePrefix}.qualifiers.store-intake", [], false),
+                'index'       => route("{$routePrefix}.qualifiers.index", [], false),
             ],
         ]);
+    }
+
+    /**
+     * source_tenant_id values whose Sahodaya matches the district and/or free-text filter, in both
+     * the tenant and the outside-Sahodaya tables.
+     *
+     * @return list<string>
+     */
+    private function sourceIdsMatching(string $district, string $search): array
+    {
+        $ids = [];
+
+        $externals = ExternalSahodaya::query()
+            ->when($district !== '', fn ($q) => $q->whereRaw('lower(district) = ?', [strtolower($district)]))
+            ->when($search !== '', fn ($q) => $q->where('name', 'like', '%'.$search.'%'))
+            ->pluck('id');
+
+        foreach ($externals as $id) {
+            $ids[] = "external:{$id}";
+        }
+
+        // A district filter has no meaning for tenants — tenants carry no district — so a district
+        // search deliberately returns external Sahodayas only.
+        if ($district === '') {
+            $tenants = Tenant::query()
+                ->where('type', 'sahodaya')
+                ->when($search !== '', fn ($q) => $q->where('name', 'like', '%'.$search.'%'))
+                ->pluck('id');
+
+            foreach ($tenants as $id) {
+                $ids[] = $id;
+            }
+        }
+
+        // An empty whitelist must match nothing rather than everything.
+        return $ids ?: ['__no_match__'];
+    }
+
+    /**
+     * Names the Sahodaya behind each intake and which pipe it came through. Resolved in bulk: the
+     * intakes live on the state connection and their sources on the central one, so this cannot be
+     * a join, and doing it per row would be a query per intake.
+     */
+    private function decorateIntakes($intakes, string $routePrefix): void
+    {
+        $externalIds = [];
+        $tenantIds = [];
+
+        foreach ($intakes as $intake) {
+            $src = (string) $intake->source_tenant_id;
+            if (str_starts_with($src, 'external:')) {
+                $externalIds[] = substr($src, 9);
+            } else {
+                $tenantIds[] = $src;
+            }
+        }
+
+        $externals = ExternalSahodaya::whereIn('id', array_filter($externalIds))->get()->keyBy('id');
+        $tenants = Tenant::whereIn('id', array_filter($tenantIds))->get(['id', 'name'])->keyBy('id');
+        $programs = FestStateProgram::whereIn('id', $intakes->pluck('state_program_id')->filter()->unique())
+            ->pluck('title', 'id');
+
+        $entryCounts = StateQualifierEntry::whereIn('intake_id', $intakes->pluck('id'))
+            ->selectRaw('intake_id, status, count(*) as c')
+            ->groupBy('intake_id', 'status')
+            ->get()
+            ->groupBy('intake_id');
+
+        foreach ($intakes as $intake) {
+            $src = (string) $intake->source_tenant_id;
+            $isExternal = str_starts_with($src, 'external:');
+            $model = $isExternal ? $externals->get(substr($src, 9)) : $tenants->get($src);
+            $byStatus = ($entryCounts->get($intake->id) ?? collect())->pluck('c', 'status');
+
+            $intake->setAttribute('review_url', route("{$routePrefix}.qualifiers.show", $intake, false));
+            $intake->setAttribute('source_kind', $isExternal ? 'external' : 'tenant');
+            // Falling back to the raw id rather than "Unknown" keeps an unresolvable intake
+            // actionable instead of anonymous.
+            $intake->setAttribute('source_name', $model?->name ?? $src);
+            $intake->setAttribute('district', $isExternal ? $model?->district : null);
+            $intake->setAttribute('source_promoted', $isExternal ? (bool) $model?->tenant_id : true);
+            $intake->setAttribute('program_title', $programs[$intake->state_program_id] ?? null);
+            $intake->setAttribute('approved_count', (int) ($byStatus['approved'] ?? 0));
+            $intake->setAttribute('pending_count', (int) ($byStatus['pending'] ?? 0));
+        }
     }
 
     public function storeIntake(Request $request, StateQualifierIntakeService $service)
@@ -178,9 +303,20 @@ class StateQualifierReviewController extends Controller
         $result = $materializer->materializeApprovedIntake($intake);
 
         $program = FestStateProgram::find($intake->state_program_id);
-        $sahodaya = Tenant::query()->where('type', 'sahodaya')->find($intake->source_tenant_id);
-        if ($program && $sahodaya && $intake->entries()->where('status', 'approved')->exists()) {
-            $remittances->calculateDemandFromApprovedQualifiers($program, $sahodaya);
+        if ($program && $intake->entries()->where('status', 'approved')->exists()) {
+            $sahodaya = Tenant::query()->where('type', 'sahodaya')->find($intake->source_tenant_id);
+
+            if ($sahodaya) {
+                // Fixed per-Sahodaya fee by default; calculateDemandFor() honours a program that
+                // deliberately opts into per-item billing instead.
+                $remittances->calculateDemandFor($program, $sahodaya);
+            } else {
+                // An outside Sahodaya is not a Tenant — its intakes are keyed "external:{uuid}", so
+                // the lookup above returns null. It still takes part and still owes the fixed fee;
+                // raising no demand at all is how every outside Sahodaya was silently billed
+                // nothing.
+                $remittances->calculateFixedDemandForSource($program, (string) $intake->source_tenant_id);
+            }
         }
 
         return back()->with(

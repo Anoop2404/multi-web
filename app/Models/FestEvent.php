@@ -66,6 +66,7 @@ class FestEvent extends Model
         'strict_item_payment_gating',
         'food_payee_type', 'food_host_school_id', 'require_payment_for_coupons',
         'phase_mode_enabled', 'workflow_mode', 'source_phase_id', 'registration_batch_id', 'workflow_leaf_key',
+        'reporting_batch_min_registrations',
         // sahodaya_customized_at was stamped via updateQuietly() since 2026-08-13 but was
         // never added here — mass-assignment silently dropped it every time, so the
         // customization-indicator badge it drives never actually turned on. fee_customized_at
@@ -98,6 +99,7 @@ class FestEvent extends Model
         'combine_regions_at_finale' => 'boolean',
         'require_payment_for_coupons' => 'boolean',
         'phase_mode_enabled' => 'boolean',
+        'reporting_batch_min_registrations' => 'integer',
         'conduct_levels' => 'array',
         'aggregation_config' => 'array',
         'notification_settings' => 'array',

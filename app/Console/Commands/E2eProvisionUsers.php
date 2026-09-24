@@ -105,6 +105,8 @@ class E2eProvisionUsers extends Command
                 'tenant_id' => $tenantId,
                 'password' => Hash::make($password),
                 'plain_password' => $password,
+                'must_change_password' => false,
+                'is_active' => true,
                 'email_verified_at' => now(),
             ]
         );

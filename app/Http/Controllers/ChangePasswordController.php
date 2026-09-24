@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PlatformUser;
 use Illuminate\Http\Request;
 use Inertia\Response;
 
@@ -10,12 +11,20 @@ class ChangePasswordController extends Controller
     public function show(Request $request): Response
     {
         $user = $request->user();
-        $user?->loadMissing('tenant');
-        $tenant = $user?->tenant;
+        $organization = null;
+
+        if ($user instanceof PlatformUser) {
+            $user->loadMissing('state');
+            $organization = $user->state;
+        } elseif ($user) {
+            $user->loadMissing('tenant');
+            $organization = $user->tenant;
+        }
+
         $roleName = $user?->getRoleNames()->first();
 
         return inertia('Auth/ChangePassword', [
-            'organizationName' => $tenant?->name,
+            'organizationName' => $organization?->name,
             'roleLabel'        => $roleName
                 ? ucwords(str_replace('_', ' ', $roleName))
                 : null,

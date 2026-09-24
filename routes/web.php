@@ -126,7 +126,11 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
             Route::get('/{stateProgram}/winners/export', [\App\Http\Controllers\Admin\KalotsavStateController::class, 'exportWinners'])->name('winners.export');
         });
 
-        Route::prefix('state-workspace')->name('state.')->group(function () {
+        // The middleware is inert until state.module_switched is on (Phase 11's cutover); with it on,
+        // these paths redirect into the module so existing bookmarks and links keep working.
+        Route::prefix('state-workspace')->name('state.')
+            ->middleware(\App\Http\Middleware\RedirectStateWorkspaceToModule::class)
+            ->group(function () {
             Route::get('/qualifiers', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'index'])->name('qualifiers.index');
             Route::post('/qualifiers/intake', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'storeIntake'])->name('qualifiers.store-intake');
             Route::get('/qualifiers/{intake}', [\App\Http\Controllers\StateAdmin\StateQualifierReviewController::class, 'show'])->name('qualifiers.show');
@@ -154,6 +158,187 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
 
         Route::get('/sahodayas', [TenantController::class, 'indexSahodayas'])->name('sahodayas.index');
         Route::get('/sahodayas/export-admin-credentials', [TenantController::class, 'exportSahodayaAdminCredentials'])->name('sahodayas.export-admin-credentials');
+
+        // ── State Kalotsav module (docs/STATE_KALOTSAV_MODULE_PLAN_2026_09_23.md) ──────────────
+        // Its own controllers under StateAdmin\Fest, its own permissions, its own pages. The older
+        // /admin/state-workspace/* routes stay until Phase 11 switches over, so nothing in flight
+        // breaks while the module is built out.
+        Route::prefix('state/fest')->name('state.fest.')->group(function () {
+            Route::get('/{event}', [\App\Http\Controllers\StateAdmin\Fest\StateFestWorkspaceController::class, 'overview'])
+                ->middleware('state.fest:view')
+                ->name('overview');
+
+            $config = \App\Http\Controllers\StateAdmin\Fest\StateEventConfigController::class;
+            $scrutiny = \App\Http\Controllers\StateAdmin\Fest\StateScrutinyController::class;
+
+            // Reading submissions is a qualifier capability; deciding on them is scrutiny. A
+            // scrutiny officer holds both, a report user neither.
+            Route::middleware('state.fest:qualifiers')->group(function () use ($scrutiny) {
+                Route::get('/{event}/submissions', [$scrutiny, 'submissions'])->name('submissions');
+            });
+
+            Route::middleware('state.fest:scrutiny')->group(function () use ($scrutiny) {
+                Route::get('/{event}/scrutiny/{intake}', [$scrutiny, 'scrutiny'])->name('scrutiny');
+                Route::post('/{event}/scrutiny/{intake}/decide', [$scrutiny, 'decide'])->name('scrutiny.decide');
+                Route::post('/{event}/scrutiny/{intake}/reserve', [$scrutiny, 'acceptReserve'])->name('scrutiny.reserve');
+                Route::post('/{event}/scrutiny/{intake}/finalise', [$scrutiny, 'finalise'])->name('scrutiny.finalise');
+                Route::post('/{event}/scrutiny/{intake}/reopen', [$scrutiny, 'reopen'])->name('scrutiny.reopen');
+                Route::get('/{event}/pending', [$scrutiny, 'pending'])->name('pending');
+            });
+
+            $conduct = \App\Http\Controllers\StateAdmin\Fest\StateConductController::class;
+            $certs = \App\Http\Controllers\StateAdmin\Fest\StateCertificateController::class;
+
+            Route::middleware('state.fest:appeals')->group(function () use ($certs) {
+                Route::get('/{event}/appeals', [$certs, 'appeals'])->name('appeals');
+                Route::post('/{event}/appeals', [$certs, 'submitAppeal'])->name('appeals.submit');
+                Route::post('/{event}/appeals/decide', [$certs, 'decideAppeal'])->name('appeals.decide');
+            });
+
+            Route::middleware('state.fest:certificates')->group(function () use ($certs) {
+                Route::get('/{event}/certificates', [$certs, 'certificates'])->name('certificates');
+                Route::post('/{event}/certificates/generate', [$certs, 'generate'])->name('certificates.generate');
+                Route::post('/{event}/certificates/detect-stale', [$certs, 'detectStale'])->name('certificates.detect-stale');
+                Route::get('/{event}/certificates/pack', [$certs, 'pack'])->name('certificates.pack');
+                Route::get('/{event}/certificates/{certificate}/print', [$certs, 'print'])->name('certificates.print');
+            });
+
+            Route::middleware('state.fest:attendance')->group(function () use ($conduct) {
+                Route::get('/{event}/attendance', [$conduct, 'attendance'])->name('attendance');
+                Route::post('/{event}/attendance', [$conduct, 'markAttendance'])->name('attendance.mark');
+            });
+
+            Route::middleware('state.fest:marks')->group(function () use ($conduct) {
+                Route::get('/{event}/marks', [$conduct, 'marks'])->name('marks');
+                Route::post('/{event}/marks/aggregate', [$conduct, 'aggregate'])->name('marks.aggregate');
+                Route::get('/{event}/marks/import-template', [$conduct, 'importTemplate'])->name('marks.import-template');
+                Route::post('/{event}/marks/import', [$conduct, 'importMarks'])->name('marks.import');
+            });
+
+            // Computing a result is a results capability; publishing one is its own, so a
+            // scrutineer can correct a ranking without releasing it.
+            Route::middleware('state.fest:results')->group(function () use ($conduct) {
+                Route::get('/{event}/results', [$conduct, 'results'])->name('results');
+                Route::get('/{event}/leaderboard', [$conduct, 'leaderboard'])->name('leaderboard');
+                Route::post('/{event}/results/compute', [$conduct, 'resultAction'])->defaults('action', 'compute')->name('results.compute');
+            });
+
+            Route::middleware('state.fest:publish')->group(function () use ($conduct, $config) {
+                // The public portal is a publish concern, not a settings one: it decides what the
+                // outside world sees, and only that.
+                Route::get('/{event}/public-portal', [$config, 'publicPortal'])->name('public-portal');
+                Route::post('/{event}/public-portal', [$config, 'savePublicVisibility'])->name('public-portal.save');
+
+                Route::post('/{event}/results/publish', [$conduct, 'resultAction'])->defaults('action', 'publish')->name('results.publish');
+                Route::post('/{event}/results/unpublish', [$conduct, 'resultAction'])->defaults('action', 'unpublish')->name('results.unpublish');
+                Route::post('/{event}/results/lock', [$conduct, 'resultAction'])->defaults('action', 'lock')->name('results.lock');
+            });
+
+            Route::middleware('state.fest:registrations')->group(function () use ($scrutiny) {
+                $teams = \App\Http\Controllers\StateAdmin\Fest\StateTeamController::class;
+
+                Route::get('/{event}/registrations', [$scrutiny, 'registrations'])->name('registrations');
+                Route::get('/{event}/teams', [$teams, 'teams'])->name('teams');
+                Route::post('/{event}/teams/leader', [$teams, 'setLeader'])->name('teams.leader');
+                Route::post('/{event}/teams/standby', [$teams, 'setStandby'])->name('teams.standby');
+                Route::get('/{event}/substitutions', [$teams, 'substitutions'])->name('substitutions');
+                Route::post('/{event}/substitutions', [$teams, 'requestSubstitution'])->name('substitutions.request');
+                Route::post('/{event}/substitutions/decide', [$teams, 'decideSubstitution'])->name('substitutions.decide');
+            });
+
+            // Settings change how the event behaves — windows, locking, what the public sees — so
+            // they sit behind the settings capability, not catalog.
+            Route::middleware('state.fest:settings')->group(function () use ($config) {
+                Route::get('/{event}/settings', [$config, 'settings'])->name('settings');
+                Route::post('/{event}/settings', [$config, 'saveSettings'])->name('settings.save');
+                Route::get('/{event}/staff', [$config, 'staff'])->name('staff');
+                Route::post('/{event}/staff', [$config, 'storeStaff'])->name('staff.store');
+                Route::delete('/{event}/staff/{staff}', [$config, 'destroyStaff'])->name('staff.destroy');
+            });
+
+            Route::middleware('state.fest:catalog')->group(function () use ($config) {
+                Route::get('/{event}/items', [$config, 'items'])->name('items');
+            });
+
+            // Grade scales, point rules and class categories decide what a mark is worth and who may
+            // compete, so they sit behind settings — the same trust as the event's other rules, and a
+            // deliberately higher one than entering marks.
+            Route::middleware('state.fest:settings')->group(function () {
+                $grading = \App\Http\Controllers\StateAdmin\Fest\StateGradingController::class;
+
+                Route::get('/{event}/grades', [$grading, 'grades'])->name('grades');
+                Route::post('/{event}/grades', [$grading, 'saveGrades'])->name('grades.save');
+                Route::post('/{event}/grades/apply-standard', [$grading, 'applyStandard'])->name('grades.apply-standard');
+
+                Route::get('/{event}/points', [$grading, 'points'])->name('points');
+                Route::post('/{event}/points', [$grading, 'savePoints'])->name('points.save');
+                Route::post('/{event}/points/apply-standard', [$grading, 'applyStandard'])->name('points.apply-standard');
+
+                $prizes = \App\Http\Controllers\StateAdmin\Fest\StatePrizeCategoryController::class;
+
+                // Prize categories decide what trophies exist, so they sit with the event's other
+                // rules rather than with results.
+                Route::get('/{event}/prizes', [$prizes, 'index'])->name('prizes');
+                Route::post('/{event}/prizes', [$prizes, 'save'])->name('prizes.save');
+                Route::post('/{event}/prizes/{category}/items', [$prizes, 'assign'])->name('prizes.assign');
+                Route::delete('/{event}/prizes/{category}', [$prizes, 'destroy'])->name('prizes.destroy');
+
+                Route::get('/{event}/eligibility', [$grading, 'eligibility'])->name('eligibility');
+                Route::post('/{event}/eligibility/seed', [$grading, 'seedCategories'])->name('eligibility.seed');
+                Route::post('/{event}/eligibility/categories', [$grading, 'saveCategory'])->name('eligibility.categories.save');
+                Route::delete('/{event}/eligibility/categories/{category}', [$grading, 'destroyCategory'])->name('eligibility.categories.destroy');
+            });
+
+            // Catering and duty rosters are event logistics, so they sit with settings and staff
+            // rather than with anything that decides who competes or what they score.
+            Route::middleware('state.fest:settings')->group(function () {
+                $hospitality = \App\Http\Controllers\StateAdmin\Fest\StateHospitalityController::class;
+
+                Route::get('/{event}/catering', [$hospitality, 'catering'])->name('catering');
+                Route::post('/{event}/catering/sessions', [$hospitality, 'saveSession'])->name('catering.sessions');
+                Route::post('/{event}/catering/freeze', [$hospitality, 'freeze'])->name('catering.freeze');
+                Route::post('/{event}/catering/issue', [$hospitality, 'issue'])->name('catering.issue');
+
+                Route::get('/{event}/volunteers', [$hospitality, 'volunteers'])->name('volunteers');
+                Route::post('/{event}/volunteers/duties', [$hospitality, 'assignDuty'])->name('volunteers.duties.assign');
+                Route::delete('/{event}/volunteers/duties/{duty}', [$hospitality, 'removeDuty'])->name('volunteers.duties.remove');
+            });
+
+            // Venues belong to the schedule: whoever plans where items happen manages the places.
+            Route::middleware('state.fest:schedule')->group(function () use ($config) {
+                $sched = \App\Http\Controllers\StateAdmin\Fest\StateScheduleController::class;
+
+                Route::get('/{event}/venues', [$config, 'venues'])->name('venues');
+                Route::post('/{event}/venues', [$config, 'storeVenue'])->name('venues.store');
+                Route::delete('/{event}/venues/{venue}', [$config, 'destroyVenue'])->name('venues.destroy');
+
+                Route::get('/{event}/schedule', [$sched, 'schedule'])->name('schedule');
+                Route::post('/{event}/schedule', [$sched, 'saveSchedule'])->name('schedule.save');
+                Route::get('/{event}/clashes', [$sched, 'clashes'])->name('clashes');
+                Route::get('/{event}/green-room', [$sched, 'greenRoom'])->name('green-room');
+
+                // Chest numbers sit with the schedule rather than registrations: they are allocated
+                // once the field is settled, and every printed sheet depends on them.
+                Route::get('/{event}/chest-numbers', [$sched, 'chestNumbers'])->name('chest-numbers');
+                Route::post('/{event}/chest-numbers/assign', [$sched, 'assignChestNumbers'])->name('chest-numbers.assign');
+                Route::post('/{event}/chest-numbers/set', [$sched, 'setChestNumber'])->name('chest-numbers.set');
+            });
+
+            // Reports are read-only, so a report user reaches them without any write capability.
+            Route::middleware('state.fest:reports')->group(function () {
+                Route::get('/{event}/reports', [\App\Http\Controllers\StateAdmin\Fest\StateReportController::class, 'index'])->name('reports');
+                Route::get('/{event}/reports/{report}', [\App\Http\Controllers\StateAdmin\Fest\StateReportController::class, 'show'])->name('reports.show');
+                Route::get('/{event}/reports/{report}/download', [\App\Http\Controllers\StateAdmin\Fest\StateReportController::class, 'download'])->name('reports.download');
+            });
+
+            // Slots decide who may compete, so they sit behind the catalog capability rather than
+            // plain view — a report user or mark operator can see the workspace but not move a quota.
+            Route::middleware('state.fest:catalog')->group(function () {
+                Route::get('/{event}/slots', [\App\Http\Controllers\StateAdmin\Fest\StateSlotController::class, 'index'])->name('slots');
+                Route::post('/{event}/slots/sahodaya', [\App\Http\Controllers\StateAdmin\Fest\StateSlotController::class, 'setSahodayaSlots'])->name('slots.sahodaya');
+                Route::post('/{event}/slots/item', [\App\Http\Controllers\StateAdmin\Fest\StateSlotController::class, 'setItemSlots'])->name('slots.item');
+            });
+        });
 
         Route::prefix('state-users')->name('state-users.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Admin\StateUserController::class, 'index'])->name('index');
@@ -201,6 +386,20 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
     })->name('dashboard');
 
     Route::get('/sahodayas/create', [TenantController::class, 'createSahodaya'])->name('sahodayas.create');
+
+    // Which Sahodayas have a working dedicated database, and creating the ones that do not.
+    // Superadmin only: creating a Postgres database is not a State office action, and it is not
+    // reversible from here.
+    Route::prefix('sahodayas/databases')->name('sahodayas.databases.')->group(function () {
+        $databases = \App\Http\Controllers\Admin\SahodayaDatabaseController::class;
+
+        Route::get('/', [$databases, 'index'])->name('index');
+        Route::post('/provision-all', [$databases, 'provisionAll'])->name('provision-all');
+        // The Sahodaya id travels in the body, not the path: a tenant id in the URL is picked up by
+        // path-based tenant resolution, and posting a school id there bounces to the login page
+        // instead of reaching this controller's 404.
+        Route::post('/provision', [$databases, 'provision'])->name('provision');
+    });
     Route::get('/schools', [TenantController::class, 'indexSchools'])->name('schools.index');
     Route::get('/schools/export-admin-credentials', [TenantController::class, 'exportSchoolAdminCredentials'])->name('schools.export-admin-credentials');
     Route::get('/schools/create', [TenantController::class, 'createSchool'])->name('schools.create');
@@ -1225,6 +1424,31 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/state-nomination/select', [\App\Http\Controllers\SahodayaAdmin\FestStateNominationController::class, 'select'])->name('state-nomination.select');
             Route::delete('/{event}/state-nomination/selections/{selection}', [\App\Http\Controllers\SahodayaAdmin\FestStateNominationController::class, 'unselect'])->name('state-nomination.unselect');
             Route::post('/{event}/state-nomination/certify', [\App\Http\Controllers\SahodayaAdmin\FestStateNominationController::class, 'certify'])->name('state-nomination.certify');
+
+            // Prize categories — named groups of items that crown an individual or school champion.
+            // The Sahodaya counterpart of the State module's /prizes tab.
+            Route::prefix('/{event}/prizes')->name('prizes.')->group(function () {
+                $prizes = \App\Http\Controllers\SahodayaAdmin\FestPrizeCategoryController::class;
+
+                Route::get('/', [$prizes, 'index'])->name('index');
+                Route::post('/', [$prizes, 'save'])->name('save');
+                Route::post('/{category}/items', [$prizes, 'assign'])->name('assign');
+                Route::delete('/{category}', [$prizes, 'destroy'])->name('destroy');
+            });
+
+            // Item-driven State winner registration. Writes the same nomination batch the workspace
+            // above does, so the two cannot send State two different answers.
+            Route::prefix('/{event}/state-winners')->name('state-winners.')->group(function () {
+                $winners = \App\Http\Controllers\SahodayaAdmin\FestStateWinnerRegistrationController::class;
+
+                Route::get('/', [$winners, 'index'])->name('index');
+                Route::post('/choose', [$winners, 'choose'])->name('choose');
+                Route::delete('/selections/{selection}', [$winners, 'remove'])->name('remove');
+                Route::post('/decline', [$winners, 'decline'])->name('decline');
+                Route::delete('/declines/{selection}', [$winners, 'withdrawDecline'])->name('declines.withdraw');
+                Route::post('/auto-fill', [$winners, 'autoFill'])->name('auto-fill');
+                Route::post('/register', [$winners, 'register'])->name('register');
+            });
             Route::post('/{event}/spawn-school-rounds', [FestEventController::class, 'spawnSchoolRounds'])->name('spawn-school-rounds');
             Route::post('/{event}/link-school-round', [FestEventController::class, 'linkSchoolRound'])->name('link-school-round');
             Route::post('/{event}/promote-discipline-events', [FestEventController::class, 'promoteDisciplineEvents'])->name('promote-discipline-events');
@@ -2046,6 +2270,40 @@ Route::prefix('state/external')->name('state.external.')->middleware(['web', 'th
 Route::get('/state/results', [\App\Http\Controllers\Public\StatePublicResultsController::class, 'index'])
     ->middleware(['web', 'throttle:60,1'])
     ->name('state.public-results');
+
+// ── Public State Kalotsav portal (Phase 7 of docs/STATE_KALOTSAV_MODULE_PLAN_2026_09_23.md) ──────
+// No auth: schedules, released results and standings are for parents, schools and the press. Every
+// page checks its own publication setting, so an unreleased section 404s instead of rendering empty.
+// Throttled because these are the only State pages a crawler can reach.
+Route::middleware(['web', 'throttle:60,1'])->group(function () {
+    $portal = \App\Http\Controllers\Public\StateFestPortalController::class;
+
+    Route::get('/state/kalotsav', [$portal, 'home'])->name('state.public.home');
+    Route::get('/state/kalotsav/{event}/schedule', [$portal, 'schedule'])->name('state.public.schedule');
+    Route::get('/state/kalotsav/{event}/results', [$portal, 'results'])->name('state.public.results');
+    Route::get('/state/kalotsav/{event}/ranking', [$portal, 'ranking'])->name('state.public.ranking');
+    Route::get('/state/kalotsav/{event}/sahodaya/{sahodaya}', [$portal, 'sahodaya'])->name('state.public.sahodaya');
+
+    // Verification is deliberately outside the event prefix: the code is what someone has in hand,
+    // and they should not need to know which event issued it.
+    Route::get('/state/certificates/verify', [$portal, 'verify'])->name('state.public.verify');
+    Route::get('/state/certificates/verify/{code}', [$portal, 'verify'])->name('state.public.verify.code');
+});
+
+// Judge portal for the State Kalotsav module. Separate from portal/state-judge (the older stack,
+// which stays until Phase 11): this one goes through StateConductService, so it honours scoring
+// locks and shows the panel chest numbers only.
+Route::prefix('portal/state-fest-judge')
+    ->name('portal.state-fest-judge.')
+    ->middleware(['web', 'auth', 'password.change', 'state.judge.portal'])
+    ->group(function () {
+        $judge = \App\Http\Controllers\Portal\StateFestJudgeController::class;
+
+        Route::get('/', [$judge, 'index'])->name('dashboard');
+        Route::get('/{event}/items/{item}', [$judge, 'sheet'])->name('sheet');
+        Route::post('/{event}/items/{item}/score', [$judge, 'score'])->name('score');
+        Route::post('/{event}/items/{item}/submit', [$judge, 'submit'])->name('submit');
+    });
 
 Route::get('/sports/entry-form', function (\Illuminate\Http\Request $request) {
     if ($request->has('inertia') || $request->wantsJson()) {

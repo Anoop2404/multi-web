@@ -27,7 +27,12 @@ class AuthController extends Controller
 {
     public function showLogin(): Response|RedirectResponse
     {
-        if (TenantDomainSync::isCentralHost(request()->getHost())) {
+        // The dedicated State domain is a platform host, not a tenant one: state_admin/state_staff
+        // are PlatformUser accounts on the same guard as superadmin. Without this it falls through
+        // to the Sahodaya membership login below and a state admin arriving at their own domain is
+        // greeted with "manage membership, schools, and registrations", a school-login link and a
+        // "Back to portal" link — none of which is addressed to them.
+        if (self::isStateHost(request()->getHost()) || TenantDomainSync::isCentralHost(request()->getHost())) {
             return inertia('Auth/SuperadminLogin', [
                 'appName' => config('app.name'),
                 'sessionExpired' => request()->query('session') === 'expired',
@@ -486,14 +491,31 @@ class AuthController extends Controller
             ->with('success', 'Gmail verified successfully. Welcome!');
     }
 
+    /** Whether a host is the configured dedicated State domain. */
+    public static function isStateHost(?string $host): bool
+    {
+        $stateDomain = strtolower((string) config('state.domain'));
+
+        return $stateDomain !== '' && strtolower((string) $host) === $stateDomain;
+    }
+
     public static function homeFor(User|PlatformUser $user): ?string
     {
+        $onStateHost = self::isStateHost(request()?->getHost());
+
         if ($user->isSuperAdmin()) {
-            return route('admin.dashboard');
+            // A superadmin who signed in on the State domain stays on it; routes/state.php gives
+            // them the same workspace a state admin gets there.
+            return $onStateHost ? '/' : route('admin.dashboard');
         }
 
         if ($user->hasAnyRole(['state_admin', 'state_staff']) || (method_exists($user, 'isStateUser') && $user->isStateUser())) {
-            return route('admin.state.dashboard');
+            // Deliberately a relative path rather than route('state.portal.dashboard'): a domain
+            // route generates its host without the request's port, which would bounce local dev
+            // from :8000 to :80. Staying relative keeps the user on the host they signed in on —
+            // which matters because the session cookie is host-only, so sending them to the central
+            // admin domain (as this used to) lands them on a login page again.
+            return $onStateHost ? '/' : route('admin.state.dashboard');
         }
 
         if ($user->hasRole('state_judge')) {

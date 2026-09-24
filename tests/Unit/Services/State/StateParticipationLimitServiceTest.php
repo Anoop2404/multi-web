@@ -56,19 +56,25 @@ class StateParticipationLimitServiceTest extends TestCase
         $this->assertSame(2, $service->globalApprovedCount($item->id));
     }
 
-    public function test_entries_approved_via_review_entry_in_a_still_open_intake_count_against_a_second_intakes_global_cap(): void
+    public function test_entries_approved_via_review_entry_in_a_still_open_intake_count_against_a_second_intake(): void
     {
         // Regression coverage for the specific race this service exists to close: an
         // entry flipped to approved via reviewEntry() is not yet materialized into a
         // StateFestRegistration (that only happens when the whole intake is finalized),
         // so counting must happen at the StateQualifierEntry level, not the
         // registration level, or a second still-open intake would see false headroom.
+        //
+        // Both intakes are the SAME Sahodaya — which is the case that matters, since one Sahodaya
+        // can have more than one open intake (a re-submission, or an external draft alongside a
+        // tenant submission). This used to use two different Sahodayas and assert a "state-wide"
+        // message, back when qualify_count was read here as a global cap; it is a per-Sahodaya
+        // cap now, matching the two paths that produce entries and the State Programs UI.
         $program = FestStateProgram::create(['title' => 'P', 'event_type' => 'kalolsavam', 'conduct_levels' => ['state'], 'status' => 'published']);
         $item = FestStateProgramItem::create(['state_program_id' => $program->id, 'title' => 'Solo', 'qualify_count' => 1]);
 
         $intakeA = $this->intake($program, 'tenant-a', 'k1');
         $entryA = $this->entry($intakeA, $item->id, 'approved'); // approved pre-finalization, intake still "received"
-        $intakeB = $this->intake($program, 'tenant-b', 'k2');
+        $intakeB = $this->intake($program, 'tenant-a', 'k2');
         $entryB = $this->entry($intakeB, $item->id, 'pending');
 
         $service = new StateParticipationLimitService();
@@ -76,7 +82,21 @@ class StateParticipationLimitServiceTest extends TestCase
         $this->assertSame('received', $intakeA->status);
         $violations = $service->validateEntryApproval($entryB);
         $this->assertNotEmpty($violations);
-        $this->assertStringContainsString('state-wide', $violations[0]);
+        $this->assertStringContainsString('per Sahodaya', $violations[0]);
+    }
+
+    public function test_one_sahodaya_filling_its_slots_never_blocks_another(): void
+    {
+        // The counterpart of the test above, and the reason the cap is per Sahodaya: with 19+
+        // Sahodayas submitting, a state-wide reading of qualify_count approved the first two
+        // entries in all of Kerala and refused everybody after that.
+        $program = FestStateProgram::create(['title' => 'P', 'event_type' => 'kalolsavam', 'conduct_levels' => ['state'], 'status' => 'published']);
+        $item = FestStateProgramItem::create(['state_program_id' => $program->id, 'title' => 'Solo', 'qualify_count' => 1]);
+
+        $this->entry($this->intake($program, 'tenant-a', 'k1'), $item->id, 'approved');
+        $entryB = $this->entry($this->intake($program, 'tenant-b', 'k2'), $item->id, 'pending');
+
+        $this->assertSame([], (new StateParticipationLimitService())->validateEntryApproval($entryB));
     }
 
     public function test_validate_bulk_approval_counts_pending_entries_for_the_same_item_against_each_other(): void

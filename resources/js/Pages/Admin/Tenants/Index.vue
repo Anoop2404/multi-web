@@ -12,6 +12,11 @@
                 </p>
             </div>
             <div class="flex items-center gap-2">
+                <!-- Only for Sahodayas, and only for a superadmin: schools share their parent's
+                     database, so there is nothing to provision for them. -->
+                <Link v-if="databasesUrl" :href="databasesUrl" class="btn-secondary">
+                    Databases
+                </Link>
                 <button v-if="!readOnly" type="button" class="btn-secondary" @click="exportAdminCredentials">
                     ↓ Export admin credentials
                 </button>
@@ -144,6 +149,7 @@ const props = defineProps({
     tenantType: { type: String, required: true },
     pageTitle: { type: String, required: true },
     createUrl: { type: String, default: null },
+    databasesUrl: { type: String, default: null },
     readOnly: { type: Boolean, default: false },
     tenantBaseDomain: { type: String, default: 'sahodaya.test' },
     filters: { type: Object, default: () => ({ search: '', status: 'all' }) },

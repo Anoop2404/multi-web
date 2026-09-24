@@ -58,6 +58,88 @@ class StateRemittanceService
      * fee_amount, recorded as StateRemittanceLine rows so reports can slice by
      * item/Sahodaya/status.
      */
+    /**
+     * What a Sahodaya owes the State for this program.
+     *
+     * The State charges a Sahodaya a FIXED fee, not a per-participant one — a Sahodaya that sends
+     * 40 qualifiers pays exactly what one sending 4 pays. So this dispatches on the state level's
+     * fee_model and defaults to the fixed figure when nothing is configured, because a blank
+     * setting must not silently fall through to per-item billing.
+     *
+     * 'per_item' keeps the older itemized behaviour for a program that deliberately opts into it.
+     */
+    public function calculateDemandFor(FestStateProgram $program, Tenant $sahodaya): StateRemittance
+    {
+        $model = $program->level_fees['state']['fee_model'] ?? null;
+
+        return $model === 'per_item'
+            ? $this->calculateDemandFromApprovedQualifiers($program, $sahodaya)
+            : $this->calculateFixedDemand($program, $sahodaya);
+    }
+
+    /**
+     * Flat per-Sahodaya demand: one line, one amount, independent of how many qualifiers were
+     * approved. The count is still recorded in source_breakdown so the figure can be audited
+     * against what the Sahodaya actually sent, but it does not affect what is owed.
+     */
+    public function calculateFixedDemand(FestStateProgram $program, Tenant $sahodaya): StateRemittance
+    {
+        return $this->calculateFixedDemandForSource($program, $sahodaya->id);
+    }
+
+    /**
+     * Same fixed demand, addressed by the intake's source key rather than a Tenant, because a
+     * Sahodaya that has not been promoted yet is not a tenant at all: its intakes and its
+     * remittances are both keyed "external:{uuid}" (see ExternalIntakeService::openDraftIntake and
+     * the portal's own fee submission). It still takes part in the State event, so it still owes
+     * the fixed fee — approval used to raise a demand only when the source resolved to a Tenant,
+     * which silently billed nothing to every outside Sahodaya.
+     */
+    public function calculateFixedDemandForSource(FestStateProgram $program, string $sourceKey): StateRemittance
+    {
+        $remittance = StateRemittance::firstOrNew([
+            'sahodaya_id'   => $sourceKey,
+            'academic_year' => $program->academic_year ?? '2026-2027',
+            'title'         => "{$program->title} — State Remittance Demand",
+        ]);
+
+        // Same idempotency guard as the itemized path: once a Sahodaya has submitted or had a
+        // remittance verified, recomputing must not rewrite the amount it already paid against.
+        if ($remittance->exists && in_array($remittance->status, ['submitted', 'verified'], true)) {
+            return $remittance;
+        }
+
+        $fixedFee = (float) ($program->level_fees['state']['sahodaya_registration_fee'] ?? 0);
+
+        $approvedCount = StateQualifierEntry::where('status', 'approved')
+            ->whereHas('intake', fn ($query) => $query
+                ->where('state_program_id', $program->id)
+                ->where('source_tenant_id', $sourceKey))
+            ->count();
+
+        $remittance->fill([
+            'amount'           => $fixedFee,
+            'status'           => 'pending',
+            'source_breakdown' => [
+                'state_program_id'  => $program->id,
+                'fee_model'         => 'flat_school',
+                'fixed_fee'         => $fixedFee,
+                'approved_nominees' => $approvedCount,
+                'calculated_at'     => now()->toIso8601String(),
+            ],
+        ])->save();
+
+        $this->syncLines($remittance, $fixedFee > 0 ? [[
+            'line_type'   => 'sahodaya_registration',
+            'label'       => 'Sahodaya registration fee (fixed)',
+            'quantity'    => 1,
+            'unit_amount' => $fixedFee,
+            'amount'      => $fixedFee,
+        ]] : []);
+
+        return $remittance->fresh('lines');
+    }
+
     public function calculateDemandFromApprovedQualifiers(FestStateProgram $program, Tenant $sahodaya): StateRemittance
     {
         $remittance = StateRemittance::firstOrNew([

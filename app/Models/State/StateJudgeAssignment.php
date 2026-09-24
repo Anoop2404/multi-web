@@ -9,7 +9,17 @@ class StateJudgeAssignment extends StateModel
 {
     protected $table = 'state_judge_assignments';
 
-    protected $fillable = ['state_event_id', 'item_id', 'item_code', 'user_id'];
+    protected $fillable = ['state_event_id', 'item_id', 'item_code', 'user_id', 'submitted_at', 'submitted_count'];
+
+    protected function casts(): array
+    {
+        return ['submitted_at' => 'datetime'];
+    }
+
+    public function isSubmitted(): bool
+    {
+        return $this->submitted_at !== null;
+    }
 
     public function stateEvent(): BelongsTo
     {

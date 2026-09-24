@@ -14,7 +14,7 @@ class StateQualifierIntake extends StateModel
     protected $keyType = 'string';
 
     protected $fillable = [
-        'state_program_id', 'state_id', 'source_tenant_id', 'source_event_id',
+        'state_program_id', 'state_id', 'source_tenant_id', 'sahodaya_id', 'sahodaya_name', 'source_event_id',
         'idempotency_key', 'status', 'payload', 'payload_hash',
         'reviewed_by', 'reviewed_at', 'review_notes',
     ];
@@ -23,6 +23,11 @@ class StateQualifierIntake extends StateModel
         'payload'     => 'array',
         'reviewed_at' => 'datetime',
     ];
+
+    public function sahodaya(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(StateSahodaya::class, 'sahodaya_id');
+    }
 
     public function entries(): HasMany
     {

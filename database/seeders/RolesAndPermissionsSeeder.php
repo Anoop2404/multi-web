@@ -8,6 +8,7 @@ use App\Models\PlatformUser;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\StateFestPermissions;
 use App\Support\TenantUserCatalog;
 use Illuminate\Database\Seeder;
 
@@ -66,6 +67,22 @@ class RolesAndPermissionsSeeder extends Seeder
             Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
         }
 
+        // State Kalotsav module permissions — separate from the tenant catalog on purpose, because a
+        // State officer's authority is not a tenant role. The matrix is what lets a mark operator be
+        // barred from publishing and a certificate operator from altering results, distinctions the
+        // old state_admin/state_staff pair could not express.
+        foreach (StateFestPermissions::all() as $permission) {
+            PlatformPermission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+        }
+
+        foreach (StateFestPermissions::roleMatrix() as $roleName => $permissions) {
+            PlatformRole::firstOrCreate(['name' => $roleName, 'guard_name' => 'web'])
+                ->givePermissionTo($permissions);
+            Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web'])
+                ->givePermissionTo($permissions);
+        }
+
         $superadmin = PlatformUser::firstOrCreate(
             ['email' => 'admin@sahodaya.test'],
             [
@@ -76,6 +93,6 @@ class RolesAndPermissionsSeeder extends Seeder
         );
 
         $superadmin->assignRole('superadmin');
-        $superadmin->syncPermissions(TenantUserCatalog::allPermissions());
+        $superadmin->syncPermissions(array_merge(TenantUserCatalog::allPermissions(), StateFestPermissions::all()));
     }
 }
