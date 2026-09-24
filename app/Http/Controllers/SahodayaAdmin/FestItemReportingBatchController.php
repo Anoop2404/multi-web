@@ -171,55 +171,30 @@ class FestItemReportingBatchController extends SahodayaAdminController
         abort_unless($itemModel, 404);
 
         $batches = $this->batchesForEvent($event);
-        $sections = $this->sectionsForItem($event, $itemModel, $batches);
-        $categoryLabel = \App\Support\FestItemCategoryLabel::resolve($itemModel, \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent()));
-
         $orgName = $this->sahodaya->name;
         $logoSrc = \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya);
-        // Chromium's own header/footer templates render in a reserved margin band, isolated
-        // from page content -- the blade's in-content position:fixed div (dompdf's technique)
-        // sits inside the same content box the table rows flow into on the Chromium path, so
-        // it overlaps the first rows instead of sitting above them. Keep the two mutually
-        // exclusive: dompdf gets the in-content div, Chromium gets headerTemplate below.
-        $isDomPdf = empty(config('services.pdf_converter.url'));
-        $participantCount = collect($sections)->sum(fn ($s) => count($s['rows']));
 
-        $html = view('fest.reporting-batches-print', [
-            'event'         => $event,
-            'item'          => $itemModel,
-            'categoryLabel' => $categoryLabel,
-            'isGroup'       => app(FestNumberingService::class)->isGroupItem($itemModel),
-            'sections'      => $sections,
-            'orgName'       => $orgName,
-            'logoSrc'       => $logoSrc,
-            'isDomPdf'      => $isDomPdf,
-        ])->render();
+        $pdfBytes = $this->renderItemReportingBatchesPdf($event, $itemModel, $batches, $orgName, $logoSrc);
 
         $slug = \Illuminate\Support\Str::slug($itemModel->title ?: 'item');
-        $inline = $request->boolean('inline') || $request->boolean('preview');
+        $disposition = ($request->boolean('inline') || $request->boolean('preview')) ? 'inline' : 'attachment';
 
-        [$headerTemplate, $footerTemplate] = \App\Support\PdfChromeHeaderFooter::build([
-            'orgName'          => $orgName,
-            'logoSrc'          => $logoSrc,
-            'docTitle'         => 'REPORTING BATCHES',
-            'eventTitle'       => $event->title,
-            'item'             => $itemModel,
-            'categoryLabel'    => $categoryLabel,
-            'participantCount' => $participantCount > 0 ? $participantCount : null,
+        return response($pdfBytes, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => "{$disposition}; filename=\"{$slug}-reporting-batches.pdf\"",
         ]);
-
-        return PdfGenerator::download(
-            $html,
-            "{$slug}-reporting-batches.pdf",
-            $inline,
-            false,
-            $headerTemplate,
-            $footerTemplate,
-            ['top' => '38mm', 'right' => '10mm', 'bottom' => '14mm', 'left' => '10mm'],
-        );
     }
 
-    /** One PDF covering every qualifying item's reporting-batch sheet, each item starting on its own page. */
+    /**
+     * One PDF covering every qualifying item's reporting-batch sheet. Each item is
+     * rendered as its own independent PDF (same as print() above, so it gets that item's
+     * own repeating per-page header) and the results are merged page-by-page with FPDI --
+     * a single shared document with one Chromium/dompdf header could only ever show one
+     * item's name across the whole file, since that header mechanism is global to the
+     * page, not to a content block. Rendering N real PDFs and merging them is what makes
+     * every page of every item show that item's own name/category/gender/type, including
+     * continuation pages when one item's batches span more than one page.
+     */
     public function bulkPrint(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
@@ -237,48 +212,108 @@ class FestItemReportingBatchController extends SahodayaAdminController
             ->filter(fn (FestEventItem $item) => (int) ($regCounts[$item->id] ?? 0) > $minRegistrations)
             ->values();
 
-        $numberingService = app(FestNumberingService::class);
-        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
-        $itemsData = $items->map(fn (FestEventItem $item) => [
-            'item'          => $item,
-            'isGroup'       => $numberingService->isGroupItem($item),
-            'categoryLabel' => \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels),
-            'genderLabel'   => \App\Support\FestSportsAgeGroup::genderLabel($item->gender),
-            'sections'      => $this->sectionsForItem($event, $item, $batches),
-        ])->values()->all();
+        abort_if($items->isEmpty(), 422, 'No items have reporting batches for this event.');
 
         $orgName = $this->sahodaya->name;
         $logoSrc = \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya);
-        $isDomPdf = empty(config('services.pdf_converter.url'));
 
-        $html = view('fest.reporting-batches-bulk-print', [
-            'event'     => $event,
-            'itemsData' => $itemsData,
-            'orgName'   => $orgName,
-            'logoSrc'   => $logoSrc,
-            'isDomPdf'  => $isDomPdf,
-        ])->render();
+        $pdfBytesByItem = $items->mapWithKeys(fn (FestEventItem $item) => [
+            $item->id => $this->renderItemReportingBatchesPdf($event, $item, $batches, $orgName, $logoSrc),
+        ])->all();
 
-        $inline = $request->boolean('inline') || $request->boolean('preview');
+        [$merged, $included] = $this->mergePdfByteStrings($pdfBytesByItem, "{$orgName} — {$event->title} — Reporting Batches (All Items)");
 
-        [$headerTemplate, $footerTemplate] = \App\Support\PdfChromeHeaderFooter::build([
-            'orgName'    => $orgName,
-            'logoSrc'    => $logoSrc,
-            'docTitle'   => 'REPORTING BATCHES — ALL ITEMS',
-            'eventTitle' => $event->title,
-        ]);
+        abort_if($included === [], 500, 'None of the items could be merged into a PDF.');
 
         $slug = \Illuminate\Support\Str::slug($event->title ?: 'event');
+        $disposition = ($request->boolean('inline') || $request->boolean('preview')) ? 'inline' : 'attachment';
 
-        return PdfGenerator::download(
+        return response($merged, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => "{$disposition}; filename=\"{$slug}-reporting-batches-all-items.pdf\"",
+        ]);
+    }
+
+    /** Renders one item's reporting-batches sheet to raw PDF bytes, with its own repeating per-page header. */
+    private function renderItemReportingBatchesPdf(FestEvent $event, FestEventItem $item, \Illuminate\Support\Collection $batches, string $orgName, ?string $logoSrc): string
+    {
+        $sections = $this->sectionsForItem($event, $item, $batches);
+        $categoryLabel = \App\Support\FestItemCategoryLabel::resolve($item, \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent()));
+        // Chromium's own header/footer templates render in a reserved margin band, isolated
+        // from page content -- the blade's in-content position:fixed div (dompdf's technique)
+        // sits inside the same content box the table rows flow into on the Chromium path, so
+        // it overlaps the first rows instead of sitting above them. Keep the two mutually
+        // exclusive: dompdf gets the in-content div, Chromium gets headerTemplate below.
+        $isDomPdf = empty(config('services.pdf_converter.url'));
+        $participantCount = collect($sections)->sum(fn ($s) => count($s['rows']));
+
+        $html = view('fest.reporting-batches-print', [
+            'event'         => $event,
+            'item'          => $item,
+            'categoryLabel' => $categoryLabel,
+            'isGroup'       => app(FestNumberingService::class)->isGroupItem($item),
+            'sections'      => $sections,
+            'orgName'       => $orgName,
+            'logoSrc'       => $logoSrc,
+            'isDomPdf'      => $isDomPdf,
+        ])->render();
+
+        [$headerTemplate, $footerTemplate] = \App\Support\PdfChromeHeaderFooter::build([
+            'orgName'          => $orgName,
+            'logoSrc'          => $logoSrc,
+            'docTitle'         => 'REPORTING BATCHES',
+            'eventTitle'       => $event->title,
+            'item'             => $item,
+            'categoryLabel'    => $categoryLabel,
+            'participantCount' => $participantCount > 0 ? $participantCount : null,
+        ]);
+
+        return PdfGenerator::render(
             $html,
-            "{$slug}-reporting-batches-all-items.pdf",
-            $inline,
             false,
             $headerTemplate,
             $footerTemplate,
             ['top' => '38mm', 'right' => '10mm', 'bottom' => '14mm', 'left' => '10mm'],
         );
+    }
+
+    /**
+     * Appends every page of every given PDF (as raw bytes) into one output PDF, in order
+     * -- same FPDI merge pattern as FestMarkEntryController::mergePdfByteStrings().
+     *
+     * @param  array<int, string>  $pdfBytesByItemId
+     * @return array{0: string, 1: list<int>} [merged PDF bytes, the item ids that actually made it in]
+     */
+    private function mergePdfByteStrings(array $pdfBytesByItemId, ?string $title = null): array
+    {
+        $pdf = new \setasign\Fpdi\Fpdi();
+        if ($title) {
+            $pdf->SetTitle($title, true);
+        }
+        $included = [];
+
+        foreach ($pdfBytesByItemId as $itemId => $bytes) {
+            $tmpPath = tempnam(sys_get_temp_dir(), 'fpdi_');
+            file_put_contents($tmpPath, $bytes);
+
+            try {
+                $pageCount = $pdf->setSourceFile($tmpPath);
+                for ($i = 1; $i <= $pageCount; $i++) {
+                    $templateId = $pdf->importPage($i);
+                    $size = $pdf->getTemplateSize($templateId);
+                    $orientation = ($size['orientation'] ?? 'P') === 'L' ? 'L' : 'P';
+                    $pdf->AddPage($orientation, [$size['width'], $size['height']]);
+                    $pdf->useTemplate($templateId);
+                }
+                $included[] = $itemId;
+            } catch (\Throwable $e) {
+                report(new \RuntimeException("bulkPrint: could not import item {$itemId} into the merge — {$e->getMessage()}", previous: $e));
+            } finally {
+                @unlink($tmpPath);
+            }
+        }
+
+        return [$included === [] ? '' : $pdf->Output('S'), $included];
     }
 
     public function store(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
