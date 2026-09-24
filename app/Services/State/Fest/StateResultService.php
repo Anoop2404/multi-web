@@ -52,11 +52,22 @@ class StateResultService
         $ranking = $this->ranking($event, $item);
         $isGroup = $this->isGroupItem($item);
 
-        DB::connection('state')->transaction(function () use ($ranking, $event, $isGroup) {
+        DB::connection('state')->transaction(function () use ($ranking, $event, $item, $isGroup) {
             foreach ($ranking as $row) {
-                $row['mark']->forceFill([
+                $mark = $row['mark'];
+
+                // A mark with a score but no grade would score zero points, silently — and marks
+                // arrive that way from the qualifier projection and from direct entry, not only from
+                // aggregation. The grade is derived from the score and kept, so the stored mark says
+                // what it was worth and why.
+                $grade = filled($mark->grade)
+                    ? $mark->grade
+                    : $this->grades->resolveGradeFromScore($event, (float) $mark->score, $item->id);
+
+                $mark->forceFill([
+                    'grade' => $grade,
                     'position' => $row['position'],
-                    'points' => $this->grades->pointsForGradePosition($event, $row['mark']->grade, $row['position'], $isGroup),
+                    'points' => $this->grades->pointsForGradePosition($event, $grade, $row['position'], $isGroup),
                     'status' => 'ranked',
                 ])->save();
             }

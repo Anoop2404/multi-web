@@ -260,6 +260,26 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
                 Route::get('/{event}/items', [$config, 'items'])->name('items');
             });
 
+            // Grade scales, point rules and class categories decide what a mark is worth and who may
+            // compete, so they sit behind settings — the same trust as the event's other rules, and a
+            // deliberately higher one than entering marks.
+            Route::middleware('state.fest:settings')->group(function () {
+                $grading = \App\Http\Controllers\StateAdmin\Fest\StateGradingController::class;
+
+                Route::get('/{event}/grades', [$grading, 'grades'])->name('grades');
+                Route::post('/{event}/grades', [$grading, 'saveGrades'])->name('grades.save');
+                Route::post('/{event}/grades/apply-standard', [$grading, 'applyStandard'])->name('grades.apply-standard');
+
+                Route::get('/{event}/points', [$grading, 'points'])->name('points');
+                Route::post('/{event}/points', [$grading, 'savePoints'])->name('points.save');
+                Route::post('/{event}/points/apply-standard', [$grading, 'applyStandard'])->name('points.apply-standard');
+
+                Route::get('/{event}/eligibility', [$grading, 'eligibility'])->name('eligibility');
+                Route::post('/{event}/eligibility/seed', [$grading, 'seedCategories'])->name('eligibility.seed');
+                Route::post('/{event}/eligibility/categories', [$grading, 'saveCategory'])->name('eligibility.categories.save');
+                Route::delete('/{event}/eligibility/categories/{category}', [$grading, 'destroyCategory'])->name('eligibility.categories.destroy');
+            });
+
             // Catering and duty rosters are event logistics, so they sit with settings and staff
             // rather than with anything that decides who competes or what they score.
             Route::middleware('state.fest:settings')->group(function () {

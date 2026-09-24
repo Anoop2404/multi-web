@@ -260,7 +260,10 @@ class StateConductService
                     ],
                     [
                         'score' => $final,
-                        'grade' => app(\App\Services\State\StateGradePointService::class)->resolveGradeFromScore($event, $final),
+                        // The item is passed so an item with its own grade scale uses it rather than
+                        // the event-wide one.
+                        'grade' => app(\App\Services\State\StateGradePointService::class)
+                            ->resolveGradeFromScore($event, $final, $itemId),
                         'status' => 'aggregated',
                     ],
                 );
