@@ -60,7 +60,7 @@
                             <br><span style="color: #64748b; font-size: 9.5px;">{{ $row['first_participant_name'] }}</span>
                         @endif
                     </td>
-                    <td>{{ $row['school'] }}</td>
+                    <td>{{ $row['school'] }}@if(isset($row['distance_km'])) <span style="color: #64748b;">({{ $row['distance_km'] }} km)</span>@endif</td>
                     <td></td>
                 </tr>
                 @endforeach

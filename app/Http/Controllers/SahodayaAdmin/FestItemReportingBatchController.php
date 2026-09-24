@@ -6,6 +6,7 @@ use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestItemReportingBatch;
 use App\Models\FestRegistration;
+use App\Models\FestSchoolDistance;
 use App\Models\Tenant;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\FestNumberingService;
@@ -19,12 +20,16 @@ class FestItemReportingBatchController extends SahodayaAdminController
     /**
      * Below this many unique registrations, an item runs fine as one group — batching is
      * only offered for items large enough that staggering reporting time actually helps.
+     * A Sahodaya can override this per event (FestEvent::reporting_batch_min_registrations);
+     * this is only the fallback when they haven't set one.
      */
-    private const MIN_REGISTRATIONS_FOR_BATCHING = 15;
+    private const DEFAULT_MIN_REGISTRATIONS_FOR_BATCHING = 15;
 
     public function index(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $minRegistrations = $event->reporting_batch_min_registrations ?? self::DEFAULT_MIN_REGISTRATIONS_FOR_BATCHING;
 
         $regCounts = FestRegistration::where('event_id', $event->id)
             ->whereNotIn('status', ['rejected', 'withdrawn'])
@@ -32,16 +37,36 @@ class FestItemReportingBatchController extends SahodayaAdminController
             ->groupBy('item_id')
             ->pluck('reg_count', 'item_id');
 
+        $assignedCounts = FestRegistration::where('event_id', $event->id)
+            ->whereNotIn('status', ['rejected', 'withdrawn'])
+            ->whereNotNull('reporting_batch_id')
+            ->selectRaw('item_id, count(*) as assigned_count')
+            ->groupBy('item_id')
+            ->pluck('assigned_count', 'item_id');
+
+        $batchCounts = FestItemReportingBatch::where('event_id', $event->id)
+            ->selectRaw('item_id, count(*) as batch_count')
+            ->groupBy('item_id')
+            ->pluck('batch_count', 'item_id');
+
         $items = $event->items()->orderBy('title')->get(['id', 'title', 'item_code', 'category', 'stage_type'])
-            ->map(fn (FestEventItem $item) => [
-                'id'                 => $item->id,
-                'title'              => $item->title,
-                'item_code'          => $item->item_code,
-                'category'           => $item->category,
-                'is_group'           => app(FestNumberingService::class)->isGroupItem($item),
-                'registration_count' => (int) ($regCounts[$item->id] ?? 0),
-            ])
-            ->filter(fn (array $item) => $item['registration_count'] > self::MIN_REGISTRATIONS_FOR_BATCHING)
+            ->map(function (FestEventItem $item) use ($regCounts, $assignedCounts, $batchCounts) {
+                $regCount = (int) ($regCounts[$item->id] ?? 0);
+                $assignedCount = (int) ($assignedCounts[$item->id] ?? 0);
+
+                return [
+                    'id'                 => $item->id,
+                    'title'              => $item->title,
+                    'item_code'          => $item->item_code,
+                    'category'           => $item->category,
+                    'is_group'           => app(FestNumberingService::class)->isGroupItem($item),
+                    'registration_count' => $regCount,
+                    'batch_count'        => (int) ($batchCounts[$item->id] ?? 0),
+                    'assigned_count'     => $assignedCount,
+                    'unassigned_count'   => $regCount - $assignedCount,
+                ];
+            })
+            ->filter(fn (array $item) => $item['registration_count'] > $minRegistrations)
             ->values();
 
         $itemId = $request->integer('item_id') ?: null;
@@ -65,8 +90,25 @@ class FestItemReportingBatchController extends SahodayaAdminController
             'selectedItemId'   => $itemId,
             'batches'          => $batches,
             'registrations'    => $registrations,
-            'minRegistrations' => self::MIN_REGISTRATIONS_FOR_BATCHING,
+            'minRegistrations' => $minRegistrations,
         ]));
+    }
+
+    public function updateSettings(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'reporting_batch_min_registrations' => 'nullable|integer|min:0',
+        ]);
+
+        $event->update(['reporting_batch_min_registrations' => $data['reporting_batch_min_registrations'] ?? null]);
+
+        $audit->festEvent($event, FestPageActivity::REPORTING_BATCHES, 'fest.reporting_batch.settings_updated', 'Updated reporting batch settings', [
+            'reporting_batch_min_registrations' => $event->reporting_batch_min_registrations,
+        ]);
+
+        return back()->with('success', 'Reporting batch settings saved.');
     }
 
     /** Full-page "batch master" — the same grouped listing as the modal, at its own URL. */
@@ -247,8 +289,14 @@ class FestItemReportingBatchController extends SahodayaAdminController
             ->with(['school', 'group', 'participants.student', 'participants.teacher', 'reportingBatch'])
             ->get();
 
+        // Nullable so we can sort distance-set schools first (closest km ascending) and push
+        // everything else after, still in the original alphabetical-by-school order.
+        $distances = FestSchoolDistance::where('event_id', $event->id)
+            ->whereIn('school_id', $registrations->pluck('school_id')->unique())
+            ->pluck('distance_km', 'school_id');
+
         return $registrations
-            ->map(function (FestRegistration $reg) use ($isGroupItem) {
+            ->map(function (FestRegistration $reg) use ($isGroupItem, $distances) {
                 $school = $reg->school?->name ?? Tenant::find($reg->school_id)?->name;
 
                 $firstParticipantName = null;
@@ -269,12 +317,13 @@ class FestItemReportingBatchController extends SahodayaAdminController
                     'is_team'               => $isGroupItem,
                     'member_count'          => $isGroupItem ? $reg->participants->count() : 1,
                     'school'                => $school,
+                    'distance_km'           => isset($distances[$reg->school_id]) ? (float) $distances[$reg->school_id] : null,
                     'status'                => $reg->status,
                     'reporting_batch_id'    => $reg->reporting_batch_id,
                     'batch_label'           => $reg->reportingBatch?->label,
                 ];
             })
-            ->sortBy(fn ($row) => [$row['school'] ?? '', $row['id']])
+            ->sortBy(fn ($row) => [$row['distance_km'] ?? PHP_FLOAT_MAX, $row['school'] ?? '', $row['id']])
             ->values()
             ->all();
     }
@@ -291,6 +340,11 @@ class FestItemReportingBatchController extends SahodayaAdminController
             ? (int) ($regCounts[$item->id] ?? 0)
             : FestRegistration::where('item_id', $item->id)->whereNotIn('status', ['rejected', 'withdrawn'])->count();
 
+        $assigned = FestRegistration::where('item_id', $item->id)
+            ->whereNotIn('status', ['rejected', 'withdrawn'])
+            ->whereNotNull('reporting_batch_id')
+            ->count();
+
         return [
             'id'                 => $item->id,
             'title'              => $item->title,
@@ -298,6 +352,9 @@ class FestItemReportingBatchController extends SahodayaAdminController
             'category'           => $item->category,
             'is_group'           => app(FestNumberingService::class)->isGroupItem($item),
             'registration_count' => $count,
+            'batch_count'        => FestItemReportingBatch::where('item_id', $item->id)->count(),
+            'assigned_count'     => $assigned,
+            'unassigned_count'   => $count - $assigned,
         ];
     }
 
