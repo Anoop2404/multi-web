@@ -25,11 +25,18 @@ class FestItemReportingBatchController extends SahodayaAdminController
      */
     private const DEFAULT_MIN_REGISTRATIONS_FOR_BATCHING = 15;
 
+    /**
+     * Default "registrations per batch" for auto-assign-by-distance, when the event
+     * hasn't set FestEvent::reporting_batch_size.
+     */
+    private const DEFAULT_BATCH_SIZE = 8;
+
     public function index(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $minRegistrations = $event->reporting_batch_min_registrations ?? self::DEFAULT_MIN_REGISTRATIONS_FOR_BATCHING;
+        $batchSize = $event->reporting_batch_size ?? self::DEFAULT_BATCH_SIZE;
 
         $regCounts = FestRegistration::where('event_id', $event->id)
             ->whereNotIn('status', ['rejected', 'withdrawn'])
@@ -90,6 +97,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
             'batches'          => $batches,
             'registrations'    => $registrations,
             'minRegistrations' => $minRegistrations,
+            'batchSize'        => $batchSize,
         ]));
     }
 
@@ -99,12 +107,17 @@ class FestItemReportingBatchController extends SahodayaAdminController
 
         $data = $request->validate([
             'reporting_batch_min_registrations' => 'nullable|integer|min:0',
+            'reporting_batch_size'              => 'nullable|integer|min:1',
         ]);
 
-        $event->update(['reporting_batch_min_registrations' => $data['reporting_batch_min_registrations'] ?? null]);
+        $event->update([
+            'reporting_batch_min_registrations' => $data['reporting_batch_min_registrations'] ?? null,
+            'reporting_batch_size'              => $data['reporting_batch_size'] ?? null,
+        ]);
 
         $audit->festEvent($event, FestPageActivity::REPORTING_BATCHES, 'fest.reporting_batch.settings_updated', 'Updated reporting batch settings', [
             'reporting_batch_min_registrations' => $event->reporting_batch_min_registrations,
+            'reporting_batch_size'              => $event->reporting_batch_size,
         ]);
 
         return back()->with('success', 'Reporting batch settings saved.');
@@ -126,6 +139,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
             'selectedItem'  => $this->itemSummary($itemModel),
             'batches'       => $this->batchesForEvent($event),
             'registrations' => $this->registrationRows($event, $itemModel),
+            'batchSize'     => $event->reporting_batch_size ?? self::DEFAULT_BATCH_SIZE,
         ]);
     }
 
@@ -278,6 +292,66 @@ class FestItemReportingBatchController extends SahodayaAdminController
         ]);
 
         return back()->with('success', "Assigned {$count} registration(s) to batch.");
+    }
+
+    /**
+     * Splits one item's registrations into batches of N (closest school first), reusing
+     * the event's existing common batches in sort_order before creating new ones. This
+     * re-assigns every one of the item's registrations -- including ones already
+     * manually assigned -- so the result is a clean, predictable re-partition.
+     */
+    public function autoAssign(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'item_id'    => ['required', 'integer', Rule::exists('fest_event_items', 'id')->where('event_id', $event->id)],
+            'batch_size' => 'nullable|integer|min:1',
+        ]);
+
+        $itemModel = FestEventItem::where('event_id', $event->id)->findOrFail($data['item_id']);
+        $batchSize = $data['batch_size'] ?? ($event->reporting_batch_size ?? self::DEFAULT_BATCH_SIZE);
+
+        // registrationRows() already sorts closest-school-first (falling back to school
+        // name, then id) -- the same order the manual "Move to batch" dropdown shows.
+        $registrationIds = collect($this->registrationRows($event, $itemModel))->pluck('id')->all();
+
+        if (empty($registrationIds)) {
+            return back()->with('success', 'No registrations to assign.');
+        }
+
+        $existingBatches = $this->batchesForEvent($event)->values();
+        $chunks = array_chunk($registrationIds, $batchSize);
+        $nextSortOrder = ((int) FestItemReportingBatch::where('event_id', $event->id)->max('sort_order')) + 1;
+        $batchIds = [];
+
+        foreach ($chunks as $index => $chunk) {
+            $batch = $existingBatches->get($index);
+
+            if (! $batch) {
+                $batch = FestItemReportingBatch::create([
+                    'event_id'   => $event->id,
+                    'label'      => 'Batch '.($index + 1),
+                    'sort_order' => $nextSortOrder++,
+                ]);
+            }
+
+            FestRegistration::where('event_id', $event->id)
+                ->where('item_id', $itemModel->id)
+                ->whereIn('id', $chunk)
+                ->update(['reporting_batch_id' => $batch->id]);
+
+            $batchIds[] = $batch->id;
+        }
+
+        $audit->festEvent($event, FestPageActivity::REPORTING_BATCHES, 'fest.reporting_batch.auto_assigned', "Auto-assigned {$itemModel->title} into ".count($chunks).' batch(es) by distance', [
+            'item_id'    => $itemModel->id,
+            'batch_size' => $batchSize,
+            'batch_ids'  => $batchIds,
+            'count'      => count($registrationIds),
+        ]);
+
+        return back()->with('success', 'Auto-assigned '.count($registrationIds).' registration(s) into '.count($chunks).' batch(es), closest schools first.');
     }
 
     /** @return list<array<string, mixed>> */

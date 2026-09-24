@@ -67,7 +67,8 @@
                 </div>
 
                 <BatchMasterList :selected-item="selectedItem" :batches="batches" :registrations="registrations"
-                                  :assign-url="`${base}/assign`" :batch-base-url="base"
+                                  :assign-url="`${base}/assign`" :auto-assign-url="`${base}/auto-assign`" :batch-size="batchSize"
+                                  :batch-base-url="base"
                                   selectable v-model="selectedRegIds" searchable v-model:search="regSearch" />
             </div>
         </div>
@@ -75,11 +76,18 @@
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />
 
         <Modal :show="showSettings" title="Reporting batch settings" @close="showSettings = false">
-            <label class="text-sm text-slate-600 block">
-                Only offer items with more than
-                <input v-model.number="settingsForm.reporting_batch_min_registrations" type="number" min="0" class="field text-sm mt-1 w-full">
-                registrations for batching.
-            </label>
+            <div class="space-y-4">
+                <label class="text-sm text-slate-600 block">
+                    Only offer items with more than
+                    <input v-model.number="settingsForm.reporting_batch_min_registrations" type="number" min="0" class="field text-sm mt-1 w-full">
+                    registrations for batching.
+                </label>
+                <label class="text-sm text-slate-600 block">
+                    Auto-assign by distance puts
+                    <input v-model.number="settingsForm.reporting_batch_size" type="number" min="1" class="field text-sm mt-1 w-full">
+                    registrations (closest schools first) in each batch.
+                </label>
+            </div>
             <template #footer>
                 <button type="button" class="btn-ghost text-sm" @click="showSettings = false">Cancel</button>
                 <button type="button" class="btn-primary text-sm" :disabled="settingsForm.processing" @click="saveSettings">
@@ -115,6 +123,7 @@ const props = defineProps({
     registrations: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
     minRegistrations: { type: Number, default: 15 },
+    batchSize: { type: Number, default: 8 },
 });
 
 const eventBase = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
@@ -126,7 +135,10 @@ const regSearch = ref('');
 const showSettings = ref(false);
 const showBatchMaster = ref(false);
 
-const settingsForm = useForm({ reporting_batch_min_registrations: props.minRegistrations });
+const settingsForm = useForm({
+    reporting_batch_min_registrations: props.minRegistrations,
+    reporting_batch_size: props.batchSize,
+});
 
 function saveSettings() {
     settingsForm.post(`${base}/settings`, {

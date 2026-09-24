@@ -16,6 +16,17 @@
             </button>
         </div>
 
+        <div v-if="autoAssignUrl && selectedItem" class="flex flex-wrap items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50/60 p-2">
+            <span class="text-xs text-indigo-900 pl-1">📏 Auto-assign by distance —</span>
+            <label class="text-xs text-indigo-900 flex items-center gap-1">
+                per batch
+                <input v-model.number="autoBatchSize" type="number" min="1" class="field !py-1 !text-xs !w-16">
+            </label>
+            <button type="button" class="btn-secondary text-sm shrink-0" :disabled="autoAssigning" @click="autoAssign">
+                {{ autoAssigning ? 'Assigning…' : '⚡ Auto-assign closest first' }}
+            </button>
+        </div>
+
         <div v-if="registrations.length === 0" class="text-sm text-slate-400">No registrations for this item yet.</div>
         <div v-else-if="groups.every((g) => g.rows.length === 0)" class="text-sm text-slate-400">No registrations match your search.</div>
 
@@ -87,14 +98,17 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     selectedItem: { type: Object, default: null },
     batches: { type: Array, default: () => [] },
     registrations: { type: Array, default: () => [] },
     assignUrl: { type: String, required: true },
+    autoAssignUrl: { type: String, default: null },
+    batchSize: { type: Number, default: 8 },
     batchBaseUrl: { type: String, default: null },
     selectable: { type: Boolean, default: false },
     modelValue: { type: Array, default: () => [] },
@@ -103,12 +117,17 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:modelValue', 'update:search']);
+const { confirm } = useConfirm();
 
 const moving = reactive(new Set());
 const modelSearch = computed(() => props.search);
 
 const bulkBatchId = ref('');
 const bulkMoving = ref(false);
+
+const autoBatchSize = ref(props.batchSize);
+const autoAssigning = ref(false);
+watch(() => props.batchSize, (v) => { autoBatchSize.value = v; });
 
 const editingTimeFor = ref(null);
 const timeForm = reactive({ report_at: '' });
@@ -193,6 +212,25 @@ function saveTime(batch) {
         preserveScroll: true,
         preserveState: true,
         onSuccess: () => { editingTimeFor.value = null; },
+    });
+}
+
+async function autoAssign() {
+    if (!props.selectedItem || !props.autoAssignUrl) return;
+
+    const size = autoBatchSize.value || props.batchSize;
+    if (!(await confirm({
+        message: `Re-assign ALL ${props.registrations.length} registration(s) for this item into batches of ${size}, closest school first? Existing assignments for this item will be overwritten.`,
+    }))) return;
+
+    autoAssigning.value = true;
+    router.post(props.autoAssignUrl, {
+        item_id: props.selectedItem.id,
+        batch_size: size,
+    }, {
+        preserveScroll: true,
+        preserveState: true,
+        onFinish: () => { autoAssigning.value = false; },
     });
 }
 

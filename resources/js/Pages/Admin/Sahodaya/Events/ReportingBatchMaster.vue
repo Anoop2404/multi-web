@@ -14,8 +14,8 @@
 
         <div class="card">
             <BatchMasterList :selected-item="selectedItem" :batches="batches" :registrations="registrations"
-                              :assign-url="`${base}/reporting-batches/assign`"
-                              :batch-base-url="`${base}/reporting-batches`"
+                              :assign-url="`${base}/reporting-batches/assign`" :auto-assign-url="`${base}/reporting-batches/auto-assign`"
+                              :batch-size="batchSize" :batch-base-url="`${base}/reporting-batches`"
                               selectable v-model="selectedRegIds" searchable v-model:search="search" />
         </div>
     </SahodayaEventsLayout>
@@ -36,6 +36,7 @@ const props = defineProps({
     selectedItem: { type: Object, required: true },
     batches: { type: Array, default: () => [] },
     registrations: { type: Array, default: () => [] },
+    batchSize: { type: Number, default: 8 },
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;

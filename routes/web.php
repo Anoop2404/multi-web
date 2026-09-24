@@ -1401,6 +1401,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::put('/{event}/reporting-batches/{batch}', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'update'])->name('reporting-batches.update');
             Route::delete('/{event}/reporting-batches/{batch}', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'destroy'])->name('reporting-batches.destroy');
             Route::post('/{event}/reporting-batches/assign', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'assignRegistrations'])->name('reporting-batches.assign');
+            Route::post('/{event}/reporting-batches/auto-assign', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'autoAssign'])->name('reporting-batches.auto-assign');
             Route::get('/{event}/school-distances', [\App\Http\Controllers\SahodayaAdmin\FestSchoolDistanceController::class, 'index'])->name('school-distances.index');
             Route::post('/{event}/school-distances', [\App\Http\Controllers\SahodayaAdmin\FestSchoolDistanceController::class, 'save'])->name('school-distances.save');
             Route::post('/{event}/registration-batches', [\App\Http\Controllers\SahodayaAdmin\FestRegistrationBatchController::class, 'store'])->name('registration-batches.store');
