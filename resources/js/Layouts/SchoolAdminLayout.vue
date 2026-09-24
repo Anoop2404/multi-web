@@ -230,6 +230,7 @@ const navGroups = computed(() => {
             programPrefix: schoolEventCtx.programPrefix ?? page.props.programPrefix,
             isSports: festEvent.event_type === 'sports' || schoolEventCtx.programSlug === 'sports-meet',
             programEvents: page.props.programEvents ?? [],
+            idCardDownloadsDisabled: Boolean(page.props.idCardDownloadsDisabled),
         });
     }
 

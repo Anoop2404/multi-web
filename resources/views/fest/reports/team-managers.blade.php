@@ -39,6 +39,7 @@
             font-size: 10.5px;
             font-weight: bold;
             text-transform: uppercase;
+            text-align: left;
         }
         td {
             border: 1px solid #e2e8f0;
@@ -56,6 +57,8 @@
         .manager-name {
             display: block;
             margin-bottom: 5px;
+            font-size: 13px;
+            font-weight: bold;
         }
         .manager-role {
             font-size: 9.5px;
@@ -98,7 +101,7 @@
                 <tr>
                     <td class="text-center">{{ $idx + 1 }}</td>
                     <td>
-                        <span class="font-bold">{{ $row->school_name }}</span>
+                        <span class="font-bold">{{ strtoupper($row->school_name) }}</span>
                     </td>
                     <td class="text-center">
                         <span class="count-badge">{{ $row->unique_student_count }}</span>
@@ -114,9 +117,6 @@
                             <span class="manager-role on-file">{{ $row->manager_role_1 }}</span>
                         @elseif($row->manager_role_1)
                             <span class="manager-role">{{ $row->manager_role_1 }}</span>
-                        @endif
-                        @if(!$row->manager_name_1 && !$row->manager_phone_1)
-                            <span class="manager-role">Not entered</span>
                         @endif
                     </td>
                     <td>

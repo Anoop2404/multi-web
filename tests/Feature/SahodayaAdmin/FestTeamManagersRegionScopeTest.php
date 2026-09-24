@@ -107,9 +107,10 @@ class FestTeamManagersRegionScopeTest extends TestCase
         $response->assertOk();
         $content = $response->streamedContent();
 
-        $this->assertStringContainsString('Region A Sentinel School', $content);
+        // School names render upper-cased in this export (see FestReportService::teamManagersXls()).
+        $this->assertStringContainsString('REGION A SENTINEL SCHOOL', $content);
         $this->assertStringContainsString('Region A Manager', $content);
-        $this->assertStringNotContainsString('Region B Sentinel School', $content);
+        $this->assertStringNotContainsString('REGION B SENTINEL SCHOOL', $content);
         $this->assertStringNotContainsString('Region B Manager', $content);
     }
 

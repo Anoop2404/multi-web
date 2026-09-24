@@ -519,4 +519,81 @@ class SchoolDocumentDownloadGateServiceTest extends TestCase
             $this->assertEquals(422, $e->getStatusCode());
         }
     }
+
+    /**
+     * fee_settings.id_card_downloads_disabled is a Sahodaya admin's explicit, unconditional
+     * switch (FeesTab.vue's "Download gates" section) — blocks every school's ID card
+     * downloads for the event regardless of fee status, and overrides
+     * id_card_allowed_with_pending_fees since disabling is a stronger admin intent than
+     * merely tolerating a pending fee. Every other document type must stay unaffected.
+     */
+    public function test_id_card_downloads_disabled_flag_blocks_regardless_of_fee_status(): void
+    {
+        $sahodaya = Tenant::create([
+            'id' => 'sahodaya-dl-gate-idcard-disabled',
+            'name' => 'Sahodaya DL Gate ID Card Disabled Test',
+            'type' => 'sahodaya',
+            'status' => 'active',
+            'is_active' => true,
+            'membership_status' => 'approved',
+        ]);
+
+        $year = AcademicYear::forSahodaya($sahodaya->id);
+
+        $school = Tenant::create([
+            'id' => 'school-dl-gate-idcard-disabled',
+            'parent_id' => $sahodaya->id,
+            'name' => 'School DL Gate ID Card Disabled Test',
+            'type' => 'school',
+            'status' => 'active',
+            'is_active' => true,
+            'membership_status' => 'approved',
+        ]);
+
+        Registration::create([
+            'school_id' => $school->id,
+            'academic_year' => $year,
+            'registration_status' => 'completed',
+        ]);
+
+        $event = FestEvent::create([
+            'tenant_id' => $sahodaya->id,
+            'title' => 'ID Card Disabled Flag Test Event',
+            'event_type' => 'kalotsav',
+            'status' => 'registration_open',
+            'approval_policy' => 'auto',
+            'fee_settings' => [
+                'fee_model' => 'none',
+                'require_verified_students' => false,
+                // Both escape hatches on -- the disable flag must still win.
+                'id_card_allowed_with_pending_fees' => true,
+                'id_card_downloads_disabled' => true,
+            ],
+        ]);
+
+        $downloadGate = app(SchoolDocumentDownloadGateService::class);
+
+        $this->assertTrue($downloadGate->idCardDownloadsDisabled($event));
+
+        // Fee model is 'none' (nothing owed) and the pending-fees escape hatch is also on,
+        // so without the disabled flag this would be wide open -- it must still be blocked.
+        $this->assertFalse($downloadGate->festEventFeeCleared($event, $school, documentType: 'id_card'));
+
+        $payload = $downloadGate->payload($school, $event, documentType: 'id_card');
+        $this->assertTrue($payload['blocked']);
+        $this->assertStringContainsString('disabled by your Sahodaya', $payload['reason']);
+
+        try {
+            $downloadGate->assertFestEventFeeForDownloads($event, $school, documentType: 'id_card');
+            $this->fail('Expected HttpException 422 was not thrown');
+        } catch (HttpException $e) {
+            $this->assertEquals(422, $e->getStatusCode());
+            $this->assertStringContainsString('disabled by your Sahodaya', $e->getMessage());
+        }
+
+        // A document type other than 'id_card' is entirely unaffected by this flag -- with
+        // fee_model 'none' there is nothing to block it on.
+        $this->assertTrue($downloadGate->festEventFeeCleared($event, $school, documentType: 'default'));
+        $downloadGate->assertFestEventFeeForDownloads($event, $school, documentType: 'default');
+    }
 }

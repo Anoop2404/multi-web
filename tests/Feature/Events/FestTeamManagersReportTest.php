@@ -202,4 +202,52 @@ class FestTeamManagersReportTest extends TestCase
 
         $this->assertSame(1, $row->unique_student_count);
     }
+
+    /**
+     * The Students count only counts a registration that is 'approved' or 'submitted' —
+     * not one still stuck earlier in the fee/proof workflow (proof_uploaded, pending_proof,
+     * partial), and not a withdrawn one. Real production data (Ace Public School,
+     * 2026-09-24) showed a withdrawn duplicate item registration; this covers that plus the
+     * other non-final statuses the same way.
+     */
+    public function test_unique_student_count_only_counts_approved_or_submitted_registrations(): void
+    {
+        $sahodaya = Tenant::create([
+            'type' => 'sahodaya', 'name' => 'Status Filter Sahodaya', 'subdomain' => 'status-filter-sahodaya-'.uniqid(),
+        ]);
+
+        $schoolTenant = Tenant::create([
+            'type' => 'school', 'name' => 'Status Filter School', 'subdomain' => 'status-filter-school-'.uniqid(),
+            'parent_id' => $sahodaya->id, 'school_prefix' => 'SFS',
+        ]);
+        $schoolClass = SchoolClass::create(['tenant_id' => $schoolTenant->id, 'name' => 'Class 10']);
+
+        $event = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Kalotsav 2027', 'event_type' => 'kalotsav',
+            'fee_settings' => ['fee_model' => 'none'],
+        ]);
+
+        $items = collect(['approved', 'submitted', 'proof_uploaded', 'pending_proof', 'partial', 'withdrawn'])
+            ->mapWithKeys(fn ($status) => [$status => FestEventItem::create([
+                'event_id' => $event->id, 'title' => "Item {$status}", 'item_code' => strtoupper($status),
+                'participant_type' => 'individual', 'is_enabled' => true,
+            ])]);
+
+        foreach ($items as $status => $item) {
+            $student = Student::create([
+                'tenant_id' => $schoolTenant->id, 'school_class_id' => $schoolClass->id,
+                'name' => "Student {$status}", 'reg_no' => 'STU/27/'.substr(md5($status), 0, 4),
+            ]);
+            $reg = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $schoolTenant->id, 'status' => $status]);
+            FestParticipant::create([
+                'registration_id' => $reg->id, 'student_id' => $student->id,
+                'participant_type' => 'student', 'participant_role' => 'performer', 'chest_no' => 1,
+            ]);
+        }
+
+        $row = (new FestReportService($event))->teamManagersData()->first();
+
+        // Only the 'approved' and 'submitted' students count -- 2, not 6.
+        $this->assertSame(2, $row->unique_student_count);
+    }
 }

@@ -57,6 +57,13 @@ trait BuildsSchoolFestEventContext
             'eventHeadNav' => $headNav,
             'programEvents' => $events->values()->all(),
             'schoolRegion' => $this->schoolKalotsavRegion($event),
+            // Read here (the one place both eventRegistration()'s direct call and
+            // withSchoolFestNavContext()'s auto-injection funnel through) rather than off
+            // $event->only(...) above, whose field list several callers pass their own
+            // narrower copy of -- schoolEventNav.js reads this to hide the "ID Cards" link
+            // entirely once a Sahodaya admin disables it, matching
+            // FestSchoolReportController::idCards()'s server-side abort_if().
+            'idCardDownloadsDisabled' => (bool) ($event->fee_settings['id_card_downloads_disabled'] ?? false),
         ];
     }
 

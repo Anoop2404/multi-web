@@ -259,6 +259,9 @@ export function useEventSettingsForms(props) {
         id_card_allowed_with_pending_fees: existingFeeSettings.id_card_allowed_with_pending_fees
             ?? schedule.id_card_allowed_with_pending_fees
             ?? false,
+        id_card_downloads_disabled: existingFeeSettings.id_card_downloads_disabled
+            ?? schedule.id_card_downloads_disabled
+            ?? false,
         payment_bank_name: existingFeeSettings.payment_bank_name ?? '',
         payment_account_no: existingFeeSettings.payment_account_no ?? '',
         payment_ifsc: existingFeeSettings.payment_ifsc ?? '',

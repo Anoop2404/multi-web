@@ -520,6 +520,13 @@
                             <span class="block text-xs text-slate-500 mt-0.5">Off by default — a school with an unpaid or partially paid fee for this event cannot download ID cards. Turn on to let them download anyway (Sahodaya membership fee still has to be clear).</span>
                         </span>
                     </label>
+                    <label class="flex items-start gap-2 text-sm">
+                        <input type="checkbox" v-model="feeSettingsForm.id_card_downloads_disabled" class="mt-0.5">
+                        <span>
+                            Disable ID card downloads for schools
+                            <span class="block text-xs text-slate-500 mt-0.5">Off by default. Turn on to block every school from downloading ID cards for this event, regardless of fee status — useful while chest numbers, photos, or results are still being finalized. Overrides "Allow with pending fees" above.</span>
+                        </span>
+                    </label>
                 </div>
             </section>
 
