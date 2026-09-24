@@ -110,12 +110,11 @@
     <table>
         <thead>
             <tr>
-                <th style="width: 4%;">#</th>
-                <th style="width: 20%;">School</th>
-                <th style="width: 8%;" class="text-center">Students</th>
-                <th style="width: 22%;">Team Manager 1</th>
-                <th style="width: 22%;">Team Manager 2</th>
-                <th style="width: 24%;">Signature</th>
+                <th style="width: 5%;">#</th>
+                <th style="width: 26%;">School</th>
+                <th style="width: 10%;" class="text-center">Students</th>
+                <th style="width: 29%;">Team Manager</th>
+                <th style="width: 30%;">Signature</th>
             </tr>
         </thead>
         <tbody>
@@ -142,20 +141,12 @@
                         @endif
                     </td>
                     <td>
-                        @if($row->manager_name_2)
-                            <span class="font-bold manager-name">{{ $row->manager_name_2 }}</span>
-                        @endif
-                        @if($row->manager_phone_2)
-                            <span>📞 {{ $row->manager_phone_2 }}</span>
-                        @endif
-                    </td>
-                    <td>
                         <span class="signature-box"></span>
                     </td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="6" class="text-center" style="padding: 20px;">No school team managers recorded.</td>
+                    <td colspan="5" class="text-center" style="padding: 20px;">No school team managers recorded.</td>
                 </tr>
             @endforelse
         </tbody>
