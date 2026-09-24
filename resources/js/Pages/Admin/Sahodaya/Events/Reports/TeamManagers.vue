@@ -5,6 +5,11 @@
                     description="Team manager and contingent official contact details on file for each participating school, with a fallback to the Events Coordinator when no dedicated manager has been entered.">
             <template #actions>
                 <ReportDownloadButtons :pdf-url="pdfUrl" :xls-url="xlsUrl" />
+                <a v-if="registrationSheetUrl" :href="registrationSheetUrl" target="_blank" rel="noopener"
+                   class="btn-secondary text-sm flex items-center gap-1.5 shadow-sm">
+                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    Registration Sheet (Sign-In)
+                </a>
             </template>
         </PageHeader>
 
@@ -87,6 +92,7 @@ const props = defineProps({
     schools: { type: Array, default: () => [] },
     pdfUrl: String,
     xlsUrl: String,
+    registrationSheetUrl: String,
     activityLogs: { type: Array, default: () => [] },
 });
 

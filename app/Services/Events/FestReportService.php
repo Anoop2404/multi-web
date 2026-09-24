@@ -870,6 +870,7 @@ class FestReportService
             'student-limits-xls' => $this->studentLimitsXls($request),
             'team-managers' => $this->teamManagersXls($request),
             'team-managers-pdf' => $this->teamManagersPdf($request),
+            'team-managers-registration-sheet' => $this->teamManagersRegistrationSheetPdf($request),
             default => abort(404, "Report type '{$type}' not supported."),
         };
     }
@@ -2317,6 +2318,48 @@ class FestReportService
             $bladeData,
             $this->slug().'-team-managers.pdf',
             false,
+            $headerTemplate,
+            $footerTemplate,
+        );
+    }
+
+    /**
+     * A physical sign-in sheet for the registration desk -- same school/manager rows
+     * as teamManagersPdf(), but the student count is left blank for the desk to fill in
+     * by hand (rather than trusting the system count, which may be stale by the time the
+     * team physically arrives) and a signature column is added for the team manager to
+     * sign against.
+     */
+    private function teamManagersRegistrationSheetPdf(Request $request): \Symfony\Component\HttpFoundation\Response
+    {
+        $data = $this->teamManagersData($request->input('school_id'));
+        $isDomPdf = empty(config('services.pdf_converter.url'));
+
+        $bladeData = [
+            'event'    => $this->event,
+            'schools'  => $data,
+            'isDomPdf' => $isDomPdf,
+            'preview'  => $this->preview,
+            ...$this->brandingData(),
+        ];
+
+        if ($this->preview) {
+            return response(view('fest.reports.team-managers-registration-sheet', $bladeData)->render())
+                ->header('Content-Type', 'text/html');
+        }
+
+        [$headerTemplate, $footerTemplate] = \App\Support\PdfChromeHeaderFooter::build([
+            'orgName'    => $bladeData['orgName'],
+            'logoSrc'    => $bladeData['logoSrc'],
+            'docTitle'   => 'Team Manager Registration Sheet',
+            'eventTitle' => $this->event->title,
+        ]);
+
+        return $this->renderPdf(
+            'fest.reports.team-managers-registration-sheet',
+            $bladeData,
+            $this->slug().'-team-managers-registration-sheet.pdf',
+            true,
             $headerTemplate,
             $footerTemplate,
         );
