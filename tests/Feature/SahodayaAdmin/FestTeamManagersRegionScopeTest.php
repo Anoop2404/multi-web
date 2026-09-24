@@ -154,6 +154,64 @@ class FestTeamManagersRegionScopeTest extends TestCase
         $this->assertStringContainsString("/events/{$childA->id}/", $href);
     }
 
+    /**
+     * The sidebar "Team Managers" link used to point straight at the raw PDF export
+     * endpoint with target="_blank" -- Inertia's <Link> ignores `target` entirely when
+     * deciding whether to intercept a click (it only reads `target` for the rendered DOM
+     * attribute), so it always ran the export through an XHR visit and rendered the
+     * non-Inertia PDF response inside Inertia's own error dialog instead of letting the
+     * browser open/download it. This is the fix: a real interactive page, matching every
+     * other report (e.g. Unique Participant Counts), with Preview/Download PDF buttons
+     * that are plain <a target="_blank"> links.
+     */
+    public function test_team_managers_page_route_renders_the_report_inline(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'sahodaya', 'name' => 'Team Manager Page Sahodaya',
+            'domain' => 'team-manager-page.test', 'is_active' => true,
+        ]);
+        SahodayaProfile::create(['tenant_id' => $sahodaya->id, 'prefix' => 'TMP', 'student_data_mode' => 'counts_only']);
+
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'school', 'name' => 'Team Manager Page School',
+            'parent_id' => $sahodaya->id, 'membership_status' => 'approved', 'is_active' => true,
+        ]);
+
+        $event = FestEvent::create([
+            'tenant_id' => $sahodaya->id, 'title' => 'Team Manager Page Kalotsav', 'event_type' => 'kalolsavam',
+            'level_round' => 'sahodaya', 'status' => 'registration_open',
+        ]);
+
+        $this->registerOneStudent($school, $event, 'Page Sentinel Student');
+
+        FestSchoolTeamManager::create([
+            'tenant_id' => $sahodaya->id, 'event_id' => $event->id, 'school_id' => $school->id,
+            'manager_name_1' => 'Page Sentinel Manager', 'manager_phone_1' => '9998887776',
+        ]);
+
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        $response = $this->actingAs($admin)->get(route('sahodaya.events.reports.team-managers', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]));
+
+        $response->assertOk();
+        $props = $response->viewData('page');
+        $this->assertSame('Sahodaya/Events/Reports/TeamManagers', $props['component']);
+
+        $rows = $props['props']['rows'];
+        $this->assertCount(1, $rows);
+        $this->assertSame('Team Manager Page School', $rows[0]->school_name);
+        $this->assertSame('Page Sentinel Manager', $rows[0]->manager_name_1);
+        $this->assertSame(1, $rows[0]->unique_student_count);
+
+        $this->assertStringContainsString('/reports/export/team-managers-pdf', $props['props']['pdfUrl']);
+        $this->assertStringContainsString('/reports/export/team-managers', $props['props']['xlsUrl']);
+    }
+
     private function registerOneStudent(Tenant $school, FestEvent $event, string $studentName): void
     {
         $class = SchoolClass::create(['tenant_id' => $school->id, 'name' => '10', 'display_order' => 10]);

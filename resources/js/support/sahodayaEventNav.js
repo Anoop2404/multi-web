@@ -169,11 +169,7 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
         { label: 'Schedule clashes', href: `${base}/reports/schedule-clashes`, icon: 'alert-circle', permissions: FEST_VIEW },
         { label: 'School participation', href: `${base}/reports/school-participation`, icon: 'bar-chart', permissions: FEST_VIEW },
         { label: 'Unique participants', href: `${base}/reports/unique-participants`, icon: 'users', permissions: FEST_VIEW },
-        // Export-only (PDF/Excel, no interactive page of its own) -- opened in a new tab
-        // like every other raw download link, so Inertia's <Link> doesn't hijack the SPA
-        // navigation for a non-Inertia response (see schoolEventNav.js's own "Team
-        // Managers" entry, added the same way for the school-side sidebar).
-        { label: 'Team Managers', href: `${base}/reports/export/team-managers-pdf`, icon: 'user-check', permissions: FEST_VIEW, target: '_blank' },
+        { label: 'Team Managers', href: `${base}/reports/team-managers`, icon: 'user-check', permissions: FEST_VIEW },
         { label: 'Student item limits', href: `${base}/reports/student-limits`, icon: 'bar-chart', permissions: FEST_VIEW },
         { label: 'Certificates', href: `${base}/certificates`, icon: 'award', permissions: FEST_CERTIFICATES },
         { label: 'ID cards', href: `${base}/id-cards`, icon: 'credit-card', permissions: FEST_VIEW },
