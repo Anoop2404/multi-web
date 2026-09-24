@@ -51,10 +51,20 @@ class FestItemReportingBatchController extends SahodayaAdminController
             ->groupBy('item_id')
             ->pluck('assigned_count', 'item_id');
 
-        $batchCount = FestItemReportingBatch::where('event_id', $event->id)->count();
+        // How many of the event's common batches THIS item actually has members in --
+        // not the event-wide batch total, which would show the same number on every
+        // item even though most batches only hold other items' registrations.
+        $usedBatchCounts = FestRegistration::where('event_id', $event->id)
+            ->whereNotIn('status', ['rejected', 'withdrawn'])
+            ->whereNotNull('reporting_batch_id')
+            ->select('item_id', 'reporting_batch_id')
+            ->distinct()
+            ->get()
+            ->groupBy('item_id')
+            ->map(fn ($rows) => $rows->pluck('reporting_batch_id')->unique()->count());
 
         $items = $event->items()->orderBy('title')->get(['id', 'title', 'item_code', 'category', 'gender', 'stage_type'])
-            ->map(function (FestEventItem $item) use ($regCounts, $assignedCounts, $batchCount) {
+            ->map(function (FestEventItem $item) use ($regCounts, $assignedCounts, $usedBatchCounts) {
                 $regCount = (int) ($regCounts[$item->id] ?? 0);
                 $assignedCount = (int) ($assignedCounts[$item->id] ?? 0);
 
@@ -66,7 +76,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
                     'gender_label'       => \App\Support\FestSportsAgeGroup::genderLabel($item->gender),
                     'is_group'           => app(FestNumberingService::class)->isGroupItem($item),
                     'registration_count' => $regCount,
-                    'batch_count'        => $batchCount,
+                    'batch_count'        => (int) ($usedBatchCounts[$item->id] ?? 0),
                     'assigned_count'     => $assignedCount,
                     'unassigned_count'   => $regCount - $assignedCount,
                 ];
@@ -402,8 +412,11 @@ class FestItemReportingBatchController extends SahodayaAdminController
 
     /**
      * One item's registrations grouped into printable sections: one per common batch (in
-     * sort_order) plus a trailing "Unassigned" section when applicable. Shared by the
-     * single-item and bulk (all-items) print actions.
+     * sort_order) that this item actually has members in, plus a trailing "Unassigned"
+     * section when applicable. Batches other items use but this one doesn't are left out
+     * entirely -- the event may have many common batches, and printing an empty "0
+     * registrations" table for each of them on every item's report is just noise. Shared
+     * by the single-item and bulk (all-items) print actions.
      *
      * @return list<array{label: string, report_at: ?string, rows: list<array<string, mixed>>}>
      */
@@ -416,7 +429,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
             'label'     => $batch->label,
             'report_at' => $batch->report_at,
             'rows'      => ($grouped[$batch->id] ?? collect())->values()->all(),
-        ])->values()->all();
+        ])->filter(fn (array $section) => count($section['rows']) > 0)->values()->all();
 
         $unassignedRows = ($grouped['unassigned'] ?? collect())->values()->all();
         if (! empty($unassignedRows)) {
@@ -493,6 +506,12 @@ class FestItemReportingBatchController extends SahodayaAdminController
             ->whereNotNull('reporting_batch_id')
             ->count();
 
+        $usedBatchCount = FestRegistration::where('item_id', $item->id)
+            ->whereNotIn('status', ['rejected', 'withdrawn'])
+            ->whereNotNull('reporting_batch_id')
+            ->distinct('reporting_batch_id')
+            ->count('reporting_batch_id');
+
         return [
             'id'                 => $item->id,
             'title'              => $item->title,
@@ -501,7 +520,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
             'gender_label'       => \App\Support\FestSportsAgeGroup::genderLabel($item->gender),
             'is_group'           => app(FestNumberingService::class)->isGroupItem($item),
             'registration_count' => $count,
-            'batch_count'        => FestItemReportingBatch::where('event_id', $item->event_id)->count(),
+            'batch_count'        => $usedBatchCount,
             'assigned_count'     => $assigned,
             'unassigned_count'   => $count - $assigned,
         ];
