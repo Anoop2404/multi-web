@@ -29,6 +29,7 @@ class FestPageActivity
     public const CERTIFICATES = 'event.certificates';
     public const ID_CARDS = 'event.id-cards';
     public const CHEST_NUMBERS = 'event.chest-numbers';
+    public const REPORTING_BATCHES = 'event.reporting-batches';
     public const COMPETITION = 'event.competition';
     public const APPEALS = 'event.appeals';
     public const ATHLETIC_RECORDS = 'event.athletic-records';
