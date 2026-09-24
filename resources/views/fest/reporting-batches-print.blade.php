@@ -6,8 +6,9 @@
     <style>
         @page { margin: 140px 28px 34px; }
         body { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 11px; color: #0f172a; margin: 0; }
-        .batch-header { margin-top: 18px; margin-bottom: 6px; page-break-after: avoid; break-after: avoid-page; }
-        .batch-header:first-of-type { margin-top: 0; }
+        .batch-block { margin-top: 18px; page-break-inside: avoid; break-inside: avoid; }
+        .batch-block:first-of-type { margin-top: 0; }
+        .batch-header { margin-bottom: 6px; }
         .batch-title { font-size: 14px; font-weight: bold; color: #0f172a; }
         .batch-meta { font-size: 10px; color: #475569; margin-top: 2px; }
         table.data { width: 100%; border-collapse: collapse; margin-top: 4px; }
