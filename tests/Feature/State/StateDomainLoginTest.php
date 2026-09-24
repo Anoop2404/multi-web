@@ -73,6 +73,21 @@ class StateDomainLoginTest extends TestCase
         $this->assertStringContainsString('/admin/state-dashboard', (string) $home);
     }
 
+    public function test_a_state_user_can_open_the_forced_password_change_page(): void
+    {
+        $user = $this->stateUser();
+
+        $response = $this->actingAs($user, 'platform')
+            ->get('http://superadmin.test/change-password')
+            ->assertOk();
+
+        $page = $response->viewData('page');
+
+        $this->assertSame('Auth/ChangePassword', $page['component']);
+        $this->assertSame('Kerala', $page['props']['organizationName']);
+        $this->assertSame('State Admin', $page['props']['roleLabel']);
+    }
+
     public function test_a_superadmin_on_the_state_domain_also_stays_on_it(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);

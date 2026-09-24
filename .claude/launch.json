@@ -18,6 +18,12 @@
       "runtimeExecutable": "php",
       "runtimeArgs": ["artisan", "serve", "--port=8000"],
       "port": 8000
+    },
+    {
+      "name": "multi-web-serve-8010",
+      "runtimeExecutable": "php",
+      "runtimeArgs": ["artisan", "serve", "--port=8010"],
+      "port": 8010
     }
   ]
 }
