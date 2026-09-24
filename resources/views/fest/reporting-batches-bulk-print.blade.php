@@ -2,10 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>{{ $orgName ?? 'Sahodaya' }} — {{ $event->title }} — {{ $item->title }} — Reporting Batches</title>
+    <title>{{ $orgName ?? 'Sahodaya' }} — {{ $event->title }} — Reporting Batches (All Items)</title>
     <style>
         @page { margin: 140px 28px 34px; }
         body { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 11px; color: #0f172a; margin: 0; }
+        .item-block { page-break-before: always; }
+        .item-block:first-of-type { page-break-before: avoid; }
+        .item-title { font-size: 15px; font-weight: bold; color: #0f172a; margin-bottom: 2px; }
+        .item-meta { font-size: 10px; color: #64748b; margin-bottom: 10px; }
         .batch-header { margin-top: 18px; margin-bottom: 6px; }
         .batch-header:first-of-type { margin-top: 0; }
         .batch-title { font-size: 14px; font-weight: bold; color: #0f172a; }
@@ -23,15 +27,23 @@
         @include('partials.pdf-report-heading', [
             'orgName' => $orgName ?? 'Sahodaya',
             'logoSrc' => $logoSrc ?? null,
-            'docTitle' => 'REPORTING BATCHES',
+            'docTitle' => 'REPORTING BATCHES — ALL ITEMS',
             'eventTitle' => $event->title,
-            'item' => $item,
-            'participantCount' => collect($sections)->sum(fn ($s) => count($s['rows'])),
         ])
     </div>
     @endif
 
-    @include('fest.partials.reporting-batches-sections', ['sections' => $sections, 'isGroup' => $isGroup])
+    @forelse($itemsData as $data)
+        <div class="item-block">
+            <div class="item-title">
+                {{ $data['item']->item_code ? "[{$data['item']->item_code}] " : '' }}{{ $data['item']->title }}
+            </div>
+            <div class="item-meta">{{ collect($data['sections'])->sum(fn ($s) => count($s['rows'])) }} participant(s)</div>
+            @include('fest.partials.reporting-batches-sections', ['sections' => $data['sections'], 'isGroup' => $data['isGroup']])
+        </div>
+    @empty
+        <p style="color: #64748b;">No items with reporting batches for this event.</p>
+    @endforelse
 
     <div class="footer">{{ $orgName ?? 'Sahodaya' }} &bull; {{ $event->title }} &bull; Generated {{ now()->format('d M Y, h:i A') }}</div>
 </body>

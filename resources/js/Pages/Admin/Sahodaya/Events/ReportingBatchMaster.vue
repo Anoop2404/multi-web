@@ -5,8 +5,12 @@
                     :description="`${selectedItem.title} — every registration grouped by reporting batch.`">
             <template #actions>
                 <Link :href="`${base}/reporting-batches?item_id=${selectedItem.id}`" class="btn-secondary text-sm">&larr; Back to Reporting Batches</Link>
-                <a :href="`${base}/reporting-batches/print?item_id=${selectedItem.id}&preview=1`" class="btn-secondary text-sm" target="_blank">👁 Preview PDF</a>
-                <a :href="`${base}/reporting-batches/print?item_id=${selectedItem.id}`" class="btn-primary text-sm">⬇ Download PDF</a>
+                <label class="text-xs text-slate-500 flex items-center gap-1">
+                    per batch
+                    <input v-model.number="downloadBatchSize" type="number" min="1" class="field !py-1 !text-xs !w-16">
+                </label>
+                <button type="button" class="btn-secondary text-sm" :disabled="printBusy" @click="printWithAutoAssign(true)">👁 Preview PDF</button>
+                <button type="button" class="btn-primary text-sm" :disabled="printBusy" @click="printWithAutoAssign(false)">⬇ Download PDF</button>
             </template>
         </PageHeader>
 
@@ -22,11 +26,12 @@
 </template>
 
 <script setup>
-import { Link } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { Link, router } from '@inertiajs/vue3';
+import { ref, watch } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import BatchMasterList from '@/Components/sahodaya/BatchMasterList.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -42,4 +47,30 @@ const props = defineProps({
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 const search = ref('');
 const selectedRegIds = ref([]);
+const { confirm } = useConfirm();
+
+const downloadBatchSize = ref(props.batchSize);
+const printBusy = ref(false);
+watch(() => props.batchSize, (v) => { downloadBatchSize.value = v; });
+
+async function printWithAutoAssign(preview) {
+    const size = downloadBatchSize.value || props.batchSize;
+    if (!(await confirm({
+        message: `Re-assign ALL ${props.registrations.length} registration(s) for this item into batches of ${size}, closest school first, then generate the PDF? Existing assignments for this item will be overwritten.`,
+    }))) return;
+
+    printBusy.value = true;
+    router.post(`${base}/reporting-batches/auto-assign`, {
+        item_id: props.selectedItem.id,
+        batch_size: size,
+    }, {
+        preserveScroll: true,
+        preserveState: true,
+        onSuccess: () => {
+            const url = `${base}/reporting-batches/print?item_id=${props.selectedItem.id}${preview ? '&preview=1' : ''}`;
+            window.open(url, '_blank');
+        },
+        onFinish: () => { printBusy.value = false; },
+    });
+}
 </script>

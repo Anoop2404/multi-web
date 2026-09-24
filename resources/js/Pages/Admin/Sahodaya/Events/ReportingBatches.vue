@@ -6,6 +6,8 @@
             <template #actions>
                 <Link :href="`${eventBase}/school-distances`" class="btn-secondary text-sm">📏 School distances</Link>
                 <button type="button" class="btn-secondary text-sm" @click="showBatchMaster = true">🗂️ Batch master</button>
+                <a v-if="items.length" :href="`${base}/bulk-print?preview=1`" class="btn-secondary text-sm" target="_blank">👁 Preview all</a>
+                <a v-if="items.length" :href="`${base}/bulk-print`" class="btn-secondary text-sm">📋 Download all (PDF)</a>
                 <button type="button" class="btn-secondary text-sm" @click="showSettings = true">⚙️ Settings</button>
             </template>
         </PageHeader>
@@ -61,8 +63,12 @@
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
                         <Link :href="`${base}/batch-master?item_id=${selectedItem.id}`" class="btn-secondary text-sm" target="_blank">Open full page ↗</Link>
-                        <a :href="`${base}/print?item_id=${selectedItem.id}&preview=1`" class="btn-secondary text-sm" target="_blank">👁 Preview PDF</a>
-                        <a :href="`${base}/print?item_id=${selectedItem.id}`" class="btn-secondary text-sm">⬇ Download PDF</a>
+                        <label class="text-xs text-slate-500 flex items-center gap-1">
+                            per batch
+                            <input v-model.number="downloadBatchSize" type="number" min="1" class="field !py-1 !text-xs !w-16">
+                        </label>
+                        <button type="button" class="btn-secondary text-sm" :disabled="printBusy" @click="printWithAutoAssign(true)">👁 Preview PDF</button>
+                        <button type="button" class="btn-secondary text-sm" :disabled="printBusy" @click="printWithAutoAssign(false)">⬇ Download PDF</button>
                     </div>
                 </div>
 
@@ -103,13 +109,14 @@
 
 <script setup>
 import { Link, router, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import BatchMasterList from '@/Components/sahodaya/BatchMasterList.vue';
 import BatchMasterModal from '@/Components/sahodaya/BatchMasterModal.vue';
 import Modal from '@/Components/ui/Modal.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -134,6 +141,7 @@ const selectedRegIds = ref([]);
 const regSearch = ref('');
 const showSettings = ref(false);
 const showBatchMaster = ref(false);
+const { confirm } = useConfirm();
 
 const settingsForm = useForm({
     reporting_batch_min_registrations: props.minRegistrations,
@@ -144,6 +152,33 @@ function saveSettings() {
     settingsForm.post(`${base}/settings`, {
         preserveScroll: true,
         onSuccess: () => { showSettings.value = false; },
+    });
+}
+
+const downloadBatchSize = ref(props.batchSize);
+const printBusy = ref(false);
+watch(() => props.batchSize, (v) => { downloadBatchSize.value = v; });
+
+async function printWithAutoAssign(preview) {
+    if (!props.selectedItem) return;
+
+    const size = downloadBatchSize.value || props.batchSize;
+    if (!(await confirm({
+        message: `Re-assign ALL ${props.registrations.length} registration(s) for this item into batches of ${size}, closest school first, then generate the PDF? Existing assignments for this item will be overwritten.`,
+    }))) return;
+
+    printBusy.value = true;
+    router.post(`${base}/auto-assign`, {
+        item_id: props.selectedItem.id,
+        batch_size: size,
+    }, {
+        preserveScroll: true,
+        preserveState: true,
+        onSuccess: () => {
+            const url = `${base}/print?item_id=${props.selectedItem.id}${preview ? '&preview=1' : ''}`;
+            window.open(url, '_blank');
+        },
+        onFinish: () => { printBusy.value = false; },
     });
 }
 

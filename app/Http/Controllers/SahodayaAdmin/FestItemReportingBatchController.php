@@ -154,20 +154,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
         abort_unless($itemModel, 404);
 
         $batches = $this->batchesForEvent($event);
-        $registrations = $this->registrationRows($event, $itemModel);
-
-        $grouped = collect($registrations)->groupBy(fn ($row) => $row['reporting_batch_id'] ?? 'unassigned');
-
-        $sections = $batches->map(fn (FestItemReportingBatch $batch) => [
-            'label'    => $batch->label,
-            'report_at' => $batch->report_at,
-            'rows'     => ($grouped[$batch->id] ?? collect())->values()->all(),
-        ])->values()->all();
-
-        $unassignedRows = ($grouped['unassigned'] ?? collect())->values()->all();
-        if (! empty($unassignedRows)) {
-            $sections[] = ['label' => 'Unassigned', 'report_at' => null, 'rows' => $unassignedRows];
-        }
+        $sections = $this->sectionsForItem($event, $itemModel, $batches);
 
         $orgName = $this->sahodaya->name;
         $logoSrc = \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya);
@@ -204,6 +191,65 @@ class FestItemReportingBatchController extends SahodayaAdminController
         return PdfGenerator::download(
             $html,
             "{$slug}-reporting-batches.pdf",
+            $inline,
+            false,
+            $headerTemplate,
+            $footerTemplate,
+            ['top' => '38mm', 'right' => '10mm', 'bottom' => '14mm', 'left' => '10mm'],
+        );
+    }
+
+    /** One PDF covering every qualifying item's reporting-batch sheet, each item starting on its own page. */
+    public function bulkPrint(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $minRegistrations = $event->reporting_batch_min_registrations ?? self::DEFAULT_MIN_REGISTRATIONS_FOR_BATCHING;
+        $batches = $this->batchesForEvent($event);
+
+        $regCounts = FestRegistration::where('event_id', $event->id)
+            ->whereNotIn('status', ['rejected', 'withdrawn'])
+            ->selectRaw('item_id, count(*) as reg_count')
+            ->groupBy('item_id')
+            ->pluck('reg_count', 'item_id');
+
+        $items = $event->items()->orderBy('title')->get()
+            ->filter(fn (FestEventItem $item) => (int) ($regCounts[$item->id] ?? 0) > $minRegistrations)
+            ->values();
+
+        $numberingService = app(FestNumberingService::class);
+        $itemsData = $items->map(fn (FestEventItem $item) => [
+            'item'     => $item,
+            'isGroup'  => $numberingService->isGroupItem($item),
+            'sections' => $this->sectionsForItem($event, $item, $batches),
+        ])->values()->all();
+
+        $orgName = $this->sahodaya->name;
+        $logoSrc = \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya);
+        $isDomPdf = empty(config('services.pdf_converter.url'));
+
+        $html = view('fest.reporting-batches-bulk-print', [
+            'event'     => $event,
+            'itemsData' => $itemsData,
+            'orgName'   => $orgName,
+            'logoSrc'   => $logoSrc,
+            'isDomPdf'  => $isDomPdf,
+        ])->render();
+
+        $inline = $request->boolean('inline') || $request->boolean('preview');
+
+        [$headerTemplate, $footerTemplate] = \App\Support\PdfChromeHeaderFooter::build([
+            'orgName'    => $orgName,
+            'logoSrc'    => $logoSrc,
+            'docTitle'   => 'REPORTING BATCHES — ALL ITEMS',
+            'eventTitle' => $event->title,
+        ]);
+
+        $slug = \Illuminate\Support\Str::slug($event->title ?: 'event');
+
+        return PdfGenerator::download(
+            $html,
+            "{$slug}-reporting-batches-all-items.pdf",
             $inline,
             false,
             $headerTemplate,
@@ -352,6 +398,32 @@ class FestItemReportingBatchController extends SahodayaAdminController
         ]);
 
         return back()->with('success', 'Auto-assigned '.count($registrationIds).' registration(s) into '.count($chunks).' batch(es), closest schools first.');
+    }
+
+    /**
+     * One item's registrations grouped into printable sections: one per common batch (in
+     * sort_order) plus a trailing "Unassigned" section when applicable. Shared by the
+     * single-item and bulk (all-items) print actions.
+     *
+     * @return list<array{label: string, report_at: ?string, rows: list<array<string, mixed>>}>
+     */
+    private function sectionsForItem(FestEvent $event, FestEventItem $item, \Illuminate\Support\Collection $batches): array
+    {
+        $registrations = $this->registrationRows($event, $item);
+        $grouped = collect($registrations)->groupBy(fn ($row) => $row['reporting_batch_id'] ?? 'unassigned');
+
+        $sections = $batches->map(fn (FestItemReportingBatch $batch) => [
+            'label'     => $batch->label,
+            'report_at' => $batch->report_at,
+            'rows'      => ($grouped[$batch->id] ?? collect())->values()->all(),
+        ])->values()->all();
+
+        $unassignedRows = ($grouped['unassigned'] ?? collect())->values()->all();
+        if (! empty($unassignedRows)) {
+            $sections[] = ['label' => 'Unassigned', 'report_at' => null, 'rows' => $unassignedRows];
+        }
+
+        return $sections;
     }
 
     /** @return list<array<string, mixed>> */

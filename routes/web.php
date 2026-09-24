@@ -1397,6 +1397,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/reporting-batches/settings', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'updateSettings'])->name('reporting-batches.settings');
             Route::get('/{event}/reporting-batches/batch-master', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'batchMaster'])->name('reporting-batches.batch-master');
             Route::get('/{event}/reporting-batches/print', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'print'])->name('reporting-batches.print');
+            Route::get('/{event}/reporting-batches/bulk-print', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'bulkPrint'])->name('reporting-batches.bulk-print');
             Route::post('/{event}/reporting-batches', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'store'])->name('reporting-batches.store');
             Route::put('/{event}/reporting-batches/{batch}', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'update'])->name('reporting-batches.update');
             Route::delete('/{event}/reporting-batches/{batch}', [\App\Http\Controllers\SahodayaAdmin\FestItemReportingBatchController::class, 'destroy'])->name('reporting-batches.destroy');
