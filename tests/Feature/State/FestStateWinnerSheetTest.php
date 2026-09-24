@@ -24,7 +24,7 @@ use Tests\TestCase;
  * The Sahodaya's item-driven winner sheet for State registration.
  *
  * The three behaviours it exists for: a tie is a choice the Sahodaya makes, a winner who cannot travel
- * is recorded as such, and the sheet knows how many seats each item has.
+ * is recorded as such, and the sheet knows how many slots each item has.
  */
 class FestStateWinnerSheetTest extends TestCase
 {
@@ -54,7 +54,7 @@ class FestStateWinnerSheetTest extends TestCase
             'conduct_levels' => ['sahodaya', 'state'], 'status' => 'published',
         ]);
 
-        // The State gives two seats per item — the "top 2" the Sahodaya sends.
+        // The State gives two slots per item — the "top 2" the Sahodaya sends.
         $this->stateItem = FestStateProgramItem::create([
             'state_program_id' => $this->program->id, 'title' => 'Light Music',
             'item_code' => 'LM01', 'category' => 'music', 'class_group' => 'category_2',
@@ -126,7 +126,7 @@ class FestStateWinnerSheetTest extends TestCase
 
     // ── The sheet ──────────────────────────────────────────────────────────────────────────
 
-    public function test_the_sheet_is_one_row_per_state_item_with_its_seats(): void
+    public function test_the_sheet_is_one_row_per_state_item_with_its_slots(): void
     {
         $this->winner('First', 1, 95);
         $this->winner('Second', 2, 88);
@@ -136,7 +136,7 @@ class FestStateWinnerSheetTest extends TestCase
         $this->assertSame('Light Music', $row['title']);
         $this->assertSame(2, $row['quota']);
         $this->assertSame(0, $row['chosen_count']);
-        $this->assertSame(2, $row['seats_left']);
+        $this->assertSame(2, $row['slots_left']);
         $this->assertCount(2, $row['candidates']);
     }
 
@@ -167,7 +167,7 @@ class FestStateWinnerSheetTest extends TestCase
         $this->assertNotNull($sheet->firstWhere('item_code', 'LM01'));
     }
 
-    public function test_choosing_fills_a_seat_and_shows_who_is_going(): void
+    public function test_choosing_fills_a_slot_and_shows_who_is_going(): void
     {
         $mark = $this->winner('First', 1, 95);
         $candidate = collect($this->nominations()->candidatePool($this->program, $this->hubEvent))
@@ -178,16 +178,16 @@ class FestStateWinnerSheetTest extends TestCase
         $row = $this->row();
 
         $this->assertSame(1, $row['chosen_count']);
-        $this->assertSame(1, $row['seats_left']);
+        $this->assertSame(1, $row['slots_left']);
         $this->assertSame('First', $row['chosen'][0]['student_name']);
         $this->assertTrue($row['candidates'][0]['is_chosen']);
     }
 
     // ── Ties ───────────────────────────────────────────────────────────────────────────────
 
-    public function test_a_tie_beyond_the_seats_is_reported_as_unresolved(): void
+    public function test_a_tie_beyond_the_slots_is_reported_as_unresolved(): void
     {
-        // Three tied firsts for two seats: the Sahodaya must choose.
+        // Three tied firsts for two slots: the Sahodaya must choose.
         $this->winner('Tied A', 1, 95);
         $this->winner('Tied B', 1, 95, 'school-2');
         $this->winner('Tied C', 1, 95);
@@ -198,9 +198,9 @@ class FestStateWinnerSheetTest extends TestCase
         $this->assertSame([1], $row['unresolved_ties']);
     }
 
-    public function test_a_tie_that_fits_the_seats_needs_no_choice(): void
+    public function test_a_tie_that_fits_the_slots_needs_no_choice(): void
     {
-        // Two tied firsts, two seats — nothing to resolve.
+        // Two tied firsts, two slots — nothing to resolve.
         $this->winner('Tied A', 1, 95);
         $this->winner('Tied B', 1, 95, 'school-2');
 
@@ -254,8 +254,8 @@ class FestStateWinnerSheetTest extends TestCase
         $this->assertCount(1, $row['declined']);
         $this->assertSame('Cannot travel', $row['declined'][0]['student_name']);
         $this->assertSame('Away at a national camp', $row['declined'][0]['note']);
-        // A decline does not consume a seat — the point is that someone else goes.
-        $this->assertSame(2, $row['seats_left']);
+        // A decline does not consume a slot — the point is that someone else goes.
+        $this->assertSame(2, $row['slots_left']);
         $this->assertTrue($row['candidates'][0]['is_declined']);
     }
 
@@ -349,7 +349,7 @@ class FestStateWinnerSheetTest extends TestCase
 
     // ── Readiness ──────────────────────────────────────────────────────────────────────────
 
-    public function test_unfilled_seats_warn_but_do_not_block(): void
+    public function test_unfilled_slots_warn_but_do_not_block(): void
     {
         $this->winner('Only one', 1, 95);
 
@@ -358,13 +358,13 @@ class FestStateWinnerSheetTest extends TestCase
 
         $readiness = $this->sheets()->readiness($this->program, $this->hubEvent);
 
-        // A Sahodaya with nobody for a seat sends nobody; blocking the whole sheet over it would
+        // A Sahodaya with nobody for a slot sends nobody; blocking the whole sheet over it would
         // strand every other item.
         $this->assertTrue($readiness['can_register']);
-        $this->assertStringContainsString('1 of 2 seat(s) unfilled', $readiness['warnings'][0]);
+        $this->assertStringContainsString('1 of 2 slot(s) unfilled', $readiness['warnings'][0]);
     }
 
-    public function test_the_quota_refuses_a_third_pick_for_two_seats(): void
+    public function test_the_quota_refuses_a_third_pick_for_two_slots(): void
     {
         $this->winner('First', 1, 95);
         $this->winner('Second', 2, 88);

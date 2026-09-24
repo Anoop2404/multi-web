@@ -33,7 +33,7 @@
                     </label>
                     <label class="flex items-center gap-1.5 text-xs text-gray-600">
                         <input type="checkbox" :checked="!!filters.only_incomplete" @change="filter('only_incomplete', $event.target.checked ? 1 : '')">
-                        Only items with seats left
+                        Only items with slots left
                     </label>
                     <div class="ml-auto flex gap-2">
                         <button type="button" class="btn-secondary text-xs" :disabled="isCertified" @click="autoFill">Fill from the top</button>
@@ -52,7 +52,7 @@
                 </ul>
             </div>
             <div v-else-if="readiness.warnings.length" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-                <p class="text-xs font-semibold text-amber-900">{{ readiness.warnings.length }} item(s) have seats unfilled</p>
+                <p class="text-xs font-semibold text-amber-900">{{ readiness.warnings.length }} item(s) have slots unfilled</p>
                 <p class="text-[11px] text-amber-800 mt-0.5">
                     You can still register — an item we have nobody for simply sends nobody.
                 </p>
@@ -82,14 +82,14 @@
                           :class="row.is_over_quota ? 'bg-red-100 text-red-700'
                               : row.is_complete ? 'bg-emerald-100 text-emerald-700'
                               : 'bg-amber-100 text-amber-800'">
-                        {{ row.chosen_count }} of {{ row.quota || '—' }} seat{{ row.quota === 1 ? '' : 's' }}
-                        <span v-if="row.seats_left"> · {{ row.seats_left }} left</span>
+                        {{ row.chosen_count }} of {{ row.quota || '—' }} slot{{ row.quota === 1 ? '' : 's' }}
+                        <span v-if="row.slots_left"> · {{ row.slots_left }} left</span>
                     </span>
                 </div>
 
                 <p v-if="row.unresolved_ties.length" class="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
                     Position {{ row.unresolved_ties.join(', ') }} is tied and more are tied than there are
-                    seats. Choose who goes — the tie is ours to break, not the State's.
+                    slots. Choose who goes — the tie is ours to break, not the State's.
                 </p>
 
                 <!-- The winner sheet itself. -->
@@ -174,7 +174,7 @@ function filter(key, value) {
 function choose(row, candidate, type) {
     // Guarded here as well as on the server so the common mistake gets a sentence rather than a 422.
     if (type === 'primary' && row.quota && row.chosen_count >= row.quota) {
-        alert(`${row.item_code} already has its ${row.quota} seat(s) filled. Remove someone first, or add this candidate as a reserve.`);
+        alert(`${row.item_code} already has its ${row.quota} slot(s) filled. Remove someone first, or add this candidate as a reserve.`);
         return;
     }
     router.post(props.actionUrls.choose, {
@@ -197,7 +197,7 @@ function withdrawDecline(selection) {
 }
 
 function autoFill() {
-    if (!confirm('Fill every empty seat with the top of that item\'s sheet? Tied positions are left for you to decide.')) return;
+    if (!confirm('Fill every empty slot with the top of that item\'s sheet? Tied positions are left for you to decide.')) return;
     router.post(props.actionUrls.autoFill, {}, { preserveScroll: true });
 }
 

@@ -18,7 +18,7 @@ use Illuminate\Http\Request;
  * Registering this Sahodaya's winners for the State's items.
  *
  * Item-driven: the page lists the State items, each with this Sahodaya's own winner sheet for it, how
- * many seats the State gives, who is chosen so far, and any tie still to be broken. Picks are saved as
+ * many slots the State gives, who is chosen so far, and any tie still to be broken. Picks are saved as
  * they are made — the sheet is a draft until it is registered — and registering is the existing
  * certify-and-push, so there is one path into the State's inbox rather than two.
  */
@@ -123,7 +123,7 @@ class FestStateWinnerRegistrationController extends SahodayaAdminController
 
         return back()->with(
             $result['skipped_ties'] ? 'warning' : 'success',
-            "{$result['filled']} seat(s) filled from the top of each sheet."
+            "{$result['filled']} slot(s) filled from the top of each sheet."
                 .($result['skipped_ties']
                     ? ' Left for you to decide, because a tie has to be broken: '.implode(', ', $result['skipped_ties']).'.'
                     : ''),

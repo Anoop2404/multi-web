@@ -31,7 +31,7 @@ use Illuminate\Validation\ValidationException;
  * - **A refusal is recorded against the person who refused.** "Our first place cannot travel" is the
  *   commonest reason a second place goes instead, and a State asked about it later needs the record
  *   to say so. A skip note on the replacement cannot express that.
- * - **Quota is shown per item**, so "two seats, one filled" is on screen rather than enforced only at
+ * - **Quota is shown per item**, so "two slots, one filled" is on screen rather than enforced only at
  *   the moment of a refused save.
  */
 class FestStateWinnerSheetService
@@ -107,11 +107,11 @@ class FestStateWinnerSheetService
             ->filter(function (int $position) use ($rows, $quota) {
                 $group = $rows->where('source_position', $position);
 
-                // A tie only needs resolving when the seats cannot hold everyone tied.
-                $seatsLeft = $quota - $rows->where('is_chosen', true)
+                // A tie only needs resolving when the slots cannot hold everyone tied.
+                $slotsLeft = $quota - $rows->where('is_chosen', true)
                     ->where('source_position', '<', $position)->count();
 
-                return $group->where('is_chosen', true)->isEmpty() && $group->count() > max(0, $seatsLeft);
+                return $group->where('is_chosen', true)->isEmpty() && $group->count() > max(0, $slotsLeft);
             })->values();
 
         return [
@@ -123,7 +123,7 @@ class FestStateWinnerSheetService
             'participant_type' => $item->participant_type,
             'quota' => $quota,
             'chosen_count' => $chosen->count(),
-            'seats_left' => max(0, $quota - $chosen->count()),
+            'slots_left' => max(0, $quota - $chosen->count()),
             'is_complete' => $quota > 0 && $chosen->count() >= $quota,
             'is_over_quota' => $quota > 0 && $chosen->count() > $quota,
             'tied_positions' => $tiedPositions->all(),
@@ -157,7 +157,7 @@ class FestStateWinnerSheetService
      * Record that a winner will not go to State.
      *
      * Stored as its own selection row rather than as a note on whoever replaces them, so the sheet can
-     * say "first place declined — reason — second place goes instead". It does not consume a seat, and
+     * say "first place declined — reason — second place goes instead". It does not consume a slot, and
      * a declined candidate cannot then be chosen without withdrawing the decline.
      */
     public function decline(FestStateNominationBatch $batch, array $candidate, string $reason, ?User $by = null): FestStateNominationSelection
@@ -244,11 +244,11 @@ class FestStateWinnerSheetService
             }
 
             if ($row['is_over_quota']) {
-                $blocking[] = "{$row['item_code']} {$row['title']}: {$row['chosen_count']} chosen for {$row['quota']} seat(s).";
+                $blocking[] = "{$row['item_code']} {$row['title']}: {$row['chosen_count']} chosen for {$row['quota']} slot(s).";
             }
 
-            if (! $row['is_complete'] && ! $row['is_over_quota'] && $row['seats_left'] > 0) {
-                $warnings[] = "{$row['item_code']} {$row['title']}: {$row['seats_left']} of {$row['quota']} seat(s) unfilled.";
+            if (! $row['is_complete'] && ! $row['is_over_quota'] && $row['slots_left'] > 0) {
+                $warnings[] = "{$row['item_code']} {$row['title']}: {$row['slots_left']} of {$row['quota']} slot(s) unfilled.";
             }
         }
 
@@ -261,7 +261,7 @@ class FestStateWinnerSheetService
     }
 
     /**
-     * Fill each item's seats with its top candidates, skipping anyone declined.
+     * Fill each item's slots with its top candidates, skipping anyone declined.
      *
      * A convenience for the common case, not a decision-maker: an item whose tie cannot be broken by
      * ranking alone is left untouched for the committee, rather than filled by whichever row sorted
@@ -284,10 +284,10 @@ class FestStateWinnerSheetService
                 continue;
             }
 
-            $seats = $row['seats_left'];
+            $slots = $row['slots_left'];
 
             foreach ($row['candidates'] as $candidate) {
-                if ($seats <= 0) {
+                if ($slots <= 0) {
                     break;
                 }
 
@@ -296,7 +296,7 @@ class FestStateWinnerSheetService
                 }
 
                 $this->nominations->select($batch, $candidate, 'primary', $row['chosen_count'] + 1, $by);
-                $seats--;
+                $slots--;
                 $filled++;
             }
         }
