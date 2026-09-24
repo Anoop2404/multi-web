@@ -87,7 +87,7 @@ const nav = computed(() => visibleStateNav(stateEventWorkspaceNav(props.event.id
 
 // The tabs that exist. Listed here rather than guessed from the nav so a half-built screen can never
 // be linked to by accident; anything not listed renders as "soon" instead of linking to a 404.
-const READY = ['', '/slots', '/reports', '/settings', '/items', '/venues', '/staff', '/submissions', '/scrutiny', '/registrations', '/pending', '/teams', '/substitutions', '/schedule', '/clashes', '/green-room', '/chest-numbers', '/attendance', '/marks', '/results', '/leaderboard', '/appeals', '/certificates', '/catering', '/volunteers', '/public-portal', '/grades', '/points', '/eligibility'];
+const READY = ['', '/slots', '/reports', '/settings', '/items', '/venues', '/staff', '/submissions', '/scrutiny', '/registrations', '/pending', '/teams', '/substitutions', '/schedule', '/clashes', '/green-room', '/chest-numbers', '/attendance', '/marks', '/results', '/leaderboard', '/appeals', '/certificates', '/catering', '/volunteers', '/public-portal', '/grades', '/points', '/eligibility', '/prizes'];
 function isReady(item) {
     const href = typeof item === 'string' ? item : item.href;
 

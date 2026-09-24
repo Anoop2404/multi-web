@@ -274,6 +274,15 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
                 Route::post('/{event}/points', [$grading, 'savePoints'])->name('points.save');
                 Route::post('/{event}/points/apply-standard', [$grading, 'applyStandard'])->name('points.apply-standard');
 
+                $prizes = \App\Http\Controllers\StateAdmin\Fest\StatePrizeCategoryController::class;
+
+                // Prize categories decide what trophies exist, so they sit with the event's other
+                // rules rather than with results.
+                Route::get('/{event}/prizes', [$prizes, 'index'])->name('prizes');
+                Route::post('/{event}/prizes', [$prizes, 'save'])->name('prizes.save');
+                Route::post('/{event}/prizes/{category}/items', [$prizes, 'assign'])->name('prizes.assign');
+                Route::delete('/{event}/prizes/{category}', [$prizes, 'destroy'])->name('prizes.destroy');
+
                 Route::get('/{event}/eligibility', [$grading, 'eligibility'])->name('eligibility');
                 Route::post('/{event}/eligibility/seed', [$grading, 'seedCategories'])->name('eligibility.seed');
                 Route::post('/{event}/eligibility/categories', [$grading, 'saveCategory'])->name('eligibility.categories.save');
@@ -1391,6 +1400,17 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/state-nomination/select', [\App\Http\Controllers\SahodayaAdmin\FestStateNominationController::class, 'select'])->name('state-nomination.select');
             Route::delete('/{event}/state-nomination/selections/{selection}', [\App\Http\Controllers\SahodayaAdmin\FestStateNominationController::class, 'unselect'])->name('state-nomination.unselect');
             Route::post('/{event}/state-nomination/certify', [\App\Http\Controllers\SahodayaAdmin\FestStateNominationController::class, 'certify'])->name('state-nomination.certify');
+
+            // Prize categories — named groups of items that crown an individual or school champion.
+            // The Sahodaya counterpart of the State module's /prizes tab.
+            Route::prefix('/{event}/prizes')->name('prizes.')->group(function () {
+                $prizes = \App\Http\Controllers\SahodayaAdmin\FestPrizeCategoryController::class;
+
+                Route::get('/', [$prizes, 'index'])->name('index');
+                Route::post('/', [$prizes, 'save'])->name('save');
+                Route::post('/{category}/items', [$prizes, 'assign'])->name('assign');
+                Route::delete('/{category}', [$prizes, 'destroy'])->name('destroy');
+            });
 
             // Item-driven State winner registration. Writes the same nomination batch the workspace
             // above does, so the two cannot send State two different answers.

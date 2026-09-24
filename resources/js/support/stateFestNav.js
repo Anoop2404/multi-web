@@ -128,6 +128,7 @@ export function stateEventWorkspaceNav(eventId) {
                 { label: 'Results & Publish', href: `${base}/results`, icon: 'award', permission: STATE_FEST.RESULTS },
                 { label: 'Leaderboard', href: `${base}/leaderboard`, icon: 'bar-chart', permission: STATE_FEST.RESULTS },
                 { label: 'Individual Championship', href: `${base}/individual-championship`, icon: 'star', permission: STATE_FEST.RESULTS },
+                { label: 'Prize Categories', href: `${base}/prizes`, icon: 'award', permission: STATE_FEST.SETTINGS },
                 { label: 'Appeals', href: `${base}/appeals`, icon: 'flag', permission: STATE_FEST.APPEALS },
             ],
         },
