@@ -385,15 +385,26 @@ class FestReportCatalog
         'student-wise', 'student-wise-report', 'student-wise-pdf',
         'item-wise', 'item-participants',
         'numbering-register', 'pending-approvals',
-        // Third retrofit pass (2026-09-24): School Team Managers & Contingent Officials
-        // and Unique Participant Counts both already declared
+        // Third retrofit pass (2026-09-24): Unique Participant Counts already declared
         // 'supported_scopes' => [..., 'region'] below — Downloads.vue was offering a
         // region tab that silently did nothing, since only membership in THIS list
-        // actually reroutes through regionAwareTargetEvent()/regionScopedRows(). Both
-        // read participants/registrations the same reportableEventIds()-combining way
-        // as every id above.
-        'team-managers', 'team-managers-pdf',
+        // actually reroutes through regionAwareTargetEvent()/regionScopedRows(). It reads
+        // participants/registrations the same reportableEventIds()-combining way as every
+        // id above.
         'unique-participants-pdf', 'unique-participants-xls',
+        // team-managers/team-managers-pdf were briefly added here too (same day), but
+        // regionAwareTargetEvent() detaches ANY leaf from its parent on every hit, not
+        // only ?region_id= ones -- that's exactly right for an aggregate report like
+        // Unique Participant Counts above (whole-Sahodaya-wide by design), but wrong for
+        // Team Managers: opening it directly on one specific phase+region leg (the
+        // normal way an admin reaches it) started silently combining every OTHER leg's
+        // students in too. Left off this list, a bare visit to one leg's own Team
+        // Managers export now means exactly that leg -- see FestReportController::
+        // reportScope()'s own mode fallback (parent_event_id !== null => 'self'), which
+        // needs the leg's real, undetached parent_event_id to land on 'self' instead of
+        // 'combined'. Explicit ?region_id=/?scope_mode=combined&competition_phase_id=
+        // still work either way, since reportScope() reads both straight off the request
+        // regardless of this list.
     ];
 
     /**
