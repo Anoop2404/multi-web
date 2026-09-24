@@ -33,7 +33,7 @@ class SchoolReportsHideChestNumberTest extends TestCase
 
     private const CHEST_NO = 4217;
 
-    /** @return array{sahodaya: Tenant, school: Tenant, admin: User, event: FestEvent, item: FestEventItem} */
+    /** @return array{sahodaya: Tenant, school: Tenant, admin: User, event: FestEvent, item: FestEventItem, student: Student} */
     private function fixture(): array
     {
         $this->seed(RolesAndPermissionsSeeder::class);
@@ -90,7 +90,7 @@ class SchoolReportsHideChestNumberTest extends TestCase
             'registration_status' => 'completed',
         ]);
 
-        return compact('sahodaya', 'school', 'admin', 'event', 'item');
+        return compact('sahodaya', 'school', 'admin', 'event', 'item', 'student');
     }
 
     public function test_student_wise_screen_does_not_leak_chest_number(): void
@@ -214,6 +214,95 @@ class SchoolReportsHideChestNumberTest extends TestCase
         $response->assertOk();
     }
 
+    public function test_item_wise_screen_does_not_leak_chest_number(): void
+    {
+        $f = $this->fixture();
+
+        $response = $this->actingAs($f['admin'])->get(
+            route('school.kalotsav.reports.item-wise', ['tenantId' => $f['school']->id, 'event' => $f['event']->id]),
+        );
+
+        $response->assertOk();
+        $response->assertDontSee(self::CHEST_NO);
+    }
+
+    public function test_item_wise_export_does_not_leak_chest_number(): void
+    {
+        $f = $this->fixture();
+
+        $response = $this->actingAs($f['admin'])->get(
+            route('school.kalotsav.reports.item-wise.export', ['tenantId' => $f['school']->id, 'event' => $f['event']->id]),
+        );
+
+        $response->assertOk();
+        $content = $response->streamedContent();
+        $this->assertStringNotContainsString((string) self::CHEST_NO, $content);
+        // The fixture's own school/Sahodaya names contain the substring "Chest" ("Chest
+        // Hide School") -- check the CSV header row specifically, not the whole content,
+        // for whether the now-always-empty Chest column was dropped as intended.
+        $headerRow = explode("\n", $content)[2] ?? '';
+        $this->assertStringNotContainsString('Chest', $headerRow);
+    }
+
+    /** See test_student_wise_pdf_renders_successfully()'s docblock — same dompdf caveat. */
+    public function test_item_wise_marks_pdf_renders_successfully(): void
+    {
+        $f = $this->fixture();
+
+        $response = $this->actingAs($f['admin'])->get(
+            route('school.kalotsav.reports.item-wise.marks-pdf', ['tenantId' => $f['school']->id, 'event' => $f['event']->id]),
+        );
+
+        $response->assertOk();
+    }
+
+    public function test_fest_day_screen_does_not_leak_chest_number(): void
+    {
+        $f = $this->fixture();
+
+        $response = $this->actingAs($f['admin'])->get(
+            route('school.kalotsav.fest-day', ['tenantId' => $f['school']->id, 'event' => $f['event']->id]),
+        );
+
+        $response->assertOk();
+        $response->assertDontSee(self::CHEST_NO);
+    }
+
+    /**
+     * StudentController::show() builds a 'sportsProfile' via StudentSportsProfileService,
+     * which is shared with the Sahodaya-admin student profile page (where chest numbers
+     * are meant to stay visible) -- this covers the school-facing call specifically.
+     */
+    public function test_student_profile_screen_does_not_leak_chest_number(): void
+    {
+        $f = $this->fixture();
+        $f['school']->forceFill(['school_prefix' => 'CHS'])->save();
+
+        $response = $this->actingAs($f['admin'])->get(
+            route('school.students.show', ['tenantId' => $f['school']->id, 'student' => $f['student']->id]),
+        );
+
+        $response->assertOk();
+        $response->assertDontSee(self::CHEST_NO);
+    }
+
+    /**
+     * EnsureGroupAdmin allows school_admin to reach the Group portal too (see
+     * GroupAdminController::assignedClassIds()), so the same admin fixture can exercise
+     * that route here — GroupAdminController::festSchedule() hard-codes chest_no to null.
+     */
+    public function test_group_portal_fest_schedule_does_not_leak_chest_number(): void
+    {
+        $f = $this->fixture();
+
+        $response = $this->actingAs($f['admin'])->get(
+            route('portal.group.fest.schedule', ['tenantId' => $f['school']->id]),
+        );
+
+        $response->assertOk();
+        $response->assertDontSee(self::CHEST_NO);
+    }
+
     public function test_sahodaya_admin_student_wise_still_sees_chest_number(): void
     {
         $f = $this->fixture();
@@ -222,6 +311,25 @@ class SchoolReportsHideChestNumberTest extends TestCase
 
         $response = $this->actingAs($sahodayaAdmin)->get(
             route('sahodaya.events.reports.student-wise', ['tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id]),
+        );
+
+        $response->assertOk();
+        $response->assertSee(self::CHEST_NO);
+    }
+
+    /**
+     * The Sahodaya admin's own student profile page is the one documented exception --
+     * it's meant to keep showing the chest number (StudentSportsProfileService::forStudent()
+     * defaults revealChestNo to true; only the school-admin and portal callers opt out).
+     */
+    public function test_sahodaya_admin_student_profile_still_sees_chest_number(): void
+    {
+        $f = $this->fixture();
+        $sahodayaAdmin = User::factory()->create(['tenant_id' => $f['sahodaya']->id]);
+        $sahodayaAdmin->assignRole('sahodaya_admin');
+
+        $response = $this->actingAs($sahodayaAdmin)->get(
+            route('sahodaya.students.show', ['tenantId' => $f['sahodaya']->id, 'student' => $f['student']->id]),
         );
 
         $response->assertOk();

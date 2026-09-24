@@ -386,7 +386,7 @@ class FestSchoolReportController extends SchoolAdminController
         // regardless of phase/region, so there's no authorization boundary to enforce —
         // phase/region are pure display/filter dimensions on the client below.
         $analytics = new FestEventReportAnalyticsService($event);
-        $rows = $analytics->itemWiseReportRows($this->school->id);
+        $rows = $this->stripChestNumbers($analytics->itemWiseReportRows($this->school->id));
 
         $root = $event->rootEvent();
         // Filter options are derived straight from the rows' own category/category_label
@@ -633,18 +633,18 @@ class FestSchoolReportController extends SchoolAdminController
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        $rows = (new FestEventReportAnalyticsService($event))->itemWiseReportRows($this->school->id);
+        $rows = $this->stripChestNumbers((new FestEventReportAnalyticsService($event))->itemWiseReportRows($this->school->id));
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
             CsvSafety::fputcsv($out, ['Generated on', now()->format('d M Y, h:i A')]);
             CsvSafety::fputcsv($out, []);
-            CsvSafety::fputcsv($out, ['Category', 'Item', 'Item Code', 'Phase', 'Region', 'School', 'Participant', 'Reg No', 'Chest', 'Status', 'Grade', 'Rank', 'Points']);
+            CsvSafety::fputcsv($out, ['Category', 'Item', 'Item Code', 'Phase', 'Region', 'School', 'Participant', 'Reg No', 'Status', 'Grade', 'Rank', 'Points']);
             foreach ($rows as $row) {
                 CsvSafety::fputcsv($out, [
                     $row['category_label'], $row['item_title'], $row['item_code'],
                     $row['phase_name'], $row['region_name'], $row['school_name'],
-                    $row['participant'], $row['reg_no'], $row['chest_no'],
+                    $row['participant'], $row['reg_no'],
                     $row['status'], $row['grade'], $row['position'], $row['points'],
                 ]);
             }
@@ -657,7 +657,7 @@ class FestSchoolReportController extends SchoolAdminController
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        $rows = (new FestEventReportAnalyticsService($event))->itemWiseReportRows($this->school->id);
+        $rows = $this->stripChestNumbers((new FestEventReportAnalyticsService($event))->itemWiseReportRows($this->school->id));
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.item-wise-marks', [
             'sahodaya'    => Tenant::find($event->tenant_id),

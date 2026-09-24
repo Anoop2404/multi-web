@@ -1491,7 +1491,10 @@ class FestRegistrationController extends SchoolAdminController
             return [
                 'name'         => $p->student?->name ?? $p->teacher?->name,
                 'item'         => $p->registration?->item?->title,
-                'chest_no'     => $p->chest_no,
+                // Schools don't see chest numbers for Sahodaya events on their own
+                // pages, unconditionally -- same as the student portal (see
+                // StudentDashboardController::festDaySlots()).
+                'chest_no'     => null,
                 'level_reg'    => $p->level_registration_number,
                 'order'        => $schedule?->sort_order,
                 'scheduled_at' => $schedule?->scheduled_at?->toIso8601String(),
