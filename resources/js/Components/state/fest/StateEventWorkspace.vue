@@ -85,8 +85,8 @@ watch(filters, (v) => emit('update:modelValue', v), { deep: true });
 
 const nav = computed(() => visibleStateNav(stateEventWorkspaceNav(props.event.id), props.permissions));
 
-// Only the Overview exists so far; the rest land with their phases. Listed here rather than guessed
-// from the nav so a half-built screen can never be linked to by accident.
+// The tabs that exist. Listed here rather than guessed from the nav so a half-built screen can never
+// be linked to by accident; anything not listed renders as "soon" instead of linking to a 404.
 const READY = ['', '/slots', '/reports', '/settings', '/items', '/venues', '/staff', '/submissions', '/scrutiny', '/registrations', '/pending', '/teams', '/substitutions', '/schedule', '/clashes', '/green-room', '/chest-numbers', '/attendance', '/marks', '/results', '/leaderboard', '/appeals', '/certificates', '/catering', '/volunteers', '/public-portal'];
 function isReady(item) {
     const href = typeof item === 'string' ? item : item.href;
@@ -98,7 +98,11 @@ function isReady(item) {
     // Query strings carry a preselected filter, not a different screen: /reports?group=print is the
     // reports tab. Stripped before matching so those links are not treated as unbuilt.
     const tail = href.replace(`/admin/state/fest/${props.event.id}`, '').split('?')[0];
-    return READY.includes(tail);
+
+    // A deeper path under a ready tab is that tab: /reports/participant-cards is the reports hub
+    // opening one report. Matched by segment, not by string prefix, so /reportsomething would not
+    // pass as /reports.
+    return READY.some((path) => tail === path || (path !== '' && tail.startsWith(`${path}/`)));
 }
 
 const page = usePage();
