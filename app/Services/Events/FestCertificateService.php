@@ -1540,7 +1540,7 @@ class FestCertificateService
     public function resolveCertificateScope(
         FestEvent $event,
         ?int $itemId = null,
-        ?int $schoolId = null,
+        ?string $schoolId = null,
         ?string $certType = null,
         ?array $certIds = null,
     ): \Illuminate\Support\Collection {
@@ -1608,7 +1608,7 @@ class FestCertificateService
         bool $plain,
         bool $publishedOnly = false,
         ?int $itemId = null,
-        ?int $schoolId = null,
+        ?string $schoolId = null,
         ?string $certType = null,
         ?array $certIds = null,
         ?Tenant $sahodaya = null,

@@ -526,7 +526,7 @@ class FestCertificateController extends SahodayaAdminController
 
         $publishedOnly = $request->boolean('published_only');
         $itemId = $request->query('item_id') ? (int) $request->query('item_id') : null;
-        $schoolId = $request->query('school_id') ? (int) $request->query('school_id') : null;
+        $schoolId = $this->schoolIdFrom($request);
         $certType = $request->query('cert_type');
         $certIds = $request->query('certificate_ids')
             ? array_filter(array_map('intval', explode(',', (string) $request->query('certificate_ids'))))
@@ -600,7 +600,7 @@ class FestCertificateController extends SahodayaAdminController
 
         $publishedOnly = $request->boolean('published_only');
         $itemId = $request->input('item_id') ? (int) $request->input('item_id') : null;
-        $schoolId = $request->input('school_id') ? (int) $request->input('school_id') : null;
+        $schoolId = $this->schoolIdFrom($request);
         $certType = $request->input('cert_type') ?: null;
         $certIds = $request->input('certificate_ids')
             ? array_values(array_filter(array_map('intval', explode(',', (string) $request->input('certificate_ids')))))
@@ -700,7 +700,7 @@ class FestCertificateController extends SahodayaAdminController
 
         $publishedOnly = $request->boolean('published_only');
         $itemId = $request->query('item_id') ? (int) $request->query('item_id') : null;
-        $schoolId = $request->query('school_id') ? (int) $request->query('school_id') : null;
+        $schoolId = $this->schoolIdFrom($request);
         $certType = $request->query('cert_type');
         $certIds = $request->query('certificate_ids')
             ? array_filter(array_map('intval', explode(',', (string) $request->query('certificate_ids'))))
@@ -730,7 +730,7 @@ class FestCertificateController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $itemId = $request->input('item_id') ? (int) $request->input('item_id') : null;
-        $schoolId = $request->input('school_id') ? (int) $request->input('school_id') : null;
+        $schoolId = $this->schoolIdFrom($request);
         $certType = $request->input('cert_type') ?: null;
         $certIds = $request->input('certificate_ids')
             ? array_values(array_filter(array_map('intval', explode(',', (string) $request->input('certificate_ids')))))
@@ -782,7 +782,7 @@ class FestCertificateController extends SahodayaAdminController
         Collection $certificates,
         string $batchType,
         ?int $itemId,
-        ?int $schoolId,
+        ?string $schoolId,
         ?string $certType,
         ?array $certIds,
     ): CertificateBatch {
@@ -894,7 +894,20 @@ class FestCertificateController extends SahodayaAdminController
         }
     }
 
-    private function describeScope(FestEvent $event, ?int $itemId, ?int $schoolId, ?string $certType, ?array $certIds, bool $publishedOnly = false): string
+    /**
+     * School ids are tenant UUIDs. These used to be read with an (int) cast, which turned
+     * "6b240f41-…" into 6 — and MySQL's string→number comparison then matched every school
+     * whose id starts with "6" — while a letter-first id became 0, silently dropping the
+     * filter so a single school's print/ZIP/render ran over the whole event.
+     */
+    private function schoolIdFrom(Request $request): ?string
+    {
+        $schoolId = trim((string) $request->input('school_id', ''));
+
+        return $schoolId !== '' ? $schoolId : null;
+    }
+
+    private function describeScope(FestEvent $event, ?int $itemId, ?string $schoolId, ?string $certType, ?array $certIds, bool $publishedOnly = false): string
     {
         if (! empty($certIds)) {
             $description = count($certIds).' selected certificate(s)';

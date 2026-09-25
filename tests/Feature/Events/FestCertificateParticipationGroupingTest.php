@@ -156,4 +156,38 @@ class FestCertificateParticipationGroupingTest extends TestCase
             })
         );
     }
+
+    /**
+     * School ids are tenant UUIDs; print-all/ZIP/render used to (int)-cast them, so a
+     * letter-first id became 0 (filter dropped — the whole event printed) and a digit-
+     * first one became its leading number (no school, or on MySQL every school whose id
+     * starts with that digit).
+     */
+    public function test_print_all_scopes_to_the_one_school_for_letter_and_digit_first_uuids(): void
+    {
+        ['admin' => $admin, 'event' => $event, 'sahodaya' => $sahodaya] = $this->makeSahodayaAdminEventAndSchool();
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song', 'item_code' => 'SS1']);
+
+        $schools = collect(['ab240f41-6cbd-41e7-8be4-d6bf465df0d3', '6b240f41-6cbd-41e7-8be4-d6bf465df0d3', '6c000000-0000-4000-8000-000000000000'])
+            ->map(fn (string $id) => Tenant::create([
+                'id' => $id, 'type' => 'school', 'parent_id' => $sahodaya->id, 'name' => 'School '.$id,
+                'domain' => Str::uuid().'.test', 'membership_status' => 'approved', 'is_active' => true,
+            ]));
+
+        foreach ($schools as $index => $school) {
+            $this->makeCertificate($event, $item, $school->id, 700 + $index, 'participation');
+        }
+
+        foreach ($schools->take(2) as $index => $school) {
+            $response = $this->actingAs($admin)->get(route('sahodaya.events.certificates.print-all', [
+                'tenantId' => $event->tenant_id, 'event' => $event->id,
+                'school_id' => $school->id, 'cert_type' => 'participation', 'plain' => 1,
+            ]));
+
+            $response->assertOk();
+            $printed = $response->viewData('certificates');
+            $this->assertCount(1, $printed, "Only {$school->id}'s certificate should print.");
+            $this->assertSame(700 + $index, FestParticipant::find($printed->first()['certificate']->entity_id)->student_id);
+        }
+    }
 }
