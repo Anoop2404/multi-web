@@ -27,13 +27,18 @@ class FestCertificateController extends SahodayaAdminController
 {
     public function index(string $tenantId, FestEvent $event)
     {
+        // A whole hub has thousands of certificates; building every payload plus the grouped
+        // views below is the heaviest read in the module.
+        @ini_set('memory_limit', '1024M');
+        @set_time_limit(180);
+
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $certificates = $this->certificatesForEvent($event);
 
         return $this->inertia('Sahodaya/Events/Certificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
             'event' => $event,
-            'certificates' => $certificates,
+            'certificates' => $this->slimCertificates($certificates),
             'publishedItems' => $this->publishedItemsForEvent($event),
             'schools' => $this->schoolsFromCertificates($certificates),
             'winnersByItem' => $this->winnersByItem($certificates, $event),
@@ -52,13 +57,18 @@ class FestCertificateController extends SahodayaAdminController
      */
     public function meritCertificates(string $tenantId, FestEvent $event)
     {
+        // A whole hub has thousands of certificates; building every payload plus the grouped
+        // views below is the heaviest read in the module.
+        @ini_set('memory_limit', '1024M');
+        @set_time_limit(180);
+
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $certificates = $this->certificatesForEvent($event, 'winner');
 
         return $this->inertia('Sahodaya/Events/MeritCertificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
             'event' => $event,
-            'certificates' => $certificates,
+            'certificates' => $this->slimCertificates($certificates),
             'publishedItems' => $this->publishedItemsForEvent($event),
             'schools' => $this->schoolsFromCertificates($certificates),
             'recentBatches' => $this->recentBatchesForEvent($event, 'winner'),
@@ -69,18 +79,54 @@ class FestCertificateController extends SahodayaAdminController
     /** Dedicated Participation certificates workspace — same idea as meritCertificates(). */
     public function participationCertificatesPage(string $tenantId, FestEvent $event)
     {
+        // A whole hub has thousands of certificates; building every payload plus the grouped
+        // views below is the heaviest read in the module.
+        @ini_set('memory_limit', '1024M');
+        @set_time_limit(180);
+
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $certificates = $this->certificatesForEvent($event, 'participation');
 
         return $this->inertia('Sahodaya/Events/ParticipationCertificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
             'event' => $event,
-            'certificates' => $certificates,
+            'certificates' => $this->slimCertificates($certificates),
             'publishedItems' => $this->publishedItemsForEvent($event),
             'schools' => $this->schoolsFromCertificates($certificates),
             'recentBatches' => $this->recentBatchesForEvent($event, 'participation'),
             'staleCount' => $certificates->filter(fn ($c) => $c['is_stale'] ?? false)->count(),
         ]));
+    }
+
+    /**
+     * Only what the certificate list pages actually read. certificatesForEvent() merges each
+     * certificate's full payloadFor() shape (participant, registration, event, item, mark
+     * ... as whole Eloquent models with their loaded relations) into every row, which the
+     * grouped views below need server-side but which serialized straight into the Inertia
+     * page was ~30 KB per certificate -- a ~3,000-certificate hub rendered a page payload of
+     * ~98 MB and exhausted memory building the root view (production, 2026-09-25).
+     *
+     * @param  Collection<int, array<string, mixed>>  $certificates
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function slimCertificates(Collection $certificates): Collection
+    {
+        return $certificates->map(function (array $c) {
+            $school = $c['registration']?->school ?? $c['participant']?->registration?->school;
+
+            return [
+                'id' => $c['id'],
+                'uuid' => $c['uuid'],
+                'cert_type' => $c['cert_type'],
+                'is_stale' => $c['is_stale'],
+                'is_rendered' => $c['is_rendered'],
+                'rendered_at' => $c['rendered_at'],
+                'student' => ['name' => $c['student']?->name ?? $c['participant']?->student?->name],
+                'item' => ! empty($c['item']) ? ['id' => $c['item']->id, 'title' => $c['item']->title] : null,
+                'mark' => $c['mark'] ? ['position' => $c['mark']->position] : null,
+                'registration' => ['school' => $school ? ['id' => $school->id, 'name' => $school->name] : null],
+            ];
+        })->values();
     }
 
     /** @return Collection<int, array<string, mixed>> */

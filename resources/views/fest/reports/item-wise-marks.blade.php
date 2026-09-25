@@ -96,7 +96,11 @@
             <div class="page-break"></div>
         @endif
 
-        @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
+        {{-- The logo is a base64 data URI (hundreds of KB) and this header repeats once per ITEM
+             -- a big event has hundreds of items, so embedding it every time built a ~98 MB
+             HTML string and exhausted memory before the PDF renderer even started. Org name
+             still heads every item; the logo only the first. --}}
+        @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $loop->first ? ($logoSrc ?? null) : null])
 
         <div class="item-header">
             <div class="item-title">

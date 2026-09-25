@@ -120,4 +120,34 @@ class FestParticipationCertificateParentTest extends TestCase
         $service = app(FestCertificateService::class);
         $this->assertSame($template->tenant_id, $service->resolveTemplate($f['root'], null, 'participation')->tenant_id);
     }
+
+    /**
+     * The list pages used to serialize each certificate's full payloadFor() shape (whole
+     * models plus their loaded relations) into the Inertia page -- ~30 KB per certificate,
+     * ~98 MB for a hub of thousands, which exhausted memory in production. Only the fields
+     * the pages actually read may be sent.
+     */
+    public function test_the_certificates_page_sends_only_the_slim_fields_the_page_reads(): void
+    {
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $f = $this->fixture();
+        app(FestCertificateService::class)->generateParticipationForEvent($f['root']);
+
+        $admin = \App\Models\User::factory()->create(['tenant_id' => $f['root']->tenant_id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        $response = $this->actingAs($admin)->get(route('sahodaya.events.certificates.index', [
+            'tenantId' => $f['root']->tenant_id, 'event' => $f['root']->id,
+        ]));
+        $response->assertOk();
+
+        $rows = $response->viewData('page')['props']['certificates'];
+        $this->assertCount(1, $rows);
+        $this->assertEqualsCanonicalizing(
+            ['id', 'uuid', 'cert_type', 'is_stale', 'is_rendered', 'rendered_at', 'student', 'item', 'mark', 'registration'],
+            array_keys((array) $rows[0]),
+        );
+        $this->assertSame('Two Leg Student', ((array) $rows[0])['student']['name']);
+        $this->assertSame('PARENT CERT SCHOOL', strtoupper(((array) $rows[0])['registration']['school']['name']));
+    }
 }
