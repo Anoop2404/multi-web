@@ -314,7 +314,7 @@
 
                                 <div v-for="(blk, idx) in form.layout_json.signature_blocks" :key="idx" class="space-y-3 p-3 bg-white border border-slate-200 rounded-lg">
                                     <div class="flex items-end justify-between gap-3">
-                                        <FormField label="Label (matched with the event's signatory)" class-extra="flex-1">
+                                        <FormField label="Label (matched with the event's signatory)" class-extra="flex-1" :error="blockLabelError(idx)">
                                             <template #default="{ id }">
                                                 <input :id="id" v-model="blk.label" maxlength="80" class="field" placeholder="e.g. Venue Convenor, Host Principal, Chief Guest">
                                             </template>
@@ -890,6 +890,11 @@ function onBlockSignature(blk, e) {
     blk.signature_file = file;
     blk.remove_signature = false;
     blk.signature_preview = file ? URL.createObjectURL(file) : null;
+}
+
+function blockLabelError(idx) {
+    const err = form.errors[`layout_json.signature_blocks.${idx}.label`];
+    return err ? 'Enter a label for this block (e.g. Venue Convenor) — it is needed to save it.' : null;
 }
 
 function removeSignatureBlock(index) {

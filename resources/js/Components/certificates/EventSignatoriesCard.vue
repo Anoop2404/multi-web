@@ -45,7 +45,7 @@
             <button type="button" class="text-rose-600 font-semibold pb-1" @click="signatories.splice(i, 1)">Remove</button>
         </div>
 
-        <p v-if="page.props.errors?.signatories" class="text-rose-600 font-semibold py-1">{{ page.props.errors.signatories }}</p>
+        <p v-if="errorMessage" class="text-rose-600 font-semibold py-1">{{ errorMessage }}</p>
         <p v-if="!signatories.length" class="text-gray-400 py-1">No signatories yet. Click "+ Add signatory", type who signs, choose the signature image, then Save.</p>
         <p class="text-gray-400 mt-2">
             Optional per-event override: whatever you fill in here replaces the default name, designation, school and signature image typed on the template's "Signature block" with the same label (Certificate templates &rarr; Signature blocks). Leave a field blank to keep the template's. Signature: PNG with a transparent background works best, max 1 MB.
@@ -54,7 +54,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 
 const props = defineProps({
@@ -64,6 +64,12 @@ const props = defineProps({
 });
 
 const page = usePage();
+const errorMessage = computed(() => {
+    const errs = page.props.errors || {};
+    const key = Object.keys(errs).find((k) => k === 'signatories' || k.startsWith('signatories.'));
+    if (!key) return '';
+    return key.endsWith('.label') ? 'Every signatory needs a label (it links the signatory to the template block) — nothing was saved.' : errs[key];
+});
 
 let signatoryUid = 0;
 const newSignatory = (src = {}) => ({
@@ -98,7 +104,6 @@ function saveSignatories() {
     signatoriesSaving.value = true;
     router.post(`${props.base}/signatories`, {
         signatories: signatories.value
-            .filter((sg) => sg.label.trim() !== '')
             .map((sg) => ({
                 label: sg.label,
                 name: sg.name || null,
