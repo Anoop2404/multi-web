@@ -5,7 +5,10 @@
     <title>School Team Managers Report</title>
     <style>
         @page {
-            margin: 30px 35px 30px 35px;
+            {{-- With the Chromium header/footer template the converter honours this rule, so the
+                 top/bottom margins must leave room for that header (~24mm) and the page-number
+                 footer; otherwise the body starts at the very top and the header is drawn over it. --}}
+            margin: {{ (($isDomPdf ?? true) || ($preview ?? false)) ? '25px 30px 25px 30px' : '32mm 10mm 14mm 10mm' }};
         }
         body {
             font-family: DejaVu Sans, sans-serif;

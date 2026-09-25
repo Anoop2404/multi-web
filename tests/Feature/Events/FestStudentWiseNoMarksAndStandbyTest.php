@@ -108,4 +108,22 @@ class FestStudentWiseNoMarksAndStandbyTest extends TestCase
         $this->assertStringNotContainsString('ALPHA SCHOOL', $one);
         $this->assertStringNotContainsString('>Grade<', $one);
     }
+
+    /**
+     * With the Chromium header/footer the converter honours the view's own @page margin, so
+     * it has to leave room for that header -- a 25px margin let the body start under it and
+     * the repeating header was drawn over the first school heading.
+     */
+    public function test_chromium_header_views_reserve_top_margin_for_the_header(): void
+    {
+        foreach (['school-wise-items' => ['rows' => []], 'team-managers' => ['schools' => []], 'team-managers-registration-sheet' => ['schools' => []]] as $view => $data) {
+            $base = ['event' => (object) ['title' => 'E'], 'orgName' => 'S', 'logoSrc' => null] + $data;
+
+            $chrome = view("fest.reports.{$view}", $base + ['isDomPdf' => false, 'preview' => false])->render();
+            $this->assertStringContainsString('margin: 32mm 10mm 14mm 10mm', $chrome, $view);
+
+            $inPage = view("fest.reports.{$view}", $base + ['isDomPdf' => true, 'preview' => false])->render();
+            $this->assertStringContainsString('margin: 25px 30px 25px 30px', $inPage, $view);
+        }
+    }
 }

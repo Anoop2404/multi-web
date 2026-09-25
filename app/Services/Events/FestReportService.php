@@ -31,6 +31,15 @@ use App\Services\Events\Reports\FestReportScope;
 
 class FestReportService
 {
+    /**
+     * Page margins for a PDF whose heading is the Chromium header template
+     * (PdfChromeHeaderFooter): the converter defaults to zero margins, so without these the
+     * body starts at the very top of the page and the repeating header is drawn over it.
+     * ~24mm of header (logo + org + event title) plus breathing room, and room for the
+     * "Page X of Y" footer.
+     */
+    private const CHROME_HEADER_MARGIN = ['top' => '32mm', 'right' => '10mm', 'bottom' => '14mm', 'left' => '10mm'];
+
     use \App\Http\Controllers\SahodayaAdmin\Concerns\ParsesBulkSheetFilters;
 
 
@@ -1088,6 +1097,7 @@ class FestReportService
             false,
             $headerTemplate,
             $footerTemplate,
+            self::CHROME_HEADER_MARGIN,
         );
     }
 
@@ -2390,6 +2400,7 @@ class FestReportService
             false,
             $headerTemplate,
             $footerTemplate,
+            self::CHROME_HEADER_MARGIN,
         );
     }
 
@@ -2432,6 +2443,7 @@ class FestReportService
             true,
             $headerTemplate,
             $footerTemplate,
+            self::CHROME_HEADER_MARGIN,
         );
     }
 }
