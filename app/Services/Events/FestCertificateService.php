@@ -746,21 +746,46 @@ class FestCertificateService
      */
     public function cachedOrFreshPdf(Certificate $certificate, \Closure $buildContext, bool $plain = false): string
     {
+        $cached = $this->cachedPdf($certificate, $plain);
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $document = $this->pdfDocument($buildContext(), $plain);
+
+        return PdfGenerator::render($document['html'], $document['isLandscape'], pageWidthMm: $document['pageWidthMm'], pageHeightMm: $document['pageHeightMm']);
+    }
+
+    /** RenderCertificateChunkJob's stored PDF for this variant, when present and fresh. */
+    public function cachedPdf(Certificate $certificate, bool $plain = false): ?string
+    {
         $cachedPath = $plain ? $certificate->plain_file_path : $certificate->file_path;
 
         if ($cachedPath && ! $certificate->is_stale && TenantStorage::exists($cachedPath, $certificate->storage_disk)) {
             return TenantStorage::get($cachedPath, $certificate->storage_disk);
         }
 
-        $context = $buildContext();
-        // Defaulting to landscape (PdfGenerator::render()'s own default) silently
-        // mis-renders any portrait template on a cache miss — RenderCertificateChunkJob
-        // always derives this from the template instead of relying on the default.
-        $isLandscape = ($context['overlayLayout']['orientation'] ?? 'landscape') !== 'portrait';
-        [$pageWidthMm, $pageHeightMm] = self::customPageDimensionsMm($context['overlayLayout'] ?? []);
-        $html = view('fest.certificate-print', array_merge($context, $plain ? ['plainMode' => true] : []))->render();
+        return null;
+    }
 
-        return PdfGenerator::render($html, $isLandscape, pageWidthMm: $pageWidthMm, pageHeightMm: $pageHeightMm);
+    /**
+     * A renderContext() (embedAssets + qr_src) as a PdfGenerator::render()/renderEach()
+     * document: the print view's HTML plus page geometry. Defaulting to landscape
+     * (render()'s own default) silently mis-renders any portrait template —
+     * RenderCertificateChunkJob always derives this from the template instead.
+     *
+     * @return array{html: string, isLandscape: bool, pageWidthMm: ?float, pageHeightMm: ?float}
+     */
+    public function pdfDocument(array $context, bool $plain = false): array
+    {
+        [$pageWidthMm, $pageHeightMm] = self::customPageDimensionsMm($context['overlayLayout'] ?? []);
+
+        return [
+            'html' => view('fest.certificate-print', array_merge($context, $plain ? ['plainMode' => true] : []))->render(),
+            'isLandscape' => ($context['overlayLayout']['orientation'] ?? 'landscape') !== 'portrait',
+            'pageWidthMm' => $pageWidthMm,
+            'pageHeightMm' => $pageHeightMm,
+        ];
     }
 
     /**

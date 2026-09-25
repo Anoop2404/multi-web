@@ -560,22 +560,44 @@ class FestCertificateController extends SahodayaAdminController
         $classGroupLabels = $groupBy === 'item' ? FestClassGroupScheme::labels(null, $event->rootEvent()) : [];
         $artsCategoryLabels = $groupBy === 'item' ? config('fest_item_taxonomy.arts_category', []) : [];
 
-        foreach ($payloads as $payload) {
-            $certificate = $payload['certificate'];
-
-            // $payload is already the final, ready-to-render shape (exportPayloadsForEvent()
-            // above built it with embedAssets+plain baked in for every certificate, cache
-            // status notwithstanding), so the closure has no computation to defer — it
-            // still gets us the shared cache-check + orientation-correct render on a miss.
-            $pdf = $service->cachedOrFreshPdf($certificate, fn () => $payload, $plain);
-
-            $name = FestCertificateService::archiveFileName($payload['student']?->name, $certificate->verification_uuid);
+        $entryName = function (array $payload) use ($service, $groupBy, $classGroupLabels, $artsCategoryLabels) {
+            $name = FestCertificateService::archiveFileName($payload['student']?->name, $payload['certificate']->verification_uuid);
             if ($groupBy) {
                 $folder = $service->archiveGroupFolder($payload, $groupBy, $classGroupLabels, $artsCategoryLabels) ?? 'Other';
                 $name = FestCertificateService::sanitizeArchiveSegment($folder).'/'.$name;
             }
-            $zip->addFromString($name, $pdf);
+
+            return $name;
+        };
+
+        // Already-rendered PDFs go straight in; the rest render through the converter
+        // with a rolling window of concurrent requests (PdfGenerator::renderEach())
+        // instead of one blocking round-trip per certificate — this direct download is
+        // what a per-school ZIP uses while a long render run is still occupying the queue.
+        $misses = [];
+        foreach ($payloads as $payload) {
+            $pdf = $service->cachedPdf($payload['certificate'], $plain);
+            if ($pdf === null) {
+                $misses[$payload['certificate']->id] = $payload;
+
+                continue;
+            }
+            $zip->addFromString($entryName($payload), $pdf);
         }
+
+        PdfGenerator::renderEach(
+            (function () use ($misses, $service, $plain) {
+                foreach ($misses as $certificateId => $payload) {
+                    yield $certificateId => $service->pdfDocument($payload, $plain);
+                }
+            })(),
+            function ($certificateId, $pdf) use ($zip, $misses, $entryName) {
+                if ($pdf instanceof \Throwable) {
+                    throw $pdf;
+                }
+                $zip->addFromString($entryName($misses[$certificateId]), $pdf);
+            },
+        );
 
         $zip->close();
 

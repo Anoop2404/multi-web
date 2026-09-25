@@ -90,8 +90,8 @@ class RenderCertificateChunkJob implements ShouldQueue
             return;
         }
 
-        $certificates = Certificate::whereIn('id', $this->certificateIds)->get();
-        $payloads = $service->payloadsFor($certificates);
+        $certificates = Certificate::whereIn('id', $this->certificateIds)->get()->keyBy('id');
+        $payloads = $service->payloadsFor($certificates->values());
 
         $templateCache = [];
         $participantsCache = [];
@@ -104,68 +104,77 @@ class RenderCertificateChunkJob implements ShouldQueue
         $failedSinceFlush = 0;
         $failedItemsSinceFlush = [];
 
-        // A few certificates at a time so their PDFs (two each) render concurrently through
-        // PdfGenerator::renderMany() — one converter round-trip after another was the bulk
-        // of a render run's wall time. Sized so the in-flight request count stays within
-        // services.pdf_converter.concurrency.
-        $perSlice = max(1, intdiv((int) config('services.pdf_converter.concurrency', 4), 2));
+        $recordFailure = function (Certificate $certificate, \Throwable $e) use ($payloads, &$processedSinceFlush, &$failedSinceFlush, &$failedItemsSinceFlush) {
+            $processedSinceFlush++;
+            $failedSinceFlush++;
+            $failedItemsSinceFlush[] = $this->failureEntry($certificate, $payloads, $e);
+        };
 
-        foreach ($certificates->chunk($perSlice) as $slice) {
-            $prepared = [];
-            $documents = [];
-            $errors = [];
+        // certificate id => ['prepared' => ..., 'pdfs' => [variant => string|Throwable]],
+        // only for certificates whose PDFs are still in flight.
+        $pending = [];
 
-            foreach ($slice as $certificate) {
+        // Lazy: a certificate's context/HTML is only built when the converter has a free
+        // slot for it (see PdfGenerator::renderEach()), so a chunk never holds every
+        // certificate's embedded-image HTML at once.
+        $documents = (function () use ($certificates, $service, $qrService, $payloads, &$templateCache, &$participantsCache, &$assetCache, &$pending, $recordFailure) {
+            foreach ($certificates as $certificate) {
                 try {
-                    $prepared[$certificate->id] = $this->prepare($certificate, $service, $qrService, $payloads, $templateCache, $participantsCache, $assetCache);
-                    $documents[$certificate->id.':bg'] = $prepared[$certificate->id]['bg'];
-                    $documents[$certificate->id.':plain'] = $prepared[$certificate->id]['plain'];
+                    $prepared = $this->prepare($certificate, $service, $qrService, $payloads, $templateCache, $participantsCache, $assetCache);
                 } catch (\Throwable $e) {
-                    $errors[$certificate->id] = $e;
+                    $recordFailure($certificate, $e);
+
+                    continue;
                 }
+
+                $pending[$certificate->id] = ['context' => $prepared['context'], 'pdfs' => []];
+
+                yield $certificate->id.':bg' => $prepared['bg'];
+                yield $certificate->id.':plain' => $prepared['plain'];
+            }
+        })();
+
+        // Both of a certificate's PDFs render independently (and complete in any order);
+        // it's stored once the second one lands. Keeps up to
+        // services.pdf_converter.concurrency converter connections busy the whole time
+        // instead of waiting on each certificate's round-trips in turn.
+        PdfGenerator::renderEach($documents, function ($key, $result) use ($batch, $certificates, $service, &$pending, $recordFailure, &$consecutiveConnectionFailures, &$processedSinceFlush, &$succeededSinceFlush, &$failedSinceFlush, &$failedItemsSinceFlush) {
+            [$certificateId, $variant] = explode(':', (string) $key, 2);
+            $pending[$certificateId]['pdfs'][$variant] = $result;
+            if (count($pending[$certificateId]['pdfs']) < 2) {
+                return;
             }
 
-            $pdfs = $documents ? PdfGenerator::renderMany($documents) : [];
+            $entry = $pending[$certificateId];
+            unset($pending[$certificateId]);
+            $certificate = $certificates->get((int) $certificateId);
 
-            foreach ($slice as $certificate) {
+            try {
+                $this->persist($certificate, $service, $entry['context'], $entry['pdfs']['bg'], $entry['pdfs']['plain']);
                 $processedSinceFlush++;
+                $succeededSinceFlush++;
+                $consecutiveConnectionFailures = 0;
+            } catch (ConnectionException $e) {
+                $recordFailure($certificate, $e);
+                $consecutiveConnectionFailures++;
 
-                try {
-                    if (isset($errors[$certificate->id])) {
-                        throw $errors[$certificate->id];
-                    }
-
-                    $this->persist($certificate, $service, $prepared[$certificate->id], $pdfs[$certificate->id.':bg'], $pdfs[$certificate->id.':plain']);
-                    $succeededSinceFlush++;
-                    $consecutiveConnectionFailures = 0;
-                } catch (ConnectionException $e) {
-                    $consecutiveConnectionFailures++;
-                    $failedSinceFlush++;
-                    $failedItemsSinceFlush[] = $this->failureEntry($certificate, $payloads, $e);
-
-                    if ($consecutiveConnectionFailures >= self::MAX_CONSECUTIVE_CONNECTION_FAILURES) {
-                        // The render service itself looks down, not this one certificate —
-                        // flush progress for what actually ran, then let tries/backoff retry
-                        // the remainder as a fresh chunk attempt once it recovers, rather than
-                        // mass-recording everything still unattempted as individually failed.
-                        $this->flushProgress($batch, $processedSinceFlush, $succeededSinceFlush, $failedSinceFlush, $failedItemsSinceFlush);
-
-                        throw $e;
-                    }
-
-                    continue;
-                } catch (\Throwable $e) {
-                    $failedSinceFlush++;
-                    $failedItemsSinceFlush[] = $this->failureEntry($certificate, $payloads, $e);
-
-                    continue;
-                }
-
-                if ($processedSinceFlush >= self::PROGRESS_FLUSH_EVERY) {
+                if ($consecutiveConnectionFailures >= self::MAX_CONSECUTIVE_CONNECTION_FAILURES) {
+                    // The render service itself looks down, not this one certificate —
+                    // flush progress for what actually ran, then let tries/backoff retry
+                    // the remainder as a fresh chunk attempt once it recovers, rather than
+                    // mass-recording everything still unattempted as individually failed.
                     $this->flushProgress($batch, $processedSinceFlush, $succeededSinceFlush, $failedSinceFlush, $failedItemsSinceFlush);
+
+                    throw $e;
                 }
+            } catch (\Throwable $e) {
+                $recordFailure($certificate, $e);
             }
-        }
+
+            if ($processedSinceFlush >= self::PROGRESS_FLUSH_EVERY) {
+                $this->flushProgress($batch, $processedSinceFlush, $succeededSinceFlush, $failedSinceFlush, $failedItemsSinceFlush);
+            }
+        });
 
         $this->flushProgress($batch, $processedSinceFlush, $succeededSinceFlush, $failedSinceFlush, $failedItemsSinceFlush);
     }
@@ -195,7 +204,7 @@ class RenderCertificateChunkJob implements ShouldQueue
 
     /**
      * Everything up to the converter call: the render context plus both variants' HTML
-     * and page geometry, as PdfGenerator::renderMany() documents.
+     * and page geometry, as PdfGenerator::renderEach() documents.
      *
      * @return array{context: array, bg: array, plain: array}
      */
@@ -236,7 +245,7 @@ class RenderCertificateChunkJob implements ShouldQueue
     }
 
     /** Stores both rendered variants and marks the certificate fresh. */
-    private function persist(Certificate $certificate, FestCertificateService $service, array $prepared, string|\Throwable $withBgPdf, string|\Throwable $plainPdf): void
+    private function persist(Certificate $certificate, FestCertificateService $service, array $context, string|\Throwable $withBgPdf, string|\Throwable $plainPdf): void
     {
         foreach ([$withBgPdf, $plainPdf] as $result) {
             if ($result instanceof \Throwable) {
@@ -244,7 +253,6 @@ class RenderCertificateChunkJob implements ShouldQueue
             }
         }
 
-        $context = $prepared['context'];
         $event = $context['event'] ?? null;
         $tenantId = $context['sahodaya']?->id ?? $this->tenantId;
 

@@ -266,8 +266,16 @@
                 </div>
             </div>
 
-            <div v-if="winnersBySchool.length" class="card divide-y divide-gray-100">
-                <div v-for="group in winnersBySchool" :key="group.school_id" class="py-3 first:pt-0 last:pb-0">
+            <div class="mb-3 flex flex-wrap items-center gap-3">
+                <input v-model="schoolSearch" type="search" placeholder="Search school or student…"
+                       class="field text-xs py-1.5 px-3 w-full sm:w-72" />
+                <span v-if="schoolSearch.trim()" class="text-xs text-gray-500">
+                    {{ filteredWinnersBySchool.length }} of {{ winnersBySchool.length }} schools
+                </span>
+            </div>
+
+            <div v-if="filteredWinnersBySchool.length" class="card divide-y divide-gray-100">
+                <div v-for="group in filteredWinnersBySchool" :key="group.school_id" class="py-3 first:pt-0 last:pb-0">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div class="min-w-0 flex items-center gap-3">
                             <p class="font-semibold text-sm text-gray-900">{{ group.school_name }}</p>
@@ -286,10 +294,18 @@
                                     📦 Download ▾
                                 </summary>
                                 <div class="absolute z-20 right-0 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
-                                    <button @click="queueZipDownload({ school_id: group.school_id, cert_type: 'winner' }, $event)" :disabled="isBatchRunning"
-                                            class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">📦 ZIP (with background)</button>
-                                    <button @click="queueZipDownload({ school_id: group.school_id, cert_type: 'winner', plain: '1' }, $event)" :disabled="isBatchRunning"
-                                            class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">📦 ZIP — no background</button>
+                                    <!-- While another run is going, a queued ZIP would wait behind all of
+                                         its jobs — download directly instead (reuses rendered PDFs). -->
+                                    <template v-if="isBatchRunning">
+                                        <a :href="`${base}/download-zip?school_id=${group.school_id}&cert_type=winner`" class="block px-3 py-2 rounded hover:bg-gray-50">📦 ZIP (with background)</a>
+                                        <a :href="`${base}/download-zip?school_id=${group.school_id}&cert_type=winner&plain=1`" class="block px-3 py-2 rounded hover:bg-gray-50">📦 ZIP — no background</a>
+                                    </template>
+                                    <template v-else>
+                                        <button @click="queueZipDownload({ school_id: group.school_id, cert_type: 'winner' }, $event)"
+                                                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">📦 ZIP (with background)</button>
+                                        <button @click="queueZipDownload({ school_id: group.school_id, cert_type: 'winner', plain: '1' }, $event)"
+                                                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">📦 ZIP — no background</button>
+                                    </template>
                                     <a :href="`${base}/print-all?school_id=${group.school_id}&cert_type=winner`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (with background) ↗</a>
                                     <a :href="`${base}/print-all?school_id=${group.school_id}&cert_type=winner&plain=1`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (plain) ↗</a>
                                 </div>
@@ -316,7 +332,7 @@
                 </div>
             </div>
             <div v-else class="card p-6 text-center text-gray-500 text-sm">
-                No merit winners grouped by school available yet.
+                {{ winnersBySchool.length ? 'No school or student matches your search.' : 'No merit winners grouped by school available yet.' }}
             </div>
         </div>
 
@@ -344,8 +360,15 @@
                 </details>
             </div>
 
-            <div v-if="participationBySchool.length" class="card divide-y divide-gray-100">
-                <div v-for="group in participationBySchool" :key="group.school_id" class="py-3 first:pt-0 last:pb-0">
+            <div class="mb-3 flex flex-wrap items-center gap-3">
+                <input v-model="schoolSearch" type="search" placeholder="Search school or student…"
+                       class="field text-xs py-1.5 px-3 w-full sm:w-72" />
+                <span v-if="schoolSearch.trim()" class="text-xs text-gray-500">
+                    {{ filteredParticipationBySchool.length }} of {{ participationBySchool.length }} schools
+                </span>
+            </div>
+            <div v-if="filteredParticipationBySchool.length" class="card divide-y divide-gray-100">
+                <div v-for="group in filteredParticipationBySchool" :key="group.school_id" class="py-3 first:pt-0 last:pb-0">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div class="min-w-0 flex items-center gap-3">
                             <p class="font-semibold text-sm text-gray-900">{{ group.school_name }}</p>
@@ -364,10 +387,18 @@
                                     📦 Download ▾
                                 </summary>
                                 <div class="absolute z-20 right-0 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
-                                    <button @click="queueZipDownload({ school_id: group.school_id, cert_type: 'participation' }, $event)" :disabled="isBatchRunning"
-                                            class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">📦 ZIP (with background)</button>
-                                    <button @click="queueZipDownload({ school_id: group.school_id, cert_type: 'participation', plain: '1' }, $event)" :disabled="isBatchRunning"
-                                            class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">📦 ZIP — no background</button>
+                                    <!-- While another run is going, a queued ZIP would wait behind all of
+                                         its jobs — download directly instead (reuses rendered PDFs). -->
+                                    <template v-if="isBatchRunning">
+                                        <a :href="`${base}/download-zip?school_id=${group.school_id}&cert_type=participation`" class="block px-3 py-2 rounded hover:bg-gray-50">📦 ZIP (with background)</a>
+                                        <a :href="`${base}/download-zip?school_id=${group.school_id}&cert_type=participation&plain=1`" class="block px-3 py-2 rounded hover:bg-gray-50">📦 ZIP — no background</a>
+                                    </template>
+                                    <template v-else>
+                                        <button @click="queueZipDownload({ school_id: group.school_id, cert_type: 'participation' }, $event)"
+                                                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">📦 ZIP (with background)</button>
+                                        <button @click="queueZipDownload({ school_id: group.school_id, cert_type: 'participation', plain: '1' }, $event)"
+                                                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">📦 ZIP — no background</button>
+                                    </template>
                                     <a :href="`${base}/print-all?school_id=${group.school_id}&cert_type=participation`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (with background) ↗</a>
                                     <a :href="`${base}/print-all?school_id=${group.school_id}&cert_type=participation&plain=1`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (plain) ↗</a>
                                 </div>
@@ -397,7 +428,7 @@
                 </div>
             </div>
             <div v-else class="card p-6 text-center text-gray-500 text-sm">
-                No participation certificates generated yet.
+                {{ participationBySchool.length ? 'No school or student matches your search.' : 'No participation certificates generated yet.' }}
             </div>
         </div>
 
@@ -632,6 +663,17 @@ const publishedItemOptions = computed(() => props.publishedItems.map(item => {
 // Settings/StorageMigration.vue's async job UX.
 const jobStatus = ref(null);
 let pollTimer = null;
+
+// Shared by both by-school tabs: matches the school name or any student listed under it.
+const schoolSearch = ref('');
+function matchesSchoolSearch(group) {
+    const q = schoolSearch.value.trim().toLowerCase();
+    if (!q) return true;
+    return (group.school_name ?? '').toLowerCase().includes(q)
+        || (group.winners ?? []).some(w => (w.name ?? '').toLowerCase().includes(q));
+}
+const filteredParticipationBySchool = computed(() => props.participationBySchool.filter(matchesSchoolSearch));
+const filteredWinnersBySchool = computed(() => props.winnersBySchool.filter(matchesSchoolSearch));
 
 function startPolling(batchId) {
     if (!batchId) return;

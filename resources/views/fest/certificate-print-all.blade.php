@@ -25,6 +25,7 @@
         };
         $__sheetSizes = $certificates->map(fn ($payload) => $__sheetSize($payload))->keyBy('name');
         $__defaultSize = $__sheetSizes->first() ?? ['width' => 297.0, 'height' => 210.0];
+        $__lastSheetName = $certificates->isNotEmpty() ? $__sheetSize($certificates->last())['name'] : null;
     @endphp
     <style>
         * { box-sizing: border-box; }
@@ -115,8 +116,18 @@
             background-color: #ffffff !important;
         }
         .actions { display: none; }
-        .cert-sheet { padding-top: 24px; page-break-after: always; break-after: page; }
-        .cert-sheet:last-child { page-break-after: auto; break-after: auto; }
+        .cert-sheet { padding-top: 24px; }
+        {{-- Break BEFORE every certificate but the first, not after every one but the
+             last: :last-child also counts whatever a browser extension (or a proxy)
+             appends to <body> after the final sheet, so the last certificate kept its
+             break-after and printed a trailing blank page. --}}
+        .cert-sheet ~ .cert-sheet { page-break-before: always; break-before: page; }
+        {{-- A change of named page always forces a new page, so anything appended to <body>
+             after the last sheet (unnamed, i.e. the default page) got a blank page of its
+             own. Naming <body>'s page after the last sheet lets such content inherit it. --}}
+        @if($__lastSheetName)
+        body { page: {{ $__lastSheetName }}; }
+        @endif
         @foreach($__sheetSizes as $__size)
         .cert-sheet.{{ $__size['name'] }} { page: {{ $__size['name'] }}; }
         @endforeach

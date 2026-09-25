@@ -7,6 +7,7 @@ use App\Models\FestEvent;
 use App\Models\Tenant;
 use App\Services\Events\FestCertificateService;
 use App\Support\FestClassGroupScheme;
+use App\Support\PdfGenerator;
 use App\Support\TenancyDatabase;
 use App\Support\TenantStorage;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -113,22 +114,59 @@ class BuildCertificateZipChunkJob implements ShouldQueue
         $classGroupLabels = $this->groupBy === 'item' ? FestClassGroupScheme::labels(null, $event->rootEvent()) : [];
         $artsCategoryLabels = $this->groupBy === 'item' ? config('fest_item_taxonomy.arts_category', []) : [];
 
-        foreach ($payloads as $payload) {
-            $certificate = $payload['certificate'];
+        $entryName = function (array $payload) use ($service, $classGroupLabels, $artsCategoryLabels) {
+            $name = FestCertificateService::archiveFileName($payload['student']?->name, $payload['certificate']->verification_uuid);
+            if ($this->groupBy) {
+                $folder = $service->archiveGroupFolder($payload, $this->groupBy, $classGroupLabels, $artsCategoryLabels) ?? 'Other';
+                $name = FestCertificateService::sanitizeArchiveSegment($folder).'/'.$name;
+            }
 
+            return $name;
+        };
+
+        // Already-rendered PDFs go straight in; the rest render through the converter
+        // with a rolling window of concurrent requests (PdfGenerator::renderEach())
+        // rather than one blocking round-trip per certificate.
+        $misses = [];
+        foreach ($payloads as $payload) {
             try {
-                $pdf = $service->cachedOrFreshPdf($certificate, fn () => $payload, $this->plain);
-                $name = FestCertificateService::archiveFileName($payload['student']?->name, $certificate->verification_uuid);
-                if ($this->groupBy) {
-                    $folder = $service->archiveGroupFolder($payload, $this->groupBy, $classGroupLabels, $artsCategoryLabels) ?? 'Other';
-                    $name = FestCertificateService::sanitizeArchiveSegment($folder).'/'.$name;
+                $pdf = $service->cachedPdf($payload['certificate'], $this->plain);
+                if ($pdf === null) {
+                    $misses[$payload['certificate']->id] = $payload;
+
+                    continue;
                 }
-                $zip->addFromString($name, $pdf);
+                $zip->addFromString($entryName($payload), $pdf);
                 $succeeded++;
             } catch (\Throwable) {
                 $failed++;
             }
         }
+
+        PdfGenerator::renderEach(
+            (function () use ($misses, $service, &$failed) {
+                foreach ($misses as $certificateId => $payload) {
+                    try {
+                        $document = $service->pdfDocument($payload, $this->plain);
+                    } catch (\Throwable) {
+                        $failed++;
+
+                        continue;
+                    }
+
+                    yield $certificateId => $document;
+                }
+            })(),
+            function ($certificateId, $pdf) use ($zip, $misses, $entryName, &$succeeded, &$failed) {
+                if ($pdf instanceof \Throwable) {
+                    $failed++;
+
+                    return;
+                }
+                $zip->addFromString($entryName($misses[$certificateId]), $pdf);
+                $succeeded++;
+            },
+        );
 
         $zip->close();
 

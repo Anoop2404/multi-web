@@ -119,4 +119,32 @@ class PdfGeneratorTest extends TestCase
         $this->assertStringStartsWith('%PDF', $results['a']);
         $this->assertStringStartsWith('%PDF', $results['b']);
     }
+
+    public function test_render_each_pulls_documents_lazily_within_the_concurrency_window(): void
+    {
+        config(['services.pdf_converter.url' => 'https://pdf.example.test/render', 'services.pdf_converter.concurrency' => 3]);
+        Http::fake(fn ($request) => Http::response('%PDF-'.strip_tags($request['html']), 200));
+
+        $pulled = 0;
+        $pulledAtFirstResult = null;
+        $documents = (function () use (&$pulled) {
+            foreach (range(1, 8) as $i) {
+                $pulled++;
+                yield "doc{$i}" => ['html' => "<p>{$i}</p>"];
+            }
+        })();
+
+        $results = [];
+        PdfGenerator::renderEach($documents, function ($key, $result) use (&$results, &$pulled, &$pulledAtFirstResult) {
+            $pulledAtFirstResult ??= $pulled;
+            $results[$key] = $result;
+        });
+
+        // Never more than the 3-document window built ahead of the first completion...
+        $this->assertLessThanOrEqual(3, $pulledAtFirstResult);
+        // ...and every document still rendered, each to its own PDF.
+        $this->assertCount(8, $results);
+        $this->assertSame('%PDF-8', $results['doc8']);
+        Http::assertSentCount(8);
+    }
 }

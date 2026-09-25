@@ -3,7 +3,8 @@
 namespace App\Support;
 
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Http\Client\Pool;
+use GuzzleHttp\Promise\EachPromise;
+use Illuminate\Http\Client\Promises\LazyPromise;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -268,17 +269,39 @@ class PdfGenerator
     }
 
     /**
-     * render() for several documents at once: up to services.pdf_converter.concurrency
-     * requests in flight against the converter instead of one blocking call after another
-     * (a bulk certificate render was two sequential round-trips per certificate). Each
-     * document that fails in the pool is retried through render() on its own, so failure
-     * and DomPDF-fallback behaviour stay exactly render()'s. Without a converter URL this
-     * is just render() in a loop.
+     * render() for several documents at once, collected into one array — see renderEach().
      *
      * @param  array<array-key, array{html: string, isLandscape?: bool, pageWidthMm?: ?float, pageHeightMm?: ?float}>  $documents
      * @return array<array-key, string|\Throwable>  PDF bytes, or what render() threw, per key.
      */
     public static function renderMany(array $documents, int $timeoutMs = 300000): array
+    {
+        $results = [];
+        self::renderEach($documents, function ($key, $result) use (&$results) {
+            $results[$key] = $result;
+        }, $timeoutMs);
+
+        return array_replace(array_intersect_key($documents, $results), $results);
+    }
+
+    /**
+     * Streams documents through the converter with a rolling window of
+     * services.pdf_converter.concurrency requests in flight: the next document is sent
+     * the moment any in-flight one finishes, rather than a whole group waiting on its
+     * slowest member. $documents may be a lazy generator — a document is only pulled
+     * (its HTML built) when a slot frees up, so a bulk render never holds every
+     * certificate's embedded-image HTML in memory at once.
+     *
+     * $onResult(key, string|\Throwable) runs as each document completes, in completion
+     * order. A document the converter fails is retried through render() on its own, so
+     * failure and DomPDF-fallback behaviour stay exactly render()'s. Anything $onResult
+     * throws aborts the whole run and propagates. Without a converter URL this is just
+     * render() in a loop.
+     *
+     * @param  iterable<array-key, array{html: string, isLandscape?: bool, pageWidthMm?: ?float, pageHeightMm?: ?float}>  $documents
+     * @param  callable(array-key, string|\Throwable): void  $onResult
+     */
+    public static function renderEach(iterable $documents, callable $onResult, int $timeoutMs = 300000): void
     {
         $renderOne = function (array $document) use ($timeoutMs) {
             try {
@@ -295,41 +318,53 @@ class PdfGenerator
         };
 
         $url = self::resolveConverterUrl(config('services.pdf_converter.url'));
-        if (! $url || count($documents) < 2) {
-            return array_map($renderOne, $documents);
-        }
-
-        $results = [];
-        $concurrency = max(1, (int) config('services.pdf_converter.concurrency', 4));
-
-        foreach (array_chunk($documents, $concurrency, preserve_keys: true) as $slice) {
-            $responses = Http::pool(function (Pool $pool) use ($slice, $url, $timeoutMs) {
-                foreach ($slice as $key => $document) {
-                    $pool->as((string) $key)
-                        ->connectTimeout((int) config('services.pdf_converter.connect_timeout', 15))
-                        ->timeout(self::converterHttpTimeout($timeoutMs))
-                        ->post($url, self::converterPayload(
-                            $document['html'],
-                            $document['isLandscape'] ?? false,
-                            null,
-                            null,
-                            null,
-                            $document['pageWidthMm'] ?? null,
-                            $document['pageHeightMm'] ?? null,
-                            $timeoutMs,
-                        ));
-                }
-            });
-
-            foreach ($slice as $key => $document) {
-                $response = $responses[(string) $key] ?? null;
-                $results[$key] = $response instanceof Response && $response->successful()
-                    ? $response->body()
-                    : $renderOne($document);
+        if (! $url) {
+            foreach ($documents as $key => $document) {
+                $onResult($key, $renderOne($document));
             }
+
+            return;
         }
 
-        return $results;
+        // Kept only while in flight, for the one-off render() retry of a failed document.
+        $inFlight = [];
+
+        $requests = (function () use ($documents, $url, $timeoutMs, &$inFlight) {
+            foreach ($documents as $key => $document) {
+                $inFlight[$key] = $document;
+
+                $promise = Http::async()
+                    ->connectTimeout((int) config('services.pdf_converter.connect_timeout', 15))
+                    ->timeout(self::converterHttpTimeout($timeoutMs))
+                    ->post($url, self::converterPayload(
+                        $document['html'],
+                        $document['isLandscape'] ?? false,
+                        null,
+                        null,
+                        null,
+                        $document['pageWidthMm'] ?? null,
+                        $document['pageHeightMm'] ?? null,
+                        $timeoutMs,
+                    ));
+
+                yield $key => $promise instanceof LazyPromise ? $promise->buildPromise() : $promise;
+            }
+        })();
+
+        $settle = function ($outcome, $key) use (&$inFlight, $onResult, $renderOne) {
+            $document = $inFlight[$key];
+            unset($inFlight[$key]);
+
+            $onResult($key, $outcome instanceof Response && $outcome->successful()
+                ? $outcome->body()
+                : $renderOne($document));
+        };
+
+        (new EachPromise($requests, [
+            'concurrency' => max(1, (int) config('services.pdf_converter.concurrency', 3)),
+            'fulfilled' => $settle,
+            'rejected' => $settle,
+        ]))->promise()->wait();
     }
 
     /** @return array<string, mixed> The converter service's request body. */
