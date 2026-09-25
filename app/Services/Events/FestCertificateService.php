@@ -881,7 +881,7 @@ class FestCertificateService
 
             $entry = [
                 'name'          => filled($mine['name']) ? $mine['name'] : ($signatories[$match]['name'] ?? ''),
-                'designation'   => filled($mine['designation']) ? $mine['designation'] : ($signatories[$match]['designation'] ?? $mine['label']),
+                'designation'   => filled($mine['designation']) ? $mine['designation'] : ($signatories[$match]['designation'] ?? ''),
                 'signature_url' => $mine['signature_url'] ?? ($signatories[$match]['signature_url'] ?? null),
                 'school'        => $mine['school'],
             ];
