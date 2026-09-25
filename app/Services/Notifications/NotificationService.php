@@ -132,6 +132,10 @@ class NotificationService
                 'title' => 'Training Registration Cancelled',
                 'body_template' => '{{school_name}} cancelled a registration in {{program_title}}.',
             ],
+            'payment.proof.uploaded' => [
+                'title' => 'Payment proof uploaded',
+                'body_template' => '{{school_name}} uploaded payment proof for {{context_label}}.',
+            ],
             'subscription.entered_grace' => [
                 'title' => 'Subscription Renewal Due',
                 'body_template' => 'Your subscription ({{plan_name}}) expired on {{period_end}} and is now in its grace period. Renew soon to avoid restricted access.',
