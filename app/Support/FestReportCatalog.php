@@ -316,6 +316,7 @@ class FestReportCatalog
             ['id' => 'age-group-matrix', 'label' => 'Age Group Matrix', 'href' => "{$base}/age-group-matrix"],
             ['id' => 'fee-collection', 'label' => 'Fee Collection', 'href' => "{$base}/fee-collection"],
             ['id' => 'student-wise', 'label' => 'Student-wise browser', 'href' => "{$base}/student-wise"],
+            ['id' => 'student-wise-by-school', 'label' => 'Student report by school (each school on its own page)', 'href' => "{$base}/student-wise-by-school"],
             ['id' => 'item-wise', 'label' => 'Item-wise browser', 'href' => "{$base}/item-wise"],
             ['id' => 'category-wise-points', 'label' => 'Category-wise Points', 'href' => "{$base}/category-wise-points"],
             ['id' => 'category-item-matrix', 'label' => 'Category & Item-wise Consolidated Report', 'href' => "{$base}/category-item-matrix"],

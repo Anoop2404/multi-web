@@ -1791,6 +1791,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
                 Route::get('/{event}/reports/pending-approvals/export', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'exportPendingApprovals'])->name('reports.pending-approvals.export');
                 Route::get('/{event}/reports/student-limits', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'studentLimits'])->name('reports.student-limits');
                 Route::get('/{event}/reports/student-wise', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'studentWise'])->name('reports.student-wise');
+                Route::get('/{event}/reports/student-wise-by-school', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'studentWiseBySchool'])->name('reports.student-wise-by-school');
                 Route::get('/{event}/reports/item-wise', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemWise'])->name('reports.item-wise');
                 Route::get('/{event}/reports/item-wise/export-all', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'exportItemWiseAll'])->name('reports.item-wise.export-all');
                 Route::get('/{event}/reports/item-wise/pdf', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'itemWisePdf'])->name('reports.item-wise.pdf');

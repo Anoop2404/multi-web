@@ -1028,6 +1028,38 @@ class FestReportController extends SahodayaAdminController
         ])));
     }
 
+    /**
+     * "Student report by school": one row per participating school with a Preview/Download
+     * of just that school's student-wise PDF, plus the all-schools bulk PDF in which every
+     * school starts on its own page (student-wise-pdf with by_school=1).
+     */
+    public function studentWiseBySchool(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+        $analytics = $this->scopedAnalytics($request, $targetEvent);
+        $exportBase = '/sahodaya-admin/'.$tenantId.'/events/'.$event->id.'/reports/export/student-wise-pdf';
+
+        $schools = collect($analytics->studentWiseBrowserRows())
+            ->groupBy('school_id')
+            ->map(fn ($students) => [
+                'school_id'      => $students->first()['school_id'],
+                'school_name'    => $students->first()['school_name'],
+                'school_code'    => $students->first()['school_code'],
+                'student_count'  => $students->count(),
+                'pdf_url'        => $exportBase.'?'.http_build_query(['school_id' => $students->first()['school_id']]),
+            ])
+            ->sortBy('school_name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        return $this->inertia('Sahodaya/Events/Reports/StudentWiseBySchool', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
+            'schools'        => $schools,
+            'bulkPdfUrl'     => $exportBase.'?by_school=1',
+            'studentTotal'   => $schools->sum('student_count'),
+        ])));
+    }
+
     public function itemWise(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
