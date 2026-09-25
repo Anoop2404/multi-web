@@ -88,6 +88,28 @@
                 </div>
             @endif
 
+            {{-- Event-level signatories (venue convenor, host principal, ...): the template's
+                 signature_blocks say where each part of a labelled block goes, the event's
+                 certificate_signatories entry with the same key says who signs. Each of
+                 signature / name / designation / school is positioned and aligned on its own,
+                 and is printed only when the event supplies a value. --}}
+            @foreach(($layout['signature_blocks'] ?? []) as $block)
+                @php $sig = ($eventSignatories ?? [])[$block['key']] ?? null; @endphp
+                @continue(empty($sig))
+                @if(!empty($sig['signature_url']))
+                    @php $bs = $block['signature'] ?? []; @endphp
+                    <div class="overlay-field signatory-signature" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($bs, ['top' => 78, 'left' => 72, 'width' => 20, 'align' => 'center']) }}">
+                        <img src="{{ $sig['signature_url'] }}" alt="" style="max-width:100%;max-height:{{ (int) ($bs['font_size'] ?? 12) * 5 }}px;">
+                    </div>
+                @endif
+                @foreach(['name' => ['top' => 86, 'font_size' => 10, 'font_weight' => 'bold'], 'designation' => ['top' => 89, 'font_size' => 8], 'school' => ['top' => 92, 'font_size' => 8]] as $part => $fallback)
+                    @php $text = $part === 'designation' ? ($sig['designation'] ?: $sig['label']) : ($sig[$part] ?? ''); @endphp
+                    @if(filled($text))
+                        <div class="overlay-field signatory-{{ $part }}" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($block[$part] ?? [], $fallback + ['left' => 72, 'width' => 20, 'font_family' => 'Montserrat', 'align' => 'center']) }}">{{ $text }}</div>
+                    @endif
+                @endforeach
+            @endforeach
+
             @if(!empty($certificate?->verification_uuid))
                 <div class="overlay-field uuid" style="bottom:12px;right:12px;font-size:9px;">
                     {{ $certificate->verification_uuid }}
@@ -163,6 +185,9 @@
                             <p class="sign-name">{{ $signatory['name'] }}</p>
                         @endif
                         <p class="sign-label">{{ $signatory['designation'] ?? '' }}</p>
+                        @if(!empty($signatory['school']))
+                            <p class="sign-label">{{ $signatory['school'] }}</p>
+                        @endif
                     </div>
                 @endforeach
             </div>

@@ -79,6 +79,30 @@
                     <span v-else>22 July 2026</span>
                 </div>
 
+                <!-- Signature blocks (per-event data; sample values shown here so the positions can be tuned) -->
+                <template v-for="(blk, bi) in signatureBlocks" :key="`sig-${bi}`">
+                    <div v-if="blk.signature"
+                         class="absolute text-slate-400"
+                         :style="overlayStyle(blk.signature, { top: 78, left: 72, width: 20, align: 'center' })">
+                        <span class="inline-block border-b border-dashed border-slate-400 italic px-2" style="font-family: cursive;">Signature</span>
+                    </div>
+                    <div v-if="blk.name"
+                         class="absolute text-slate-800"
+                         :style="overlayStyle(blk.name, { top: 86, left: 72, width: 20, font_size: 10, font_family: 'Montserrat', font_weight: 'bold', align: 'center' })">
+                        Name
+                    </div>
+                    <div v-if="blk.designation"
+                         class="absolute text-slate-600"
+                         :style="overlayStyle(blk.designation, { top: 89, left: 72, width: 20, font_size: 8, font_family: 'Montserrat', align: 'center' })">
+                        {{ blk.label || 'Designation' }}
+                    </div>
+                    <div v-if="blk.school"
+                         class="absolute text-slate-600"
+                         :style="overlayStyle(blk.school, { top: 92, left: 72, width: 20, font_size: 8, font_family: 'Montserrat', align: 'center' })">
+                        School name
+                    </div>
+                </template>
+
                 <!-- Verification UUID Overlay -->
                 <div v-if="uuidLayout"
                      class="absolute text-slate-400 text-center tracking-wide text-[8px]"
@@ -180,6 +204,7 @@ const recipientNameLayout = computed(() => props.layout?.recipient_name);
 const bodyLayout = computed(() => props.layout?.body);
 const dateLayout = computed(() => props.layout?.certificate_date);
 const uuidLayout = computed(() => props.layout?.uuid);
+const signatureBlocks = computed(() => Array.isArray(props.layout?.signature_blocks) ? props.layout.signature_blocks : []);
 const customFields = computed(() => Array.isArray(props.layout?.custom_fields) ? props.layout.custom_fields : []);
 
 const fontFamilyStackMap = {

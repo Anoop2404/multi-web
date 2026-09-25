@@ -301,7 +301,56 @@ class CertificateTemplate extends Model
                 ->all();
         }
 
+        $defaults['signature_blocks'] = self::normalizeSignatureBlocks($custom['signature_blocks'] ?? []);
+
         return $defaults;
+    }
+
+    /**
+     * Labelled signature slots an admin adds to a background-image template ("Venue
+     * Convenor", "Host Principal", ...). The template only owns where each part goes; who
+     * signs comes from the event's certificate_signatories entry with the same key.
+     * Each of signature/name/designation/school is positioned and aligned independently.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function normalizeSignatureBlocks(mixed $blocks): array
+    {
+        if (! is_array($blocks)) {
+            return [];
+        }
+
+        $textKeys = ['top', 'left', 'width', 'font_size', 'font_family', 'font_weight', 'font_style', 'align'];
+        $seen = [];
+        $out = [];
+
+        foreach ($blocks as $block) {
+            if (! is_array($block)) {
+                continue;
+            }
+            $label = trim((string) ($block['label'] ?? ''));
+            $key = self::signatureKey($label);
+            if ($key === '' || isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+
+            $entry = ['key' => $key, 'label' => $label];
+            foreach (['signature', 'name', 'designation', 'school'] as $part) {
+                $entry[$part] = is_array($block[$part] ?? null)
+                    ? array_intersect_key($block[$part], array_flip($textKeys))
+                    : [];
+            }
+            $out[] = $entry;
+        }
+
+        return $out;
+    }
+
+    /** Stable match key between a template's signature block and an event's signatory. */
+    public static function signatureKey(string $label): string
+    {
+        return \Illuminate\Support\Str::slug($label);
     }
 
     /**

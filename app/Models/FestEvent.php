@@ -67,6 +67,7 @@ class FestEvent extends Model
         'food_payee_type', 'food_host_school_id', 'require_payment_for_coupons',
         'phase_mode_enabled', 'workflow_mode', 'source_phase_id', 'registration_batch_id', 'workflow_leaf_key',
         'reporting_batch_min_registrations', 'reporting_batch_size',
+        'certificate_signatories',
         // sahodaya_customized_at was stamped via updateQuietly() since 2026-08-13 but was
         // never added here — mass-assignment silently dropped it every time, so the
         // customization-indicator badge it drives never actually turned on. fee_customized_at
@@ -80,6 +81,7 @@ class FestEvent extends Model
     ];
 
     protected $casts = [
+        'certificate_signatories' => 'array',
         'is_cascaded' => 'boolean',
         'nav_hidden' => 'boolean',
         'results_published' => 'boolean',

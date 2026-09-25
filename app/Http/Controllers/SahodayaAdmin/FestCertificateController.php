@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SahodayaAdmin;
 use App\Jobs\BuildCertificateZipChunkJob;
 use App\Jobs\RenderCertificateChunkJob;
 use App\Models\Certificate;
+use App\Models\CertificateTemplate;
 use App\Models\CertificateBatch;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
@@ -47,6 +48,8 @@ class FestCertificateController extends SahodayaAdminController
             'participationBySchool' => $this->participationBySchool($certificates, $event),
             'recentBatches' => $this->recentBatchesForEvent($event),
             'staleCount' => $certificates->filter(fn ($c) => $c['is_stale'] ?? false)->count(),
+            'certificateSignatories' => $this->signatoriesForUi($event),
+            'signatoryLabelSuggestions' => $this->signatoryLabelSuggestions(),
         ]));
     }
 
@@ -375,6 +378,102 @@ class FestCertificateController extends SahodayaAdminController
         return back()->with('success', $validated['certificate_date']
             ? 'Certificate date updated.'
             : 'Certificate date cleared — back to the event\'s own dates.');
+    }
+
+    /**
+     * Sets this event's certificate signatories (venue convenor, host principal, ...): a
+     * free list of {label, name, designation, school, signature image}. Who signs differs
+     * per host venue, so it can't be baked into a shared template; the template decides
+     * where each labelled block is printed (Certificate templates -> Signature blocks) and
+     * matches it to an entry here by the label.
+     */
+    public function updateSignatories(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $validated = $request->validate([
+            'signatories'                    => 'nullable|array|max:12',
+            'signatories.*.label'            => 'required|string|max:80',
+            'signatories.*.name'             => 'nullable|string|max:120',
+            'signatories.*.designation'      => 'nullable|string|max:120',
+            'signatories.*.school'           => 'nullable|string|max:160',
+            'signatories.*.signature'        => 'nullable|image|max:1024',
+            'signatories.*.signature_path'   => 'nullable|string|max:255',
+            'signatories.*.remove_signature' => 'nullable|boolean',
+        ]);
+
+        // An existing image path may only be kept if it is one this event already holds --
+        // never trust a client-supplied storage path.
+        $held = collect($event->certificate_signatories ?? [])->pluck('signature_path')->filter()->all();
+        $disk = TenantStorage::uploadDisk();
+        $seen = [];
+        $entries = [];
+
+        foreach ($validated['signatories'] ?? [] as $i => $row) {
+            $label = trim($row['label']);
+            $key = CertificateTemplate::signatureKey($label);
+            if ($key === '' || isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+
+            $path = in_array($row['signature_path'] ?? null, $held, true) ? $row['signature_path'] : null;
+            if ($request->hasFile("signatories.$i.signature")) {
+                $path = $request->file("signatories.$i.signature")->store('sahodaya/'.$this->sahodaya->id.'/certificate-signatures', $disk);
+                if ($path === false) {
+                    return back()->withErrors(['signatories' => "Could not store the signature image for \"{$label}\" — storage is unavailable. Nothing was saved."]);
+                }
+            } elseif (! empty($row['remove_signature'])) {
+                $path = null;
+            }
+
+            $entries[] = [
+                'key'            => $key,
+                'label'          => $label,
+                'name'           => $row['name'] ?? null,
+                'designation'    => $row['designation'] ?? null,
+                'school'         => $row['school'] ?? null,
+                'signature_path' => $path,
+            ];
+        }
+
+        $event->update(['certificate_signatories' => $entries ?: null]);
+
+        return back()->with('success', 'Signatories saved. Existing certificates refresh the next time they are regenerated.');
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function signatoriesForUi(FestEvent $event): array
+    {
+        return collect($event->certificate_signatories ?? [])->map(fn ($s) => [
+            'label'          => $s['label'] ?? '',
+            'name'           => $s['name'] ?? '',
+            'designation'    => $s['designation'] ?? '',
+            'school'         => $s['school'] ?? '',
+            'signature_path' => $s['signature_path'] ?? null,
+            'signature_url'  => ! empty($s['signature_path'])
+                ? TenantStorage::logoUrl($this->sahodaya, $s['signature_path'])
+                : null,
+        ])->values()->all();
+    }
+
+    /**
+     * Labels already used as signature blocks on this Sahodaya's templates, so the event
+     * form can offer them (the label is what ties an entry to a template's block).
+     *
+     * @return list<string>
+     */
+    private function signatoryLabelSuggestions(): array
+    {
+        return CertificateTemplate::query()
+            ->where('tenant_id', $this->sahodaya->id)
+            ->get(['layout_json'])
+            ->flatMap(fn ($t) => collect($t->layout_json['signature_blocks'] ?? [])->pluck('label'))
+            ->filter()
+            ->push('Venue Convenor')
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function downloadZip(Request $request, string $tenantId, FestEvent $event)

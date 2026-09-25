@@ -303,6 +303,60 @@
                                 </FormField>
                             </div>
 
+                            <div class="sm:col-span-2 space-y-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                                <div class="flex items-center justify-between gap-3">
+                                    <div>
+                                        <p class="font-bold text-slate-800 text-xs uppercase tracking-wider">Signature blocks</p>
+                                        <p class="text-xs text-slate-500 mt-0.5">Each block is a signatory whose name, designation, school and signature image are filled in per event (Event &rarr; Certificates &rarr; Signatories) by the same label. Here you only choose where every part prints and how it is aligned.</p>
+                                    </div>
+                                    <button type="button" class="btn-secondary text-xs whitespace-nowrap" @click="addSignatureBlock">+ Add signature block</button>
+                                </div>
+
+                                <div v-for="(blk, idx) in form.layout_json.signature_blocks" :key="idx" class="space-y-3 p-3 bg-white border border-slate-200 rounded-lg">
+                                    <div class="flex items-end justify-between gap-3">
+                                        <FormField label="Label (matched with the event's signatory)" class-extra="flex-1">
+                                            <template #default="{ id }">
+                                                <input :id="id" v-model="blk.label" maxlength="80" class="field" placeholder="e.g. Venue Convenor, Host Principal, Chief Guest">
+                                            </template>
+                                        </FormField>
+                                        <button type="button" class="text-xs font-semibold text-rose-600 pb-3" @click="removeSignatureBlock(idx)">Remove</button>
+                                    </div>
+
+                                    <div v-for="part in signatureParts" :key="part.key"
+                                         class="grid grid-cols-2 sm:grid-cols-5 gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+                                        <p class="col-span-2 sm:col-span-5 font-bold text-slate-700 text-[11px] uppercase tracking-wider">{{ part.label }}</p>
+                                        <FormField label="Top %">
+                                            <template #default="{ id }">
+                                                <input :id="id" v-model.number="blk[part.key].top" type="number" step="any" min="0" max="100" class="field">
+                                            </template>
+                                        </FormField>
+                                        <FormField label="Left %">
+                                            <template #default="{ id }">
+                                                <input :id="id" v-model.number="blk[part.key].left" type="number" step="any" min="0" max="100" class="field">
+                                            </template>
+                                        </FormField>
+                                        <FormField label="Width %">
+                                            <template #default="{ id }">
+                                                <input :id="id" v-model.number="blk[part.key].width" type="number" step="any" min="5" max="100" class="field">
+                                            </template>
+                                        </FormField>
+                                        <FormField :label="part.sizeLabel">
+                                            <template #default="{ id }">
+                                                <input :id="id" v-model.number="blk[part.key].font_size" type="number" step="any" min="6" max="96" class="field">
+                                            </template>
+                                        </FormField>
+                                        <FormField label="Text Align">
+                                            <template #default="{ id }">
+                                                <SearchableSelect :id="id" v-model="blk[part.key].align"
+                                                    :options="[{ value: 'left', label: 'Left' }, { value: 'center', label: 'Center' }, { value: 'right', label: 'Right' }]"
+                                                    :all-option="false" placeholder="Select text align" />
+                                            </template>
+                                        </FormField>
+                                    </div>
+                                </div>
+                                <p v-if="!form.layout_json.signature_blocks.length" class="text-xs text-slate-400">No signature blocks yet — add one for every person who signs (venue convenor, host principal, ...).</p>
+                            </div>
+
                             <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
                                 <p class="sm:col-span-2 md:col-span-4 font-bold text-slate-800 text-xs uppercase tracking-wider">Photo Position &amp; Size</p>
                                 <FormField label="Top %" hint="Distance from the top of the canvas.">
@@ -778,6 +832,33 @@ function isTruthy(value) {
     return value === true || value === 1 || value === '1' || value === 'true';
 }
 
+const signatureParts = [
+    { key: 'signature', label: 'Signature image', sizeLabel: 'Height scale' },
+    { key: 'name', label: 'Name', sizeLabel: 'Font size' },
+    { key: 'designation', label: 'Designation', sizeLabel: 'Font size' },
+    { key: 'school', label: 'School name', sizeLabel: 'Font size' },
+];
+
+const signaturePartDefaults = (top, left = 72) => ({
+    signature: { top, left, width: 20, font_size: 12, align: 'center' },
+    name: { top: top + 8, left, width: 20, font_size: 10, font_family: 'Montserrat', font_weight: 'bold', font_style: 'normal', align: 'center' },
+    designation: { top: top + 11, left, width: 20, font_size: 8, font_family: 'Montserrat', font_weight: 'normal', font_style: 'normal', align: 'center' },
+    school: { top: top + 14, left, width: 20, font_size: 8, font_family: 'Montserrat', font_weight: 'normal', font_style: 'normal', align: 'center' },
+});
+
+function addSignatureBlock() {
+    const n = form.layout_json.signature_blocks.length;
+    form.layout_json.signature_blocks.push({
+        label: n === 0 ? 'Venue Convenor' : '',
+        ...signaturePartDefaults(70, n % 2 === 0 ? 72 : 8),
+    });
+}
+
+function removeSignatureBlock(index) {
+    form.layout_json.signature_blocks.splice(index, 1);
+}
+
+
 function textFieldDefaults(src = {}, def = {}, fallback = {}) {
     return {
         top: src.top ?? def.top ?? fallback.top ?? 0,
@@ -843,6 +924,18 @@ function layoutDefaults(from = null) {
         // certificate_date trio -- for backgrounds whose own artwork already lays out
         // several separate blanks. Falls back to the Sahodaya-wide default's own custom
         // fields only when this template has none of its own yet.
+        // Per-event signatories (see Events/Certificates.vue): the template only holds each
+        // labelled block's position/alignment for signature, name, designation and school.
+        signature_blocks: (src.signature_blocks ?? d.signature_blocks ?? []).map((blk) => {
+            const base = signaturePartDefaults(70);
+            return {
+                label: blk.label ?? '',
+                signature: textFieldDefaults(blk.signature, null, base.signature),
+                name: textFieldDefaults(blk.name, null, base.name),
+                designation: textFieldDefaults(blk.designation, null, base.designation),
+                school: textFieldDefaults(blk.school, null, base.school),
+            };
+        }),
         custom_fields: (src.custom_fields ?? d.custom_fields ?? []).map((cf) => ({
             text: cf.text ?? '',
             ...textFieldDefaults(cf, null, {

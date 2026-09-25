@@ -691,6 +691,9 @@ class FestCertificateService
                     : null,
             ])->values()->all();
 
+        $eventSignatories = $this->eventSignatories($event, $sahodaya, $embedAssets);
+        $signatories = $this->withEventSignatories($signatories, $eventSignatories);
+
         $eventParticipants = null;
         if ($certificate->cert_type === 'participation' && $event) {
             if (! array_key_exists($event->id, $participantsCache)) {
@@ -711,6 +714,9 @@ class FestCertificateService
             'photoUrl'      => $photoUrl,
             'overlayLayout' => $overlayLayout,
             'signatories'   => $signatories,
+            // Overlay (background-image) templates don't render the signatory footer; the
+            // blade places each entry via the template's signature_blocks with the same key.
+            'eventSignatories' => collect($eventSignatories)->keyBy('key')->all(),
         ]);
     }
 
@@ -802,12 +808,85 @@ class FestCertificateService
         $fieldValues = $context['fieldValues'] ?? [];
 
         $template = $context['template'] ?? null;
+        $event = $context['event'] ?? null;
 
         return hash('sha256', json_encode([
             'template_id'          => $template?->id,
             'template_updated_at'  => $template?->updated_at?->toISOString(),
             'fieldValues'          => $fieldValues,
+            'signatories'          => $event?->certificate_signatories,
         ]));
+    }
+
+    /**
+     * The event's own signatories (venue convenor, host principal, ...) with their
+     * signature images resolved to a URL / embedded data URI. Entries with nothing filled
+     * in are dropped.
+     *
+     * @return list<array{key: string, label: string, name: ?string, designation: ?string, school: ?string, signature_url: ?string}>
+     */
+    private function eventSignatories(?FestEvent $event, ?Tenant $sahodaya, bool $embedAssets): array
+    {
+        if (! $event || ! is_array($event->certificate_signatories)) {
+            return [];
+        }
+
+        return collect($event->certificate_signatories)
+            ->filter(fn ($s) => is_array($s) && filled($s['key'] ?? null))
+            ->map(fn ($s) => [
+                'key'           => $s['key'],
+                'label'         => $s['label'] ?? $s['key'],
+                'name'          => $s['name'] ?? null,
+                'designation'   => $s['designation'] ?? null,
+                'school'        => $s['school'] ?? null,
+                'signature_url' => (! empty($s['signature_path']) && $sahodaya)
+                    ? ($embedAssets
+                        ? TenantStorage::photoBase64DataUri($sahodaya, $s['signature_path'], 400)
+                        : TenantStorage::logoUrl($sahodaya, $s['signature_path']))
+                    : null,
+            ])
+            ->filter(fn ($s) => filled($s['name']) || filled($s['designation']) || filled($s['school']) || filled($s['signature_url']))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Footer-style templates: an event signatory replaces the template signatory whose
+     * designation names the same role (same slug), otherwise it is appended -- the person
+     * changes with every host venue while the template is shared. Fields left blank on the
+     * event keep the template's value.
+     *
+     * @param  list<array{name: string, designation: string, signature_url: ?string}>  $signatories
+     * @param  list<array<string, mixed>>  $eventSignatories
+     * @return list<array<string, mixed>>
+     */
+    private function withEventSignatories(array $signatories, array $eventSignatories): array
+    {
+        foreach ($eventSignatories as $mine) {
+            $match = null;
+            foreach ($signatories as $i => $signatory) {
+                $slug = CertificateTemplate::signatureKey((string) ($signatory['designation'] ?? ''));
+                if ($slug !== '' && str_contains($slug, $mine['key'])) {
+                    $match = $i;
+                    break;
+                }
+            }
+
+            $entry = [
+                'name'          => filled($mine['name']) ? $mine['name'] : ($signatories[$match]['name'] ?? ''),
+                'designation'   => filled($mine['designation']) ? $mine['designation'] : ($signatories[$match]['designation'] ?? $mine['label']),
+                'signature_url' => $mine['signature_url'] ?? ($signatories[$match]['signature_url'] ?? null),
+                'school'        => $mine['school'],
+            ];
+
+            if ($match === null) {
+                $signatories[] = $entry;
+            } else {
+                $signatories[$match] = $entry;
+            }
+        }
+
+        return $signatories;
     }
 
     /**
