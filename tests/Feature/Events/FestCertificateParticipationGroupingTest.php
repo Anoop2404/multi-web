@@ -185,6 +185,13 @@ class FestCertificateParticipationGroupingTest extends TestCase
             ]));
 
             $response->assertOk();
+            // One printed page per certificate: each sheet sits on a named page of its
+            // template's size, clipped 1mm short of it (a sheet exactly one page tall
+            // spilled into a blank page after every certificate).
+            $html = $response->getContent();
+            $this->assertStringContainsString('@page cert-2970x2100 { size: 297mm 210mm; margin: 0; }', $html);
+            $this->assertStringContainsString('.cert-sheet.cert-2970x2100 { height: 209mm; }', $html);
+            $this->assertSame(1, substr_count($html, 'class="cert-sheet cert-2970x2100"'));
             $printed = $response->viewData('certificates');
             $this->assertCount(1, $printed, "Only {$school->id}'s certificate should print.");
             $this->assertSame(700 + $index, FestParticipant::find($printed->first()['certificate']->entity_id)->student_id);

@@ -10,18 +10,21 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800&display=swap" rel="stylesheet">
     @php
-        // Fallback page size for the rare browser without CSS named-page support — based
-        // on the first certificate's orientation, since a batch is normally one uniform
-        // template. Browsers that DO support named pages (all modern Chromium/Firefox)
-        // get the correct size per certificate via the .cert-page-* classes below,
-        // matching the same per-item orientation certificate-body.blade.php already uses
-        // for the .has-background.portrait class — so the physical page and the visible
-        // card agree instead of a portrait card being forced onto a landscape sheet.
-        $__firstPayload = $certificates->first();
-        $__firstLayout = $__firstPayload
-            ? ($__firstPayload['overlayLayout'] ?? (!empty($__firstPayload['template']) ? $__firstPayload['template']->overlayLayout() : \App\Models\CertificateTemplate::defaultBackgroundLayout()))
-            : [];
-        $__defaultOrientation = ($__firstLayout['orientation'] ?? 'landscape') === 'portrait' ? 'portrait' : 'landscape';
+        // Each certificate prints on a page of its own template's physical size — A4 in
+        // its orientation, or the template's custom width/height (same
+        // CertificateTemplate::pageDimensionsMm() the single-certificate print view uses)
+        // — via one CSS named page per distinct size. The first certificate's size is the
+        // plain @page fallback for a browser without named-page support, since a batch is
+        // normally one uniform template.
+        $__sheetSize = function (array $payload): array {
+            $layout = $payload['overlayLayout'] ?? (!empty($payload['template']) ? $payload['template']->overlayLayout() : \App\Models\CertificateTemplate::defaultBackgroundLayout());
+            $orientation = ($layout['orientation'] ?? 'landscape') === 'portrait' ? 'portrait' : 'landscape';
+            [$width, $height] = \App\Models\CertificateTemplate::pageDimensionsMm($layout, $orientation);
+
+            return ['name' => 'cert-'.(int) round($width * 10).'x'.(int) round($height * 10), 'width' => $width, 'height' => $height];
+        };
+        $__sheetSizes = $certificates->map(fn ($payload) => $__sheetSize($payload))->keyBy('name');
+        $__defaultSize = $__sheetSizes->first() ?? ['width' => 297.0, 'height' => 210.0];
     @endphp
     <style>
         * { box-sizing: border-box; }
@@ -114,6 +117,9 @@
         .actions { display: none; }
         .cert-sheet { padding-top: 24px; page-break-after: always; break-after: page; }
         .cert-sheet:last-child { page-break-after: auto; break-after: auto; }
+        @foreach($__sheetSizes as $__size)
+        .cert-sheet.{{ $__size['name'] }} { page: {{ $__size['name'] }}; }
+        @endforeach
         .toolbar {
             position: sticky; top: 0; z-index: 9999; text-align: center; padding: 14px;
             background: #0f172a; color: #fff; border-bottom: 1px solid #334155; display: flex; align-items: center; justify-content: center; gap: 12px;
@@ -127,37 +133,37 @@
         }
         .toolbar p { margin: 8px 0 0; font-size: 12px; color: #94a3b8; width: 100%; }
         @media print {
-            body { background: #ffffff !important; margin: 0 !important; padding: 0 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            html, body { background: #ffffff !important; margin: 0 !important; padding: 0 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             .no-print, .toolbar { display: none !important; }
-            .cert-sheet { padding-top: 0 !important; }
-            .page.has-background {
-                width: 297mm !important;
-                height: 210mm !important;
-                min-height: 210mm !important;
-                max-width: 297mm !important;
-                max-height: 210mm !important;
-                margin: 0 !important;
-                box-shadow: none !important;
-                page-break-after: always;
-                break-after: page;
-            }
+            {{-- Every certificate used to print followed by a blank page: .page carried its
+                 own break-after on top of .cert-sheet's, and a .page exactly one page tall
+                 spills past it by sub-pixel rounding. Same fix as the single-certificate
+                 view (certificate-print.blade.php): only the sheet breaks, and it's clipped
+                 to 1mm under the page height so rounding can never start another page. --}}
+            .cert-sheet { padding-top: 0 !important; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
+            .page,
+            .page.has-background,
             .page.has-background.portrait {
-                width: 210mm !important;
-                height: 297mm !important;
-                min-height: 297mm !important;
-                max-width: 210mm !important;
-                max-height: 297mm !important;
                 margin: 0 !important;
                 box-shadow: none !important;
-                page-break-after: always;
-                break-after: page;
+                page-break-after: auto;
+                break-after: auto;
             }
+            @foreach($__sheetSizes as $__size)
+            .cert-sheet.{{ $__size['name'] }} { height: {{ $__size['height'] - 1 }}mm; }
+            .cert-sheet.{{ $__size['name'] }} .page.has-background {
+                width: {{ $__size['width'] }}mm !important;
+                height: {{ $__size['height'] }}mm !important;
+                min-height: {{ $__size['height'] }}mm !important;
+                max-width: {{ $__size['width'] }}mm !important;
+                max-height: {{ $__size['height'] }}mm !important;
+            }
+            @endforeach
         }
-        @page { size: A4 {{ $__defaultOrientation }}; margin: 0; }
-        @page cert-landscape { size: A4 landscape; margin: 0; }
-        @page cert-portrait { size: A4 portrait; margin: 0; }
-        .cert-sheet.cert-page-landscape { page: cert-landscape; }
-        .cert-sheet.cert-page-portrait { page: cert-portrait; }
+        @page { size: {{ $__defaultSize['width'] }}mm {{ $__defaultSize['height'] }}mm; margin: 0; }
+        @foreach($__sheetSizes as $__size)
+        @page {{ $__size['name'] }} { size: {{ $__size['width'] }}mm {{ $__size['height'] }}mm; margin: 0; }
+        @endforeach
     </style>
 </head>
 <body>
@@ -187,11 +193,7 @@
     @include('fest.partials.certificate-fit-text-script')
 
     @forelse($certificates as $payload)
-        @php
-            $__layout = $payload['overlayLayout'] ?? (!empty($payload['template']) ? $payload['template']->overlayLayout() : \App\Models\CertificateTemplate::defaultBackgroundLayout());
-            $__orientation = ($__layout['orientation'] ?? 'landscape') === 'portrait' ? 'portrait' : 'landscape';
-        @endphp
-        <div class="cert-sheet cert-page-{{ $__orientation }}">
+        <div class="cert-sheet {{ $__sheetSize($payload)['name'] }}">
             @include('fest.partials.certificate-body', array_merge($payload, ['isSample' => true]))
         </div>
     @empty
