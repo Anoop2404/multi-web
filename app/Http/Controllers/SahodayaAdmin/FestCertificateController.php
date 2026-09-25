@@ -445,6 +445,92 @@ class FestCertificateController extends SahodayaAdminController
         ]));
     }
 
+    /**
+     * Downloadable rank tally (?format=pdf|xls): per item how many entries hold rank 1 / 2 / 3
+     * and the winner certificates to print, plus the same ranks rolled up by category —
+     * merit only, no participation-certificate or participation-entry columns. Same numbers
+     * as the tally page (certificateTally()).
+     */
+    public function tallyRankReport(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $tally = app(FestCertificateService::class)->certificateTally($event);
+
+        // certificateTally() carries the raw class_group/age_group key ("category_1");
+        // a printed report wants the scheme's short label ("Category 1").
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
+        $categoryLabel = function (?string $raw) use ($classGroupLabels): string {
+            if ($raw === null || $raw === '' || $raw === 'Open / all categories') {
+                return 'Open / all categories';
+            }
+            $label = FestClassGroupScheme::resolveItemLabel($classGroupLabels, $raw) ?: $raw;
+
+            return trim(explode(' — ', $label)[0]);
+        };
+
+        $rows = collect($tally['rows'])
+            ->map(fn (array $row) => $row + ['category_label' => $categoryLabel($row['category'])])
+            ->sort(fn (array $a, array $b) => strnatcasecmp($a['category_label'], $b['category_label']) ?: strnatcasecmp($a['title'], $b['title']))
+            ->values();
+        $summary = collect($tally['summary'])
+            ->map(fn (array $row) => ['category' => $categoryLabel($row['category'])] + $row)
+            ->values();
+        $totals = $tally['totals'];
+
+        $filenameBase = \App\Support\ReportFilename::build('rank-tally', $event->title, $event->event_start, [], 'pdf');
+
+        if ($request->query('format') === 'xls') {
+            $itemRows = $rows->map(fn (array $row, int $i) => [
+                $i + 1,
+                $row['title'],
+                $row['category_label'],
+                $row['is_team'] ? 'Team' : 'Individual',
+                $row['is_team'] ? "{$row['entry_count']} teams ({$row['member_count']} members)" : $row['entry_count'],
+                $row['rank_1'],
+                $row['rank_2'],
+                $row['rank_3'],
+                $row['rank_1'] + $row['rank_2'] + $row['rank_3'],
+                $row['winner_certs'],
+                $row['projected_winner_certs'],
+            ])->push([
+                '', 'All items', '', '', '',
+                $totals['rank_1'], $totals['rank_2'], $totals['rank_3'],
+                $totals['rank_1'] + $totals['rank_2'] + $totals['rank_3'],
+                $totals['winner_certs'], $totals['projected_winner_certs'],
+            ]);
+
+            $summaryRows = $summary->map(fn (array $row) => [
+                $row['category'], $row['items'], $row['rank_1'], $row['rank_2'], $row['rank_3'], $row['total'],
+            ])->push([
+                'All categories', $totals['items'], $totals['rank_1'], $totals['rank_2'], $totals['rank_3'],
+                $totals['rank_1'] + $totals['rank_2'] + $totals['rank_3'],
+            ]);
+
+            return \App\Support\ExcelExport::downloadMultiSheet(pathinfo($filenameBase, PATHINFO_FILENAME), [
+                'Rank tally' => [
+                    'headers' => ['Sl No', 'Item', 'Category', 'Type', 'Entries', 'Rank 1', 'Rank 2', 'Rank 3', 'Total placed', 'Winner certificates', 'Projected winner certificates (top 3)'],
+                    'rows' => $itemRows,
+                ],
+                'By category' => [
+                    'headers' => ['Category', 'Items', 'Rank 1', 'Rank 2', 'Rank 3', 'Total'],
+                    'rows' => $summaryRows,
+                ],
+            ], \App\Support\ExcelExport::generatedOnNote());
+        }
+
+        $html = view('fest.reports.rank-tally', [
+            'event' => $event,
+            'orgName' => $this->sahodaya->name,
+            'logoSrc' => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+            'rows' => $rows,
+            'summary' => $summary,
+            'totals' => $totals,
+        ])->render();
+
+        return PdfGenerator::download($html, $filenameBase, $request->boolean('inline'), true);
+    }
+
     public function generate(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

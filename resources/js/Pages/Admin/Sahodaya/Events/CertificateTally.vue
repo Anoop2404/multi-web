@@ -8,6 +8,9 @@
             <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates`" class="btn-secondary">
                 &larr; Certificates
             </Link>
+            <!-- Merit only: rank 1/2/3 and winner certificates per item + by category, no participation columns. -->
+            <a v-if="rows.length" :href="rankReportUrl('pdf')" class="btn-secondary">⬇ Rank tally report (PDF)</a>
+            <a v-if="rows.length" :href="rankReportUrl('xls')" class="btn-secondary">⬇ Rank tally report (Excel)</a>
         </div>
 
         <div v-if="childEvents.length" class="card !p-4 mb-5 flex flex-wrap items-center gap-2">
@@ -138,6 +141,10 @@ const props = defineProps({
     activityLogs: { type: Array, default: () => [] },
     childEvents: { type: Array, default: () => [] },
 });
+
+function rankReportUrl(format) {
+    return `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/tally/rank-report?format=${format}`;
+}
 
 function switchSportEvent(value) {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${value}/certificates/tally`);
