@@ -79,32 +79,28 @@
                     <span v-else>22 July 2026</span>
                 </div>
 
-                <!-- Signature blocks (per-event data; sample values shown here so the positions can be tuned) -->
+                <!-- Signature blocks: only the parts that have a value are drawn, exactly as on the
+                     printed certificate -- a blank name/designation/school/image shows nothing. -->
                 <template v-for="(blk, bi) in signatureBlocks" :key="`sig-${bi}`">
-                    <div v-if="blk.signature"
-                         class="absolute text-slate-400"
+                    <div v-if="blk.signature && (blk.signature_preview || (blk.signature_url && !blk.remove_signature))"
+                         class="absolute"
                          :style="overlayStyle(blk.signature, { top: 78, left: 72, width: 20, align: 'center' })">
-                        <img v-if="blk.signature_preview || (blk.signature_url && !blk.remove_signature)"
-                             :src="blk.signature_preview || blk.signature_url" alt="" :style="{ maxWidth: '100%', maxHeight: `${(Number(blk.signature.font_size) || 12) * 5}px` }">
-                        <span v-else class="inline-block border-b border-dashed border-slate-400 italic px-2" style="font-family: cursive;">Signature</span>
+                        <img :src="blk.signature_preview || blk.signature_url" alt="" :style="{ maxWidth: '100%', maxHeight: `${(Number(blk.signature.font_size) || 12) * 5}px` }">
                     </div>
-                    <div v-if="blk.name"
+                    <div v-if="blk.name && blk.name_text"
                          class="absolute text-slate-800"
-                         :class="{ 'opacity-40 italic': !blk.name_text }"
                          :style="overlayStyle(blk.name, { top: 86, left: 72, width: 20, font_size: 10, font_family: 'Montserrat', font_weight: 'bold', align: 'center' })">
-                        {{ blk.name_text || 'Name (set per event)' }}
+                        {{ blk.name_text }}
                     </div>
-                    <div v-if="blk.designation"
+                    <div v-if="blk.designation && blk.designation_text"
                          class="absolute text-slate-600"
-                         :class="{ 'opacity-40 italic': !blk.designation_text }"
                          :style="overlayStyle(blk.designation, { top: 89, left: 72, width: 20, font_size: 8, font_family: 'Montserrat', align: 'center' })">
-                        {{ blk.designation_text || 'Designation (set per event)' }}
+                        {{ blk.designation_text }}
                     </div>
-                    <div v-if="blk.school"
+                    <div v-if="blk.school && blk.school_text"
                          class="absolute text-slate-600"
-                         :class="{ 'opacity-40 italic': !blk.school_text }"
                          :style="overlayStyle(blk.school, { top: 92, left: 72, width: 20, font_size: 8, font_family: 'Montserrat', align: 'center' })">
-                        {{ blk.school_text || 'School name (set per event)' }}
+                        {{ blk.school_text }}
                     </div>
                 </template>
 
