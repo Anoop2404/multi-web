@@ -83,7 +83,7 @@ class FestFoodHostBillingController extends SchoolAdminController
         $schools = Tenant::whereIn('id', $bills->pluck('school_id')->unique())->pluck('name', 'id');
 
         return $this->inertia('School/Fest/FoodHostBilling', [
-            'event' => $event->only('id', 'title'),
+            'event' => $event->only('id', 'title', 'event_type', 'event_start', 'event_end', 'food_payee_type', 'food_host_school_id'),
             'hierarchy' => $event->hierarchyContext(),
             'bills' => $bills->map(fn (FestFoodBill $b) => [
                 'id' => $b->id,
@@ -112,7 +112,7 @@ class FestFoodHostBillingController extends SchoolAdminController
         $this->assertIsHost($event);
 
         return $this->inertia('School/Fest/FoodHostBillingReport', [
-            'event' => $event->only('id', 'title'),
+            'event' => $event->only('id', 'title', 'event_type', 'event_start', 'event_end', 'food_payee_type', 'food_host_school_id'),
             'hierarchy' => $event->hierarchyContext(),
             'report' => FestFoodOrderItem::dayMealReport($event->id, $this->school->id),
         ]);
@@ -170,7 +170,7 @@ class FestFoodHostBillingController extends SchoolAdminController
             ->get();
 
         return $this->inertia('School/Fest/FoodHostBillingShow', [
-            'event' => $event->only('id', 'title'),
+            'event' => $event->only('id', 'title', 'event_type', 'event_start', 'event_end', 'food_payee_type', 'food_host_school_id'),
             'hierarchy' => $event->hierarchyContext(),
             'bill' => [
                 ...$bill->only(['id', 'status', 'amount_total', 'amount_paid', 'notes']),

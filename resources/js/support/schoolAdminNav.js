@@ -216,7 +216,6 @@ function festToolItems(schoolId) {
         { label: 'Fest Hub (meal requests inside)', href: schoolAdminHref(schoolId, 'fest', 'hub'), icon: 'star' },
         { label: 'All fest reports', href: schoolAdminHref(schoolId, 'fest', 'reports'), icon: 'file-text', exact: true },
         { label: 'School Events', href: schoolAdminHref(schoolId, 'fest-programs'), icon: 'calendar' },
-        { label: 'Food Coupons', href: schoolAdminHref(schoolId, 'food-coupons'), icon: 'clipboard' },
         { label: 'Circulars', href: schoolAdminHref(schoolId, 'circulars'), icon: 'file-text' },
         { label: 'Notifications', href: schoolAdminHref(schoolId, 'notifications'), icon: 'bell' },
     ];

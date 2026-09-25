@@ -42,7 +42,7 @@ class FestFoodBillingController extends SahodayaAdminController
         $regionFoodSummary = $isPartitionedHub ? $partitions->combinedFoodSummary($event) : null;
 
         return $this->inertia('Sahodaya/Events/FoodBilling', $this->withEventActivity($event, FestPageActivity::FOOD_BILLING, [
-            'event' => $event->only('id', 'title', 'food_payee_type', 'food_host_school_id'),
+            'event' => $event->only('id', 'title', 'event_type', 'food_payee_type', 'food_host_school_id'),
             'hierarchy' => $event->hierarchyContext(),
             'hostSchoolName' => $hostSchoolName,
             'isPartitionedHub' => $isPartitionedHub,
@@ -169,7 +169,7 @@ class FestFoodBillingController extends SahodayaAdminController
             ->get();
 
         return $this->inertia('Sahodaya/Events/FoodBillingShow', $this->withEventActivity($event, FestPageActivity::FOOD_BILLING, [
-            'event' => $event->only('id', 'title'),
+            'event' => $event->only('id', 'title', 'event_type', 'food_payee_type', 'food_host_school_id'),
             'bill' => [
                 ...$bill->only(['id', 'status', 'payment_mode', 'payee_type', 'amount_total', 'amount_paid', 'notes']),
                 'balance_due' => $bill->balanceDue(),

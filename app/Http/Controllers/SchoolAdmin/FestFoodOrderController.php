@@ -85,7 +85,7 @@ class FestFoodOrderController extends SchoolAdminController
         }
 
         return $this->inertia('School/Fest/FoodOrder', [
-            'event' => $event->only('id', 'title', 'event_start', 'event_end'),
+            'event' => $event->only('id', 'title', 'event_type', 'event_start', 'event_end', 'food_payee_type', 'food_host_school_id'),
             'hierarchy' => $event->hierarchyContext(),
             'menuItems' => $menuItems,
             'mealTypes' => FestFoodMenuItem::MEAL_TYPES,

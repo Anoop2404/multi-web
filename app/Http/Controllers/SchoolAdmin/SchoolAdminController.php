@@ -98,7 +98,11 @@ abstract class SchoolAdminController extends Controller
 
         $program = $props['program'] ?? ($props['programMeta']['slug'] ?? null);
         if (! is_string($program) || $program === '') {
-            return $props;
+            if (! empty($event['event_type']) && is_string($event['event_type'])) {
+                $program = \App\Support\SchoolFestProgram::slugForEventType($event['event_type']);
+            } else {
+                return $props;
+            }
         }
 
         if (isset($props['eventHeadNav'], $props['programPrefix'])) {

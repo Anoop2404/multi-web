@@ -43,7 +43,7 @@ class FestFoodMenuController extends SahodayaAdminController
             ]);
 
         return $this->inertia('Sahodaya/Events/FoodMenu', $this->withEventActivity($event, FestPageActivity::FOOD_MENU, [
-            'event' => $event->only('id', 'title', 'event_start', 'event_end', 'food_payee_type', 'food_host_school_id', 'conducting_school_id', 'require_payment_for_coupons'),
+            'event' => $event->only('id', 'title', 'event_type', 'event_start', 'event_end', 'food_payee_type', 'food_host_school_id', 'conducting_school_id', 'require_payment_for_coupons'),
             'hierarchy' => $event->hierarchyContext(),
             'menuItems' => $items,
             'catalogItems' => $catalogItems,

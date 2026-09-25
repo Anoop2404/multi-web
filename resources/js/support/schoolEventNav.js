@@ -69,6 +69,34 @@ export function detectSchoolEventFromUrl(url) {
         }
     }
 
+    // Flat fest routes, e.g. /school-admin/{school}/fest/{event}/(food-order|food-host-billing|catering|house|appeals)
+    const flatFest = path.match(
+        /\/school-admin\/[^/]+\/fest\/(\d+)(?:\/|$)/,
+    );
+    if (flatFest) {
+        return {
+            programPrefix: null,
+            programSlug: null,
+            eventId: flatFest[1],
+        };
+    }
+
+    // Food coupons filtered by event: /school-admin/{school}/food-coupons?event_id=123
+    const coupons = path.match(
+        /\/school-admin\/[^/]+\/food-coupons(?:\/|$)/,
+    );
+    if (coupons) {
+        const params = new URL(full, 'http://local').searchParams;
+        const eventId = params.get('event_id');
+        if (eventId) {
+            return {
+                programPrefix: null,
+                programSlug: null,
+                eventId,
+            };
+        }
+    }
+
     return null;
 }
 
@@ -140,18 +168,16 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
         { label: 'Clash requests', href: `${eventBase}/clash-requests`, icon: 'alert-circle' },
         { label: 'Substitutions', href: `${eventBase}/substitution-requests`, icon: 'repeat' },
         { label: 'Fest day view', href: `${programBase}/fest-day/${eventId}`, icon: 'calendar' },
-        // Food ordering/billing lives under the flat /fest/{event}/... routes (same
-        // namespace as food coupons & catering), not under the program-prefixed
-        // /{program}/events/{id}/... routes used above.
-        { label: 'Food order', href: `/school-admin/${schoolId}/fest/${eventId}/food-order`, icon: 'clipboard' },
     );
 
-    // Only the school designated as the food payee for this event gets the billing
-    // management link — every other school just sees "Food order" above. If the
-    // Sahodaya is the payee (the default), no school gets a billing link at all; that's
-    // managed from the Sahodaya-admin side instead.
+    // Food & catering navigation: dedicated event-scoped section
+    const foodItems = [
+        { label: 'Food order', href: `/school-admin/${schoolId}/fest/${eventId}/food-order`, icon: 'clipboard' },
+        { label: 'Food coupons', href: `/school-admin/${schoolId}/food-coupons?event_id=${eventId}`, icon: 'hash' },
+    ];
+
     if (event?.food_payee_type === 'host_school' && String(event?.food_host_school_id) === String(schoolId)) {
-        workflowItems.push({ label: 'Food billing (host)', href: `/school-admin/${schoolId}/fest/${eventId}/food-host-billing`, icon: 'credit-card' });
+        foodItems.push({ label: 'Food billing (host)', href: `/school-admin/${schoolId}/fest/${eventId}/food-host-billing`, icon: 'credit-card' });
     }
 
     const groups = [
@@ -168,6 +194,10 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
         {
             section: event.title ?? 'This event',
             items: workflowItems,
+        },
+        {
+            section: 'Food & catering',
+            items: foodItems,
         },
     ];
 

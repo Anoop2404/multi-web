@@ -20,6 +20,7 @@ class FestFoodCouponController extends SchoolAdminController
             ->get(['id', 'title', 'event_start', 'status']);
 
         $eventId = request()->query('event_id') ? (int) request()->query('event_id') : null;
+        $event = $eventId ? FestEvent::find($eventId) : null;
 
         $coupons = FestFoodCoupon::where('school_id', $school->id)
             ->when($eventId, fn ($q) => $q->where('event_id', $eventId))
@@ -29,6 +30,7 @@ class FestFoodCouponController extends SchoolAdminController
 
         return $this->inertia('School/Fest/FoodCoupons', [
             'events'  => $events,
+            'event'   => $event ? $event->only('id', 'title', 'event_type', 'event_start', 'event_end') : null,
             'coupons' => $coupons,
             'filters' => ['event_id' => $eventId],
         ]);

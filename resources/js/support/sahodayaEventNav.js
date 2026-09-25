@@ -202,23 +202,19 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
     if (caps.houses) {
         adminItems.push({ label: 'Houses', href: `${base}/houses`, icon: 'building', permissions: FEST_MANAGE });
     }
-    if (caps.catering) {
-        // "(legacy)" — free headcount-only flow, superseded by Food menu/Food billing below.
-        // Kept for events already using it; not offered to new events. See
-        // docs/REGION_SCOPED_ADMIN_AND_EVENT_FLOW_PLAN.md §2.6.
-        adminItems.push({ label: 'Catering (legacy)', href: `${base}/catering`, icon: 'clipboard', permissions: FEST_CATERING });
-    }
-    if (caps.foodCoupons) {
-        // Not "(legacy)" — this page now issues from either the old catering flow or the
-        // new food-billing flow (issueFromBill()), and is the shared redemption/print UI.
-        adminItems.push({ label: 'Food coupons', href: `${base}/food-coupons`, icon: 'hash', permissions: FEST_CATERING });
-    }
-    adminItems.push(
+    groups.push({ section: 'Administration', items: adminItems });
+
+    const foodItems = [
         { label: 'Food menu', href: `${base}/food-menu`, icon: 'clipboard', permissions: FEST_CATERING },
         { label: 'Food billing', href: `${base}/food-billing`, icon: 'credit-card', permissions: FEST_CATERING },
-    );
-
-    groups.push({ section: 'Administration', items: adminItems });
+    ];
+    if (caps.foodCoupons) {
+        foodItems.push({ label: 'Food coupons', href: `${base}/food-coupons`, icon: 'hash', permissions: FEST_CATERING });
+    }
+    if (caps.catering) {
+        foodItems.push({ label: 'Catering (legacy)', href: `${base}/catering`, icon: 'clipboard', permissions: FEST_CATERING });
+    }
+    groups.push({ section: 'Food & catering', items: foodItems });
 
     if (programEvents.length) {
         const visible = programEvents.filter((ev) => String(ev.id) !== String(eventId)).slice(0, 4);

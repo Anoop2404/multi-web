@@ -1,234 +1,491 @@
 <template>
     <SahodayaEventsLayout :title="`${event.title} — Food Menu`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
-                         :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="`${event.title} — Food Menu`" eyebrow="Operations"
+                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
+        <PageHeader :title="`${event.title} — Food Menu & Catering`" eyebrow="Operations"
                     :description="isPartitionedHub
                         ? 'Build the food item catalog here, then apply it to every region below. Schools order and pay against their own region\'s event, not this hub.'
-                        : 'Define food items once, then assign them to breakfast, lunch, and other meal slots across the event\'s days. Schools order and pay from Food Billing.'" />
+                        : 'Manage dishes in your catalog, schedule meals across event dates, and configure where schools pay for their contingent food orders.'" />
 
         <EventHierarchyBadge :hierarchy="hierarchy" :hub-href="hubHref" />
 
-        <div class="flex flex-wrap gap-2 mb-6">
-            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/food-billing`" class="text-sm text-indigo-600">Food Billing →</Link>
-            <button v-if="isPartitionedHub" @click="syncToRegions" class="btn-secondary text-sm ml-auto">
-                Apply menu to all regions
-            </button>
+        <!-- Top Navigation & Quick Links -->
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+            <div class="flex items-center gap-2">
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/food-billing`"
+                      class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-xs">
+                    <span>💳</span> Food Billing & Invoices →
+                </Link>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/food-billing/report`"
+                      class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-xs">
+                    <span>📊</span> Kitchen Headcount Report →
+                </Link>
+            </div>
+            <div v-if="isPartitionedHub" class="flex items-center gap-2">
+                <button type="button" @click="syncToRegions" class="btn-secondary text-xs">
+                    Apply menu to all regions
+                </button>
+            </div>
         </div>
 
         <FoodRegionDrillDown v-if="isPartitionedHub" :sahodaya-id="sahodaya.id" :regions="foodRegionSummary"
                               target-path="food-menu" class="mb-6" />
 
-        <!-- Payee settings -->
-        <div class="card mb-6 max-w-xl">
-            <h3 class="section-title">Who food payments go to</h3>
-            <form @submit.prevent="savePayee" class="space-y-3 mt-3">
-                <div class="flex gap-4 text-sm">
-                    <label class="flex items-center gap-2">
-                        <input type="radio" value="sahodaya" v-model="payeeForm.food_payee_type"> Sahodaya (default)
-                    </label>
-                    <label class="flex items-center gap-2">
-                        <input type="radio" value="host_school" v-model="payeeForm.food_payee_type"> A host school
-                    </label>
-                </div>
-                <div v-if="payeeForm.food_payee_type === 'host_school'">
-                    <SearchableSelect v-model="payeeForm.food_host_school_id" :options="schoolOptions"
-                                      :all-option="true" all-label="— Select school —" />
-                    <p v-if="payeeForm.errors.food_host_school_id" class="text-xs text-red-600 mt-1">{{ payeeForm.errors.food_host_school_id }}</p>
-                    <p v-if="event.conducting_school_id" class="text-xs text-gray-400 mt-1">
-                        This event's conducting school is set — you can pick the same one here if that's who should be paid.
-                    </p>
-                    <div v-if="payeeForm.food_host_school_id" class="mt-3 rounded-lg border border-slate-200 p-3 space-y-2">
-                        <p class="text-sm font-semibold text-slate-700">Host school account details</p>
-                        <p class="text-xs text-gray-400">Shown to schools ordering food so they know where to pay. The school can also edit these itself under its Settings.</p>
-                        <input v-model="payeeForm.payment_bank_name" type="text" placeholder="Bank name" class="field">
-                        <input v-model="payeeForm.payment_account_no" type="text" placeholder="Account number" class="field font-mono">
-                        <input v-model="payeeForm.payment_ifsc" type="text" placeholder="IFSC" class="field font-mono uppercase">
-                        <input v-model="payeeForm.payment_upi" type="text" placeholder="UPI ID (e.g. school@upi)" class="field font-mono">
-                        <p v-for="f in ['payment_bank_name', 'payment_account_no', 'payment_ifsc', 'payment_upi']" :key="f"
-                           v-show="payeeForm.errors[f]" class="text-xs text-red-600">{{ payeeForm.errors[f] }}</p>
-                    </div>
-                </div>
-                <label class="flex items-center gap-2 text-sm">
-                    <input type="checkbox" v-model="payeeForm.require_payment_for_coupons">
-                    Only issue food coupons for settled (fully paid) bills
-                </label>
-                <button type="submit" class="btn-secondary text-sm" :disabled="payeeForm.processing">Save</button>
-            </form>
+        <!-- 3 Primary Navigation Tabs -->
+        <div class="border-b border-slate-200 mb-6">
+            <nav class="flex space-x-6" aria-label="Tabs">
+                <button type="button"
+                        @click="activeTab = 'schedule'"
+                        class="group inline-flex items-center gap-2 py-3 px-1 border-b-2 font-bold text-sm transition"
+                        :class="activeTab === 'schedule'
+                            ? 'border-indigo-600 text-indigo-600'
+                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'">
+                    <span class="text-base">📅</span>
+                    <span>Meal Schedule</span>
+                    <span class="rounded-full px-2 py-0.5 text-xs font-semibold"
+                          :class="activeTab === 'schedule' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'">
+                        {{ menuItems.length }}
+                    </span>
+                </button>
+
+                <button type="button"
+                        @click="activeTab = 'catalog'"
+                        class="group inline-flex items-center gap-2 py-3 px-1 border-b-2 font-bold text-sm transition"
+                        :class="activeTab === 'catalog'
+                            ? 'border-indigo-600 text-indigo-600'
+                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'">
+                    <span class="text-base">🍽️</span>
+                    <span>Food Catalog</span>
+                    <span class="rounded-full px-2 py-0.5 text-xs font-semibold"
+                          :class="activeTab === 'catalog' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'">
+                        {{ catalogItems.length }}
+                    </span>
+                </button>
+
+                <button type="button"
+                        @click="activeTab = 'payee'"
+                        class="group inline-flex items-center gap-2 py-3 px-1 border-b-2 font-bold text-sm transition"
+                        :class="activeTab === 'payee'
+                            ? 'border-indigo-600 text-indigo-600'
+                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'">
+                    <span class="text-base">💳</span>
+                    <span>Payee & Billing Settings</span>
+                </button>
+            </nav>
         </div>
 
-        <!-- Step 1 + 2: build the food-item catalog, then assign items to meal slots -->
-        <div class="grid lg:grid-cols-2 gap-6 mb-8">
-            <div class="card space-y-4">
-                <div>
-                    <h3 class="section-title flex items-center gap-2"><span aria-hidden="true">🍽️</span> Food items</h3>
-                    <p class="section-desc">Define each dish once — name, description, price. Assign it to meal slots on the right, as many times as it's served.</p>
-                </div>
-
-                <form @submit.prevent="addCatalogItem" class="grid sm:grid-cols-2 gap-2 p-3 rounded-xl border border-slate-200 bg-slate-50/60">
-                    <input v-model="catalogForm.name" type="text" placeholder="Item name (e.g. Idli)" class="field text-sm sm:col-span-2">
-                    <p v-if="catalogForm.errors.name" class="text-xs text-red-600 sm:col-span-2 -mt-1">{{ catalogForm.errors.name }}</p>
-                    <input v-model="catalogForm.description" type="text" placeholder="Description (optional)" class="field text-sm sm:col-span-2">
-                    <input v-model="catalogForm.default_price" type="number" min="0" step="0.01" placeholder="Price (₹)" class="field text-sm">
-                    <button type="submit" class="btn-primary text-sm" :disabled="catalogForm.processing || !catalogForm.name || !catalogForm.default_price">
-                        Add item
+        <!-- ========================================== -->
+        <!-- TAB 1: MEAL SCHEDULE BY DATE               -->
+        <!-- ========================================== -->
+        <div v-if="activeTab === 'schedule'" class="space-y-6">
+            <!-- Schedule Action & Filter Bar -->
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm">
+                <!-- Date Filter Pills -->
+                <div class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1">Filter Date:</span>
+                    <button type="button" @click="selectedDate = 'all'"
+                            class="px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition"
+                            :class="selectedDate === 'all' ? 'bg-slate-900 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'">
+                        All Dates ({{ allDates.length }})
                     </button>
-                    <p v-if="catalogForm.errors.default_price" class="text-xs text-red-600 sm:col-span-2 -mt-1">{{ catalogForm.errors.default_price }}</p>
-                </form>
-
-                <div v-if="catalogItems.length" class="divide-y divide-slate-100 rounded-xl border border-slate-200 max-h-[26rem] overflow-y-auto">
-                    <div v-for="c in catalogItems" :key="c.id" class="p-3 hover:bg-slate-50/60">
-                        <form v-if="editingCatalogId === c.id" @submit.prevent="saveCatalogEdit(c)" class="grid grid-cols-2 gap-2 text-xs">
-                            <input v-model="catalogEditForm.name" type="text" class="field text-xs col-span-2" placeholder="Name">
-                            <input v-model="catalogEditForm.description" type="text" class="field text-xs col-span-2" placeholder="Description">
-                            <input v-model="catalogEditForm.default_price" type="number" min="0" step="0.01" class="field text-xs">
-                            <label class="flex items-center gap-1 text-xs text-slate-600"><input type="checkbox" v-model="catalogEditForm.is_active"> Active</label>
-                            <div class="col-span-2 flex gap-3">
-                                <button type="submit" class="text-xs font-semibold text-indigo-600">Save</button>
-                                <button type="button" class="text-xs text-slate-500" @click="editingCatalogId = null">Cancel</button>
-                            </div>
-                        </form>
-                        <div v-else class="flex items-start justify-between gap-3">
-                            <div class="min-w-0">
-                                <p class="font-semibold text-sm text-slate-900" :class="{ 'text-slate-400': !c.is_active }">{{ c.name }}</p>
-                                <p v-if="c.description" class="text-xs text-slate-500">{{ c.description }}</p>
-                                <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
-                                    <span class="font-semibold text-slate-700">₹{{ Number(c.default_price).toFixed(2) }}</span>
-                                    <span class="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 border border-indigo-100">
-                                        {{ c.slots_count }} slot{{ c.slots_count === 1 ? '' : 's' }}
-                                    </span>
-                                    <span v-if="!c.is_active" class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 border border-slate-200">Inactive</span>
-                                </div>
-                            </div>
-                            <div class="flex gap-3 shrink-0 text-xs">
-                                <button class="font-semibold text-indigo-600" @click="startCatalogEdit(c)">Edit</button>
-                                <button class="font-semibold text-red-500" @click="removeCatalogItem(c)">Remove</button>
-                            </div>
-                        </div>
-                    </div>
+                    <button v-for="d in allDates" :key="d" type="button" @click="selectedDate = d"
+                            class="px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition"
+                            :class="selectedDate === d ? 'bg-indigo-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'">
+                        📅 {{ formatCalendarDate(d) }}
+                    </button>
                 </div>
-                <p v-else class="text-sm text-slate-400">No food items yet — add your first one above.</p>
+
+                <button type="button" @click="openAssignModal(null, null)"
+                        class="btn-primary text-xs font-bold px-4 py-2 shrink-0 justify-center shadow-sm">
+                    <span>➕</span> Assign Dishes to Meal Slot
+                </button>
             </div>
 
-            <div class="card space-y-4">
-                <div>
-                    <h3 class="section-title flex items-center gap-2"><span aria-hidden="true">📋</span> Assign items to a meal</h3>
-                    <p class="section-desc">Select items below, pick a date and meal, then assign. Assigning the same item to a slot twice is safely skipped.</p>
+            <!-- Grouped Scheduled Items -->
+            <div v-for="group in filteredGroupedItems" :key="group.date" class="space-y-6">
+                <div class="flex items-center gap-3 border-b-2 border-slate-200 pb-2">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm">
+                        📅
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-extrabold text-slate-900">{{ formatCalendarDate(group.date) }}</h2>
+                        <p class="text-xs text-slate-500">{{ group.meals.reduce((acc, m) => acc + m.items.length, 0) }} item(s) scheduled</p>
+                    </div>
                 </div>
 
-                <div v-if="catalogItems.length === 0" class="text-sm text-slate-400">Add a food item on the left first.</div>
-                <template v-else>
-                    <input v-model="catalogSearch" type="search" class="field text-sm" placeholder="Search food items…">
-
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <SearchableSelect v-if="eventDates.length" v-model="assignForm.menu_date" :options="eventDateOptions"
-                                              :all-option="true" all-label="— Date —" />
-                            <input v-else v-model="assignForm.menu_date" type="date" class="field text-sm"
-                                   :min="event.event_start" :max="event.event_end">
+                <div v-for="mealGroup in group.meals" :key="mealGroup.mealType" class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700 bg-slate-100 px-3 py-1.5 rounded-lg">
+                            <span class="text-base" aria-hidden="true">{{ mealIcon(mealGroup.mealType) }}</span>
+                            <span>{{ mealTypes[mealGroup.mealType] || mealGroup.mealType }}</span>
+                            <span class="text-slate-400 font-normal">({{ mealGroup.items.length }})</span>
                         </div>
-                        <SearchableSelect v-model="assignForm.meal_type" :options="mealTypeOptions"
-                                          :all-option="true" all-label="— Meal —" />
+                        <button type="button" @click="openAssignModal(group.date, mealGroup.mealType)"
+                                class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+                            + Add dish to this {{ mealTypes[mealGroup.mealType] || mealGroup.mealType }}
+                        </button>
                     </div>
-                    <p v-if="assignForm.errors.menu_date" class="text-xs text-red-600 -mt-2">{{ assignForm.errors.menu_date }}</p>
-                    <p v-if="assignForm.errors.meal_type" class="text-xs text-red-600 -mt-2">{{ assignForm.errors.meal_type }}</p>
 
-                    <button type="button" class="btn-primary text-sm w-full justify-center"
-                            :disabled="selectedCatalogIds.length === 0 || !assignForm.menu_date || !assignForm.meal_type || assignForm.processing"
-                            @click="assignCatalogItems">
-                        Assign ({{ selectedCatalogIds.length }})
-                    </button>
-
-                    <p class="text-xs text-slate-400">{{ filteredCatalogItems.length }} of {{ catalogItems.length }} item(s)</p>
-
-                    <div class="max-h-80 overflow-y-auto rounded-xl border border-slate-200">
-                        <table class="data-table">
-                            <thead class="sticky top-0">
-                                <tr>
-                                    <th class="w-8"><input type="checkbox" :checked="allCatalogSelected" @change="toggleSelectAllCatalog"></th>
-                                    <th>Item</th>
-                                    <th>Price</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="c in filteredCatalogItems" :key="c.id">
-                                    <td class="align-top"><input type="checkbox" :value="c.id" v-model="selectedCatalogIds"></td>
-                                    <td>
-                                        {{ c.name }}
-                                        <span v-if="!c.is_active" class="ml-1 text-[10px] text-slate-400">(inactive)</span>
-                                    </td>
-                                    <td class="text-slate-600">₹{{ Number(c.default_price).toFixed(2) }}</td>
-                                </tr>
-                                <tr v-if="filteredCatalogItems.length === 0">
-                                    <td colspan="3" class="p-4 text-center text-sm text-slate-400">No items match "{{ catalogSearch }}".</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </template>
-            </div>
-        </div>
-
-        <!-- Scheduled menu, grouped by day then by meal (in breakfast → lunch → snacks →
-             tea → dinner → other order — see FestFoodMenuItem::MEAL_TYPES, the source of
-             truth both here and on the school-facing FoodOrder page). -->
-        <div>
-            <h3 class="section-title mb-3">Scheduled menu</h3>
-            <div v-for="group in groupedItems" :key="group.date" class="mb-6 last:mb-0">
-                <p class="text-sm font-bold text-slate-800 mb-3">{{ formatCalendarDate(group.date) }}</p>
-                <div v-for="mealGroup in group.meals" :key="mealGroup.mealType" class="mb-5 last:mb-0">
-                    <div class="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        <span aria-hidden="true">{{ mealIcon(mealGroup.mealType) }}</span>
-                        <span>{{ mealTypes[mealGroup.mealType] || mealGroup.mealType }}</span>
-                    </div>
-                    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <FoodItemCard v-for="item in mealGroup.items" :key="item.id"
                                       :name="item.name" :description="item.description" :price="Number(item.price)"
                                       :icon="mealIcon(mealGroup.mealType)" :muted="!item.is_available"
                                       :badges="menuItemBadges(item)">
                             <template #corner>
-                                <span class="status-pill bg-slate-100 text-slate-500">#{{ item.sort_order }}</span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/60">
+                                    #{{ item.sort_order }}
+                                </span>
                             </template>
                             <template #actions>
-                                <button class="text-xs font-semibold text-indigo-600" @click="startEdit(item)">Edit</button>
-                                <button class="text-xs font-semibold text-red-500" @click="removeItem(item)">Remove</button>
+                                <button type="button" class="text-xs font-semibold text-indigo-600 hover:underline" @click="startEdit(item)">Edit</button>
+                                <button type="button" class="text-xs font-semibold text-rose-600 hover:underline" @click="removeItem(item)">Remove</button>
                             </template>
                         </FoodItemCard>
                     </div>
                 </div>
             </div>
-            <EmptyState v-if="!menuItems.length" title="Nothing scheduled yet"
-                        description="Assign a food item to a date and meal above to build the schedule." />
+
+            <!-- Empty State for Schedule -->
+            <div v-if="filteredGroupedItems.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-12 text-center">
+                <span class="text-4xl">📅</span>
+                <h3 class="text-base font-bold text-slate-800 mt-3">Nothing scheduled yet</h3>
+                <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                    {{ catalogItems.length === 0
+                        ? 'Add dishes to your Food Catalog first, then assign them to dates and meal slots.'
+                        : 'Assign dishes from your catalog to specific dates (Breakfast, Lunch, etc.) so schools can order them.' }}
+                </p>
+                <div class="mt-4 flex justify-center gap-3">
+                    <button v-if="catalogItems.length === 0" type="button" @click="activeTab = 'catalog'" class="btn-primary text-xs">
+                        Go to Food Catalog →
+                    </button>
+                    <button v-else type="button" @click="openAssignModal(null, null)" class="btn-primary text-xs">
+                        Assign Dishes Now
+                    </button>
+                </div>
+            </div>
         </div>
 
-        <Modal :show="editingId !== null" title="Edit menu item" size="lg" @close="cancelEdit">
-            <form v-if="editingItem" id="edit-menu-item-form" @submit.prevent="saveEdit(editingItem)" class="form-stack">
-                <FormField label="Item name">
-                    <template #default="{ id }"><input :id="id" v-model="editForm.name" type="text" class="field text-sm"></template>
+        <!-- ========================================== -->
+        <!-- TAB 2: FOOD CATALOG                        -->
+        <!-- ========================================== -->
+        <div v-if="activeTab === 'catalog'" class="space-y-6">
+            <div class="grid lg:grid-cols-3 gap-6 items-start">
+                <!-- Add New Catalog Item Form -->
+                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+                    <div>
+                        <h3 class="font-bold text-base text-slate-900 flex items-center gap-2">
+                            <span>🍽️</span> Add New Dish
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-1">
+                            Define a dish once in the master catalog with its name and default price. You can schedule it across multiple dates and meals.
+                        </p>
+                    </div>
+
+                    <form @submit.prevent="addCatalogItem" class="space-y-3">
+                        <div>
+                            <label class="text-xs font-semibold text-slate-700 block mb-1">Dish Name *</label>
+                            <input v-model="catalogForm.name" type="text" placeholder="e.g. Chicken Biriyani, Veg Meals, Tea" class="field text-xs w-full" required>
+                            <p v-if="catalogForm.errors.name" class="text-xs text-rose-600 mt-1">{{ catalogForm.errors.name }}</p>
+                        </div>
+
+                        <div>
+                            <label class="text-xs font-semibold text-slate-700 block mb-1">Description (Optional)</label>
+                            <input v-model="catalogForm.description" type="text" placeholder="e.g. Served with raita & pickle" class="field text-xs w-full">
+                        </div>
+
+                        <div>
+                            <label class="text-xs font-semibold text-slate-700 block mb-1">Default Price (₹) *</label>
+                            <input v-model="catalogForm.default_price" type="number" min="0" step="0.01" placeholder="100.00" class="field text-xs w-full" required>
+                            <p v-if="catalogForm.errors.default_price" class="text-xs text-rose-600 mt-1">{{ catalogForm.errors.default_price }}</p>
+                        </div>
+
+                        <!-- Veg / Non-veg preview -->
+                        <div v-if="catalogForm.name" class="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
+                            <span class="text-slate-500">Diet Type Detected:</span>
+                            <VegBadge :name="catalogForm.name" :description="catalogForm.description" show-label />
+                        </div>
+
+                        <button type="submit" class="btn-primary w-full text-xs font-bold py-2.5 justify-center shadow-xs"
+                                :disabled="catalogForm.processing || !catalogForm.name || !catalogForm.default_price">
+                            {{ catalogForm.processing ? 'Adding to catalog…' : 'Add Dish to Catalog' }}
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Catalog Dishes Explorer -->
+                <div class="lg:col-span-2 rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                    <!-- Explorer Header -->
+                    <div class="p-4 border-b border-slate-200 bg-slate-50/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                        <div>
+                            <h3 class="font-bold text-sm text-slate-900">Master Catalog Dishes</h3>
+                            <p class="text-xs text-slate-500">{{ catalogItems.length }} dishes registered</p>
+                        </div>
+                        <input v-model="catalogSearch" type="search" placeholder="Search catalog dishes…"
+                               class="field text-xs max-w-xs">
+                    </div>
+
+                    <!-- Dishes List / Table -->
+                    <div class="divide-y divide-slate-100 max-h-[32rem] overflow-y-auto">
+                        <div v-for="c in filteredCatalogItems" :key="c.id" class="p-4 hover:bg-slate-50/80 transition">
+                            <!-- Inline Edit Mode -->
+                            <form v-if="editingCatalogId === c.id" @submit.prevent="saveCatalogEdit(c)" class="space-y-2">
+                                <div class="grid grid-cols-2 gap-2 text-xs">
+                                    <input v-model="catalogEditForm.name" type="text" class="field text-xs col-span-2" placeholder="Name" required>
+                                    <input v-model="catalogEditForm.description" type="text" class="field text-xs col-span-2" placeholder="Description">
+                                    <input v-model="catalogEditForm.default_price" type="number" min="0" step="0.01" class="field text-xs" placeholder="Price" required>
+                                    <label class="flex items-center gap-1.5 text-xs text-slate-700">
+                                        <input type="checkbox" v-model="catalogEditForm.is_active"> Active in catalog
+                                    </label>
+                                </div>
+                                <div class="flex gap-2 justify-end pt-1">
+                                    <button type="button" class="btn-secondary text-xs py-1" @click="editingCatalogId = null">Cancel</button>
+                                    <button type="submit" class="btn-primary text-xs py-1">Save Dish</button>
+                                </div>
+                            </form>
+
+                            <!-- Normal Card Display -->
+                            <div v-else class="flex items-start justify-between gap-4">
+                                <div class="flex items-start gap-3 min-w-0">
+                                    <div class="mt-0.5">
+                                        <VegBadge :name="c.name" :description="c.description" />
+                                    </div>
+                                    <div class="min-w-0">
+                                        <h4 class="font-bold text-sm text-slate-900" :class="{ 'text-slate-400': !c.is_active }">{{ c.name }}</h4>
+                                        <p v-if="c.description" class="text-xs text-slate-500 mt-0.5 line-clamp-1">{{ c.description }}</p>
+                                        <div class="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+                                            <span class="font-extrabold text-slate-900">₹{{ Number(c.default_price).toFixed(2) }}</span>
+                                            <span class="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 border border-indigo-100">
+                                                Used in {{ c.slots_count }} slot{{ c.slots_count === 1 ? '' : 's' }}
+                                            </span>
+                                            <span v-if="!c.is_active" class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 border border-slate-200">
+                                                Inactive
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 shrink-0 text-xs">
+                                    <button type="button" class="font-semibold text-indigo-600 hover:text-indigo-800" @click="startCatalogEdit(c)">Edit</button>
+                                    <button type="button" class="font-semibold text-rose-600 hover:text-rose-800" @click="removeCatalogItem(c)">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-if="filteredCatalogItems.length === 0" class="p-8 text-center text-slate-400 text-sm">
+                            No dishes found matching "{{ catalogSearch }}".
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 3: PAYEE & BILLING SETTINGS            -->
+        <!-- ========================================== -->
+        <div v-if="activeTab === 'payee'" class="max-w-3xl space-y-6">
+            <form @submit.prevent="savePayee" class="space-y-6">
+                <!-- Section 1: Payee Designation -->
+                <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+                    <div>
+                        <h3 class="font-bold text-base text-slate-900 flex items-center gap-2">
+                            <span>🏛️</span> Food Payments Payee
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-1">
+                            Choose who receives the food bill payments from schools and handles payment verification.
+                        </p>
+                    </div>
+
+                    <div class="grid sm:grid-cols-2 gap-3">
+                        <label class="relative flex flex-col p-4 rounded-xl border-2 cursor-pointer transition"
+                               :class="payeeForm.food_payee_type === 'sahodaya'
+                                   ? 'border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-200'
+                                   : 'border-slate-200 hover:border-slate-300 bg-white'">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-bold text-sm text-slate-900">Sahodaya Office</span>
+                                <input type="radio" value="sahodaya" v-model="payeeForm.food_payee_type" class="text-indigo-600">
+                            </div>
+                            <p class="text-xs text-slate-500 leading-relaxed">
+                                Schools pay directly into the Sahodaya bank account or UPI QR code configured in Sahodaya Settings.
+                            </p>
+                        </label>
+
+                        <label class="relative flex flex-col p-4 rounded-xl border-2 cursor-pointer transition"
+                               :class="payeeForm.food_payee_type === 'host_school'
+                                   ? 'border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-200'
+                                   : 'border-slate-200 hover:border-slate-300 bg-white'">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-bold text-sm text-slate-900">Designated Host School</span>
+                                <input type="radio" value="host_school" v-model="payeeForm.food_payee_type" class="text-indigo-600">
+                            </div>
+                            <p class="text-xs text-slate-500 leading-relaxed">
+                                A specific school venue hosts the event and manages catering payments from their own dashboard.
+                            </p>
+                        </label>
+                    </div>
+
+                    <!-- Host School Account Details -->
+                    <div v-if="payeeForm.food_payee_type === 'host_school'" class="pt-3 border-t border-slate-100 space-y-3">
+                        <div>
+                            <label class="text-xs font-semibold text-slate-700 block mb-1">Select Host School *</label>
+                            <SearchableSelect v-model="payeeForm.food_host_school_id" :options="schoolOptions"
+                                              :all-option="true" all-label="— Select host school —" />
+                            <p v-if="payeeForm.errors.food_host_school_id" class="text-xs text-rose-600 mt-1">{{ payeeForm.errors.food_host_school_id }}</p>
+                        </div>
+
+                        <div v-if="payeeForm.food_host_school_id" class="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
+                            <div>
+                                <h4 class="font-bold text-xs uppercase tracking-wider text-slate-700">Host School Bank & UPI Account</h4>
+                                <p class="text-xs text-slate-500 mt-0.5">
+                                    These details are displayed to ordering schools on their food checkout page.
+                                </p>
+                            </div>
+                            <div class="grid sm:grid-cols-2 gap-3 text-xs">
+                                <div>
+                                    <label class="font-semibold text-slate-700 block mb-1">Bank Name</label>
+                                    <input v-model="payeeForm.payment_bank_name" type="text" placeholder="e.g. State Bank of India" class="field text-xs w-full">
+                                </div>
+                                <div>
+                                    <label class="font-semibold text-slate-700 block mb-1">Account Number</label>
+                                    <input v-model="payeeForm.payment_account_no" type="text" placeholder="e.g. 10482910482" class="field text-xs w-full font-mono">
+                                </div>
+                                <div>
+                                    <label class="font-semibold text-slate-700 block mb-1">IFSC Code</label>
+                                    <input v-model="payeeForm.payment_ifsc" type="text" placeholder="e.g. SBIN0001234" class="field text-xs w-full font-mono uppercase">
+                                </div>
+                                <div>
+                                    <label class="font-semibold text-slate-700 block mb-1">UPI ID</label>
+                                    <input v-model="payeeForm.payment_upi" type="text" placeholder="e.g. schoolname@upi" class="field text-xs w-full font-mono">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 2: Coupon Issuance Policy -->
+                <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-3">
+                    <h3 class="font-bold text-base text-slate-900 flex items-center gap-2">
+                        <span>🎟️</span> Coupon Issuance Rule
+                    </h3>
+                    <label class="flex items-start gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/60 cursor-pointer hover:bg-slate-50 transition">
+                        <input type="checkbox" v-model="payeeForm.require_payment_for_coupons" class="mt-0.5 text-indigo-600 rounded">
+                        <div>
+                            <span class="font-bold text-xs text-slate-800 block">Only issue food coupons for settled (fully paid) bills</span>
+                            <span class="text-xs text-slate-500 mt-0.5 block leading-relaxed">
+                                When checked, meal coupons cannot be distributed or printed until the school's total food bill has been verified and settled.
+                            </span>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="flex justify-end">
+                    <button type="submit" class="btn-primary text-xs font-bold px-6 py-2.5 shadow-sm" :disabled="payeeForm.processing">
+                        {{ payeeForm.processing ? 'Saving settings…' : 'Save Payee & Billing Settings' }}
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- MODAL: ASSIGN DISHES TO MEAL SLOT          -->
+        <!-- ========================================== -->
+        <Modal :show="showAssignModal" title="Assign Dishes to Meal Slot" size="lg" @close="showAssignModal = false">
+            <div class="space-y-4">
+                <p class="text-xs text-slate-500">
+                    Pick a date and meal slot, then select which dishes from the master catalog should be served.
+                </p>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs font-semibold text-slate-700 block mb-1">Date *</label>
+                        <SearchableSelect v-if="eventDates.length" v-model="assignForm.menu_date" :options="eventDateOptions"
+                                          :all-option="true" all-label="— Select Date —" />
+                        <input v-else v-model="assignForm.menu_date" type="date" class="field text-xs w-full"
+                               :min="event.event_start" :max="event.event_end">
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-slate-700 block mb-1">Meal Slot *</label>
+                        <SearchableSelect v-model="assignForm.meal_type" :options="mealTypeOptions"
+                                          :all-option="true" all-label="— Select Meal —" />
+                    </div>
+                </div>
+
+                <!-- Catalog Items Selection Table -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="font-bold text-slate-700">Select Dishes ({{ selectedCatalogIds.length }} selected)</span>
+                        <input v-model="catalogSearch" type="search" placeholder="Search dishes…" class="field text-xs py-1 max-w-[12rem]">
+                    </div>
+
+                    <div class="max-h-64 overflow-y-auto rounded-xl border border-slate-200">
+                        <table class="data-table text-xs">
+                            <thead class="sticky top-0 bg-slate-50">
+                                <tr>
+                                    <th class="w-8"><input type="checkbox" :checked="allCatalogSelected" @change="toggleSelectAllCatalog"></th>
+                                    <th>Dish</th>
+                                    <th>Price</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="c in filteredCatalogItems" :key="c.id" class="hover:bg-slate-50/70">
+                                    <td class="align-middle"><input type="checkbox" :value="c.id" v-model="selectedCatalogIds"></td>
+                                    <td>
+                                        <div class="flex items-center gap-2">
+                                            <VegBadge :name="c.name" :description="c.description" />
+                                            <span class="font-semibold text-slate-900">{{ c.name }}</span>
+                                            <span v-if="!c.is_active" class="text-[10px] text-slate-400">(inactive)</span>
+                                        </div>
+                                    </td>
+                                    <td class="font-bold text-slate-800">₹{{ Number(c.default_price).toFixed(2) }}</td>
+                                </tr>
+                                <tr v-if="filteredCatalogItems.length === 0">
+                                    <td colspan="3" class="p-6 text-center text-slate-400">No dishes match "{{ catalogSearch }}".</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <template #footer>
+                <button type="button" class="btn-secondary text-xs" @click="showAssignModal = false">Cancel</button>
+                <button type="button" class="btn-primary text-xs font-bold"
+                        :disabled="selectedCatalogIds.length === 0 || !assignForm.menu_date || !assignForm.meal_type || assignForm.processing"
+                        @click="executeAssign">
+                    {{ assignForm.processing ? 'Assigning…' : `Assign (${selectedCatalogIds.length}) to Schedule` }}
+                </button>
+            </template>
+        </Modal>
+
+        <!-- ========================================== -->
+        <!-- MODAL: EDIT SCHEDULED ITEM                 -->
+        <!-- ========================================== -->
+        <Modal :show="editingId !== null" title="Edit Scheduled Menu Item" size="md" @close="cancelEdit">
+            <form v-if="editingItem" id="edit-menu-item-form" @submit.prevent="saveEdit(editingItem)" class="space-y-3">
+                <FormField label="Item Name">
+                    <template #default="{ id }"><input :id="id" v-model="editForm.name" type="text" class="field text-xs w-full" required></template>
                 </FormField>
                 <div class="grid grid-cols-2 gap-3">
-                    <FormField label="Meal">
+                    <FormField label="Meal Slot">
                         <template #default="{ id }">
                             <SearchableSelect :id="id" v-model="editForm.meal_type" :options="mealTypeOptions" :all-option="false" placeholder="Select meal" />
                         </template>
                     </FormField>
-                    <FormField label="Sort order">
-                        <template #default="{ id }"><input :id="id" v-model="editForm.sort_order" type="number" min="0" class="field text-sm"></template>
+                    <FormField label="Sort Order">
+                        <template #default="{ id }"><input :id="id" v-model="editForm.sort_order" type="number" min="0" class="field text-xs w-full"></template>
                     </FormField>
                     <FormField label="Price (₹)">
-                        <template #default="{ id }"><input :id="id" v-model="editForm.price" type="number" min="0" step="0.01" class="field text-sm"></template>
+                        <template #default="{ id }"><input :id="id" v-model="editForm.price" type="number" min="0" step="0.01" class="field text-xs w-full" required></template>
                     </FormField>
-                    <FormField label="Max per school" hint="Leave blank for no limit">
-                        <template #default="{ id }"><input :id="id" v-model="editForm.max_per_school" type="number" min="1" class="field text-sm"></template>
+                    <FormField label="Max Per School" hint="Leave blank for no limit">
+                        <template #default="{ id }"><input :id="id" v-model="editForm.max_per_school" type="number" min="1" class="field text-xs w-full"></template>
                     </FormField>
                 </div>
-                <label class="choice-chip" :class="editForm.is_available ? 'choice-chip--checked' : ''">
-                    <input type="checkbox" v-model="editForm.is_available" class="choice-chip-input">
-                    <span class="choice-chip-label">Available for schools to order</span>
+                <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 bg-slate-50/60 cursor-pointer">
+                    <input type="checkbox" v-model="editForm.is_available" class="text-indigo-600 rounded">
+                    <span class="text-xs font-semibold text-slate-800">Available for schools to order</span>
                 </label>
             </form>
             <template #footer>
-                <button type="button" class="btn-secondary text-sm" @click="cancelEdit">Cancel</button>
-                <button type="submit" form="edit-menu-item-form" class="btn-primary text-sm">Save changes</button>
+                <button type="button" class="btn-secondary text-xs" @click="cancelEdit">Cancel</button>
+                <button type="submit" form="edit-menu-item-form" class="btn-primary text-xs font-bold">Save Changes</button>
             </template>
         </Modal>
 
@@ -245,13 +502,19 @@ import EventHierarchyBadge from '@/Components/fest/EventHierarchyBadge.vue';
 import FoodRegionDrillDown from '@/Components/sahodaya/FoodRegionDrillDown.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import FoodItemCard from '@/Components/food/FoodItemCard.vue';
+import VegBadge from '@/Components/food/VegBadge.vue';
+import Modal from '@/Components/ui/Modal.vue';
+import FormField from '@/Components/ui/FormField.vue';
 import { mealIcon } from '@/support/mealIcons.js';
 import { formatCalendarDate } from '@/support/calendarDates.js';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
-    sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
-    event: Object, menuItems: { type: Array, default: () => [] },
+    sahodaya: Object,
+    publicUrl: String,
+    pendingPaymentsCount: Number,
+    event: Object,
+    menuItems: { type: Array, default: () => [] },
     catalogItems: { type: Array, default: () => [] },
     hierarchy: { type: Object, default: null },
     mealTypes: { type: Object, default: () => ({}) },
@@ -269,16 +532,23 @@ const hubHref = computed(() => (
 ));
 const { confirm } = useConfirm();
 
+// Tab state: 'schedule' | 'catalog' | 'payee'
+const activeTab = ref('schedule');
+const selectedDate = ref('all');
+const showAssignModal = ref(false);
+
 function syncToRegions() {
     router.post(`${base}/food-menu/sync-to-regions`, {}, { preserveScroll: true });
 }
 
+// --- Payee Settings ---
 const payeeForm = useForm({
     food_payee_type: props.event.food_payee_type || 'sahodaya',
     food_host_school_id: props.event.food_host_school_id || '',
     require_payment_for_coupons: props.event.require_payment_for_coupons || false,
     payment_bank_name: '', payment_account_no: '', payment_ifsc: '', payment_upi: '',
 });
+
 function fillHostPayment(schoolId) {
     const d = props.schoolPaymentDetails?.[schoolId] ?? {};
     payeeForm.payment_bank_name = d.bank_name ?? '';
@@ -288,11 +558,12 @@ function fillHostPayment(schoolId) {
 }
 fillHostPayment(payeeForm.food_host_school_id);
 watch(() => payeeForm.food_host_school_id, fillHostPayment);
+
 function savePayee() {
     payeeForm.put(`${base}/food-menu-payee`, { preserveScroll: true });
 }
 
-// --- Food item catalog: define once, reuse across as many meal slots as needed ---
+// --- Food Catalog ---
 const catalogForm = useForm({ name: '', description: '', default_price: '' });
 function addCatalogItem() {
     catalogForm.post(`${base}/food-catalog`, { preserveScroll: true, onSuccess: () => catalogForm.reset() });
@@ -300,6 +571,7 @@ function addCatalogItem() {
 
 const editingCatalogId = ref(null);
 const catalogEditForm = reactive({ name: '', description: '', default_price: '', is_active: true });
+
 function startCatalogEdit(c) {
     editingCatalogId.value = c.id;
     catalogEditForm.name = c.name;
@@ -318,15 +590,23 @@ async function removeCatalogItem(c) {
     router.delete(`${base}/food-catalog/${c.id}`, { preserveScroll: true });
 }
 
-// --- Assign selected catalog items onto one date+meal slot in bulk ---
+// --- Assign Dishes to Slot Modal ---
 const catalogSearch = ref('');
 const selectedCatalogIds = ref([]);
 const assignForm = useForm({ catalog_item_ids: [], menu_date: '', meal_type: '' });
 
-// Options for the date/meal SearchableSelects above — dates need their labels formatted,
-// and meal types (a plain object keyed by meal type) need flattening into {value, label}.
 const eventDateOptions = computed(() => props.eventDates.map((d) => ({ value: d, label: formatCalendarDate(d) })));
 const mealTypeOptions = computed(() => Object.entries(props.mealTypes).map(([value, label]) => ({ value, label })));
+
+function openAssignModal(prefillDate = null, prefillMeal = null) {
+    if (prefillDate) assignForm.menu_date = prefillDate;
+    else if (props.eventDates.length) assignForm.menu_date = props.eventDates[0];
+
+    if (prefillMeal) assignForm.meal_type = prefillMeal;
+    else assignForm.meal_type = Object.keys(props.mealTypes)[0] || '';
+
+    showAssignModal.value = true;
+}
 
 const filteredCatalogItems = computed(() => {
     const q = catalogSearch.value.trim().toLowerCase();
@@ -334,9 +614,6 @@ const filteredCatalogItems = computed(() => {
     return props.catalogItems.filter((c) => c.name.toLowerCase().includes(q) || (c.description || '').toLowerCase().includes(q));
 });
 
-// Scoped to the currently filtered set, not the global catalog — searching, selecting
-// everything visible, then broadening the search doesn't silently drop the earlier
-// selection (mirrors the Phases page's item-assignment panel).
 const allCatalogSelected = computed(() => filteredCatalogItems.value.length > 0
     && filteredCatalogItems.value.every((c) => selectedCatalogIds.value.includes(c.id)));
 
@@ -350,15 +627,18 @@ function toggleSelectAllCatalog() {
     }
 }
 
-function assignCatalogItems() {
+function executeAssign() {
     assignForm.catalog_item_ids = selectedCatalogIds.value;
     assignForm.post(`${base}/food-menu/assign-catalog-items`, {
         preserveScroll: true,
-        onSuccess: () => { selectedCatalogIds.value = []; },
+        onSuccess: () => {
+            selectedCatalogIds.value = [];
+            showAssignModal.value = false;
+        },
     });
 }
 
-// --- Scheduled menu: per-slot edit (via modal) / remove ---
+// --- Scheduled Menu Item Editing ---
 const editingId = ref(null);
 const editForm = reactive({ meal_type: '', name: '', price: '', max_per_school: '', is_available: true, sort_order: 0 });
 const editingItem = computed(() => props.menuItems.find((i) => i.id === editingId.value) ?? null);
@@ -399,24 +679,34 @@ async function removeItem(item) {
     router.delete(`${base}/food-menu/${item.id}`, { preserveScroll: true });
 }
 
-// Canonical meal order comes from the mealTypes prop (an ordered object, keyed
-// breakfast/lunch/snacks/tea/dinner/other — see FestFoodMenuItem::MEAL_TYPES), not from
-// however the items array happens to arrive.
 const mealTypeOrder = computed(() => Object.keys(props.mealTypes));
 
-const groupedItems = computed(() => {
-    const byDate = {};
+const allDates = computed(() => {
+    const dates = new Set();
     for (const item of props.menuItems) {
+        if (item.menu_date) dates.add(item.menu_date);
+    }
+    return Array.from(dates).sort();
+});
+
+const filteredGroupedItems = computed(() => {
+    const dateFilter = selectedDate.value;
+    const byDate = {};
+
+    for (const item of props.menuItems) {
+        if (dateFilter !== 'all' && item.menu_date !== dateFilter) continue;
+
         const d = item.menu_date;
         if (!byDate[d]) byDate[d] = {};
         if (!byDate[d][item.meal_type]) byDate[d][item.meal_type] = [];
         byDate[d][item.meal_type].push(item);
     }
+
     return Object.keys(byDate).sort().map((date) => ({
         date,
         meals: mealTypeOrder.value
             .filter((mt) => byDate[date][mt]?.length)
             .map((mt) => ({ mealType: mt, items: byDate[date][mt] })),
-    }));
+    })).filter((group) => group.meals.length > 0);
 });
 </script>

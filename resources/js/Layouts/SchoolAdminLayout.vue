@@ -225,10 +225,16 @@ const navGroups = computed(() => {
     const schoolEventCtx = detectSchoolEventFromUrl(page.url);
     const festEvent = page.props.event;
     if (schoolEventCtx?.eventId && festEvent?.id) {
-        return schoolEventScopedNav(tid.value, schoolEventCtx.programSlug, festEvent, {
+        const eventType = festEvent.event_type || 'kalotsav';
+        const programSlug = schoolEventCtx.programSlug
+            || (eventType === 'sports' ? 'sports-meet' : eventType);
+        const programPrefix = schoolEventCtx.programPrefix
+            || (eventType === 'sports' ? 'sports' : eventType);
+
+        return schoolEventScopedNav(tid.value, programSlug, festEvent, {
             ...options,
-            programPrefix: schoolEventCtx.programPrefix ?? page.props.programPrefix,
-            isSports: festEvent.event_type === 'sports' || schoolEventCtx.programSlug === 'sports-meet',
+            programPrefix,
+            isSports: festEvent.event_type === 'sports' || programSlug === 'sports-meet',
             programEvents: page.props.programEvents ?? [],
             idCardDownloadsDisabled: Boolean(page.props.idCardDownloadsDisabled),
         });

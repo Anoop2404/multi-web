@@ -52,7 +52,7 @@ class FestEventPortalController extends SchoolAdminController
             ->get();
 
         return $this->inertia('School/Events/Catering', [
-            'event'  => $event->only('id', 'title'),
+            'event'  => $event->only('id', 'title', 'event_type', 'event_start', 'event_end'),
             'hierarchy' => $event->hierarchyContext(),
             'orders' => $orders,
         ]);
