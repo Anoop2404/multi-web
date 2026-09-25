@@ -10,6 +10,7 @@ use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestQualification;
 use App\Models\FestRegistration;
+use App\Models\Student;
 use App\Models\Tenant;
 use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsFestIdCardResponses;
 use App\Services\Events\FestParticipationLimitService;
