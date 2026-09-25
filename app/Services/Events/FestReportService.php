@@ -1046,6 +1046,8 @@ class FestReportService
             'event' => $this->event,
             'students' => $rows,
             'showChestNo' => false,
+            // ?hide_marks=1: no Rank / Mark / Grade columns (a plain registered-items list).
+            'showMarks' => ! $request->boolean('hide_marks'),
             'bySchool' => $request->boolean('by_school'),
             ...$this->brandingData(),
         ], $this->slug().($request->boolean('by_school') ? '-student-wise-by-school.pdf' : '-student-wise-report.pdf'));

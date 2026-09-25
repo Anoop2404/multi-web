@@ -160,20 +160,23 @@
                 </div>
             </div>
         </div>
+        @php $showMarks = $showMarks ?? true; @endphp
         <table class="items-table">
             <thead>
                 <tr>
                     <th style="width: 4%;">#</th>
-                    <th style="width: {{ ($showChestNo ?? true) ? '19' : '23' }}%;">Item Name</th>
+                    <th style="width: {{ ($showChestNo ?? true) ? '19' : ($showMarks ? '23' : '39') }}%;">Item Name</th>
                     <th style="width: 14%;">Category / Head</th>
                     <th style="width: 12%; text-align: center;">Stage / Type</th>
                     @if($showChestNo ?? true)
                     <th style="width: 9%; text-align: center;">Chest No</th>
                     @endif
                     <th style="width: 8%; text-align: center;">Status</th>
+                    @if($showMarks)
                     <th style="width: 8%; text-align: center;">Rank</th>
                     <th style="width: 8%; text-align: center;">Mark</th>
                     <th style="width: 8%; text-align: center;">Grade</th>
+                    @endif
                 </tr>
             </thead>
             <tbody>
@@ -212,7 +215,9 @@
                             {{ $item['status'] ?? '—' }}
                         </span>
                     </td>
-                    @if($item['results_published'] ?? false)
+                    @if(! $showMarks)
+                        {{-- marks columns left off --}}
+                    @elseif($item['results_published'] ?? false)
                         <td style="text-align: center; font-weight: bold;">{{ $item['position'] ?? '—' }}</td>
                         <td style="text-align: center;">{{ $item['score'] ?? '—' }}</td>
                         <td style="text-align: center; font-weight: bold;">{{ $item['grade'] ?? '—' }}</td>

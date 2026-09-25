@@ -9,6 +9,11 @@
                     <span class="text-xs font-semibold text-slate-600">Each school on its own page:</span>
                     <ReportDownloadButtons :pdf-url="bySchoolPdfUrl" />
                 </div>
+                <div class="flex flex-wrap items-center gap-2 border-l border-slate-200 pl-3">
+                    <span class="text-xs font-semibold text-slate-600">Without rank / mark / grade:</span>
+                    <a :href="noMarksUrl(pdfUrl)" target="_blank" rel="noopener" class="btn-secondary text-sm">PDF ↓</a>
+                    <a :href="noMarksUrl(bySchoolPdfUrl)" target="_blank" rel="noopener" class="btn-secondary text-sm">Each school on its own page ↓</a>
+                </div>
             </template>
         </PageHeader>
 
@@ -187,6 +192,12 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
+
+// The same PDF link with the marks columns dropped, as a direct download.
+function noMarksUrl(url) {
+    if (!url) return '#';
+    return `${url}${url.includes('?') ? '&' : '?'}hide_marks=1&download=1`;
+}
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { festItemParticipantTypeLabel as participantTypeLabel } from '@/support/festItemListingMeta.js';
 

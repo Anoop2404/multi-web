@@ -1893,6 +1893,8 @@ class FestEventReportAnalyticsService
         $eventIds = $this->eventIds();
 
         $participants = FestParticipant::query()
+            // Standby (reserve) entrants aren't on the item -- left out, like the item-wise report.
+            ->where(fn ($q) => $q->whereNull('participant_role')->orWhere('participant_role', '!=', 'standby'))
             ->whereHas('registration', fn ($q) => $q
                 ->whereIn('event_id', $eventIds)
                 ->active()
