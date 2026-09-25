@@ -61,6 +61,12 @@ class FestItemWiseFilterQueryTest extends TestCase
 
         $this->assertSame([], $service->itemWiseReportRows(category: 'does-not-exist'));
 
+        // Standby entrants are left out of the report entirely.
+        $standbyParticipant = FestParticipant::where('registration_id', FestRegistration::where('item_id', $itemIds['Lower Item'])->first()->id)->first();
+        $standbyParticipant->update(['participant_role' => 'standby']);
+        $this->assertCount(7, $service->itemWiseReportRows());
+        $this->assertNotContains($standbyParticipant->id, collect($service->itemWiseReportRows())->pluck('id')->all());
+
         // The SQL really is filtering: an item-scoped call hydrates only that item's rows.
         DB::enableQueryLog();
         $service->itemWiseReportRows(itemId: $itemIds['Lower Item']);

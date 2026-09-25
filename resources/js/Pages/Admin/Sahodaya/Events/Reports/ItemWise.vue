@@ -5,6 +5,9 @@
                     description="Every item's registered students, in one table — filter by phase, region, category, or search.">
             <template #actions>
                 <ReportDownloadButtons :pdf-url="pdfExportUrl" :csv-url="exportUrl" />
+                <a :href="pdfNoMarksUrl" target="_blank" rel="noopener" class="btn-secondary text-sm">
+                    PDF without grade / rank / score ↓
+                </a>
             </template>
         </PageHeader>
 
@@ -229,6 +232,7 @@ function scopedUrl(baseUrl, extraParams = {}) {
 }
 
 const exportUrl = computed(() => scopedUrl(props.xlsUrl));
+const pdfNoMarksUrl = computed(() => scopedUrl(props.pdfUrl, { for_whom: forWhom.value, hide_marks: '1', download: '1' }));
 const pdfExportUrl = computed(() => scopedUrl(props.pdfUrl, { for_whom: forWhom.value, hide_marks: includeMarks.value ? '' : '1' }));
 
 const categoryOptions = computed(() => props.categories.map((c) => ({ value: c.key, label: c.label })));

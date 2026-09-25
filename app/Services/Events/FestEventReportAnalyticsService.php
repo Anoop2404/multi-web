@@ -2045,6 +2045,9 @@ class FestEventReportAnalyticsService
             : null;
 
         $rows = FestParticipant::query()
+            // Standby (reserve) entrants aren't part of this report -- they haven't been put
+            // on the item. NULL role counts as a normal entrant.
+            ->where(fn ($q) => $q->whereNull('participant_role')->orWhere('participant_role', '!=', 'standby'))
             ->whereHas('registration', function ($q) use ($schoolId, $itemId, $categoryClassGroups) {
                 $q->whereIn('event_id', $this->eventIds())->active();
                 if ($schoolId) {
