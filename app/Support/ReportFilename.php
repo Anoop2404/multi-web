@@ -51,6 +51,50 @@ class ReportFilename
         return implode('_', $parts).'.'.ltrim($ext, '.');
     }
 
+    /**
+     * build() for a fest event, naming it so a phase/region leg stays identifiable: the
+     * Sahodaya's own name is dropped from the front of the title (it's the same on every
+     * file they download), the root fest's title becomes the subject, and a leg's own name
+     * (its title after the root's — "Sargadhara — Tirur Region", "Digi Fest") is added as
+     * its own segment. Plain build() cut the full leg title at 40 characters, so every leg
+     * of "Malappuram Central Sahodaya Kalotsavam 2026-27 — …" came out as the same
+     * "malappuram-central-sahodaya-kalotsavam-2".
+     *
+     * @param  array<int, string|int|null>  $extra  Appended after the leg name, as in build().
+     */
+    public static function buildForEvent(
+        string $purpose,
+        \App\Models\FestEvent $event,
+        array $extra = [],
+        string $ext = 'pdf',
+        ?string $organizationName = null,
+    ): string {
+        $withoutOrganization = function (string $title) use ($organizationName): string {
+            if (! $organizationName) {
+                return $title;
+            }
+            $stripped = preg_replace('/^'.preg_quote(trim($organizationName), '/').'[\s\x{2014}\-:]*/iu', '', $title);
+
+            return trim((string) $stripped) !== '' ? trim((string) $stripped) : $title;
+        };
+
+        $root = $event->rootEvent();
+        $legName = null;
+        if ($root && $root->id !== $event->id) {
+            $legName = str_starts_with($event->title, $root->title)
+                ? trim((string) preg_replace('/^[\s\x{2014}\-:]+/u', '', substr($event->title, strlen($root->title))))
+                : $withoutOrganization($event->title);
+        }
+
+        return static::build(
+            $purpose,
+            $withoutOrganization(($root ?? $event)->title),
+            $event->event_start ?? $root?->event_start,
+            [$legName ?: null, ...$extra],
+            $ext,
+        );
+    }
+
     protected static function slug(string $value, ?int $limit = null): string
     {
         $slug = str($value)->slug();

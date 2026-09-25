@@ -392,6 +392,12 @@ class FestCertificateService
         // deduped by student_id across every item's projected top 3.
         $projectedWinnerStudentIds = [];
 
+        // The scheme's own name for each item's category ("Category 1 — Classes 3 & 4", a
+        // sports age group's label) — 'category' below stays the raw class_group/age_group
+        // key, which the summary groups by.
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
+        $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
+
         $rows = [];
         foreach ($byItem as $itemId => $data) {
             $item = $data['item'];
@@ -443,8 +449,16 @@ class FestCertificateService
                 'rank_1'                 => $rankCounts[1],
                 'rank_2'                 => $rankCounts[2],
                 'rank_3'                 => $rankCounts[3],
+                // Medals actually handed out at each place — one per person, so every
+                // member of a placed team gets one (rank_N above counts that team once),
+                // and a tie gives each tied person one.
+                'medals_1'               => count($data['ranked'][1] ?? []),
+                'medals_2'               => count($data['ranked'][2] ?? []),
+                'medals_3'               => count($data['ranked'][3] ?? []),
                 'head_name'              => $item->head?->name,
                 'category'               => $item->age_group ?: $item->class_group,
+                'category_label'         => FestItemCategoryLabel::resolve($item, $classGroupLabels, $artsCategoryLabels)
+                    ?: ($item->age_group ?: $item->class_group),
                 'is_team'                => $isTeam,
                 'entry_count'            => $isTeam
                     ? collect($entrants)->pluck('group_id')->unique()->count()
@@ -472,19 +486,27 @@ class FestCertificateService
         $totals['rank_1'] = array_sum(array_column($rows, 'rank_1'));
         $totals['rank_2'] = array_sum(array_column($rows, 'rank_2'));
         $totals['rank_3'] = array_sum(array_column($rows, 'rank_3'));
+        $totals['medals_1'] = array_sum(array_column($rows, 'medals_1'));
+        $totals['medals_2'] = array_sum(array_column($rows, 'medals_2'));
+        $totals['medals_3'] = array_sum(array_column($rows, 'medals_3'));
+        $totals['medals_total'] = $totals['medals_1'] + $totals['medals_2'] + $totals['medals_3'];
 
         // Summary list: the same rank counts rolled up by category.
         $summary = [];
         foreach ($rows as $row) {
             $key = (string) ($row['category'] ?: 'Open / all categories');
-            $summary[$key] ??= ['category' => $key, 'items' => 0, 'rank_1' => 0, 'rank_2' => 0, 'rank_3' => 0];
+            $summary[$key] ??= ['category' => $key, 'category_label' => $row['category'] ? ($row['category_label'] ?: $key) : $key, 'items' => 0, 'rank_1' => 0, 'rank_2' => 0, 'rank_3' => 0, 'medals_1' => 0, 'medals_2' => 0, 'medals_3' => 0];
             $summary[$key]['items']++;
             foreach ([1, 2, 3] as $place) {
                 $summary[$key]["rank_{$place}"] += $row["rank_{$place}"];
+                $summary[$key]["medals_{$place}"] += $row["medals_{$place}"];
             }
         }
         ksort($summary, SORT_NATURAL | SORT_FLAG_CASE);
-        $summary = array_map(fn (array $r) => $r + ['total' => $r['rank_1'] + $r['rank_2'] + $r['rank_3']], array_values($summary));
+        $summary = array_map(fn (array $r) => $r + [
+            'total' => $r['rank_1'] + $r['rank_2'] + $r['rank_3'],
+            'medals_total' => $r['medals_1'] + $r['medals_2'] + $r['medals_3'],
+        ], array_values($summary));
 
         return ['rows' => $rows, 'totals' => $totals, 'summary' => $summary];
     }

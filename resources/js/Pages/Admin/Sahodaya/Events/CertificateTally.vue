@@ -8,9 +8,9 @@
             <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates`" class="btn-secondary">
                 &larr; Certificates
             </Link>
-            <!-- Merit only: rank 1/2/3 and winner certificates per item + by category, no participation columns. -->
-            <a v-if="rows.length" :href="rankReportUrl('pdf')" class="btn-secondary">⬇ Rank tally report (PDF)</a>
-            <a v-if="rows.length" :href="rankReportUrl('xls')" class="btn-secondary">⬇ Rank tally report (Excel)</a>
+            <!-- Gold / silver / bronze medals per item — one per person (team members each get one) — portrait PDF; Excel adds medals by category. -->
+            <a v-if="rows.length" :href="medalReportUrl('pdf')" class="btn-secondary">⬇ Medal tally (PDF)</a>
+            <a v-if="rows.length" :href="medalReportUrl('xls')" class="btn-secondary">⬇ Medal tally (Excel)</a>
         </div>
 
         <div v-if="childEvents.length" class="card !p-4 mb-5 flex flex-wrap items-center gap-2">
@@ -51,7 +51,7 @@
                     <p class="font-medium">{{ row.title }}</p>
                     <p v-if="row.head_name" class="text-xs text-slate-400">{{ row.head_name }}</p>
                 </td>
-                <td class="px-4 py-3 text-slate-600">{{ row.category || '—' }}</td>
+                <td class="px-4 py-3 text-slate-600">{{ row.category_label || row.category || '—' }}</td>
                 <td class="px-4 py-3">
                     <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                           :class="row.is_team ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-700 border border-slate-200'">
@@ -72,6 +72,19 @@
                 <td class="px-4 py-3 text-right font-semibold">{{ row.rank_3 || '—' }}</td>
                 <td class="px-4 py-3 text-right font-semibold text-orange-600">{{ row.projected_winner_certs }}</td>
                 <td class="px-4 py-3 text-right font-semibold text-sky-700">{{ row.participation_certs }}
+                    <span class="block text-[10px] font-normal text-slate-400">entries</span>
+                </td>
+            </tr>
+            <!-- Totals for the whole list, as its last row. -->
+            <tr v-if="rows.length" class="bg-slate-100 font-bold border-t-2 border-slate-300">
+                <td class="px-4 py-3" colspan="3">All items ({{ totals.items }})</td>
+                <td class="px-4 py-3 text-slate-700">{{ totalEntries }}</td>
+                <td class="px-4 py-3 text-right text-amber-700">{{ totals.winner_certs }}</td>
+                <td class="px-4 py-3 text-right">{{ totals.rank_1 || 0 }}</td>
+                <td class="px-4 py-3 text-right">{{ totals.rank_2 || 0 }}</td>
+                <td class="px-4 py-3 text-right">{{ totals.rank_3 || 0 }}</td>
+                <td class="px-4 py-3 text-right text-orange-600">{{ totals.projected_winner_certs }}</td>
+                <td class="px-4 py-3 text-right text-sky-700">{{ totalParticipationEntries }}
                     <span class="block text-[10px] font-normal text-slate-400">entries</span>
                 </td>
             </tr>
@@ -97,7 +110,7 @@
                     </thead>
                     <tbody class="divide-y divide-slate-100 text-sm">
                         <tr v-for="s in summary" :key="s.category">
-                            <td class="px-4 py-2 font-medium">{{ s.category }}</td>
+                            <td class="px-4 py-2 font-medium">{{ s.category_label || s.category }}</td>
                             <td class="px-4 py-2 text-right">{{ s.items }}</td>
                             <td class="px-4 py-2 text-right">{{ s.rank_1 }}</td>
                             <td class="px-4 py-2 text-right">{{ s.rank_2 }}</td>
@@ -142,13 +155,18 @@ const props = defineProps({
     childEvents: { type: Array, default: () => [] },
 });
 
-function rankReportUrl(format) {
-    return `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/tally/rank-report?format=${format}`;
+function medalReportUrl(format) {
+    return `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates/tally/medal-report?format=${format}`;
 }
 
 function switchSportEvent(value) {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${value}/certificates/tally`);
 }
+
+// Entries column total: individual items count people, team items count teams — same as
+// the rows above (members are shown separately for teams).
+const totalEntries = computed(() => props.rows.reduce((sum, row) => sum + (row.entry_count || 0), 0));
+const totalParticipationEntries = computed(() => props.rows.reduce((sum, row) => sum + (row.participation_certs || 0), 0));
 
 const regionOptions = computed(() => props.childEvents.map(ev => ({
     value: String(ev.id),
