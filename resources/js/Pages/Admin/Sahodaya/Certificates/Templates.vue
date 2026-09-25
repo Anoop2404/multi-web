@@ -328,7 +328,7 @@
                                                 <input :id="id" v-model="blk.name_text" maxlength="120" class="field" placeholder="e.g. Fr. Dr. Thomas Joseph">
                                             </template>
                                         </FormField>
-                                        <FormField label="Designation" hint="Blank = the label above.">
+                                        <FormField label="Designation" hint="Blank = nothing printed.">
                                             <template #default="{ id }">
                                                 <input :id="id" v-model="blk.designation_text" maxlength="120" class="field" placeholder="e.g. Principal">
                                             </template>

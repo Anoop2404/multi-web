@@ -102,9 +102,6 @@
                     $sigName = ! empty($sig['name']) ? $sig['name'] : ($block['name_text'] ?? '');
                     $sigSchool = ! empty($sig['school']) ? $sig['school'] : ($block['school_text'] ?? '');
                     $sigDesignation = ! empty($sig['designation']) ? $sig['designation'] : ($block['designation_text'] ?? '');
-                    if ($sigDesignation === '' && ($sigName !== '' || $sigSchool !== '' || ! empty($sigUrl))) {
-                        $sigDesignation = $block['label'];
-                    }
                     $sigParts = ['name' => $sigName, 'designation' => $sigDesignation, 'school' => $sigSchool];
                 @endphp
                 @if(!empty($sigUrl))

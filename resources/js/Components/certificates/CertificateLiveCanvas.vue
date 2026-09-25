@@ -96,7 +96,7 @@
                     <div v-if="blk.designation"
                          class="absolute text-slate-600"
                          :style="overlayStyle(blk.designation, { top: 89, left: 72, width: 20, font_size: 8, font_family: 'Montserrat', align: 'center' })">
-                        {{ blk.designation_text || blk.label || 'Designation' }}
+                        {{ blk.designation_text || 'Designation' }}
                     </div>
                     <div v-if="blk.school"
                          class="absolute text-slate-600"

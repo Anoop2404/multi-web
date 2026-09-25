@@ -28,7 +28,7 @@
             </label>
             <label class="block">
                 <span class="block text-[10px] uppercase tracking-wide text-gray-500 mb-0.5">Designation (optional)</span>
-                <input v-model="sg.designation" type="text" maxlength="120" class="field text-xs py-1 px-2 w-52" placeholder="defaults to the label">
+                <input v-model="sg.designation" type="text" maxlength="120" class="field text-xs py-1 px-2 w-52" placeholder="blank = template's / none">
             </label>
             <label class="block">
                 <span class="block text-[10px] uppercase tracking-wide text-gray-500 mb-0.5">School name</span>
