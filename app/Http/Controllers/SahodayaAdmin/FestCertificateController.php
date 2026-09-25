@@ -10,6 +10,7 @@ use App\Models\CertificateBatch;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestParticipant;
+use App\Models\FestRegistration;
 use App\Models\Tenant;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\FestCertificateService;
@@ -36,6 +37,7 @@ class FestCertificateController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $certificates = $this->withParticipationItems($this->certificatesForEvent($event), $event);
+        $schoolResults = $this->schoolResultsStatus($event);
 
         return $this->inertia('Sahodaya/Events/Certificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
             'event' => $event,
@@ -43,8 +45,8 @@ class FestCertificateController extends SahodayaAdminController
             'publishedItems' => $this->publishedItemsForEvent($event),
             'schools' => $this->schoolsFromCertificates($certificates),
             'winnersByItem' => $this->winnersByItem($certificates, $event),
-            'winnersBySchool' => $this->winnersBySchool($certificates, $event),
-            'participationBySchool' => $this->participationBySchool($certificates, $event),
+            'winnersBySchool' => $this->withSchoolResults($this->winnersBySchool($certificates, $event), $schoolResults),
+            'participationBySchool' => $this->withSchoolResults($this->participationBySchool($certificates, $event), $schoolResults),
             'recentBatches' => $this->recentBatchesForEvent($event),
             'staleCount' => $certificates->filter(fn ($c) => $c['is_stale'] ?? false)->count(),
             'certificateSignatories' => $this->signatoriesForUi($event),
@@ -244,6 +246,68 @@ class FestCertificateController extends SahodayaAdminController
     private function participationBySchool(Collection $certificates, FestEvent $currentEvent): Collection
     {
         return $this->groupCertificatesBySchool($certificates, 'participation', $currentEvent);
+    }
+
+    /**
+     * Per school: how many of the items it has approved registrations in have their
+     * results published (FestEventItem.results_published_at — the per-item flag, same as
+     * publishedItemsForEvent(); the event-wide results_published only flips once the whole
+     * fest is final). A school with none pending has every merit result it will ever get,
+     * and every grade its participation certificates print, so its certificates are safe
+     * to bulk-download.
+     *
+     * @return Collection<string, array{total: int, published: int, pending: list<string>}> keyed by school id
+     */
+    private function schoolResultsStatus(FestEvent $event): Collection
+    {
+        $registrations = FestRegistration::query()
+            ->whereIn('event_id', $event->reportableEventIds())
+            ->where('status', 'approved')
+            ->whereNotNull('item_id')
+            ->whereNotNull('school_id')
+            ->distinct()
+            ->get(['school_id', 'item_id']);
+
+        if ($registrations->isEmpty()) {
+            return collect();
+        }
+
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
+        $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
+        $items = FestEventItem::whereIn('id', $registrations->pluck('item_id')->unique())
+            ->with('event:id,tenant_id')
+            ->get(['id', 'event_id', 'title', 'class_group', 'category', 'age_group', 'results_published_at'])
+            ->keyBy('id');
+
+        return $registrations->groupBy('school_id')->map(function (Collection $rows) use ($items, $classGroupLabels, $artsCategoryLabels) {
+            $schoolItems = $rows->pluck('item_id')->unique()->map(fn ($id) => $items->get($id))->filter();
+            $pending = $schoolItems->reject(fn (FestEventItem $item) => $item->results_published_at !== null);
+
+            return [
+                'total' => $schoolItems->count(),
+                'published' => $schoolItems->count() - $pending->count(),
+                'pending' => $pending
+                    ->map(function (FestEventItem $item) use ($classGroupLabels, $artsCategoryLabels) {
+                        $category = FestItemCategoryLabel::shortLabel($item, $classGroupLabels, $artsCategoryLabels);
+
+                        return $category ? "{$item->title} ({$category})" : $item->title;
+                    })
+                    ->sort()
+                    ->values()
+                    ->all(),
+            ];
+        });
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $groups  groupCertificatesBySchool() rows
+     * @param  Collection<string, array{total: int, published: int, pending: list<string>}>  $schoolResults
+     */
+    private function withSchoolResults(Collection $groups, Collection $schoolResults): Collection
+    {
+        return $groups->map(fn (array $group) => $group + [
+            'results' => $schoolResults->get($group['school_id']) ?? ['total' => 0, 'published' => 0, 'pending' => []],
+        ]);
     }
 
     /**

@@ -269,18 +269,48 @@
             <div class="mb-3 flex flex-wrap items-center gap-3">
                 <input v-model="schoolSearch" type="search" placeholder="Search school or student…"
                        class="field text-xs py-1.5 px-3 w-full sm:w-72" />
-                <span v-if="schoolSearch.trim()" class="text-xs text-gray-500">
+                <select v-model="schoolReadiness" class="field text-xs py-1.5 px-2 w-auto">
+                    <option value="all">All schools</option>
+                    <option value="ready">✓ Results complete ({{ winnersBySchool.filter(isSchoolReady).length }})</option>
+                    <option value="pending">⏳ Results pending ({{ winnersBySchool.length - winnersBySchool.filter(isSchoolReady).length }})</option>
+                </select>
+                <span v-if="schoolSearch.trim() || schoolReadiness !== 'all'" class="text-xs text-gray-500">
                     {{ filteredWinnersBySchool.length }} of {{ winnersBySchool.length }} schools
                 </span>
+                <details v-if="readyCertificateIds(filteredWinnersBySchool).length" class="relative ml-auto">
+                    <summary class="btn-secondary py-1.5 px-3 text-xs inline-flex list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+                        📦 Results-complete schools shown ({{ filteredWinnersBySchool.filter(isSchoolReady).length }}) ▾
+                    </summary>
+                    <div class="absolute z-20 right-0 mt-1 w-72 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
+                        <p class="px-3 pt-2 pb-1 text-[11px] text-gray-500">One folder per school — only schools whose every registered item has published results.</p>
+                        <button @click="queueZipDownload({ certificate_ids: readyCertificateIds(filteredWinnersBySchool).join(','), group_by: 'school' }, $event)" :disabled="isBatchRunning"
+                                class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                            📦 ZIP (with background)
+                        </button>
+                        <button @click="queueZipDownload({ certificate_ids: readyCertificateIds(filteredWinnersBySchool).join(','), group_by: 'school', plain: '1' }, $event)" :disabled="isBatchRunning"
+                                class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                            📦 ZIP — no background
+                        </button>
+                        <p v-if="isBatchRunning" class="px-3 pb-2 text-[11px] text-amber-700">Available once the current run finishes.</p>
+                    </div>
+                </details>
             </div>
 
             <div v-if="filteredWinnersBySchool.length" class="card divide-y divide-gray-100">
                 <div v-for="group in filteredWinnersBySchool" :key="group.school_id" class="py-3 first:pt-0 last:pb-0">
                     <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div class="min-w-0 flex items-center gap-3">
+                        <div class="min-w-0 flex flex-wrap items-center gap-x-3 gap-y-1">
                             <p class="font-semibold text-sm text-gray-900">{{ group.school_name }}</p>
                             <span class="shrink-0 text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-medium">
                                 {{ group.winners.length }} merit winner{{ group.winners.length === 1 ? '' : 's' }}
+                            </span>
+                            <span v-if="isSchoolReady(group)" class="shrink-0 text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium"
+                                  :title="`All ${group.results.total} registered item(s) have published results — safe to bulk-download`">
+                                ✓ Results complete ({{ group.results.total }}/{{ group.results.total }})
+                            </span>
+                            <span v-else-if="group.results?.total" class="shrink-0 text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-medium"
+                                  :title="`Results pending: ${group.results.pending.join(', ')}`">
+                                ⏳ {{ group.results.pending.length }} of {{ group.results.total }} items pending
                             </span>
                         </div>
                         <div class="flex flex-wrap items-center gap-3 text-xs shrink-0">
@@ -312,6 +342,12 @@
                             </details>
                         </div>
                     </div>
+                    <details v-if="group.results?.pending?.length" class="mt-1">
+                        <summary class="text-xs font-medium text-amber-700 hover:text-amber-900 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                            ▸ {{ group.results.pending.length }} item{{ group.results.pending.length === 1 ? '' : 's' }} still awaiting results
+                        </summary>
+                        <p class="mt-1 text-[11px] text-gray-600">{{ group.results.pending.join(' · ') }}</p>
+                    </details>
                     <ul class="mt-2 flex flex-wrap gap-x-5 gap-y-1.5">
                         <li v-for="w in group.winners" :key="w.id" class="flex items-center gap-2 text-xs">
                             <span class="shrink-0 rounded-full bg-amber-500 text-white font-bold w-5 h-5 flex items-center justify-center text-[10px]">
@@ -332,7 +368,7 @@
                 </div>
             </div>
             <div v-else class="card p-6 text-center text-gray-500 text-sm">
-                {{ winnersBySchool.length ? 'No school or student matches your search.' : 'No merit winners grouped by school available yet.' }}
+                {{ winnersBySchool.length ? 'No school matches this search / filter.' : 'No merit winners grouped by school available yet.' }}
             </div>
         </div>
 
@@ -363,17 +399,47 @@
             <div class="mb-3 flex flex-wrap items-center gap-3">
                 <input v-model="schoolSearch" type="search" placeholder="Search school or student…"
                        class="field text-xs py-1.5 px-3 w-full sm:w-72" />
-                <span v-if="schoolSearch.trim()" class="text-xs text-gray-500">
+                <select v-model="schoolReadiness" class="field text-xs py-1.5 px-2 w-auto">
+                    <option value="all">All schools</option>
+                    <option value="ready">✓ Results complete ({{ participationBySchool.filter(isSchoolReady).length }})</option>
+                    <option value="pending">⏳ Results pending ({{ participationBySchool.length - participationBySchool.filter(isSchoolReady).length }})</option>
+                </select>
+                <span v-if="schoolSearch.trim() || schoolReadiness !== 'all'" class="text-xs text-gray-500">
                     {{ filteredParticipationBySchool.length }} of {{ participationBySchool.length }} schools
                 </span>
+                <details v-if="readyCertificateIds(filteredParticipationBySchool).length" class="relative ml-auto">
+                    <summary class="btn-secondary py-1.5 px-3 text-xs inline-flex list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+                        📦 Results-complete schools shown ({{ filteredParticipationBySchool.filter(isSchoolReady).length }}) ▾
+                    </summary>
+                    <div class="absolute z-20 right-0 mt-1 w-72 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
+                        <p class="px-3 pt-2 pb-1 text-[11px] text-gray-500">One folder per school — only schools whose every registered item has published results.</p>
+                        <button @click="queueZipDownload({ certificate_ids: readyCertificateIds(filteredParticipationBySchool).join(','), group_by: 'school' }, $event)" :disabled="isBatchRunning"
+                                class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                            📦 ZIP (with background)
+                        </button>
+                        <button @click="queueZipDownload({ certificate_ids: readyCertificateIds(filteredParticipationBySchool).join(','), group_by: 'school', plain: '1' }, $event)" :disabled="isBatchRunning"
+                                class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                            📦 ZIP — no background
+                        </button>
+                        <p v-if="isBatchRunning" class="px-3 pb-2 text-[11px] text-amber-700">Available once the current run finishes.</p>
+                    </div>
+                </details>
             </div>
             <div v-if="filteredParticipationBySchool.length" class="card divide-y divide-gray-100">
                 <div v-for="group in filteredParticipationBySchool" :key="group.school_id" class="py-3 first:pt-0 last:pb-0">
                     <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div class="min-w-0 flex items-center gap-3">
+                        <div class="min-w-0 flex flex-wrap items-center gap-x-3 gap-y-1">
                             <p class="font-semibold text-sm text-gray-900">{{ group.school_name }}</p>
                             <span class="shrink-0 text-xs px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-medium">
                                 {{ group.winners.length }} student{{ group.winners.length === 1 ? '' : 's' }}
+                            </span>
+                            <span v-if="isSchoolReady(group)" class="shrink-0 text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium"
+                                  :title="`All ${group.results.total} registered item(s) have published results — safe to bulk-download`">
+                                ✓ Results complete ({{ group.results.total }}/{{ group.results.total }})
+                            </span>
+                            <span v-else-if="group.results?.total" class="shrink-0 text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-medium"
+                                  :title="`Results pending: ${group.results.pending.join(', ')}`">
+                                ⏳ {{ group.results.pending.length }} of {{ group.results.total }} items pending
                             </span>
                         </div>
                         <div class="flex flex-wrap items-center gap-3 text-xs shrink-0">
@@ -405,6 +471,12 @@
                             </details>
                         </div>
                     </div>
+                    <details v-if="group.results?.pending?.length" class="mt-1">
+                        <summary class="text-xs font-medium text-amber-700 hover:text-amber-900 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                            ▸ {{ group.results.pending.length }} item{{ group.results.pending.length === 1 ? '' : 's' }} still awaiting results
+                        </summary>
+                        <p class="mt-1 text-[11px] text-gray-600">{{ group.results.pending.join(' · ') }}</p>
+                    </details>
                     <details class="mt-2">
                         <summary class="text-xs font-medium text-gray-500 hover:text-gray-700 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
                             ▸ View {{ group.winners.length }} name{{ group.winners.length === 1 ? '' : 's' }}
@@ -428,7 +500,7 @@
                 </div>
             </div>
             <div v-else class="card p-6 text-center text-gray-500 text-sm">
-                {{ participationBySchool.length ? 'No school or student matches your search.' : 'No participation certificates generated yet.' }}
+                {{ participationBySchool.length ? 'No school matches this search / filter.' : 'No participation certificates generated yet.' }}
             </div>
         </div>
 
@@ -664,13 +736,28 @@ const publishedItemOptions = computed(() => props.publishedItems.map(item => {
 const jobStatus = ref(null);
 let pollTimer = null;
 
-// Shared by both by-school tabs: matches the school name or any student listed under it.
+// Shared by both by-school tabs: matches the school name or any student listed under it,
+// and the results-readiness filter.
 const schoolSearch = ref('');
+const schoolReadiness = ref('all');
+
+// Every item the school has approved registrations in has published results (see
+// FestCertificateController::schoolResultsStatus()) — no merit result or grade still to come.
+function isSchoolReady(group) {
+    return (group.results?.total ?? 0) > 0 && (group.results?.pending?.length ?? 0) === 0;
+}
+
 function matchesSchoolSearch(group) {
+    if (schoolReadiness.value === 'ready' && !isSchoolReady(group)) return false;
+    if (schoolReadiness.value === 'pending' && isSchoolReady(group)) return false;
     const q = schoolSearch.value.trim().toLowerCase();
     if (!q) return true;
     return (group.school_name ?? '').toLowerCase().includes(q)
         || (group.winners ?? []).some(w => (w.name ?? '').toLowerCase().includes(q));
+}
+
+function readyCertificateIds(groups) {
+    return groups.filter(isSchoolReady).flatMap(group => group.winners.map(w => w.id));
 }
 const filteredParticipationBySchool = computed(() => props.participationBySchool.filter(matchesSchoolSearch));
 const filteredWinnersBySchool = computed(() => props.winnersBySchool.filter(matchesSchoolSearch));

@@ -197,4 +197,40 @@ class FestCertificateParticipationGroupingTest extends TestCase
             $this->assertSame(700 + $index, FestParticipant::find($printed->first()['certificate']->entity_id)->student_id);
         }
     }
+
+    /**
+     * Each by-school row says whether every item the school registered in has its results
+     * published — the admin's cue that the school's certificates are final and safe to
+     * bulk-download — and names the items still pending otherwise.
+     */
+    public function test_by_school_rows_report_whether_every_registered_item_is_published(): void
+    {
+        ['admin' => $admin, 'event' => $event, 'sahodaya' => $sahodaya, 'school' => $readySchool] = $this->makeSahodayaAdminEventAndSchool();
+        $pendingSchool = Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'school', 'parent_id' => $sahodaya->id, 'name' => 'Pending Results School',
+            'domain' => Str::uuid().'.test', 'membership_status' => 'approved', 'is_active' => true,
+        ]);
+
+        $published = FestEventItem::create(['event_id' => $event->id, 'title' => 'Published Item', 'item_code' => 'PI1']);
+        $published->forceFill(['results_published_at' => now()])->save();
+        $unpublished = FestEventItem::create(['event_id' => $event->id, 'title' => 'Unpublished Item', 'item_code' => 'UI1']);
+
+        $this->makeCertificate($event, $published, $readySchool->id, 801, 'participation');
+        $this->makeCertificate($event, $published, $pendingSchool->id, 802, 'participation');
+        // The pending school also entered an item whose results aren't out yet.
+        $this->makeCertificate($event, $unpublished, $pendingSchool->id, 803, 'participation');
+
+        $response = $this->actingAs($admin)->get(route('sahodaya.events.certificates.index', [
+            'tenantId' => $event->tenant_id, 'event' => $event->id,
+        ]));
+
+        $response->assertOk();
+        $rows = collect($response->viewData('page')['props']['participationBySchool'])->keyBy('school_id');
+
+        $this->assertSame(['total' => 1, 'published' => 1, 'pending' => []], $rows[$readySchool->id]['results']);
+        $this->assertSame(2, $rows[$pendingSchool->id]['results']['total']);
+        $this->assertSame(1, $rows[$pendingSchool->id]['results']['published']);
+        $this->assertCount(1, $rows[$pendingSchool->id]['results']['pending']);
+        $this->assertStringStartsWith('Unpublished Item', $rows[$pendingSchool->id]['results']['pending'][0]);
+    }
 }
