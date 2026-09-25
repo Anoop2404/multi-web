@@ -355,6 +355,23 @@ We appreciate the participant's talent and dedication and wish continued success
 BODY;
     }
 
+    /**
+     * Default body for a participation certificate. Issued once per person from the parent
+     * event (see FestCertificateService::generateParticipationForEvent()), so it names the
+     * parent event and lists every item the person entered via {participation_items_box}
+     * rather than a single item.
+     */
+    public static function defaultParticipationBody(): string
+    {
+        return <<<'BODY'
+This is to certify that {salutation} {recipient_name}, Class {class}, {school_name} has participated in the {event_title} organized by {sahodaya_name} held on {event_dates}, in the following items:
+
+{participation_items_box}
+
+We appreciate the participant's talent, dedication and sportsmanship and wish continued success in future endeavours.
+BODY;
+    }
+
     /** @return list<array{name: string, designation: string, signature_path: ?string}> */
     public static function defaultTrainingSignatories(): array
     {

@@ -355,7 +355,9 @@ class CertificateTemplateController extends SahodayaAdminController
         $body = $data['body'] ?? match ($data['event_type']) {
             'training' => CertificateTemplate::defaultTrainingBody(),
             'topper' => CertificateTemplate::defaultTopperBody(),
-            'fest' => CertificateTemplate::defaultFestBody(),
+            'fest' => $data['certificate_type'] === 'participation'
+                ? CertificateTemplate::defaultParticipationBody()
+                : CertificateTemplate::defaultFestBody(),
             default => null,
         };
 

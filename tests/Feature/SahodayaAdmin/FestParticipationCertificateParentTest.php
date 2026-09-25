@@ -98,4 +98,26 @@ class FestParticipationCertificateParentTest extends TestCase
         $this->assertSame('Parent Cert Kalotsavam', $fields['event_title']);
         $this->assertEqualsCanonicalizing(['Pencil Drawing', 'Solo Song'], $fields['item_titles']);
     }
+
+    public function test_seeding_command_creates_one_active_participation_template_on_the_parent(): void
+    {
+        $f = $this->fixture();
+
+        // Pointed at a leg, it still lands on the parent.
+        $this->artisan('fest:seed-participation-template', ['event' => $f['leg1']->id])->assertSuccessful();
+
+        $template = \App\Models\CertificateTemplate::where('certificate_type', 'participation')->sole();
+        $this->assertSame($f['root']->id, $template->event_id);
+        $this->assertTrue($template->is_active);
+        $this->assertStringContainsString('{participation_items_box}', $template->body);
+
+        // A second run won't silently replace it...
+        $this->artisan('fest:seed-participation-template', ['event' => $f['root']->id])->assertFailed();
+        // ...unless forced, which leaves exactly one active.
+        $this->artisan('fest:seed-participation-template', ['event' => $f['root']->id, '--force' => true])->assertSuccessful();
+        $this->assertSame(1, \App\Models\CertificateTemplate::where('certificate_type', 'participation')->where('is_active', true)->count());
+
+        $service = app(FestCertificateService::class);
+        $this->assertSame($template->tenant_id, $service->resolveTemplate($f['root'], null, 'participation')->tenant_id);
+    }
 }

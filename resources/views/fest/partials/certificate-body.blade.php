@@ -175,9 +175,15 @@
             <button onclick="window.print()" style="padding:.5rem 1.25rem;font-size:1rem;cursor:pointer">Print / Save as PDF</button>
         </div>
     @endif
+    @php
+        // A participation certificate is about taking part, not placing -- it must not say
+        // "achieved this distinction" the way a winner/record-break one does.
+        $__legacyCertType = is_array($certificate ?? null) ? ($certificate['cert_type'] ?? null) : ($certificate?->cert_type ?? null);
+        $__isParticipationLegacy = $__legacyCertType === 'participation';
+    @endphp
     <div class="cert-legacy">
         <div class="inner">
-            <p class="org">{{ ($recordBreak ?? null) ? 'Record Break Achievement' : 'Certificate of Achievement' }}</p>
+            <p class="org">{{ ($recordBreak ?? null) ? 'Record Break Achievement' : ($__isParticipationLegacy ? 'Certificate of Participation' : 'Certificate of Achievement') }}</p>
             <h1>{{ $event?->title ?? 'Kalotsav' }}</h1>
             <p class="subtitle">{{ $fieldValues['item_title'] ?? $item?->title ?? '' }}</p>
             <p class="detail">This is to certify that</p>
@@ -197,6 +203,8 @@
             @endif
             @if($recordBreak)
             <p class="detail">has achieved this athletic record distinction.</p>
+            @elseif($__isParticipationLegacy)
+            <p class="detail">has participated in the above item(s) of this event.</p>
             @else
             <p class="detail">has participated and achieved this distinction.</p>
             @endif
