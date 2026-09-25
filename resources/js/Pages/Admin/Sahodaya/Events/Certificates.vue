@@ -103,11 +103,11 @@
                                         class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                                     📦 Merit winners — grouped by school — no background (ZIP)
                                 </button>
-                                <button v-if="participationByItem.length" @click="queueZipDownload({ cert_type: 'participation' }, $event)" :disabled="isBatchRunning"
+                                <button v-if="participationBySchool.length" @click="queueZipDownload({ cert_type: 'participation' }, $event)" :disabled="isBatchRunning"
                                         class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                                     📦 Participation only (ZIP)
                                 </button>
-                                <button v-if="participationByItem.length" @click="queueZipDownload({ cert_type: 'participation', plain: '1' }, $event)" :disabled="isBatchRunning"
+                                <button v-if="participationBySchool.length" @click="queueZipDownload({ cert_type: 'participation', plain: '1' }, $event)" :disabled="isBatchRunning"
                                         class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                                     📦 Participation only — no background (ZIP)
                                 </button>
@@ -164,19 +164,12 @@
                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
                     🏫 Merit Winners (Grouped by School)
                 </button>
-                <button @click="activeTab = 'participation_item'"
-                        class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors"
-                        :class="activeTab === 'participation_item'
-                            ? 'border-indigo-600 text-indigo-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
-                    📜 Participation (Grouped by Item)
-                </button>
                 <button @click="activeTab = 'participation_school'"
                         class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors"
                         :class="activeTab === 'participation_school'
                             ? 'border-indigo-600 text-indigo-600'
                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
-                    📜 Participation (Grouped by School)
+                    📜 Participation (by School)
                 </button>
                 <button @click="activeTab = 'all'"
                         class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors"
@@ -316,79 +309,12 @@
             </div>
         </div>
 
-        <!-- TAB: Participation Certificates Grouped by Item -->
-        <div v-if="activeTab === 'participation_item'" class="mb-6">
-            <div class="flex items-center justify-between gap-4 mb-3">
-                <div>
-                    <h3 class="text-sm font-semibold text-gray-800">Participation Certificates Grouped by Item</h3>
-                    <p class="text-xs text-gray-500">Every item with at least one participation certificate generated.</p>
-                </div>
-            </div>
-
-            <div v-if="participationByItem.length" class="card divide-y divide-gray-100">
-                <div v-for="group in participationByItem" :key="group.item_id" class="py-3 first:pt-0 last:pb-0">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div class="min-w-0 flex items-center gap-3">
-                            <span class="shrink-0 text-xs font-semibold text-gray-400 tabular-nums">{{ group.sl_no }}.</span>
-                            <p class="font-semibold text-sm text-gray-900">
-                                {{ group.item_title }}<span v-if="[group.category_label, group.type_label, group.gender_label].some(Boolean)" class="font-normal text-gray-500"> ({{ [group.category_label, group.type_label, group.gender_label].filter(Boolean).join(' · ') }})</span>
-                            </p>
-                            <span class="shrink-0 text-xs px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-medium">
-                                {{ group.winners.length }} participant{{ group.winners.length === 1 ? '' : 's' }}
-                            </span>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-3 text-xs shrink-0">
-                            <button @click="renderAndCache({ item_id: group.item_id, cert_type: 'participation' })"
-                                    class="font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed"
-                                    :disabled="isBatchRunning">
-                                ⚙️ Render
-                            </button>
-                            <a :href="`${base}/preview-sample?cert_type=participation&item_id=${group.item_id}`" target="_blank" class="text-gray-500 hover:text-gray-800" title="Preview worst case">
-                                👁️
-                            </a>
-                            <details class="relative">
-                                <summary class="font-semibold text-gray-600 hover:text-gray-800 inline-flex items-center gap-1 list-none cursor-pointer [&::-webkit-details-marker]:hidden">
-                                    📦 Download ▾
-                                </summary>
-                                <div class="absolute z-20 right-0 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
-                                    <a :href="`${base}/download-zip?item_id=${group.item_id}&cert_type=participation`" class="block px-3 py-2 rounded hover:bg-gray-50">📦 ZIP</a>
-                                    <a :href="`${base}/print-all?item_id=${group.item_id}&cert_type=participation`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (with background) ↗</a>
-                                    <a :href="`${base}/print-all?item_id=${group.item_id}&cert_type=participation&plain=1`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (plain) ↗</a>
-                                </div>
-                            </details>
-                        </div>
-                    </div>
-                    <details class="mt-2">
-                        <summary class="text-xs font-medium text-gray-500 hover:text-gray-700 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                            ▸ View {{ group.winners.length }} name{{ group.winners.length === 1 ? '' : 's' }}
-                        </summary>
-                        <ul class="mt-2 flex flex-wrap gap-x-5 gap-y-1.5">
-                            <li v-for="w in group.winners" :key="w.id" class="flex items-center gap-2 text-xs">
-                                <span class="font-medium text-gray-800">{{ w.name }}</span>
-                                <span class="flex items-center gap-2 text-[11px]">
-                                    <a :href="`/certificates/print/${w.uuid}`" target="_blank" class="text-indigo-600 font-medium hover:underline">Print (With BG) ↗</a>
-                                    <a :href="`/certificates/print/${w.uuid}?plain=1`" target="_blank" class="text-gray-500 hover:underline">Plain ↗</a>
-                                    <template v-if="w.is_rendered && !w.is_stale">
-                                        <a :href="`/certificates/pdf/${w.uuid}`" target="_blank" class="text-emerald-600 font-medium hover:underline">View PDF ↗</a>
-                                        <a :href="`/certificates/pdf/${w.uuid}?download=1`" class="text-emerald-600 font-medium hover:underline">Download PDF</a>
-                                    </template>
-                                </span>
-                            </li>
-                        </ul>
-                    </details>
-                </div>
-            </div>
-            <div v-else class="card p-6 text-center text-gray-500 text-sm">
-                No participation certificates generated by item yet.
-            </div>
-        </div>
-
         <!-- TAB: Participation Certificates Grouped by School -->
         <div v-if="activeTab === 'participation_school'" class="mb-6">
             <div class="flex items-center justify-between gap-4 mb-3">
                 <div>
-                    <h3 class="text-sm font-semibold text-gray-800">Participation Certificates Grouped by School</h3>
-                    <p class="text-xs text-gray-500">Participation certificates organized by school for distribution.</p>
+                    <h3 class="text-sm font-semibold text-gray-800">Participation Certificates by School</h3>
+                    <p class="text-xs text-gray-500">One certificate per student, listing every item they took part in — organized by school for distribution.</p>
                 </div>
             </div>
 
@@ -398,7 +324,7 @@
                         <div class="min-w-0 flex items-center gap-3">
                             <p class="font-semibold text-sm text-gray-900">{{ group.school_name }}</p>
                             <span class="shrink-0 text-xs px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-medium">
-                                {{ group.winners.length }} participant{{ group.winners.length === 1 ? '' : 's' }}
+                                {{ group.winners.length }} student{{ group.winners.length === 1 ? '' : 's' }}
                             </span>
                         </div>
                         <div class="flex flex-wrap items-center gap-3 text-xs shrink-0">
@@ -423,11 +349,12 @@
                         <summary class="text-xs font-medium text-gray-500 hover:text-gray-700 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
                             ▸ View {{ group.winners.length }} name{{ group.winners.length === 1 ? '' : 's' }}
                         </summary>
-                        <ul class="mt-2 flex flex-wrap gap-x-5 gap-y-1.5">
-                            <li v-for="w in group.winners" :key="w.id" class="flex items-center gap-2 text-xs">
+                        <ol class="mt-2 divide-y divide-gray-50">
+                            <li v-for="(w, index) in group.winners" :key="w.id" class="py-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs">
+                                <span class="w-6 shrink-0 text-right text-[11px] text-gray-400 tabular-nums">{{ index + 1 }}.</span>
                                 <span class="font-medium text-gray-800">{{ w.name }}</span>
-                                <span class="text-[11px] text-gray-500">{{ w.item_title }}<template v-if="w.category_label"> ({{ w.category_label }})</template></span>
-                                <span class="flex items-center gap-2 text-[11px]">
+                                <span class="min-w-0 flex-1 text-[11px] text-gray-500">{{ participationItemsText(w) }}</span>
+                                <span class="flex items-center gap-2 text-[11px] shrink-0">
                                     <a :href="`/certificates/print/${w.uuid}`" target="_blank" class="text-indigo-600 font-medium hover:underline">Print (With BG) ↗</a>
                                     <a :href="`/certificates/print/${w.uuid}?plain=1`" target="_blank" class="text-gray-500 hover:underline">Plain ↗</a>
                                     <template v-if="w.is_rendered && !w.is_stale">
@@ -436,12 +363,12 @@
                                     </template>
                                 </span>
                             </li>
-                        </ul>
+                        </ol>
                     </details>
                 </div>
             </div>
             <div v-else class="card p-6 text-center text-gray-500 text-sm">
-                No participation certificates grouped by school available yet.
+                No participation certificates generated yet.
             </div>
         </div>
 
@@ -617,7 +544,6 @@ const props = defineProps({
     schools: { type: Array, default: () => [] },
     winnersByItem: { type: Array, default: () => [] },
     winnersBySchool: { type: Array, default: () => [] },
-    participationByItem: { type: Array, default: () => [] },
     participationBySchool: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
     recentBatches: { type: Array, default: () => [] },
@@ -640,6 +566,16 @@ const defaultCertificateDateLabel = computed(() => {
     if (!raw) return 'today (no event dates set)';
     return new Date(raw).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 });
+
+// A participation certificate is one per student and prints every item they entered, so
+// list them all (falls back to the anchor item for a row without the aggregated list).
+function participationItemsText(row) {
+    const items = row.items?.length ? row.items : [{ title: row.item_title, category_label: row.category_label }];
+    return items
+        .filter(i => i.title)
+        .map(i => (i.category_label ? `${i.title} (${i.category_label})` : i.title))
+        .join(', ');
+}
 
 function saveCertificateDate() {
     router.post(`${base}/certificate-date`, { certificate_date: certificateDateInput.value || null }, { preserveScroll: true });

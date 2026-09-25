@@ -16,13 +16,13 @@ use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
- * Covers the new "Participation (Grouped by Item)"/"Grouped by School" tabs —
- * FestCertificateController::groupCertificatesByItem()/groupCertificatesBySchool()
- * generalized from the merit-only winnersByItem()/winnersBySchool() to accept a
- * $certType param. Guards against the generalized methods silently regressing to
- * winner-only (the ($c['cert_type'] ?? null) === $certType filter must actually vary
- * per call site) and confirms is_rendered/is_stale — needed for gating the new
- * View/Download PDF links — actually reach the grouped output, not just the flat list.
+ * Covers the "Participation (by School)" tab — FestCertificateController::
+ * groupCertificatesBySchool() shared with the merit winnersBySchool() via a $certType
+ * param. Guards against it silently regressing to winner-only (the
+ * ($c['cert_type'] ?? null) === $certType filter must actually vary per call site),
+ * confirms is_rendered/is_stale reach the grouped output, and that a participation row
+ * lists every item on the student's one certificate — there is no per-item
+ * participation grouping, since the certificate is per student, handed out per school.
  */
 class FestCertificateParticipationGroupingTest extends TestCase
 {
@@ -74,7 +74,7 @@ class FestCertificateParticipationGroupingTest extends TestCase
         ]);
     }
 
-    public function test_participation_by_item_and_by_school_group_independently_of_winners(): void
+    public function test_participation_groups_by_school_independently_of_winners(): void
     {
         ['admin' => $admin, 'event' => $event, 'school' => $school] = $this->makeSahodayaAdminEventAndSchool();
 
@@ -93,7 +93,7 @@ class FestCertificateParticipationGroupingTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->has('participationByItem', 2)
+            ->missing('participationByItem')
             ->has('participationBySchool', 1)
             ->where('participationBySchool.0.winners', fn ($winners) => count($winners) === 3)
             ->has('winnersByItem', 1)
@@ -114,12 +114,45 @@ class FestCertificateParticipationGroupingTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
-            ->has('participationByItem', 1)
-            ->where('participationByItem.0.winners', function ($winners) {
+            ->has('participationBySchool', 1)
+            ->where('participationBySchool.0.winners', function ($winners) {
                 $winners = collect($winners);
 
                 return $winners->contains(fn ($w) => $w['is_rendered'] === true)
                     && $winners->contains(fn ($w) => $w['is_rendered'] === false);
+            })
+        );
+    }
+
+    public function test_participation_row_lists_every_item_on_the_students_one_certificate(): void
+    {
+        ['admin' => $admin, 'event' => $event, 'school' => $school] = $this->makeSahodayaAdminEventAndSchool();
+        $itemA = FestEventItem::create(['event_id' => $event->id, 'title' => 'Recitation', 'item_code' => 'RC1', 'display_order' => 1]);
+        $itemB = FestEventItem::create(['event_id' => $event->id, 'title' => 'Group Song', 'item_code' => 'GS1', 'display_order' => 2]);
+
+        // One certificate, anchored to the student's Recitation row...
+        $this->makeCertificate($event, $itemA, $school->id, 601, 'participation');
+        // ...but they also entered Group Song, which the certificate prints too.
+        $registration = FestRegistration::create([
+            'event_id' => $event->id, 'item_id' => $itemB->id, 'school_id' => $school->id, 'status' => 'approved',
+        ]);
+        FestParticipant::create([
+            'registration_id' => $registration->id, 'event_id' => $event->id, 'student_id' => 601,
+            'participant_type' => 'student', 'participant_role' => 'performer',
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('sahodaya.events.certificates.index', [
+            'tenantId' => $event->tenant_id, 'event' => $event->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->has('participationBySchool', 1)
+            ->where('participationBySchool.0.winners', function ($winners) {
+                $winners = collect($winners);
+
+                return $winners->count() === 1
+                    && collect($winners->first()['items'])->pluck('title')->all() === ['Recitation', 'Group Song'];
             })
         );
     }

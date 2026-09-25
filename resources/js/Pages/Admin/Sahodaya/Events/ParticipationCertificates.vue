@@ -134,8 +134,8 @@
                                 <span v-if="c.is_stale" class="text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider bg-amber-100 text-amber-800">⚠️ Stale</span>
                                 <span v-else-if="!c.is_rendered" class="text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider bg-gray-100 text-gray-500">Not rendered</span>
                             </div>
-                            <p class="text-xs text-gray-600 mt-0.5 truncate">
-                                {{ c.item?.title ?? 'Event Participant' }}<span class="text-gray-400"> (+ any other items entered)</span>
+                            <p class="text-xs text-gray-600 mt-0.5">
+                                {{ itemsText(c) }}
                                 <span class="text-gray-400"> · </span>
                                 <span class="text-gray-500 font-medium">{{ c.registration?.school?.name ?? c.participant?.registration?.school?.name }}</span>
                             </p>
@@ -206,6 +206,13 @@ const itemOptions = computed(() => props.publishedItems.map(item => {
     return { id: item.id, name };
 }));
 
+// One certificate per student listing every item they entered (c.items, from the controller).
+function itemsText(c) {
+    const items = c.items?.length ? c.items : (c.item ? [c.item] : []);
+    if (!items.length) return 'Event Participant';
+    return items.map(i => (i.category_label ? `${i.title} (${i.category_label})` : i.title)).join(', ');
+}
+
 const filteredCertificates = computed(() => props.certificates.filter(c => {
     if (selectedItemId.value && c.item?.id !== selectedItemId.value) return false;
     if (selectedSchoolId.value) {
@@ -215,7 +222,7 @@ const filteredCertificates = computed(() => props.certificates.filter(c => {
     if (searchQuery.value.trim()) {
         const q = searchQuery.value.toLowerCase().trim();
         const studentName = (c.student?.name ?? c.participant?.student?.name ?? '').toLowerCase();
-        const itemTitle = (c.item?.title ?? '').toLowerCase();
+        const itemTitle = itemsText(c).toLowerCase();
         if (!studentName.includes(q) && !itemTitle.includes(q)) return false;
     }
     return true;

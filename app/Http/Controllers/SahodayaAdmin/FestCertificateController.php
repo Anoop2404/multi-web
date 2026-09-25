@@ -35,7 +35,7 @@ class FestCertificateController extends SahodayaAdminController
 
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $certificates = $this->certificatesForEvent($event);
+        $certificates = $this->withParticipationItems($this->certificatesForEvent($event), $event);
 
         return $this->inertia('Sahodaya/Events/Certificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
             'event' => $event,
@@ -44,7 +44,6 @@ class FestCertificateController extends SahodayaAdminController
             'schools' => $this->schoolsFromCertificates($certificates),
             'winnersByItem' => $this->winnersByItem($certificates, $event),
             'winnersBySchool' => $this->winnersBySchool($certificates, $event),
-            'participationByItem' => $this->participationByItem($certificates, $event),
             'participationBySchool' => $this->participationBySchool($certificates, $event),
             'recentBatches' => $this->recentBatchesForEvent($event),
             'staleCount' => $certificates->filter(fn ($c) => $c['is_stale'] ?? false)->count(),
@@ -91,7 +90,7 @@ class FestCertificateController extends SahodayaAdminController
 
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $certificates = $this->certificatesForEvent($event, 'participation');
+        $certificates = $this->withParticipationItems($this->certificatesForEvent($event, 'participation'), $event);
 
         return $this->inertia('Sahodaya/Events/ParticipationCertificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
             'event' => $event,
@@ -130,6 +129,7 @@ class FestCertificateController extends SahodayaAdminController
                 'rendered_at' => $c['rendered_at'],
                 'student' => ['name' => $c['student']?->name ?? $c['participant']?->student?->name],
                 'item' => ! empty($c['item']) ? ['id' => $c['item']->id, 'title' => $c['item']->title] : null,
+                'items' => $c['participation_items'] ?? null,
                 'mark' => $c['mark'] ? ['position' => $c['mark']->position] : null,
                 'registration' => ['school' => $school ? ['id' => $school->id, 'name' => $school->name] : null],
             ];
@@ -234,20 +234,50 @@ class FestCertificateController extends SahodayaAdminController
     }
 
     /**
-     * A participation certificate is anchored to one arbitrary FestParticipant row (see
-     * FestCertificateService::generateParticipationForEvent()'s $anchor), so grouping by
-     * $c['item'] here groups by that person's *first* registered item, same simplification
-     * ParticipationCertificates.vue's item filter already makes — not every item they
-     * participated in. Multi-item participants aren't fanned out into multiple groups.
+     * A participation certificate is one per person (anchored to an arbitrary one of their
+     * FestParticipant rows — see FestCertificateService::generateParticipationForEvent()),
+     * handed out per school, so there is deliberately no grouped-by-item participation
+     * view: grouping by the anchor's item misfiled multi-item students under whichever item
+     * they happened to register first. Each row carries the person's full item list
+     * (withParticipationItems()) — what the certificate itself prints.
      */
-    private function participationByItem(Collection $certificates, FestEvent $currentEvent): Collection
-    {
-        return $this->groupCertificatesByItem($certificates, 'participation', $currentEvent);
-    }
-
     private function participationBySchool(Collection $certificates, FestEvent $currentEvent): Collection
     {
         return $this->groupCertificatesBySchool($certificates, 'participation', $currentEvent);
+    }
+
+    /**
+     * Adds 'participation_items' (every item the person's aggregated certificate lists, as
+     * [id, title, category_label]) to each participation certificate row; winner rows are
+     * left untouched since they are always exactly their own single item.
+     *
+     * @param  Collection<int, array<string, mixed>>  $certificates
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function withParticipationItems(Collection $certificates, FestEvent $event): Collection
+    {
+        if (! $certificates->contains(fn ($c) => ($c['cert_type'] ?? null) === 'participation')) {
+            return $certificates;
+        }
+
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
+        $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
+        $itemsByPerson = app(FestCertificateService::class)->participationItemsByPerson($event)
+            ->map(fn (Collection $items) => $items->map(fn (FestEventItem $item) => [
+                'id' => $item->id,
+                'title' => $item->title,
+                'category_label' => FestItemCategoryLabel::shortLabel($item, $classGroupLabels, $artsCategoryLabels),
+            ])->values()->all());
+
+        return $certificates->map(function (array $c) use ($itemsByPerson) {
+            if (($c['cert_type'] ?? null) !== 'participation' || empty($c['participant'])) {
+                return $c;
+            }
+
+            $c['participation_items'] = $itemsByPerson->get(FestCertificateService::participationPersonKey($c['participant']), []);
+
+            return $c;
+        });
     }
 
     /**
@@ -304,24 +334,31 @@ class FestCertificateController extends SahodayaAdminController
         return $certificates
             ->filter(fn ($c) => ($c['cert_type'] ?? null) === $certType && ! empty($c['item']))
             ->groupBy(fn ($c) => $c['registration']?->school_id ?? $c['participant']?->registration?->school_id ?? 0)
-            ->map(function ($group) use ($classGroupLabels, $artsCategoryLabels) {
+            ->map(function ($group) use ($classGroupLabels, $artsCategoryLabels, $certType) {
                 $first = $group->first();
                 $school = $first['registration']?->school ?? $first['participant']?->registration?->school;
+
+                $rows = $group->map(fn ($c) => [
+                    'id' => $c['id'],
+                    'uuid' => $c['uuid'],
+                    'name' => $c['student']?->name ?? $c['participant']?->student?->name ?? 'Participant',
+                    'item_title' => $c['item']?->title ?? '',
+                    'category_label' => FestItemCategoryLabel::shortLabel($c['item'], $classGroupLabels, $artsCategoryLabels),
+                    // Participation: every item on the person's one certificate, not
+                    // just the anchor row's item.
+                    'items' => $c['participation_items'] ?? null,
+                    'position' => $c['mark']?->position ?? $c['position'] ?? null,
+                    'is_rendered' => $c['is_rendered'] ?? false,
+                    'is_stale' => $c['is_stale'] ?? false,
+                ]);
 
                 return [
                     'school_id' => $school?->id ?? 0,
                     'school_name' => $school?->name ?? 'Unknown School',
-                    'winners' => $group->sortBy(fn ($c) => $c['mark']?->position ?? $c['position'] ?? 99)
-                        ->map(fn ($c) => [
-                            'id' => $c['id'],
-                            'uuid' => $c['uuid'],
-                            'name' => $c['student']?->name ?? $c['participant']?->student?->name ?? 'Participant',
-                            'item_title' => $c['item']?->title ?? '',
-                            'category_label' => FestItemCategoryLabel::shortLabel($c['item'], $classGroupLabels, $artsCategoryLabels),
-                            'position' => $c['mark']?->position ?? $c['position'] ?? null,
-                            'is_rendered' => $c['is_rendered'] ?? false,
-                            'is_stale' => $c['is_stale'] ?? false,
-                        ])
+                    // Participation has no positions — alphabetical, for handing out.
+                    'winners' => ($certType === 'participation'
+                        ? $rows->sortBy(fn ($r) => mb_strtolower($r['name']))
+                        : $rows->sortBy(fn ($r) => $r['position'] ?? 99))
                         ->values(),
                 ];
             })

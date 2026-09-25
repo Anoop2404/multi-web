@@ -144,10 +144,12 @@ class FestParticipationCertificateParentTest extends TestCase
         $rows = $response->viewData('page')['props']['certificates'];
         $this->assertCount(1, $rows);
         $this->assertEqualsCanonicalizing(
-            ['id', 'uuid', 'cert_type', 'is_stale', 'is_rendered', 'rendered_at', 'student', 'item', 'mark', 'registration'],
+            ['id', 'uuid', 'cert_type', 'is_stale', 'is_rendered', 'rendered_at', 'student', 'item', 'items', 'mark', 'registration'],
             array_keys((array) $rows[0]),
         );
         $this->assertSame('Two Leg Student', ((array) $rows[0])['student']['name']);
+        // One certificate per student: the listing carries every item it prints, across both legs.
+        $this->assertEqualsCanonicalizing(['Pencil Drawing', 'Solo Song'], array_column(((array) $rows[0])['items'], 'title'));
         $this->assertSame('PARENT CERT SCHOOL', strtoupper(((array) $rows[0])['registration']['school']['name']));
     }
 }

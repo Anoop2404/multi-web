@@ -276,7 +276,7 @@ class FestCertificateService
     private function participationGroupsForEvent(FestEvent $event): \Illuminate\Support\Collection
     {
         return $this->eligibleParticipantsForEvent($event)
-            ->groupBy(fn (FestParticipant $p) => $p->student_id ? 'student:'.$p->student_id : 'teacher:'.$p->teacher_id);
+            ->groupBy(fn (FestParticipant $p) => self::participationPersonKey($p));
     }
 
     /**
@@ -1118,10 +1118,38 @@ class FestCertificateService
     {
         $eventParticipants ??= $this->eligibleParticipantsForEvent($event);
 
-        return $eventParticipants
+        return $this->distinctItemsOf($eventParticipants
             ->filter(fn (FestParticipant $p) => $participant->student_id
                 ? $p->student_id === $participant->student_id
-                : $p->teacher_id === $participant->teacher_id)
+                : $p->teacher_id === $participant->teacher_id));
+    }
+
+    /**
+     * participationItems() for every person at once, keyed like participationGroupsForEvent()
+     * ('student:ID' / 'teacher:ID') — for the admin certificate listings, which show each
+     * person once with the full item list their aggregated certificate prints, not just
+     * their anchor row's item. Resolved against the same (root, for phased) event
+     * generateParticipationForEvent() issues from.
+     *
+     * @return \Illuminate\Support\Collection<string, \Illuminate\Support\Collection<int, FestEventItem>>
+     */
+    public function participationItemsByPerson(FestEvent $event): \Illuminate\Support\Collection
+    {
+        $event = $this->certificateEvent($event, 'participation');
+
+        return $this->participationGroupsForEvent($event)
+            ->map(fn (\Illuminate\Support\Collection $group) => $this->distinctItemsOf($group));
+    }
+
+    public static function participationPersonKey(FestParticipant $participant): string
+    {
+        return $participant->student_id ? 'student:'.$participant->student_id : 'teacher:'.$participant->teacher_id;
+    }
+
+    /** @return \Illuminate\Support\Collection<int, FestEventItem> */
+    private function distinctItemsOf(\Illuminate\Support\Collection $participants): \Illuminate\Support\Collection
+    {
+        return $participants
             ->map(fn (FestParticipant $p) => $p->registration?->item)
             ->filter()
             ->unique('id')
