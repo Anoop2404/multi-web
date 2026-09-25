@@ -87,13 +87,10 @@ class BuildCertificateZipChunkJob implements ShouldQueue
             return;
         }
 
-        $payloads = $service->exportPayloadsForEvent(
-            $event,
-            embedAssets: true,
-            plain: $this->plain,
-            certIds: $this->certificateIds,
-            sahodaya: $tenant,
-        );
+        [$certificates, $payloads] = $service->exportScope($event, certIds: $this->certificateIds);
+        // Full (embedded-image) contexts are built lazily, only for certificates not
+        // already rendered — see the renderEach() call below.
+        $buildContext = $service->exportContextBuilder(embedAssets: true, plain: $this->plain, sahodaya: $tenant);
 
         $localPath = storage_path('app/tmp/fest-certs-batch'.$batch->id.'.zip');
         @mkdir(dirname($localPath), 0755, true);
@@ -128,11 +125,12 @@ class BuildCertificateZipChunkJob implements ShouldQueue
         // with a rolling window of concurrent requests (PdfGenerator::renderEach())
         // rather than one blocking round-trip per certificate.
         $misses = [];
-        foreach ($payloads as $payload) {
+        foreach ($certificates as $certificate) {
             try {
-                $pdf = $service->cachedPdf($payload['certificate'], $this->plain);
+                $payload = $payloads->get($certificate->id);
+                $pdf = $service->cachedPdf($certificate, $this->plain);
                 if ($pdf === null) {
-                    $misses[$payload['certificate']->id] = $payload;
+                    $misses[$certificate->id] = $payload;
 
                     continue;
                 }
@@ -144,10 +142,10 @@ class BuildCertificateZipChunkJob implements ShouldQueue
         }
 
         PdfGenerator::renderEach(
-            (function () use ($misses, $service, &$failed) {
+            (function () use ($misses, $service, $buildContext, &$failed) {
                 foreach ($misses as $certificateId => $payload) {
                     try {
-                        $document = $service->pdfDocument($payload, $this->plain);
+                        $document = $service->pdfDocument($buildContext($payload['certificate'], $payload), $this->plain);
                     } catch (\Throwable) {
                         $failed++;
 

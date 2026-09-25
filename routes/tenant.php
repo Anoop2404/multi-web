@@ -69,7 +69,10 @@ Route::middleware([
     });
 
     // Public festival portal (always available on Sahodaya tenants)
-    Route::prefix('fest')->name('tenant.fest.')->group(function () {
+    // IDs are numeric: a non-numeric {event} (bots, mangled links) used to reach the
+    // controllers' int $eventId and 500 with a TypeError, and a non-numeric {item}/{mark}
+    // a Postgres bigint cast error — now they're a plain 404.
+    Route::prefix('fest')->name('tenant.fest.')->where(['event' => '[0-9]+', 'item' => '[0-9]+', 'mark' => '[0-9]+'])->group(function () {
         Route::get('/', [FestPortalController::class, 'index'])->name('index');
         Route::get('/{event}', [FestPortalController::class, 'show'])->name('show');
         Route::get('/{event}/schedule', [FestPortalController::class, 'schedule'])->name('schedule');

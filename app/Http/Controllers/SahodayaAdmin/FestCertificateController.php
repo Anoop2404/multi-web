@@ -598,18 +598,9 @@ class FestCertificateController extends SahodayaAdminController
         $groupBy = in_array($request->query('group_by'), ['item', 'school'], true) ? $request->query('group_by') : null;
 
         $service = app(FestCertificateService::class);
-        $payloads = $service->exportPayloadsForEvent(
-            $event,
-            embedAssets: true,
-            plain: $request->boolean('plain'),
-            publishedOnly: $publishedOnly,
-            itemId: $itemId,
-            schoolId: $schoolId,
-            certType: $certType,
-            certIds: $certIds
-        );
+        [$certificates, $payloads] = $service->exportScope($event, $publishedOnly, $itemId, $schoolId, $certType, $certIds);
 
-        abort_if($payloads->isEmpty(), 404, $publishedOnly ? 'No published winner certificates to download.' : 'No certificates to download.');
+        abort_if($certificates->isEmpty(), 404, $publishedOnly ? 'No published winner certificates to download.' : 'No certificates to download.');
 
         $zipPath = storage_path('app/tmp/fest-certs-'.$event->id.'-'.time().'.zip');
         @mkdir(dirname($zipPath), 0755, true);
@@ -638,21 +629,25 @@ class FestCertificateController extends SahodayaAdminController
         // with a rolling window of concurrent requests (PdfGenerator::renderEach())
         // instead of one blocking round-trip per certificate — this direct download is
         // what a per-school ZIP uses while a long render run is still occupying the queue.
+        // A full (embedded-image) context is only built for a certificate about to be
+        // rendered, never up front for the whole scope.
         $misses = [];
-        foreach ($payloads as $payload) {
-            $pdf = $service->cachedPdf($payload['certificate'], $plain);
+        foreach ($certificates as $certificate) {
+            $payload = $payloads->get($certificate->id);
+            $pdf = $service->cachedPdf($certificate, $plain);
             if ($pdf === null) {
-                $misses[$payload['certificate']->id] = $payload;
+                $misses[$certificate->id] = $payload;
 
                 continue;
             }
             $zip->addFromString($entryName($payload), $pdf);
         }
 
+        $buildContext = $service->exportContextBuilder(embedAssets: true, plain: $plain);
         PdfGenerator::renderEach(
-            (function () use ($misses, $service, $plain) {
+            (function () use ($misses, $service, $plain, $buildContext) {
                 foreach ($misses as $certificateId => $payload) {
-                    yield $certificateId => $service->pdfDocument($payload, $plain);
+                    yield $certificateId => $service->pdfDocument($buildContext($payload['certificate'], $payload), $plain);
                 }
             })(),
             function ($certificateId, $pdf) use ($zip, $misses, $entryName) {

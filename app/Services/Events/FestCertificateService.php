@@ -1631,17 +1631,10 @@ class FestCertificateService
     }
 
     /**
-     * Full render payloads for an export scope — used by the synchronous small-scope
-     * download/print routes directly, and by BuildCertificateZipJob for the queued
-     * whole-event export. $sahodaya, when given, builds each certificate's QR verify URL
-     * from the tenant's own domain (TenantDomainSync::publicUrl()) instead of
-     * route(..., absolute: true) — required for the job, which runs on a queue worker
-     * with no HTTP request to derive a host from (route() would fall back to
-     * config('app.url'), the platform's own domain, not the issuing Sahodaya's — the same
-     * bug already fixed this session for RenderCertificateChunkJob/
-     * TrainingCertificateService). Left null (the default) for the existing controller
-     * call sites, which already run inside a real request on the tenant's own domain —
-     * route(absolute: true) is correct there as-is.
+     * Every certificate's final render context for an export scope, built up front —
+     * for the bulk print page (plain URLs, no embedded images, so holding them all is
+     * cheap). The ZIP paths use exportScope() + exportContextBuilder() instead, building
+     * contexts only for certificates that aren't already rendered, one at a time.
      */
     public function exportPayloadsForEvent(
         FestEvent $event,
@@ -1654,40 +1647,74 @@ class FestCertificateService
         ?array $certIds = null,
         ?Tenant $sahodaya = null,
     ): \Illuminate\Support\Collection {
-        $certificates = $this->resolveCertificateScope($event, $itemId, $schoolId, $certType, $certIds);
+        [$certificates, $payloads] = $this->exportScope($event, $publishedOnly, $itemId, $schoolId, $certType, $certIds);
+        $buildContext = $this->exportContextBuilder($embedAssets, $plain, $sahodaya);
 
+        return $certificates->map(fn (Certificate $certificate) => $buildContext($certificate, $payloads->get($certificate->id)));
+    }
+
+    /**
+     * The certificates an export covers plus their cheap payloadsFor() rows (no render
+     * context) — enough to name/group archive entries and check the render cache, so the
+     * ZIP paths only build a full context for certificates that actually need rendering.
+     *
+     * @return array{0: \Illuminate\Support\Collection<int, Certificate>, 1: \Illuminate\Support\Collection<int, array<string, mixed>>}
+     */
+    public function exportScope(
+        FestEvent $event,
+        bool $publishedOnly = false,
+        ?int $itemId = null,
+        ?string $schoolId = null,
+        ?string $certType = null,
+        ?array $certIds = null,
+    ): array {
+        $certificates = $this->resolveCertificateScope($event, $itemId, $schoolId, $certType, $certIds);
         $payloads = $this->payloadsFor($certificates);
 
         if ($publishedOnly) {
             $certificates = $this->publishedOnlyWinners($certificates, $payloads);
         }
 
+        return [$certificates->values(), $payloads];
+    }
+
+    /**
+     * A closure building one certificate's final render context (renderContext() + QR +
+     * plain flag), with the template/participant/asset caches shared across every call —
+     * so a bulk export can build contexts one at a time, as they're needed, instead of
+     * holding every certificate's embedded-image context at once (a big ZIP ran the web
+     * request out of its 1 GB memory limit that way).
+     *
+     * $sahodaya, when given, builds the QR verify URL from the tenant's own domain
+     * (TenantDomainSync::publicUrl()) instead of route(..., absolute: true) — required on
+     * a queue worker, which has no HTTP request to derive a host from.
+     *
+     * @return \Closure(Certificate, ?array): array<string, mixed>
+     */
+    public function exportContextBuilder(bool $embedAssets, bool $plain, ?Tenant $sahodaya = null): \Closure
+    {
         $templateCache = [];
         $participantsCache = [];
-        // Shared across the whole export (as RenderCertificateChunkJob already does) — it
-        // was left out here, so every certificate re-fetched and re-resized the template's
-        // background/logo/seal/signatures (ZIP) or re-probed storage for each URL (print),
-        // enough for a one-school print of ~14 certificates to run past the gateway timeout.
         $assetCache = [];
 
-        return $certificates->map(function ($certificate) use ($payloads, &$templateCache, &$participantsCache, &$assetCache, $embedAssets, $plain, $sahodaya) {
-            $payload = $this->renderContext($certificate, $payloads->get($certificate->id), $templateCache, $participantsCache, embedAssets: $embedAssets, assetCache: $assetCache);
+        return function (Certificate $certificate, ?array $payload) use (&$templateCache, &$participantsCache, &$assetCache, $embedAssets, $plain, $sahodaya): array {
+            $context = $this->renderContext($certificate, $payload, $templateCache, $participantsCache, embedAssets: $embedAssets, assetCache: $assetCache);
 
             $verifyUrl = $sahodaya
                 ? (TenantDomainSync::publicUrl($sahodaya) ?? url('/')).'/certificates/verify/'.$certificate->verification_uuid
                 : route('certificates.verify', $certificate->verification_uuid, absolute: true);
-            $payload['qr_src'] = app(FestIdCardQrService::class)->dataUri($verifyUrl);
+            $context['qr_src'] = app(FestIdCardQrService::class)->dataUri($verifyUrl);
 
             // "Plain" drops the uploaded background image only — the template's own
             // title/body/logo/seal/signatories still render via the same partial's
             // existing no-background branch, just without the ink-heavy backdrop, for
             // admins printing physical copies in bulk.
             if ($plain) {
-                $payload['plainMode'] = true;
+                $context['plainMode'] = true;
             }
 
-            return $payload;
-        });
+            return $context;
+        };
     }
 
     /**

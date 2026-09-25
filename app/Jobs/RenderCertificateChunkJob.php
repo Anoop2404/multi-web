@@ -16,6 +16,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Renders and caches one ~30-certificate slice of a CertificateBatch run (see
@@ -90,6 +91,13 @@ class RenderCertificateChunkJob implements ShouldQueue
             return;
         }
 
+        // Where a chunk's time goes (logged at the end): building each certificate's context
+        // and HTML, and storing the PDFs, both happen on this one PHP process — the rest is
+        // waiting on the converter.
+        $startedAt = microtime(true);
+        $prepareSeconds = 0.0;
+        $storeSeconds = 0.0;
+
         $certificates = Certificate::whereIn('id', $this->certificateIds)->get()->keyBy('id');
         $payloads = $service->payloadsFor($certificates->values());
 
@@ -117,14 +125,17 @@ class RenderCertificateChunkJob implements ShouldQueue
         // Lazy: a certificate's context/HTML is only built when the converter has a free
         // slot for it (see PdfGenerator::renderEach()), so a chunk never holds every
         // certificate's embedded-image HTML at once.
-        $documents = (function () use ($certificates, $service, $qrService, $payloads, &$templateCache, &$participantsCache, &$assetCache, &$pending, $recordFailure) {
+        $documents = (function () use ($certificates, $service, $qrService, $payloads, &$templateCache, &$participantsCache, &$assetCache, &$pending, $recordFailure, &$prepareSeconds) {
             foreach ($certificates as $certificate) {
+                $preparing = microtime(true);
                 try {
                     $prepared = $this->prepare($certificate, $service, $qrService, $payloads, $templateCache, $participantsCache, $assetCache);
                 } catch (\Throwable $e) {
                     $recordFailure($certificate, $e);
 
                     continue;
+                } finally {
+                    $prepareSeconds += microtime(true) - $preparing;
                 }
 
                 $pending[$certificate->id] = ['context' => $prepared['context'], 'pdfs' => []];
@@ -138,7 +149,7 @@ class RenderCertificateChunkJob implements ShouldQueue
         // it's stored once the second one lands. Keeps up to
         // services.pdf_converter.concurrency converter connections busy the whole time
         // instead of waiting on each certificate's round-trips in turn.
-        PdfGenerator::renderEach($documents, function ($key, $result) use ($batch, $certificates, $service, &$pending, $recordFailure, &$consecutiveConnectionFailures, &$processedSinceFlush, &$succeededSinceFlush, &$failedSinceFlush, &$failedItemsSinceFlush) {
+        PdfGenerator::renderEach($documents, function ($key, $result) use ($batch, $certificates, $service, &$pending, $recordFailure, &$consecutiveConnectionFailures, &$processedSinceFlush, &$succeededSinceFlush, &$failedSinceFlush, &$failedItemsSinceFlush, &$storeSeconds) {
             [$certificateId, $variant] = explode(':', (string) $key, 2);
             $pending[$certificateId]['pdfs'][$variant] = $result;
             if (count($pending[$certificateId]['pdfs']) < 2) {
@@ -149,6 +160,7 @@ class RenderCertificateChunkJob implements ShouldQueue
             unset($pending[$certificateId]);
             $certificate = $certificates->get((int) $certificateId);
 
+            $storing = microtime(true);
             try {
                 $this->persist($certificate, $service, $entry['context'], $entry['pdfs']['bg'], $entry['pdfs']['plain']);
                 $processedSinceFlush++;
@@ -169,6 +181,8 @@ class RenderCertificateChunkJob implements ShouldQueue
                 }
             } catch (\Throwable $e) {
                 $recordFailure($certificate, $e);
+            } finally {
+                $storeSeconds += microtime(true) - $storing;
             }
 
             if ($processedSinceFlush >= self::PROGRESS_FLUSH_EVERY) {
@@ -177,6 +191,18 @@ class RenderCertificateChunkJob implements ShouldQueue
         });
 
         $this->flushProgress($batch, $processedSinceFlush, $succeededSinceFlush, $failedSinceFlush, $failedItemsSinceFlush);
+
+        $totalSeconds = microtime(true) - $startedAt;
+        Log::info('Certificate render chunk finished', [
+            'batch' => $this->certificateBatchId,
+            'certificates' => $certificates->count(),
+            'seconds' => round($totalSeconds, 1),
+            'per_certificate' => $certificates->count() ? round($totalSeconds / $certificates->count(), 2) : null,
+            'prepare_seconds' => round($prepareSeconds, 1),
+            'store_seconds' => round($storeSeconds, 1),
+            'converter_wait_seconds' => round(max(0, $totalSeconds - $prepareSeconds - $storeSeconds), 1),
+            'concurrency' => (int) config('services.pdf_converter.concurrency', 3),
+        ]);
     }
 
     /**

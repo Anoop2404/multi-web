@@ -31,6 +31,26 @@ class CustomNotFoundPageTest extends TestCase
             ->assertDontSee('No query results for model');
     }
 
+    /**
+     * A non-numeric event id (bots, mangled links) used to reach FestPortalController's
+     * int $eventId and 500 with a TypeError; a non-numeric item id a Postgres bigint cast
+     * error. Both are now a plain 404.
+     */
+    public function test_non_numeric_public_fest_ids_are_not_found_not_a_server_error(): void
+    {
+        Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'Malappuram Sahodaya',
+            'domain' => 'bad-fest-id.test',
+            'is_active' => true,
+        ]);
+
+        $this->get('http://bad-fest-id.test/fest/wp-login.php')->assertNotFound();
+        $this->get('http://bad-fest-id.test/fest/abc/results')->assertNotFound();
+        $this->get('http://bad-fest-id.test/fest/12/items/abc/results')->assertNotFound();
+    }
+
     public function test_unknown_page_shows_generic_recovery_page_without_event_action(): void
     {
         Tenant::create([
