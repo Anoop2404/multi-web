@@ -31,6 +31,14 @@ class CertificateTemplateController extends SahodayaAdminController
                 $row['seal_url'] = $t->seal_path
                     ? TenantStorage::logoUrl($this->sahodaya, $t->seal_path)
                     : null;
+                if (is_array($row['layout_json']['signature_blocks'] ?? null)) {
+                    $row['layout_json']['signature_blocks'] = collect($row['layout_json']['signature_blocks'])
+                        ->map(fn ($b) => array_merge($b, [
+                            'signature_url' => ! empty($b['signature_path'])
+                                ? TenantStorage::logoUrl($this->sahodaya, $b['signature_path'])
+                                : null,
+                        ]))->all();
+                }
                 $row['signatories'] = collect($t->signatories ?? [])->map(fn ($s) => array_merge($s, [
                     'signature_url' => ! empty($s['signature_path'])
                         ? TenantStorage::logoUrl($this->sahodaya, $s['signature_path'])
@@ -122,7 +130,15 @@ class CertificateTemplateController extends SahodayaAdminController
                 'sealUrl'       => $template->seal_path ? TenantStorage::logoUrl($this->sahodaya, $template->seal_path) : null,
                 'backgroundUrl' => $template->background_path ? TenantStorage::logoUrl($this->sahodaya, $template->background_path) : null,
                 'photoUrl'      => app(\App\Services\Events\FestIdCardService::class)->defaultAvatarDataUri('neutral'),
-                'overlayLayout' => $template->overlayLayout(),
+                'overlayLayout' => collect($template->overlayLayout())->map(function ($v, $k) {
+                    if ($k !== 'signature_blocks') {
+                        return $v;
+                    }
+
+                    return collect($v)->map(fn ($b) => array_merge($b, [
+                        'signature_url' => ! empty($b['signature_path']) ? TenantStorage::logoUrl($this->sahodaya, $b['signature_path']) : null,
+                    ]))->all();
+                })->all(),
                 'signatories'   => collect($template->signatories ?? CertificateTemplate::defaultTrainingSignatories())
                     ->map(fn ($s) => [
                         'name'          => $s['name'] ?? '',
@@ -286,6 +302,11 @@ class CertificateTemplateController extends SahodayaAdminController
             'layout_json.participation_label_cover.height' => 'nullable|numeric|min:1|max:30',
             'layout_json.signature_blocks'                 => 'nullable|array|max:12',
             'layout_json.signature_blocks.*.label'         => 'nullable|string|max:80',
+            'layout_json.signature_blocks.*.name_text'        => 'nullable|string|max:120',
+            'layout_json.signature_blocks.*.designation_text' => 'nullable|string|max:120',
+            'layout_json.signature_blocks.*.school_text'      => 'nullable|string|max:160',
+            'layout_json.signature_blocks.*.signature_file'   => 'nullable|image|max:1024',
+            'layout_json.signature_blocks.*.remove_signature' => 'nullable|boolean',
             'layout_json.signature_blocks.*.signature.top'        => 'nullable|numeric|min:0|max:100',
             'layout_json.signature_blocks.*.signature.left'       => 'nullable|numeric|min:0|max:100',
             'layout_json.signature_blocks.*.signature.width'      => 'nullable|numeric|min:0|max:100',
@@ -398,6 +419,7 @@ class CertificateTemplateController extends SahodayaAdminController
         $layout = null;
         if ($backgroundPath || (in_array($data['event_type'], ['training', 'fest'], true) && isset($data['layout_json']))) {
             $layout = $this->mergeLayout($data['layout_json'] ?? null);
+            $layout = $this->withBlockSignatures($request, $layout, [], $baseDir.'/signatures', $disk);
             if ($detectedOrientation) {
                 $layout['orientation'] = $detectedOrientation;
             }
@@ -534,6 +556,11 @@ class CertificateTemplateController extends SahodayaAdminController
             'layout_json.participation_label_cover.height' => 'nullable|numeric|min:1|max:30',
             'layout_json.signature_blocks'                 => 'nullable|array|max:12',
             'layout_json.signature_blocks.*.label'         => 'nullable|string|max:80',
+            'layout_json.signature_blocks.*.name_text'        => 'nullable|string|max:120',
+            'layout_json.signature_blocks.*.designation_text' => 'nullable|string|max:120',
+            'layout_json.signature_blocks.*.school_text'      => 'nullable|string|max:160',
+            'layout_json.signature_blocks.*.signature_file'   => 'nullable|image|max:1024',
+            'layout_json.signature_blocks.*.remove_signature' => 'nullable|boolean',
             'layout_json.signature_blocks.*.signature.top'        => 'nullable|numeric|min:0|max:100',
             'layout_json.signature_blocks.*.signature.left'       => 'nullable|numeric|min:0|max:100',
             'layout_json.signature_blocks.*.signature.width'      => 'nullable|numeric|min:0|max:100',
@@ -638,7 +665,13 @@ class CertificateTemplateController extends SahodayaAdminController
         }
 
         if (array_key_exists('layout_json', $data)) {
-            $updates['layout_json'] = $this->mergeLayout($data['layout_json'], $template->layout_json);
+            $updates['layout_json'] = $this->withBlockSignatures(
+                $request,
+                $this->mergeLayout($data['layout_json'], $template->layout_json),
+                $template->layout_json['signature_blocks'] ?? [],
+                $baseDir.'/signatures',
+                $disk,
+            );
         }
 
         // A freshly uploaded image's real dimensions are authoritative for orientation,
@@ -759,6 +792,43 @@ class CertificateTemplateController extends SahodayaAdminController
         return back()->with('success', 'Template removed.');
     }
 
+    /**
+     * Re-attaches each signature block's stored image: the path already saved for the block
+     * with the same label (never one the client sends), replaced by a fresh upload or
+     * cleared by "remove". Blocks are matched to their form rows by label, since blank-label
+     * rows are dropped and would otherwise shift the row indexes.
+     *
+     * @param  array<string, mixed>  $layout
+     * @param  list<array<string, mixed>>  $existingBlocks
+     * @return array<string, mixed>
+     */
+    private function withBlockSignatures(Request $request, array $layout, array $existingBlocks, string $dir, string $disk): array
+    {
+        $rows = $request->input('layout_json.signature_blocks');
+        if (! is_array($rows) || ! isset($layout['signature_blocks'])) {
+            return $layout;
+        }
+
+        $existingPaths = collect($existingBlocks)->pluck('signature_path', 'key')->all();
+        $rowIndexByKey = [];
+        foreach ($rows as $i => $row) {
+            $rowIndexByKey[CertificateTemplate::signatureKey((string) ($row['label'] ?? ''))] ??= $i;
+        }
+
+        foreach ($layout['signature_blocks'] as $n => $block) {
+            $i = $rowIndexByKey[$block['key']] ?? null;
+            $path = $existingPaths[$block['key']] ?? null;
+            if ($i !== null && $request->hasFile("layout_json.signature_blocks.{$i}.signature_file")) {
+                $path = $request->file("layout_json.signature_blocks.{$i}.signature_file")->store($dir, $disk);
+            } elseif ($i !== null && filter_var($rows[$i]['remove_signature'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                $path = null;
+            }
+            $layout['signature_blocks'][$n]['signature_path'] = $path;
+        }
+
+        return $layout;
+    }
+
     /** @return list<array{name: string, designation: string, signature_path: ?string}> */
     private function normalizeSignatories(Request $request, ?array $input, string $dir, string $disk, array $existing = []): array
     {
@@ -841,7 +911,7 @@ class CertificateTemplateController extends SahodayaAdminController
         }
 
         if (array_key_exists('signature_blocks', $input)) {
-            $layout['signature_blocks'] = CertificateTemplate::normalizeSignatureBlocks($input['signature_blocks']);
+            $layout['signature_blocks'] = CertificateTemplate::normalizeSignatureBlocks($input['signature_blocks'], false);
         }
 
         return $layout;

@@ -94,18 +94,28 @@
                  signature / name / designation / school is positioned and aligned on its own,
                  and is printed only when the event supplies a value. --}}
             @foreach(($layout['signature_blocks'] ?? []) as $block)
-                @php $sig = ($eventSignatories ?? [])[$block['key']] ?? null; @endphp
-                @continue(empty($sig))
-                @if(!empty($sig['signature_url']))
+                @php
+                    // Event's signatory wins per part; the template block's own name/
+                    // designation/school/signature are the fallback defaults.
+                    $sig = ($eventSignatories ?? [])[$block['key']] ?? [];
+                    $sigUrl = $sig['signature_url'] ?? ($block['signature_url'] ?? null);
+                    $sigName = ! empty($sig['name']) ? $sig['name'] : ($block['name_text'] ?? '');
+                    $sigSchool = ! empty($sig['school']) ? $sig['school'] : ($block['school_text'] ?? '');
+                    $sigDesignation = ! empty($sig['designation']) ? $sig['designation'] : ($block['designation_text'] ?? '');
+                    if ($sigDesignation === '' && ($sigName !== '' || $sigSchool !== '' || ! empty($sigUrl))) {
+                        $sigDesignation = $block['label'];
+                    }
+                    $sigParts = ['name' => $sigName, 'designation' => $sigDesignation, 'school' => $sigSchool];
+                @endphp
+                @if(!empty($sigUrl))
                     @php $bs = $block['signature'] ?? []; @endphp
                     <div class="overlay-field signatory-signature" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($bs, ['top' => 78, 'left' => 72, 'width' => 20, 'align' => 'center']) }}">
-                        <img src="{{ $sig['signature_url'] }}" alt="" style="max-width:100%;max-height:{{ (int) ($bs['font_size'] ?? 12) * 5 }}px;">
+                        <img src="{{ $sigUrl }}" alt="" style="max-width:100%;max-height:{{ (int) ($bs['font_size'] ?? 12) * 5 }}px;">
                     </div>
                 @endif
                 @foreach(['name' => ['top' => 86, 'font_size' => 10, 'font_weight' => 'bold'], 'designation' => ['top' => 89, 'font_size' => 8], 'school' => ['top' => 92, 'font_size' => 8]] as $part => $fallback)
-                    @php $text = $part === 'designation' ? ($sig['designation'] ?: $sig['label']) : ($sig[$part] ?? ''); @endphp
-                    @if(filled($text))
-                        <div class="overlay-field signatory-{{ $part }}" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($block[$part] ?? [], $fallback + ['left' => 72, 'width' => 20, 'font_family' => 'Montserrat', 'align' => 'center']) }}">{{ $text }}</div>
+                    @if(filled($sigParts[$part]))
+                        <div class="overlay-field signatory-{{ $part }}" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($block[$part] ?? [], $fallback + ['left' => 72, 'width' => 20, 'font_family' => 'Montserrat', 'align' => 'center']) }}">{{ $sigParts[$part] }}</div>
                     @endif
                 @endforeach
             @endforeach

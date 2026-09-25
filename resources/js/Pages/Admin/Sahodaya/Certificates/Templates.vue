@@ -307,7 +307,7 @@
                                 <div class="flex items-center justify-between gap-3">
                                     <div>
                                         <p class="font-bold text-slate-800 text-xs uppercase tracking-wider">Signature blocks</p>
-                                        <p class="text-xs text-slate-500 mt-0.5">Each block is a signatory whose name, designation, school and signature image are filled in per event (Event &rarr; Certificates &rarr; Signatories) by the same label. Here you only choose where every part prints and how it is aligned.</p>
+                                        <p class="text-xs text-slate-500 mt-0.5">Each block is one signatory. Type the name, designation and school and upload the signature image here as the default for this template, and choose where each part prints. An event can override any of them per venue under Event &rarr; Certificates &rarr; Signatories using the same label.</p>
                                     </div>
                                     <button type="button" class="btn-secondary text-xs whitespace-nowrap" @click="addSignatureBlock">+ Add signature block</button>
                                 </div>
@@ -320,6 +320,35 @@
                                             </template>
                                         </FormField>
                                         <button type="button" class="text-xs font-semibold text-rose-600 pb-3" @click="removeSignatureBlock(idx)">Remove</button>
+                                    </div>
+
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                        <FormField label="Name">
+                                            <template #default="{ id }">
+                                                <input :id="id" v-model="blk.name_text" maxlength="120" class="field" placeholder="e.g. Fr. Dr. Thomas Joseph">
+                                            </template>
+                                        </FormField>
+                                        <FormField label="Designation" hint="Blank = the label above.">
+                                            <template #default="{ id }">
+                                                <input :id="id" v-model="blk.designation_text" maxlength="120" class="field" placeholder="e.g. Principal">
+                                            </template>
+                                        </FormField>
+                                        <FormField label="School name">
+                                            <template #default="{ id }">
+                                                <input :id="id" v-model="blk.school_text" maxlength="160" class="field" placeholder="e.g. St. Alphonsa Public School Oorakam, Malappuram">
+                                            </template>
+                                        </FormField>
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-3">
+                                        <label class="text-xs font-semibold text-slate-600">Signature image
+                                            <input type="file" accept="image/*" class="block mt-1 text-xs font-normal" @change="onBlockSignature(blk, $event)">
+                                        </label>
+                                        <img v-if="blk.signature_preview || (blk.signature_url && !blk.remove_signature)"
+                                             :src="blk.signature_preview || blk.signature_url" alt="Signature" class="h-12 border border-slate-200 rounded bg-white p-0.5">
+                                        <label v-if="blk.signature_url" class="flex items-center gap-1 text-xs text-slate-600">
+                                            <input v-model="blk.remove_signature" type="checkbox"> Remove image
+                                        </label>
+                                        <span class="text-[11px] text-slate-400">PNG with a transparent background works best, max 1 MB.</span>
                                     </div>
 
                                     <div v-for="part in signatureParts" :key="part.key"
@@ -850,8 +879,17 @@ function addSignatureBlock() {
     const n = form.layout_json.signature_blocks.length;
     form.layout_json.signature_blocks.push({
         label: n === 0 ? 'Venue Convenor' : '',
+        name_text: '', designation_text: '', school_text: '',
+        signature_file: null, signature_preview: null, signature_url: null, remove_signature: false,
         ...signaturePartDefaults(70, n % 2 === 0 ? 72 : 8),
     });
+}
+
+function onBlockSignature(blk, e) {
+    const file = e.target.files?.[0] ?? null;
+    blk.signature_file = file;
+    blk.remove_signature = false;
+    blk.signature_preview = file ? URL.createObjectURL(file) : null;
 }
 
 function removeSignatureBlock(index) {
@@ -930,10 +968,17 @@ function layoutDefaults(from = null) {
             const base = signaturePartDefaults(70);
             return {
                 label: blk.label ?? '',
-                signature: textFieldDefaults(blk.signature, null, base.signature),
-                name: textFieldDefaults(blk.name, null, base.name),
-                designation: textFieldDefaults(blk.designation, null, base.designation),
-                school: textFieldDefaults(blk.school, null, base.school),
+                name_text: blk.name_text ?? '',
+                designation_text: blk.designation_text ?? '',
+                school_text: blk.school_text ?? '',
+                signature_file: null,
+                signature_preview: null,
+                signature_url: blk.signature_url ?? null,
+                remove_signature: false,
+                signature: textFieldDefaults(blk.signature, {}, base.signature),
+                name: textFieldDefaults(blk.name, {}, base.name),
+                designation: textFieldDefaults(blk.designation, {}, base.designation),
+                school: textFieldDefaults(blk.school, {}, base.school),
             };
         }),
         custom_fields: (src.custom_fields ?? d.custom_fields ?? []).map((cf) => ({
@@ -1064,6 +1109,7 @@ function upload() {
         onSuccess: () => {
             form.reset('template_file', 'converted_background_png', 'logo', 'seal');
             form.signatories.forEach(s => { s.signature = null; });
+            form.layout_json.signature_blocks.forEach(b => { b.signature_file = null; b.remove_signature = false; });
             if (editingId.value) {
                 cancelEdit();
             }

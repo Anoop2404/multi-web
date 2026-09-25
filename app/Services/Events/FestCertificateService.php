@@ -674,6 +674,13 @@ class FestCertificateService
         }
 
         $overlayLayout = $template?->overlayLayout() ?? CertificateTemplate::defaultBackgroundLayout();
+        foreach ($overlayLayout['signature_blocks'] ?? [] as $i => $block) {
+            if (! empty($block['signature_path']) && $sahodaya) {
+                $overlayLayout['signature_blocks'][$i]['signature_url'] = $embedAssets
+                    ? TenantStorage::photoBase64DataUri($sahodaya, $block['signature_path'], 400)
+                    : TenantStorage::logoUrl($sahodaya, $block['signature_path']);
+            }
+        }
 
         $participant = $payload['participant'] ?? null;
         $photoUrl = ($overlayLayout['show_photo'] ?? false) && $participant

@@ -48,7 +48,7 @@
         <p v-if="page.props.errors?.signatories" class="text-rose-600 font-semibold py-1">{{ page.props.errors.signatories }}</p>
         <p v-if="!signatories.length" class="text-gray-400 py-1">No signatories yet. Click "+ Add signatory", type who signs, choose the signature image, then Save.</p>
         <p class="text-gray-400 mt-2">
-            The signature image is uploaded here (PNG with a transparent background works best, max 1 MB). Add a matching "Signature block" on the certificate template (Certificate templates &rarr; Signature blocks) to set where each part prints; on plain templates the entry is added to the signature footer.
+            Optional per-event override: whatever you fill in here replaces the default name, designation, school and signature image typed on the template's "Signature block" with the same label (Certificate templates &rarr; Signature blocks). Leave a field blank to keep the template's. Signature: PNG with a transparent background works best, max 1 MB.
         </p>
     </div>
 </template>

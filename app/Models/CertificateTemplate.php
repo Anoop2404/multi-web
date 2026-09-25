@@ -314,7 +314,7 @@ class CertificateTemplate extends Model
      *
      * @return list<array<string, mixed>>
      */
-    public static function normalizeSignatureBlocks(mixed $blocks): array
+    public static function normalizeSignatureBlocks(mixed $blocks, bool $trustPaths = true): array
     {
         if (! is_array($blocks)) {
             return [];
@@ -341,6 +341,13 @@ class CertificateTemplate extends Model
                     ? array_intersect_key($block[$part], array_flip($textKeys))
                     : [];
             }
+            // Template-level defaults, used when the event supplies nothing for the part.
+            foreach (['name_text' => 120, 'designation_text' => 120, 'school_text' => 160] as $field => $max) {
+                $entry[$field] = mb_substr(trim((string) ($block[$field] ?? '')), 0, $max);
+            }
+            // A stored file path is only ever trusted when reading our own saved layout;
+            // client input never supplies one (see CertificateTemplateController).
+            $entry['signature_path'] = $trustPaths && ! empty($block['signature_path']) ? (string) $block['signature_path'] : null;
             $out[] = $entry;
         }
 

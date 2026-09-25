@@ -84,22 +84,24 @@
                     <div v-if="blk.signature"
                          class="absolute text-slate-400"
                          :style="overlayStyle(blk.signature, { top: 78, left: 72, width: 20, align: 'center' })">
-                        <span class="inline-block border-b border-dashed border-slate-400 italic px-2" style="font-family: cursive;">Signature</span>
+                        <img v-if="blk.signature_preview || (blk.signature_url && !blk.remove_signature)"
+                             :src="blk.signature_preview || blk.signature_url" alt="" :style="{ maxWidth: '100%', maxHeight: `${(Number(blk.signature.font_size) || 12) * 5}px` }">
+                        <span v-else class="inline-block border-b border-dashed border-slate-400 italic px-2" style="font-family: cursive;">Signature</span>
                     </div>
                     <div v-if="blk.name"
                          class="absolute text-slate-800"
                          :style="overlayStyle(blk.name, { top: 86, left: 72, width: 20, font_size: 10, font_family: 'Montserrat', font_weight: 'bold', align: 'center' })">
-                        Name
+                        {{ blk.name_text || 'Name' }}
                     </div>
                     <div v-if="blk.designation"
                          class="absolute text-slate-600"
                          :style="overlayStyle(blk.designation, { top: 89, left: 72, width: 20, font_size: 8, font_family: 'Montserrat', align: 'center' })">
-                        {{ blk.label || 'Designation' }}
+                        {{ blk.designation_text || blk.label || 'Designation' }}
                     </div>
                     <div v-if="blk.school"
                          class="absolute text-slate-600"
                          :style="overlayStyle(blk.school, { top: 92, left: 72, width: 20, font_size: 8, font_family: 'Montserrat', align: 'center' })">
-                        School name
+                        {{ blk.school_text || 'School name' }}
                     </div>
                 </template>
 
