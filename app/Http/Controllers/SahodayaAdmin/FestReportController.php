@@ -1111,8 +1111,10 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        @ini_set('memory_limit', '512M');
-        @set_time_limit(300);
+        // A whole-event scope runs to thousands of rows (Kochi Metro: ~6,000 registrations),
+        // and the row arrays plus the rendered HTML are held in memory at once.
+        @ini_set('memory_limit', '1024M');
+        @set_time_limit(600);
 
         $rows = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event))->itemWiseReportRows(
             schoolId: null,
@@ -1139,12 +1141,21 @@ class FestReportController extends SahodayaAdminController
         // it -- this used to call DomPDF directly, which builds the whole box tree in memory
         // and exhausted the 512M request limit on a ~6,000-row event (production, 2026-09-25).
         // DomPDF remains the fallback inside PdfGenerator, with more headroom.
-        return \App\Support\PdfGenerator::download(
-            $html,
-            "{$event->id}-mark-entry-report.pdf",
-            inline: $request->boolean('inline') || $request->boolean('preview'),
-            isLandscape: true,
-        );
+        // Converter only, never the DomPDF fallback: DomPDF cannot hold a whole-event scope
+        // (it exhausted the server's 512M limit, and that limit can't be raised from code on
+        // a locked PHP-FPM pool), so a converter failure is reported as itself instead of a
+        // memory 500. ~6,000 rows takes the converter roughly 80s -- give it the time.
+        try {
+            return \App\Support\PdfGenerator::download(
+                $html,
+                "{$event->id}-mark-entry-report.pdf",
+                inline: $request->boolean('inline') || $request->boolean('preview'),
+                isLandscape: true,
+                requireBrowserRenderer: true,
+            );
+        } catch (\RuntimeException $e) {
+            abort(503, 'The PDF service could not build this report ('.$e->getMessage().'). Try again, or filter by category/item to make it smaller.');
+        }
     }
 
     public function categoryWisePoints(Request $request, string $tenantId, FestEvent $event)

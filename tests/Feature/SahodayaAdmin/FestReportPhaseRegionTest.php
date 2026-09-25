@@ -112,7 +112,9 @@ class FestReportPhaseRegionTest extends TestCase
             return true;
         });
 
-        // Test item-wise PDF with scope params
+        // Test item-wise PDF with scope params (converter-only -- fake it)
+        config(['services.pdf_converter.url' => 'https://pdf.example.test/generate-pdf']);
+        \Illuminate\Support\Facades\Http::fake(['pdf.example.test/*' => \Illuminate\Support\Facades\Http::response('%PDF-1.4 fake', 200)]);
         $pdfResponse = $this->actingAs($admin)->get(
             route('sahodaya.events.reports.item-wise.pdf', [
                 'tenantId' => $sahodaya->id,

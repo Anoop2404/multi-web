@@ -35,6 +35,10 @@ class FestItemWiseReportTest extends TestCase
 
     public function test_combined_item_wise_report_shows_category_phase_region_and_school_across_the_hub(): void
     {
+        // The Sahodaya item-wise PDF is converter-only (no DomPDF fallback) -- fake it.
+        config(['services.pdf_converter.url' => 'https://pdf.example.test/generate-pdf']);
+        \Illuminate\Support\Facades\Http::fake(['pdf.example.test/*' => \Illuminate\Support\Facades\Http::response('%PDF-1.4 fake', 200)]);
+
         $this->seed(RolesAndPermissionsSeeder::class);
 
         $sahodaya = Tenant::create([
@@ -479,5 +483,22 @@ class FestItemWiseReportTest extends TestCase
         $row = collect($response->viewData('page')['props']['rows'])->first();
 
         $this->assertSame('Category 1 — Classes 3 & 4', $row['category_label']);
+    }
+
+    public function test_item_wise_pdf_reports_a_converter_failure_instead_of_falling_back_to_dompdf(): void
+    {
+        config(['services.pdf_converter.url' => 'https://pdf.example.test/generate-pdf']);
+        \Illuminate\Support\Facades\Http::fake(['pdf.example.test/*' => \Illuminate\Support\Facades\Http::response('boom', 500)]);
+
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $sahodaya = Tenant::create(['id' => (string) Str::uuid(), 'type' => 'sahodaya', 'name' => 'Conv Fail Sahodaya', 'domain' => 'conv-fail.test', 'is_active' => true]);
+        SahodayaProfile::create(['tenant_id' => $sahodaya->id, 'prefix' => 'CF', 'student_data_mode' => 'counts_only']);
+        $event = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Conv Fail Kalotsav', 'event_type' => 'kalolsavam', 'status' => 'published']);
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        $response = $this->actingAs($admin)->get(route('sahodaya.events.reports.item-wise.pdf', ['tenantId' => $sahodaya->id, 'event' => $event->id]));
+
+        $response->assertStatus(503);
     }
 }
