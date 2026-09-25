@@ -101,58 +101,83 @@ class RenderContinuousDieIdCardsJob implements ShouldQueue
             $cardChunks = array_chunk($cards, $cardsPerChunk);
             $totalChunks = count($cardChunks);
 
+            $viewName = $customTemplate ? 'fest.id-cards.custom-sheet' : 'fest.id-cards.sheet';
+            $clusterLogoSrc = TenantBranding::logoEmbedSrc($tenant);
+
+            $this->updateStatus($tenant, $settingKey, [
+                'status'           => 'rendering',
+                'progress_percent' => 0,
+                'progress_text'    => "Rendering {$totalChunks} batch(es)...",
+                'processed_chunks' => 0,
+                'total_chunks'     => $totalChunks,
+            ]);
+
+            // Chunks go to the converter through PdfGenerator::renderEach(): a rolling
+            // window of services.pdf_converter.concurrency requests, the next chunk sent as
+            // soon as any in-flight one finishes, instead of one chunk at a time. A chunk's
+            // HTML (card photos embedded as data URIs) is only built when a slot frees, so
+            // no more than that many are held at once. Chunks complete in any order and are
+            // put back in sequence before merging.
+            $documents = (function () use ($cardChunks, $tenant, $event, $clusterLogoSrc, $backgroundUrl, $customTemplate, $gridLayout, $viewName) {
+                foreach ($cardChunks as $chunkIdx => $chunkCards) {
+                    $viewData = [
+                        'cards'          => $chunkCards,
+                        'sections'       => null, // Null triggers continuous packing (zero empty padding slots)
+                        'clusterName'    => $tenant->name,
+                        'clusterLogoSrc' => $clusterLogoSrc,
+                        'eventTitle'     => $event->title,
+                        'audience'       => 'student',
+                        'showTitle'      => false,
+                        'isPdf'          => true,
+                        'backgroundUrl'  => $backgroundUrl,
+                        'fields'         => $customTemplate?->fields() ?? [],
+                        'cardWidthMm'    => $customTemplate?->card_width_mm ?? 90,
+                        'cardHeightMm'   => $customTemplate?->card_height_mm ?? 140,
+                        'cardsPerPage'   => $customTemplate?->cards_per_page ?? 4,
+                        'pageWidthMm'    => $customTemplate?->page_width_mm,
+                        'pageHeightMm'   => $customTemplate?->page_height_mm,
+                        'gridLayout'     => $gridLayout,
+                    ];
+
+                    yield $chunkIdx => [
+                        'html'         => view($viewName, $viewData)->render(),
+                        'isLandscape'  => true,
+                        'pageWidthMm'  => $customTemplate?->page_width_mm,
+                        'pageHeightMm' => $customTemplate?->page_height_mm,
+                    ];
+                }
+            })();
+
             $pdfChunksBytes = [];
 
-            foreach ($cardChunks as $chunkIdx => $chunkCards) {
-                $chunkNumber = $chunkIdx + 1;
-                $pct = (int) round(($chunkIdx / $totalChunks) * 100);
+            PdfGenerator::renderEach(
+                $documents,
+                function ($chunkIdx, $chunkPdf) use (&$pdfChunksBytes, $totalChunks, $tenant, $settingKey) {
+                    if ($chunkPdf instanceof \Throwable) {
+                        throw $chunkPdf;
+                    }
+                    if (empty($chunkPdf)) {
+                        throw new \RuntimeException('PDF generation returned empty content for batch '.($chunkIdx + 1).'.');
+                    }
 
-                $this->updateStatus($tenant, $settingKey, [
-                    'status'           => 'rendering',
-                    'progress_percent' => $pct,
-                    'progress_text'    => "Rendering batch {$chunkNumber} of {$totalChunks} ({$pct}%)...",
-                    'processed_chunks' => $chunkIdx,
-                    'total_chunks'     => $totalChunks,
-                ]);
+                    $pdfChunksBytes[$chunkIdx] = $chunkPdf;
+                    $done = count($pdfChunksBytes);
+                    $pct = (int) round(($done / $totalChunks) * 100);
 
-                $viewData = [
-                    'cards'          => $chunkCards,
-                    'sections'       => null, // Null triggers continuous packing (zero empty padding slots)
-                    'clusterName'    => $tenant->name,
-                    'clusterLogoSrc' => TenantBranding::logoEmbedSrc($tenant),
-                    'eventTitle'     => $event->title,
-                    'audience'       => 'student',
-                    'showTitle'      => false,
-                    'isPdf'          => true,
-                    'backgroundUrl'  => $backgroundUrl,
-                    'fields'         => $customTemplate?->fields() ?? [],
-                    'cardWidthMm'    => $customTemplate?->card_width_mm ?? 90,
-                    'cardHeightMm'   => $customTemplate?->card_height_mm ?? 140,
-                    'cardsPerPage'   => $customTemplate?->cards_per_page ?? 4,
-                    'pageWidthMm'    => $customTemplate?->page_width_mm,
-                    'pageHeightMm'   => $customTemplate?->page_height_mm,
-                    'gridLayout'     => $gridLayout,
-                ];
+                    $this->updateStatus($tenant, $settingKey, [
+                        'status'           => 'rendering',
+                        'progress_percent' => $pct,
+                        'progress_text'    => "Rendered batch {$done} of {$totalChunks} ({$pct}%)...",
+                        'processed_chunks' => $done,
+                        'total_chunks'     => $totalChunks,
+                    ]);
+                },
+                timeoutMs: 180000, // 3 minutes per 10-sheet chunk is more than enough
+                requireBrowserRenderer: true,
+            );
 
-                $viewName = $customTemplate ? 'fest.id-cards.custom-sheet' : 'fest.id-cards.sheet';
-                $html = view($viewName, $viewData)->render();
-
-                $chunkPdf = PdfGenerator::render(
-                    $html,
-                    isLandscape: true,
-                    pageWidthMm: $customTemplate?->page_width_mm,
-                    pageHeightMm: $customTemplate?->page_height_mm,
-                    timeoutMs: 180000, // 3 minutes per 20-sheet chunk is more than enough
-                    requireBrowserRenderer: true,
-                );
-
-                if (empty($chunkPdf)) {
-                    throw new \RuntimeException("PDF generation returned empty content for batch {$chunkNumber}.");
-                }
-
-                $pdfChunksBytes[] = $chunkPdf;
-                unset($html, $chunkCards, $viewData);
-            }
+            ksort($pdfChunksBytes);
+            $pdfChunksBytes = array_values($pdfChunksBytes);
 
             // Merge all chunk PDFs into one single continuous master PDF
             if ($totalChunks === 1) {

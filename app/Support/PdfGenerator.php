@@ -300,10 +300,12 @@ class PdfGenerator
      *
      * @param  iterable<array-key, array{html: string, isLandscape?: bool, pageWidthMm?: ?float, pageHeightMm?: ?float}>  $documents
      * @param  callable(array-key, string|\Throwable): void  $onResult
+     * @param  bool  $requireBrowserRenderer  Same as render()'s — applied to the retry (and
+     *                                        to every document when no converter is set).
      */
-    public static function renderEach(iterable $documents, callable $onResult, int $timeoutMs = 300000): void
+    public static function renderEach(iterable $documents, callable $onResult, int $timeoutMs = 300000, bool $requireBrowserRenderer = false): void
     {
-        $renderOne = function (array $document) use ($timeoutMs) {
+        $renderOne = function (array $document) use ($timeoutMs, $requireBrowserRenderer) {
             try {
                 return self::render(
                     $document['html'],
@@ -311,6 +313,7 @@ class PdfGenerator
                     pageWidthMm: $document['pageWidthMm'] ?? null,
                     pageHeightMm: $document['pageHeightMm'] ?? null,
                     timeoutMs: $timeoutMs,
+                    requireBrowserRenderer: $requireBrowserRenderer,
                 );
             } catch (\Throwable $e) {
                 return $e;
