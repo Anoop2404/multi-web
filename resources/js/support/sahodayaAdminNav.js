@@ -403,6 +403,7 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
             section: 'Schools & Membership',
             items: [
                 { label: 'Schools', href: `${base}/schools`, icon: 'building', badge: approvedSchoolsCount },
+                { label: 'Principals & contacts', href: `${base}/schools/contacts-report`, icon: 'users' },
                 { label: 'Pending applications', href: `${base}/schools/applications`, icon: 'inbox', badge: pendingSchoolsCount, hidden: !pendingSchoolsCount },
                 { label: 'Membership fees', href: `${base}/membership/payments`, icon: 'credit-card', badge: pendingPaymentsCount },
                 { label: 'Student verification', href: `${base}/students/verification${unverifiedStudentsCount ? '?verification=unverified' : ''}`, icon: 'users', badge: unverifiedStudentsCount },
