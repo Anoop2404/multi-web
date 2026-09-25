@@ -13,6 +13,8 @@
             </Link>
         </div>
 
+        <EventSignatoriesCard :base="base" :initial-signatories="certificateSignatories" :label-suggestions="signatoryLabelSuggestions" />
+
         <!-- Filter + pipeline: item/school here drive both the list below and every
              bulk action (render/download/preview). Generation itself isn't item-scoped
              (a participation certificate is issued once per person for the whole event,
@@ -170,6 +172,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import EventSignatoriesCard from '@/Components/certificates/EventSignatoriesCard.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
@@ -180,6 +183,8 @@ const props = defineProps({
     schools: { type: Array, default: () => [] },
     recentBatches: { type: Array, default: () => [] },
     staleCount: { type: Number, default: 0 },
+    certificateSignatories: { type: Array, default: () => [] },
+    signatoryLabelSuggestions: { type: Array, default: () => [] },
     activityLogs: { type: Array, default: () => [] },
 });
 

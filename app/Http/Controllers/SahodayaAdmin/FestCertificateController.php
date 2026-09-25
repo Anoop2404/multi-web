@@ -75,6 +75,8 @@ class FestCertificateController extends SahodayaAdminController
             'publishedItems' => $this->publishedItemsForEvent($event),
             'schools' => $this->schoolsFromCertificates($certificates),
             'recentBatches' => $this->recentBatchesForEvent($event, 'winner'),
+            'certificateSignatories' => $this->signatoriesForUi($event),
+            'signatoryLabelSuggestions' => $this->signatoryLabelSuggestions(),
             'staleCount' => $certificates->filter(fn ($c) => $c['is_stale'] ?? false)->count(),
         ]));
     }
@@ -97,6 +99,8 @@ class FestCertificateController extends SahodayaAdminController
             'publishedItems' => $this->publishedItemsForEvent($event),
             'schools' => $this->schoolsFromCertificates($certificates),
             'recentBatches' => $this->recentBatchesForEvent($event, 'participation'),
+            'certificateSignatories' => $this->signatoriesForUi($event),
+            'signatoryLabelSuggestions' => $this->signatoryLabelSuggestions(),
             'staleCount' => $certificates->filter(fn ($c) => $c['is_stale'] ?? false)->count(),
         ]));
     }
