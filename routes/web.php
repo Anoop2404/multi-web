@@ -1106,6 +1106,9 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::post('/schools/bulk-reset-password', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'bulkResetPassword'])->name('schools.bulk-reset-password');
         Route::post('/schools/bulk-send-credentials', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'bulkSendCredentials'])->name('schools.bulk-send-credentials');
         Route::post('/schools/bulk-create-login', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'bulkCreateLogin'])->name('schools.bulk-create-login');
+        Route::get('/schools/contacts-report', [\App\Http\Controllers\SahodayaAdmin\SchoolContactsReportController::class, 'index'])->name('schools.contacts-report');
+        Route::get('/schools/contacts-report/excel', [\App\Http\Controllers\SahodayaAdmin\SchoolContactsReportController::class, 'exportExcel'])->name('schools.contacts-report.excel');
+        Route::get('/schools/contacts-report/pdf', [\App\Http\Controllers\SahodayaAdmin\SchoolContactsReportController::class, 'exportPdf'])->name('schools.contacts-report.pdf');
         Route::get('/schools/export', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'export'])->name('schools.export');
         Route::get('/schools/export-id-card-codes', [\App\Http\Controllers\SahodayaAdmin\MemberSchoolsController::class, 'exportSchoolCodes'])->name('schools.export-id-card-codes');
         Route::get('/schools/code-assignment', [\App\Http\Controllers\SahodayaAdmin\SchoolCodeController::class, 'index'])->name('schools.codes');
@@ -1496,10 +1499,10 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/schedule/auto', [FestScheduleController::class, 'autoGenerate'])->name('schedule.auto');
             Route::post('/{event}/schedule/publish', [FestScheduleController::class, 'publishSchedule'])->name('schedule.publish');
             Route::post('/{event}/schedule/unpublish', [FestScheduleController::class, 'unpublishSchedule'])->name('schedule.unpublish');
+            Route::post('/{event}/schedule/clear', [FestScheduleController::class, 'clearSchedule'])->name('schedule.clear');
             Route::get('/{event}/schedule/import-template', [FestScheduleController::class, 'importTemplate'])->name('schedule.import-template');
             Route::post('/{event}/schedule/import', [FestScheduleController::class, 'importStore'])->name('schedule.import');
             Route::get('/{event}/schedule/items', [FestScheduleController::class, 'itemsIndex'])->name('schedule.items');
-            Route::post('/{event}/schedule/clear', [FestScheduleController::class, 'clearSchedule'])->name('schedule.clear');
             Route::post('/{event}/schedule/items/bulk', [FestScheduleController::class, 'bulkStoreItems'])->name('schedule.items.bulk');
             Route::post('/{event}/schedule/items/auto-sequence', [FestScheduleController::class, 'autoSequenceItems'])->name('schedule.items.auto-sequence');
             Route::get('/{event}/schedule/items/import-template', [FestScheduleController::class, 'itemImportTemplate'])->name('schedule.items.import-template');
