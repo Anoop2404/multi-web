@@ -14,6 +14,9 @@ return new class extends Migration
     {
         Schema::table('fest_item_reporting_batches', function (Blueprint $table) {
             $table->dropForeign(['item_id']);
+            // SQLite refuses to drop a column a composite index still references (Postgres
+            // drops the index along with it), which broke every test run's migrate step.
+            $table->dropIndex(['item_id', 'sort_order']);
             $table->dropColumn('item_id');
         });
     }
