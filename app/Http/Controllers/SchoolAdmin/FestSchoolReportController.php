@@ -659,7 +659,7 @@ class FestSchoolReportController extends SchoolAdminController
 
         $rows = $this->stripChestNumbers((new FestEventReportAnalyticsService($event))->itemWiseReportRows($this->school->id));
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.item-wise-marks', [
+        $html = view('fest.reports.item-wise-marks', [
             'sahodaya'    => Tenant::find($event->tenant_id),
             'event'       => $event,
             'rows'        => $rows,
@@ -670,9 +670,10 @@ class FestSchoolReportController extends SchoolAdminController
             'generatedAt' => now()->format('d M Y, h:i A'),
             'forWhom'     => trim((string) $request->input('for_whom', '')) ?: null,
             'logoSrc'     => \App\Support\TenantBranding::logoEmbedSrc($this->school),
-        ])->setPaper('a4', 'landscape');
+        ])->render();
 
-        return $pdf->download("{$event->id}-mark-entry-report.pdf");
+        // The external converter renders it (same as the Sahodaya-side report) -- see PdfGenerator.
+        return \App\Support\PdfGenerator::download($html, "{$event->id}-mark-entry-report.pdf", isLandscape: true);
     }
 
     public function exportItemWisePdf(
