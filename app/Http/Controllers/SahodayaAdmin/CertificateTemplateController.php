@@ -820,6 +820,11 @@ class CertificateTemplateController extends SahodayaAdminController
             $path = $existingPaths[$block['key']] ?? null;
             if ($i !== null && $request->hasFile("layout_json.signature_blocks.{$i}.signature_file")) {
                 $path = $request->file("layout_json.signature_blocks.{$i}.signature_file")->store($dir, $disk);
+                if ($path === false) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        "layout_json.signature_blocks.{$i}.signature_file" => 'The signature image could not be stored — storage is unavailable. Nothing was saved.',
+                    ]);
+                }
             } elseif ($i !== null && filter_var($rows[$i]['remove_signature'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
                 $path = null;
             }
