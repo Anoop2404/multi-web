@@ -2037,13 +2037,36 @@ class FestEventReportAnalyticsService
         $usesPhasedRegionalBilling = $this->event->rootEvent()->usesPhasedRegionalBilling();
         $gradePointService = app(FestGradePointService::class);
 
+        // The item and category filters are cheap to apply in SQL and cut what gets hydrated
+        // from every participant in the event to just the ones asked for. Both are still
+        // re-checked in PHP below (a no-op then), so behaviour is unchanged.
+        $categoryClassGroups = ($category !== null && $category !== '')
+            ? $this->classGroupsForCategory($category, $classGroupLabels)
+            : null;
+
         $rows = FestParticipant::query()
-            ->whereHas('registration', function ($q) use ($schoolId) {
+            ->whereHas('registration', function ($q) use ($schoolId, $itemId, $categoryClassGroups) {
                 $q->whereIn('event_id', $this->eventIds())->active();
                 if ($schoolId) {
                     $q->where('school_id', $schoolId);
                 }
+                if ($itemId !== null && $itemId > 0) {
+                    $q->where('item_id', $itemId);
+                }
+                if ($categoryClassGroups !== null) {
+                    $q->whereHas('item', function ($iq) use ($categoryClassGroups) {
+                        $iq->where(function ($w) use ($categoryClassGroups) {
+                            $named = array_values(array_filter($categoryClassGroups, fn ($g) => $g !== null));
+                            $w->whereIn('class_group', $named ?: ['__none__']);
+                            if (in_array(null, $categoryClassGroups, true)) {
+                                $w->orWhereNull('class_group');
+                            }
+                        });
+                    });
+                }
             })
+            // Only the columns this report reads -- fest_participants is a wide table.
+            ->select(['id', 'registration_id', 'student_id', 'teacher_id', 'chest_no', 'level_registration_number', 'item_registration_number'])
             ->with([
                 'student:id,name,reg_no',
                 'teacher:id,name,reg_no',
@@ -2157,6 +2180,23 @@ class FestEventReportAnalyticsService
         }
 
         return $rows->sortBy(['item_title', 'participant'])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Raw items.class_group values (null included) that resolve to the given category key,
+     * so a category filter can run in SQL. Uses the same resolver the rows themselves use.
+     *
+     * @param  array<string, string>  $classGroupLabels
+     * @return list<?string>
+     */
+    private function classGroupsForCategory(string $category, array $classGroupLabels): array
+    {
+        return FestEventItem::whereIn('event_id', $this->eventIds())
+            ->distinct()
+            ->pluck('class_group')
+            ->filter(fn ($raw) => \App\Support\FestClassGroupScheme::resolveItemKey($classGroupLabels, $raw === '' ? null : $raw) === $category)
             ->values()
             ->all();
     }
