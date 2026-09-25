@@ -660,25 +660,28 @@ class FestCertificateService
                 ? TenantStorage::photoBase64DataUri($sahodaya, $template->background_path, 1600)
                 : null);
         } else {
-            $logoUrl = $template?->logo_path && $sahodaya
+            // Memoized as well: logoUrl() falls through to Storage exists() probes (a
+            // network round-trip each on S3) whenever the file isn't on the local public
+            // disk, and a bulk print used to repeat every one of them per certificate.
+            $assetCacheKey = 'url:'.($template?->id ?? 'none').':'.($sahodaya?->id ?? 'none');
+
+            $logoUrl = $this->cachedAssetDataUri($assetCache, $assetCacheKey.':logo', fn () => $template?->logo_path && $sahodaya
                 ? TenantStorage::logoUrl($sahodaya, $template->logo_path)
-                : ($sahodaya ? TenantBranding::logoUrl($sahodaya) : null);
+                : ($sahodaya ? TenantBranding::logoUrl($sahodaya) : null));
 
-            $sealUrl = $template?->seal_path && $sahodaya
+            $sealUrl = $this->cachedAssetDataUri($assetCache, $assetCacheKey.':seal', fn () => $template?->seal_path && $sahodaya
                 ? TenantStorage::logoUrl($sahodaya, $template->seal_path)
-                : null;
+                : null);
 
-            $backgroundUrl = $template?->background_path && $sahodaya
+            $backgroundUrl = $this->cachedAssetDataUri($assetCache, $assetCacheKey.':background', fn () => $template?->background_path && $sahodaya
                 ? TenantStorage::logoUrl($sahodaya, $template->background_path)
-                : null;
+                : null);
         }
 
         $overlayLayout = $template?->overlayLayout() ?? CertificateTemplate::defaultBackgroundLayout();
         foreach ($overlayLayout['signature_blocks'] ?? [] as $i => $block) {
             if (! empty($block['signature_path']) && $sahodaya) {
-                $overlayLayout['signature_blocks'][$i]['signature_url'] = $embedAssets
-                    ? TenantStorage::photoBase64DataUri($sahodaya, $block['signature_path'], 400)
-                    : TenantStorage::logoUrl($sahodaya, $block['signature_path']);
+                $overlayLayout['signature_blocks'][$i]['signature_url'] = $this->signatureSrc($assetCache, $sahodaya, $block['signature_path'], $embedAssets);
             }
         }
 
@@ -692,13 +695,11 @@ class FestCertificateService
                 'name'          => $s['name'] ?? '',
                 'designation'   => $s['designation'] ?? '',
                 'signature_url' => (! empty($s['signature_path']) && $sahodaya)
-                    ? ($embedAssets
-                        ? TenantStorage::photoBase64DataUri($sahodaya, $s['signature_path'], 400)
-                        : TenantStorage::logoUrl($sahodaya, $s['signature_path']))
+                    ? $this->signatureSrc($assetCache, $sahodaya, $s['signature_path'], $embedAssets)
                     : null,
             ])->values()->all();
 
-        $eventSignatories = $this->eventSignatories($event, $sahodaya, $embedAssets);
+        $eventSignatories = $this->eventSignatories($event, $sahodaya, $embedAssets, $assetCache);
         $signatories = $this->withEventSignatories($signatories, $eventSignatories);
 
         $eventParticipants = null;
@@ -795,6 +796,23 @@ class FestCertificateService
     }
 
     /**
+     * A signature image (template signature block, template signatory, or per-event
+     * signatory) — the same few files on every certificate of a bulk run, so resolved
+     * once per run via $assetCache instead of re-read/resized (embed) or re-probed on
+     * storage (URL) for each certificate.
+     */
+    private function signatureSrc(array &$assetCache, Tenant $sahodaya, string $path, bool $embedAssets): ?string
+    {
+        return $this->cachedAssetDataUri(
+            $assetCache,
+            'sig:'.($embedAssets ? 'embed' : 'url').':'.$sahodaya->id.':'.$path,
+            fn () => $embedAssets
+                ? TenantStorage::photoBase64DataUri($sahodaya, $path, 400)
+                : TenantStorage::logoUrl($sahodaya, $path),
+        );
+    }
+
+    /**
      * Fingerprint of what renderContext() actually resolved for this certificate — used
      * by RenderCertificateChunkJob (written at render time) and
      * VerifyCertificateStalenessCommand (recomputed later for comparison) to detect when
@@ -832,7 +850,7 @@ class FestCertificateService
      *
      * @return list<array{key: string, label: string, name: ?string, designation: ?string, school: ?string, signature_url: ?string}>
      */
-    private function eventSignatories(?FestEvent $event, ?Tenant $sahodaya, bool $embedAssets): array
+    private function eventSignatories(?FestEvent $event, ?Tenant $sahodaya, bool $embedAssets, array &$assetCache = []): array
     {
         if (! $event || ! is_array($event->certificate_signatories)) {
             return [];
@@ -847,9 +865,7 @@ class FestCertificateService
                 'designation'   => $s['designation'] ?? null,
                 'school'        => $s['school'] ?? null,
                 'signature_url' => (! empty($s['signature_path']) && $sahodaya)
-                    ? ($embedAssets
-                        ? TenantStorage::photoBase64DataUri($sahodaya, $s['signature_path'], 400)
-                        : TenantStorage::logoUrl($sahodaya, $s['signature_path']))
+                    ? $this->signatureSrc($assetCache, $sahodaya, $s['signature_path'], $embedAssets)
                     : null,
             ])
             ->filter(fn ($s) => filled($s['name']) || filled($s['designation']) || filled($s['school']) || filled($s['signature_url']))
@@ -1623,9 +1639,14 @@ class FestCertificateService
 
         $templateCache = [];
         $participantsCache = [];
+        // Shared across the whole export (as RenderCertificateChunkJob already does) — it
+        // was left out here, so every certificate re-fetched and re-resized the template's
+        // background/logo/seal/signatures (ZIP) or re-probed storage for each URL (print),
+        // enough for a one-school print of ~14 certificates to run past the gateway timeout.
+        $assetCache = [];
 
-        return $certificates->map(function ($certificate) use ($payloads, &$templateCache, &$participantsCache, $embedAssets, $plain, $sahodaya) {
-            $payload = $this->renderContext($certificate, $payloads->get($certificate->id), $templateCache, $participantsCache, embedAssets: $embedAssets);
+        return $certificates->map(function ($certificate) use ($payloads, &$templateCache, &$participantsCache, &$assetCache, $embedAssets, $plain, $sahodaya) {
+            $payload = $this->renderContext($certificate, $payloads->get($certificate->id), $templateCache, $participantsCache, embedAssets: $embedAssets, assetCache: $assetCache);
 
             $verifyUrl = $sahodaya
                 ? (TenantDomainSync::publicUrl($sahodaya) ?? url('/')).'/certificates/verify/'.$certificate->verification_uuid

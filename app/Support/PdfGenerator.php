@@ -3,6 +3,8 @@
 namespace App\Support;
 
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -205,38 +207,11 @@ class PdfGenerator
         $browserFailure = $url ? null : 'The browser PDF converter is not configured.';
 
         if ($url) {
-            $hasHeaderFooter = $headerTemplate !== null || $footerTemplate !== null;
-            $resolvedMargin = $margin ?? ['top' => '0', 'bottom' => '0', 'left' => '0', 'right' => '0'];
-
-            $payload = [
-                'html' => $html,
-                'printBackground' => true,
-                'timeout' => $timeoutMs,
-                'margin' => $resolvedMargin,
-                'marginTop' => self::marginToMm($resolvedMargin['top'] ?? 0),
-                'marginRight' => self::marginToMm($resolvedMargin['right'] ?? 0),
-                'marginBottom' => self::marginToMm($resolvedMargin['bottom'] ?? 0),
-                'marginLeft' => self::marginToMm($resolvedMargin['left'] ?? 0),
-            ];
-
-            if ($hasCustomSize) {
-                $payload['width'] = $pageWidthMm.'mm';
-                $payload['height'] = $pageHeightMm.'mm';
-            } else {
-                $payload['landscape'] = $isLandscape;
-                $payload['format'] = 'A4';
-            }
-
-            if ($hasHeaderFooter) {
-                $payload['displayHeaderFooter'] = true;
-                $payload['headerTemplate'] = $headerTemplate ?? '<span></span>';
-                $payload['footerTemplate'] = $footerTemplate ?? '<span></span>';
-            }
+            $payload = self::converterPayload($html, $isLandscape, $headerTemplate, $footerTemplate, $margin, $pageWidthMm, $pageHeightMm, $timeoutMs);
 
             try {
-                $httpTimeout = (int) max(config('services.pdf_converter.timeout', 300), ceil($timeoutMs / 1000) + 30);
                 $response = Http::connectTimeout((int) config('services.pdf_converter.connect_timeout', 15))
-                    ->timeout($httpTimeout)
+                    ->timeout(self::converterHttpTimeout($timeoutMs))
                     ->post($url, $payload);
 
                 if ($response->successful()) {
@@ -290,6 +265,117 @@ class PdfGenerator
         }
 
         return $pdf->output();
+    }
+
+    /**
+     * render() for several documents at once: up to services.pdf_converter.concurrency
+     * requests in flight against the converter instead of one blocking call after another
+     * (a bulk certificate render was two sequential round-trips per certificate). Each
+     * document that fails in the pool is retried through render() on its own, so failure
+     * and DomPDF-fallback behaviour stay exactly render()'s. Without a converter URL this
+     * is just render() in a loop.
+     *
+     * @param  array<array-key, array{html: string, isLandscape?: bool, pageWidthMm?: ?float, pageHeightMm?: ?float}>  $documents
+     * @return array<array-key, string|\Throwable>  PDF bytes, or what render() threw, per key.
+     */
+    public static function renderMany(array $documents, int $timeoutMs = 300000): array
+    {
+        $renderOne = function (array $document) use ($timeoutMs) {
+            try {
+                return self::render(
+                    $document['html'],
+                    $document['isLandscape'] ?? false,
+                    pageWidthMm: $document['pageWidthMm'] ?? null,
+                    pageHeightMm: $document['pageHeightMm'] ?? null,
+                    timeoutMs: $timeoutMs,
+                );
+            } catch (\Throwable $e) {
+                return $e;
+            }
+        };
+
+        $url = self::resolveConverterUrl(config('services.pdf_converter.url'));
+        if (! $url || count($documents) < 2) {
+            return array_map($renderOne, $documents);
+        }
+
+        $results = [];
+        $concurrency = max(1, (int) config('services.pdf_converter.concurrency', 4));
+
+        foreach (array_chunk($documents, $concurrency, preserve_keys: true) as $slice) {
+            $responses = Http::pool(function (Pool $pool) use ($slice, $url, $timeoutMs) {
+                foreach ($slice as $key => $document) {
+                    $pool->as((string) $key)
+                        ->connectTimeout((int) config('services.pdf_converter.connect_timeout', 15))
+                        ->timeout(self::converterHttpTimeout($timeoutMs))
+                        ->post($url, self::converterPayload(
+                            $document['html'],
+                            $document['isLandscape'] ?? false,
+                            null,
+                            null,
+                            null,
+                            $document['pageWidthMm'] ?? null,
+                            $document['pageHeightMm'] ?? null,
+                            $timeoutMs,
+                        ));
+                }
+            });
+
+            foreach ($slice as $key => $document) {
+                $response = $responses[(string) $key] ?? null;
+                $results[$key] = $response instanceof Response && $response->successful()
+                    ? $response->body()
+                    : $renderOne($document);
+            }
+        }
+
+        return $results;
+    }
+
+    /** @return array<string, mixed> The converter service's request body. */
+    private static function converterPayload(
+        string $html,
+        bool $isLandscape,
+        ?string $headerTemplate,
+        ?string $footerTemplate,
+        ?array $margin,
+        ?float $pageWidthMm,
+        ?float $pageHeightMm,
+        int $timeoutMs,
+    ): array {
+        $resolvedMargin = $margin ?? ['top' => '0', 'bottom' => '0', 'left' => '0', 'right' => '0'];
+
+        $payload = [
+            'html' => $html,
+            'printBackground' => true,
+            'timeout' => $timeoutMs,
+            'margin' => $resolvedMargin,
+            'marginTop' => self::marginToMm($resolvedMargin['top'] ?? 0),
+            'marginRight' => self::marginToMm($resolvedMargin['right'] ?? 0),
+            'marginBottom' => self::marginToMm($resolvedMargin['bottom'] ?? 0),
+            'marginLeft' => self::marginToMm($resolvedMargin['left'] ?? 0),
+        ];
+
+        if ($pageWidthMm && $pageHeightMm) {
+            $payload['width'] = $pageWidthMm.'mm';
+            $payload['height'] = $pageHeightMm.'mm';
+        } else {
+            $payload['landscape'] = $isLandscape;
+            $payload['format'] = 'A4';
+        }
+
+        if ($headerTemplate !== null || $footerTemplate !== null) {
+            $payload['displayHeaderFooter'] = true;
+            $payload['headerTemplate'] = $headerTemplate ?? '<span></span>';
+            $payload['footerTemplate'] = $footerTemplate ?? '<span></span>';
+        }
+
+        return $payload;
+    }
+
+    private static function converterHttpTimeout(int $timeoutMs): int
+    {
+        return (int) max(config('services.pdf_converter.timeout', 300), ceil($timeoutMs / 1000) + 30);
     }
 
     /** DomPDF's setPaper() takes a custom size as points (72/inch), not mm. */

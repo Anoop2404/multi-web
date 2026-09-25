@@ -74,4 +74,49 @@ class PdfGeneratorTest extends TestCase
 
         $this->assertSame(200, PdfGenerator::download('<html><body>Local dev</body></html>', 'report.pdf')->getStatusCode());
     }
+
+    public function test_render_many_sends_every_document_to_the_converter_keyed_by_its_own_key(): void
+    {
+        config(['services.pdf_converter.url' => 'https://pdf.example.test/render', 'services.pdf_converter.concurrency' => 2]);
+        Http::fake(fn ($request) => Http::response('%PDF-'.strip_tags($request['html']), 200));
+
+        $results = PdfGenerator::renderMany([
+            '7:bg' => ['html' => '<p>seven-bg</p>', 'isLandscape' => true],
+            '7:plain' => ['html' => '<p>seven-plain</p>', 'isLandscape' => true],
+            '8:bg' => ['html' => '<p>eight-bg</p>', 'pageWidthMm' => 297.0, 'pageHeightMm' => 210.0],
+        ]);
+
+        $this->assertSame(['7:bg' => '%PDF-seven-bg', '7:plain' => '%PDF-seven-plain', '8:bg' => '%PDF-eight-bg'], $results);
+        Http::assertSentCount(3);
+        Http::assertSent(fn ($request) => $request['html'] === '<p>eight-bg</p>' && $request['width'] === '297mm');
+        Http::assertSent(fn ($request) => $request['html'] === '<p>seven-bg</p>' && $request['landscape'] === true && $request['format'] === 'A4');
+    }
+
+    public function test_render_many_reports_a_failed_document_without_losing_the_others(): void
+    {
+        config(['services.pdf_converter.url' => 'https://pdf.example.test/render']);
+        Http::fake(fn ($request) => str_contains($request['html'], 'bad')
+            ? Http::response('boom', 500)
+            : Http::response('%PDF-ok', 200));
+
+        $results = PdfGenerator::renderMany([
+            'good' => ['html' => '<p>good</p>'],
+            'bad' => ['html' => '<p>bad</p>'],
+        ]);
+
+        $this->assertSame('%PDF-ok', $results['good']);
+        // Retried through render() on its own, so it fails exactly the way render() does.
+        $this->assertInstanceOf(RuntimeException::class, $results['bad']);
+    }
+
+    public function test_render_many_without_a_converter_renders_each_document_locally(): void
+    {
+        config(['services.pdf_converter.url' => null]);
+
+        $results = PdfGenerator::renderMany(['a' => ['html' => '<p>A</p>'], 'b' => ['html' => '<p>B</p>']]);
+
+        $this->assertSame(['a', 'b'], array_keys($results));
+        $this->assertStringStartsWith('%PDF', $results['a']);
+        $this->assertStringStartsWith('%PDF', $results['b']);
+    }
 }

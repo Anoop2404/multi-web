@@ -140,6 +140,48 @@ class FestCertificateBatchGenerationTest extends TestCase
         ]);
     }
 
+    /**
+     * With the Chromium converter configured, RenderCertificateChunkJob sends each slice
+     * of certificates' two variants through PdfGenerator::renderMany() concurrently —
+     * every certificate must still end up with its OWN two PDFs (not a neighbour's from
+     * the same pooled slice), across slice boundaries.
+     */
+    public function test_batch_through_the_converter_stores_each_certificates_own_pdfs(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        config(['services.pdf_converter.url' => 'https://pdf.example.test/render', 'services.pdf_converter.concurrency' => 4]);
+        \Illuminate\Support\Facades\Http::fake(function ($request) {
+            preg_match('/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/', $request['html'], $uuid);
+
+            return \Illuminate\Support\Facades\Http::response('%PDF-'.($uuid[0] ?? 'none'), 200);
+        });
+
+        $sahodaya = $this->makeSahodaya();
+        $school = $this->makeSchool($sahodaya->id);
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        $event = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Pooled Render Event', 'event_type' => 'kalolsavam']);
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song', 'item_code' => 'SS1']);
+        $certificates = $this->makeCertificates($event, $item, $school->id, 5);
+
+        $this->actingAs($admin)->post(route('sahodaya.events.certificates.batches.store', [
+            'tenantId' => $sahodaya->id,
+            'event'    => $event->id,
+        ]))->assertRedirect();
+
+        $batch = CertificateBatch::findOrFail(session('certificate_batch_id'));
+        $this->assertSame(CertificateBatch::STATUS_COMPLETED, $batch->status);
+        $this->assertSame(5, $batch->succeeded_count);
+        \Illuminate\Support\Facades\Http::assertSentCount(10);
+
+        foreach ($certificates as $certificate) {
+            $certificate->refresh();
+            $this->assertSame('%PDF-'.$certificate->verification_uuid, TenantStorage::get($certificate->file_path, $certificate->storage_disk));
+            $this->assertSame('%PDF-'.$certificate->verification_uuid, TenantStorage::get($certificate->plain_file_path, $certificate->storage_disk));
+        }
+    }
+
     public function test_download_zip_serves_the_cached_file_instead_of_re_rendering(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);

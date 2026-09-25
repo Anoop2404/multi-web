@@ -319,6 +319,7 @@ class FestEventPortalController extends SchoolAdminController
         $basePayloads = $service->payloadsFor($certificates);
         $templateCache = [];
         $participantsCache = [];
+        $assetCache = [];
 
         // Same real-PDF/QR/embedded-asset output as the Sahodaya-admin bulk ZIP
         // (FestCertificateController::downloadZip()) — this endpoint used to zip raw
@@ -329,11 +330,11 @@ class FestEventPortalController extends SchoolAdminController
             // $payload starts as payloadsFor()'s cheap version; the closure only upgrades
             // it to the expensive embedAssets+qr_src renderContext() on a cache miss —
             // captured by reference so the filename lookup below sees whichever version
-            // actually ran, and $templateCache/$participantsCache stay shared across every
-            // certificate in this loop (renderContext()'s own cross-call cache), not reset
-            // per closure invocation.
-            $pdf = $service->cachedOrFreshPdf($certificate, function () use (&$payload, $certificate, $service, &$templateCache, &$participantsCache) {
-                $payload = $service->renderContext($certificate, $payload, $templateCache, $participantsCache, embedAssets: true);
+            // actually ran, and $templateCache/$participantsCache/$assetCache stay shared across
+            // every certificate in this loop (renderContext()'s own cross-call cache), not
+            // reset per closure invocation.
+            $pdf = $service->cachedOrFreshPdf($certificate, function () use (&$payload, $certificate, $service, &$templateCache, &$participantsCache, &$assetCache) {
+                $payload = $service->renderContext($certificate, $payload, $templateCache, $participantsCache, embedAssets: true, assetCache: $assetCache);
                 $payload['qr_src'] = app(FestIdCardQrService::class)->dataUri(route('certificates.verify', $certificate->verification_uuid, absolute: true));
 
                 return $payload;

@@ -104,38 +104,66 @@ class RenderCertificateChunkJob implements ShouldQueue
         $failedSinceFlush = 0;
         $failedItemsSinceFlush = [];
 
-        foreach ($certificates as $certificate) {
-            $processedSinceFlush++;
+        // A few certificates at a time so their PDFs (two each) render concurrently through
+        // PdfGenerator::renderMany() — one converter round-trip after another was the bulk
+        // of a render run's wall time. Sized so the in-flight request count stays within
+        // services.pdf_converter.concurrency.
+        $perSlice = max(1, intdiv((int) config('services.pdf_converter.concurrency', 4), 2));
 
-            try {
-                $this->renderOne($certificate, $service, $qrService, $payloads, $templateCache, $participantsCache, $assetCache);
-                $succeededSinceFlush++;
-                $consecutiveConnectionFailures = 0;
-            } catch (ConnectionException $e) {
-                $consecutiveConnectionFailures++;
-                $failedSinceFlush++;
-                $failedItemsSinceFlush[] = $this->failureEntry($certificate, $payloads, $e);
+        foreach ($certificates->chunk($perSlice) as $slice) {
+            $prepared = [];
+            $documents = [];
+            $errors = [];
 
-                if ($consecutiveConnectionFailures >= self::MAX_CONSECUTIVE_CONNECTION_FAILURES) {
-                    // The render service itself looks down, not this one certificate —
-                    // flush progress for what actually ran, then let tries/backoff retry
-                    // the remainder as a fresh chunk attempt once it recovers, rather than
-                    // mass-recording everything still unattempted as individually failed.
-                    $this->flushProgress($batch, $processedSinceFlush, $succeededSinceFlush, $failedSinceFlush, $failedItemsSinceFlush);
-
-                    throw $e;
+            foreach ($slice as $certificate) {
+                try {
+                    $prepared[$certificate->id] = $this->prepare($certificate, $service, $qrService, $payloads, $templateCache, $participantsCache, $assetCache);
+                    $documents[$certificate->id.':bg'] = $prepared[$certificate->id]['bg'];
+                    $documents[$certificate->id.':plain'] = $prepared[$certificate->id]['plain'];
+                } catch (\Throwable $e) {
+                    $errors[$certificate->id] = $e;
                 }
-
-                continue;
-            } catch (\Throwable $e) {
-                $failedSinceFlush++;
-                $failedItemsSinceFlush[] = $this->failureEntry($certificate, $payloads, $e);
-
-                continue;
             }
 
-            if ($processedSinceFlush >= self::PROGRESS_FLUSH_EVERY) {
-                $this->flushProgress($batch, $processedSinceFlush, $succeededSinceFlush, $failedSinceFlush, $failedItemsSinceFlush);
+            $pdfs = $documents ? PdfGenerator::renderMany($documents) : [];
+
+            foreach ($slice as $certificate) {
+                $processedSinceFlush++;
+
+                try {
+                    if (isset($errors[$certificate->id])) {
+                        throw $errors[$certificate->id];
+                    }
+
+                    $this->persist($certificate, $service, $prepared[$certificate->id], $pdfs[$certificate->id.':bg'], $pdfs[$certificate->id.':plain']);
+                    $succeededSinceFlush++;
+                    $consecutiveConnectionFailures = 0;
+                } catch (ConnectionException $e) {
+                    $consecutiveConnectionFailures++;
+                    $failedSinceFlush++;
+                    $failedItemsSinceFlush[] = $this->failureEntry($certificate, $payloads, $e);
+
+                    if ($consecutiveConnectionFailures >= self::MAX_CONSECUTIVE_CONNECTION_FAILURES) {
+                        // The render service itself looks down, not this one certificate —
+                        // flush progress for what actually ran, then let tries/backoff retry
+                        // the remainder as a fresh chunk attempt once it recovers, rather than
+                        // mass-recording everything still unattempted as individually failed.
+                        $this->flushProgress($batch, $processedSinceFlush, $succeededSinceFlush, $failedSinceFlush, $failedItemsSinceFlush);
+
+                        throw $e;
+                    }
+
+                    continue;
+                } catch (\Throwable $e) {
+                    $failedSinceFlush++;
+                    $failedItemsSinceFlush[] = $this->failureEntry($certificate, $payloads, $e);
+
+                    continue;
+                }
+
+                if ($processedSinceFlush >= self::PROGRESS_FLUSH_EVERY) {
+                    $this->flushProgress($batch, $processedSinceFlush, $succeededSinceFlush, $failedSinceFlush, $failedItemsSinceFlush);
+                }
             }
         }
 
@@ -165,7 +193,13 @@ class RenderCertificateChunkJob implements ShouldQueue
         $failedItems = [];
     }
 
-    private function renderOne(
+    /**
+     * Everything up to the converter call: the render context plus both variants' HTML
+     * and page geometry, as PdfGenerator::renderMany() documents.
+     *
+     * @return array{context: array, bg: array, plain: array}
+     */
+    private function prepare(
         Certificate $certificate,
         FestCertificateService $service,
         FestIdCardQrService $qrService,
@@ -173,7 +207,7 @@ class RenderCertificateChunkJob implements ShouldQueue
         array &$templateCache,
         array &$participantsCache,
         array &$assetCache,
-    ): void {
+    ): array {
         $context = $service->renderContext(
             $certificate,
             $payloads->get($certificate->id),
@@ -190,22 +224,37 @@ class RenderCertificateChunkJob implements ShouldQueue
         $verifyUrl = ($sahodaya ? TenantDomainSync::publicUrl($sahodaya) : null) ?? url('/');
         $context['qr_src'] = $qrService->dataUri($verifyUrl.'/certificates/verify/'.$certificate->verification_uuid);
 
-        $event = $context['event'] ?? null;
-        $tenantId = $context['sahodaya']?->id ?? $this->tenantId;
         $isLandscape = ($context['overlayLayout']['orientation'] ?? 'landscape') !== 'portrait';
         [$pageWidthMm, $pageHeightMm] = FestCertificateService::customPageDimensionsMm($context['overlayLayout'] ?? []);
+        $geometry = ['isLandscape' => $isLandscape, 'pageWidthMm' => $pageWidthMm, 'pageHeightMm' => $pageHeightMm];
+
+        return [
+            'context' => $context,
+            'bg' => ['html' => view('fest.certificate-print', $context)->render()] + $geometry,
+            'plain' => ['html' => view('fest.certificate-print', array_merge($context, ['plainMode' => true]))->render()] + $geometry,
+        ];
+    }
+
+    /** Stores both rendered variants and marks the certificate fresh. */
+    private function persist(Certificate $certificate, FestCertificateService $service, array $prepared, string|\Throwable $withBgPdf, string|\Throwable $plainPdf): void
+    {
+        foreach ([$withBgPdf, $plainPdf] as $result) {
+            if ($result instanceof \Throwable) {
+                throw $result;
+            }
+        }
+
+        $context = $prepared['context'];
+        $event = $context['event'] ?? null;
+        $tenantId = $context['sahodaya']?->id ?? $this->tenantId;
 
         $directory = 'certificates/'.$tenantId.'/'.($event?->id ?? '0').'/'.$certificate->cert_type;
         $baseName = $certificate->id.'-'.$certificate->verification_uuid;
         $disk = TenantStorage::uploadDisk();
 
-        $withBgHtml = view('fest.certificate-print', $context)->render();
-        $withBgPdf = PdfGenerator::render($withBgHtml, $isLandscape, pageWidthMm: $pageWidthMm, pageHeightMm: $pageHeightMm);
         $withBgPath = $directory.'/'.$baseName.'.pdf';
         TenantStorage::put($withBgPath, $withBgPdf, $disk);
 
-        $plainHtml = view('fest.certificate-print', array_merge($context, ['plainMode' => true]))->render();
-        $plainPdf = PdfGenerator::render($plainHtml, $isLandscape, pageWidthMm: $pageWidthMm, pageHeightMm: $pageHeightMm);
         $plainPath = $directory.'/'.$baseName.'-plain.pdf';
         TenantStorage::put($plainPath, $plainPdf, $disk);
 

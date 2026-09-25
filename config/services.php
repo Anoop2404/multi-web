@@ -43,6 +43,8 @@ return [
         'url' => env('PDF_CONVERTER_URL'),
         'timeout' => env('PDF_CONVERTER_TIMEOUT', 300),
         'connect_timeout' => env('PDF_CONVERTER_CONNECT_TIMEOUT', 15),
+        // Max requests PdfGenerator::renderMany() keeps in flight (bulk certificate renders).
+        'concurrency' => env('PDF_CONVERTER_CONCURRENCY', 4),
         // DomPDF fallback when the converter fails. Off: it exhausts memory on large reports.
         'fallback' => env('PDF_CONVERTER_FALLBACK', false),
     ],
