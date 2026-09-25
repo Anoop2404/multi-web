@@ -150,7 +150,10 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
             Route::post('/fest/{event}/judges', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'assignJudge'])->name('fest.judges.assign');
             Route::delete('/fest/{event}/judges/{assignment}', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'unassignJudge'])->name('fest.judges.unassign');
             Route::post('/fest/{event}/marks', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'enterMark'])->name('fest.marks.enter');
-            Route::post('/fest/{event}/publish-results', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'publishResults'])->name('fest.results.publish');
+            // Named fest.publish-results, not fest.results.publish: that full name
+            // (admin.state.fest.results.publish) belongs to the State module's own publish route
+            // below, and the duplicate made `php artisan route:cache` refuse to build.
+            Route::post('/fest/{event}/publish-results', [\App\Http\Controllers\StateAdmin\StateFestWorkspaceController::class, 'publishResults'])->name('fest.publish-results');
 
             Route::get('/reports/participation/{stateProgram}', [\App\Http\Controllers\StateAdmin\StateParticipationReportController::class, 'index'])->name('reports.participation');
             Route::get('/reports/participation/{stateProgram}/export', [\App\Http\Controllers\StateAdmin\StateParticipationReportController::class, 'export'])->name('reports.participation.export');
