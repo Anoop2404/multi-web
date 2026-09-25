@@ -1046,8 +1046,9 @@ class FestReportService
     /**
      * School-wise participant list: one section per school (each on its own page), its items
      * underneath, and each item's participants listed -- no photos, so it stays light even for
-     * a whole event. Same rows as the item-wise report (standby entrants already excluded);
-     * marks show only for items whose results are published, like the student-wise PDF.
+     * a whole event. Same rows as the item-wise report (standby entrants already excluded).
+     * No marks columns by default; ?show_marks=1 adds Grade / Rank / Score, and even then
+     * only for items whose results are published, like the student-wise PDF.
      */
     private function schoolWiseItemsPdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
@@ -1072,7 +1073,8 @@ class FestReportService
         $bladeData = [
             'event'     => $this->event,
             'rows'      => $rows,
-            'showMarks' => ! $request->boolean('hide_marks'),
+            // A participant list: no Grade / Rank / Score unless asked for (?show_marks=1).
+            'showMarks' => $request->boolean('show_marks'),
             'isDomPdf'  => $isDomPdf,
             'preview'   => $this->preview && $isDomPdf,
             ...$this->brandingData(),

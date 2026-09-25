@@ -100,13 +100,21 @@ class FestStudentWiseNoMarksAndStandbyTest extends TestCase
         $this->assertStringContainsString('Girls', $html);
         $this->assertStringContainsString('Group', $html);
         $this->assertStringNotContainsString('<img', $html);
-        $this->assertStringContainsString('>Grade<', $html);
+        // A participant list by default: no marks columns.
+        foreach (['Grade', 'Rank', 'Score'] as $col) {
+            $this->assertStringNotContainsString(">{$col}<", $html);
+        }
 
         // One school only, and without the marks columns.
-        $one = $service->export('student-wise-pdf', new \Illuminate\Http\Request(['by_school' => 1, 'inline' => 1, 'school_id' => $schools['Zeta School']->id, 'hide_marks' => 1]))->getContent();
+        $one = $service->export('student-wise-pdf', new \Illuminate\Http\Request(['by_school' => 1, 'inline' => 1, 'school_id' => $schools['Zeta School']->id]))->getContent();
         $this->assertStringContainsString('ZETA SCHOOL', $one);
         $this->assertStringNotContainsString('ALPHA SCHOOL', $one);
-        $this->assertStringNotContainsString('>Grade<', $one);
+
+        // Marks columns only when explicitly asked for.
+        $withMarks = $service->export('student-wise-pdf', new \Illuminate\Http\Request(['by_school' => 1, 'inline' => 1, 'show_marks' => 1]))->getContent();
+        foreach (['Grade', 'Rank', 'Score'] as $col) {
+            $this->assertStringContainsString(">{$col}<", $withMarks);
+        }
     }
 
     /**

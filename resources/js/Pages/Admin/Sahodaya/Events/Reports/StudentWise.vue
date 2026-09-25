@@ -6,13 +6,13 @@
             <template #actions>
                 <ReportDownloadButtons :pdf-url="pdfUrl" :xls-url="xlsUrl" />
                 <div class="flex flex-wrap items-center gap-2 border-l border-slate-200 pl-3">
-                    <span class="text-xs font-semibold text-slate-600">School-wise, items under each school:</span>
+                    <span class="text-xs font-semibold text-slate-600">School-wise list (no grade / rank / score), items under each school:</span>
                     <ReportDownloadButtons :pdf-url="bySchoolPdfUrl" />
                 </div>
                 <div class="flex flex-wrap items-center gap-2 border-l border-slate-200 pl-3">
-                    <span class="text-xs font-semibold text-slate-600">Without rank / mark / grade:</span>
+                    <span class="text-xs font-semibold text-slate-600">Student cards without rank / mark / grade:</span>
                     <a :href="noMarksUrl(pdfUrl)" target="_blank" rel="noopener" class="btn-secondary text-sm">PDF ↓</a>
-                    <a :href="noMarksUrl(bySchoolPdfUrl)" target="_blank" rel="noopener" class="btn-secondary text-sm">School-wise, by item ↓</a>
+                    <a :href="withMarksUrl(bySchoolPdfUrl)" target="_blank" rel="noopener" class="btn-secondary text-sm">School-wise list with grade / rank / score ↓</a>
                 </div>
             </template>
         </PageHeader>
@@ -194,6 +194,11 @@ import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue
 import ReportDownloadButtons from '@/Components/reports/ReportDownloadButtons.vue';
 
 // The same PDF link with the marks columns dropped, as a direct download.
+function withMarksUrl(url) {
+    if (!url) return '#';
+    return `${url}${url.includes('?') ? '&' : '?'}show_marks=1&download=1`;
+}
+
 function noMarksUrl(url) {
     if (!url) return '#';
     return `${url}${url.includes('?') ? '&' : '?'}hide_marks=1&download=1`;
