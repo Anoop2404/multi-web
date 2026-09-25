@@ -824,13 +824,37 @@ function batchTypeLabel(batchType) {
     return 'Render';
 }
 
+// Every Download / print menu on this page is a native <details class="relative">, which
+// only closes when its own summary is clicked again — so menus piled up open (one per
+// school row). Close them like normal menus: clicking anywhere outside (including opening
+// another menu), picking an option inside, or Escape. The "View names" / pending-items
+// expanders aren't .relative, so they're left alone.
+function closeDropdownMenus(event) {
+    document.querySelectorAll('details.relative[open]').forEach((menu) => {
+        const inside = event?.target instanceof Node && menu.contains(event.target);
+        const pickedOption = inside && !event.target.closest('summary') && event.target.closest('a, button');
+        if (!inside || pickedOption) {
+            menu.removeAttribute('open');
+        }
+    });
+}
+function closeDropdownMenusOnEscape(event) {
+    if (event.key === 'Escape') closeDropdownMenus();
+}
+
 onMounted(() => {
     const lastBatch = props.recentBatches?.[0];
     if (lastBatch && !['completed', 'completed_with_errors', 'failed', 'cancelled'].includes(lastBatch.status)) {
         startPolling(lastBatch.id);
     }
+    document.addEventListener('click', closeDropdownMenus);
+    document.addEventListener('keydown', closeDropdownMenusOnEscape);
 });
-onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
+onUnmounted(() => {
+    if (pollTimer) clearInterval(pollTimer);
+    document.removeEventListener('click', closeDropdownMenus);
+    document.removeEventListener('keydown', closeDropdownMenusOnEscape);
+});
 
 // Search, Filter, & Pagination state
 const searchQuery = ref('');
