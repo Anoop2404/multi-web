@@ -37,6 +37,16 @@
                     <p v-if="event.conducting_school_id" class="text-xs text-gray-400 mt-1">
                         This event's conducting school is set — you can pick the same one here if that's who should be paid.
                     </p>
+                    <div v-if="payeeForm.food_host_school_id" class="mt-3 rounded-lg border border-slate-200 p-3 space-y-2">
+                        <p class="text-sm font-semibold text-slate-700">Host school account details</p>
+                        <p class="text-xs text-gray-400">Shown to schools ordering food so they know where to pay. The school can also edit these itself under its Settings.</p>
+                        <input v-model="payeeForm.payment_bank_name" type="text" placeholder="Bank name" class="field">
+                        <input v-model="payeeForm.payment_account_no" type="text" placeholder="Account number" class="field font-mono">
+                        <input v-model="payeeForm.payment_ifsc" type="text" placeholder="IFSC" class="field font-mono uppercase">
+                        <input v-model="payeeForm.payment_upi" type="text" placeholder="UPI ID (e.g. school@upi)" class="field font-mono">
+                        <p v-for="f in ['payment_bank_name', 'payment_account_no', 'payment_ifsc', 'payment_upi']" :key="f"
+                           v-show="payeeForm.errors[f]" class="text-xs text-red-600">{{ payeeForm.errors[f] }}</p>
+                    </div>
                 </div>
                 <label class="flex items-center gap-2 text-sm">
                     <input type="checkbox" v-model="payeeForm.require_payment_for_coupons">
@@ -227,7 +237,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
@@ -247,6 +257,7 @@ const props = defineProps({
     mealTypes: { type: Object, default: () => ({}) },
     eventDates: { type: Array, default: () => [] },
     schoolOptions: { type: Array, default: () => [] },
+    schoolPaymentDetails: { type: Object, default: () => ({}) },
     activityLogs: { type: Array, default: () => [] },
     isPartitionedHub: { type: Boolean, default: false },
     foodRegionSummary: { type: Array, default: () => [] },
@@ -266,7 +277,17 @@ const payeeForm = useForm({
     food_payee_type: props.event.food_payee_type || 'sahodaya',
     food_host_school_id: props.event.food_host_school_id || '',
     require_payment_for_coupons: props.event.require_payment_for_coupons || false,
+    payment_bank_name: '', payment_account_no: '', payment_ifsc: '', payment_upi: '',
 });
+function fillHostPayment(schoolId) {
+    const d = props.schoolPaymentDetails?.[schoolId] ?? {};
+    payeeForm.payment_bank_name = d.bank_name ?? '';
+    payeeForm.payment_account_no = d.account_no ?? '';
+    payeeForm.payment_ifsc = d.ifsc ?? '';
+    payeeForm.payment_upi = d.upi ?? '';
+}
+fillHostPayment(payeeForm.food_host_school_id);
+watch(() => payeeForm.food_host_school_id, fillHostPayment);
 function savePayee() {
     payeeForm.put(`${base}/food-menu-payee`, { preserveScroll: true });
 }

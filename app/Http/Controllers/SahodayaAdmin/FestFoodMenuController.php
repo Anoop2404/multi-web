@@ -24,6 +24,10 @@ class FestFoodMenuController extends SahodayaAdminController
         // FestFoodMenuItem::sortForDisplay() for the canonical chronological order.
         $items = FestFoodMenuItem::sortForDisplay(FestFoodMenuItem::forEvent($event->id)->get());
         $isPartitionedHub = $partitions->isPartitionedHub($event);
+        $schools = Tenant::where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->orderBy('name')
+            ->get();
 
         $catalogItems = FestFoodCatalogItem::forEvent($event->id)
             ->withCount('menuItems')
@@ -45,10 +49,12 @@ class FestFoodMenuController extends SahodayaAdminController
             'catalogItems' => $catalogItems,
             'mealTypes' => $this->mealTypeOptions(),
             'eventDates' => $this->eventDateOptions($event),
-            'schoolOptions' => Tenant::where('parent_id', $this->sahodaya->id)
-                ->where('type', 'school')
-                ->orderBy('name')
-                ->get(['id', 'name']),
+            'schoolOptions' => $schools->map->only('id', 'name')->values(),
+            // Keyed by school id so the payee form can prefill whichever host school gets
+            // picked -- only schools that actually have something on file are included.
+            'schoolPaymentDetails' => $schools
+                ->mapWithKeys(fn (Tenant $s) => [$s->id => $s->paymentDetails()])
+                ->filter(fn (array $d) => collect($d)->except('qr_code')->filter()->isNotEmpty()),
             'isPartitionedHub' => $isPartitionedHub,
             'foodRegionSummary' => $isPartitionedHub ? $partitions->foodRegionDrillDownSummary($event) : [],
         ]));
@@ -87,7 +93,28 @@ class FestFoodMenuController extends SahodayaAdminController
                 Rule::exists(Tenant::class, 'id')->where('parent_id', $this->sahodaya->id)->where('type', 'school'),
             ],
             'require_payment_for_coupons' => ['nullable', 'boolean'],
+            // The host school's own receiving account -- same fields the school itself can
+            // edit under School Settings, entered here so the Sahodaya admin can fill them in
+            // on the school's behalf.
+            'payment_bank_name' => ['nullable', 'string', 'max:255'],
+            'payment_account_no' => ['nullable', 'string', 'max:64'],
+            'payment_ifsc' => ['nullable', 'string', 'max:32'],
+            'payment_upi' => ['nullable', 'string', 'max:255'],
         ]);
+
+        if ($data['food_payee_type'] === 'host_school') {
+            $host = Tenant::find($data['food_host_school_id']);
+            $keys = ['payment_bank_name' => 'bank_name', 'payment_account_no' => 'account_no', 'payment_ifsc' => 'ifsc', 'payment_upi' => 'upi'];
+            if ($host && collect(array_keys($keys))->contains(fn (string $k) => $request->exists($k))) {
+                $payment = $host->paymentDetails();
+                foreach ($keys as $field => $key) {
+                    if ($request->exists($field)) {
+                        $payment[$key] = $data[$field] ?? null;
+                    }
+                }
+                $host->setSetting('payment', $payment);
+            }
+        }
 
         $event->update([
             'food_payee_type' => $data['food_payee_type'],
