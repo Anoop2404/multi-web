@@ -90,18 +90,21 @@
                     </div>
                     <div v-if="blk.name"
                          class="absolute text-slate-800"
+                         :class="{ 'opacity-40 italic': !blk.name_text }"
                          :style="overlayStyle(blk.name, { top: 86, left: 72, width: 20, font_size: 10, font_family: 'Montserrat', font_weight: 'bold', align: 'center' })">
-                        {{ blk.name_text || 'Name' }}
+                        {{ blk.name_text || 'Name (set per event)' }}
                     </div>
                     <div v-if="blk.designation"
                          class="absolute text-slate-600"
+                         :class="{ 'opacity-40 italic': !blk.designation_text }"
                          :style="overlayStyle(blk.designation, { top: 89, left: 72, width: 20, font_size: 8, font_family: 'Montserrat', align: 'center' })">
-                        {{ blk.designation_text || 'Designation' }}
+                        {{ blk.designation_text || 'Designation (set per event)' }}
                     </div>
                     <div v-if="blk.school"
                          class="absolute text-slate-600"
+                         :class="{ 'opacity-40 italic': !blk.school_text }"
                          :style="overlayStyle(blk.school, { top: 92, left: 72, width: 20, font_size: 8, font_family: 'Montserrat', align: 'center' })">
-                        {{ blk.school_text || 'School name' }}
+                        {{ blk.school_text || 'School name (set per event)' }}
                     </div>
                 </template>
 
