@@ -244,7 +244,7 @@ class CertificateTemplateController extends SahodayaAdminController
     public function store(Request $request)
     {
         $data = $request->validate([
-            'event_type'          => 'required|string|max:50',
+            'event_type'          => ['required', 'string', Rule::in(['fest', 'training', 'topper'])],
             'event_id'            => 'nullable|integer|exists:fest_events,id',
             'item_id'             => 'nullable|integer|exists:fest_event_items,id',
             'certificate_type'    => 'required|string|max:50',
@@ -491,7 +491,7 @@ class CertificateTemplateController extends SahodayaAdminController
             // correctly; this mirrors it. event_type/certificate_type had the exact same
             // gap — changing either dropdown on an existing template looked like it saved
             // (redirect, no error) but silently left both columns untouched.
-            'event_type'          => 'nullable|string|max:50',
+            'event_type'          => ['nullable', 'string', Rule::in(['fest', 'training', 'topper'])],
             'certificate_type'    => 'nullable|string|max:50',
             'event_id'            => 'nullable|integer|exists:fest_events,id',
             'item_id'             => 'nullable|integer|exists:fest_event_items,id',
