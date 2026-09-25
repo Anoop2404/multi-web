@@ -44,6 +44,7 @@ class FestItemWisePdfLayoutTest extends TestCase
         $this->assertMatchesRegularExpression('/ALPHA SCHOOL.*?&middot; 2.*?Amy.*?Ann.*?ZED SCHOOL.*?&middot; 1.*?Zoe/s', $html);
         // The School column is gone (the heading row replaces it).
         $this->assertStringNotContainsString('>School<', $html);
+        $this->assertStringContainsString('>Chest<', $html);
         $this->assertStringContainsString('>Grade<', $html);
         $this->assertStringContainsString('>Rank<', $html);
         $this->assertStringContainsString('>Score<', $html);
@@ -53,10 +54,12 @@ class FestItemWisePdfLayoutTest extends TestCase
     {
         $html = $this->html(false);
 
-        $this->assertStringNotContainsString('>Grade<', $html);
-        $this->assertStringNotContainsString('>Rank<', $html);
-        $this->assertStringNotContainsString('>Score<', $html);
+        foreach (['Chest', 'Grade', 'Rank', 'Score'] as $col) {
+            $this->assertStringNotContainsString(">{$col}<", $html);
+        }
         $this->assertStringContainsString('>Participant<', $html);
-        $this->assertStringContainsString('colspan="5"', $html);
+        $this->assertStringContainsString('>Reg No<', $html);
+        $this->assertStringContainsString('>Status<', $html);
+        $this->assertStringContainsString('colspan="4"', $html);
     }
 }

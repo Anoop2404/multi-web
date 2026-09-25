@@ -6,7 +6,7 @@
             <template #actions>
                 <ReportDownloadButtons :pdf-url="pdfExportUrl" :csv-url="exportUrl" />
                 <a :href="pdfNoMarksUrl" target="_blank" rel="noopener" class="btn-secondary text-sm">
-                    PDF without grade / rank / score ↓
+                    PDF without chest / grade / rank / score ↓
                 </a>
             </template>
         </PageHeader>
@@ -18,7 +18,7 @@
             </label>
             <label class="text-xs font-semibold text-slate-600 flex items-center gap-2 mt-2">
                 <input v-model="includeMarks" type="checkbox" class="rounded border-slate-300" />
-                Include grade, rank &amp; score on the PDF (untick to print a plain participant list)
+                Include chest no, grade, rank &amp; score on the PDF (untick to print a plain participant list)
             </label>
         </div>
 
