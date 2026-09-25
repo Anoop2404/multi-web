@@ -1703,22 +1703,22 @@ class FestEventReportAnalyticsService
         );
     }
 
-    public function teamSquadPdf(?string $schoolId = null): \Illuminate\Http\Response
+    public function teamSquadPdf(?string $schoolId = null)
     {
-        return Pdf::loadView('fest.reports.team-squads', [
+        return \App\Support\PdfGenerator::fromView('fest.reports.team-squads', [
             'event' => $this->event,
             'rows'  => $this->teamSquadRows($schoolId),
             ...$this->brandingData(),
-        ])->download(str($this->event->title)->slug()->limit(40).'-team-squads.pdf');
+        ], str($this->event->title)->slug()->limit(40).'-team-squads.pdf');
     }
 
-    public function medalTallyPdf(): \Illuminate\Http\Response
+    public function medalTallyPdf()
     {
-        return Pdf::loadView('fest.reports.medal-tally', [
+        return \App\Support\PdfGenerator::fromView('fest.reports.medal-tally', [
             'event' => $this->event,
             'rows'  => $this->medalTallyBySchool(),
             ...$this->brandingData(),
-        ])->download(str($this->event->title)->slug()->limit(40).'-medal-tally.pdf');
+        ], str($this->event->title)->slug()->limit(40).'-medal-tally.pdf');
     }
 
     /** @return list<array<string, mixed>> */

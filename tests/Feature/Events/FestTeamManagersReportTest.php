@@ -336,4 +336,25 @@ class FestTeamManagersReportTest extends TestCase
         // The count cell must stay empty, not render the system's own count value.
         $this->assertStringNotContainsString('count-badge', $html);
     }
+
+    /**
+     * With the external converter configured, a preview is the converter's own PDF shown
+     * inline (the same bytes a download produces), not a separately rendered HTML page.
+     */
+    public function test_preview_goes_through_the_converter_when_one_is_configured(): void
+    {
+        config(['services.pdf_converter.url' => 'https://pdf.example.test/generate-pdf']);
+        \Illuminate\Support\Facades\Http::fake(['pdf.example.test/*' => \Illuminate\Support\Facades\Http::response('%PDF-1.4 converter', 200)]);
+
+        $sahodaya = Tenant::create(['type' => 'sahodaya', 'name' => 'Conv Preview Sahodaya', 'subdomain' => 'conv-prev-'.uniqid()]);
+        $event = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Conv Preview Kalotsav', 'event_type' => 'kalotsav', 'fee_settings' => ['fee_model' => 'none']]);
+
+        foreach (['team-managers-pdf', 'team-managers-registration-sheet'] as $id) {
+            $response = (new FestReportService($event))->export($id, new Request(['inline' => 1]));
+
+            $this->assertSame('application/pdf', $response->headers->get('Content-Type'), $id);
+            $this->assertStringContainsString('inline', (string) $response->headers->get('Content-Disposition'), $id);
+        }
+        \Illuminate\Support\Facades\Http::assertSentCount(2);
+    }
 }

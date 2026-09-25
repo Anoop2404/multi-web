@@ -1124,7 +1124,7 @@ class FestReportController extends SahodayaAdminController
             itemId: $request->integer('item_id') ?: null,
         );
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.item-wise-marks', [
+        $html = view('fest.reports.item-wise-marks', [
             'sahodaya'    => $this->sahodaya,
             'event'       => $event,
             'rows'        => $rows,
@@ -1240,7 +1240,7 @@ class FestReportController extends SahodayaAdminController
         $itemColWidth = $itemCount > 0 ? max(10, min(24, (int) floor(670 / $itemCount))) : 24;
         $fontSize = $itemColWidth >= 18 ? 8 : ($itemColWidth >= 13 ? 7 : 6);
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.category-points-table', [
+        $html = view('fest.reports.category-points-table', [
             'event'         => $event,
             'categoryLabel' => $categoryLabel,
             'items'         => $table['items'],
@@ -1251,15 +1251,11 @@ class FestReportController extends SahodayaAdminController
             'logoSrc'       => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
             'itemColWidth'  => $itemColWidth,
             'fontSize'      => $fontSize,
-        ])->setPaper('a4', 'landscape');
+        ])->render();
 
         $filename = "{$event->id}-{$category}-category-points.pdf";
 
-        if ($request->boolean('inline') || $request->boolean('preview')) {
-            return $pdf->stream($filename);
-        }
-
-        return $pdf->download($filename);
+        return \App\Support\PdfGenerator::download($html, $filename, $request->boolean('inline') || $request->boolean('preview'), true);
     }
 
     /** Excel sibling of categoryWisePointsPdf() above — same data, same rotated item-name headers as the consolidated matrix's own export. */
@@ -1318,21 +1314,17 @@ class FestReportController extends SahodayaAdminController
             strtoupper($school['school_name']), $school['subtotal'], $school['rank'],
         ])->all();
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.category-points-summary', [
+        $html = view('fest.reports.category-points-summary', [
             'event'         => $event,
             'categoryLabel' => $categoryLabel,
             'rows'          => $rows,
             'orgName'       => $this->sahodaya->name,
             'logoSrc'       => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
-        ]);
+        ])->render();
 
         $filename = "{$event->id}-{$category}-category-points-summary.pdf";
 
-        if ($request->boolean('inline') || $request->boolean('preview')) {
-            return $pdf->stream($filename);
-        }
-
-        return $pdf->download($filename);
+        return \App\Support\PdfGenerator::download($html, $filename, $request->boolean('inline') || $request->boolean('preview'));
     }
 
     /** Excel sibling of categoryWisePointsSummaryPdf() above. */

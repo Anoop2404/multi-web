@@ -1479,7 +1479,10 @@ class FestReportService
             ->values();
 
         $audience = $this->reportAudience($request);
-        $isPreview = $this->preview;
+        // HTML preview only where there is no external converter (local dev). With the
+        // converter configured, preview is the converter's own PDF shown inline -- exactly
+        // what the download produces -- not a separate browser-rendered approximation.
+        $isPreview = $this->preview && empty(config('services.pdf_converter.url'));
         $isDomPdf = empty(config('services.pdf_converter.url'));
 
         // Build photo map. Embed every photo as a base64 data URI — for the PDF this
@@ -1641,7 +1644,10 @@ class FestReportService
             ->values();
 
         $audience = $this->reportAudience($request);
-        $isPreview = $this->preview;
+        // HTML preview only where there is no external converter (local dev). With the
+        // converter configured, preview is the converter's own PDF shown inline -- exactly
+        // what the download produces -- not a separate browser-rendered approximation.
+        $isPreview = $this->preview && empty(config('services.pdf_converter.url'));
         $isDomPdf = empty(config('services.pdf_converter.url'));
 
         $rows = $this->participantReportRows($participants, $audience);
@@ -2289,13 +2295,13 @@ class FestReportService
             // the Blade view's own HTML directly, below) even when the Chromium
             // converter is otherwise configured -- so the view's in-page title/branding
             // must still show for a preview, not just for the dompdf fallback.
-            'preview'  => $this->preview,
+            'preview'  => $this->preview && $isDomPdf,
             ...$this->brandingData(),
         ];
 
         // Same fast-path as attendanceSheetPdf()/timesheetPdf() — skip the external
         // Puppeteer round-trip for an on-screen preview, render the Blade view directly.
-        if ($this->preview) {
+        if ($this->preview && $isDomPdf) {
             return response(view('fest.reports.team-managers', $bladeData)->render())
                 ->header('Content-Type', 'text/html');
         }
@@ -2340,11 +2346,11 @@ class FestReportService
             'event'    => $this->event,
             'schools'  => $data,
             'isDomPdf' => $isDomPdf,
-            'preview'  => $this->preview,
+            'preview'  => $this->preview && $isDomPdf,
             ...$this->brandingData(),
         ];
 
-        if ($this->preview) {
+        if ($this->preview && $isDomPdf) {
             return response(view('fest.reports.team-managers-registration-sheet', $bladeData)->render())
                 ->header('Content-Type', 'text/html');
         }

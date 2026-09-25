@@ -36,6 +36,20 @@ class PdfGenerator
      *                               since the dimensions already encode orientation.
      * @param  ?float  $pageHeightMm  See $pageWidthMm.
      */
+    /** Render a Blade view and send it through download() -- see there for the parameters. */
+    public static function fromView(
+        string $view,
+        array $data,
+        string $filename,
+        bool $inline = false,
+        bool $isLandscape = false,
+        ?string $headerTemplate = null,
+        ?string $footerTemplate = null,
+        ?array $margin = null,
+    ) {
+        return self::download(view($view, $data)->render(), $filename, $inline, $isLandscape, $headerTemplate, $footerTemplate, $margin);
+    }
+
     public static function download(
         string $html,
         string $filename,
@@ -114,6 +128,15 @@ class PdfGenerator
 
         if ($requireBrowserRenderer) {
             throw new \RuntimeException($browserFailure ?? 'Browser PDF generation failed.');
+        }
+
+        // The external converter is the renderer of record wherever one is configured. DomPDF
+        // is only for environments with no converter at all (local dev): on a big document it
+        // runs the request out of memory instead of failing usefully, so a converter failure is
+        // reported as itself (503) rather than quietly falling back. PDF_CONVERTER_FALLBACK=true
+        // restores the old behaviour.
+        if ($url && ! config('services.pdf_converter.fallback')) {
+            abort(503, 'The PDF converter could not build this document ('.($browserFailure ?? 'no response').'). Please try again in a moment.');
         }
 
         // Fallback to DomPDF. It builds a full box tree for the whole document in memory, so
@@ -230,6 +253,11 @@ class PdfGenerator
 
         if ($requireBrowserRenderer) {
             throw new \RuntimeException($browserFailure ?? 'Browser PDF generation failed.');
+        }
+
+        // Same policy as download(): the configured converter is the renderer of record.
+        if ($url && ! config('services.pdf_converter.fallback')) {
+            throw new \RuntimeException('The PDF converter could not build this document ('.($browserFailure ?? 'no response').').');
         }
 
         // Fallback to DomPDF
