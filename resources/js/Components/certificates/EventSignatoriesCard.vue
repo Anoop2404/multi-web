@@ -104,6 +104,7 @@ function saveSignatories() {
     signatoriesSaving.value = true;
     router.post(`${props.base}/signatories`, {
         signatories: signatories.value
+            .filter((sg) => sg.label.trim() || sg.name || sg.designation || sg.school || sg.signature || (sg.signature_path && !sg.remove_signature))
             .map((sg) => ({
                 label: sg.label,
                 name: sg.name || null,

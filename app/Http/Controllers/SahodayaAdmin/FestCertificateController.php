@@ -397,7 +397,7 @@ class FestCertificateController extends SahodayaAdminController
 
         $validated = $request->validate([
             'signatories'                    => 'nullable|array|max:12',
-            'signatories.*.label'            => 'required|string|max:80',
+            'signatories.*.label'            => 'nullable|required_with:signatories.*.name,signatories.*.designation,signatories.*.school,signatories.*.signature,signatories.*.signature_path|string|max:80',
             'signatories.*.name'             => 'nullable|string|max:120',
             'signatories.*.designation'      => 'nullable|string|max:120',
             'signatories.*.school'           => 'nullable|string|max:160',
@@ -414,7 +414,7 @@ class FestCertificateController extends SahodayaAdminController
         $entries = [];
 
         foreach ($validated['signatories'] ?? [] as $i => $row) {
-            $label = trim($row['label']);
+            $label = trim((string) ($row['label'] ?? ''));
             $key = CertificateTemplate::signatureKey($label);
             if ($key === '' || isset($seen[$key])) {
                 continue;
