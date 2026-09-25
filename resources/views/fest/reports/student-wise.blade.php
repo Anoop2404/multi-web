@@ -26,6 +26,8 @@
             margin-bottom: 16px;
             font-size: 11.5px;
         }
+        .school-heading { font-size: 16px; font-weight: bold; color: #0f3d7a; border-bottom: 2px solid #0f3d7a; padding-bottom: 4px; }
+        .school-heading-sub { font-size: 11px; color: #64748b; margin: 3px 0 12px; }
         .student-card {
             border: 1px solid #cbd5e1;
             border-radius: 6px;
@@ -121,7 +123,22 @@
     <h2>{{ $event->title }} — Student-Wise Participant Report</h2>
     <p class="meta">Student Participant Entries & Registered Items · Generated on {{ date('d M Y, h:i A') }}</p>
 
-    @foreach($students as $idx => $st)
+    @php
+        // by_school: every school starts on its own page under a school heading, so the PDF
+        // can be split/handed out per school. Rows arrive already sorted school -> student.
+        $bySchool = $bySchool ?? false;
+        $groups = $bySchool
+            ? collect($students)->groupBy(fn ($s) => ($s['school_id'] ?? '').'|'.($s['school_name'] ?? ''))->values()->all()
+            : [$students];
+    @endphp
+    @foreach($groups as $group)
+    @if($bySchool)
+        <div class="school-break" @if(!$loop->first) style="page-break-before: always;" @endif>
+            <div class="school-heading">{{ $group[0]['school_name'] ?? '—' }}@if(!empty($group[0]['school_code'])) ({{ $group[0]['school_code'] }})@endif</div>
+            <div class="school-heading-sub">{{ count($group) }} student(s)</div>
+        </div>
+    @endif
+    @foreach($group as $idx => $st)
     <div class="student-card">
         <div class="card-header">
             <div class="student-info">
@@ -209,6 +226,7 @@
             </tbody>
         </table>
     </div>
+    @endforeach
     @endforeach
 </body>
 </html>

@@ -1046,8 +1046,9 @@ class FestReportService
             'event' => $this->event,
             'students' => $rows,
             'showChestNo' => false,
+            'bySchool' => $request->boolean('by_school'),
             ...$this->brandingData(),
-        ], $this->slug().'-student-wise-report.pdf');
+        ], $this->slug().($request->boolean('by_school') ? '-student-wise-by-school.pdf' : '-student-wise-report.pdf'));
     }
 
     private function studentWiseReportXls(Request $request): StreamedResponse

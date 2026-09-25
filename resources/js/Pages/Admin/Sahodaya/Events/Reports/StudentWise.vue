@@ -5,6 +5,10 @@
                     description="View all registered student participants, their school, photos, and registered competition items.">
             <template #actions>
                 <ReportDownloadButtons :pdf-url="pdfUrl" :xls-url="xlsUrl" />
+                <div class="flex flex-wrap items-center gap-2 border-l border-slate-200 pl-3">
+                    <span class="text-xs font-semibold text-slate-600">Each school on its own page:</span>
+                    <ReportDownloadButtons :pdf-url="bySchoolPdfUrl" />
+                </div>
             </template>
         </PageHeader>
 
@@ -195,6 +199,7 @@ const props = defineProps({
     filters: { type: Object, default: () => ({}) },
     schools: { type: Array, default: () => [] },
     pdfUrl: String,
+    bySchoolPdfUrl: String,
     xlsUrl: String,
     activityLogs: { type: Array, default: () => [] },
     childEvents: { type: Array, default: () => [] },
