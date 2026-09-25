@@ -1911,6 +1911,7 @@ class FestEventReportAnalyticsService
             ->get();
 
         $marksByParticipant = FestMark::query()
+            ->select(['id', 'participant_id', 'grade', 'position', 'score', 'measurement_value', 'measurement_unit'])
             ->whereIn('event_id', $eventIds)
             ->whereIn('participant_id', $participants->pluck('id'))
             ->get()
@@ -2140,6 +2141,7 @@ class FestEventReportAnalyticsService
                     'category_label'  => \App\Support\FestClassGroupScheme::resolveItemLabel($classGroupLabels, $item->class_group),
                     'stage_type'      => $item->stage_type,
                     'participant_type' => $item->participant_type,
+                    'results_published' => $itemPublished,
                     'gender_label'    => \App\Support\FestItemCategoryLabel::genderLabel($item->gender),
                     'type_label'      => \App\Support\FestItemCategoryLabel::typeLabel($item->participant_type),
                     'phase_name'      => $usesPhasedRegionalBilling ? ($event?->sourcePhase?->name) : null,

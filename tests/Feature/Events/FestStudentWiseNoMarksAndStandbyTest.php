@@ -68,4 +68,44 @@ class FestStudentWiseNoMarksAndStandbyTest extends TestCase
         $this->assertStringContainsString('Item Name', $without);
         $this->assertStringContainsString('Alpha School', $without);
     }
+
+    /**
+     * The school-wise download (by_school=1): one section per school, its items underneath with
+     * each item's participants -- standby entrants excluded, no photos.
+     */
+    public function test_school_wise_pdf_groups_schools_then_items_and_skips_standby(): void
+    {
+        $sahodaya = Tenant::create(['id' => (string) Str::uuid(), 'type' => 'sahodaya', 'name' => 'SW Sahodaya', 'domain' => 'sw-items.test', 'is_active' => true]);
+        $event = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'SW Fest', 'event_type' => 'kalolsavam', 'status' => 'published']);
+        $itemA = FestEventItem::create(['event_id' => $event->id, 'title' => 'Alpha Item', 'participant_type' => 'individual', 'is_enabled' => true, 'gender' => 'female']);
+        $itemB = FestEventItem::create(['event_id' => $event->id, 'title' => 'Beta Group Item', 'participant_type' => 'group', 'is_enabled' => true]);
+
+        $schools = [];
+        foreach (['Zeta School', 'Alpha School'] as $name) {
+            $schools[$name] = Tenant::create(['id' => (string) Str::uuid(), 'type' => 'school', 'name' => $name, 'parent_id' => $sahodaya->id, 'membership_status' => 'approved', 'is_active' => true]);
+            $class = SchoolClass::create(['tenant_id' => $schools[$name]->id, 'name' => '6']);
+            foreach ([[$itemA, "{$name} Ann", 'performer'], [$itemB, "{$name} Bea", 'performer'], [$itemB, "{$name} Reserve", 'standby']] as [$item, $student, $role]) {
+                $st = Student::create(['tenant_id' => $schools[$name]->id, 'school_class_id' => $class->id, 'name' => $student, 'status' => 'active']);
+                $reg = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $schools[$name]->id, 'status' => 'approved']);
+                FestParticipant::create(['registration_id' => $reg->id, 'student_id' => $st->id, 'participant_type' => 'student', 'participant_role' => $role, 'chest_no' => 1]);
+            }
+        }
+
+        $service = new \App\Services\Events\FestReportService($event);
+        $html = $service->export('student-wise-pdf', new \Illuminate\Http\Request(['by_school' => 1, 'inline' => 1]))->getContent();
+
+        // Schools A-Z, each with its items (A-Z) and participants; the standby is nowhere.
+        $this->assertMatchesRegularExpression('/ALPHA SCHOOL.*?Alpha Item.*?Alpha School Ann.*?Beta Group Item.*?Alpha School Bea.*?ZETA SCHOOL.*?Zeta School Ann.*?Zeta School Bea/s', $html);
+        $this->assertStringNotContainsString('Reserve', $html);
+        $this->assertStringContainsString('Girls', $html);
+        $this->assertStringContainsString('Group', $html);
+        $this->assertStringNotContainsString('<img', $html);
+        $this->assertStringContainsString('>Grade<', $html);
+
+        // One school only, and without the marks columns.
+        $one = $service->export('student-wise-pdf', new \Illuminate\Http\Request(['by_school' => 1, 'inline' => 1, 'school_id' => $schools['Zeta School']->id, 'hide_marks' => 1]))->getContent();
+        $this->assertStringContainsString('ZETA SCHOOL', $one);
+        $this->assertStringNotContainsString('ALPHA SCHOOL', $one);
+        $this->assertStringNotContainsString('>Grade<', $one);
+    }
 }

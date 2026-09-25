@@ -1034,8 +1034,69 @@ class FestReportService
         ], $rows, ExcelExport::generatedOnNote());
     }
 
+    /**
+     * School-wise participant list: one section per school (each on its own page), its items
+     * underneath, and each item's participants listed -- no photos, so it stays light even for
+     * a whole event. Same rows as the item-wise report (standby entrants already excluded);
+     * marks show only for items whose results are published, like the student-wise PDF.
+     */
+    private function schoolWiseItemsPdf(Request $request): \Symfony\Component\HttpFoundation\Response
+    {
+        $schoolId = $request->input('school_id');
+        $rank = $request->integer('rank') ?: null;
+        $analytics = app(FestEventReportAnalyticsService::class, ['event' => $this->event]);
+
+        $rows = collect($analytics->itemWiseReportRows(schoolId: null, search: $request->input('search')))
+            ->when($schoolId, fn ($c) => $c->where('school_id', $schoolId))
+            ->map(function (array $r) {
+                if (! ($r['results_published'] ?? false)) {
+                    $r['grade'] = $r['position'] = $r['score'] = null;
+                }
+
+                return $r;
+            })
+            ->when($rank !== null, fn ($c) => $c->filter(fn ($r) => $r['position'] === $rank))
+            ->values()
+            ->all();
+
+        $isDomPdf = empty(config('services.pdf_converter.url'));
+        $bladeData = [
+            'event'     => $this->event,
+            'rows'      => $rows,
+            'showMarks' => ! $request->boolean('hide_marks'),
+            'isDomPdf'  => $isDomPdf,
+            'preview'   => $this->preview && $isDomPdf,
+            ...$this->brandingData(),
+        ];
+
+        if ($this->preview && $isDomPdf) {
+            return response(view('fest.reports.school-wise-items', $bladeData)->render())
+                ->header('Content-Type', 'text/html');
+        }
+
+        [$headerTemplate, $footerTemplate] = \App\Support\PdfChromeHeaderFooter::build([
+            'orgName'    => $bladeData['orgName'],
+            'logoSrc'    => $bladeData['logoSrc'],
+            'docTitle'   => 'School-wise participants',
+            'eventTitle' => $this->event->title,
+        ]);
+
+        return $this->renderPdf(
+            'fest.reports.school-wise-items',
+            $bladeData,
+            $this->slug().'-school-wise-participants.pdf',
+            false,
+            $headerTemplate,
+            $footerTemplate,
+        );
+    }
+
     private function studentWisePdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
+        if ($request->boolean('by_school')) {
+            return $this->schoolWiseItemsPdf($request);
+        }
+
         $schoolId = $request->input('school_id');
         $search = $request->input('search');
         $rank = $request->integer('rank') ?: null;
