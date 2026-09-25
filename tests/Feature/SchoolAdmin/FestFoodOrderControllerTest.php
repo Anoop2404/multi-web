@@ -147,6 +147,21 @@ class FestFoodOrderControllerTest extends TestCase
         $this->assertSame(100.0, (float) $bill->amount_total);
     }
 
+    public function test_food_order_page_is_never_cached(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school, 'schoolAdmin' => $schoolAdmin] = $this->makeSahodayaAndSchool();
+        $event = $this->makeStandaloneEvent($sahodaya);
+
+        $response = $this->actingAs($schoolAdmin)->get(route('school.food-order.show', [
+            'tenantId' => $school->id, 'event' => $event->id,
+        ]));
+
+        $response->assertOk();
+        $cacheControl = (string) $response->headers->get('Cache-Control');
+        $this->assertStringContainsString('no-store', $cacheControl);
+        $this->assertStringContainsString('private', $cacheControl);
+    }
+
     public function test_school_can_order_food_on_its_assigned_legacy_region_leaf_but_not_a_sibling_region_leaf(): void
     {
         ['sahodaya' => $sahodaya, 'school' => $school, 'schoolAdmin' => $schoolAdmin] = $this->makeSahodayaAndSchool();

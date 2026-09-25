@@ -683,7 +683,10 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/fest/{event}/certificates/download-all', [FestEventPortalController::class, 'downloadCertificatesZip'])->name('fest.certificates.download-all');
     Route::get('/food-coupons', [\App\Http\Controllers\SchoolAdmin\FestFoodCouponController::class, 'index'])->name('food-coupons.index');
     Route::get('/fest/{event}/food-coupons/print', [\App\Http\Controllers\SchoolAdmin\FestFoodCouponController::class, 'print'])->name('food-coupons.print');
-    Route::get('/fest/{event}/food-order', [\App\Http\Controllers\SchoolAdmin\FestFoodOrderController::class, 'show'])->name('food-order.show');
+    // Live order/payment state: never let the browser (or back/forward cache) serve a stored copy.
+    Route::get('/fest/{event}/food-order', [\App\Http\Controllers\SchoolAdmin\FestFoodOrderController::class, 'show'])
+        ->middleware('cache.headers:no_store;no_cache;must_revalidate;private;max_age=0')
+        ->name('food-order.show');
     Route::post('/fest/{event}/food-order/items', [\App\Http\Controllers\SchoolAdmin\FestFoodOrderController::class, 'addItem'])->name('food-order.items.store');
     Route::delete('/fest/{event}/food-order/items/{orderItem}', [\App\Http\Controllers\SchoolAdmin\FestFoodOrderController::class, 'removeItem'])->name('food-order.items.destroy');
     Route::post('/fest/{event}/food-order/payments', [\App\Http\Controllers\SchoolAdmin\FestFoodOrderController::class, 'submitPayment'])->name('food-order.payments.store');
