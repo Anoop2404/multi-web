@@ -112,6 +112,39 @@ class FestCertificateServiceTallyTest extends TestCase
      * Before any marks are entered, winner_certs is genuinely 0 everywhere — this is the
      * planning projection: "how many certificates would the top 3 need, if decided today."
      */
+    /** Rank 1/2/3 counts per item (a tie gives two entries the same place) and their category roll-up. */
+    public function test_rank_counts_per_item_and_category_summary(): void
+    {
+        $event = $this->makeEvent();
+        $school = $this->makeSchool($event->tenant_id);
+        $solo = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song', 'participant_type' => 'individual', 'category' => 'music', 'age_group' => 'Sub Junior', 'is_enabled' => true]);
+        $dance = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Dance', 'participant_type' => 'individual', 'category' => 'dance', 'age_group' => 'Sub Junior', 'is_enabled' => true]);
+        $senior = FestEventItem::create(['event_id' => $event->id, 'title' => 'Essay', 'participant_type' => 'individual', 'category' => 'lit', 'age_group' => 'Senior', 'is_enabled' => true]);
+
+        // Solo Song: a tie for 1st (two entries), one 2nd, no 3rd.
+        $this->individualParticipant($event, $solo, $school->id, position: 1);
+        $this->individualParticipant($event, $solo, $school->id, position: 1);
+        $this->individualParticipant($event, $solo, $school->id, position: 2);
+        // Solo Dance: one of each.
+        foreach ([1, 2, 3] as $place) {
+            $this->individualParticipant($event, $dance, $school->id, position: $place);
+        }
+        // Essay: entered, no marks yet.
+        $this->individualParticipant($event, $senior, $school->id);
+
+        $tally = app(FestCertificateService::class)->certificateTally($event);
+        $rows = collect($tally['rows'])->keyBy('item_id');
+
+        $this->assertSame([2, 1, 0], [$rows[$solo->id]['rank_1'], $rows[$solo->id]['rank_2'], $rows[$solo->id]['rank_3']]);
+        $this->assertSame([1, 1, 1], [$rows[$dance->id]['rank_1'], $rows[$dance->id]['rank_2'], $rows[$dance->id]['rank_3']]);
+        $this->assertSame([0, 0, 0], [$rows[$senior->id]['rank_1'], $rows[$senior->id]['rank_2'], $rows[$senior->id]['rank_3']]);
+        $this->assertSame([3, 2, 1], [$tally['totals']['rank_1'], $tally['totals']['rank_2'], $tally['totals']['rank_3']]);
+
+        $summary = collect($tally['summary'])->keyBy('category');
+        $this->assertSame(['items' => 2, 'rank_1' => 3, 'rank_2' => 2, 'rank_3' => 1, 'total' => 6], collect($summary['Sub Junior'])->only(['items', 'rank_1', 'rank_2', 'rank_3', 'total'])->all());
+        $this->assertSame(0, $summary['Senior']['total']);
+    }
+
     public function test_projected_winner_certs_assumes_top_three_before_any_marks_exist(): void
     {
         $event = $this->makeEvent();

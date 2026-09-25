@@ -64,12 +64,57 @@
                     <template v-else>{{ row.entry_count }}</template>
                 </td>
                 <td class="px-4 py-3 text-right font-semibold text-amber-700">{{ row.winner_certs }}</td>
+                <td class="px-4 py-3 text-right font-semibold">{{ row.rank_1 || '—' }}</td>
+                <td class="px-4 py-3 text-right font-semibold">{{ row.rank_2 || '—' }}</td>
+                <td class="px-4 py-3 text-right font-semibold">{{ row.rank_3 || '—' }}</td>
                 <td class="px-4 py-3 text-right font-semibold text-orange-600">{{ row.projected_winner_certs }}</td>
                 <td class="px-4 py-3 text-right font-semibold text-sky-700">{{ row.participation_certs }}
                     <span class="block text-[10px] font-normal text-slate-400">entries</span>
                 </td>
             </tr>
         </SahodayaDataTable>
+
+        <!-- Summary list: podium places rolled up by category, ending in the event-wide total. -->
+        <div v-if="rows.length" class="card mt-6 overflow-hidden !p-0">
+            <div class="px-4 py-3 border-b border-slate-200">
+                <h3 class="font-bold text-sm text-slate-800">Summary — rank 1 / 2 / 3 by category</h3>
+                <p class="text-xs text-slate-400 mt-0.5">Individual items count people, team items count teams. Zero until marks are entered.</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="data-table min-w-full">
+                    <thead>
+                        <tr class="bg-slate-50 text-xs">
+                            <th class="text-left px-4 py-2">Category</th>
+                            <th class="text-right px-4 py-2">Items</th>
+                            <th class="text-right px-4 py-2">Rank 1</th>
+                            <th class="text-right px-4 py-2">Rank 2</th>
+                            <th class="text-right px-4 py-2">Rank 3</th>
+                            <th class="text-right px-4 py-2">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 text-sm">
+                        <tr v-for="s in summary" :key="s.category">
+                            <td class="px-4 py-2 font-medium">{{ s.category }}</td>
+                            <td class="px-4 py-2 text-right">{{ s.items }}</td>
+                            <td class="px-4 py-2 text-right">{{ s.rank_1 }}</td>
+                            <td class="px-4 py-2 text-right">{{ s.rank_2 }}</td>
+                            <td class="px-4 py-2 text-right">{{ s.rank_3 }}</td>
+                            <td class="px-4 py-2 text-right font-semibold">{{ s.total }}</td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="bg-slate-100 font-bold text-sm border-t-2 border-slate-300">
+                            <td class="px-4 py-2">All categories</td>
+                            <td class="px-4 py-2 text-right">{{ totals.items }}</td>
+                            <td class="px-4 py-2 text-right">{{ totals.rank_1 }}</td>
+                            <td class="px-4 py-2 text-right">{{ totals.rank_2 }}</td>
+                            <td class="px-4 py-2 text-right">{{ totals.rank_3 }}</td>
+                            <td class="px-4 py-2 text-right">{{ (totals.rank_1 || 0) + (totals.rank_2 || 0) + (totals.rank_3 || 0) }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
 
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />
     </SahodayaEventsLayout>
@@ -88,7 +133,8 @@ const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object,
     rows: { type: Array, default: () => [] },
-    totals: { type: Object, default: () => ({ items: 0, winner_certs: 0, projected_winner_certs: 0, projected_winner_unique_students: 0, participation_certs: 0, grand_total: 0 }) },
+    summary: { type: Array, default: () => [] },
+    totals: { type: Object, default: () => ({ items: 0, winner_certs: 0, projected_winner_certs: 0, projected_winner_unique_students: 0, participation_certs: 0, grand_total: 0, rank_1: 0, rank_2: 0, rank_3: 0 }) },
     activityLogs: { type: Array, default: () => [] },
     childEvents: { type: Array, default: () => [] },
 });
@@ -108,6 +154,9 @@ const columns = [
     { key: 'type', label: 'Type' },
     { key: 'entries', label: 'Entries' },
     { key: 'winner_certs', label: 'Winner certs', align: 'right' },
+    { key: 'rank_1', label: 'Rank 1', align: 'right' },
+    { key: 'rank_2', label: 'Rank 2', align: 'right' },
+    { key: 'rank_3', label: 'Rank 3', align: 'right' },
     { key: 'projected_winner_certs', label: 'Projected (top 3)', align: 'right' },
     { key: 'participation_certs', label: 'Entries', align: 'right' },
 ];

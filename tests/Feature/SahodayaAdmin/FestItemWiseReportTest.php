@@ -501,4 +501,26 @@ class FestItemWiseReportTest extends TestCase
 
         $response->assertStatus(503);
     }
+
+    public function test_item_wise_downloads_are_named_after_the_fest(): void
+    {
+        config(['services.pdf_converter.url' => 'https://pdf.example.test/generate-pdf']);
+        \Illuminate\Support\Facades\Http::fake(['pdf.example.test/*' => \Illuminate\Support\Facades\Http::response('%PDF-1.4 fake', 200)]);
+
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $sahodaya = Tenant::create(['id' => (string) Str::uuid(), 'type' => 'sahodaya', 'name' => 'Named Sahodaya', 'domain' => 'named-dl.test', 'is_active' => true]);
+        SahodayaProfile::create(['tenant_id' => $sahodaya->id, 'prefix' => 'ND', 'student_data_mode' => 'counts_only']);
+        $event = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Kochi Metro District Kalotsav', 'event_type' => 'kalolsavam', 'status' => 'published']);
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        $pdf = $this->actingAs($admin)->get(route('sahodaya.events.reports.item-wise.pdf', ['tenantId' => $sahodaya->id, 'event' => $event->id, 'download' => 1]));
+        $disposition = (string) $pdf->headers->get('content-disposition');
+        $this->assertStringContainsString('item-wise-report_kochi-metro-district-kalotsav', $disposition);
+        $this->assertStringNotContainsString($event->id.'-mark-entry-report', $disposition);
+
+        $csv = $this->actingAs($admin)->get(route('sahodaya.events.reports.item-wise.export-all', ['tenantId' => $sahodaya->id, 'event' => $event->id]));
+        $this->assertStringContainsString('item-wise-report_kochi-metro-district-kalotsav', (string) $csv->headers->get('content-disposition'));
+        $this->assertStringEndsWith('.csv', trim((string) $csv->headers->get('content-disposition')));
+    }
 }

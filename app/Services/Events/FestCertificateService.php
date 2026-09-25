@@ -371,6 +371,7 @@ class FestCertificateService
             $item = $mark->participant->registration->item;
             $byItem[$item->id]['item'] ??= $item;
             $byItem[$item->id]['winners'][] = $mark->participant;
+            $byItem[$item->id]['ranked'][(int) $mark->position][] = $mark->participant;
         }
 
         foreach ($participants as $participant) {
@@ -425,9 +426,23 @@ class FestCertificateService
                 }
             }
 
+            // How many entries hold each podium place: people for an individual item, teams
+            // for a team item (a team's members share one place). Ties give several entries
+            // the same place; before marks exist every count is 0.
+            $rankCounts = [];
+            foreach ([1, 2, 3] as $place) {
+                $atPlace = collect($data['ranked'][$place] ?? []);
+                $rankCounts[$place] = $isTeam
+                    ? $atPlace->map(fn ($p) => $p->group_id ?? 'p'.$p->id)->unique()->count()
+                    : $atPlace->count();
+            }
+
             $rows[] = [
                 'item_id'                => $itemId,
                 'title'                  => $item->title,
+                'rank_1'                 => $rankCounts[1],
+                'rank_2'                 => $rankCounts[2],
+                'rank_3'                 => $rankCounts[3],
                 'head_name'              => $item->head?->name,
                 'category'               => $item->age_group ?: $item->class_group,
                 'is_team'                => $isTeam,
@@ -454,8 +469,24 @@ class FestCertificateService
             'participation_certs'            => $participationCertificateCount,
         ];
         $totals['grand_total'] = $totals['winner_certs'] + $totals['participation_certs'];
+        $totals['rank_1'] = array_sum(array_column($rows, 'rank_1'));
+        $totals['rank_2'] = array_sum(array_column($rows, 'rank_2'));
+        $totals['rank_3'] = array_sum(array_column($rows, 'rank_3'));
 
-        return ['rows' => $rows, 'totals' => $totals];
+        // Summary list: the same rank counts rolled up by category.
+        $summary = [];
+        foreach ($rows as $row) {
+            $key = (string) ($row['category'] ?: 'Open / all categories');
+            $summary[$key] ??= ['category' => $key, 'items' => 0, 'rank_1' => 0, 'rank_2' => 0, 'rank_3' => 0];
+            $summary[$key]['items']++;
+            foreach ([1, 2, 3] as $place) {
+                $summary[$key]["rank_{$place}"] += $row["rank_{$place}"];
+            }
+        }
+        ksort($summary, SORT_NATURAL | SORT_FLAG_CASE);
+        $summary = array_map(fn (array $r) => $r + ['total' => $r['rank_1'] + $r['rank_2'] + $r['rank_3']], array_values($summary));
+
+        return ['rows' => $rows, 'totals' => $totals, 'summary' => $summary];
     }
 
     public function issueRecordBreakCertificate(FestRecordBreak $break): Certificate

@@ -1132,7 +1132,7 @@ class FestReportController extends SahodayaAdminController
                 ]);
             }
             fclose($out);
-        }, "{$event->id}-item-wise-report.csv", ['Content-Type' => 'text/csv']);
+        }, \App\Support\ReportFilename::build('item-wise-report', $event->title, $event->event_start, [], 'csv'), ['Content-Type' => 'text/csv']);
     }
 
     /**
@@ -1182,7 +1182,7 @@ class FestReportController extends SahodayaAdminController
         try {
             return \App\Support\PdfGenerator::download(
                 $html,
-                "{$event->id}-mark-entry-report.pdf",
+                \App\Support\ReportFilename::build('item-wise-report', $event->title, $event->event_start, $request->boolean('hide_marks') ? ['participants'] : []),
                 inline: $request->boolean('inline') || $request->boolean('preview'),
                 isLandscape: true,
                 requireBrowserRenderer: true,
@@ -1287,7 +1287,7 @@ class FestReportController extends SahodayaAdminController
             'fontSize'      => $fontSize,
         ])->render();
 
-        $filename = "{$event->id}-{$category}-category-points.pdf";
+        $filename = \App\Support\ReportFilename::build('category-points', $event->title, $event->event_start, [$category]);
 
         return \App\Support\PdfGenerator::download($html, $filename, $request->boolean('inline') || $request->boolean('preview'), true);
     }
@@ -1322,7 +1322,7 @@ class FestReportController extends SahodayaAdminController
             return $row;
         });
 
-        return \App\Support\ExcelExport::download("{$event->id}-{$category}-category-points", $headers, $rows, \App\Support\ExcelExport::generatedOnNote(), $verticalHeaderIndices, $columnStyles);
+        return \App\Support\ExcelExport::download(pathinfo(\App\Support\ReportFilename::build('category-points', $event->title, $event->event_start, [$category], 'xls'), PATHINFO_FILENAME), $headers, $rows, \App\Support\ExcelExport::generatedOnNote(), $verticalHeaderIndices, $columnStyles);
     }
 
     /**
@@ -1356,7 +1356,7 @@ class FestReportController extends SahodayaAdminController
             'logoSrc'       => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
         ])->render();
 
-        $filename = "{$event->id}-{$category}-category-points-summary.pdf";
+        $filename = \App\Support\ReportFilename::build('category-points-summary', $event->title, $event->event_start, [$category]);
 
         return \App\Support\PdfGenerator::download($html, $filename, $request->boolean('inline') || $request->boolean('preview'));
     }
@@ -1377,7 +1377,7 @@ class FestReportController extends SahodayaAdminController
             strtoupper($school['school_name']), $school['subtotal'], $school['rank'],
         ]);
 
-        return \App\Support\ExcelExport::download("{$event->id}-{$category}-category-points-summary", $headers, $rows, \App\Support\ExcelExport::generatedOnNote(), [], $columnStyles);
+        return \App\Support\ExcelExport::download(pathinfo(\App\Support\ReportFilename::build('category-points-summary', $event->title, $event->event_start, [$category], 'xls'), PATHINFO_FILENAME), $headers, $rows, \App\Support\ExcelExport::generatedOnNote(), [], $columnStyles);
     }
 
     /** JSON endpoint the Category-wise Points report's interactive per-category points table fetches on tab switch. */

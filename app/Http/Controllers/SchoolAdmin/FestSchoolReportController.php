@@ -299,7 +299,7 @@ class FestSchoolReportController extends SchoolAdminController
                 ]);
             }
             fclose($out);
-        }, "{$event->id}-student-limits.csv", ['Content-Type' => 'text/csv']);
+        }, \App\Support\ReportFilename::build('student-limits', $event->title, $event->event_start, [$this->school->name], 'csv'), ['Content-Type' => 'text/csv']);
     }
 
     public function studentWise(Request $request, string $tenantId, FestEvent $event, string $program)
@@ -603,7 +603,7 @@ class FestSchoolReportController extends SchoolAdminController
                 ]);
             }
             fclose($out);
-        }, "{$event->id}-student-wise.csv", ['Content-Type' => 'text/csv']);
+        }, \App\Support\ReportFilename::build('student-wise', $event->title, $event->event_start, [$this->school->name], 'csv'), ['Content-Type' => 'text/csv']);
     }
 
     public function exportTeacherWise(Request $request, string $tenantId, FestEvent $event, string $program)
@@ -626,7 +626,7 @@ class FestSchoolReportController extends SchoolAdminController
                 CsvSafety::fputcsv($out, [$teacher->reg_no, $teacher->name, $teacher->designation, $items, $marks->sum('score'), $results]);
             }
             fclose($out);
-        }, "{$event->id}-teacher-wise.csv", ['Content-Type' => 'text/csv']);
+        }, \App\Support\ReportFilename::build('teacher-wise', $event->title, $event->event_start, [$this->school->name], 'csv'), ['Content-Type' => 'text/csv']);
     }
 
     /** All-items CSV — companion export to itemWise() above (2026-08-25 rework, replaces the old single-item export). */
@@ -650,7 +650,7 @@ class FestSchoolReportController extends SchoolAdminController
                 ]);
             }
             fclose($out);
-        }, "{$event->id}-item-wise-report.csv", ['Content-Type' => 'text/csv']);
+        }, \App\Support\ReportFilename::build('item-wise-report', $event->title, $event->event_start, [$this->school->name], 'csv'), ['Content-Type' => 'text/csv']);
     }
 
     /** Mark entry report as PDF — chest no / grade / rank / score for the school's own registrations, stamped with who generated it and when (and an optional ?for_whom= recipient note). */
@@ -674,7 +674,7 @@ class FestSchoolReportController extends SchoolAdminController
         ])->render();
 
         // The external converter renders it (same as the Sahodaya-side report) -- see PdfGenerator.
-        return \App\Support\PdfGenerator::download($html, "{$event->id}-mark-entry-report.pdf", isLandscape: true);
+        return \App\Support\PdfGenerator::download($html, \App\Support\ReportFilename::build('item-wise-report', $event->title, $event->event_start, [$this->school->name], 'pdf'), isLandscape: true);
     }
 
     public function exportItemWisePdf(
@@ -733,7 +733,7 @@ class FestSchoolReportController extends SchoolAdminController
                 ]);
             }
             fclose($out);
-        }, "{$event->id}-participation.csv", ['Content-Type' => 'text/csv']);
+        }, \App\Support\ReportFilename::build('participation', $event->title, $event->event_start, [$this->school->name], 'csv'), ['Content-Type' => 'text/csv']);
     }
 
     public function exportQualifiers(Request $request, string $tenantId, string $program)
