@@ -116,17 +116,61 @@ class FestFoodMenuController extends SahodayaAdminController
             }
         }
 
+        $previousType = $event->food_payee_type;
+        $previousHost = $event->food_host_school_id;
+        $newType = $data['food_payee_type'];
+        $newHost = $newType === 'host_school' ? $data['food_host_school_id'] : null;
+
         $event->update([
-            'food_payee_type' => $data['food_payee_type'],
-            'food_host_school_id' => $data['food_payee_type'] === 'host_school' ? $data['food_host_school_id'] : null,
+            'food_payee_type' => $newType,
+            'food_host_school_id' => $newHost,
             'require_payment_for_coupons' => $data['require_payment_for_coupons'] ?? $event->require_payment_for_coupons ?? false,
         ]);
+
+        $this->applyPayeeToInheritedEventsAndUnpaidBills($event, $previousType, $previousHost, $newType, $newHost);
 
         $audit->festEvent($event, FestPageActivity::FOOD_MENU, 'fest.food_menu.payee_updated', 'Food payment payee updated', [
             'payee_type' => $data['food_payee_type'],
         ]);
 
         return back()->with('success', 'Food payment settings updated. This applies to new bills going forward.');
+    }
+
+    /**
+     * Schools are shown the payee their own bill was created with (a snapshot, so a later
+     * change can't redirect money already paid to someone else). That meant changing the
+     * payee to a host school never reached schools who had already opened a bill -- they
+     * kept seeing the Sahodaya's (event fee) account. So the new payee is also applied to:
+     *  - this event's OPEN bills that have no payment recorded yet (nothing paid to anyone,
+     *    so there is nothing to protect), and
+     *  - phase/region events under this one that were still on the payee this event had
+     *    before (i.e. inherited it rather than being set on their own), plus their unpaid
+     *    open bills.
+     * Bills that already have a payment keep their original payee.
+     */
+    private function applyPayeeToInheritedEventsAndUnpaidBills(FestEvent $event, ?string $previousType, ?string $previousHost, string $newType, ?string $newHost): void
+    {
+        $eventIds = [$event->id];
+
+        if (! $event->parent_event_id) {
+            $children = FestEvent::whereIn('id', $event->reportableEventIds())
+                ->where('id', '!=', $event->id)
+                ->where('food_payee_type', $previousType)
+                ->where(fn ($q) => $previousHost === null
+                    ? $q->whereNull('food_host_school_id')
+                    : $q->where('food_host_school_id', $previousHost))
+                ->get();
+
+            foreach ($children as $child) {
+                $child->update(['food_payee_type' => $newType, 'food_host_school_id' => $newHost]);
+                $eventIds[] = $child->id;
+            }
+        }
+
+        \App\Models\FestFoodBill::whereIn('event_id', $eventIds)
+            ->where('status', \App\Models\FestFoodBill::STATUS_OPEN)
+            ->whereDoesntHave('payments')
+            ->update(['payee_type' => $newType, 'host_school_id' => $newHost]);
     }
 
     /** Add a reusable food item to this event's catalog. Not itself schedulable — see assignCatalogItems(). */

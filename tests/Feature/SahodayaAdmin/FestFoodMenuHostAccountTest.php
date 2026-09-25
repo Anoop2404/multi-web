@@ -98,4 +98,51 @@ class FestFoodMenuHostAccountTest extends TestCase
 
         $this->assertNull($f['host']->fresh()->paymentDetails()['bank_name']);
     }
+
+    /**
+     * A school's bill keeps the payee it was opened with, so choosing a host school later never
+     * reached schools that had already opened a bill -- they kept seeing the Sahodaya's (event
+     * fee) account. Unpaid open bills, and events that inherited the old payee, follow the change;
+     * a bill that already has a payment keeps its original payee.
+     */
+    public function test_changing_the_payee_moves_unpaid_bills_and_inherited_child_events_but_not_paid_ones(): void
+    {
+        $f = $this->fixture();
+
+        $otherSchool = Tenant::create(['id' => (string) Str::uuid(), 'type' => 'school', 'name' => 'Paid School', 'parent_id' => $f['sahodaya']->id, 'membership_status' => 'approved', 'is_active' => true]);
+        $unpaidSchool = Tenant::create(['id' => (string) Str::uuid(), 'type' => 'school', 'name' => 'Unpaid School', 'parent_id' => $f['sahodaya']->id, 'membership_status' => 'approved', 'is_active' => true]);
+
+        $child = FestEvent::create([
+            'tenant_id' => $f['sahodaya']->id, 'title' => 'Child Leg', 'event_type' => 'kalolsavam',
+            'parent_event_id' => $f['event']->id, 'root_event_id' => $f['event']->id, 'level_round' => 'sahodaya', 'status' => 'registration_open',
+        ]);
+
+        $makeBill = fn (FestEvent $e, Tenant $school) => \App\Models\FestFoodBill::create([
+            'tenant_id' => $f['sahodaya']->id, 'event_id' => $e->id, 'school_id' => $school->id,
+            'status' => \App\Models\FestFoodBill::STATUS_OPEN, 'payment_mode' => 'prepaid',
+            'payee_type' => 'sahodaya', 'amount_total' => 100, 'amount_paid' => 0,
+        ]);
+        $unpaid = $makeBill($f['event'], $unpaidSchool);
+        $paid = $makeBill($f['event'], $otherSchool);
+        \App\Models\FestFoodPayment::create(['bill_id' => $paid->id, 'amount' => 50, 'payment_mode' => 'upi', 'status' => 'approved', 'received_at' => now()]);
+        $childBill = $makeBill($child, $unpaidSchool);
+
+        $this->actingAs($f['admin'])->put(route('sahodaya.events.food-menu.payee.update', [
+            'tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id,
+        ]), [
+            'food_payee_type' => 'host_school', 'food_host_school_id' => $f['host']->id,
+            'payment_bank_name' => 'Axis Bank', 'payment_account_no' => '925010033650305',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame('host_school', $unpaid->fresh()->payee_type);
+        $this->assertSame($f['host']->id, $unpaid->fresh()->host_school_id);
+
+        // The bill with a recorded payment keeps where that money went.
+        $this->assertSame('sahodaya', $paid->fresh()->payee_type);
+
+        // The child event inherited the old payee, so it (and its unpaid bill) follow.
+        $this->assertSame('host_school', $child->fresh()->food_payee_type);
+        $this->assertSame($f['host']->id, $child->fresh()->food_host_school_id);
+        $this->assertSame('host_school', $childBill->fresh()->payee_type);
+    }
 }
