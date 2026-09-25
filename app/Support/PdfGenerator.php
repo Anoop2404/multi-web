@@ -116,7 +116,16 @@ class PdfGenerator
             throw new \RuntimeException($browserFailure ?? 'Browser PDF generation failed.');
         }
 
-        // Fallback to DomPDF
+        // Fallback to DomPDF. It builds a full box tree for the whole document in memory, so
+        // a big report (hundreds of table rows) blows straight through the default 512M
+        // request limit -- production hit exactly that in Css/Style.php whenever the
+        // Chromium converter was unreachable and a large report fell back to here. Give
+        // this one path more headroom, and say why we're here so the real cause (the
+        // converter being down) shows up in the log next to the failure.
+        @ini_set('memory_limit', '1536M');
+        @set_time_limit(300);
+        Log::warning('PDF falling back to DomPDF ('.number_format(strlen($html) / 1024).' KB of HTML): '.($browserFailure ?? 'browser renderer not used').' [file: '.$filename.']');
+
         $pdf = Pdf::loadHTML($html);
         if ($hasCustomSize) {
             $pdf->setPaper([0, 0, self::mmToPoints($pageWidthMm), self::mmToPoints($pageHeightMm)]);

@@ -1133,15 +1133,18 @@ class FestReportController extends SahodayaAdminController
             'generatedAt' => now()->format('d M Y, h:i A'),
             'forWhom'     => trim((string) $request->input('for_whom', '')) ?: null,
             'logoSrc'     => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
-        ])->setPaper('a4', 'landscape');
+        ])->render();
 
-        $filename = "{$event->id}-mark-entry-report.pdf";
-
-        if ($request->boolean('inline') || $request->boolean('preview')) {
-            return $pdf->stream($filename);
-        }
-
-        return $pdf->download($filename);
+        // Through the shared generator so the Chromium converter (when configured) renders
+        // it -- this used to call DomPDF directly, which builds the whole box tree in memory
+        // and exhausted the 512M request limit on a ~6,000-row event (production, 2026-09-25).
+        // DomPDF remains the fallback inside PdfGenerator, with more headroom.
+        return \App\Support\PdfGenerator::download(
+            $html,
+            "{$event->id}-mark-entry-report.pdf",
+            inline: $request->boolean('inline') || $request->boolean('preview'),
+            isLandscape: true,
+        );
     }
 
     public function categoryWisePoints(Request $request, string $tenantId, FestEvent $event)
