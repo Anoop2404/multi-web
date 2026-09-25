@@ -1894,6 +1894,11 @@ public function tv(Request $request, int $eventId)
 
         $mark = FestMark::where('participant_id', $participant->id)->first();
         $schedule = FestSchedule::where('participant_id', $participant->id)->first();
+        // The view reads sort_order straight off this model, so drop it entirely while the
+        // schedule is unpublished rather than relying on each field being nulled downstream.
+        if (! $isAdminPreview && ! $this->visibility->showSchedulePublicly($event)) {
+            $schedule = null;
+        }
 
         $public = $this->visibility->formatPublicParticipant($event, $participant, $schedule, $mark, $isAdminPreview);
         // Cross-phase: a championship/results page linking here already shows this

@@ -1499,6 +1499,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/schedule/import-template', [FestScheduleController::class, 'importTemplate'])->name('schedule.import-template');
             Route::post('/{event}/schedule/import', [FestScheduleController::class, 'importStore'])->name('schedule.import');
             Route::get('/{event}/schedule/items', [FestScheduleController::class, 'itemsIndex'])->name('schedule.items');
+            Route::post('/{event}/schedule/clear', [FestScheduleController::class, 'clearSchedule'])->name('schedule.clear');
             Route::post('/{event}/schedule/items/bulk', [FestScheduleController::class, 'bulkStoreItems'])->name('schedule.items.bulk');
             Route::post('/{event}/schedule/items/auto-sequence', [FestScheduleController::class, 'autoSequenceItems'])->name('schedule.items.auto-sequence');
             Route::get('/{event}/schedule/items/import-template', [FestScheduleController::class, 'itemImportTemplate'])->name('schedule.items.import-template');

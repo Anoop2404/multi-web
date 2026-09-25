@@ -210,6 +210,36 @@ class FestScheduleController extends SahodayaAdminController
         return back()->with('success', 'Schedule hidden from public portal.');
     }
 
+    /**
+     * Wipes every schedule slot (item-level and per-participant) for this event so it can be
+     * planned again from scratch. Item timing settings (mode/duration/buffer) live on the
+     * items themselves and are untouched. A schedule that no longer exists must not stay
+     * published, so it is also hidden from the public portal.
+     */
+    public function clearSchedule(string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $cleared = FestSchedule::where('event_id', $event->id)->delete();
+
+        if ($event->schedule_published) {
+            if ($event->usesPhasedRegionalBilling()) {
+                app(\App\Services\Events\FestPhasePublicationService::class)->unpublishSchedule($event);
+            } else {
+                $event->update(['schedule_published' => false]);
+
+                app(\App\Services\Events\FestRegionPartitionService::class)
+                    ->cascadeLifecycleToChildren($event, ['schedule_published' => false]);
+            }
+        }
+
+        $audit->festEvent($event, FestPageActivity::SCHEDULE, 'fest.schedule.cleared', "Cleared all schedule slots ({$cleared})", [
+            'count' => $cleared,
+        ]);
+
+        return back()->with('success', "Cleared {$cleared} schedule slot(s). The schedule is hidden from the public portal until you publish it again.");
+    }
+
     public function importTemplate(string $tenantId, FestEvent $event, FestParticipantLookupService $lookup)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

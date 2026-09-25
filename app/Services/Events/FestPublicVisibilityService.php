@@ -189,6 +189,8 @@ class FestPublicVisibilityService
         $item = $participant->registration?->item;
         $showMarks = $this->showIndividualMarks($event, $isAdminPreview, $item);
         $showName = $this->showParticipantName($event, $participant, $item, $isAdminPreview);
+        // Slot times only become visible once the schedule has been published to the public.
+        $showSchedule = $isAdminPreview || $this->showSchedulePublicly($event);
 
         $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
         $categoryLabel = FestItemCategoryLabel::resolve($item, $classGroupLabels, config('fest_item_taxonomy.arts_category', []));
@@ -206,9 +208,9 @@ class FestPublicVisibilityService
             'category_label'     => $categoryLabel,
             'gender_label'       => \App\Support\FestSportsAgeGroup::genderLabel($item?->gender),
             'team_name'          => $showName ? $participant->group?->team_name : null,
-            'scheduled_at'       => $schedule?->scheduled_at,
-            'stage'              => $schedule?->stage,
-            'sort_order'         => $schedule?->sort_order,
+            'scheduled_at'       => $showSchedule ? $schedule?->scheduled_at : null,
+            'stage'              => $showSchedule ? $schedule?->stage : null,
+            'sort_order'         => $showSchedule ? $schedule?->sort_order : null,
             'position'           => $showMarks ? $mark?->position : null,
             'grade'              => $showMarks ? $mark?->grade : null,
             'score'              => $showMarks ? $mark?->score : null,

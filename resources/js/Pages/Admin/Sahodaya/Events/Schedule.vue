@@ -13,6 +13,7 @@
             <button v-else type="button" @click="unpublishSchedule"
                     class="px-4 py-2 border border-amber-500 text-amber-700 rounded-lg text-sm">Unpublish public schedule</button>
             <span v-if="event.schedule_published" class="text-xs text-emerald-700 font-semibold">Public schedule live</span>
+            <button type="button" class="px-4 py-2 border border-red-300 text-red-600 rounded-lg text-sm" @click="clearSchedule">Clear all schedules</button>
             <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/schedule/import-template`"
                class="text-xs font-semibold text-indigo-600">Schedule CSV template</a>
         </div>
@@ -218,6 +219,11 @@ function autoGenerate() {
 
 function publishSchedule() {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/schedule/publish`, {}, { preserveScroll: true });
+}
+
+async function clearSchedule() {
+    if (!(await confirm({ message: 'Clear every schedule slot for this event? The public schedule is hidden until you publish it again.' }))) return;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/schedule/clear`, {}, { preserveScroll: true });
 }
 
 function unpublishSchedule() {

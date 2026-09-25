@@ -6,6 +6,10 @@
             <template #actions>
                 <a :href="reportUrl" class="btn-secondary text-sm">Schedule report →</a>
                 <a :href="settingsUrl" class="btn-secondary text-sm">Venues & stages →</a>
+                <span class="text-xs font-semibold" :class="event.schedule_published ? 'text-emerald-700' : 'text-slate-500'">
+                    {{ event.schedule_published ? 'Public schedule live' : 'Not published to public' }}
+                </span>
+                <button type="button" class="btn-secondary text-sm !text-red-600" @click="clearAllSchedules">Clear all schedules</button>
             </template>
         </PageHeader>
 
@@ -202,6 +206,7 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     sahodaya: Object,
@@ -293,6 +298,13 @@ function estimatedMinutesFor(row) {
 watch(() => props.rows, initDraft, { immediate: true });
 
 const base = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`);
+const { confirm } = useConfirm();
+
+async function clearAllSchedules() {
+    if (!(await confirm({ message: 'Clear every date/time slot for this event? Item timing settings are kept, and the public schedule is hidden until you publish it again.' }))) return;
+
+    router.post(`${base.value}/schedule/clear`, {}, { preserveScroll: true });
+}
 const settingsUrl = computed(() => `${base.value}/settings/venues`);
 const reportUrl = computed(() => `${base.value}/reports/item-schedule`);
 const importTemplateUrl = computed(() => `${base.value}/schedule/items/import-template`);
