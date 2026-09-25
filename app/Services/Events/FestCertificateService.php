@@ -181,22 +181,21 @@ class FestCertificateService
     public function generateParticipationForEvent(FestEvent $event): array
     {
         if ($event->usesPhasedRegionalBilling()) {
-            // A participation certificate just lists what someone took part in — unlike
-            // winner certs (still strictly per-phase; a "First Prize" only means something
-            // within its own region's ranking), it's fine for one combined certificate to
-            // span every phase/region a person entered. Calling this with the HUB itself as
-            // $event does exactly that: reportableEventIds() on a hub already walks every
-            // phase/region + grandchild beneath it, so eligibleParticipantsForEvent()'s
-            // queries naturally aggregate across all of them with no other change needed
-            // here — see FestGradePointService::resolveGradeFromScore()'s own fix for the
-            // one place that DOES need to resolve per-item rather than blindly using $event.
-            if ($event->parent_event_id) {
-                abort_unless($event->source_phase_id, 422, 'Generate certificates from a published operational phase/region event.');
-            }
-            // Only true for the hub once every phase/region beneath it has actually
-            // published (FestPhasePublicationService::publishResults() sets it there
-            // automatically at that point) — so this same check gates both cases correctly.
-            abort_unless($event->results_published, 422, 'Publish this phase/region before generating certificates.');
+            // Always issued from the parent (root) event, never per phase/region leg: a
+            // participation certificate just lists what someone took part in, so one
+            // combined certificate per person spans every leg they entered (unlike winner
+            // certs, which stay strictly per-phase -- a "First Prize" only means something
+            // within its own region's ranking). Called with a leg, this used to issue a
+            // separate certificate per leg, so a student in two legs got two. Routing to the
+            // root also makes revokeStaleParticipationCertificates() clear those old
+            // per-leg certificates, since every leg's participants are in the root's scope.
+            //
+            // No results_published gate either -- participating doesn't depend on results
+            // being released, and the root only ever flips that flag once EVERY leg has
+            // published, which left the parent's "Generate all" blocked for weeks. See
+            // FestGradePointService::resolveGradeFromScore()'s own fix for the one place that
+            // resolves per-item rather than blindly using the event.
+            $event = $event->rootEvent();
         }
 
         $created = [];
@@ -222,6 +221,10 @@ class FestCertificateService
                     'generated_at'      => now(),
                 ]
             );
+
+            if ($template && $cert->template_id !== $template->id) {
+                $cert->update(['template_id' => $template->id]);
+            }
 
             $created[] = $cert;
         }
@@ -1278,6 +1281,23 @@ class FestCertificateService
         return implode(', ', $items).' and '.$last;
     }
 
+    /**
+     * The event a certificate is rendered against. A participation certificate is issued
+     * from the parent (root) event of a phased/regional event (see
+     * generateParticipationForEvent()), so its {event_title}, dates, and the item list it
+     * aggregates must come from that root -- not from whichever leg the anchor participant
+     * happens to belong to, which would title it "Off Stage - Tirur Region" and list only
+     * that one leg's items.
+     */
+    private function certificateEvent(?FestEvent $event, ?string $certType): ?FestEvent
+    {
+        if ($event && $certType === 'participation' && $event->usesPhasedRegionalBilling()) {
+            return $event->rootEvent();
+        }
+
+        return $event;
+    }
+
     public function payloadFor(Certificate $certificate): array
     {
         if ($certificate->entity_type === FestRecordBreak::class) {
@@ -1291,7 +1311,7 @@ class FestCertificateService
             'certificate' => $certificate,
             'participant' => $participant,
             'student'     => $participant?->student,
-            'event'       => $participant?->registration?->event,
+            'event'       => $this->certificateEvent($participant?->registration?->event, $certificate->cert_type),
             'item'        => $participant?->registration?->item,
             'mark'        => $participant
                 ? FestMark::where('participant_id', $participant->id)->first()
@@ -1360,7 +1380,7 @@ class FestCertificateService
             $participant = $participants->get($certificate->entity_id);
             $mark = $participant ? $marksByParticipant->get($participant->id) : null;
             $item = $participant?->registration?->item ?? $mark?->item;
-            $event = $participant?->registration?->event ?? $mark?->event;
+            $event = $this->certificateEvent($participant?->registration?->event ?? $mark?->event, $certificate->cert_type);
 
             return [$certificate->id => [
                 'certificate'  => $certificate,

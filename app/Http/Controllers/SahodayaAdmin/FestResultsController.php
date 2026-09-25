@@ -584,7 +584,10 @@ class FestResultsController extends SahodayaAdminController
             app(\App\Services\Events\FestPhasePublicationService::class)
                 ->publishResults($event, $request->user()?->id);
             app(FestCertificateService::class)->generateForEvent($event);
-            app(FestCertificateService::class)->generateParticipationForEvent($event);
+            // Participation certificates are issued once per person from the parent event
+            // (generateParticipationForEvent() routes any leg to its root), so publishing one
+            // leg must not auto-issue them for everyone else's still-unfinished legs -- the
+            // admin generates them from the parent's Participation certificates page.
             app(FestCmsAutoPush::class)->pushScoreboard($event->rootEvent());
             app(FestEventNotifier::class)->resultsPublished($event);
             FestScoreboardUpdated::dispatch($event->rootEvent()->fresh());
