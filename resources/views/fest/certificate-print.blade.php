@@ -138,7 +138,14 @@
                 print-color-adjust: exact !important;
             }
             .no-print, .actions-bar { display: none !important; }
-            .cert-viewport { padding: 0 !important; margin: 0 !important; display: block !important; }
+            {{-- A single certificate must print as exactly one page. Three things pushed it onto
+                 a second, grey-backed one: the screen-only slate <html> background (only <body>
+                 was reset), .cert-viewport's min-height:100vh/overflow:auto stacking on top of a
+                 .page that is already exactly one page tall (sub-pixel rounding spills past it),
+                 and the break-after:always below, which is for the bulk print-all sheet (its own
+                 file), not one certificate. The 1mm of slack keeps rounding from spilling. --}}
+            html { background: #ffffff !important; }
+            .cert-viewport { min-height: 0 !important; overflow: hidden !important; height: {{ $__pageHeightMm - 1 }}mm !important; padding: 0 !important; margin: 0 !important; display: block !important; }
             .page,
             .page.has-background,
             .page.has-background.portrait {
@@ -155,8 +162,8 @@
                 min-height: {{ $__pageHeightMm }}mm !important;
                 max-width: {{ $__pageWidthMm }}mm !important;
                 max-height: {{ $__pageHeightMm }}mm !important;
-                page-break-after: always;
-                break-after: page;
+                page-break-after: auto;
+                break-after: auto;
             }
             .page.has-background.portrait {
                 width: {{ $__pageWidthMm }}mm !important;
@@ -164,8 +171,8 @@
                 min-height: {{ $__pageHeightMm }}mm !important;
                 max-width: {{ $__pageWidthMm }}mm !important;
                 max-height: {{ $__pageHeightMm }}mm !important;
-                page-break-after: always;
-                break-after: page;
+                page-break-after: auto;
+                break-after: auto;
             }
         }
     </style>
