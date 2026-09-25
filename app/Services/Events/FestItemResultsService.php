@@ -149,7 +149,12 @@ class FestItemResultsService
         $targetItem = FestEventItem::find($itemId);
         $isNonIndividual = $targetItem && strtolower((string) $targetItem->participant_type) !== 'individual';
 
+        // Standby students don't compete unless promoted to performer, so they never get
+        // marks or a rank -- same exclusion mark entry and public results already apply.
+        // Without it each standby showed up as an unranked row (individual items) or got
+        // merged into the team's name list (group items) on the ranked/winners sheets.
         $participants = FestParticipant::query()
+            ->where(fn ($q) => $q->whereNull('participant_role')->orWhere('participant_role', '!=', 'standby'))
             ->whereHas('registration', fn ($q) => $q
                 ->whereIn('event_id', $event->reportableEventIds())
                 ->whereIn('item_id', $itemIds)
