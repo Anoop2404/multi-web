@@ -59,6 +59,9 @@
                             </summary>
                             <div class="absolute z-20 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg p-1">
                                 <a :href="downloadFilteredUrl" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">📦 Matching certificates (ZIP)</a>
+                                <a :href="downloadZipUrl({ plain: true })" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">📦 Matching — no background (ZIP)</a>
+                                <a v-if="!selectedSchoolId" :href="downloadZipUrl({ bySchool: true })" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">📦 Matching — folder per school (ZIP)</a>
+                                <a v-if="!selectedSchoolId" :href="downloadZipUrl({ bySchool: true, plain: true })" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">📦 Matching — folder per school — no background (ZIP)</a>
                                 <a :href="printFilteredUrl(false)" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">🖨️ Print matching (with background) ↗</a>
                                 <a :href="printFilteredUrl(true)" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">🖨️ Print matching (plain) ↗</a>
                             </div>
@@ -264,6 +267,12 @@ function scopeParams() {
 }
 
 const downloadFilteredUrl = computed(() => `${base}/download-zip?${scopeParams()}`);
+function downloadZipUrl({ plain = false, bySchool = false } = {}) {
+    const params = scopeParams();
+    if (plain) params.set('plain', '1');
+    if (bySchool) params.set('group_by', 'school');
+    return `${base}/download-zip?${params}`;
+}
 function printFilteredUrl(plain) {
     const params = scopeParams();
     if (plain) params.set('plain', '1');

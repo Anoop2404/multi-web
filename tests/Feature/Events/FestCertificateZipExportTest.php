@@ -241,6 +241,52 @@ class FestCertificateZipExportTest extends TestCase
         return $names;
     }
 
+    /**
+     * The participation "grouped by school — no background" bulk download (and the
+     * per-school "ZIP — no background" row option): one folder per school holding that
+     * school's plain certificates, and a school-scoped export holds only that school's.
+     */
+    public function test_queue_zip_export_participation_plain_puts_each_school_in_its_own_folder(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $sahodaya = $this->makeSahodaya();
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        $event = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Zip Export Event', 'event_type' => 'kalolsavam']);
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song', 'item_code' => 'SS1']);
+
+        $schools = collect(['Alpha Public School', 'Beta Vidyalaya'])->map(fn (string $name) => Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'school', 'parent_id' => $sahodaya->id, 'name' => $name,
+            'domain' => Str::uuid().'.test', 'membership_status' => 'approved', 'is_active' => true,
+        ]));
+        $this->makeCertificates($event, $item, $schools[0]->id, 2);
+        $this->makeCertificates($event, $item, $schools[1]->id, 1);
+        // A winner certificate must stay out of a participation-only export.
+        $this->makeCertificates($event, $item, $schools[0]->id, 1, 'winner');
+
+        $this->actingAs($admin)->post(route('sahodaya.events.certificates.download-zip.queue', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]), ['cert_type' => 'participation', 'group_by' => 'school', 'plain' => '1'])->assertRedirect();
+
+        $batch = CertificateBatch::findOrFail(session('certificate_batch_id'));
+        $this->assertSame(CertificateBatch::STATUS_COMPLETED, $batch->status);
+        $this->assertTrue((bool) $batch->plain);
+        $this->assertSame('school', $batch->group_by);
+
+        $folders = collect($this->zipEntryNames($batch))->map(fn (string $name) => explode('/', $name)[0])->countBy()->all();
+        $this->assertEquals([$schools[0]->fresh()->name => 2, $schools[1]->fresh()->name => 1], $folders);
+
+        // Per-school row: that school only.
+        $this->actingAs($admin)->post(route('sahodaya.events.certificates.download-zip.queue', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]), ['cert_type' => 'participation', 'school_id' => $schools[1]->id, 'plain' => '1'])->assertRedirect();
+
+        $schoolBatch = CertificateBatch::findOrFail(session('certificate_batch_id'));
+        $this->assertSame(1, $schoolBatch->total_count);
+        $this->assertCount(1, $this->zipEntryNames($schoolBatch));
+    }
+
     public function test_queue_zip_export_with_no_matching_certificates_returns_404_and_no_batch_row(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);

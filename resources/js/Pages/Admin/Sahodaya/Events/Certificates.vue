@@ -111,6 +111,14 @@
                                         class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                                     📦 Participation only — no background (ZIP)
                                 </button>
+                                <button v-if="participationBySchool.length" @click="queueZipDownload({ cert_type: 'participation', group_by: 'school' }, $event)" :disabled="isBatchRunning"
+                                        class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                    📦 Participation — grouped by school (ZIP)
+                                </button>
+                                <button v-if="participationBySchool.length" @click="queueZipDownload({ cert_type: 'participation', group_by: 'school', plain: '1' }, $event)" :disabled="isBatchRunning"
+                                        class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                    📦 Participation — grouped by school — no background (ZIP)
+                                </button>
                                 <div class="border-t border-gray-100 my-1"></div>
                                 <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all`" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">🖨️ Print all (with background) ↗</a>
                                 <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?plain=1`" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">🖨️ Print all (plain) ↗</a>
@@ -278,7 +286,10 @@
                                     📦 Download ▾
                                 </summary>
                                 <div class="absolute z-20 right-0 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
-                                    <a :href="`${base}/download-zip?school_id=${group.school_id}&cert_type=winner`" class="block px-3 py-2 rounded hover:bg-gray-50">📦 ZIP</a>
+                                    <button @click="queueZipDownload({ school_id: group.school_id, cert_type: 'winner' }, $event)" :disabled="isBatchRunning"
+                                            class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">📦 ZIP (with background)</button>
+                                    <button @click="queueZipDownload({ school_id: group.school_id, cert_type: 'winner', plain: '1' }, $event)" :disabled="isBatchRunning"
+                                            class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">📦 ZIP — no background</button>
                                     <a :href="`${base}/print-all?school_id=${group.school_id}&cert_type=winner`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (with background) ↗</a>
                                     <a :href="`${base}/print-all?school_id=${group.school_id}&cert_type=winner&plain=1`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (plain) ↗</a>
                                 </div>
@@ -316,6 +327,21 @@
                     <h3 class="text-sm font-semibold text-gray-800">Participation Certificates by School</h3>
                     <p class="text-xs text-gray-500">One certificate per student, listing every item they took part in — organized by school for distribution.</p>
                 </div>
+                <details v-if="participationBySchool.length" class="relative shrink-0">
+                    <summary class="btn-secondary py-1.5 px-3 text-xs inline-flex list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+                        📦 All schools — folder per school ▾
+                    </summary>
+                    <div class="absolute z-20 right-0 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
+                        <button @click="queueZipDownload({ cert_type: 'participation', group_by: 'school' }, $event)" :disabled="isBatchRunning"
+                                class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                            📦 ZIP (with background)
+                        </button>
+                        <button @click="queueZipDownload({ cert_type: 'participation', group_by: 'school', plain: '1' }, $event)" :disabled="isBatchRunning"
+                                class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                            📦 ZIP — no background
+                        </button>
+                    </div>
+                </details>
             </div>
 
             <div v-if="participationBySchool.length" class="card divide-y divide-gray-100">
@@ -338,7 +364,10 @@
                                     📦 Download ▾
                                 </summary>
                                 <div class="absolute z-20 right-0 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
-                                    <a :href="`${base}/download-zip?school_id=${group.school_id}&cert_type=participation`" class="block px-3 py-2 rounded hover:bg-gray-50">📦 ZIP</a>
+                                    <button @click="queueZipDownload({ school_id: group.school_id, cert_type: 'participation' }, $event)" :disabled="isBatchRunning"
+                                            class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">📦 ZIP (with background)</button>
+                                    <button @click="queueZipDownload({ school_id: group.school_id, cert_type: 'participation', plain: '1' }, $event)" :disabled="isBatchRunning"
+                                            class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">📦 ZIP — no background</button>
                                     <a :href="`${base}/print-all?school_id=${group.school_id}&cert_type=participation`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (with background) ↗</a>
                                     <a :href="`${base}/print-all?school_id=${group.school_id}&cert_type=participation&plain=1`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (plain) ↗</a>
                                 </div>
