@@ -13,6 +13,10 @@
                 Prepared for (optional, shown on the PDF)
                 <input v-model="forWhom" type="text" placeholder="e.g. District Kalotsav Committee" class="field text-sm w-72" />
             </label>
+            <label class="text-xs font-semibold text-slate-600 flex items-center gap-2 mt-2">
+                <input v-model="includeMarks" type="checkbox" class="rounded border-slate-300" />
+                Include grade, rank &amp; score on the PDF (untick to print a plain participant list)
+            </label>
         </div>
 
         <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="item-wise" />
@@ -214,6 +218,7 @@ function applyReportScope() {
 }
 
 const forWhom = ref('');
+const includeMarks = ref(true);
 
 function scopedUrl(baseUrl, extraParams = {}) {
     const params = new URLSearchParams(
@@ -224,7 +229,7 @@ function scopedUrl(baseUrl, extraParams = {}) {
 }
 
 const exportUrl = computed(() => scopedUrl(props.xlsUrl));
-const pdfExportUrl = computed(() => scopedUrl(props.pdfUrl, { for_whom: forWhom.value }));
+const pdfExportUrl = computed(() => scopedUrl(props.pdfUrl, { for_whom: forWhom.value, hide_marks: includeMarks.value ? '' : '1' }));
 
 const categoryOptions = computed(() => props.categories.map((c) => ({ value: c.key, label: c.label })));
 const markStatusOptions = [

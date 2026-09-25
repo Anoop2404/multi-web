@@ -73,6 +73,18 @@
             background-color: #f8fafc;
         }
         .text-center { text-align: center; }
+        .c-idx { color: #94a3b8; }
+        .c-mono { font-family: monospace; }
+        .c-cap { text-transform: capitalize; }
+        tr.school-row td {
+            background-color: #e2e8f0;
+            color: #0f172a;
+            font-weight: bold;
+            font-size: 10px;
+            padding: 4px 6px;
+            letter-spacing: 0.3px;
+        }
+        .school-count { font-weight: normal; color: #475569; }
         .font-bold { font-weight: bold; }
         .footer {
             margin-top: 12px;
@@ -91,6 +103,9 @@
     @forelse($groupedByItem as $itemId => $itemRows)
         @php
             $firstRow = $itemRows->first();
+            // Individual, or Group (a team/pair/trio keeps its own name in brackets).
+            $typeLabel = $firstRow['type_label'] ?? 'Individual';
+            $typeText = $typeLabel === 'Individual' ? 'Individual' : ($typeLabel === 'Group' ? 'Group' : 'Group ('.$typeLabel.')');
         @endphp
         @if(!$loop->first)
             <div class="page-break"></div>
@@ -111,6 +126,10 @@
             </div>
             <div class="item-meta">
                 Category: <strong>{{ $firstRow['category_label'] }}</strong>
+                @if(!empty($firstRow['gender_label']))
+                    &nbsp;|&nbsp; Gender: <strong>{{ $firstRow['gender_label'] }}</strong>
+                @endif
+                &nbsp;|&nbsp; Type: <strong>{{ $typeText }}</strong>
                 @if(!empty($firstRow['phase_name']))
                     &nbsp;|&nbsp; Phase: <strong>{{ $firstRow['phase_name'] }}</strong>
                 @endif
@@ -124,33 +143,50 @@
             <p class="for-whom">Prepared for: {{ $forWhom }}</p>
         @endif
 
+        @php
+            // false = a plain participant list with no Grade/Rank/Score columns (print option).
+            $showMarks = $showMarks ?? true;
+            $cols = $showMarks ? 8 : 5;
+            // Grouped by school inside each item: a school heading row, then that school's
+            // participants (already in name order), so a school's entrants read together.
+            $bySchool = $itemRows->groupBy(fn ($r) => strtoupper($r['school_name'] ?? '—'))->sortKeys(SORT_NATURAL | SORT_FLAG_CASE);
+            $n = 0;
+        @endphp
         <table>
             <thead>
                 <tr>
-                    <th style="width: 4%;">#</th>
-                    <th style="width: 25%;">School</th>
-                    <th style="width: 25%;">Participant</th>
-                    <th style="width: 10%;" class="text-center">Reg No</th>
-                    <th style="width: 8%;" class="text-center">Chest</th>
-                    <th style="width: 8%;" class="text-center">Status</th>
-                    <th style="width: 6%;" class="text-center">Grade</th>
-                    <th style="width: 6%;" class="text-center">Rank</th>
-                    <th style="width: 8%;" class="text-center">{{ ($showPoints ?? false) ? 'Points' : 'Score' }}</th>
+                    <th style="width: {{ $showMarks ? 5 : 6 }}%;">#</th>
+                    <th style="width: {{ $showMarks ? 35 : 46 }}%;">Participant</th>
+                    <th style="width: {{ $showMarks ? 13 : 20 }}%;" class="text-center">Reg No</th>
+                    <th style="width: {{ $showMarks ? 9 : 14 }}%;" class="text-center">Chest</th>
+                    <th style="width: {{ $showMarks ? 10 : 14 }}%;" class="text-center">Status</th>
+                    @if($showMarks)
+                        <th style="width: 8%;" class="text-center">Grade</th>
+                        <th style="width: 8%;" class="text-center">Rank</th>
+                        <th style="width: 12%;" class="text-center">{{ ($showPoints ?? false) ? 'Points' : 'Score' }}</th>
+                    @endif
                 </tr>
             </thead>
             <tbody>
-                @foreach($itemRows as $idx => $r)
-                <tr>
-                    <td class="text-center" style="color: #94a3b8;">{{ $idx + 1 }}</td>
-                    <td>{{ strtoupper($r['school_name'] ?? '') }}</td>
-                    <td><strong>{{ $r['participant'] }}</strong></td>
-                    <td class="text-center" style="font-family: monospace;">{{ $r['reg_no'] ?? '—' }}</td>
-                    <td class="text-center font-bold">{{ $r['chest_no'] ?? '—' }}</td>
-                    <td class="text-center" style="text-transform: capitalize;">{{ $r['status'] }}</td>
-                    <td class="text-center font-bold">{{ $r['grade'] ?? '—' }}</td>
-                    <td class="text-center">{{ $r['position'] ?? '—' }}</td>
-                    <td class="text-center">{{ (($showPoints ?? false) ? $r['points'] : $r['score']) ?? '—' }}</td>
+                @foreach($bySchool as $schoolName => $schoolRows)
+                <tr class="school-row">
+                    <td colspan="{{ $cols }}">{{ $schoolName }} <span class="school-count">&middot; {{ $schoolRows->count() }}</span></td>
                 </tr>
+                @foreach($schoolRows as $r)
+                @php $n++; @endphp
+                <tr>
+                    <td class="text-center c-idx">{{ $n }}</td>
+                    <td><strong>{{ $r['participant'] }}</strong></td>
+                    <td class="text-center c-mono">{{ $r['reg_no'] ?? '—' }}</td>
+                    <td class="text-center font-bold">{{ $r['chest_no'] ?? '—' }}</td>
+                    <td class="text-center c-cap">{{ $r['status'] }}</td>
+                    @if($showMarks)
+                        <td class="text-center font-bold">{{ $r['grade'] ?? '—' }}</td>
+                        <td class="text-center">{{ $r['position'] ?? '—' }}</td>
+                        <td class="text-center">{{ (($showPoints ?? false) ? $r['points'] : $r['score']) ?? '—' }}</td>
+                    @endif
+                </tr>
+                @endforeach
                 @endforeach
             </tbody>
         </table>

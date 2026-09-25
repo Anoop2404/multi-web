@@ -2080,7 +2080,7 @@ class FestEventReportAnalyticsService
                 // int-typed eventById() throws a TypeError the moment score-based grading
                 // needs it (a combined participation-certificate/hub-level view is exactly
                 // when $item->event_id genuinely differs from $event->id).
-                'registration.item:id,event_id,title,item_code,category,stage_type,participant_type,class_group,results_published_at,results_hidden',
+                'registration.item:id,event_id,title,item_code,category,stage_type,participant_type,gender,class_group,results_published_at,results_hidden',
                 'registration.event:id,source_phase_id,region_id',
                 'registration.event.sourcePhase:id,name',
                 'registration.event.region:id,name,code',
@@ -2135,6 +2135,8 @@ class FestEventReportAnalyticsService
                     'category_label'  => \App\Support\FestClassGroupScheme::resolveItemLabel($classGroupLabels, $item->class_group),
                     'stage_type'      => $item->stage_type,
                     'participant_type' => $item->participant_type,
+                    'gender_label'    => \App\Support\FestItemCategoryLabel::genderLabel($item->gender),
+                    'type_label'      => \App\Support\FestItemCategoryLabel::typeLabel($item->participant_type),
                     'phase_name'      => $usesPhasedRegionalBilling ? ($event?->sourcePhase?->name) : null,
                     'region_name'     => $event?->region?->name,
                     'region_code'     => $event?->region?->code,

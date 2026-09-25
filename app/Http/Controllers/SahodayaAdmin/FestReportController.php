@@ -1131,6 +1131,8 @@ class FestReportController extends SahodayaAdminController
             'showPhase'   => collect($rows)->contains(fn ($r) => ! empty($r['phase_name'])),
             'showRegion'  => collect($rows)->contains(fn ($r) => ! empty($r['region_name'])),
             'showPoints'  => false,
+            // ?hide_marks=1: a plain participant list without Grade / Rank / Score.
+            'showMarks'   => ! $request->boolean('hide_marks'),
             'generatedBy' => $request->user()?->name ?? 'Unknown',
             'generatedAt' => now()->format('d M Y, h:i A'),
             'forWhom'     => trim((string) $request->input('for_whom', '')) ?: null,
