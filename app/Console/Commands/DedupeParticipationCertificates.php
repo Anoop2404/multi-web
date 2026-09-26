@@ -51,6 +51,13 @@ class DedupeParticipationCertificates extends Command
             ])->all());
         }
 
+        $printedDuplicates = \App\Models\FestCertificatePrint::whereIn('certificate_id', $duplicates->pluck('id'))->count();
+        if ($printedDuplicates > 0) {
+            $this->warn("{$printedDuplicates} of these duplicates were already recorded as printed by a 'Print complete students' run -- their student's kept certificate would show as not printed. Not touching anything; tell the developer.");
+
+            return self::FAILURE;
+        }
+
         if ($this->option('fix') && $duplicates->isNotEmpty()) {
             $service->generateParticipationForEvent($root);
             $this->info('Regenerated participation certificates from the parent event; duplicates revoked.');
