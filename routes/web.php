@@ -1738,6 +1738,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/certificates/download-zip/queue', [FestCertificateController::class, 'queueZipExport'])->name('certificates.download-zip.queue');
             Route::post('/{event}/certificates/print-complete', [FestCertificateController::class, 'printComplete'])->name('certificates.print-complete');
             Route::get('/{event}/certificates/print-complete/report', [FestCertificateController::class, 'printCompleteReport'])->name('certificates.print-complete.report');
+            Route::get('/{event}/certificates/print-status/pdf', [FestCertificateController::class, 'printStatusPdf'])->name('certificates.print-status.pdf');
+            Route::get('/{event}/certificates/print-status/xls', [FestCertificateController::class, 'printStatusXls'])->name('certificates.print-status.xls');
             Route::get('/{event}/certificates/print-all', [FestCertificateController::class, 'printAll'])->name('certificates.print-all');
             Route::post('/{event}/certificates/batches', [FestCertificateController::class, 'generateAndRenderBatch'])->name('certificates.batches.store');
             Route::get('/{event}/certificates/batches', [FestCertificateController::class, 'batches'])->name('certificates.batches.index');

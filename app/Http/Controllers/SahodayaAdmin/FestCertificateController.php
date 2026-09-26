@@ -529,6 +529,123 @@ class FestCertificateController extends SahodayaAdminController
         ];
     }
 
+    /**
+     * Standing per-school student list for participation certificates: every student with
+     * their class, items and status -- printed (and when), ready to print (all results
+     * published, not printed yet) or awaiting results (and which items). Independent of any
+     * one print run, so the not-yet-printed students can be kept and printed together
+     * later ("Print complete students" never reprints a printed student).
+     *
+     * @param  ?string  $status  all | printed | unprinted (ready + awaiting)
+     * @return list<array{name: string, counts: array<string, int>, students: list<array<string, mixed>>}>
+     */
+    private function printStatusData(FestEvent $event, ?string $schoolId, string $status): array
+    {
+        $groups = $this->participationPrintGroups($event)
+            ->when($schoolId, fn ($c) => $c->filter(fn (array $g) => (string) $g['school_id'] === $schoolId))
+            ->values();
+
+        $certIds = $groups->flatMap(fn (array $g) => collect($g['winners'])->pluck('id'));
+        $printedAt = FestCertificatePrint::whereIn('certificate_id', $certIds)->pluck('printed_at', 'certificate_id');
+        $classes = \App\Models\Student::with('schoolClass:id,name')
+            ->whereIn('id', $groups->flatMap(fn (array $g) => collect($g['winners'])->pluck('student_id'))->filter()->unique())
+            ->get(['id', 'school_class_id'])->keyBy('id');
+
+        return $groups->map(function (array $g) use ($status, $printedAt, $classes) {
+            $students = collect($g['winners'])->map(function (array $w) use ($printedAt, $classes) {
+                $state = $w['printed'] ? 'printed' : ($w['complete'] ? 'ready' : 'awaiting');
+
+                return [
+                    'name' => $w['name'],
+                    'class' => $classes->get($w['student_id'])?->schoolClass?->name,
+                    'items' => collect($w['items'] ?? [])->pluck('title')->all(),
+                    'status' => $state,
+                    'printed_at' => $w['printed'] ? $printedAt->get($w['id']) : null,
+                    'awaiting' => $w['pending_items'],
+                ];
+            })->sortBy(fn ($r) => mb_strtolower($r['name']))->values();
+
+            $counts = [
+                'total' => $students->count(),
+                'printed' => $students->where('status', 'printed')->count(),
+                'ready' => $students->where('status', 'ready')->count(),
+                'awaiting' => $students->where('status', 'awaiting')->count(),
+            ];
+
+            $shown = match ($status) {
+                'printed' => $students->where('status', 'printed'),
+                'unprinted' => $students->where('status', '!=', 'printed'),
+                default => $students,
+            };
+
+            return ['name' => $g['school_name'], 'counts' => $counts, 'students' => $shown->values()->all()];
+        })
+            ->filter(fn (array $s) => $s['students'] !== [])
+            ->sortBy('name')
+            ->values()
+            ->all();
+    }
+
+    private function printStatusRequest(Request $request, FestEvent $event): array
+    {
+        @ini_set('memory_limit', '1024M');
+        @set_time_limit(300);
+
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $status = in_array($request->query('status'), ['printed', 'unprinted'], true) ? $request->query('status') : 'all';
+        $schoolId = $request->query('school_id') ? (string) $request->query('school_id') : null;
+
+        return [$this->printStatusData($event, $schoolId, $status), $status];
+    }
+
+    public function printStatusPdf(Request $request, string $tenantId, FestEvent $event)
+    {
+        [$schools, $status] = $this->printStatusRequest($request, $event);
+
+        return \App\Support\PdfChromeHeaderFooter::download('fest.reports.certificate-print-status', [
+            'event' => $event,
+            'schools' => $schools,
+            'status' => $status,
+            'orgName' => $this->sahodaya->name,
+            'logoSrc' => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+        ], \App\Support\ReportFilename::build('certificate-print-status', $event->title, now(), [$status]),
+            $request->boolean('inline') || $request->boolean('preview'), 'Certificate Print Status', $event->title);
+    }
+
+    public function printStatusXls(Request $request, string $tenantId, FestEvent $event)
+    {
+        [$schools, $status] = $this->printStatusRequest($request, $event);
+        $labels = ['printed' => 'Printed', 'ready' => 'Ready to print', 'awaiting' => 'Awaiting results'];
+
+        $rows = [];
+        $summary = [];
+        foreach ($schools as $school) {
+            $summary[] = [strtoupper($school['name']), $school['counts']['total'], $school['counts']['printed'], $school['counts']['ready'], $school['counts']['awaiting']];
+            foreach ($school['students'] as $i => $student) {
+                $rows[] = [
+                    strtoupper($school['name']),
+                    $i + 1,
+                    $student['name'],
+                    $student['class'],
+                    implode(', ', $student['items']),
+                    $labels[$student['status']],
+                    $student['printed_at']?->format('d M Y, h:i A'),
+                    implode(', ', $student['awaiting']),
+                ];
+            }
+        }
+
+        return \App\Support\ExcelExport::downloadMultiSheet(
+            pathinfo(\App\Support\ReportFilename::build('certificate-print-status', $event->title, now(), [$status], 'xls'), PATHINFO_FILENAME),
+            [
+                'Students' => ['headers' => ['School', '#', 'Student', 'Class', 'Items', 'Status', 'Printed on', 'Awaiting results for'], 'rows' => $rows],
+                'School summary' => ['headers' => ['School', 'Students', 'Printed', 'Ready to print', 'Awaiting results'], 'rows' => $summary],
+            ],
+            \App\Support\ExcelExport::generatedOnNote(),
+        );
+    }
+
     private function withDownloadMarks(Collection $groups, Collection $marks, string $certType): Collection
     {
         return $groups->map(function (array $group) use ($marks, $certType) {

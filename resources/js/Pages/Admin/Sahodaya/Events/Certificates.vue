@@ -424,6 +424,18 @@
                 </div>
             </div>
 
+            <div class="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
+                <span class="font-semibold text-slate-700">📋 Student print status by school:</span>
+                <select v-model="statusFilter" class="field text-xs py-1 px-2 w-auto">
+                    <option value="all">All students</option>
+                    <option value="unprinted">Not printed yet (ready + awaiting)</option>
+                    <option value="printed">Printed</option>
+                </select>
+                <a :href="statusUrl('pdf', { preview: 1 })" target="_blank" rel="noopener" class="btn-secondary py-1 px-3 text-xs">👁️ Preview PDF</a>
+                <a :href="statusUrl('pdf')" class="btn-secondary py-1 px-3 text-xs">⬇️ PDF</a>
+                <a :href="statusUrl('xls')" class="btn-secondary py-1 px-3 text-xs">⬇️ Excel</a>
+                <span class="text-slate-500">One page per school: each student with class, items and whether they are printed, ready or awaiting results.</span>
+            </div>
             <div v-if="printRun" class="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs text-emerald-900 flex flex-wrap items-center gap-x-4 gap-y-1">
                 <span>✓ Sent {{ printRun.count }} certificate{{ printRun.count === 1 ? '' : 's' }} from {{ printRun.schools }} school{{ printRun.schools === 1 ? '' : 's' }} to print and marked them printed.</span>
                 <a :href="printRun.print_url" target="_blank" rel="noopener" class="font-semibold underline">Open print page again ↗</a>
@@ -501,6 +513,8 @@
                                     {{ group.downloaded ? '✓ Downloaded' : 'Mark downloaded' }}
                                 </span>
                             </label>
+                            <a :href="statusUrl('pdf', { preview: 1, school_id: group.school_id })" target="_blank" rel="noopener"
+                               class="font-semibold text-slate-600 hover:text-slate-800" title="This school's students with printed / ready / awaiting status">📋 List</a>
                             <button v-if="readyToPrint(group)" @click="printComplete(group.school_id)" :disabled="printingComplete"
                                     class="font-semibold text-emerald-700 hover:text-emerald-900 disabled:opacity-40 disabled:cursor-not-allowed"
                                     title="Prints only the students whose every item has published results, and marks them printed">
@@ -813,6 +827,12 @@ const schoolDownloaded = ref('all');
 // --- "Print complete students": participation certificates of students whose every item has
 // published results, for schools that are otherwise still pending. The server records them as
 // printed (so they are never printed twice), opens the print page, and builds a per-school report.
+const statusFilter = ref('all');
+function statusUrl(format, extra = {}) {
+    const params = new URLSearchParams({ status: statusFilter.value, ...extra });
+    return `${base}/print-status/${format}?${params.toString()}`;
+}
+
 const printingComplete = ref(false);
 const printRun = ref(null);
 const printError = ref('');

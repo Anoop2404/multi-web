@@ -349,4 +349,46 @@ class FestParticipationCertificateParentTest extends TestCase
         $this->actingAs($admin)->get("/sahodaya-admin/{$tenant}/events/{$f['leg1']->id}/certificates/participants")
             ->assertRedirect("/sahodaya-admin/{$tenant}/events/{$f['root']->id}/certificates/participants");
     }
+    public function test_print_status_report_lists_every_student_by_school_with_printed_ready_and_awaiting(): void
+    {
+        config(['services.pdf_converter.url' => 'https://pdf.example.test/generate-pdf']);
+        \Illuminate\Support\Facades\Http::fake(['pdf.example.test/*' => \Illuminate\Support\Facades\Http::response('%PDF-1.4 fake', 200)]);
+
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $f = $this->fixture();
+        $school = \App\Models\Tenant::find($f['student']->tenant_id);
+        $class = \App\Models\SchoolClass::where('tenant_id', $school->id)->first();
+
+        $lateItem = FestEventItem::create(['event_id' => $f['leg1']->id, 'title' => 'Late Item', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $late = Student::create(['tenant_id' => $school->id, 'school_class_id' => $class->id, 'name' => 'Late Student', 'status' => 'active']);
+        $reg = FestRegistration::create(['event_id' => $f['leg1']->id, 'item_id' => $lateItem->id, 'school_id' => $school->id, 'status' => 'approved']);
+        FestParticipant::create(['registration_id' => $reg->id, 'student_id' => $late->id, 'participant_type' => 'student', 'participant_role' => 'performer', 'chest_no' => 2]);
+        app(FestCertificateService::class)->generateParticipationForEvent($f['root']);
+
+        FestEventItem::whereIn('title', ['Pencil Drawing', 'Solo Song'])->update(['results_published_at' => now()]);
+
+        $admin = \App\Models\User::factory()->create(['tenant_id' => $f['root']->tenant_id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+        $base = "/sahodaya-admin/{$f['root']->tenant_id}/events/{$f['root']->id}/certificates/print-status";
+
+        // Before printing: one student ready, one awaiting.
+        $xml = $this->actingAs($admin)->get("{$base}/xls")->streamedContent();
+        $this->assertStringContainsString('Two Leg Student', $xml);
+        $this->assertStringContainsString('Late Student', $xml);
+        $this->assertStringContainsString('Ready to print', $xml);
+        $this->assertStringContainsString('Awaiting results', $xml);
+        $this->assertStringContainsString('Late Item', $xml);
+
+        // After printing the complete student, the "not printed" filter keeps only the other one.
+        $this->actingAs($admin)->postJson(str_replace('print-status', 'print-complete', $base), [])->assertOk();
+        $unprinted = $this->actingAs($admin)->get("{$base}/xls?status=unprinted")->streamedContent();
+        $this->assertStringContainsString('Late Student', $unprinted);
+        $this->assertStringNotContainsString('Two Leg Student', $unprinted);
+        $printed = $this->actingAs($admin)->get("{$base}/xls?status=printed")->streamedContent();
+        $this->assertStringContainsString('Two Leg Student', $printed);
+        $this->assertStringNotContainsString('Late Student', $printed);
+
+        $this->actingAs($admin)->get("{$base}/pdf?preview=1&status=all")->assertOk();
+        \Illuminate\Support\Facades\Http::assertSent(fn ($r) => str_contains((string) ($r->data()['html'] ?? ''), 'Late Student') && str_contains((string) $r->data()['html'], 'Two Leg Student'));
+    }
 }
