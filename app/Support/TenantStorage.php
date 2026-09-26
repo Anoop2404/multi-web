@@ -741,6 +741,15 @@ class TenantStorage
             return null;
         }
 
+        // This customer-specific template was originally installed as a CMYK JPEG.
+        // Production storage may contain an older/re-encoded copy whose byte hash is
+        // different from the bundled source, so resolve it by tenant + stable preset
+        // filename before reading the stored bytes. This keeps the correction isolated
+        // to Kochi Metro's Template 2 and leaves every other Sahodaya background alone.
+        if ($replacement = self::tenantSrgbBackgroundReplacement($tenant, $path)) {
+            return 'data:'.$replacement[1].';base64,'.base64_encode($replacement[0]);
+        }
+
         if (str_starts_with($path, 'data:image/')) {
             return $path;
         }
@@ -749,8 +758,8 @@ class TenantStorage
         // Background artwork is commonly supplied as a colour-managed CMYK JPEG. GD
         // does not preserve that profile while resizing, while Chromium's PDF writer
         // may embed the untouched JPEG as DeviceCMYK and turn muted pinks into neon
-        // magenta. The PDF-only path therefore uses an ICC-converted sRGB replacement
-        // for known artwork and otherwise keeps unknown CMYK bytes untouched.
+        // magenta. Unknown CMYK artwork is therefore kept untouched rather than being
+        // destructively re-encoded by GD.
         if (! str_starts_with($path, 'http://') && ! str_starts_with($path, 'https://')) {
             return self::photoBase64DataUri($tenant, $path, $maxDimension, preserveCmykJpeg: true);
         }
@@ -839,7 +848,7 @@ class TenantStorage
         if ($preserveCmykJpeg) {
             $imageInfo = @getimagesizefromstring($contents);
             if (($imageInfo['mime'] ?? null) === 'image/jpeg' && ($imageInfo['channels'] ?? null) === 4) {
-                return self::knownSrgbBackgroundReplacement($contents);
+                return null;
             }
         }
 
@@ -894,15 +903,20 @@ class TenantStorage
      *
      * @return array{0: string, 1: string}|null [contents, mime]
      */
-    private static function knownSrgbBackgroundReplacement(string $contents): ?array
+    private static function tenantSrgbBackgroundReplacement(?Tenant $tenant, string $path): ?array
     {
-        $replacementByHash = [
-            'cc3a122ae1d211c04bb2636e5d86c450eb5d026d2641defd4a5cecf7bc931855'
-                => database_path('seeders/assets/id-card-templates/kalotsav-student-id-template-2-srgb.jpg'),
-        ];
+        if ((string) $tenant?->id !== 'b7f9b005-9f08-4833-8c02-8767a440ad01') {
+            return null;
+        }
 
-        $replacementPath = $replacementByHash[hash('sha256', $contents)] ?? null;
-        if (! $replacementPath || ! is_file($replacementPath)) {
+        $pathOnly = parse_url($path, PHP_URL_PATH);
+        $filename = basename(is_string($pathOnly) ? $pathOnly : $path);
+        if (! preg_match('/^kalotsav-student-id-template-2(?:-copy-\d+)?\.jpg$/', $filename)) {
+            return null;
+        }
+
+        $replacementPath = database_path('seeders/assets/id-card-templates/kalotsav-student-id-template-2-srgb.jpg');
+        if (! is_file($replacementPath)) {
             return null;
         }
 

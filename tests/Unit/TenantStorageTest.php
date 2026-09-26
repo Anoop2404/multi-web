@@ -12,8 +12,8 @@ class TenantStorageTest extends TestCase
 {
     public function test_known_cmyk_background_is_color_managed_to_srgb_for_pdf(): void
     {
-        $tenant = new Tenant(['id' => (string) Str::uuid()]);
-        $relative = "sahodaya/{$tenant->id}/id-card-templates/backgrounds/cmyk-card.jpg";
+        $tenant = new Tenant(['id' => 'b7f9b005-9f08-4833-8c02-8767a440ad01']);
+        $relative = "sahodaya/{$tenant->id}/id-card-templates/backgrounds/kalotsav-student-id-template-2.jpg";
         $stored = base_path('storage/app/public/'.$relative);
         $source = database_path('seeders/assets/id-card-templates/kalotsav-student-id-template-2.jpg');
         @mkdir(dirname($stored), 0777, true);
@@ -32,6 +32,27 @@ class TenantStorageTest extends TestCase
             $imageInfo = getimagesizefromstring($embedded);
             $this->assertSame(3, $imageInfo['channels'] ?? null);
             $this->assertSame(1654, $imageInfo[1] ?? null);
+        } finally {
+            @unlink($stored);
+        }
+    }
+
+    public function test_customer_specific_background_correction_does_not_apply_to_other_sahodayas(): void
+    {
+        $tenant = new Tenant(['id' => (string) Str::uuid()]);
+        $relative = "sahodaya/{$tenant->id}/id-card-templates/backgrounds/kalotsav-student-id-template-2.jpg";
+        $stored = base_path('storage/app/public/'.$relative);
+        $source = database_path('seeders/assets/id-card-templates/kalotsav-student-id-template-2.jpg');
+        @mkdir(dirname($stored), 0777, true);
+        copy($source, $stored);
+
+        try {
+            $dataUri = TenantStorage::backgroundDataUri($tenant, $relative, 1600);
+            $embedded = base64_decode(substr($dataUri, strpos($dataUri, ',') + 1), true);
+
+            $this->assertNotFalse($embedded);
+            $this->assertSame(hash_file('sha256', $source), hash('sha256', $embedded));
+            $this->assertSame(4, getimagesizefromstring($embedded)['channels'] ?? null);
         } finally {
             @unlink($stored);
         }
