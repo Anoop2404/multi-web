@@ -7,6 +7,7 @@ use App\Jobs\RenderCertificateChunkJob;
 use App\Models\Certificate;
 use App\Models\CertificateTemplate;
 use App\Models\CertificateBatch;
+use App\Models\FestCertificatePrint;
 use App\Models\FestCertificateSchoolMark;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
@@ -48,7 +49,7 @@ class FestCertificateController extends SahodayaAdminController
             'schools' => $this->schoolsFromCertificates($certificates),
             'winnersByItem' => $this->winnersByItem($certificates, $event),
             'winnersBySchool' => $this->withDownloadMarks($this->withSchoolResults($this->winnersBySchool($certificates, $event), $schoolResults), $marks, 'winner'),
-            'participationBySchool' => $this->withDownloadMarks($this->withSchoolResults($this->participationBySchool($certificates, $event), $schoolResults), $marks, 'participation'),
+            'participationBySchool' => $this->withDownloadMarks($this->withPrintState($this->withSchoolResults($this->participationBySchool($certificates, $event), $schoolResults)), $marks, 'participation'),
             'recentBatches' => $this->recentBatchesForEvent($event),
             'staleCount' => $certificates->filter(fn ($c) => $c['is_stale'] ?? false)->count(),
             'certificateSignatories' => $this->signatoriesForUi($event),
@@ -329,6 +330,169 @@ class FestCertificateController extends SahodayaAdminController
             ->keyBy(fn ($m) => $m->cert_type.'|'.$m->school_id);
     }
 
+    /**
+     * Adds 'complete' (every item on the student's participation certificate has published
+     * results -- so its grades are final and it is safe to print even while the school has
+     * other items pending) and 'printed' (already sent to print by a "Print complete
+     * students" run) to each participation row of the by-school groups.
+     *
+     * @param  Collection<int, array<string, mixed>>  $groups
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function withPrintState(Collection $groups): Collection
+    {
+        $itemIds = $groups->flatMap(fn (array $g) => collect($g['winners'])->flatMap(fn (array $w) => collect($w['items'] ?? [])->pluck('id')))->unique()->values();
+        $published = FestEventItem::whereIn('id', $itemIds)->whereNotNull('results_published_at')->pluck('id')->flip();
+        $printed = FestCertificatePrint::whereIn('certificate_id', $groups->flatMap(fn (array $g) => collect($g['winners'])->pluck('id')))->pluck('certificate_id')->flip();
+
+        return $groups->map(function (array $group) use ($published, $printed) {
+            $group['winners'] = collect($group['winners'])->map(function (array $w) use ($published, $printed) {
+                $items = collect($w['items'] ?? []);
+                $w['complete'] = $items->isNotEmpty() && $items->every(fn ($i) => $published->has($i['id']));
+                $w['pending_items'] = $items->reject(fn ($i) => $published->has($i['id']))->pluck('title')->values()->all();
+                $w['printed'] = $printed->has($w['id']);
+
+                return $w;
+            })->values();
+
+            return $group;
+        });
+    }
+
+    /** All participation rows for the event, by school, with print state (and the school's own results status). */
+    private function participationPrintGroups(FestEvent $event): Collection
+    {
+        $certificates = $this->withParticipationItems($this->certificatesForEvent($event, 'participation'), $event);
+
+        return $this->withPrintState($this->participationBySchool($certificates, $event));
+    }
+
+    /**
+     * "Print complete students": prints only the students whose every item has published
+     * results and who have not been printed before -- for schools that still have other
+     * items pending -- records them as printed under one run id, and ticks a school as
+     * downloaded once ALL its students are printed. Returns the run's print + report URLs.
+     */
+    public function printComplete(Request $request, string $tenantId, FestEvent $event)
+    {
+        @ini_set('memory_limit', '1024M');
+        @set_time_limit(300);
+
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $validated = $request->validate(['school_id' => 'nullable|string|max:64']);
+        $schoolId = $validated['school_id'] ?? null;
+
+        $groups = $this->participationPrintGroups($event)
+            ->when($schoolId, fn ($c) => $c->filter(fn (array $g) => (string) $g['school_id'] === $schoolId));
+
+        $toPrint = $groups->flatMap(fn (array $g) => collect($g['winners'])
+            ->filter(fn (array $w) => $w['complete'] && ! $w['printed'])
+            ->map(fn (array $w) => ['certificate_id' => $w['id'], 'school_id' => (string) $g['school_id']]));
+
+        if ($toPrint->isEmpty()) {
+            return response()->json(['message' => 'No complete students are left to print — every student with all results published has already been printed.'], 422);
+        }
+
+        $run = (string) \Illuminate\Support\Str::uuid();
+        $rootId = $event->rootEvent()->id;
+        $now = now();
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($toPrint, $run, $rootId, $now, $request, $groups) {
+            foreach ($toPrint->chunk(500) as $chunk) {
+                FestCertificatePrint::insertOrIgnore($chunk->map(fn (array $r) => [
+                    'event_id' => $rootId,
+                    'certificate_id' => $r['certificate_id'],
+                    'school_id' => $r['school_id'],
+                    'run_uuid' => $run,
+                    'printed_by_user_id' => $request->user()?->id,
+                    'printed_at' => $now,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ])->all());
+            }
+
+            // A school whose every student is now printed is done -- tick it downloaded.
+            $printedIds = $toPrint->pluck('certificate_id')->flip();
+            foreach ($groups as $group) {
+                $all = collect($group['winners']);
+                if ($group['school_id'] && $all->every(fn (array $w) => $w['printed'] || $printedIds->has($w['id']))) {
+                    FestCertificateSchoolMark::updateOrCreate(
+                        ['event_id' => $rootId, 'school_id' => (string) $group['school_id'], 'cert_type' => 'participation'],
+                        ['marked_by_user_id' => $request->user()?->id, 'marked_at' => $now],
+                    );
+                }
+            }
+        });
+
+        $base = "/sahodaya-admin/{$tenantId}/events/{$event->id}/certificates";
+
+        return response()->json([
+            'run' => $run,
+            'count' => $toPrint->count(),
+            'schools' => $toPrint->pluck('school_id')->unique()->count(),
+            'print_url' => "{$base}/print-all?run={$run}".($request->boolean('plain') ? '&plain=1' : ''),
+            'report_url' => "{$base}/print-complete/report?run={$run}",
+        ]);
+    }
+
+    /**
+     * Portrait bulk report for one print run: per school, the students printed in the run
+     * and the students still pending (with the items awaiting results), one school per page.
+     */
+    public function printCompleteReport(Request $request, string $tenantId, FestEvent $event)
+    {
+        @ini_set('memory_limit', '1024M');
+        @set_time_limit(300);
+
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $run = (string) $request->query('run');
+        $runRows = FestCertificatePrint::where('run_uuid', $run)->get();
+        abort_if($runRows->isEmpty(), 404, 'Unknown print run.');
+        abort_unless(in_array((int) $runRows->first()->event_id, $event->rootEvent()->reportableEventIds(), true), 404);
+
+        $inRun = $runRows->pluck('certificate_id')->flip();
+        $runSchools = $runRows->pluck('school_id')->unique()->flip();
+
+        $groups = $this->participationPrintGroups($event)->filter(fn (array $g) => $runSchools->has((string) $g['school_id']))->values();
+
+        $students = \App\Models\Student::with('schoolClass:id,name')
+            ->whereIn('id', $groups->flatMap(fn (array $g) => collect($g['winners'])->pluck('student_id'))->filter()->unique())
+            ->get(['id', 'school_class_id'])->keyBy('id');
+
+        $describe = fn (array $w, array $items) => [
+            'name' => $w['name'],
+            'class' => $students->get($w['student_id'])?->schoolClass?->name,
+            'items' => $items,
+        ];
+
+        $schools = $groups->map(function (array $g) use ($inRun, $describe) {
+            $winners = collect($g['winners']);
+            $sort = fn ($rows) => $rows->sortBy(fn ($r) => mb_strtolower($r['name']))->values()->all();
+
+            return [
+                'name' => $g['school_name'],
+                'printed' => $sort($winners->filter(fn ($w) => $inRun->has($w['id']))
+                    ->map(fn ($w) => $describe($w, collect($w['items'] ?? [])->pluck('title')->all()))),
+                // Not printed yet: still waiting on the listed items' results.
+                'pending' => $sort($winners->filter(fn ($w) => ! $w['printed'] && ! $inRun->has($w['id']))
+                    ->map(fn ($w) => $describe($w, $w['pending_items']))),
+                'earlier' => $winners->filter(fn ($w) => $w['printed'] && ! $inRun->has($w['id']))->count(),
+            ];
+        })->sortBy('name')->values()->all();
+
+        $filename = \App\Support\ReportFilename::build('certificate-print-report', $event->title, $runRows->first()->printed_at);
+
+        return \App\Support\PdfChromeHeaderFooter::download('fest.reports.certificate-print-run', [
+            'event' => $event,
+            'schools' => $schools,
+            'printedAt' => $runRows->first()->printed_at,
+            'orgName' => $this->sahodaya->name,
+            'logoSrc' => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+        ], $filename, $request->boolean('inline') || $request->boolean('preview'), 'Certificate Print Report', $event->title);
+    }
+
     private function withDownloadMarks(Collection $groups, Collection $marks, string $certType): Collection
     {
         return $groups->map(function (array $group) use ($marks, $certType) {
@@ -480,6 +644,7 @@ class FestCertificateController extends SahodayaAdminController
                 $rows = $group->map(fn ($c) => [
                     'id' => $c['id'],
                     'uuid' => $c['uuid'],
+                    'student_id' => $c['student']?->id ?? $c['participant']?->student_id,
                     'name' => $c['student']?->name ?? $c['participant']?->student?->name ?? 'Participant',
                     'item_title' => $c['item']?->title ?? '',
                     'category_label' => FestItemCategoryLabel::shortLabel($c['item'], $classGroupLabels, $artsCategoryLabels),
@@ -923,6 +1088,14 @@ class FestCertificateController extends SahodayaAdminController
         $certIds = $request->query('certificate_ids')
             ? array_filter(array_map('intval', explode(',', (string) $request->query('certificate_ids'))))
             : null;
+
+        // A "Print complete students" run: print exactly the certificates it recorded.
+        if ($run = $request->query('run')) {
+            $runRows = FestCertificatePrint::where('run_uuid', (string) $run)->get(['certificate_id', 'event_id']);
+            abort_if($runRows->isEmpty() || ! in_array((int) $runRows->first()->event_id, $event->rootEvent()->reportableEventIds(), true), 404, 'Unknown print run.');
+            $certIds = $runRows->pluck('certificate_id')->map(fn ($id) => (int) $id)->all();
+            $certType = 'participation';
+        }
 
         $payloads = app(FestCertificateService::class)->exportPayloadsForEvent(
             $event,

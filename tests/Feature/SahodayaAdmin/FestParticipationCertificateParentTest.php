@@ -215,4 +215,56 @@ class FestParticipationCertificateParentTest extends TestCase
         $this->assertFalse($ticked($f['root']));
         $this->assertSame(0, \App\Models\FestCertificateSchoolMark::count());
     }
+    public function test_print_complete_prints_only_students_with_all_results_published_once_and_reports_the_rest(): void
+    {
+        config(['services.pdf_converter.url' => 'https://pdf.example.test/generate-pdf']);
+        \Illuminate\Support\Facades\Http::fake(['pdf.example.test/*' => \Illuminate\Support\Facades\Http::response('%PDF-1.4 fake', 200)]);
+
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $f = $this->fixture();
+        $school = \App\Models\Tenant::find($f['student']->tenant_id);
+        $class = $f['student']->schoolClass ?? \App\Models\SchoolClass::where('tenant_id', $school->id)->first();
+
+        // A second student of the same school whose only item has NOT published results yet.
+        $lateItem = FestEventItem::create(['event_id' => $f['leg1']->id, 'title' => 'Late Item', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $late = Student::create(['tenant_id' => $school->id, 'school_class_id' => $class->id, 'name' => 'Late Student', 'status' => 'active']);
+        $reg = FestRegistration::create(['event_id' => $f['leg1']->id, 'item_id' => $lateItem->id, 'school_id' => $school->id, 'status' => 'approved']);
+        FestParticipant::create(['registration_id' => $reg->id, 'student_id' => $late->id, 'participant_type' => 'student', 'participant_role' => 'performer', 'chest_no' => 2]);
+
+        app(FestCertificateService::class)->generateParticipationForEvent($f['root']);
+
+        $admin = \App\Models\User::factory()->create(['tenant_id' => $f['root']->tenant_id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+        $base = "/sahodaya-admin/{$f['root']->tenant_id}/events/{$f['root']->id}/certificates";
+
+        // Nothing published yet: nobody is complete.
+        $this->actingAs($admin)->postJson("{$base}/print-complete", [])->assertStatus(422);
+
+        // Publish the two items of the first student only.
+        FestEventItem::whereIn('title', ['Pencil Drawing', 'Solo Song'])->update(['results_published_at' => now()]);
+
+        $run = $this->actingAs($admin)->postJson("{$base}/print-complete", ['school_id' => $school->id]);
+        $run->assertOk()->assertJsonPath('count', 1)->assertJsonPath('schools', 1);
+        $this->assertSame(1, \App\Models\FestCertificatePrint::count());
+        $this->assertSame(0, \App\Models\FestCertificateSchoolMark::count(), 'a school with a pending student is not auto-ticked');
+
+        // Same again: the printed student is not printed twice.
+        $this->actingAs($admin)->postJson("{$base}/print-complete", [])->assertStatus(422);
+
+        // The print page for the run renders exactly that student's certificate.
+        $this->actingAs($admin)->get($run->json('print_url'))->assertOk();
+
+        // The report lists the printed student and, separately, the pending one with the awaited item.
+        $this->actingAs($admin)->get($run->json('report_url').'&preview=1')->assertOk();
+        \Illuminate\Support\Facades\Http::assertSent(function ($request) {
+            $html = (string) ($request->data()['html'] ?? '');
+
+            return str_contains($html, 'Two Leg Student') && str_contains($html, 'Late Student') && str_contains($html, 'Late Item');
+        });
+
+        // Once the late item publishes too, the last student prints and the school auto-ticks.
+        $lateItem->update(['results_published_at' => now()]);
+        $this->actingAs($admin)->postJson("{$base}/print-complete", [])->assertOk()->assertJsonPath('count', 1);
+        $this->assertSame(1, \App\Models\FestCertificateSchoolMark::where('cert_type', 'participation')->count());
+    }
 }

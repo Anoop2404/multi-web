@@ -397,7 +397,13 @@
                     <h3 class="text-sm font-semibold text-gray-800">Participation Certificates by School</h3>
                     <p class="text-xs text-gray-500">One certificate per student, listing every item they took part in — organized by school for distribution.</p>
                 </div>
-                <details v-if="participationBySchool.length" class="relative shrink-0">
+                <div v-if="participationBySchool.length" class="flex flex-wrap items-center gap-2 shrink-0">
+                    <button v-if="totalReadyToPrint" @click="printComplete(null)" :disabled="printingComplete"
+                            class="btn-primary py-1.5 px-3 text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="Prints every student (all schools) whose items all have published results and who was not printed before, marks them printed, and opens a per-school report sheet">
+                        🖨️ Print complete students — all schools ({{ totalReadyToPrint }})
+                    </button>
+                <details class="relative shrink-0">
                     <summary class="btn-secondary py-1.5 px-3 text-xs inline-flex list-none cursor-pointer [&::-webkit-details-marker]:hidden">
                         📦 All schools — folder per school ▾
                     </summary>
@@ -412,7 +418,16 @@
                         </button>
                     </div>
                 </details>
+                </div>
             </div>
+
+            <div v-if="printRun" class="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs text-emerald-900 flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span>✓ Sent {{ printRun.count }} certificate{{ printRun.count === 1 ? '' : 's' }} from {{ printRun.schools }} school{{ printRun.schools === 1 ? '' : 's' }} to print and marked them printed.</span>
+                <a :href="printRun.print_url" target="_blank" rel="noopener" class="font-semibold underline">Open print page again ↗</a>
+                <a :href="`${printRun.report_url}&preview=1`" target="_blank" rel="noopener" class="font-semibold underline">👁️ Report sheet ↗</a>
+                <a :href="printRun.report_url" class="font-semibold underline">⬇️ Report sheet (PDF)</a>
+            </div>
+            <p v-if="printError" class="mb-3 text-xs text-red-700">{{ printError }}</p>
 
             <div class="mb-3 flex flex-wrap items-center gap-3">
                 <input v-model="schoolSearch" type="search" placeholder="Search school or student…"
@@ -468,6 +483,10 @@
                                   :title="group.downloaded_at ? `Marked downloaded ${new Date(group.downloaded_at).toLocaleString()}` : 'Marked downloaded'">
                                 ✓ Downloaded
                             </span>
+                            <span v-if="printedCount(group)" class="shrink-0 text-xs px-2 py-0.5 rounded bg-teal-100 text-teal-800 font-medium"
+                                  title="Students already sent to print by a 'Print complete students' run">
+                                🖨️ {{ printedCount(group) }}/{{ group.winners.length }} printed
+                            </span>
                         </div>
                         <div class="flex flex-wrap items-center gap-3 text-xs shrink-0">
                             <label class="inline-flex items-center gap-1.5 cursor-pointer select-none"
@@ -479,6 +498,11 @@
                                     {{ group.downloaded ? '✓ Downloaded' : 'Mark downloaded' }}
                                 </span>
                             </label>
+                            <button v-if="readyToPrint(group)" @click="printComplete(group.school_id)" :disabled="printingComplete"
+                                    class="font-semibold text-emerald-700 hover:text-emerald-900 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    title="Prints only the students whose every item has published results, and marks them printed">
+                                🖨️ Print complete ({{ readyToPrint(group) }})
+                            </button>
                             <button @click="renderAndCache({ school_id: group.school_id, cert_type: 'participation' })"
                                     class="font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed"
                                     :disabled="isBatchRunning">
@@ -521,6 +545,9 @@
                             <li v-for="(w, index) in group.winners" :key="w.id" class="py-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs">
                                 <span class="w-6 shrink-0 text-right text-[11px] text-gray-400 tabular-nums">{{ index + 1 }}.</span>
                                 <span class="font-medium text-gray-800">{{ w.name }}</span>
+                                <span v-if="w.printed" class="text-[10px] px-1.5 py-0.5 rounded bg-teal-100 text-teal-800 font-semibold">🖨️ printed</span>
+                                <span v-else-if="w.complete" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold">ready</span>
+                                <span v-else class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold">awaiting results</span>
                                 <span class="min-w-0 flex-1 text-[11px] text-gray-500">{{ participationItemsText(w) }}</span>
                                 <span class="flex items-center gap-2 text-[11px] shrink-0">
                                     <a :href="`/certificates/print/${w.uuid}`" target="_blank" class="text-indigo-600 font-medium hover:underline">Print (With BG) ↗</a>
@@ -777,6 +804,56 @@ let pollTimer = null;
 const schoolSearch = ref('');
 const schoolReadiness = ref('all');
 const schoolDownloaded = ref('all');
+
+// --- "Print complete students": participation certificates of students whose every item has
+// published results, for schools that are otherwise still pending. The server records them as
+// printed (so they are never printed twice), opens the print page, and builds a per-school report.
+const printingComplete = ref(false);
+const printRun = ref(null);
+const printError = ref('');
+
+function readyToPrint(group) {
+    return (group.winners ?? []).filter((w) => w.complete && !w.printed).length;
+}
+function printedCount(group) {
+    return (group.winners ?? []).filter((w) => w.printed).length;
+}
+const totalReadyToPrint = computed(() => props.participationBySchool.reduce((n, g) => n + readyToPrint(g), 0));
+
+function xsrfToken() {
+    const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : '';
+}
+
+async function printComplete(schoolId) {
+    const what = schoolId ? 'this school' : 'all schools';
+    if (!window.confirm(`Print every complete student of ${what} and mark them as printed?`)) return;
+    printingComplete.value = true;
+    printError.value = '';
+    // Opened synchronously so the browser doesn't block it as a pop-up after the request.
+    const printWindow = window.open('', '_blank');
+    try {
+        const res = await fetch(`${base}/print-complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': xsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ school_id: schoolId ?? null }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            printWindow?.close();
+            printError.value = data.message || 'Could not start the print run.';
+            return;
+        }
+        printRun.value = data;
+        if (printWindow) printWindow.location = data.print_url;
+        router.reload({ preserveScroll: true, preserveState: true });
+    } catch (e) {
+        printWindow?.close();
+        printError.value = 'Could not start the print run.';
+    } finally {
+        printingComplete.value = false;
+    }
+}
 
 // Manual checklist: tick a school once its certificates have been downloaded / handed over.
 function markDownloaded(group, certType, downloaded) {
