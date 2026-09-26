@@ -203,15 +203,14 @@ class FestParticipationCertificateParentTest extends TestCase
             'school_id' => $schoolId, 'cert_type' => 'participation', 'downloaded' => true,
         ])->assertRedirect();
 
-        // ...is visible from the parent (and from the leg it was made on).
+        // ...is visible from the parent (a child event no longer lists participation certificates).
         $this->assertTrue($ticked($f['root']));
-        $this->assertTrue($ticked($f['leg1']));
+        $this->assertNull($ticked($f['leg1']));
 
         // Unticking from the parent clears it everywhere, including the leg's own row.
         $this->actingAs($admin)->post(route('sahodaya.events.certificates.school-downloaded', $params($f['root'])), [
             'school_id' => $schoolId, 'cert_type' => 'participation', 'downloaded' => false,
         ])->assertRedirect();
-        $this->assertFalse($ticked($f['leg1']));
         $this->assertFalse($ticked($f['root']));
         $this->assertSame(0, \App\Models\FestCertificateSchoolMark::count());
     }
@@ -292,5 +291,60 @@ class FestParticipationCertificateParentTest extends TestCase
 
         $this->artisan('fest:participation-duplicates', ['event' => $f['root']->id, '--fix' => true])->assertSuccessful();
         $this->assertSame(1, Certificate::where('cert_type', 'participation')->count());
+    }
+    public function test_generate_reuses_an_existing_certificate_for_a_student_instead_of_creating_a_second(): void
+    {
+        $f = $this->fixture();
+        $service = app(FestCertificateService::class);
+        $service->generateParticipationForEvent($f['root']);
+        $original = Certificate::where('cert_type', 'participation')->sole();
+
+        // Simulate the anchor having shifted: the only certificate now sits on the student's
+        // other participant row (the higher id).
+        $other = FestParticipant::where('student_id', $f['student']->id)->orderByDesc('id')->first();
+        $original->update(['entity_id' => $other->id]);
+
+        $service->generateParticipationForEvent($f['root']);
+        $service->generateParticipationForEvent($f['leg1']);
+        $service->generateParticipationForEvent($f['root']);
+
+        $certs = Certificate::where('cert_type', 'participation')->get();
+        $this->assertCount(1, $certs, 'still one certificate per student');
+        $this->assertSame($original->verification_uuid, $certs->first()->verification_uuid, 'the existing certificate (and its QR) was kept, not replaced');
+        $this->assertSame(FestParticipant::where('student_id', $f['student']->id)->min('id'), (int) $certs->first()->entity_id, 're-anchored on the current anchor row');
+    }
+
+    public function test_child_events_hold_participation_certificates_back(): void
+    {
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $f = $this->fixture();
+        $service = app(FestCertificateService::class);
+        $service->generateParticipationForEvent($f['root']);
+        $this->assertTrue($service->holdsParticipation($f['leg1']));
+        $this->assertFalse($service->holdsParticipation($f['root']));
+
+        $admin = \App\Models\User::factory()->create(['tenant_id' => $f['root']->tenant_id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+        $tenant = $f['root']->tenant_id;
+
+        // The leg's certificates page lists no participation certificates and says so.
+        $page = $this->actingAs($admin)->get(route('sahodaya.events.certificates.index', ['tenantId' => $tenant, 'event' => $f['leg1']->id]));
+        $props = $page->viewData('page')['props'];
+        $this->assertTrue($props['participationHeld']);
+        $this->assertStringContainsString("/events/{$f['root']->id}/certificates/participants", $props['participationParentUrl']);
+        $this->assertSame([], collect($props['certificates'])->where('cert_type', 'participation')->values()->all());
+        $this->assertSame([], (array) $props['participationBySchool']);
+
+        // Exports from the leg skip them too; the parent still has it.
+        $this->assertCount(0, $service->exportScope($f['leg1'], certType: 'participation')[0]);
+        $this->assertCount(1, $service->exportScope($f['root'], certType: 'participation')[0]);
+
+        // Generating participation from a leg is refused; the parent's workspace is where it lives.
+        $before = Certificate::where('cert_type', 'participation')->count();
+        $this->actingAs($admin)->post(route('sahodaya.events.certificates.participation', ['tenantId' => $tenant, 'event' => $f['leg1']->id]))
+            ->assertSessionHas('error');
+        $this->assertSame($before, Certificate::where('cert_type', 'participation')->count());
+        $this->actingAs($admin)->get("/sahodaya-admin/{$tenant}/events/{$f['leg1']->id}/certificates/participants")
+            ->assertRedirect("/sahodaya-admin/{$tenant}/events/{$f['root']->id}/certificates/participants");
     }
 }

@@ -54,7 +54,7 @@ class FestCertificateController extends SahodayaAdminController
             'staleCount' => $certificates->filter(fn ($c) => $c['is_stale'] ?? false)->count(),
             'certificateSignatories' => $this->signatoriesForUi($event),
             'signatoryLabelSuggestions' => $this->signatoryLabelSuggestions(),
-        ]));
+        ] + $this->participationHoldProps($event)));
     }
 
     /**
@@ -82,12 +82,19 @@ class FestCertificateController extends SahodayaAdminController
             'certificateSignatories' => $this->signatoriesForUi($event),
             'signatoryLabelSuggestions' => $this->signatoryLabelSuggestions(),
             'staleCount' => $certificates->filter(fn ($c) => $c['is_stale'] ?? false)->count(),
-        ]));
+        ] + $this->participationHoldProps($event)));
     }
 
     /** Dedicated Participation certificates workspace — same idea as meritCertificates(). */
     public function participationCertificatesPage(string $tenantId, FestEvent $event)
     {
+        if (app(FestCertificateService::class)->holdsParticipation($event)) {
+            abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+            return redirect("/sahodaya-admin/{$tenantId}/events/{$event->rootEvent()->id}/certificates/participants")
+                ->with('info', 'Participation certificates are issued once per student from the parent event — showing them here.');
+        }
+
         // A whole hub has thousands of certificates; building every payload plus the grouped
         // views below is the heaviest read in the module.
         @ini_set('memory_limit', '1024M');
@@ -150,10 +157,21 @@ class FestCertificateController extends SahodayaAdminController
         })->pluck('id');
 
         $service = app(FestCertificateService::class);
+
+        // A phase/region child event holds participation certificates back -- the parent
+        // issues one per person for the whole hub.
+        if ($service->holdsParticipation($event)) {
+            if ($certType === 'participation') {
+                return collect();
+            }
+            $certType ??= null;
+        }
+
         $certificates = $service->dedupeParticipationPerPerson(
             Certificate::where('entity_type', FestParticipant::class)
                 ->whereIn('entity_id', $participantIds)
                 ->when($certType, fn ($q) => $q->where('cert_type', $certType))
+                ->when(! $certType && $service->holdsParticipation($event), fn ($q) => $q->where('cert_type', '!=', 'participation'))
                 ->orderByDesc('generated_at')
                 ->get()
         );
@@ -493,6 +511,22 @@ class FestCertificateController extends SahodayaAdminController
             'orgName' => $this->sahodaya->name,
             'logoSrc' => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
         ], $filename, $request->boolean('inline') || $request->boolean('preview'), 'Certificate Print Report', $event->title);
+    }
+
+    /**
+     * Tells the certificates pages a child event holds participation certificates back, and
+     * where they live (the parent's participation workspace).
+     *
+     * @return array{participationHeld: bool, participationParentUrl: ?string}
+     */
+    private function participationHoldProps(FestEvent $event): array
+    {
+        $held = app(FestCertificateService::class)->holdsParticipation($event);
+
+        return [
+            'participationHeld' => $held,
+            'participationParentUrl' => $held ? "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->rootEvent()->id}/certificates/participants" : null,
+        ];
     }
 
     private function withDownloadMarks(Collection $groups, Collection $marks, string $certType): Collection

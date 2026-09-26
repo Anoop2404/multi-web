@@ -181,6 +181,30 @@ class FestCertificateService
     public function generateParticipationForEvent(FestEvent $event): array
     {
         if ($event->usesPhasedRegionalBilling()) {
+            $event = $event->rootEvent();
+        }
+
+        // Two runs at the same moment (a double click, a publish while someone generates)
+        // would each see "no certificate yet" and both create one -- serialise them per hub.
+        try {
+            $lock = \Illuminate\Support\Facades\Cache::lock('fest-participation-generate:'.$event->id, 300);
+            $acquired = $lock->block(120);
+        } catch (\Illuminate\Contracts\Cache\LockTimeoutException) {
+            return [];
+        } catch (\Throwable) {
+            return $this->generateParticipationUnlocked($event);
+        }
+
+        try {
+            return $this->generateParticipationUnlocked($event);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function generateParticipationUnlocked(FestEvent $event): array
+    {
+        if ($event->usesPhasedRegionalBilling()) {
             // Always issued from the parent (root) event, never per phase/region leg: a
             // participation certificate just lists what someone took part in, so one
             // combined certificate per person spans every leg they entered (unlike winner
@@ -205,22 +229,49 @@ class FestCertificateService
         // (or tenant-wide) participation template, never one item's narrow one.
         $template = $this->resolveTemplate($event, null, 'participation');
 
-        foreach ($this->participationGroupsForEvent($event) as $group) {
+        // What already exists for this hub, per person. A person must only ever end up with
+        // ONE participation certificate: if one exists (anchored on any of their participant
+        // rows -- e.g. from before the anchor shifted, or an earlier per-leg run) it is
+        // re-anchored and reused, keeping its verification QR / rendered files, rather than
+        // creating a second one and leaving the old to be revoked later.
+        $scopeParticipants = FestParticipant::where(function ($q) use ($event) {
+            $q->whereIn('event_id', $event->reportableEventIds())
+                ->orWhereHas('registration', fn ($rq) => $rq->whereIn('event_id', $event->reportableEventIds()));
+        })->get(['id', 'student_id', 'teacher_id']);
+        $existingByParticipant = Certificate::where('entity_type', FestParticipant::class)
+            ->where('cert_type', 'participation')
+            ->whereIn('entity_id', $scopeParticipants->pluck('id'))
+            ->get()
+            ->keyBy('entity_id');
+        $existingByPerson = $scopeParticipants
+            ->filter(fn (FestParticipant $p) => $existingByParticipant->has($p->id))
+            ->groupBy(fn (FestParticipant $p) => self::participationPersonKey($p))
+            ->map(fn (\Illuminate\Support\Collection $g) => $g->map(fn (FestParticipant $p) => $existingByParticipant->get($p->id))->sortBy('id')->values());
+
+        foreach ($this->participationGroupsForEvent($event) as $personKey => $group) {
             $anchor = $group->sortBy('id')->first();
             $currentAnchorIds[] = $anchor->id;
 
-            $cert = Certificate::firstOrCreate(
-                [
-                    'entity_type' => FestParticipant::class,
-                    'entity_id'   => $anchor->id,
-                    'cert_type'   => 'participation',
-                ],
-                [
-                    'template_id'        => $template?->id,
-                    'verification_uuid' => (string) Str::uuid(),
-                    'generated_at'      => now(),
-                ]
-            );
+            $cert = $existingByParticipant->get($anchor->id) ?? $existingByPerson->get($personKey)?->first();
+
+            if ($cert && (int) $cert->entity_id !== (int) $anchor->id) {
+                $cert->update(['entity_id' => $anchor->id]);
+            }
+
+            if (! $cert) {
+                $cert = Certificate::firstOrCreate(
+                    [
+                        'entity_type' => FestParticipant::class,
+                        'entity_id'   => $anchor->id,
+                        'cert_type'   => 'participation',
+                    ],
+                    [
+                        'template_id'        => $template?->id,
+                        'verification_uuid' => (string) Str::uuid(),
+                        'generated_at'      => now(),
+                    ]
+                );
+            }
 
             if ($template && $cert->template_id !== $template->id) {
                 $cert->update(['template_id' => $template->id]);
@@ -1632,6 +1683,17 @@ class FestCertificateService
      * "what a Download covers" never drift apart for the same filters.
      */
     /**
+     * Participation certificates are issued once per person from the parent (root) event of a
+     * phased/regional hub, so a child (phase/region leg) event holds them back: its
+     * certificates pages, exports and Generate button deal in merit certificates only and
+     * point at the parent for participation.
+     */
+    public function holdsParticipation(FestEvent $event): bool
+    {
+        return $event->parent_event_id !== null && $event->usesPhasedRegionalBilling();
+    }
+
+    /**
      * One participation certificate per person, whatever is in the table: a person can end up
      * with two Certificate rows anchored on different FestParticipant rows (e.g. left over
      * from before participation was issued from the parent event, or an anchor that shifted)
@@ -1693,10 +1755,18 @@ class FestCertificateService
             ->when($schoolId, fn ($q) => $q->whereHas('registration', fn ($sq) => $sq->where('school_id', $schoolId)))
             ->pluck('id');
 
+        if ($this->holdsParticipation($event)) {
+            if ($certType === 'participation') {
+                return collect();
+            }
+            $certType = $certType ?: null;
+        }
+
         return $this->dedupeParticipationPerPerson(
             Certificate::where('entity_type', FestParticipant::class)
                 ->whereIn('entity_id', $participantIds)
                 ->when($certType, fn ($q) => $q->where('cert_type', $certType))
+                ->when(! $certType && $this->holdsParticipation($event), fn ($q) => $q->where('cert_type', '!=', 'participation'))
                 ->get()
         );
     }

@@ -8,8 +8,11 @@
             <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/merit`" class="font-semibold text-amber-700 hover:text-amber-900">
                 🏆 Open Merit Certificates workspace →
             </Link>
-            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/participants`" class="font-semibold text-blue-700 hover:text-blue-900">
+            <Link v-if="!participationHeld" :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/participants`" class="font-semibold text-blue-700 hover:text-blue-900">
                 📜 Open Participation Certificates workspace →
+            </Link>
+            <Link v-else :href="participationParentUrl" class="font-semibold text-blue-700 hover:text-blue-900">
+                📜 Participation certificates are issued from the parent event — open them there →
             </Link>
         </div>
 
@@ -43,7 +46,7 @@
                                 🏆 Merit{{ selectedItemId ? ' (item)' : '' }}
                             </button>
                         </div>
-                        <button @click="generateParticipation" class="btn-secondary py-1.5 px-3 text-xs">Participation</button>
+                        <button v-if="!participationHeld" @click="generateParticipation" class="btn-secondary py-1.5 px-3 text-xs">Participation</button>
                     </div>
                 </div>
 
@@ -172,7 +175,7 @@
                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
                     🏫 Merit Winners (Grouped by School)
                 </button>
-                <button @click="activeTab = 'participation_school'"
+                <button v-if="!participationHeld" @click="activeTab = 'participation_school'"
                         class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors"
                         :class="activeTab === 'participation_school'
                             ? 'border-indigo-600 text-indigo-600'
@@ -735,6 +738,8 @@ import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, certificates: Array,
+    participationHeld: { type: Boolean, default: false },
+    participationParentUrl: { type: String, default: null },
     publishedItems: { type: Array, default: () => [] },
     schools: { type: Array, default: () => [] },
     winnersByItem: { type: Array, default: () => [] },

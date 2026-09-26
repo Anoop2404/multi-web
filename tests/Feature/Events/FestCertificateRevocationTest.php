@@ -181,8 +181,11 @@ class FestCertificateRevocationTest extends TestCase
 
         app(FestCertificateService::class)->generateParticipationForEvent($f['event']);
 
-        $this->assertNull(Certificate::find($oldCertificateId), 'The stale anchor\'s certificate must be revoked, not left as a duplicate.');
+        // Exactly one certificate for the person, now at the new anchor. The existing one is
+        // re-anchored rather than revoked and re-issued, so its verification QR (possibly
+        // already printed) keeps working.
         $this->assertSame(1, Certificate::where('cert_type', 'participation')->count(), 'Exactly one certificate for this person, at the new anchor.');
         $this->assertTrue(Certificate::where('entity_id', $rowB->id)->where('cert_type', 'participation')->exists());
+        $this->assertSame($rowB->id, Certificate::find($oldCertificateId)?->entity_id, 'The existing certificate moved to the new anchor instead of being duplicated.');
     }
 }

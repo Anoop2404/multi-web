@@ -92,7 +92,12 @@ class FestCertificateOpsController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $created = app(FestCertificateService::class)->generateParticipationForEvent($event);
+        $service = app(FestCertificateService::class);
+        if ($service->holdsParticipation($event)) {
+            return back()->with('error', 'Participation certificates are issued from the parent event, not from a phase/region event. Open the parent event to generate them.');
+        }
+
+        $created = $service->generateParticipationForEvent($event);
 
         return back()->with('success', count($created).' participation certificate(s) generated.');
     }

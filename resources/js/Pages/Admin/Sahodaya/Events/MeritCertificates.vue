@@ -8,7 +8,7 @@
             <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates`" class="text-gray-500 hover:text-gray-800">
                 ← All certificates
             </Link>
-            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/participants`" class="text-gray-500 hover:text-gray-800">
+            <Link :href="participationParentUrl || `/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/participants`" class="text-gray-500 hover:text-gray-800">
                 Participation certificates →
             </Link>
         </div>
@@ -184,6 +184,7 @@ import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, certificates: Array,
+    participationParentUrl: { type: String, default: null },
     publishedItems: { type: Array, default: () => [] },
     schools: { type: Array, default: () => [] },
     recentBatches: { type: Array, default: () => [] },
