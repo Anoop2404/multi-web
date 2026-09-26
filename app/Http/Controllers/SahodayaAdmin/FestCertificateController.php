@@ -150,11 +150,13 @@ class FestCertificateController extends SahodayaAdminController
         })->pluck('id');
 
         $service = app(FestCertificateService::class);
-        $certificates = Certificate::where('entity_type', FestParticipant::class)
-            ->whereIn('entity_id', $participantIds)
-            ->when($certType, fn ($q) => $q->where('cert_type', $certType))
-            ->orderByDesc('generated_at')
-            ->get();
+        $certificates = $service->dedupeParticipationPerPerson(
+            Certificate::where('entity_type', FestParticipant::class)
+                ->whereIn('entity_id', $participantIds)
+                ->when($certType, fn ($q) => $q->where('cert_type', $certType))
+                ->orderByDesc('generated_at')
+                ->get()
+        );
 
         // Batched instead of one payloadFor() (2 queries each) per row — see
         // FestCertificateService::payloadsFor().

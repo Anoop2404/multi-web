@@ -267,4 +267,30 @@ class FestParticipationCertificateParentTest extends TestCase
         $this->actingAs($admin)->postJson("{$base}/print-complete", [])->assertOk()->assertJsonPath('count', 1);
         $this->assertSame(1, \App\Models\FestCertificateSchoolMark::where('cert_type', 'participation')->count());
     }
+    public function test_a_student_with_two_certificate_rows_is_listed_and_exported_once_and_the_command_cleans_up(): void
+    {
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $f = $this->fixture();
+        $service = app(FestCertificateService::class);
+        $service->generateParticipationForEvent($f['root']);
+
+        // Leftover: a second participation certificate for the same student, anchored on the
+        // other leg's participant row.
+        $other = FestParticipant::where('student_id', $f['student']->id)->orderByDesc('id')->first();
+        Certificate::create(['entity_type' => FestParticipant::class, 'entity_id' => $other->id, 'cert_type' => 'participation', 'verification_uuid' => (string) Str::uuid(), 'generated_at' => now()]);
+        $this->assertSame(2, Certificate::where('cert_type', 'participation')->count());
+
+        $admin = \App\Models\User::factory()->create(['tenant_id' => $f['root']->tenant_id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+        $rows = $this->actingAs($admin)->get(route('sahodaya.events.certificates.index', ['tenantId' => $f['root']->tenant_id, 'event' => $f['root']->id]))
+            ->viewData('page')['props']['certificates'];
+        $this->assertCount(1, $rows, 'listed once');
+        $this->assertCount(1, $service->exportScope($f['root'], certType: 'participation')[0], 'exported/printed once');
+
+        $this->artisan('fest:participation-duplicates', ['event' => $f['root']->id])->assertSuccessful();
+        $this->assertSame(2, Certificate::where('cert_type', 'participation')->count(), 'report only, nothing removed');
+
+        $this->artisan('fest:participation-duplicates', ['event' => $f['root']->id, '--fix' => true])->assertSuccessful();
+        $this->assertSame(1, Certificate::where('cert_type', 'participation')->count());
+    }
 }

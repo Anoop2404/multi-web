@@ -1631,6 +1631,46 @@ class FestCertificateService
      * export job (BuildCertificateZipJob), so "what a Generate/Render run covers" and
      * "what a Download covers" never drift apart for the same filters.
      */
+    /**
+     * One participation certificate per person, whatever is in the table: a person can end up
+     * with two Certificate rows anchored on different FestParticipant rows (e.g. left over
+     * from before participation was issued from the parent event, or an anchor that shifted)
+     * until the next Generate revokes the extra. Lists and exports must never show or print
+     * both -- keeps the row on the lowest participant id per person and drops the rest.
+     * Winner certificates are untouched.
+     *
+     * @param  \Illuminate\Support\Collection<int, Certificate>  $certificates
+     * @return array{0: \Illuminate\Support\Collection<int, Certificate>, 1: \Illuminate\Support\Collection<int, Certificate>} [kept, duplicates]
+     */
+    public function splitParticipationDuplicates(\Illuminate\Support\Collection $certificates): array
+    {
+        $participation = $certificates->where('cert_type', 'participation');
+        if ($participation->count() < 2) {
+            return [$certificates->values(), collect()];
+        }
+
+        $participants = FestParticipant::whereIn('id', $participation->pluck('entity_id'))
+            ->get(['id', 'student_id', 'teacher_id'])
+            ->keyBy('id');
+
+        $duplicateIds = $participation
+            ->groupBy(fn (Certificate $c) => $participants->has($c->entity_id)
+                ? self::participationPersonKey($participants->get($c->entity_id))
+                : 'orphan:'.$c->id)
+            ->flatMap(fn (\Illuminate\Support\Collection $group) => $group->sortBy('entity_id')->slice(1)->pluck('id'))
+            ->flip();
+
+        return [
+            $certificates->reject(fn (Certificate $c) => $duplicateIds->has($c->id))->values(),
+            $certificates->filter(fn (Certificate $c) => $duplicateIds->has($c->id))->values(),
+        ];
+    }
+
+    public function dedupeParticipationPerPerson(\Illuminate\Support\Collection $certificates): \Illuminate\Support\Collection
+    {
+        return $this->splitParticipationDuplicates($certificates)[0];
+    }
+
     public function resolveCertificateScope(
         FestEvent $event,
         ?int $itemId = null,
@@ -1653,10 +1693,12 @@ class FestCertificateService
             ->when($schoolId, fn ($q) => $q->whereHas('registration', fn ($sq) => $sq->where('school_id', $schoolId)))
             ->pluck('id');
 
-        return Certificate::where('entity_type', FestParticipant::class)
-            ->whereIn('entity_id', $participantIds)
-            ->when($certType, fn ($q) => $q->where('cert_type', $certType))
-            ->get();
+        return $this->dedupeParticipationPerPerson(
+            Certificate::where('entity_type', FestParticipant::class)
+                ->whereIn('entity_id', $participantIds)
+                ->when($certType, fn ($q) => $q->where('cert_type', $certType))
+                ->get()
+        );
     }
 
     /**
