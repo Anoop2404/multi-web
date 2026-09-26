@@ -747,8 +747,10 @@ class TenantStorage
 
         // For storage-relative paths, delegate to the existing method (handles local + all disks).
         // Background artwork is commonly supplied as a colour-managed CMYK JPEG. GD
-        // does not preserve that profile while resizing and can turn muted pinks into
-        // neon magenta, so keep those original bytes for the PDF renderer.
+        // does not preserve that profile while resizing, while Chromium's PDF writer
+        // may embed the untouched JPEG as DeviceCMYK and turn muted pinks into neon
+        // magenta. The PDF-only path therefore uses an ICC-converted sRGB replacement
+        // for known artwork and otherwise keeps unknown CMYK bytes untouched.
         if (! str_starts_with($path, 'http://') && ! str_starts_with($path, 'https://')) {
             return self::photoBase64DataUri($tenant, $path, $maxDimension, preserveCmykJpeg: true);
         }
@@ -830,18 +832,22 @@ class TenantStorage
         bool $preserveCmykJpeg = false,
     ): ?array
     {
-        if (! function_exists('imagecreatefromstring') || $contents === '') {
+        if ($contents === '') {
+            return null;
+        }
+
+        if ($preserveCmykJpeg) {
+            $imageInfo = @getimagesizefromstring($contents);
+            if (($imageInfo['mime'] ?? null) === 'image/jpeg' && ($imageInfo['channels'] ?? null) === 4) {
+                return self::knownSrgbBackgroundReplacement($contents);
+            }
+        }
+
+        if (! function_exists('imagecreatefromstring')) {
             return null;
         }
 
         try {
-            if ($preserveCmykJpeg) {
-                $imageInfo = @getimagesizefromstring($contents);
-                if (($imageInfo['mime'] ?? null) === 'image/jpeg' && ($imageInfo['channels'] ?? null) === 4) {
-                    return null;
-                }
-            }
-
             $src = @imagecreatefromstring($contents);
             if (! $src) {
                 return null;
@@ -877,6 +883,34 @@ class TenantStorage
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /**
+     * Return a pre-converted sRGB version of known CMYK print artwork.
+     *
+     * Runtime GD cannot perform an ICC-aware CMYK conversion. Keeping these small,
+     * reviewed replacements beside their source assets makes the PDF result
+     * deterministic even on production hosts without Imagick/ColorSync.
+     *
+     * @return array{0: string, 1: string}|null [contents, mime]
+     */
+    private static function knownSrgbBackgroundReplacement(string $contents): ?array
+    {
+        $replacementByHash = [
+            'cc3a122ae1d211c04bb2636e5d86c450eb5d026d2641defd4a5cecf7bc931855'
+                => database_path('seeders/assets/id-card-templates/kalotsav-student-id-template-2-srgb.jpg'),
+        ];
+
+        $replacementPath = $replacementByHash[hash('sha256', $contents)] ?? null;
+        if (! $replacementPath || ! is_file($replacementPath)) {
+            return null;
+        }
+
+        $replacement = @file_get_contents($replacementPath);
+
+        return is_string($replacement) && $replacement !== ''
+            ? [$replacement, 'image/jpeg']
+            : null;
     }
 
     public static function localAbsolutePath(?Tenant $tenant, ?string $relativePath): ?string

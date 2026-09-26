@@ -189,7 +189,7 @@ class IdCardTemplatePresetInstaller
                 'description' => 'Purple and pink portrait card with a compact participant-information panel.',
                 'audience' => 'student',
                 'is_active' => false,
-                'background_asset' => 'kalotsav-student-id-template-2.jpg',
+                'background_asset' => 'kalotsav-student-id-template-2-srgb.jpg',
                 'background_filename' => 'kalotsav-student-id-template-2.jpg',
                 'card_width_mm' => 89,
                 'card_height_mm' => 135,

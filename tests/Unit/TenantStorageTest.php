@@ -10,7 +10,7 @@ use Tests\TestCase;
 
 class TenantStorageTest extends TestCase
 {
-    public function test_cmyk_background_keeps_its_profile_when_embedded_for_pdf(): void
+    public function test_known_cmyk_background_is_color_managed_to_srgb_for_pdf(): void
     {
         $tenant = new Tenant(['id' => (string) Str::uuid()]);
         $relative = "sahodaya/{$tenant->id}/id-card-templates/backgrounds/cmyk-card.jpg";
@@ -26,10 +26,11 @@ class TenantStorageTest extends TestCase
             $this->assertStringStartsWith('data:image/jpeg;base64,', $dataUri);
             $embedded = base64_decode(substr($dataUri, strpos($dataUri, ',') + 1), true);
             $this->assertNotFalse($embedded);
-            $this->assertSame(hash_file('sha256', $source), hash('sha256', $embedded));
+            $srgb = database_path('seeders/assets/id-card-templates/kalotsav-student-id-template-2-srgb.jpg');
+            $this->assertSame(hash_file('sha256', $srgb), hash('sha256', $embedded));
 
             $imageInfo = getimagesizefromstring($embedded);
-            $this->assertSame(4, $imageInfo['channels'] ?? null);
+            $this->assertSame(3, $imageInfo['channels'] ?? null);
             $this->assertSame(1654, $imageInfo[1] ?? null);
         } finally {
             @unlink($stored);
