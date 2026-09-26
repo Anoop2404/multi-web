@@ -183,7 +183,7 @@ class StateRemittanceController extends Controller
         $disk = config('filesystems.upload_disk', 'shared');
 
         if (in_array($disk, ['s3', 'private'], true)) {
-            return redirect(Storage::disk($disk)->temporaryUrl($remittance->proof_path, now()->addMinutes(15)));
+            return redirect(\App\Support\TenantStorage::privateTemporaryUrl($disk, $remittance->proof_path, now()->addMinutes(15)));
         }
 
         return Storage::disk($disk)->download($remittance->proof_path);

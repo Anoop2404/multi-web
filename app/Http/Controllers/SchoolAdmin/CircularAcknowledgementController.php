@@ -51,7 +51,7 @@ class CircularAcknowledgementController extends SchoolAdminController
         }
 
         if ($disk === 's3' || $disk === 'private') {
-            $url = Storage::disk($disk)->temporaryUrl($circular->file_path, now()->addMinutes(15));
+            $url = \App\Support\TenantStorage::privateTemporaryUrl($disk, $circular->file_path, now()->addMinutes(15));
             return redirect($url);
         }
 

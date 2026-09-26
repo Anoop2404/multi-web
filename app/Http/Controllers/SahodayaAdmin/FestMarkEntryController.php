@@ -2063,7 +2063,7 @@ class FestMarkEntryController extends SahodayaAdminController
 
         $disk = config('filesystems.upload_disk', 'shared');
         if (in_array($disk, ['s3', 'private'], true)) {
-            return redirect(\Illuminate\Support\Facades\Storage::disk($disk)->temporaryUrl($upload->file_path, now()->addMinutes(15)));
+            return redirect(TenantStorage::privateTemporaryUrl($disk, $upload->file_path, now()->addMinutes(15)));
         }
 
         return TenantStorage::downloadResponse($this->sahodaya, $upload->file_path);

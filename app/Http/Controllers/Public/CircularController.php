@@ -45,7 +45,7 @@ class CircularController extends Controller
         $circular->increment('download_count');
 
         if ($disk === 's3' || $disk === 'private') {
-            return redirect(Storage::disk($disk)->temporaryUrl($circular->file_path, now()->addMinutes(15)));
+            return redirect(\App\Support\TenantStorage::privateTemporaryUrl($disk, $circular->file_path, now()->addMinutes(15)));
         }
 
         return Storage::disk($disk)->download($circular->file_path);

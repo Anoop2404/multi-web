@@ -131,4 +131,82 @@ class TenantStorageCloudFrontTest extends TestCase
         $this->assertNotInstanceOf(RedirectResponse::class, $response);
         $this->assertSame(200, $response->getStatusCode());
     }
+
+    /** assetUrl()'s S3 existence check, answered from the cache so no network call is made. */
+    private function rememberOnS3(string $path): void
+    {
+        \Illuminate\Support\Facades\Cache::put('tenant-storage:s3-exists:'.sha1($path), true, 3600);
+    }
+
+    public function test_logos_get_the_stable_public_cloudfront_address(): void
+    {
+        config(['filesystems.disks.s3.public_url' => 'https://dpublic456.cloudfront.net', 'filesystems.disks.s3.url' => 'https://dpublic456.cloudfront.net']);
+        Storage::forgetDisk('s3');
+        $this->rememberOnS3('logos/t1/logo.jpg');
+
+        $first = TenantStorage::assetUrl(null, 'logos/t1/logo.jpg');
+
+        $this->assertSame('https://dpublic456.cloudfront.net/domains/logos/t1/logo.jpg', $first);
+        $this->assertSame($first, TenantStorage::assetUrl(null, 'logos/t1/logo.jpg'), 'Stable across renders, so browsers and CloudFront cache it.');
+    }
+
+    public function test_other_s3_images_get_a_signed_cloudfront_url_that_stays_the_same_across_renders(): void
+    {
+        $this->configureCloudFront();
+        $this->rememberOnS3('certificate-templates/bg.png');
+
+        $first = TenantStorage::assetUrl(null, 'certificate-templates/bg.png');
+
+        $this->assertStringStartsWith('https://dprivate123.cloudfront.net/domains/certificate-templates/bg.png?Expires='.TenantStorage::cacheableCloudFrontExpiry(), $first);
+        $this->assertSame($first, TenantStorage::assetUrl(null, 'certificate-templates/bg.png'));
+        $this->assertGreaterThanOrEqual(time() + 86400, TenantStorage::cacheableCloudFrontExpiry(), 'Must outlive a cached public page.');
+    }
+
+    public function test_without_cloudfront_other_s3_images_keep_their_presigned_s3_url(): void
+    {
+        $this->rememberOnS3('certificate-templates/bg.png');
+
+        $url = TenantStorage::assetUrl(null, 'certificate-templates/bg.png');
+
+        $this->assertStringContainsString('test-bucket', $url);
+        $this->assertStringContainsString('X-Amz-Signature=', $url);
+    }
+
+    public function test_download_response_redirects_s3_images_with_the_cacheable_link_and_documents_with_the_short_one(): void
+    {
+        Storage::fake('s3');
+        Storage::disk('s3')->put('news/photo.jpg', 'jpg');
+        Storage::disk('s3')->put('receipts/proof.pdf', 'pdf');
+        $this->configureCloudFront();
+        $tenant = new \App\Models\Tenant;
+
+        $image = TenantStorage::downloadResponse($tenant, 'news/photo.jpg');
+        $this->assertInstanceOf(RedirectResponse::class, $image);
+        $this->assertStringContainsString('Expires='.TenantStorage::cacheableCloudFrontExpiry(), $image->getTargetUrl());
+
+        $document = TenantStorage::downloadResponse($tenant, 'receipts/proof.pdf');
+        $this->assertInstanceOf(RedirectResponse::class, $document);
+        parse_str(parse_url($document->getTargetUrl(), PHP_URL_QUERY), $params);
+        $this->assertLessThanOrEqual(time() + 601, (int) $params['Expires']);
+    }
+
+    public function test_download_response_still_streams_without_cloudfront(): void
+    {
+        Storage::fake('s3');
+        Storage::disk('s3')->put('news/photo.jpg', 'jpg');
+
+        $response = TenantStorage::downloadResponse(new \App\Models\Tenant, 'news/photo.jpg');
+
+        $this->assertNotInstanceOf(RedirectResponse::class, $response);
+        $this->assertSame(200, $response->getStatusCode());
+    }
+
+    public function test_private_temporary_url_prefers_cloudfront_and_falls_back_to_the_disk(): void
+    {
+        $this->assertStringContainsString('X-Amz-Signature=', TenantStorage::privateTemporaryUrl('s3', 'circulars/c.pdf', now()->addMinutes(15)));
+
+        $this->configureCloudFront();
+        $url = TenantStorage::privateTemporaryUrl('s3', 'circulars/c.pdf', now()->addMinutes(15));
+        $this->assertStringStartsWith('https://dprivate123.cloudfront.net/domains/circulars/c.pdf?Expires=', $url);
+    }
 }

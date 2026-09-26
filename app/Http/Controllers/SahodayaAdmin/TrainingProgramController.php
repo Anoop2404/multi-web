@@ -686,7 +686,7 @@ class TrainingProgramController extends SahodayaAdminController
 
         $disk = config('filesystems.upload_disk', 'shared');
         if (in_array($disk, ['s3', 'private'], true)) {
-            return redirect(Storage::disk($disk)->temporaryUrl($path, now()->addMinutes(15)));
+            return redirect(TenantStorage::privateTemporaryUrl($disk, $path, now()->addMinutes(15)));
         }
 
         return TenantStorage::downloadResponse($this->sahodaya, $path);
@@ -1100,7 +1100,7 @@ class TrainingProgramController extends SahodayaAdminController
 
         $disk = config('filesystems.upload_disk', 'shared');
         if (in_array($disk, ['s3', 'private'], true)) {
-            return redirect(Storage::disk($disk)->temporaryUrl($path, now()->addMinutes(15)));
+            return redirect(TenantStorage::privateTemporaryUrl($disk, $path, now()->addMinutes(15)));
         }
 
         return TenantStorage::downloadResponse($this->sahodaya, $path);

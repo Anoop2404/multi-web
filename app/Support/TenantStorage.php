@@ -181,7 +181,7 @@ class TenantStorage
      * (a re-rendered certificate keeps its key), and an origin request policy forwarding
      * the response-content-disposition query string (download filename / inline view).
      */
-    public static function cloudFrontSignedUrl(string $relativePath, ?string $filename = null, bool $inline = false, ?int $ttlSeconds = null): ?string
+    public static function cloudFrontSignedUrl(string $relativePath, ?string $filename = null, bool $inline = false, ?int $ttlSeconds = null, ?int $expiresAt = null): ?string
     {
         if (! self::cloudFrontConfigured()) {
             return null;
@@ -210,12 +210,84 @@ class TenantStorage
 
             $signer = new \Aws\CloudFront\UrlSigner((string) $config['key_pair_id'], (string) $config['private_key_path']);
 
-            return $signer->getSignedUrl($url, time() + max(60, $ttlSeconds ?? (int) ($config['ttl'] ?? 600)));
+            return $signer->getSignedUrl($url, $expiresAt ?? time() + max(60, $ttlSeconds ?? (int) ($config['ttl'] ?? 600)));
         } catch (\Throwable $e) {
             Log::warning('CloudFront signed URL failed; streaming the file instead: '.$e->getMessage());
 
             return null;
         }
+    }
+
+    /**
+     * Expiry for signed CloudFront URLs embedded in pages (images): aligned to 12-hour
+     * windows, so the URL stays identical across page views within a window and browsers
+     * can cache the image, and always at least 24 h away — longer than Cloudflare keeps a
+     * cached public page (1 h, plus up to a day stale-while-revalidate).
+     */
+    public static function cacheableCloudFrontExpiry(): int
+    {
+        return (intdiv(time(), 43200) + 3) * 43200;
+    }
+
+    /**
+     * A browser URL for a private file: a signed CloudFront URL when $disk is S3 and
+     * CloudFront is configured, otherwise the disk's own temporaryUrl() — the drop-in for
+     * the controllers that redirect to Storage::disk($disk)->temporaryUrl(...).
+     */
+    public static function privateTemporaryUrl(string $disk, string $relativePath, \DateTimeInterface $expiresAt): string
+    {
+        if ($disk === 's3' && ($url = self::cloudFrontSignedUrl($relativePath, null, true, max(60, $expiresAt->getTimestamp() - time())))) {
+            return $url;
+        }
+
+        return Storage::disk($disk)->temporaryUrl($relativePath, $expiresAt);
+    }
+
+    /**
+     * Browser URL for a file on S3 that's embedded in a page (assetUrl()). Logos — on
+     * every page, including Cloudflare-cached public ones — get the stable public
+     * CloudFront address when AWS_PUBLIC_URL is set (cacheable, never expires; the
+     * distribution must keep domains/logos/* public). Anything else: a cacheable signed
+     * CloudFront URL when configured, else a presigned S3 URL as before. A fresh 2-hour
+     * presigned S3 URL per render meant every page view re-downloaded the logo from S3,
+     * and a cached public page could outlive its link.
+     */
+    private static function embeddedS3Url(string $relativePath): string
+    {
+        $storage = Storage::disk('s3');
+
+        if (str_starts_with($relativePath, 'logos/') && filled(config('filesystems.disks.s3.public_url'))) {
+            return $storage->url($relativePath);
+        }
+
+        if ($url = self::cloudFrontSignedUrl($relativePath, null, true, null, self::cacheableCloudFrontExpiry())) {
+            return $url;
+        }
+
+        try {
+            return $storage->temporaryUrl($relativePath, now()->addHours(2));
+        } catch (\Throwable) {
+            return $storage->url($relativePath);
+        }
+    }
+
+    /**
+     * exists() on S3, remembered — assetUrl() runs on every page render and stored file
+     * names are unique (a replaced logo gets a new name), so a HEAD request to S3 per
+     * render bought nothing. A miss is only remembered briefly.
+     */
+    private static function rememberedExistsOnS3(string $relativePath): bool
+    {
+        $key = 'tenant-storage:s3-exists:'.sha1($relativePath);
+        $cached = Cache::get($key);
+        if (is_bool($cached)) {
+            return $cached;
+        }
+
+        $exists = Storage::disk('s3')->exists($relativePath);
+        Cache::put($key, $exists, $exists ? now()->addHours(6) : now()->addMinutes(5));
+
+        return $exists;
     }
 
     /** Copy cloud object to a local temp path for batch processing (imports). */
@@ -345,16 +417,12 @@ class TenantStorage
 
             try {
                 $storage = Storage::disk($disk);
-                if (! $storage->exists($relativePath)) {
+                if (! ($disk === 's3' ? self::rememberedExistsOnS3($relativePath) : $storage->exists($relativePath))) {
                     continue;
                 }
 
                 if ($disk === 's3') {
-                    try {
-                        return $storage->temporaryUrl($relativePath, now()->addHours(2));
-                    } catch (\Throwable) {
-                        return $storage->url($relativePath);
-                    }
+                    return self::embeddedS3Url($relativePath);
                 }
 
                 if ($disk === self::SHARED_DISK && $localServeUrl) {
@@ -460,13 +528,24 @@ class TenantStorage
         }
     }
 
-    public static function downloadResponse(Tenant $tenant, string $relativePath): BinaryFileResponse|StreamedResponse|Response
+    public static function downloadResponse(Tenant $tenant, string $relativePath): BinaryFileResponse|StreamedResponse|Response|RedirectResponse
     {
         $relativePath = ltrim($relativePath, '/');
 
         foreach (self::downloadDisks() as $disk) {
             try {
                 if (self::disk($disk)->exists($relativePath)) {
+                    // On S3 with CloudFront configured: redirect to a signed CloudFront URL
+                    // instead of streaming the file through this server (images get the
+                    // browser-cacheable long link, documents the short default one).
+                    if ($disk === 's3') {
+                        $isImage = (bool) preg_match('/\.(jpe?g|png|gif|webp|svg|avif)$/i', $relativePath);
+                        $url = self::cloudFrontSignedUrl($relativePath, null, true, null, $isImage ? self::cacheableCloudFrontExpiry() : null);
+                        if ($url) {
+                            return redirect()->away($url);
+                        }
+                    }
+
                     return self::disk($disk)->response($relativePath);
                 }
             } catch (\Throwable) {
