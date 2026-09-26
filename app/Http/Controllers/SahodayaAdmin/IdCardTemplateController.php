@@ -57,7 +57,7 @@ class IdCardTemplateController extends SahodayaAdminController
             'fontFamilyOptions'  => CertificateTemplate::fontFamilyOptions(),
             'defaultFields'      => IdCardTemplate::defaultFields(),
             'templatePresets'    => $presetInstaller->options(),
-            'diePresets'         => IdCardDiePreset::options(),
+            'diePresets'         => IdCardDiePreset::optionsForTenant((string) $this->sahodaya->id),
         ]);
     }
 

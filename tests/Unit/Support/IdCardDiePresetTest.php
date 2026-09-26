@@ -36,4 +36,13 @@ class IdCardDiePresetTest extends TestCase
         $this->assertEqualsWithDelta(466.3, $lastCardRight, 0.0001);
         $this->assertEqualsWithDelta(305.1, $lastCardBottom, 0.0001);
     }
+
+    public function test_badge_die_is_available_only_to_kochi_metro_sahodaya(): void
+    {
+        $this->assertCount(
+            1,
+            IdCardDiePreset::optionsForTenant('b7f9b005-9f08-4833-8c02-8767a440ad01'),
+        );
+        $this->assertSame([], IdCardDiePreset::optionsForTenant('another-sahodaya'));
+    }
 }

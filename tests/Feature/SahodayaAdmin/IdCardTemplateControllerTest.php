@@ -155,7 +155,7 @@ class IdCardTemplateControllerTest extends TestCase
         $this->seed(RolesAndPermissionsSeeder::class);
 
         $sahodaya = Tenant::create([
-            'id' => (string) Str::uuid(),
+            'id' => 'b7f9b005-9f08-4833-8c02-8767a440ad01',
             'type' => 'sahodaya',
             'name' => 'Die Test Sahodaya',
             'subdomain' => 'die-test',
@@ -204,5 +204,33 @@ class IdCardTemplateControllerTest extends TestCase
         $preview->assertSee('left: 16.3mm; top: 25.1mm;', false);
         $preview->assertSee('left: 376.3mm; top: 165.1mm;', false);
         $this->assertSame(10, substr_count($preview->getContent(), 'class="die-card-slot"'));
+    }
+
+    public function test_other_sahodayas_do_not_receive_the_customer_specific_die(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'Other Sahodaya',
+            'subdomain' => 'other-die-test',
+            'is_active' => true,
+        ]);
+
+        $admin = User::factory()->create([
+            'tenant_id' => $sahodaya->id,
+            'email_verified_at' => now(),
+        ]);
+        $admin->assignRole('sahodaya_admin');
+
+        if (TenancyDatabase::enabled()) {
+            TenancyDatabase::initializeForTenant($sahodaya);
+        }
+
+        $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/id-card-templates")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('diePresets', []));
     }
 }

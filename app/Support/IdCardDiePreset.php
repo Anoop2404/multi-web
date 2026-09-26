@@ -4,6 +4,16 @@ namespace App\Support;
 
 final class IdCardDiePreset
 {
+    private const KOCHI_METRO_SAHODAYA_ID = 'b7f9b005-9f08-4833-8c02-8767a440ad01';
+
+    /** @return list<array<string, mixed>> */
+    public static function optionsForTenant(string $tenantId): array
+    {
+        return $tenantId === self::KOCHI_METRO_SAHODAYA_ID
+            ? self::options()
+            : [];
+    }
+
     /**
      * Measured physical sheet layouts that can be applied to an individual
      * ID-card template without changing its artwork or field arrangement.
