@@ -74,6 +74,10 @@ class RenderContinuousDieIdCardsJobTest extends TestCase
         $status = TenantSetting::where('tenant_id', $sahodaya->id)->where('key', "fest_die_render_event_{$event->id}")->first()?->value;
         $this->assertSame('completed', $status['status'] ?? null, $status['error'] ?? 'no status');
         $this->assertSame(2, $status['total_chunks']);
+        $this->assertMatchesRegularExpression(
+            '#/id-cards/die/full-continuous-run-[a-f0-9]{16}\.pdf$#',
+            $status['file_path'],
+        );
         Http::assertSentCount(2);
 
         $merged = Storage::disk(TenantStorage::SHARED_DISK)->get($status['file_path']);

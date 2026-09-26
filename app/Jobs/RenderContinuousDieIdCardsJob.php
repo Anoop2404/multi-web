@@ -190,7 +190,13 @@ class RenderContinuousDieIdCardsJob implements ShouldQueue
                 $finalPdfBytes = $this->mergePdfChunks($pdfChunksBytes);
             }
 
-            $s3Path = "sahodaya/{$tenant->id}/events/{$event->id}/id-cards/die/full-continuous-run.pdf";
+            // Use a content-versioned object key. Overwriting the former fixed
+            // full-continuous-run.pdf key left CloudFront free to serve its cached
+            // copy after a regeneration (including after colour-profile fixes).
+            // A changed PDF now always gets a changed URL, while identical bytes
+            // naturally reuse the same safe cache entry.
+            $contentVersion = substr(hash('sha256', $finalPdfBytes), 0, 16);
+            $s3Path = "sahodaya/{$tenant->id}/events/{$event->id}/id-cards/die/full-continuous-run-{$contentVersion}.pdf";
 
             // 1. Always save to local shared storage first so it is guaranteed present on the server
             try {
