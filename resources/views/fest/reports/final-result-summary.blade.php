@@ -18,10 +18,9 @@
         table.data th.school-col { text-align: left; }
         table.data td { border: 1px solid #cbd5e1; padding: 0 14px; height: 46px; font-size: 15px; text-align: center; }
         table.data td.school-col { text-align: left; font-weight: bold; }
-        table.data td.total-col { background: #c8d6ea; color: #1d3557; font-weight: bold; font-size: 16px; }
+        table.data td.total-col { font-weight: bold; font-size: 16px; }
         table.data td.rank-col { font-weight: bold; font-size: 16px; }
         table.data tr.rank-1 td { background: #fef3c7; }
-        table.data tr.rank-1 td.total-col { background: #fde68a; }
         .footer { margin-top: 14px; padding-top: 6px; border-top: 1px solid #cbd5e1; font-size: 8.5px; color: #64748b; }
         .empty { text-align: center; padding: 18px; color: #64748b; font-size: 13px; }
     </style>

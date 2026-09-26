@@ -12,9 +12,8 @@
     td { border-bottom: 1px solid #cbd5e1; padding: 0 8px; height: 28px; font-size: 11.5px; text-align: center; }
     td.school { text-align: left; font-weight: bold; }
     th.school { text-align: left; }
-    td.pts { background: #c8d6ea; font-weight: bold; color: #1d3557; }
+    td.pts { font-weight: bold; }
     tr.top3 td { font-weight: bold; background: #fef9e7; }
-    tr.top3 td.pts { background: #f5e6a8; }
 </style>
 </head><body>
 @if($isDomPdf ?? true)
