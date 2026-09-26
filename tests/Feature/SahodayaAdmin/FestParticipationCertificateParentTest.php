@@ -248,6 +248,12 @@ class FestParticipationCertificateParentTest extends TestCase
         $this->assertStringContainsString('&plain=1', $run->json('print_url_plain'));
         $this->assertStringNotContainsString('plain', $run->json('print_url_with_background'));
         $this->actingAs($admin)->get($run->json('print_url_plain'))->assertOk();
+
+        // Reprint: the already-printed student can be printed again (either variant), one school or all.
+        $this->actingAs($admin)->get("{$base}/print-all?reprint=1&school_id={$school->id}")->assertOk();
+        $this->actingAs($admin)->get("{$base}/print-all?reprint=1&plain=1")->assertOk();
+        $this->actingAs($admin)->get("{$base}/print-all?reprint=1&school_id=no-such-school")->assertNotFound();
+        $this->assertSame(1, \App\Models\FestCertificatePrint::count(), 'reprinting changes no printed marks');
         $this->assertSame(1, \App\Models\FestCertificatePrint::count());
         $this->assertSame(0, \App\Models\FestCertificateSchoolMark::count(), 'a school with a pending student is not auto-ticked');
 

@@ -1273,6 +1273,18 @@ class FestCertificateController extends SahodayaAdminController
             ? array_filter(array_map('intval', explode(',', (string) $request->query('certificate_ids'))))
             : null;
 
+        // Reprint: every student already sent to print by a "Print complete students" run
+        // (optionally one school), e.g. to print again on another paper or without the
+        // background. Changes no printed marks.
+        if ($request->boolean('reprint')) {
+            $reprint = FestCertificatePrint::whereIn('event_id', $event->rootEvent()->reportableEventIds())
+                ->when($request->query('school_id'), fn ($q, $school) => $q->where('school_id', (string) $school))
+                ->pluck('certificate_id');
+            abort_if($reprint->isEmpty(), 404, 'No printed students to reprint.');
+            $certIds = $reprint->map(fn ($id) => (int) $id)->all();
+            $certType = 'participation';
+        }
+
         // A "Print complete students" run: print exactly the certificates it recorded.
         if ($run = $request->query('run')) {
             $runRows = FestCertificatePrint::where('run_uuid', (string) $run)->get(['certificate_id', 'event_id']);

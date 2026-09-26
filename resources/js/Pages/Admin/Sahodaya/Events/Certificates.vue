@@ -401,16 +401,24 @@
                     <p class="text-xs text-gray-500">One certificate per student, listing every item they took part in — organized by school for distribution.</p>
                 </div>
                 <div v-if="participationBySchool.length" class="flex flex-wrap items-center gap-2 shrink-0">
-                    <details v-if="totalReadyToPrint" class="relative">
+                    <details v-if="totalReadyToPrint || totalPrinted" class="relative">
                         <summary class="btn-primary py-1.5 px-3 text-xs inline-flex list-none cursor-pointer [&::-webkit-details-marker]:hidden"
-                                 title="Prints every student (all schools) whose items all have published results and who was not printed before, marks them printed, and opens a per-school report sheet">
-                            🖨️ Print complete students — all schools ({{ totalReadyToPrint }}) ▾
+                                 title="Print every student (all schools) whose items all have published results and who was not printed before — or reprint the ones already printed">
+                            🖨️ {{ totalReadyToPrint ? `Print complete students — all schools (${totalReadyToPrint})` : `Reprint printed — all schools (${totalPrinted})` }} ▾
                         </summary>
-                        <div class="absolute z-20 right-0 mt-1 w-60 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left text-xs">
-                            <button @click="printComplete(null, false, $event)" :disabled="printingComplete"
-                                    class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🖨️ With background</button>
-                            <button @click="printComplete(null, true, $event)" :disabled="printingComplete"
-                                    class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🖨️ Without background (plain)</button>
+                        <div class="absolute z-20 right-0 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left text-xs">
+                            <template v-if="totalReadyToPrint">
+                                <p class="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">Print complete ({{ totalReadyToPrint }}) — marks them printed</p>
+                                <button @click="printComplete(null, false, $event)" :disabled="printingComplete"
+                                        class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🖨️ With background</button>
+                                <button @click="printComplete(null, true, $event)" :disabled="printingComplete"
+                                        class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🖨️ Without background (plain)</button>
+                            </template>
+                            <template v-if="totalPrinted">
+                                <p class="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">Reprint printed ({{ totalPrinted }})</p>
+                                <a :href="reprintUrl(null, false)" target="_blank" rel="noopener" class="block px-3 py-2 rounded hover:bg-gray-50">🔁 Reprint with background ↗</a>
+                                <a :href="reprintUrl(null, true)" target="_blank" rel="noopener" class="block px-3 py-2 rounded hover:bg-gray-50">🔁 Reprint without background ↗</a>
+                            </template>
                         </div>
                     </details>
                 <details class="relative shrink-0">
@@ -523,16 +531,24 @@
                             </label>
                             <a :href="statusUrl('pdf', { preview: 1, school_id: group.school_id })" target="_blank" rel="noopener"
                                class="font-semibold text-slate-600 hover:text-slate-800" title="This school's students with printed / ready / awaiting status">📋 List</a>
-                            <details v-if="readyToPrint(group)" class="relative">
+                            <details v-if="readyToPrint(group) || printedCount(group)" class="relative">
                                 <summary class="font-semibold text-emerald-700 hover:text-emerald-900 inline-flex items-center gap-1 list-none cursor-pointer [&::-webkit-details-marker]:hidden"
-                                         title="Prints only the students whose every item has published results, and marks them printed">
-                                    🖨️ Print complete ({{ readyToPrint(group) }}) ▾
+                                         title="Print students whose every item has published results, or reprint the ones already printed">
+                                    🖨️ {{ readyToPrint(group) ? `Print complete (${readyToPrint(group)})` : `Reprint (${printedCount(group)})` }} ▾
                                 </summary>
-                                <div class="absolute z-20 right-0 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
-                                    <button @click="printComplete(group.school_id, false, $event)" :disabled="printingComplete"
-                                            class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🖨️ With background</button>
-                                    <button @click="printComplete(group.school_id, true, $event)" :disabled="printingComplete"
-                                            class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🖨️ Without background (plain)</button>
+                                <div class="absolute z-20 right-0 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
+                                    <template v-if="readyToPrint(group)">
+                                        <p class="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">Print complete ({{ readyToPrint(group) }}) — marks them printed</p>
+                                        <button @click="printComplete(group.school_id, false, $event)" :disabled="printingComplete"
+                                                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🖨️ With background</button>
+                                        <button @click="printComplete(group.school_id, true, $event)" :disabled="printingComplete"
+                                                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🖨️ Without background (plain)</button>
+                                    </template>
+                                    <template v-if="printedCount(group)">
+                                        <p class="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">Reprint printed ({{ printedCount(group) }})</p>
+                                        <a :href="reprintUrl(group.school_id, false)" target="_blank" rel="noopener" class="block px-3 py-2 rounded hover:bg-gray-50">🔁 Reprint with background ↗</a>
+                                        <a :href="reprintUrl(group.school_id, true)" target="_blank" rel="noopener" class="block px-3 py-2 rounded hover:bg-gray-50">🔁 Reprint without background ↗</a>
+                                    </template>
                                 </div>
                             </details>
                             <button @click="renderAndCache({ school_id: group.school_id, cert_type: 'participation' })"
@@ -857,6 +873,13 @@ function readyToPrint(group) {
 }
 function printedCount(group) {
     return (group.winners ?? []).filter((w) => w.printed).length;
+}
+const totalPrinted = computed(() => props.participationBySchool.reduce((n, g) => n + printedCount(g), 0));
+function reprintUrl(schoolId, plain) {
+    const params = new URLSearchParams({ reprint: '1' });
+    if (schoolId) params.set('school_id', schoolId);
+    if (plain) params.set('plain', '1');
+    return `${base}/print-all?${params.toString()}`;
 }
 const totalReadyToPrint = computed(() => props.participationBySchool.reduce((n, g) => n + readyToPrint(g), 0));
 
