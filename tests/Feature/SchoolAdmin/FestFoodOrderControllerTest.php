@@ -6,6 +6,7 @@ use App\Models\FestEvent;
 use App\Models\FestEventPhase;
 use App\Models\FestFoodBill;
 use App\Models\FestFoodMenuItem;
+use App\Models\FestFoodOrderItem;
 use App\Models\Region;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
@@ -19,6 +20,7 @@ use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 /**
@@ -28,9 +30,8 @@ use Tests\TestCase;
  * - Correct event_id targeting + partition awareness (normal / legacy region leaf / phase
  *   leaf), reusing FestRegistrationRouterService::assertSchoolCanAccess() the same way
  *   registration does.
- * - The food_cutoff_at gate in assertAccess() (app/Http/Controllers/SchoolAdmin/
- *   FestFoodOrderController.php:25-31), including that it's a no-op for any event that
- *   isn't phase_mode_enabled with a source_phase_id.
+ * - Admin-managed opening/closing windows for every event and the phase food cutoff
+ *   that remains a hard closing cap for phased competition leaves.
  * - is_available and max_per_school enforcement in addItem().
  */
 class FestFoodOrderControllerTest extends TestCase
@@ -157,9 +158,138 @@ class FestFoodOrderControllerTest extends TestCase
         ]));
 
         $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('School/Fest/FoodOrder', false)
+            ->where('orderingOpen', true)
+            ->where('orderingStatus', 'open')
+            ->where('foodOrderOpensAt', null)
+            ->where('foodOrderClosesAt', null)
+            ->where('foodCutoffAt', null)
+            ->has('menuItems', 0)
+        );
         $cacheControl = (string) $response->headers->get('Cache-Control');
         $this->assertStringContainsString('no-store', $cacheControl);
         $this->assertStringContainsString('private', $cacheControl);
+    }
+
+    public function test_admin_window_keeps_page_readable_but_blocks_orders_before_opening(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school, 'schoolAdmin' => $schoolAdmin] = $this->makeSahodayaAndSchool();
+        $event = $this->makeStandaloneEvent($sahodaya, [
+            'food_order_opens_at' => now()->addHour(),
+            'food_order_closes_at' => now()->addDay(),
+        ]);
+        $menuItem = $this->addMenuItem($sahodaya->id, $event->id);
+
+        $this->actingAs($schoolAdmin)->get(route('school.food-order.show', [
+            'tenantId' => $school->id, 'event' => $event->id,
+        ]))->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('School/Fest/FoodOrder', false)
+            ->where('orderingOpen', false)
+            ->where('orderingStatus', 'upcoming')
+            ->where('foodOrderOpensAt', fn ($value) => is_string($value) && $value !== '')
+        );
+
+        $this->actingAs($schoolAdmin)->post(route('school.food-order.items.store', [
+            'tenantId' => $school->id, 'event' => $event->id,
+        ]), ['menu_item_id' => $menuItem->id, 'quantity' => 1])->assertStatus(422);
+
+        $this->assertSame(0, FestFoodBill::where('event_id', $event->id)->count());
+    }
+
+    public function test_admin_window_allows_orders_while_open(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school, 'schoolAdmin' => $schoolAdmin] = $this->makeSahodayaAndSchool();
+        $event = $this->makeStandaloneEvent($sahodaya, [
+            'food_order_opens_at' => now()->subHour(),
+            'food_order_closes_at' => now()->addHour(),
+        ]);
+        $menuItem = $this->addMenuItem($sahodaya->id, $event->id);
+
+        $this->actingAs($schoolAdmin)->post(route('school.food-order.items.store', [
+            'tenantId' => $school->id, 'event' => $event->id,
+        ]), ['menu_item_id' => $menuItem->id, 'quantity' => 1])->assertRedirect();
+
+        $this->assertSame(1, FestFoodBill::where('event_id', $event->id)->count());
+    }
+
+    public function test_admin_window_keeps_page_readable_but_blocks_orders_after_closing(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school, 'schoolAdmin' => $schoolAdmin] = $this->makeSahodayaAndSchool();
+        $event = $this->makeStandaloneEvent($sahodaya, [
+            'food_order_opens_at' => now()->subDay(),
+            'food_order_closes_at' => now()->subHour(),
+        ]);
+        $menuItem = $this->addMenuItem($sahodaya->id, $event->id);
+
+        $this->actingAs($schoolAdmin)->get(route('school.food-order.show', [
+            'tenantId' => $school->id, 'event' => $event->id,
+        ]))->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('School/Fest/FoodOrder', false)
+            ->where('orderingOpen', false)
+            ->where('orderingStatus', 'closed')
+            ->where('foodOrderClosesAt', fn ($value) => is_string($value) && $value !== '')
+        );
+
+        $this->actingAs($schoolAdmin)->post(route('school.food-order.items.store', [
+            'tenantId' => $school->id, 'event' => $event->id,
+        ]), ['menu_item_id' => $menuItem->id, 'quantity' => 1])->assertStatus(422);
+
+        $this->assertSame(0, FestFoodBill::where('event_id', $event->id)->count());
+    }
+
+    public function test_daily_windows_can_close_one_food_date_while_another_remains_open(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school, 'schoolAdmin' => $schoolAdmin] = $this->makeSahodayaAndSchool();
+        $event = $this->makeStandaloneEvent($sahodaya, [
+            'food_order_day_windows' => [
+                '2026-09-01' => ['opens_at' => null, 'closes_at' => now()->subHour()->toIso8601String()],
+                '2026-09-02' => ['opens_at' => now()->subHour()->toIso8601String(), 'closes_at' => now()->addHour()->toIso8601String()],
+            ],
+        ]);
+        $closedItem = $this->addMenuItem($sahodaya->id, $event->id, ['menu_date' => '2026-09-01', 'name' => 'Day one meal']);
+        $openItem = $this->addMenuItem($sahodaya->id, $event->id, ['menu_date' => '2026-09-02', 'name' => 'Day two meal']);
+
+        $this->actingAs($schoolAdmin)->get(route('school.food-order.show', [
+            'tenantId' => $school->id, 'event' => $event->id,
+        ]))->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('orderingStatus', 'open')
+            ->where('foodOrderDayWindows.2026-09-01.status', 'closed')
+            ->where('foodOrderDayWindows.2026-09-02.status', 'open')
+        );
+
+        $this->actingAs($schoolAdmin)->post(route('school.food-order.items.store', [
+            'tenantId' => $school->id, 'event' => $event->id,
+        ]), ['menu_item_id' => $closedItem->id, 'quantity' => 1])->assertStatus(422);
+
+        $this->actingAs($schoolAdmin)->post(route('school.food-order.items.store', [
+            'tenantId' => $school->id, 'event' => $event->id,
+        ]), ['menu_item_id' => $openItem->id, 'quantity' => 1])->assertRedirect();
+
+        $this->assertSame(0, FestFoodOrderItem::where('menu_item_id', $closedItem->id)->count());
+        $this->assertSame(1, FestFoodOrderItem::where('menu_item_id', $openItem->id)->count());
+    }
+
+    public function test_school_cannot_remove_an_item_after_that_food_date_closes(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school, 'schoolAdmin' => $schoolAdmin] = $this->makeSahodayaAndSchool();
+        $event = $this->makeStandaloneEvent($sahodaya);
+        $menuItem = $this->addMenuItem($sahodaya->id, $event->id);
+
+        $this->actingAs($schoolAdmin)->post(route('school.food-order.items.store', [
+            'tenantId' => $school->id, 'event' => $event->id,
+        ]), ['menu_item_id' => $menuItem->id, 'quantity' => 1])->assertRedirect();
+
+        $orderItem = FestFoodOrderItem::where('menu_item_id', $menuItem->id)->firstOrFail();
+        $event->update(['food_order_day_windows' => [
+            '2026-09-01' => ['opens_at' => null, 'closes_at' => now()->subMinute()->toIso8601String()],
+        ]]);
+
+        $this->actingAs($schoolAdmin)->delete(route('school.food-order.items.destroy', [
+            'tenantId' => $school->id, 'event' => $event->id, 'orderItem' => $orderItem->id,
+        ]))->assertStatus(422);
+
+        $this->assertDatabaseHas('fest_food_order_items', ['id' => $orderItem->id]);
     }
 
     public function test_school_can_order_food_on_its_assigned_legacy_region_leaf_but_not_a_sibling_region_leaf(): void
@@ -259,6 +389,15 @@ class FestFoodOrderControllerTest extends TestCase
         [$leaf] = $this->makeNonRegionalPhaseRoot($sahodaya, ['food_cutoff_at' => now()->subDay()]);
         $menuItem = $this->addMenuItem($sahodaya->id, $leaf->id);
 
+        $page = $this->actingAs($schoolAdmin)->get(route('school.food-order.show', [
+            'tenantId' => $school->id, 'event' => $leaf->id,
+        ]));
+        $page->assertOk()->assertInertia(fn (Assert $inertia) => $inertia
+            ->component('School/Fest/FoodOrder', false)
+            ->where('orderingOpen', false)
+            ->where('foodCutoffAt', fn ($value) => is_string($value) && $value !== '')
+        );
+
         $response = $this->actingAs($schoolAdmin)->post(route('school.food-order.items.store', [
             'tenantId' => $school->id, 'event' => $leaf->id,
         ]), ['menu_item_id' => $menuItem->id, 'quantity' => 1]);
@@ -275,12 +414,35 @@ class FestFoodOrderControllerTest extends TestCase
         [$leaf] = $this->makeNonRegionalPhaseRoot($sahodaya, ['food_cutoff_at' => now()->addDay()]);
         $menuItem = $this->addMenuItem($sahodaya->id, $leaf->id);
 
+        $page = $this->actingAs($schoolAdmin)->get(route('school.food-order.show', [
+            'tenantId' => $school->id, 'event' => $leaf->id,
+        ]));
+        $page->assertOk()->assertInertia(fn (Assert $inertia) => $inertia
+            ->component('School/Fest/FoodOrder', false)
+            ->where('orderingOpen', true)
+            ->where('foodCutoffAt', fn ($value) => is_string($value) && $value !== '')
+        );
+
         $response = $this->actingAs($schoolAdmin)->post(route('school.food-order.items.store', [
             'tenantId' => $school->id, 'event' => $leaf->id,
         ]), ['menu_item_id' => $menuItem->id, 'quantity' => 1]);
 
         $response->assertRedirect();
         $this->assertSame(1, FestFoodBill::where('event_id', $leaf->id)->where('school_id', $school->id)->count());
+    }
+
+    public function test_phase_cutoff_is_the_effective_close_when_admin_window_ends_later(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school, 'schoolAdmin' => $schoolAdmin] = $this->makeSahodayaAndSchool();
+        [$leaf, $phase] = $this->makeNonRegionalPhaseRoot($sahodaya, ['food_cutoff_at' => now()->addHour()]);
+        $leaf->update(['food_order_closes_at' => now()->addDay()]);
+
+        $this->actingAs($schoolAdmin)->get(route('school.food-order.show', [
+            'tenantId' => $school->id, 'event' => $leaf->id,
+        ]))->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('orderingStatus', 'open')
+            ->where('foodOrderClosesAt', fn ($value) => Carbon::parse($value)->equalTo($phase->food_cutoff_at))
+        );
     }
 
     public function test_null_food_cutoff_allows_ordering_on_a_phase_leaf(): void
@@ -297,12 +459,7 @@ class FestFoodOrderControllerTest extends TestCase
         $this->assertSame(1, FestFoodBill::where('event_id', $leaf->id)->where('school_id', $school->id)->count());
     }
 
-    /**
-     * Documented gap (Food Module audit 2026-08-17, Finding 13): the food_cutoff_at check
-     * only runs when phase_mode_enabled && source_phase_id are both set — a plain standard
-     * event has neither, so it has no ordering cutoff at all, no matter how late "now" is.
-     */
-    public function test_food_cutoff_is_never_enforced_on_a_non_phase_event(): void
+    public function test_a_non_phase_event_without_an_admin_window_remains_open(): void
     {
         ['sahodaya' => $sahodaya, 'school' => $school, 'schoolAdmin' => $schoolAdmin] = $this->makeSahodayaAndSchool();
         $event = $this->makeStandaloneEvent($sahodaya);

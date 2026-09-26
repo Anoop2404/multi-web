@@ -31,6 +31,7 @@ class FestFoodMenuSyncService
         }
 
         $this->copyPayeeSettings($hub, $child);
+        $this->copyOrderingWindow($hub, $child);
 
         return $count;
     }
@@ -99,5 +100,25 @@ class FestFoodMenuSyncService
             'food_payee_type'     => $hub->food_payee_type,
             'food_host_school_id' => $hub->food_host_school_id,
         ]);
+    }
+
+    /** Fill missing window edges without overwriting a region's own schedule. */
+    private function copyOrderingWindow(FestEvent $hub, FestEvent $child): void
+    {
+        $updates = [];
+
+        if (! $child->food_order_opens_at && $hub->food_order_opens_at) {
+            $updates['food_order_opens_at'] = $hub->food_order_opens_at;
+        }
+        if (! $child->food_order_closes_at && $hub->food_order_closes_at) {
+            $updates['food_order_closes_at'] = $hub->food_order_closes_at;
+        }
+        if (empty($child->food_order_day_windows) && ! empty($hub->food_order_day_windows)) {
+            $updates['food_order_day_windows'] = $hub->food_order_day_windows;
+        }
+
+        if ($updates !== []) {
+            $child->update($updates);
+        }
     }
 }

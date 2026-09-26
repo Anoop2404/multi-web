@@ -15,7 +15,20 @@
                         </span>
                         <span v-if="pendingPaymentsCount > 0"
                               class="inline-flex items-center gap-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 text-xs font-medium">
-                            <span>⏳</span> {{ pendingPaymentsCount }} payment review pending
+                            <span aria-hidden="true">⏳</span> {{ pendingPaymentsCount }} payment review pending
+                        </span>
+                        <span v-if="foodOrderOpensAt || foodOrderClosesAt"
+                              class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium"
+                              :class="orderingStatus === 'upcoming'
+                                  ? 'bg-sky-500/20 text-sky-200 border-sky-400/30'
+                                  : orderingOpen
+                                      ? 'bg-white/10 text-slate-200 border-white/20'
+                                      : 'bg-rose-500/20 text-rose-200 border-rose-400/30'">
+                            {{ orderingStatus === 'upcoming'
+                                ? `Orders open ${formatCutoff(foodOrderOpensAt)}`
+                                : orderingOpen && foodOrderClosesAt
+                                    ? `Orders close ${formatCutoff(foodOrderClosesAt)}`
+                                    : 'Ordering closed' }}
                         </span>
                     </div>
                     <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-white">{{ event.title }}</h1>
@@ -49,9 +62,25 @@
         </div>
 
         <div v-if="bill && bill.status !== 'open'" class="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/90 p-4 text-amber-800 text-sm mb-6 shadow-xs">
-            <span class="text-xl shrink-0">🔒</span>
+            <span class="text-xl shrink-0" aria-hidden="true">🔒</span>
             <div>
                 <strong class="font-semibold">This bill is settled.</strong> Ordering is locked. Please contact the Sahodaya administration if you need to modify your contingent's food requirements.
+            </div>
+        </div>
+
+        <div v-else-if="orderingStatus === 'upcoming'" class="flex items-center gap-3 rounded-xl border border-sky-200 bg-sky-50/90 p-4 text-sky-800 text-sm mb-6 shadow-xs" role="status">
+            <span class="text-xl shrink-0" aria-hidden="true">🕒</span>
+            <div>
+                <strong class="font-semibold">Food ordering has not opened yet.</strong>
+                Ordering starts {{ formatCutoff(foodOrderOpensAt) }}. You can review the menu in the meantime.
+            </div>
+        </div>
+
+        <div v-else-if="!orderingOpen" class="flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50/90 p-4 text-rose-800 text-sm mb-6 shadow-xs" role="status">
+            <span class="text-xl shrink-0" aria-hidden="true">⏱️</span>
+            <div>
+                <strong class="font-semibold">Food ordering is closed.</strong>
+                The cutoff was {{ formatCutoff(foodOrderClosesAt) }}. You can still review your order and payment history below.
             </div>
         </div>
 
@@ -67,8 +96,9 @@
                     </span>
                     <input v-model="searchQuery" type="text"
                            class="field pl-9 pr-8 text-sm w-full"
+                           aria-label="Search food items"
                            placeholder="Search food items (e.g. Biriyani, Idli, Tea)…">
-                    <button v-if="searchQuery" @click="searchQuery = ''"
+                    <button v-if="searchQuery" type="button" aria-label="Clear food search" @click="searchQuery = ''"
                             class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
                         ×
                     </button>
@@ -100,8 +130,13 @@
                 </div>
             </div>
 
+            <p v-if="allDates.length > 1 || Object.keys(mealTypes).length > 3"
+               class="sm:hidden text-[10px] font-semibold text-indigo-600 text-right">
+                Swipe filter rows to see more →
+            </p>
+
             <!-- Date Selector Tabs (if multiple dates) -->
-            <div v-if="allDates.length > 1" class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none border-t border-slate-100 pt-2.5">
+            <div v-if="allDates.length > 1" class="flex items-center gap-2 overflow-x-auto pb-1 border-t border-slate-100 pt-2.5" role="group" aria-label="Filter by menu date">
                 <span class="text-xs font-bold text-slate-500 uppercase tracking-wider shrink-0 mr-1">Date:</span>
                 <button type="button" @click="selectedDate = 'all'"
                         class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition"
@@ -116,7 +151,7 @@
             </div>
 
             <!-- Meal Type Selector Pills -->
-            <div class="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-t border-slate-100 pt-2.5">
+            <div class="flex items-center gap-1.5 overflow-x-auto pb-1 border-t border-slate-100 pt-2.5" role="group" aria-label="Filter by meal type">
                 <span class="text-xs font-bold text-slate-500 uppercase tracking-wider shrink-0 mr-1">Meal:</span>
                 <button type="button" @click="selectedMeal = 'all'"
                         class="px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition"
@@ -138,7 +173,7 @@
             <div class="lg:col-span-2 space-y-8">
                 <div v-for="group in filteredGroupedMenu" :key="group.date" class="space-y-6">
                     <!-- Date Section Header -->
-                    <div class="flex items-center gap-3 border-b-2 border-slate-200 pb-2">
+                    <div class="flex flex-wrap items-center gap-3 border-b-2 border-slate-200 pb-2">
                         <div class="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm">
                             📅
                         </div>
@@ -146,6 +181,10 @@
                             <h2 class="text-lg font-extrabold text-slate-900">{{ formatCalendarDate(group.date) }}</h2>
                             <p class="text-xs text-slate-500">{{ group.meals.reduce((acc, m) => acc + m.items.length, 0) }} item(s) available</p>
                         </div>
+                        <span v-if="dayWindowFor(group.date)" class="ml-auto inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold"
+                              :class="dayWindowClass(group.date)">
+                            {{ dayWindowLabel(group.date) }}
+                        </span>
                     </div>
 
                     <!-- Meal Groups inside Date -->
@@ -171,8 +210,8 @@
                                     </span>
                                 </template>
 
-                                <template v-if="canOrder" #actions>
-                                    <template v-if="!item.max_per_school || remainingFor(item) > 0">
+                                <template #actions>
+                                    <template v-if="canOrderItem(item) && (!item.max_per_school || remainingFor(item) > 0)">
                                         <div class="flex items-center gap-1.5">
                                             <QuantityStepper :model-value="qty[item.id] ?? 1" :max="item.max_per_school ? remainingFor(item) : 999"
                                                               @update:model-value="(val) => (qty[item.id] = val)" />
@@ -189,7 +228,7 @@
                                         </div>
                                     </template>
                                     <span v-else class="text-xs font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200">
-                                        Limit reached
+                                        {{ orderUnavailableLabel(item) }}
                                     </span>
                                 </template>
                             </FoodItemCard>
@@ -198,12 +237,16 @@
                 </div>
 
                 <div v-if="filteredGroupedMenu.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-12 text-center">
-                    <span class="text-4xl">🍽️</span>
-                    <h3 class="text-base font-bold text-slate-800 mt-3">No food items found</h3>
+                    <span class="text-4xl" aria-hidden="true">🍽️</span>
+                    <h3 class="text-base font-bold text-slate-800 mt-3">
+                        {{ menuItems.length === 0 ? 'Food menu not published yet' : 'No matching food items' }}
+                    </h3>
                     <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                        No dishes match your selected filters. Try clearing your search query or selecting a different meal/diet filter.
+                        {{ menuItems.length === 0
+                            ? 'The event organizer has not published food items for this event. Please check back later.'
+                            : 'No dishes match your selected filters. Try clearing your search query or selecting a different meal or diet filter.' }}
                     </p>
-                    <button type="button" @click="resetFilters" class="btn-secondary text-xs mt-4">
+                    <button v-if="menuItems.length > 0" type="button" @click="resetFilters" class="btn-secondary text-xs mt-4">
                         Reset Filters
                     </button>
                 </div>
@@ -278,7 +321,7 @@
                                 </div>
                                 <div class="text-right shrink-0">
                                     <p class="text-sm font-bold text-slate-900">₹{{ Number(oi.line_total).toFixed(2) }}</p>
-                                    <button v-if="canOrder" type="button"
+                                    <button v-if="canOrderItem(oi)" type="button"
                                             class="text-[11px] font-semibold text-rose-600 hover:text-rose-800 mt-0.5 inline-block"
                                             @click="removeItem(oi)">
                                         Remove
@@ -375,75 +418,20 @@
                         </div>
                     </div>
 
-                    <!-- Payment Submission Form -->
-                    <div v-if="bill && Number(bill.balance_due) > 0 && canOrder" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-                        <div class="flex items-center justify-between">
-                            <h4 class="font-bold text-sm text-slate-900 flex items-center gap-1.5">
-                                <span>📤</span> Submit Payment Proof
-                            </h4>
-                            <span class="text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full font-medium">Awaiting review</span>
+                    <!-- Focused Payment Submission Entry Point -->
+                    <div v-if="bill && Number(bill.balance_due) > 0 && canOrder" class="rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4 shadow-sm space-y-3">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <h4 class="font-bold text-sm text-slate-900">Ready to record your payment?</h4>
+                                <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                                    Upload the receipt in a focused form after completing the transfer.
+                                </p>
+                            </div>
+                            <span class="shrink-0 text-xs font-extrabold text-rose-700">₹{{ Number(bill.balance_due).toFixed(2) }} due</span>
                         </div>
-                        <p class="text-xs text-slate-500 leading-relaxed">
-                            After transferring payment, upload screenshot or receipt. Sahodaya will verify and approve your payment.
-                        </p>
-
-                        <form class="space-y-3" @submit.prevent="submitPayment">
-                            <div class="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label class="text-xs font-semibold text-slate-700 block mb-1">Amount (₹) *</label>
-                                    <input v-model="paymentForm.amount" type="number" min="0.01" step="0.01" class="field text-xs w-full"
-                                           :placeholder="Number(bill.balance_due).toFixed(2)" required>
-                                </div>
-                                <div>
-                                    <label class="text-xs font-semibold text-slate-700 block mb-1">Payment Mode *</label>
-                                    <select v-model="paymentForm.payment_mode" class="field text-xs w-full" required>
-                                        <option value="upi">UPI (GPay/PhonePe)</option>
-                                        <option value="bank_transfer">Bank Transfer (NEFT/IMPS)</option>
-                                        <option value="cash">Cash</option>
-                                        <option value="other">Other</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label class="text-xs font-semibold text-slate-700 block mb-1">Transaction Ref / UTR</label>
-                                <input v-model="paymentForm.transaction_ref" type="text" class="field text-xs w-full font-mono"
-                                       placeholder="e.g. 324109482190">
-                            </div>
-
-                            <div>
-                                <label class="text-xs font-semibold text-slate-700 block mb-1">Paid From Bank (Optional)</label>
-                                <input v-model="paymentForm.bank_name" type="text" class="field text-xs w-full"
-                                       placeholder="e.g. SBI, HDFC, Canara">
-                            </div>
-
-                            <div>
-                                <label class="text-xs font-semibold text-slate-700 block mb-1">Proof (Screenshot/PDF) *</label>
-                                <input type="file" accept=".pdf,.jpg,.jpeg,.png" class="field text-xs w-full file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-slate-100" required @change="onProofSelected">
-                                <!-- Proof Preview Thumbnail -->
-                                <div v-if="proofPreviewUrl" class="mt-2 p-2 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
-                                    <img :src="proofPreviewUrl" alt="Proof preview" class="w-12 h-12 rounded object-cover border border-slate-200">
-                                    <div class="text-[11px] min-w-0">
-                                        <p class="font-medium text-slate-800 truncate">{{ paymentForm.proof?.name }}</p>
-                                        <p class="text-slate-400">Ready to upload</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label class="text-xs font-semibold text-slate-700 block mb-1">Notes (Optional)</label>
-                                <textarea v-model="paymentForm.notes" rows="2" class="field text-xs w-full"
-                                          placeholder="Any notes for billing team…"></textarea>
-                            </div>
-
-                            <p v-if="paymentForm.errors.amount" class="text-xs text-rose-600">{{ paymentForm.errors.amount }}</p>
-                            <p v-if="paymentForm.errors.proof" class="text-xs text-rose-600">{{ paymentForm.errors.proof }}</p>
-
-                            <button type="submit" class="btn-primary w-full text-xs font-bold py-2.5 justify-center shadow-sm"
-                                    :disabled="paymentForm.processing">
-                                {{ paymentForm.processing ? 'Submitting proof…' : 'Submit Payment for Verification' }}
-                            </button>
-                        </form>
+                        <button type="button" class="btn-primary w-full text-xs font-bold py-2.5 justify-center shadow-sm" @click="openPaymentModal">
+                            Upload Payment Proof
+                        </button>
                     </div>
                 </div>
 
@@ -518,7 +506,7 @@
                                     <span>⚠️</span> Rejection Note from Billing Team:
                                 </p>
                                 <p class="leading-relaxed">{{ p.rejection_reason }}</p>
-                                <button type="button" @click="rightPanelTab = 'order'"
+                                <button type="button" @click="openPaymentModal"
                                         class="text-xs font-bold text-rose-700 underline mt-1 block">
                                     Submit a new payment proof →
                                 </button>
@@ -548,6 +536,9 @@
             </div>
         </div>
 
+        <!-- Keeps the final controls clear of the fixed mobile tray bar. -->
+        <div v-if="totalOrderedCount > 0" class="h-20 lg:hidden" aria-hidden="true"></div>
+
         <!-- Mobile Sticky Bottom Floating Cart Bar -->
         <div v-if="totalOrderedCount > 0" class="lg:hidden fixed bottom-3 inset-x-3 z-30">
             <button type="button" @click="showMobileCart = true"
@@ -573,7 +564,7 @@
                     </div>
                     <div class="text-right">
                         <p class="font-bold text-sm text-slate-900">₹{{ Number(oi.line_total).toFixed(2) }}</p>
-                        <button v-if="canOrder" type="button" class="text-xs text-rose-600 font-semibold mt-1" @click="removeItem(oi)">
+                        <button v-if="canOrderItem(oi)" type="button" class="text-xs text-rose-600 font-semibold mt-1" @click="removeItem(oi)">
                             Remove
                         </button>
                     </div>
@@ -594,11 +585,91 @@
                     </div>
                 </div>
 
-                <a href="#your-order" @click="showMobileCart = false"
+                <button v-if="bill && Number(bill.balance_due) > 0 && canOrder" type="button"
+                        class="btn-primary w-full justify-center text-sm py-2.5" @click="openPaymentFromMobileCart">
+                    Upload Payment Proof
+                </button>
+                <a v-else href="#your-order" @click="showMobileCart = false"
                    class="btn-primary w-full justify-center text-sm py-2.5">
-                    Proceed to Payment & Bank Details ↓
+                    View Payment & Bank Details ↓
                 </a>
             </div>
+        </Modal>
+
+        <!-- Focused Payment Proof Form -->
+        <Modal :show="showPaymentModal" title="Submit Payment Proof" size="md" @close="closePaymentModal">
+            <form id="payment-proof-form" class="space-y-4" @submit.prevent="submitPayment">
+                <div class="rounded-xl border border-indigo-100 bg-indigo-50 p-3 text-xs text-indigo-900">
+                    <span class="font-semibold">Balance due:</span>
+                    ₹{{ (bill ? Number(bill.balance_due) : 0).toFixed(2) }}. Your submission will remain pending until the billing team verifies it.
+                </div>
+
+                <div class="grid sm:grid-cols-2 gap-3">
+                    <FormField label="Amount (₹)" :error="paymentForm.errors.amount" required>
+                        <template #default="{ id }">
+                            <input :id="id" v-model="paymentForm.amount" type="number" min="0.01" step="0.01"
+                                   class="field text-sm w-full" :placeholder="bill ? Number(bill.balance_due).toFixed(2) : ''" required>
+                        </template>
+                    </FormField>
+                    <FormField label="Payment Mode" :error="paymentForm.errors.payment_mode" required>
+                        <template #default="{ id }">
+                            <select :id="id" v-model="paymentForm.payment_mode" class="field text-sm w-full" required>
+                                <option value="upi">UPI (GPay/PhonePe)</option>
+                                <option value="bank_transfer">Bank Transfer (NEFT/IMPS)</option>
+                                <option value="cash">Cash</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </template>
+                    </FormField>
+                </div>
+
+                <FormField label="Transaction Ref / UTR" :error="paymentForm.errors.transaction_ref"
+                           hint="Enter the reference shown by your bank or payment app.">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="paymentForm.transaction_ref" type="text" class="field text-sm w-full font-mono"
+                               placeholder="e.g. 324109482190">
+                    </template>
+                </FormField>
+
+                <FormField label="Paid From Bank (Optional)" :error="paymentForm.errors.bank_name">
+                    <template #default="{ id }">
+                        <input :id="id" v-model="paymentForm.bank_name" type="text" class="field text-sm w-full"
+                               placeholder="e.g. SBI, HDFC, Canara">
+                    </template>
+                </FormField>
+
+                <FormField label="Proof (Screenshot or PDF)" :error="paymentForm.errors.proof"
+                           hint="JPG, PNG, or PDF up to 5 MB." required>
+                    <template #default="{ id }">
+                        <input :id="id" ref="proofInput" type="file" accept=".pdf,.jpg,.jpeg,.png"
+                               class="field text-sm w-full file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-slate-100"
+                               required @change="onProofSelected">
+                    </template>
+                </FormField>
+
+                <div v-if="proofPreviewUrl" class="p-2 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+                    <img :src="proofPreviewUrl" alt="Selected payment proof preview" class="w-14 h-14 rounded object-cover border border-slate-200">
+                    <div class="text-xs min-w-0">
+                        <p class="font-medium text-slate-800 truncate">{{ paymentForm.proof?.name }}</p>
+                        <p class="text-slate-500">Ready to upload</p>
+                    </div>
+                </div>
+
+                <FormField label="Notes (Optional)" :error="paymentForm.errors.notes">
+                    <template #default="{ id }">
+                        <textarea :id="id" v-model="paymentForm.notes" rows="3" class="field text-sm w-full"
+                                  placeholder="Any notes for the billing team…"></textarea>
+                    </template>
+                </FormField>
+            </form>
+
+            <template #footer>
+                <button type="button" class="btn-secondary text-xs" :disabled="paymentForm.processing" @click="closePaymentModal">Cancel</button>
+                <button type="submit" form="payment-proof-form" class="btn-primary text-xs font-bold"
+                        :disabled="paymentForm.processing">
+                    {{ paymentForm.processing ? 'Submitting proof…' : 'Submit for Verification' }}
+                </button>
+            </template>
         </Modal>
 
         <!-- QR Code Zoom Modal -->
@@ -656,6 +727,7 @@ import FoodItemCard from '@/Components/food/FoodItemCard.vue';
 import VegBadge from '@/Components/food/VegBadge.vue';
 import QuantityStepper from '@/Components/food/QuantityStepper.vue';
 import Modal from '@/Components/ui/Modal.vue';
+import FormField from '@/Components/ui/FormField.vue';
 import { mealIcon } from '@/support/mealIcons.js';
 import { isNonVeg } from '@/support/dietDetector.js';
 import { router, useForm, usePage } from '@inertiajs/vue3';
@@ -674,12 +746,54 @@ const props = defineProps({
     payments: { type: Array, default: () => [] },
     payeeLabel: { type: String, default: '' },
     payeeDetails: { type: Object, default: null },
+    foodCutoffAt: { type: String, default: null },
+    foodOrderOpensAt: { type: String, default: null },
+    foodOrderClosesAt: { type: String, default: null },
+    foodOrderDayWindows: { type: Object, default: () => ({}) },
+    orderingStatus: { type: String, default: 'open' },
+    orderingOpen: { type: Boolean, default: true },
 });
 
 const school = computed(() => usePage().props.school);
 const base = computed(() => `/school-admin/${school.value?.id}/fest/${props.event.id}/food-order`);
 
-const canOrder = computed(() => !props.bill || props.bill.status === 'open');
+const canOrder = computed(() => props.orderingOpen && (!props.bill || props.bill.status === 'open'));
+
+function dayWindowFor(date) {
+    return props.foodOrderDayWindows?.[date] ?? null;
+}
+
+function canOrderItem(item) {
+    if (!canOrder.value) return false;
+    const dayWindow = dayWindowFor(item.menu_date);
+    return !dayWindow || dayWindow.status === 'open';
+}
+
+function dayWindowLabel(date) {
+    const window = dayWindowFor(date);
+    if (!window) return '';
+    if (window.status === 'upcoming') return `Orders open ${formatCutoff(window.opens_at)}`;
+    if (window.status === 'closed') return 'Ordering closed for this day';
+    if (window.closes_at) return `Orders close ${formatCutoff(window.closes_at)}`;
+    return 'Ordering open';
+}
+
+function dayWindowClass(date) {
+    const status = dayWindowFor(date)?.status;
+    if (status === 'closed') return 'border-rose-200 bg-rose-50 text-rose-700';
+    if (status === 'upcoming') return 'border-sky-200 bg-sky-50 text-sky-700';
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+}
+
+function orderUnavailableLabel(item) {
+    if (props.orderingStatus === 'upcoming') return 'Ordering not open';
+    if (!props.orderingOpen) return 'Ordering closed';
+    if (props.bill && props.bill.status !== 'open') return 'Bill settled';
+    const dayStatus = dayWindowFor(item.menu_date)?.status;
+    if (dayStatus === 'upcoming') return 'This day is not open';
+    if (dayStatus === 'closed') return 'This day is closed';
+    return 'Limit reached';
+}
 
 // Sub-Tab state: 'order' | 'history'
 const rightPanelTab = ref('order');
@@ -692,9 +806,11 @@ const selectedMeal = ref('all');
 
 const showMobileCart = ref(false);
 const showQrModal = ref(false);
+const showPaymentModal = ref(false);
 const copiedField = ref(null);
 
 const proofPreviewUrl = ref(null);
+const proofInput = ref(null);
 const schoolProofModalOpen = ref(false);
 const selectedSchoolProofPayment = ref(null);
 
@@ -724,9 +840,27 @@ const paymentForm = useForm({
     amount: '', payment_mode: 'upi', transaction_ref: '', bank_name: '', proof: null, notes: '',
 });
 
+function openPaymentModal() {
+    if (!canOrder.value || !props.bill || Number(props.bill.balance_due) <= 0) return;
+    if (!paymentForm.amount) paymentForm.amount = Number(props.bill.balance_due).toFixed(2);
+    showPaymentModal.value = true;
+}
+
+function openPaymentFromMobileCart() {
+    showMobileCart.value = false;
+    openPaymentModal();
+}
+
+function closePaymentModal() {
+    if (paymentForm.processing) return;
+    showPaymentModal.value = false;
+    paymentForm.clearErrors();
+}
+
 function onProofSelected(event) {
     const file = event.target.files[0] ?? null;
     paymentForm.proof = file;
+    if (proofPreviewUrl.value) URL.revokeObjectURL(proofPreviewUrl.value);
     if (file && file.type.startsWith('image/')) {
         proofPreviewUrl.value = URL.createObjectURL(file);
     } else {
@@ -739,8 +873,11 @@ function submitPayment() {
         preserveScroll: true,
         onSuccess: () => {
             paymentForm.reset();
+            if (proofPreviewUrl.value) URL.revokeObjectURL(proofPreviewUrl.value);
             proofPreviewUrl.value = null;
-            rightPanelTab.value = 'history'; // Switch to history tab to see new payment!
+            if (proofInput.value) proofInput.value.value = '';
+            showPaymentModal.value = false;
+            rightPanelTab.value = 'history';
         },
     });
 }
@@ -783,12 +920,19 @@ function badgesFor(item) {
     const remaining = remainingFor(item);
     const badges = [{ label: `${orderedQty(item.id)} / ${item.max_per_school} ordered`, tone: remaining <= 0 ? 'amber' : 'slate' }];
     if (remaining <= 0) badges.push({ label: 'Limit reached', tone: 'amber' });
+    else badges.push({ label: `Only ${remaining} remaining`, tone: remaining <= 10 ? 'amber' : 'slate' });
     return badges;
 }
 
-function addItem(item) {
+async function addItem(item) {
+    if (!canOrderItem(item)) return;
     const requested = Math.min(Number(qty[item.id]) || 1, remainingFor(item));
     if (requested < 1) return;
+    if (requested >= 10 && !(await confirm({
+        title: 'Confirm large quantity',
+        message: `Add ${requested} × ${item.name} to your school’s order?`,
+        confirmLabel: 'Add to Order',
+    }))) return;
     itemForm.menu_item_id = item.id;
     itemForm.quantity = requested;
     itemForm.post(`${base.value}/items`, {
@@ -797,6 +941,16 @@ function addItem(item) {
             qty[item.id] = 1;
         },
     });
+}
+
+function formatCutoff(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat('en-IN', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+    }).format(date);
 }
 
 async function removeItem(oi) {

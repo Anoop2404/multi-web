@@ -63,6 +63,14 @@ class FestPhaseTopologyService
             'region_id' => $region?->id,
         ]);
 
+        // A newly generated phase begins with the root's ordering window. Existing
+        // phase-specific windows are left alone on later topology syncs.
+        if (! $leaf->exists) {
+            $leaf->food_order_opens_at = $root->food_order_opens_at;
+            $leaf->food_order_closes_at = $root->food_order_closes_at;
+            $leaf->food_order_day_windows = $root->food_order_day_windows;
+        }
+
         $leaf->fill([
             'tenant_id' => $root->tenant_id,
             'academic_year_id' => $root->academic_year_id,

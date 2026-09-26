@@ -3,11 +3,13 @@
 namespace Tests\Feature\SahodayaAdmin;
 
 use App\Models\FestEvent;
+use App\Models\FestEventPhase;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -82,6 +84,139 @@ class FestFoodMenuHostAccountTest extends TestCase
         $response->assertOk();
         $details = $response->viewData('page')['props']['schoolPaymentDetails'];
         $this->assertSame('Federal Bank', $details[$f['host']->id]['bank_name']);
+    }
+
+    public function test_admin_can_schedule_the_food_ordering_window(): void
+    {
+        $f = $this->fixture();
+
+        $this->actingAs($f['admin'])->put(route('sahodaya.events.food-menu.payee.update', [
+            'tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id,
+        ]), [
+            'food_payee_type' => 'sahodaya',
+            'food_order_opens_at' => '2026-10-01 09:00:00',
+            'food_order_closes_at' => '2026-10-03 18:30:00',
+        ])->assertSessionHasNoErrors();
+
+        $event = $f['event']->fresh();
+        $this->assertSame('2026-10-01 09:00:00', $event->food_order_opens_at->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-10-03 18:30:00', $event->food_order_closes_at->format('Y-m-d H:i:s'));
+
+        $page = $this->actingAs($f['admin'])->get(route('sahodaya.events.food-menu.index', [
+            'tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id,
+        ]));
+        $this->assertNotEmpty($page->viewData('page')['props']['event']['food_order_opens_at']);
+        $this->assertNotEmpty($page->viewData('page')['props']['event']['food_order_closes_at']);
+    }
+
+    public function test_admin_can_schedule_independent_windows_for_each_food_date(): void
+    {
+        $f = $this->fixture();
+        $f['event']->update(['event_start' => '2026-10-01', 'event_end' => '2026-10-03']);
+
+        $this->actingAs($f['admin'])->put(route('sahodaya.events.food-menu.payee.update', [
+            'tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id,
+        ]), [
+            'food_payee_type' => 'sahodaya',
+            'food_order_day_windows' => [
+                ['date' => '2026-10-01', 'opens_at' => '2026-09-28 09:00:00', 'closes_at' => '2026-09-30 18:00:00'],
+                ['date' => '2026-10-02', 'opens_at' => null, 'closes_at' => '2026-10-01 18:00:00'],
+                ['date' => '2026-10-03', 'opens_at' => null, 'closes_at' => null],
+            ],
+        ])->assertSessionHasNoErrors();
+
+        $windows = $f['event']->fresh()->food_order_day_windows;
+        $this->assertCount(2, $windows);
+        $this->assertSame('2026-09-28T09:00:00+05:30', $windows['2026-10-01']['opens_at']);
+        $this->assertSame('2026-10-01T18:00:00+05:30', $windows['2026-10-02']['closes_at']);
+        $this->assertArrayNotHasKey('2026-10-03', $windows);
+
+        $page = $this->actingAs($f['admin'])->get(route('sahodaya.events.food-menu.index', [
+            'tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id,
+        ]));
+        $this->assertCount(3, $page->viewData('page')['props']['eventDates']);
+        $this->assertCount(2, $page->viewData('page')['props']['event']['food_order_day_windows']);
+    }
+
+    public function test_daily_ordering_window_end_must_be_after_its_start(): void
+    {
+        $f = $this->fixture();
+
+        $this->actingAs($f['admin'])->put(route('sahodaya.events.food-menu.payee.update', [
+            'tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id,
+        ]), [
+            'food_payee_type' => 'sahodaya',
+            'food_order_day_windows' => [[
+                'date' => '2026-10-01',
+                'opens_at' => '2026-09-30 18:00:00',
+                'closes_at' => '2026-09-29 18:00:00',
+            ]],
+        ])->assertSessionHasErrors('food_order_day_windows.0.closes_at');
+
+        $this->assertNull($f['event']->fresh()->food_order_day_windows);
+    }
+
+    public function test_ordering_window_end_must_be_after_its_start(): void
+    {
+        $f = $this->fixture();
+
+        $this->actingAs($f['admin'])->put(route('sahodaya.events.food-menu.payee.update', [
+            'tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id,
+        ]), [
+            'food_payee_type' => 'sahodaya',
+            'food_order_opens_at' => '2026-10-03 18:30:00',
+            'food_order_closes_at' => '2026-10-01 09:00:00',
+        ])->assertSessionHasErrors('food_order_closes_at');
+
+        $this->assertNull($f['event']->fresh()->food_order_opens_at);
+        $this->assertNull($f['event']->fresh()->food_order_closes_at);
+    }
+
+    public function test_phase_ordering_window_cannot_open_after_its_hard_cutoff(): void
+    {
+        $f = $this->fixture();
+        $f['event']->update(['phase_mode_enabled' => true, 'source_phase_id' => 500]);
+        FestEventPhase::create([
+            'tenant_id' => $f['sahodaya']->id,
+            'event_id' => $f['event']->id,
+            'source_phase_id' => 500,
+            'name' => 'Phase One',
+            'code' => 'P1',
+            'food_cutoff_at' => '2026-10-03 18:30:00',
+        ]);
+
+        $this->actingAs($f['admin'])->put(route('sahodaya.events.food-menu.payee.update', [
+            'tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id,
+        ]), [
+            'food_payee_type' => 'sahodaya',
+            'food_order_opens_at' => '2026-10-04 09:00:00',
+        ])->assertSessionHasErrors('food_order_opens_at');
+
+        $this->assertNull($f['event']->fresh()->food_order_opens_at);
+    }
+
+    public function test_hub_ordering_window_updates_children_that_still_inherit_it(): void
+    {
+        $f = $this->fixture();
+        $child = FestEvent::create([
+            'tenant_id' => $f['sahodaya']->id,
+            'title' => 'Inherited Region',
+            'event_type' => 'kalolsavam',
+            'level_round' => 'sahodaya',
+            'status' => 'registration_open',
+            'parent_event_id' => $f['event']->id,
+        ]);
+
+        $this->actingAs($f['admin'])->put(route('sahodaya.events.food-menu.payee.update', [
+            'tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id,
+        ]), [
+            'food_payee_type' => 'sahodaya',
+            'food_order_opens_at' => '2026-10-01 09:00:00',
+            'food_order_closes_at' => '2026-10-03 18:30:00',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertTrue($child->fresh()->food_order_opens_at->equalTo(Carbon::parse('2026-10-01 09:00:00')));
+        $this->assertTrue($child->fresh()->food_order_closes_at->equalTo(Carbon::parse('2026-10-03 18:30:00')));
     }
 
     public function test_account_details_are_ignored_when_the_payee_is_the_sahodaya(): void

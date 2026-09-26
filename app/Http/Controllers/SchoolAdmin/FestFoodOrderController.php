@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\FestEvent;
+use App\Models\FestEventPhase;
 use App\Models\FestFoodBill;
 use App\Models\FestFoodMenuItem;
 use App\Models\FestFoodOrderItem;
@@ -11,11 +12,100 @@ use App\Models\Tenant;
 use App\Services\Events\FestRegistrationRouterService;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 
 class FestFoodOrderController extends SchoolAdminController
 {
-    private function assertAccess(FestEvent $event): void
+    private function foodCutoffAt(FestEvent $event)
+    {
+        if (! $event->phase_mode_enabled || ! $event->source_phase_id) {
+            return null;
+        }
+
+        return FestEventPhase::where('event_id', $event->id)
+            ->where('source_phase_id', $event->source_phase_id)
+            ->first()?->food_cutoff_at;
+    }
+
+    /** @return array{opens_at: ?Carbon, closes_at: ?Carbon, status: string} */
+    private function orderingWindow(FestEvent $event): array
+    {
+        $phaseCutoff = $this->foodCutoffAt($event);
+        $closesAt = $event->food_order_closes_at;
+
+        // A phase cutoff is a competition-level hard stop. An event-level ordering
+        // window may close earlier, but cannot silently extend beyond that cutoff.
+        if ($phaseCutoff && (! $closesAt || $phaseCutoff->lt($closesAt))) {
+            $closesAt = $phaseCutoff;
+        }
+
+        $status = 'open';
+        if ($closesAt && now()->gt($closesAt)) {
+            $status = 'closed';
+        } elseif ($event->food_order_opens_at && now()->lt($event->food_order_opens_at)) {
+            $status = 'upcoming';
+        }
+
+        return [
+            'opens_at' => $event->food_order_opens_at,
+            'closes_at' => $closesAt,
+            'status' => $status,
+        ];
+    }
+
+    /** @param array{opens_at: ?Carbon, closes_at: ?Carbon, status: string} $eventWindow */
+    private function dayOrderingWindow(FestEvent $event, string $menuDate, array $eventWindow): array
+    {
+        $configured = ($event->food_order_day_windows ?? [])[$menuDate] ?? null;
+        if (! is_array($configured)) {
+            return $eventWindow;
+        }
+
+        $opensAt = $eventWindow['opens_at'];
+        $closesAt = $eventWindow['closes_at'];
+        $dayOpensAt = filled($configured['opens_at'] ?? null) ? Carbon::parse($configured['opens_at']) : null;
+        $dayClosesAt = filled($configured['closes_at'] ?? null) ? Carbon::parse($configured['closes_at']) : null;
+
+        // Daily windows narrow the event-wide window; they never broaden it.
+        if ($dayOpensAt && (! $opensAt || $dayOpensAt->gt($opensAt))) {
+            $opensAt = $dayOpensAt;
+        }
+        if ($dayClosesAt && (! $closesAt || $dayClosesAt->lt($closesAt))) {
+            $closesAt = $dayClosesAt;
+        }
+
+        $status = 'open';
+        if ($closesAt && now()->gt($closesAt)) {
+            $status = 'closed';
+        } elseif ($opensAt && now()->lt($opensAt)) {
+            $status = 'upcoming';
+        }
+
+        return [
+            'opens_at' => $opensAt,
+            'closes_at' => $closesAt,
+            'status' => $status,
+        ];
+    }
+
+    private function assertOrderingOpen(FestEvent $event, ?string $menuDate = null): void
+    {
+        $window = $this->orderingWindow($event);
+        if ($menuDate !== null) {
+            $window = $this->dayOrderingWindow($event, $menuDate, $window);
+        }
+
+        $scope = $menuDate ? ' for '.Carbon::parse($menuDate)->format('d M Y') : '';
+        abort_if(
+            $window['status'] === 'upcoming',
+            422,
+            'Food ordering'.$scope.' has not opened yet. Ordering starts '.$window['opens_at']?->format('d M Y, h:i A').'.'
+        );
+        abort_if($window['status'] === 'closed', 422, 'Food ordering'.$scope.' has closed.');
+    }
+
+    private function assertAccess(FestEvent $event, bool $enforceFoodCutoff = true): void
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
@@ -25,24 +115,33 @@ class FestFoodOrderController extends SchoolAdminController
         // direct hub and sibling-region ... food ... requests").
         app(FestRegistrationRouterService::class)->assertSchoolCanAccess($event, $this->school->id);
 
-        if ($event->phase_mode_enabled && $event->source_phase_id) {
-            $phase = \App\Models\FestEventPhase::where('event_id', $event->id)
-                ->where('source_phase_id', $event->source_phase_id)
-                ->first();
-            $cutoff = $phase?->food_cutoff_at;
-            abort_if($cutoff && now()->gt($cutoff), 422, 'Food ordering has closed for this competition phase.');
+        if ($enforceFoodCutoff) {
+            $this->assertOrderingOpen($event);
         }
     }
 
     public function show(string $tenantId, FestEvent $event)
     {
-        $this->assertAccess($event);
+        // Keep the page readable after the cutoff so schools can review their order,
+        // balance, and payment history. Mutating actions still enforce the cutoff.
+        $this->assertAccess($event, false);
+        $window = $this->orderingWindow($event);
 
         // Sorted in PHP, not via orderBy('meal_type') — see
         // FestFoodMenuItem::sortForDisplay() for why a SQL sort would be wrong here.
         $menuItems = FestFoodMenuItem::sortForDisplay(
             FestFoodMenuItem::forEvent($event->id)->where('is_available', true)->get()
         );
+        $dayWindows = collect(array_keys($event->food_order_day_windows ?? []))
+            ->mapWithKeys(function (string $date) use ($event, $window) {
+                $dayWindow = $this->dayOrderingWindow($event, $date, $window);
+
+                return [$date => [
+                    'opens_at' => $dayWindow['opens_at']?->toIso8601String(),
+                    'closes_at' => $dayWindow['closes_at']?->toIso8601String(),
+                    'status' => $dayWindow['status'],
+                ]];
+            });
 
         $bill = FestFoodBill::where('event_id', $event->id)->where('school_id', $this->school->id)->first();
         $bill?->load(['orderItems', 'payments']);
@@ -102,12 +201,20 @@ class FestFoodOrderController extends SchoolAdminController
                 ? ($hostSchool ? "Payable to {$hostSchool->name} (host school)" : 'Payable to the host school')
                 : 'Payable to Sahodaya',
             'payeeDetails' => $payeeDetails,
+            // foodCutoffAt is retained as an alias for older front-end clients while the
+            // explicit opening/closing props describe the complete window.
+            'foodCutoffAt' => $window['closes_at']?->toIso8601String(),
+            'foodOrderOpensAt' => $window['opens_at']?->toIso8601String(),
+            'foodOrderClosesAt' => $window['closes_at']?->toIso8601String(),
+            'orderingStatus' => $window['status'],
+            'orderingOpen' => $window['status'] === 'open',
+            'foodOrderDayWindows' => $dayWindows,
         ]);
     }
 
     public function addItem(Request $request, string $tenantId, FestEvent $event)
     {
-        $this->assertAccess($event);
+        $this->assertAccess($event, false);
 
         $data = $request->validate([
             'menu_item_id' => 'required|integer|exists:fest_food_menu_items,id',
@@ -117,6 +224,7 @@ class FestFoodOrderController extends SchoolAdminController
         $menuItem = FestFoodMenuItem::where('event_id', $event->id)
             ->where('is_available', true)
             ->findOrFail($data['menu_item_id']);
+        $this->assertOrderingOpen($event, $menuItem->menu_date->format('Y-m-d'));
 
         $bill = FestFoodBill::firstOrCreateForSchool($event, $this->school->id);
         abort_if($bill->status !== FestFoodBill::STATUS_OPEN, 422, 'Your food bill for this event is already settled — contact the Sahodaya to reopen it.');
@@ -134,10 +242,11 @@ class FestFoodOrderController extends SchoolAdminController
 
     public function removeItem(string $tenantId, FestEvent $event, FestFoodOrderItem $orderItem)
     {
-        $this->assertAccess($event);
+        $this->assertAccess($event, false);
 
         $bill = FestFoodBill::where('event_id', $event->id)->where('school_id', $this->school->id)->firstOrFail();
         abort_if($orderItem->bill_id !== $bill->id, 404);
+        $this->assertOrderingOpen($event, $orderItem->menu_date->format('Y-m-d'));
 
         $bill->removeOrderItem($orderItem);
 
@@ -185,7 +294,8 @@ class FestFoodOrderController extends SchoolAdminController
     /** Proof file for one of THIS school's own payment submissions. */
     public function paymentProof(string $tenantId, FestEvent $event, FestFoodPayment $payment)
     {
-        $this->assertAccess($event);
+        // Payment evidence remains part of the read-only history after ordering closes.
+        $this->assertAccess($event, false);
 
         $bill = FestFoodBill::where('event_id', $event->id)->where('school_id', $this->school->id)->firstOrFail();
         abort_if($payment->bill_id !== $bill->id, 404);

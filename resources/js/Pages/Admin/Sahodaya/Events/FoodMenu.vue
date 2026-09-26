@@ -32,7 +32,7 @@
 
         <!-- 3 Primary Navigation Tabs -->
         <div class="border-b border-slate-200 mb-6">
-            <nav class="flex space-x-6" aria-label="Tabs">
+            <nav class="flex space-x-6 overflow-x-auto" aria-label="Tabs">
                 <button type="button"
                         @click="activeTab = 'schedule'"
                         class="group inline-flex items-center gap-2 py-3 px-1 border-b-2 font-bold text-sm transition"
@@ -68,7 +68,7 @@
                             ? 'border-indigo-600 text-indigo-600'
                             : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'">
                     <span class="text-base">💳</span>
-                    <span>Payee & Billing Settings</span>
+                    <span class="whitespace-nowrap">Ordering & Billing</span>
                 </button>
             </nav>
         </div>
@@ -181,22 +181,23 @@
                     </div>
 
                     <form @submit.prevent="addCatalogItem" class="space-y-3">
-                        <div>
-                            <label class="text-xs font-semibold text-slate-700 block mb-1">Dish Name *</label>
-                            <input v-model="catalogForm.name" type="text" placeholder="e.g. Chicken Biriyani, Veg Meals, Tea" class="field text-xs w-full" required>
-                            <p v-if="catalogForm.errors.name" class="text-xs text-rose-600 mt-1">{{ catalogForm.errors.name }}</p>
-                        </div>
+                        <FormField label="Dish Name" :error="catalogForm.errors.name" required>
+                            <template #default="{ id }">
+                                <input :id="id" v-model="catalogForm.name" type="text" placeholder="e.g. Chicken Biriyani, Veg Meals, Tea" class="field text-xs w-full" required>
+                            </template>
+                        </FormField>
 
-                        <div>
-                            <label class="text-xs font-semibold text-slate-700 block mb-1">Description (Optional)</label>
-                            <input v-model="catalogForm.description" type="text" placeholder="e.g. Served with raita & pickle" class="field text-xs w-full">
-                        </div>
+                        <FormField label="Description (Optional)" :error="catalogForm.errors.description">
+                            <template #default="{ id }">
+                                <input :id="id" v-model="catalogForm.description" type="text" placeholder="e.g. Served with raita & pickle" class="field text-xs w-full">
+                            </template>
+                        </FormField>
 
-                        <div>
-                            <label class="text-xs font-semibold text-slate-700 block mb-1">Default Price (₹) *</label>
-                            <input v-model="catalogForm.default_price" type="number" min="0" step="0.01" placeholder="100.00" class="field text-xs w-full" required>
-                            <p v-if="catalogForm.errors.default_price" class="text-xs text-rose-600 mt-1">{{ catalogForm.errors.default_price }}</p>
-                        </div>
+                        <FormField label="Default Price (₹)" :error="catalogForm.errors.default_price" required>
+                            <template #default="{ id }">
+                                <input :id="id" v-model="catalogForm.default_price" type="number" min="0" step="0.01" placeholder="100.00" class="field text-xs w-full" required>
+                            </template>
+                        </FormField>
 
                         <!-- Veg / Non-veg preview -->
                         <div v-if="catalogForm.name" class="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
@@ -220,6 +221,7 @@
                             <p class="text-xs text-slate-500">{{ catalogItems.length }} dishes registered</p>
                         </div>
                         <input v-model="catalogSearch" type="search" placeholder="Search catalog dishes…"
+                               aria-label="Search catalog dishes"
                                class="field text-xs max-w-xs">
                     </div>
 
@@ -229,9 +231,9 @@
                             <!-- Inline Edit Mode -->
                             <form v-if="editingCatalogId === c.id" @submit.prevent="saveCatalogEdit(c)" class="space-y-2">
                                 <div class="grid grid-cols-2 gap-2 text-xs">
-                                    <input v-model="catalogEditForm.name" type="text" class="field text-xs col-span-2" placeholder="Name" required>
-                                    <input v-model="catalogEditForm.description" type="text" class="field text-xs col-span-2" placeholder="Description">
-                                    <input v-model="catalogEditForm.default_price" type="number" min="0" step="0.01" class="field text-xs" placeholder="Price" required>
+                                    <input v-model="catalogEditForm.name" type="text" class="field text-xs col-span-2" placeholder="Name" aria-label="Dish name" required>
+                                    <input v-model="catalogEditForm.description" type="text" class="field text-xs col-span-2" placeholder="Description" aria-label="Dish description">
+                                    <input v-model="catalogEditForm.default_price" type="number" min="0" step="0.01" class="field text-xs" placeholder="Price" aria-label="Default dish price" required>
                                     <label class="flex items-center gap-1.5 text-xs text-slate-700">
                                         <input type="checkbox" v-model="catalogEditForm.is_active"> Active in catalog
                                     </label>
@@ -278,11 +280,111 @@
         </div>
 
         <!-- ========================================== -->
-        <!-- TAB 3: PAYEE & BILLING SETTINGS            -->
+        <!-- TAB 3: ORDERING & BILLING SETTINGS          -->
         <!-- ========================================== -->
         <div v-if="activeTab === 'payee'" class="max-w-3xl space-y-6">
             <form @submit.prevent="savePayee" class="space-y-6">
-                <!-- Section 1: Payee Designation -->
+                <!-- Section 1: Ordering Window -->
+                <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                        <div>
+                            <h3 class="font-bold text-base text-slate-900 flex items-center gap-2">
+                                <span aria-hidden="true">⏱️</span> School Ordering Window
+                            </h3>
+                            <p class="text-xs text-slate-500 mt-1">
+                                Choose when schools can add or remove food items and submit payments.
+                            </p>
+                        </div>
+                        <span class="inline-flex self-start items-center rounded-full border px-2.5 py-1 text-xs font-bold"
+                              :class="orderingWindowStatus.classes">
+                            {{ orderingWindowStatus.label }}
+                        </span>
+                    </div>
+
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <FormField label="Orders open at" :error="payeeForm.errors.food_order_opens_at"
+                                   hint="Leave blank to allow ordering immediately.">
+                            <template #default="{ id }">
+                                <input :id="id" v-model="payeeForm.food_order_opens_at" type="datetime-local" class="field text-xs w-full">
+                            </template>
+                        </FormField>
+                        <FormField label="Orders close at" :error="payeeForm.errors.food_order_closes_at"
+                                   hint="Leave blank for no admin-set closing time.">
+                            <template #default="{ id }">
+                                <input :id="id" v-model="payeeForm.food_order_closes_at" type="datetime-local" class="field text-xs w-full">
+                            </template>
+                        </FormField>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 border border-slate-200 p-3">
+                        <button type="button" class="btn-secondary text-xs" :disabled="payeeForm.processing" @click="startOrderingNow">Start orders now</button>
+                        <button type="button" class="inline-flex items-center rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50"
+                                :disabled="payeeForm.processing" @click="closeOrderingNow">
+                            Close orders now
+                        </button>
+                        <span class="text-[11px] text-slate-500">Quick actions apply immediately.</span>
+                    </div>
+
+                    <details v-if="payeeForm.food_order_day_windows.length" class="rounded-xl border border-slate-200 bg-slate-50/60">
+                        <summary class="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3">
+                            <span>
+                                <strong class="text-sm text-slate-800">Per-day ordering windows</strong>
+                                <span class="block text-xs text-slate-500 mt-0.5">Optionally open later or close earlier for an individual food date.</span>
+                            </span>
+                            <span class="rounded-full bg-white border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-600 whitespace-nowrap">
+                                {{ configuredDayWindowsCount }} configured
+                            </span>
+                        </summary>
+
+                        <div class="border-t border-slate-200 p-3 sm:p-4 space-y-3">
+                            <div v-for="(day, index) in payeeForm.food_order_day_windows" :key="day.date"
+                                 class="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <div>
+                                        <p class="text-sm font-bold text-slate-900">{{ formatCalendarDate(day.date) }}</p>
+                                        <p class="text-[11px] text-slate-500">Controls items served on this date.</p>
+                                    </div>
+                                    <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold"
+                                          :class="dayWindowStatus(day).classes">
+                                        {{ dayWindowStatus(day).label }}
+                                    </span>
+                                </div>
+
+                                <div class="grid sm:grid-cols-2 gap-3">
+                                    <FormField label="Opens at" :error="payeeForm.errors[`food_order_day_windows.${index}.opens_at`]">
+                                        <template #default="{ id }">
+                                            <input :id="id" v-model="day.opens_at" type="datetime-local" class="field text-xs w-full">
+                                        </template>
+                                    </FormField>
+                                    <FormField label="Closes at" :error="payeeForm.errors[`food_order_day_windows.${index}.closes_at`]">
+                                        <template #default="{ id }">
+                                            <input :id="id" v-model="day.closes_at" type="datetime-local" class="field text-xs w-full">
+                                        </template>
+                                    </FormField>
+                                </div>
+
+                                <div class="flex flex-wrap gap-2">
+                                    <button type="button" class="btn-secondary text-[11px]" :disabled="payeeForm.processing" @click="openDayNow(day)">Open this day now</button>
+                                    <button type="button" class="text-[11px] font-bold text-rose-700 px-3 py-1.5 rounded-lg border border-rose-200 hover:bg-rose-50"
+                                            :disabled="payeeForm.processing" @click="closeDayNow(day)">
+                                        Close this day now
+                                    </button>
+                                    <button v-if="day.opens_at || day.closes_at" type="button" class="text-[11px] font-semibold text-slate-500 px-2 py-1.5 hover:text-slate-800"
+                                            :disabled="payeeForm.processing" @click="clearDayWindow(day)">
+                                        Use overall window
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <p v-if="event.phase_food_cutoff_at" class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        This phase has a hard cutoff at <strong>{{ formatDateTime(event.phase_food_cutoff_at) }}</strong>.
+                        Ordering will stop then even if the admin closing time is later or blank.
+                    </p>
+                </div>
+
+                <!-- Section 2: Payee Designation -->
                 <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
                     <div>
                         <h3 class="font-bold text-base text-slate-900 flex items-center gap-2">
@@ -323,12 +425,12 @@
 
                     <!-- Host School Account Details -->
                     <div v-if="payeeForm.food_payee_type === 'host_school'" class="pt-3 border-t border-slate-100 space-y-3">
-                        <div>
-                            <label class="text-xs font-semibold text-slate-700 block mb-1">Select Host School *</label>
-                            <SearchableSelect v-model="payeeForm.food_host_school_id" :options="schoolOptions"
-                                              :all-option="true" all-label="— Select host school —" />
-                            <p v-if="payeeForm.errors.food_host_school_id" class="text-xs text-rose-600 mt-1">{{ payeeForm.errors.food_host_school_id }}</p>
-                        </div>
+                        <FormField label="Select Host School" :error="payeeForm.errors.food_host_school_id" required>
+                            <template #default="{ id }">
+                                <SearchableSelect :id="id" v-model="payeeForm.food_host_school_id" :options="schoolOptions"
+                                                  :all-option="true" all-label="— Select host school —" />
+                            </template>
+                        </FormField>
 
                         <div v-if="payeeForm.food_host_school_id" class="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
                             <div>
@@ -338,28 +440,24 @@
                                 </p>
                             </div>
                             <div class="grid sm:grid-cols-2 gap-3 text-xs">
-                                <div>
-                                    <label class="font-semibold text-slate-700 block mb-1">Bank Name</label>
-                                    <input v-model="payeeForm.payment_bank_name" type="text" placeholder="e.g. State Bank of India" class="field text-xs w-full">
-                                </div>
-                                <div>
-                                    <label class="font-semibold text-slate-700 block mb-1">Account Number</label>
-                                    <input v-model="payeeForm.payment_account_no" type="text" placeholder="e.g. 10482910482" class="field text-xs w-full font-mono">
-                                </div>
-                                <div>
-                                    <label class="font-semibold text-slate-700 block mb-1">IFSC Code</label>
-                                    <input v-model="payeeForm.payment_ifsc" type="text" placeholder="e.g. SBIN0001234" class="field text-xs w-full font-mono uppercase">
-                                </div>
-                                <div>
-                                    <label class="font-semibold text-slate-700 block mb-1">UPI ID</label>
-                                    <input v-model="payeeForm.payment_upi" type="text" placeholder="e.g. schoolname@upi" class="field text-xs w-full font-mono">
-                                </div>
+                                <FormField label="Bank Name" :error="payeeForm.errors.payment_bank_name">
+                                    <template #default="{ id }"><input :id="id" v-model="payeeForm.payment_bank_name" type="text" placeholder="e.g. State Bank of India" class="field text-xs w-full"></template>
+                                </FormField>
+                                <FormField label="Account Number" :error="payeeForm.errors.payment_account_no">
+                                    <template #default="{ id }"><input :id="id" v-model="payeeForm.payment_account_no" type="text" placeholder="e.g. 10482910482" class="field text-xs w-full font-mono"></template>
+                                </FormField>
+                                <FormField label="IFSC Code" :error="payeeForm.errors.payment_ifsc">
+                                    <template #default="{ id }"><input :id="id" v-model="payeeForm.payment_ifsc" type="text" placeholder="e.g. SBIN0001234" class="field text-xs w-full font-mono uppercase"></template>
+                                </FormField>
+                                <FormField label="UPI ID" :error="payeeForm.errors.payment_upi">
+                                    <template #default="{ id }"><input :id="id" v-model="payeeForm.payment_upi" type="text" placeholder="e.g. schoolname@upi" class="field text-xs w-full font-mono"></template>
+                                </FormField>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Section 2: Coupon Issuance Policy -->
+                <!-- Section 3: Coupon Issuance Policy -->
                 <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-3">
                     <h3 class="font-bold text-base text-slate-900 flex items-center gap-2">
                         <span>🎟️</span> Coupon Issuance Rule
@@ -377,7 +475,7 @@
 
                 <div class="flex justify-end">
                     <button type="submit" class="btn-primary text-xs font-bold px-6 py-2.5 shadow-sm" :disabled="payeeForm.processing">
-                        {{ payeeForm.processing ? 'Saving settings…' : 'Save Payee & Billing Settings' }}
+                        {{ payeeForm.processing ? 'Saving settings…' : 'Save Ordering & Billing Settings' }}
                     </button>
                 </div>
             </form>
@@ -393,39 +491,41 @@
                 </p>
 
                 <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="text-xs font-semibold text-slate-700 block mb-1">Date *</label>
-                        <SearchableSelect v-if="eventDates.length" v-model="assignForm.menu_date" :options="eventDateOptions"
-                                          :all-option="true" all-label="— Select Date —" />
-                        <input v-else v-model="assignForm.menu_date" type="date" class="field text-xs w-full"
-                               :min="event.event_start" :max="event.event_end">
-                    </div>
-                    <div>
-                        <label class="text-xs font-semibold text-slate-700 block mb-1">Meal Slot *</label>
-                        <SearchableSelect v-model="assignForm.meal_type" :options="mealTypeOptions"
-                                          :all-option="true" all-label="— Select Meal —" />
-                    </div>
+                    <FormField label="Date" :error="assignForm.errors.menu_date" required>
+                        <template #default="{ id }">
+                            <SearchableSelect v-if="eventDates.length" :id="id" v-model="assignForm.menu_date" :options="eventDateOptions"
+                                              :all-option="true" all-label="— Select Date —" />
+                            <input v-else :id="id" v-model="assignForm.menu_date" type="date" class="field text-xs w-full"
+                                   :min="event.event_start" :max="event.event_end">
+                        </template>
+                    </FormField>
+                    <FormField label="Meal Slot" :error="assignForm.errors.meal_type" required>
+                        <template #default="{ id }">
+                            <SearchableSelect :id="id" v-model="assignForm.meal_type" :options="mealTypeOptions"
+                                              :all-option="true" all-label="— Select Meal —" />
+                        </template>
+                    </FormField>
                 </div>
 
                 <!-- Catalog Items Selection Table -->
                 <div class="space-y-2">
                     <div class="flex items-center justify-between text-xs">
                         <span class="font-bold text-slate-700">Select Dishes ({{ selectedCatalogIds.length }} selected)</span>
-                        <input v-model="catalogSearch" type="search" placeholder="Search dishes…" class="field text-xs py-1 max-w-[12rem]">
+                        <input v-model="catalogSearch" type="search" placeholder="Search dishes…" aria-label="Search dishes to assign" class="field text-xs py-1 max-w-[12rem]">
                     </div>
 
                     <div class="max-h-64 overflow-y-auto rounded-xl border border-slate-200">
                         <table class="data-table text-xs">
                             <thead class="sticky top-0 bg-slate-50">
                                 <tr>
-                                    <th class="w-8"><input type="checkbox" :checked="allCatalogSelected" @change="toggleSelectAllCatalog"></th>
+                                    <th class="w-8"><input type="checkbox" aria-label="Select all visible dishes" :checked="allCatalogSelected" @change="toggleSelectAllCatalog"></th>
                                     <th>Dish</th>
                                     <th>Price</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr v-for="c in filteredCatalogItems" :key="c.id" class="hover:bg-slate-50/70">
-                                    <td class="align-middle"><input type="checkbox" :value="c.id" v-model="selectedCatalogIds"></td>
+                                    <td class="align-middle"><input type="checkbox" :value="c.id" v-model="selectedCatalogIds" :aria-label="`Select ${c.name}`"></td>
                                     <td>
                                         <div class="flex items-center gap-2">
                                             <VegBadge :name="c.name" :description="c.description" />
@@ -546,8 +646,143 @@ const payeeForm = useForm({
     food_payee_type: props.event.food_payee_type || 'sahodaya',
     food_host_school_id: props.event.food_host_school_id || '',
     require_payment_for_coupons: props.event.require_payment_for_coupons || false,
+    food_order_opens_at: toDateTimeLocal(props.event.food_order_opens_at),
+    food_order_closes_at: toDateTimeLocal(props.event.food_order_closes_at),
+    food_order_day_windows: buildDayWindowRows(),
     payment_bank_name: '', payment_account_no: '', payment_ifsc: '', payment_upi: '',
 });
+
+function buildDayWindowRows() {
+    const configured = props.event.food_order_day_windows ?? {};
+    const dates = [...new Set([...props.eventDates, ...Object.keys(configured)])].sort();
+
+    return dates.map((date) => ({
+        date,
+        opens_at: toDateTimeLocal(configured[date]?.opens_at),
+        closes_at: toDateTimeLocal(configured[date]?.closes_at),
+    }));
+}
+
+function toDateTimeLocal(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const pad = (part) => String(part).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function formatDateTime(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
+function parsedTime(value) {
+    if (!value) return null;
+    const time = new Date(value).getTime();
+    return Number.isNaN(time) ? null : time;
+}
+
+const orderingWindowStatus = computed(() => {
+    const now = Date.now();
+    const opensAt = parsedTime(payeeForm.food_order_opens_at);
+    const configuredClose = parsedTime(payeeForm.food_order_closes_at);
+    const phaseClose = parsedTime(props.event.phase_food_cutoff_at);
+    const closingCandidates = [configuredClose, phaseClose].filter((value) => value !== null);
+    const closesAt = closingCandidates.length ? Math.min(...closingCandidates) : null;
+
+    if (closesAt !== null && now > closesAt) {
+        return { label: 'Closed', classes: 'border-rose-200 bg-rose-50 text-rose-700' };
+    }
+    if (opensAt !== null && now < opensAt) {
+        return { label: 'Scheduled', classes: 'border-sky-200 bg-sky-50 text-sky-700' };
+    }
+    return {
+        label: opensAt === null && closesAt === null ? 'Open · no limits' : 'Open now',
+        classes: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    };
+});
+
+const configuredDayWindowsCount = computed(() => payeeForm.food_order_day_windows
+    .filter((day) => day.opens_at || day.closes_at).length);
+
+function dayWindowStatus(day) {
+    const now = Date.now();
+    const openingCandidates = [parsedTime(payeeForm.food_order_opens_at), parsedTime(day.opens_at)]
+        .filter((value) => value !== null);
+    const closingCandidates = [
+        parsedTime(payeeForm.food_order_closes_at),
+        parsedTime(props.event.phase_food_cutoff_at),
+        parsedTime(day.closes_at),
+    ].filter((value) => value !== null);
+    const opensAt = openingCandidates.length ? Math.max(...openingCandidates) : null;
+    const closesAt = closingCandidates.length ? Math.min(...closingCandidates) : null;
+
+    if (closesAt !== null && now > closesAt) {
+        return { label: 'Closed', classes: 'border-rose-200 bg-rose-50 text-rose-700' };
+    }
+    if (opensAt !== null && now < opensAt) {
+        return { label: 'Scheduled', classes: 'border-sky-200 bg-sky-50 text-sky-700' };
+    }
+    return { label: 'Open now', classes: 'border-emerald-200 bg-emerald-50 text-emerald-700' };
+}
+
+function startOrderingNow() {
+    const opensAt = toDateTimeLocal(new Date());
+    payeeForm.food_order_opens_at = opensAt;
+    if (parsedTime(payeeForm.food_order_closes_at) !== null && parsedTime(payeeForm.food_order_closes_at) <= parsedTime(opensAt)) {
+        payeeForm.food_order_closes_at = '';
+    }
+    savePayee();
+}
+
+async function closeOrderingNow() {
+    if (!(await confirm({
+        title: 'Close food ordering?',
+        message: 'Schools will no longer be able to change orders or submit payments. They can still review their order history.',
+        confirmLabel: 'Close Orders',
+        destructive: true,
+    }))) return;
+
+    const closesAt = toDateTimeLocal(new Date());
+    if (parsedTime(payeeForm.food_order_opens_at) !== null && parsedTime(payeeForm.food_order_opens_at) >= parsedTime(closesAt)) {
+        payeeForm.food_order_opens_at = '';
+    }
+    payeeForm.food_order_closes_at = closesAt;
+    savePayee();
+}
+
+function openDayNow(day) {
+    const opensAt = toDateTimeLocal(new Date());
+    day.opens_at = opensAt;
+    if (parsedTime(day.closes_at) !== null && parsedTime(day.closes_at) <= parsedTime(opensAt)) {
+        day.closes_at = '';
+    }
+    savePayee();
+}
+
+async function closeDayNow(day) {
+    if (!(await confirm({
+        title: `Close orders for ${formatCalendarDate(day.date)}?`,
+        message: 'Schools will no longer be able to add or remove food served on this date.',
+        confirmLabel: 'Close This Day',
+        destructive: true,
+    }))) return;
+
+    const closesAt = toDateTimeLocal(new Date());
+    if (parsedTime(day.opens_at) !== null && parsedTime(day.opens_at) >= parsedTime(closesAt)) {
+        day.opens_at = '';
+    }
+    day.closes_at = closesAt;
+    savePayee();
+}
+
+function clearDayWindow(day) {
+    day.opens_at = '';
+    day.closes_at = '';
+    savePayee();
+}
 
 function fillHostPayment(schoolId) {
     const d = props.schoolPaymentDetails?.[schoolId] ?? {};
