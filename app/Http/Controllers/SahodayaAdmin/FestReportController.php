@@ -1384,7 +1384,7 @@ class FestReportController extends SahodayaAdminController
      * full school list the points tables print. Same totals/ranks as the Overall ranking
      * and the per-category points tables, just cut down to the podium.
      *
-     * @return array{overall: list<array{rank: int, school: string, total: int|float}>, categories: list<array{key: string, label: string, excluded: bool, rows: list<array{rank: int, school: string, total: int|float}>}>}
+     * @return array{overall: ?list<array{rank: int, school: string, total: int|float}>, categories: list<array{key: string, label: string, excluded: bool, rows: list<array{rank: int, school: string, total: int|float}>}>}
      */
     private function finalResultSummaryData(Request $request, FestEvent $event): array
     {
@@ -1393,16 +1393,24 @@ class FestReportController extends SahodayaAdminController
         $scoreboards = app(\App\Services\Events\PublicFestScoreboardService::class);
         $excludedKeys = \App\Support\FestOverallCategoryExclusion::excluded($targetEvent->rootEvent());
 
+        // Which sections to print: ?overall=0 drops the overall page; ?categories=a,b keeps
+        // only those categories (present-but-empty = none). Neither given = everything.
+        $wantOverall = ! $request->has('overall') || $request->boolean('overall');
+        $onlyCategories = $request->has('categories')
+            ? array_values(array_filter(array_map('trim', explode(',', (string) $request->query('categories')))))
+            : null;
+
         $podium = fn (iterable $schools, string $totalKey) => collect($schools)
             ->filter(fn (array $s) => $s['rank'] <= 3 && ($s[$totalKey] ?? 0) > 0)
             ->map(fn (array $s) => ['rank' => (int) $s['rank'], 'school' => strtoupper($s['school_name']), 'total' => $s[$totalKey]])
             ->values()
             ->all();
 
-        $overall = $podium($analytics->schoolItemPointsMatrix()['schools'], 'overall');
+        $overall = $wantOverall ? $podium($analytics->schoolItemPointsMatrix()['schools'], 'overall') : null;
 
         $categories = collect($analytics->categoryWiseItemRows())
             ->keys()
+            ->filter(fn (string $key) => $onlyCategories === null || in_array($key, $onlyCategories, true))
             ->map(fn (string $key) => [
                 'key'      => $key,
                 'label'    => $key === 'open' ? 'Open' : $scoreboards->categoryLabel($targetEvent, $key),
@@ -1439,7 +1447,10 @@ class FestReportController extends SahodayaAdminController
         $headers = ['School', 'Total', 'Rank'];
         $styles = [1 => 'overall'];
 
-        $sheets = ['Overall' => ['headers' => $headers, 'rows' => $toRows($data['overall']), 'columnStyles' => $styles]];
+        $sheets = [];
+        if ($data['overall'] !== null) {
+            $sheets['Overall'] = ['headers' => $headers, 'rows' => $toRows($data['overall']), 'columnStyles' => $styles];
+        }
         foreach ($data['categories'] as $category) {
             $sheets[$category['label']] = ['headers' => $headers, 'rows' => $toRows($category['rows']), 'columnStyles' => $styles];
         }

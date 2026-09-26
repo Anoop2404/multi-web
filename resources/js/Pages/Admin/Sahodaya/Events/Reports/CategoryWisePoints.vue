@@ -18,15 +18,34 @@
             </button>
         </div>
 
-        <div class="card mb-4 px-5 py-3 flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <h3 class="section-title text-sm !mb-0">Final result summary</h3>
-                <p class="text-xs text-slate-500">Overall top 3 schools, then the top 3 schools of every category on its own page / sheet.</p>
+        <div class="card mb-4 px-5 py-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h3 class="section-title text-sm !mb-0">Final result summary — bulk print</h3>
+                    <p class="text-xs text-slate-500">Choose what to include; each ticked item prints its top 3 schools on its own page (its own sheet in Excel).</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <a v-if="summarySelectionCount" :href="summaryUrl('pdf', { preview: 1 })" target="_blank" rel="noopener" class="btn-secondary text-xs">👁️ Preview PDF</a>
+                    <a v-if="summarySelectionCount" :href="summaryUrl('pdf')" class="btn-secondary text-xs">⬇️ PDF</a>
+                    <a v-if="summarySelectionCount" :href="summaryUrl('xls')" class="btn-secondary text-xs">⬇️ Excel</a>
+                    <span v-else class="text-xs text-amber-700">Tick at least one item.</span>
+                </div>
             </div>
-            <div class="flex items-center gap-2">
-                <a :href="`${base.replace('category-wise-points', 'final-result-summary')}/pdf?preview=1`" target="_blank" rel="noopener" class="btn-secondary text-xs">👁️ Preview PDF</a>
-                <a :href="`${base.replace('category-wise-points', 'final-result-summary')}/pdf`" class="btn-secondary text-xs">⬇️ PDF</a>
-                <a :href="`${base.replace('category-wise-points', 'final-result-summary')}/xls`" class="btn-secondary text-xs">⬇️ Excel</a>
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+                <label class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-sm font-semibold cursor-pointer select-none"
+                       :class="summaryOverall ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600'">
+                    <input type="checkbox" v-model="summaryOverall" class="sr-only" />
+                    {{ summaryOverall ? '☑' : '☐' }} Overall
+                </label>
+                <label v-for="cat in categories" :key="cat.key"
+                       class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-sm font-semibold cursor-pointer select-none"
+                       :class="summaryKeys.includes(cat.key) ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600'">
+                    <input type="checkbox" :value="cat.key" v-model="summaryKeys" class="sr-only" />
+                    {{ summaryKeys.includes(cat.key) ? '☑' : '☐' }} {{ cat.label }}
+                </label>
+                <span class="w-px h-4 bg-slate-200 mx-1"></span>
+                <button type="button" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800" @click="selectAllSummary(true)">Select all</button>
+                <button type="button" class="text-xs font-semibold text-slate-500 hover:text-slate-700" @click="selectAllSummary(false)">Clear</button>
             </div>
         </div>
 
@@ -167,6 +186,21 @@ const props = defineProps({
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/category-wise-points`;
+
+// Bulk "final result summary": which of Overall / each category to print.
+const summaryOverall = ref(true);
+const summaryKeys = ref(props.categories.map((c) => c.key));
+const summarySelectionCount = computed(() => (summaryOverall.value ? 1 : 0) + summaryKeys.value.length);
+
+function selectAllSummary(all) {
+    summaryOverall.value = all;
+    summaryKeys.value = all ? props.categories.map((c) => c.key) : [];
+}
+
+function summaryUrl(format, extra = {}) {
+    const params = new URLSearchParams({ overall: summaryOverall.value ? '1' : '0', categories: summaryKeys.value.join(','), ...extra });
+    return `${base.replace('category-wise-points', 'final-result-summary')}/${format}?${params.toString()}`;
+}
 
 const activeKey = ref(props.categories[0]?.key ?? null);
 const activeCategory = computed(() => props.categories.find((c) => c.key === activeKey.value) ?? null);

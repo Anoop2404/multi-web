@@ -39,7 +39,7 @@
 
     @php
         $sections = array_merge(
-            [['label' => 'Overall — Top 3 Schools', 'excluded' => false, 'rows' => $overall, 'empty' => 'No overall results recorded yet.']],
+            $overall === null ? [] : [['label' => 'Overall — Top 3 Schools', 'excluded' => false, 'rows' => $overall, 'empty' => 'No overall results recorded yet.']],
             array_map(fn ($c) => ['label' => $c['label'].' — Top 3 Schools', 'excluded' => $c['excluded'], 'rows' => $c['rows'], 'empty' => 'No results recorded yet for this category.'], $categories),
         );
     @endphp

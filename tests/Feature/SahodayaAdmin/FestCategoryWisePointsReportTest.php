@@ -380,6 +380,20 @@ class FestCategoryWisePointsReportTest extends TestCase
         foreach ([4, 5] as $n) {
             $this->assertStringNotContainsString("PODIUM SCHOOL {$n}", $xml, 'only the top 3 ranks are listed');
         }
+
+        // Bulk selection: overall only / one category only / neither.
+        $overallOnly = $this->actingAs($admin)->get("{$base}/xls?overall=1&categories=")->streamedContent();
+        $this->assertSame(1, substr_count($overallOnly, '<Worksheet'));
+        $this->assertStringContainsString('ss:Name="Overall"', $overallOnly);
+
+        $categoryOnly = $this->actingAs($admin)->get("{$base}/xls?overall=0&categories=hs")->streamedContent();
+        $this->assertSame(1, substr_count($categoryOnly, '<Worksheet'));
+        $this->assertStringNotContainsString('ss:Name="Overall"', $categoryOnly);
+        $this->assertStringContainsString('PODIUM SCHOOL 1', $categoryOnly);
+
+        $unknownCategory = $this->actingAs($admin)->get("{$base}/xls?overall=0&categories=nope")->streamedContent();
+        $this->assertStringNotContainsString('PODIUM SCHOOL', $unknownCategory);
+        $this->actingAs($admin)->get("{$base}/pdf?preview=1&overall=0&categories=hs")->assertOk();
     }
 
     /**
