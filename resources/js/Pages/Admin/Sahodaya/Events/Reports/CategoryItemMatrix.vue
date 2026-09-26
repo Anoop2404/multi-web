@@ -4,9 +4,11 @@
         <PageHeader :title="`${event.title} — Category & Item-wise Consolidated Report`" eyebrow="Reports"
                     description="Every school's points per item, grouped by category, with subtotal and overall columns — matches the printed result-sheet format.">
             <template #actions>
-                <a :href="`${exportBase}/category-item-matrix-pdf`" class="btn-secondary text-sm">⬇️ PDF</a>
+                <a :href="`${exportBase}/category-item-matrix-pdf?preview=1`" target="_blank" rel="noopener" class="btn-secondary text-sm">👁️ Preview PDF</a>
+                <a :href="`${exportBase}/category-item-matrix-pdf?download=1`" class="btn-secondary text-sm">⬇️ PDF</a>
                 <a :href="`${exportBase}/category-item-matrix-xls`" class="btn-secondary text-sm">⬇️ Excel</a>
-                <a :href="`${exportBase}/category-totals-pdf`" class="btn-secondary text-sm">⬇️ Category Totals (PDF)</a>
+                <a :href="`${exportBase}/category-totals-pdf?preview=1`" target="_blank" rel="noopener" class="btn-secondary text-sm">👁️ Category Totals</a>
+                <a :href="`${exportBase}/category-totals-pdf?download=1`" class="btn-secondary text-sm">⬇️ Category Totals (PDF)</a>
                 <a :href="`${exportBase}/category-totals-xls`" class="btn-secondary text-sm">⬇️ Category Totals (Excel)</a>
             </template>
         </PageHeader>
@@ -29,7 +31,8 @@
             <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Category Totals — per Phase:</span>
             <div v-for="phase in phaseOptions" :key="phase.id" class="flex items-center gap-1.5">
                 <span class="text-xs font-semibold text-slate-600">{{ phase.short_title || phase.title }}</span>
-                <a :href="phaseCategoryTotalsUrl(phase.id, 'pdf')" class="btn-secondary text-xs">PDF</a>
+                <a :href="`${phaseCategoryTotalsUrl(phase.id, 'pdf')}?preview=1`" target="_blank" rel="noopener" class="btn-secondary text-xs">👁️</a>
+                <a :href="`${phaseCategoryTotalsUrl(phase.id, 'pdf')}?download=1`" class="btn-secondary text-xs">PDF</a>
                 <a :href="phaseCategoryTotalsUrl(phase.id, 'xls')" class="btn-secondary text-xs">Excel</a>
             </div>
         </div>

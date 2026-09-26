@@ -64,6 +64,7 @@
                         <a :href="categoryPdfUrl(activeCategory, false)" class="btn-secondary text-xs">⬇️ PDF</a>
                         <a :href="categoryXlsUrl(activeCategory)" class="btn-secondary text-xs">⬇️ Excel</a>
                         <span class="w-px h-4 bg-slate-200 mx-1"></span>
+                        <a :href="`${categorySummaryPdfUrl(activeCategory)}?preview=1`" target="_blank" rel="noopener" class="btn-secondary text-xs">👁️ Totals Only</a>
                         <a :href="categorySummaryPdfUrl(activeCategory)" class="btn-secondary text-xs">⬇️ Totals Only (PDF)</a>
                         <a :href="categorySummaryXlsUrl(activeCategory)" class="btn-secondary text-xs">⬇️ Totals Only (Excel)</a>
                     </div>

@@ -381,4 +381,47 @@ class FestCategoryWisePointsReportTest extends TestCase
             $this->assertStringNotContainsString("PODIUM SCHOOL {$n}", $xml, 'only the top 3 ranks are listed');
         }
     }
+
+    /**
+     * The category totals / final summary / overall ranking PDFs let Chromium draw the branding
+     * header and page-number footer on every page (so a long table keeps its heading on
+     * page 2+), instead of one in-page heading that only ever prints on page 1; the view
+     * then must not draw its own copy or it doubles up.
+     */
+    public function test_converter_pdfs_use_the_repeating_chromium_header_and_skip_the_in_page_heading(): void
+    {
+        config(['services.pdf_converter.url' => 'https://pdf.example.test/generate-pdf']);
+        \Illuminate\Support\Facades\Http::fake(['pdf.example.test/*' => \Illuminate\Support\Facades\Http::response('%PDF-1.4 fake', 200)]);
+
+        [$sahodaya, $event, $admin] = $this->fixture();
+        $base = "/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports";
+
+        $urls = [
+            "{$base}/final-result-summary/pdf?preview=1",
+            "{$base}/category-wise-points/hs/summary-pdf?preview=1",
+            "{$base}/export/category-totals-pdf?preview=1",
+            "{$base}/export/overall-ranking?preview=1",
+        ];
+
+        foreach ($urls as $url) {
+            \Illuminate\Support\Facades\Http::fake(['pdf.example.test/*' => \Illuminate\Support\Facades\Http::response('%PDF-1.4 fake', 200)]);
+            $response = $this->actingAs($admin)->get($url);
+            $this->assertSame(200, $response->getStatusCode(), $url);
+            $this->assertStringContainsString('inline', (string) $response->headers->get('content-disposition'), "{$url} previews inline");
+
+            \Illuminate\Support\Facades\Http::assertSent(function ($request) use ($url) {
+                $payload = $request->data();
+                $this->assertNotEmpty($payload['headerTemplate'] ?? null, "{$url} needs the repeating Chromium header");
+                $this->assertNotEmpty($payload['footerTemplate'] ?? null);
+                $this->assertStringContainsString('32mm', $payload['html'], "{$url} reserves room for that header via @page");
+                $this->assertStringNotContainsString('<h1>', $payload['html'], "{$url} must not also print its own heading");
+
+                return true;
+            });
+        }
+
+        // Download variant: same PDF, attachment disposition.
+        $download = $this->actingAs($admin)->get("{$base}/export/overall-ranking?download=1");
+        $this->assertStringContainsString('attachment', (string) $download->headers->get('content-disposition'));
+    }
 }

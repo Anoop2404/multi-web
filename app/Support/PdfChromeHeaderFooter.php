@@ -45,4 +45,36 @@ class PdfChromeHeaderFooter
 
         return [$header, $footer];
     }
+
+    /** Page margins that leave room for the Chromium header/footer built above. */
+    public const MARGIN = ['top' => '32mm', 'right' => '10mm', 'bottom' => '14mm', 'left' => '10mm'];
+
+    /**
+     * Renders a report view to PDF with the branding header + page-number footer repeating
+     * on every page when the external Chromium converter is configured; on the dompdf
+     * fallback the view itself draws the branding once (it gets `$isDomPdf`, and must skip
+     * its own in-page heading / use the wider `@page` margin only when that is false --
+     * see fest/reports/final-result-summary.blade.php). $inline previews, otherwise it
+     * downloads.
+     *
+     * @param  array<string, mixed>  $data  must carry orgName and logoSrc
+     */
+    public static function download(string $view, array $data, string $filename, bool $inline, string $docTitle, string $eventTitle, bool $landscape = false)
+    {
+        $isDomPdf = empty(config('services.pdf_converter.url'));
+        $data['isDomPdf'] = $isDomPdf;
+
+        if ($isDomPdf) {
+            return PdfGenerator::fromView($view, $data, $filename, $inline, $landscape);
+        }
+
+        [$header, $footer] = self::build([
+            'orgName'    => $data['orgName'] ?? 'Sahodaya',
+            'logoSrc'    => $data['logoSrc'] ?? null,
+            'docTitle'   => $docTitle,
+            'eventTitle' => $eventTitle,
+        ]);
+
+        return PdfGenerator::fromView($view, $data, $filename, $inline, $landscape, $header, $footer, self::MARGIN);
+    }
 }

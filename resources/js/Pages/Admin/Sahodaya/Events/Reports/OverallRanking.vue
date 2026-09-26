@@ -3,7 +3,8 @@
         <PageHeader :title="`${event.title} — Ranking`" eyebrow="Reports"
                     description="Overall school ranking from published marks.">
             <template #actions>
-                <a :href="pdfUrl" target="_blank" class="btn-primary text-sm">Download PDF ↓</a>
+                <a :href="withQuery(pdfUrl, 'preview=1')" target="_blank" rel="noopener" class="btn-secondary text-sm">👁️ Preview PDF</a>
+                <a :href="withQuery(pdfUrl, 'download=1')" class="btn-primary text-sm">Download PDF ↓</a>
             </template>
         </PageHeader>
 
@@ -24,6 +25,12 @@ import { Link } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
+
+// pdfUrl may already carry ?region_id=..; the export defaults to an inline preview, so the
+// download button has to ask for ?download=1 explicitly.
+function withQuery(url, query) {
+    return url + (url.includes('?') ? '&' : '?') + query;
+}
 
 defineProps({ sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number, event: Object, rankings: Array, pdfUrl: String,
     activityLogs: { type: Array, default: () => [] },

@@ -1348,17 +1348,15 @@ class FestReportController extends SahodayaAdminController
             strtoupper($school['school_name']), $school['subtotal'], $school['rank'],
         ])->all();
 
-        $html = view('fest.reports.category-points-summary', [
+        $filename = \App\Support\ReportFilename::build('category-points-summary', $event->title, $event->event_start, [$category]);
+
+        return \App\Support\PdfChromeHeaderFooter::download('fest.reports.category-points-summary', [
             'event'         => $event,
             'categoryLabel' => $categoryLabel,
             'rows'          => $rows,
             'orgName'       => $this->sahodaya->name,
             'logoSrc'       => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
-        ])->render();
-
-        $filename = \App\Support\ReportFilename::build('category-points-summary', $event->title, $event->event_start, [$category]);
-
-        return \App\Support\PdfGenerator::download($html, $filename, $request->boolean('inline') || $request->boolean('preview'));
+        ], $filename, $request->boolean('inline') || $request->boolean('preview'), "{$categoryLabel} Totals", $event->title);
     }
 
     /** Excel sibling of categoryWisePointsSummaryPdf() above. */
@@ -1422,15 +1420,13 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $html = view('fest.reports.final-result-summary', $this->finalResultSummaryData($request, $event) + [
+        $filename = \App\Support\ReportFilename::build('final-result-summary', $event->title, $event->event_start);
+
+        return \App\Support\PdfChromeHeaderFooter::download('fest.reports.final-result-summary', $this->finalResultSummaryData($request, $event) + [
             'event'   => $event,
             'orgName' => $this->sahodaya->name,
             'logoSrc' => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
-        ])->render();
-
-        $filename = \App\Support\ReportFilename::build('final-result-summary', $event->title, $event->event_start);
-
-        return \App\Support\PdfGenerator::download($html, $filename, $request->boolean('inline') || $request->boolean('preview'));
+        ], $filename, $request->boolean('inline') || $request->boolean('preview'), 'Final Result Summary', $event->title);
     }
 
     /** Excel sibling: an "Overall" sheet, then one sheet per category. */

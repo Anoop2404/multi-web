@@ -1187,13 +1187,28 @@ class FestReportService
         ], $this->slug().'-school-wise.pdf');
     }
 
+    /**
+     * Portrait report with branding + page numbers repeating on every page (Chromium
+     * header/footer when the converter is configured, an in-page heading on dompdf);
+     * previews inline unless the request carries ?download=1.
+     */
+    private function chromeReportPdf(string $view, array $data, string $filename, string $docTitle): \Symfony\Component\HttpFoundation\Response
+    {
+        return \App\Support\PdfChromeHeaderFooter::download(
+            $view,
+            $data + ['event' => $this->event, ...$this->brandingData()],
+            $filename,
+            $this->preview,
+            $docTitle,
+            $this->event->title,
+        );
+    }
+
     private function overallRankingPdf(): \Symfony\Component\HttpFoundation\Response
     {
-        return $this->renderPdf('fest.reports.overall-ranking', [
-            'event'   => $this->event,
+        return $this->chromeReportPdf('fest.reports.overall-ranking', [
             'schools' => $this->schoolRankingRows(),
-            ...$this->brandingData(),
-        ], $this->slug().'-overall-ranking.pdf');
+        ], $this->slug().'-overall-ranking.pdf', 'Overall School Ranking');
     }
 
     /**
@@ -1248,12 +1263,10 @@ class FestReportService
     {
         ['categories' => $categories, 'rows' => $rows] = $this->categoryTotalsData($analytics);
 
-        return $this->renderPdf('fest.reports.category-totals', [
-            'event'      => $this->event,
+        return $this->chromeReportPdf('fest.reports.category-totals', [
             'categories' => $categories,
             'rows'       => $rows,
-            ...$this->brandingData(),
-        ], $this->slug().'-category-totals.pdf');
+        ], $this->slug().'-category-totals.pdf', 'Category-wise Totals');
     }
 
     private function categoryItemMatrixXls(FestEventReportAnalyticsService $analytics): StreamedResponse
@@ -2197,12 +2210,10 @@ class FestReportService
 
     private function sahodayaRankingPdf(): \Symfony\Component\HttpFoundation\Response
     {
-        return $this->renderPdf('fest.reports.overall-ranking', [
-            'event'   => $this->event,
+        return $this->chromeReportPdf('fest.reports.overall-ranking', [
             'schools' => $this->schoolRankingRows(),
             'title'   => 'Sahodaya School Ranking',
-            ...$this->brandingData(),
-        ], $this->slug().'-sahodaya-ranking.pdf');
+        ], $this->slug().'-sahodaya-ranking.pdf', 'Sahodaya School Ranking');
     }
 
     private function studentParticipationXls(Request $request): StreamedResponse
