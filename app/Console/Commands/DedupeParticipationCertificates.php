@@ -9,7 +9,7 @@ use Illuminate\Console\Command;
 
 class DedupeParticipationCertificates extends Command
 {
-    protected $signature = 'fest:participation-duplicates {event : Event id (any event of the family)} {--tenant= : Sahodaya tenant id to run against (per-Sahodaya databases)} {--fix : Remove the extra certificates (re-runs participation generation, which revokes duplicates)}';
+    protected $signature = 'fest:participation-duplicates {event : Event id (any event of the family)} {--tenant= : Sahodaya tenant id to run against (per-Sahodaya databases)} {--fix : Remove the extra certificates (deletes the extra certificates, keeping the lowest-anchored one per student)}';
 
     protected $description = 'List (and with --fix remove) participation certificates that duplicate a student who already has one';
 
@@ -59,8 +59,20 @@ class DedupeParticipationCertificates extends Command
         }
 
         if ($this->option('fix') && $duplicates->isNotEmpty()) {
-            $service->generateParticipationForEvent($root);
-            $this->info('Regenerated participation certificates from the parent event; duplicates revoked.');
+            // The certificate a student keeps is the one on their lowest participant row -- the
+            // same one every list, print and ZIP already shows. Remove the others directly
+            // (and their rendered files) instead of relying on a regeneration run.
+            $removed = $service->deleteDuplicateCertificates($duplicates);
+            $this->info("Removed {$removed} duplicate certificate(s).");
+
+            $remaining = \App\Models\Certificate::where('entity_type', FestParticipant::class)
+                ->where('cert_type', 'participation')
+                ->whereIn('entity_id', $all->pluck('entity_id'))
+                ->get();
+            [, $left] = $service->splitParticipationDuplicates($remaining);
+            $this->info("Participation certificates now: {$remaining->count()} | duplicates left: {$left->count()}");
+
+            return $left->isEmpty() ? self::SUCCESS : self::FAILURE;
         } elseif ($duplicates->isNotEmpty()) {
             $this->line('Re-run with --fix to remove them.');
         }

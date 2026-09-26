@@ -290,7 +290,9 @@ class FestParticipationCertificateParentTest extends TestCase
         $this->assertSame(2, Certificate::where('cert_type', 'participation')->count(), 'report only, nothing removed');
 
         $this->artisan('fest:participation-duplicates', ['event' => $f['root']->id, '--fix' => true])->assertSuccessful();
-        $this->assertSame(1, Certificate::where('cert_type', 'participation')->count());
+        $left = Certificate::where('cert_type', 'participation')->get();
+        $this->assertCount(1, $left);
+        $this->assertSame((int) FestParticipant::where('student_id', $f['student']->id)->min('id'), (int) $left->first()->entity_id, 'the lowest-anchored certificate is the one kept');
     }
     public function test_generate_reuses_an_existing_certificate_for_a_student_instead_of_creating_a_second(): void
     {

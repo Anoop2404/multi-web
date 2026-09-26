@@ -190,6 +190,8 @@ class FestCertificateService
             $lock = \Illuminate\Support\Facades\Cache::lock('fest-participation-generate:'.$event->id, 300);
             $acquired = $lock->block(120);
         } catch (\Illuminate\Contracts\Cache\LockTimeoutException) {
+            \Illuminate\Support\Facades\Log::warning('Participation generation skipped: another run held the lock', ['event' => $event->id]);
+
             return [];
         } catch (\Throwable) {
             return $this->generateParticipationUnlocked($event);
@@ -1726,6 +1728,14 @@ class FestCertificateService
             $certificates->reject(fn (Certificate $c) => $duplicateIds->has($c->id))->values(),
             $certificates->filter(fn (Certificate $c) => $duplicateIds->has($c->id))->values(),
         ];
+    }
+
+    /** Deletes the given (duplicate) certificates and their rendered files. */
+    public function deleteDuplicateCertificates(\Illuminate\Support\Collection $duplicates): int
+    {
+        $this->deleteCertificatesWithFiles($duplicates);
+
+        return $duplicates->count();
     }
 
     public function dedupeParticipationPerPerson(\Illuminate\Support\Collection $certificates): \Illuminate\Support\Collection
