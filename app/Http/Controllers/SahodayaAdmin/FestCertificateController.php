@@ -547,23 +547,31 @@ class FestCertificateController extends SahodayaAdminController
 
         $certIds = $groups->flatMap(fn (array $g) => collect($g['winners'])->pluck('id'));
         $printedAt = FestCertificatePrint::whereIn('certificate_id', $certIds)->pluck('printed_at', 'certificate_id');
-        $classes = \App\Models\Student::with('schoolClass:id,name')
-            ->whereIn('id', $groups->flatMap(fn (array $g) => collect($g['winners'])->pluck('student_id'))->filter()->unique())
-            ->get(['id', 'school_class_id'])->keyBy('id');
+        $studentIds = $groups->flatMap(fn (array $g) => collect($g['winners'])->pluck('student_id'))->filter()->unique()->values();
+        $regNos = \App\Models\Student::whereIn('id', $studentIds)->pluck('reg_no', 'id');
+        // Fest ID = the registration number the student competes under (same field the
+        // student-wise reports print as Fest ID); first one found across their entries.
+        $festIds = FestParticipant::whereIn('student_id', $studentIds)
+            ->whereNotNull('level_registration_number')
+            ->whereIn('event_id', $event->rootEvent()->reportableEventIds())
+            ->orderBy('id')
+            ->pluck('level_registration_number', 'student_id');
 
-        return $groups->map(function (array $g) use ($status, $printedAt, $classes) {
-            $students = collect($g['winners'])->map(function (array $w) use ($printedAt, $classes) {
+        return $groups->map(function (array $g) use ($status, $printedAt, $regNos, $festIds) {
+            $students = collect($g['winners'])->map(function (array $w) use ($printedAt, $regNos, $festIds) {
                 $state = $w['printed'] ? 'printed' : ($w['complete'] ? 'ready' : 'awaiting');
 
                 return [
                     'name' => $w['name'],
-                    'class' => $classes->get($w['student_id'])?->schoolClass?->name,
-                    'items' => collect($w['items'] ?? [])->pluck('title')->all(),
+                    'student_id' => $regNos->get($w['student_id']),
+                    'fest_id' => $festIds->get($w['student_id']),
                     'status' => $state,
                     'printed_at' => $w['printed'] ? $printedAt->get($w['id']) : null,
-                    'awaiting' => $w['pending_items'],
                 ];
-            })->sortBy(fn ($r) => mb_strtolower($r['name']))->values();
+            })
+                // Printed students first, the rest after; each block alphabetical.
+                ->sortBy(fn ($r) => ($r['status'] === 'printed' ? '0' : '1').mb_strtolower($r['name']))
+                ->values();
 
             $counts = [
                 'total' => $students->count(),
@@ -616,32 +624,26 @@ class FestCertificateController extends SahodayaAdminController
     public function printStatusXls(Request $request, string $tenantId, FestEvent $event)
     {
         [$schools, $status] = $this->printStatusRequest($request, $event);
-        $labels = ['printed' => 'Printed', 'ready' => 'Ready to print', 'awaiting' => 'Awaiting results'];
-
         $rows = [];
-        $summary = [];
         foreach ($schools as $school) {
-            $summary[] = [strtoupper($school['name']), $school['counts']['total'], $school['counts']['printed'], $school['counts']['ready'], $school['counts']['awaiting']];
             foreach ($school['students'] as $i => $student) {
                 $rows[] = [
                     strtoupper($school['name']),
                     $i + 1,
+                    $student['student_id'],
+                    $student['fest_id'],
                     $student['name'],
-                    $student['class'],
-                    implode(', ', $student['items']),
-                    $labels[$student['status']],
-                    $student['printed_at']?->format('d M Y, h:i A'),
-                    implode(', ', $student['awaiting']),
+                    '', // Verified -- ticked by hand
+                    '', // Correct -- ticked by hand
+                    $student['status'] === 'printed' ? 'Printed' : '',
                 ];
             }
         }
 
-        return \App\Support\ExcelExport::downloadMultiSheet(
+        return \App\Support\ExcelExport::download(
             pathinfo(\App\Support\ReportFilename::build('certificate-print-status', $event->title, now(), [$status], 'xls'), PATHINFO_FILENAME),
-            [
-                'Students' => ['headers' => ['School', '#', 'Student', 'Class', 'Items', 'Status', 'Printed on', 'Awaiting results for'], 'rows' => $rows],
-                'School summary' => ['headers' => ['School', 'Students', 'Printed', 'Ready to print', 'Awaiting results'], 'rows' => $summary],
-            ],
+            ['School', '#', 'Student ID', 'Fest ID', 'Student', 'Verified', 'Correct', 'Printed'],
+            $rows,
             \App\Support\ExcelExport::generatedOnNote(),
         );
     }

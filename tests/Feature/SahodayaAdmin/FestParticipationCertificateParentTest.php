@@ -375,12 +375,16 @@ class FestParticipationCertificateParentTest extends TestCase
         $xml = $this->actingAs($admin)->get("{$base}/xls")->streamedContent();
         $this->assertStringContainsString('Two Leg Student', $xml);
         $this->assertStringContainsString('Late Student', $xml);
-        $this->assertStringContainsString('Ready to print', $xml);
-        $this->assertStringContainsString('Awaiting results', $xml);
-        $this->assertStringContainsString('Late Item', $xml);
+        foreach (['Student ID', 'Fest ID', 'Verified', 'Correct', 'Printed'] as $column) {
+            $this->assertStringContainsString(">{$column}<", $xml);
+        }
+        $this->assertStringNotContainsString('Class', $xml, 'no class column');
 
         // After printing the complete student, the "not printed" filter keeps only the other one.
         $this->actingAs($admin)->postJson(str_replace('print-status', 'print-complete', $base), [])->assertOk();
+        // In the full list the printed student comes first, the rest after.
+        $all = $this->actingAs($admin)->get("{$base}/xls")->streamedContent();
+        $this->assertLessThan(strpos($all, 'Late Student'), strpos($all, 'Two Leg Student'), 'printed students are listed first');
         $unprinted = $this->actingAs($admin)->get("{$base}/xls?status=unprinted")->streamedContent();
         $this->assertStringContainsString('Late Student', $unprinted);
         $this->assertStringNotContainsString('Two Leg Student', $unprinted);

@@ -428,13 +428,13 @@
                 <span class="font-semibold text-slate-700">📋 Student print status by school:</span>
                 <select v-model="statusFilter" class="field text-xs py-1 px-2 w-auto">
                     <option value="all">All students</option>
-                    <option value="unprinted">Not printed yet (ready + awaiting)</option>
+                    <option value="unprinted">Not printed yet</option>
                     <option value="printed">Printed</option>
                 </select>
                 <a :href="statusUrl('pdf', { preview: 1 })" target="_blank" rel="noopener" class="btn-secondary py-1 px-3 text-xs">👁️ Preview PDF</a>
                 <a :href="statusUrl('pdf')" class="btn-secondary py-1 px-3 text-xs">⬇️ PDF</a>
                 <a :href="statusUrl('xls')" class="btn-secondary py-1 px-3 text-xs">⬇️ Excel</a>
-                <span class="text-slate-500">One page per school: each student with class, items and whether they are printed, ready or awaiting results.</span>
+                <span class="text-slate-500">One page per school: Student ID, Fest ID, name, blank Verified / Correct boxes to tick by hand, and a Printed mark.</span>
             </div>
             <div v-if="printRun" class="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs text-emerald-900 flex flex-wrap items-center gap-x-4 gap-y-1">
                 <span>✓ Sent {{ printRun.count }} certificate{{ printRun.count === 1 ? '' : 's' }} from {{ printRun.schools }} school{{ printRun.schools === 1 ? '' : 's' }} to print and marked them printed.</span>
