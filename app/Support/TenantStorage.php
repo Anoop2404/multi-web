@@ -669,7 +669,12 @@ class TenantStorage
      * this is faster, not just more reliable. Falls back to the original bytes if GD
      * isn't installed or resizing fails for any reason.
      */
-    public static function photoBase64DataUri(?Tenant $tenant, ?string $relativePath, int $maxDimension = 160): ?string
+    public static function photoBase64DataUri(
+        ?Tenant $tenant,
+        ?string $relativePath,
+        int $maxDimension = 160,
+        bool $preserveCmykJpeg = false,
+    ): ?string
     {
         if (! $relativePath) {
             return null;
@@ -696,7 +701,7 @@ class TenantStorage
         if ($local && is_file($local)) {
             $contents = @file_get_contents($local);
             if ($contents !== false && $contents !== '') {
-                [$contents, $mime] = self::shrinkImageForEmbed($contents, $maxDimension)
+                [$contents, $mime] = self::shrinkImageForEmbed($contents, $maxDimension, $preserveCmykJpeg)
                     ?? [$contents, @mime_content_type($local) ?: 'image/jpeg'];
 
                 return 'data:'.$mime.';base64,'.base64_encode($contents);
@@ -709,7 +714,7 @@ class TenantStorage
                 if ($contents === null || $contents === '') {
                     continue;
                 }
-                [$contents, $mime] = self::shrinkImageForEmbed($contents, $maxDimension)
+                [$contents, $mime] = self::shrinkImageForEmbed($contents, $maxDimension, $preserveCmykJpeg)
                     ?? [$contents, self::detectMimeFromBytes($contents)];
 
                 return 'data:'.$mime.';base64,'.base64_encode($contents);
@@ -741,8 +746,11 @@ class TenantStorage
         }
 
         // For storage-relative paths, delegate to the existing method (handles local + all disks).
+        // Background artwork is commonly supplied as a colour-managed CMYK JPEG. GD
+        // does not preserve that profile while resizing and can turn muted pinks into
+        // neon magenta, so keep those original bytes for the PDF renderer.
         if (! str_starts_with($path, 'http://') && ! str_starts_with($path, 'https://')) {
-            return self::photoBase64DataUri($tenant, $path, $maxDimension);
+            return self::photoBase64DataUri($tenant, $path, $maxDimension, preserveCmykJpeg: true);
         }
 
         // The path is already a full URL (e.g. an S3 signed URL resolved by logoUrl()).
@@ -754,7 +762,7 @@ class TenantStorage
             if ($contents === false || $contents === '') {
                 return null;
             }
-            [$contents, $mime] = self::shrinkImageForEmbed($contents, $maxDimension)
+            [$contents, $mime] = self::shrinkImageForEmbed($contents, $maxDimension, preserveCmykJpeg: true)
                 ?? [$contents, self::detectMimeFromBytes($contents)];
 
             return 'data:'.$mime.';base64,'.base64_encode($contents);
@@ -816,13 +824,24 @@ class TenantStorage
      *
      * @return array{0: string, 1: string}|null [contents, mime]
      */
-    private static function shrinkImageForEmbed(string $contents, int $maxDimension): ?array
+    private static function shrinkImageForEmbed(
+        string $contents,
+        int $maxDimension,
+        bool $preserveCmykJpeg = false,
+    ): ?array
     {
         if (! function_exists('imagecreatefromstring') || $contents === '') {
             return null;
         }
 
         try {
+            if ($preserveCmykJpeg) {
+                $imageInfo = @getimagesizefromstring($contents);
+                if (($imageInfo['mime'] ?? null) === 'image/jpeg' && ($imageInfo['channels'] ?? null) === 4) {
+                    return null;
+                }
+            }
+
             $src = @imagecreatefromstring($contents);
             if (! $src) {
                 return null;
