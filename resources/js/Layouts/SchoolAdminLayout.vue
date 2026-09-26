@@ -133,6 +133,7 @@ import {
 } from '@/support/schoolAdminNav.js';
 import { detectSchoolEventFromUrl, schoolEventScopedNav } from '@/support/schoolEventNav.js';
 import { computed, ref, watch } from 'vue';
+import { useStaleRefresh } from '@/composables/useStaleRefresh.js';
 
 const props = defineProps({
     title:   { type: String, default: 'Dashboard' },
@@ -143,6 +144,9 @@ const props = defineProps({
 });
 
 const page = usePage();
+
+// Re-fetch page data when the tab is revisited after a while, so other admins' changes show up.
+useStaleRefresh();
 const mobileNavOpen = ref(false);
 const navSearch = ref('');
 const isStaffUser = computed(() => props.isStaff || page.props.isStaff);
