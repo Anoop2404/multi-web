@@ -365,9 +365,9 @@ class FestParticipationCertificateParentTest extends TestCase
         FestParticipant::create(['registration_id' => $reg->id, 'student_id' => $late->id, 'participant_type' => 'student', 'participant_role' => 'performer', 'chest_no' => 2]);
         app(FestCertificateService::class)->generateParticipationForEvent($f['root']);
 
-        // The school's class "10" belongs to "Category 3" for this Sahodaya -> C3.
-        $category = \App\Models\ClassCategory::create(['sahodaya_id' => $f['root']->tenant_id, 'code' => 'c3', 'label' => 'Category 3', 'min_class' => 8, 'max_class' => 10, 'is_active' => true, 'sort_order' => 3]);
-        \App\Models\MasterClass::create(['sahodaya_id' => $f['root']->tenant_id, 'class_category_id' => $category->id, 'name' => '10', 'display_order' => 10, 'is_active' => true]);
+        // The fest's own category scheme: classes 8, 9 & 10 are Category 3 -> C3.
+        $f['root']->update(['fee_settings' => array_merge((array) $f['root']->fee_settings, ['class_group_scheme' => 'custom'])]);
+        \App\Models\FestEventClassGroup::create(['tenant_id' => $f['root']->tenant_id, 'event_id' => $f['root']->id, 'key' => 'category_3', 'label' => 'Category 3', 'classes' => [8, 9, 10], 'sort_order' => 3]);
 
         FestEventItem::whereIn('title', ['Pencil Drawing', 'Solo Song'])->update(['results_published_at' => now()]);
 

@@ -17,7 +17,9 @@
         td.num, th.num { width: 34px; text-align: center; padding: 0 2px; }
         td.id, th.id { width: 62px; text-align: center; }
         td.cat, th.cat { width: 56px; text-align: center; }
-        td.done, th.done { width: 74px; text-align: center; font-weight: bold; color: #166534; }
+        td.done, th.done { width: 74px; text-align: center; font-weight: bold; }
+        td.done { color: #166534; }
+        th.done { color: #fff; }
         td.chk, th.chk { width: 78px; text-align: center; }
         td.items { font-size: 10px; line-height: 1.35; padding-top: 3px; padding-bottom: 3px; }
         .box { display: inline-block; width: 14px; height: 14px; border: 1.5px solid #475569; vertical-align: middle; }

@@ -551,14 +551,18 @@ class FestCertificateController extends SahodayaAdminController
             ->get(['id', 'school_class_id'])
             ->mapWithKeys(fn ($st) => [$st->id => trim((string) $st->schoolClass?->name)]);
 
-        // Class -> category code ("Category 1" => C1) from the Sahodaya's class categories.
-        $categoryByClass = app(\App\Services\Membership\EffectiveMasterDataResolver::class)
-            ->masterClasses($this->sahodaya->id)
-            ->mapWithKeys(function ($class) {
-                $label = (string) $class->classCategory?->label;
-
-                return [trim((string) $class->name) => preg_match('/(\d+)/', $label, $m) ? 'C'.$m[1] : $label];
-            });
+        // Class -> the fest's own category code (C1, C2, ...), read from the event's category
+        // scheme labels ("Category 1 — Classes 3 & 4" => classes 3 and 4 are C1) -- the same
+        // categories the items and results use, not the school stage names (Primary, ...).
+        $categoryByClass = [];
+        foreach (FestClassGroupScheme::labels(null, $event->rootEvent()) as $label) {
+            if (preg_match('/Category\s*(\d+)/i', (string) $label, $cat) && preg_match('/Classes?\s*(.+)$/i', (string) $label, $classes)) {
+                preg_match_all('/\d+/', $classes[1], $numbers);
+                foreach ($numbers[0] as $number) {
+                    $categoryByClass[(string) (int) $number] = 'C'.$cat[1];
+                }
+            }
+        }
 
         // Fest ID = the registration number the student competes under (same field the
         // student-wise reports print as Fest ID); first one found across their entries.
@@ -570,18 +574,30 @@ class FestCertificateController extends SahodayaAdminController
 
         return $groups->map(function (array $g) use ($status, $classNames, $categoryByClass, $festIds) {
             $students = collect($g['winners'])->map(function (array $w) use ($classNames, $categoryByClass, $festIds) {
+                // By class number; if the class isn't listed in the scheme, fall back to the
+                // category of their (non-open) items.
+                $classNumber = preg_match('/\d+/', (string) $classNames->get($w['student_id'], ''), $m) ? (string) (int) $m[0] : null;
+                $category = $classNumber !== null ? ($categoryByClass[$classNumber] ?? null) : null;
+                if ($category === null) {
+                    $category = collect($w['items'] ?? [])
+                        ->map(fn ($i) => (string) ($i['category_label'] ?? ''))
+                        ->filter(fn ($label) => preg_match('/Category\s*(\d+)/i', $label) && ! preg_match('/group|open/i', $label))
+                        ->map(fn ($label) => 'C'.preg_replace('/\D+/', '', (string) preg_replace('/^.*?Category\s*(\d+).*$/i', '$1', $label)))
+                        ->first() ?? '';
+                }
+
                 return [
                     'name' => $w['name'],
                     'fest_id' => $festIds->get($w['student_id']),
-                    'category' => $categoryByClass->get($classNames->get($w['student_id'], ''), ''),
+                    'category' => $category,
                     'items' => collect($w['items'] ?? [])->pluck('title')->all(),
                     // Every item they entered has published results.
                     'complete' => (bool) $w['complete'],
                     'status' => $w['printed'] ? 'printed' : ($w['complete'] ? 'ready' : 'awaiting'),
                 ];
             })
-                // Printed students first, the rest after; each block alphabetical.
-                ->sortBy(fn ($r) => ($r['status'] === 'printed' ? '0' : '1').mb_strtolower($r['name']))
+                // Complete students first, the rest after; each block alphabetical.
+                ->sortBy(fn ($r) => ($r['complete'] ? '0' : '1').mb_strtolower($r['name']))
                 ->values();
 
             $counts = [
