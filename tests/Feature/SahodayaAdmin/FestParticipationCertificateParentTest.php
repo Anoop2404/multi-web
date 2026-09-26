@@ -152,4 +152,36 @@ class FestParticipationCertificateParentTest extends TestCase
         $this->assertEqualsCanonicalizing(['Pencil Drawing', 'Solo Song'], array_column(((array) $rows[0])['items'], 'title'));
         $this->assertSame('PARENT CERT SCHOOL', strtoupper(((array) $rows[0])['registration']['school']['name']));
     }
+
+    public function test_a_school_can_be_manually_ticked_as_downloaded_and_unticked(): void
+    {
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $f = $this->fixture();
+        app(FestCertificateService::class)->generateParticipationForEvent($f['root']);
+        $schoolId = $f['student']->tenant_id;
+
+        $admin = \App\Models\User::factory()->create(['tenant_id' => $f['root']->tenant_id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+        $params = ['tenantId' => $f['root']->tenant_id, 'event' => $f['root']->id];
+
+        $group = fn () => collect($this->actingAs($admin)->get(route('sahodaya.events.certificates.index', $params))
+            ->viewData('page')['props']['participationBySchool'])->firstWhere('school_id', $schoolId);
+
+        $this->assertFalse($group()['downloaded']);
+
+        $this->actingAs($admin)->post(route('sahodaya.events.certificates.school-downloaded', $params), [
+            'school_id' => $schoolId, 'cert_type' => 'participation', 'downloaded' => true,
+        ])->assertRedirect();
+        $this->assertTrue($group()['downloaded']);
+        $this->assertNotNull($group()['downloaded_at']);
+
+        // A merit tick for the same school is a separate flag.
+        $this->assertSame(1, \App\Models\FestCertificateSchoolMark::count());
+
+        $this->actingAs($admin)->post(route('sahodaya.events.certificates.school-downloaded', $params), [
+            'school_id' => $schoolId, 'cert_type' => 'participation', 'downloaded' => false,
+        ])->assertRedirect();
+        $this->assertFalse($group()['downloaded']);
+        $this->assertSame(0, \App\Models\FestCertificateSchoolMark::count());
+    }
 }

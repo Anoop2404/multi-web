@@ -7,6 +7,7 @@ use App\Jobs\RenderCertificateChunkJob;
 use App\Models\Certificate;
 use App\Models\CertificateTemplate;
 use App\Models\CertificateBatch;
+use App\Models\FestCertificateSchoolMark;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestParticipant;
@@ -38,6 +39,7 @@ class FestCertificateController extends SahodayaAdminController
 
         $certificates = $this->withParticipationItems($this->certificatesForEvent($event), $event);
         $schoolResults = $this->schoolResultsStatus($event);
+        $marks = $this->downloadMarks($event);
 
         return $this->inertia('Sahodaya/Events/Certificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
             'event' => $event,
@@ -45,8 +47,8 @@ class FestCertificateController extends SahodayaAdminController
             'publishedItems' => $this->publishedItemsForEvent($event),
             'schools' => $this->schoolsFromCertificates($certificates),
             'winnersByItem' => $this->winnersByItem($certificates, $event),
-            'winnersBySchool' => $this->withSchoolResults($this->winnersBySchool($certificates, $event), $schoolResults),
-            'participationBySchool' => $this->withSchoolResults($this->participationBySchool($certificates, $event), $schoolResults),
+            'winnersBySchool' => $this->withDownloadMarks($this->withSchoolResults($this->winnersBySchool($certificates, $event), $schoolResults), $marks, 'winner'),
+            'participationBySchool' => $this->withDownloadMarks($this->withSchoolResults($this->participationBySchool($certificates, $event), $schoolResults), $marks, 'participation'),
             'recentBatches' => $this->recentBatchesForEvent($event),
             'staleCount' => $certificates->filter(fn ($c) => $c['is_stale'] ?? false)->count(),
             'certificateSignatories' => $this->signatoriesForUi($event),
@@ -303,6 +305,59 @@ class FestCertificateController extends SahodayaAdminController
      * @param  Collection<int, array<string, mixed>>  $groups  groupCertificatesBySchool() rows
      * @param  Collection<string, array{total: int, published: int, pending: list<string>}>  $schoolResults
      */
+    /**
+     * The manual downloaded ticks for the event, keyed "certType|schoolId".
+     *
+     * @return Collection<string, FestCertificateSchoolMark>
+     */
+    private function downloadMarks(FestEvent $event): Collection
+    {
+        return FestCertificateSchoolMark::where('event_id', $event->id)
+            ->get()
+            ->keyBy(fn ($m) => $m->cert_type.'|'.$m->school_id);
+    }
+
+    private function withDownloadMarks(Collection $groups, Collection $marks, string $certType): Collection
+    {
+        return $groups->map(function (array $group) use ($marks, $certType) {
+            $mark = $marks->get($certType.'|'.$group['school_id']);
+
+            return $group + [
+                'downloaded' => $mark !== null,
+                'downloaded_at' => $mark?->marked_at?->toIso8601String(),
+            ];
+        });
+    }
+
+    /** Manually tick / untick a school's certificates of one type as downloaded. */
+    public function markSchoolDownloaded(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $validated = $request->validate([
+            'school_id' => 'required|string|max:64',
+            'cert_type' => 'required|in:winner,participation',
+            'downloaded' => 'required|boolean',
+        ]);
+
+        $key = [
+            'event_id' => $event->id,
+            'school_id' => $validated['school_id'],
+            'cert_type' => $validated['cert_type'],
+        ];
+
+        if ($validated['downloaded']) {
+            FestCertificateSchoolMark::updateOrCreate($key, [
+                'marked_by_user_id' => $request->user()?->id,
+                'marked_at' => now(),
+            ]);
+        } else {
+            FestCertificateSchoolMark::where($key)->delete();
+        }
+
+        return back();
+    }
+
     private function withSchoolResults(Collection $groups, Collection $schoolResults): Collection
     {
         return $groups->map(fn (array $group) => $group + [

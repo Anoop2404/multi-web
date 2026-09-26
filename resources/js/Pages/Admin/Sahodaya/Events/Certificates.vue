@@ -274,7 +274,12 @@
                     <option value="ready">✓ Results complete ({{ winnersBySchool.filter(isSchoolReady).length }})</option>
                     <option value="pending">⏳ Results pending ({{ winnersBySchool.length - winnersBySchool.filter(isSchoolReady).length }})</option>
                 </select>
-                <span v-if="schoolSearch.trim() || schoolReadiness !== 'all'" class="text-xs text-gray-500">
+                <select v-model="schoolDownloaded" class="field text-xs py-1.5 px-2 w-auto">
+                    <option value="all">Downloaded: any</option>
+                    <option value="yes">✓ Downloaded ({{ winnersBySchool.filter(g => g.downloaded).length }})</option>
+                    <option value="no">Not downloaded ({{ winnersBySchool.filter(g => !g.downloaded).length }})</option>
+                </select>
+                <span v-if="schoolSearch.trim() || schoolReadiness !== 'all' || schoolDownloaded !== 'all'" class="text-xs text-gray-500">
                     {{ filteredWinnersBySchool.length }} of {{ winnersBySchool.length }} schools
                 </span>
                 <details v-if="readyCertificateIds(filteredWinnersBySchool).length" class="relative ml-auto">
@@ -312,8 +317,21 @@
                                   :title="`Results pending: ${group.results.pending.join(', ')}`">
                                 ⏳ {{ group.results.pending.length }} of {{ group.results.total }} items pending
                             </span>
+                            <span v-if="group.downloaded" class="shrink-0 text-xs px-2 py-0.5 rounded bg-emerald-600 text-white font-medium"
+                                  :title="group.downloaded_at ? `Marked downloaded ${new Date(group.downloaded_at).toLocaleString()}` : 'Marked downloaded'">
+                                ✓ Downloaded
+                            </span>
                         </div>
                         <div class="flex flex-wrap items-center gap-3 text-xs shrink-0">
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer select-none"
+                                   :title="group.downloaded ? 'Marked as downloaded — click to undo' : 'Tick once you have downloaded / handed over this school\'s certificates'">
+                                <input type="checkbox" class="rounded border-gray-300 text-emerald-600"
+                                       :checked="group.downloaded" :disabled="!group.school_id"
+                                       @change="markDownloaded(group, 'winner', $event.target.checked)" />
+                                <span :class="group.downloaded ? 'font-semibold text-emerald-700' : 'text-gray-500'">
+                                    {{ group.downloaded ? '✓ Downloaded' : 'Mark downloaded' }}
+                                </span>
+                            </label>
                             <button @click="renderAndCache({ school_id: group.school_id, cert_type: 'winner' })"
                                     class="font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed"
                                     :disabled="isBatchRunning">
@@ -404,7 +422,12 @@
                     <option value="ready">✓ Results complete ({{ participationBySchool.filter(isSchoolReady).length }})</option>
                     <option value="pending">⏳ Results pending ({{ participationBySchool.length - participationBySchool.filter(isSchoolReady).length }})</option>
                 </select>
-                <span v-if="schoolSearch.trim() || schoolReadiness !== 'all'" class="text-xs text-gray-500">
+                <select v-model="schoolDownloaded" class="field text-xs py-1.5 px-2 w-auto">
+                    <option value="all">Downloaded: any</option>
+                    <option value="yes">✓ Downloaded ({{ participationBySchool.filter(g => g.downloaded).length }})</option>
+                    <option value="no">Not downloaded ({{ participationBySchool.filter(g => !g.downloaded).length }})</option>
+                </select>
+                <span v-if="schoolSearch.trim() || schoolReadiness !== 'all' || schoolDownloaded !== 'all'" class="text-xs text-gray-500">
                     {{ filteredParticipationBySchool.length }} of {{ participationBySchool.length }} schools
                 </span>
                 <details v-if="readyCertificateIds(filteredParticipationBySchool).length" class="relative ml-auto">
@@ -441,8 +464,21 @@
                                   :title="`Results pending: ${group.results.pending.join(', ')}`">
                                 ⏳ {{ group.results.pending.length }} of {{ group.results.total }} items pending
                             </span>
+                            <span v-if="group.downloaded" class="shrink-0 text-xs px-2 py-0.5 rounded bg-emerald-600 text-white font-medium"
+                                  :title="group.downloaded_at ? `Marked downloaded ${new Date(group.downloaded_at).toLocaleString()}` : 'Marked downloaded'">
+                                ✓ Downloaded
+                            </span>
                         </div>
                         <div class="flex flex-wrap items-center gap-3 text-xs shrink-0">
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer select-none"
+                                   :title="group.downloaded ? 'Marked as downloaded — click to undo' : 'Tick once you have downloaded / handed over this school\'s certificates'">
+                                <input type="checkbox" class="rounded border-gray-300 text-emerald-600"
+                                       :checked="group.downloaded" :disabled="!group.school_id"
+                                       @change="markDownloaded(group, 'participation', $event.target.checked)" />
+                                <span :class="group.downloaded ? 'font-semibold text-emerald-700' : 'text-gray-500'">
+                                    {{ group.downloaded ? '✓ Downloaded' : 'Mark downloaded' }}
+                                </span>
+                            </label>
                             <button @click="renderAndCache({ school_id: group.school_id, cert_type: 'participation' })"
                                     class="font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed"
                                     :disabled="isBatchRunning">
@@ -740,6 +776,16 @@ let pollTimer = null;
 // and the results-readiness filter.
 const schoolSearch = ref('');
 const schoolReadiness = ref('all');
+const schoolDownloaded = ref('all');
+
+// Manual checklist: tick a school once its certificates have been downloaded / handed over.
+function markDownloaded(group, certType, downloaded) {
+    router.post(`${base}/school-downloaded`, {
+        school_id: group.school_id,
+        cert_type: certType,
+        downloaded,
+    }, { preserveScroll: true, preserveState: true });
+}
 
 // Every item the school has approved registrations in has published results (see
 // FestCertificateController::schoolResultsStatus()) — no merit result or grade still to come.
@@ -750,6 +796,8 @@ function isSchoolReady(group) {
 function matchesSchoolSearch(group) {
     if (schoolReadiness.value === 'ready' && !isSchoolReady(group)) return false;
     if (schoolReadiness.value === 'pending' && isSchoolReady(group)) return false;
+    if (schoolDownloaded.value === 'yes' && !group.downloaded) return false;
+    if (schoolDownloaded.value === 'no' && group.downloaded) return false;
     const q = schoolSearch.value.trim().toLowerCase();
     if (!q) return true;
     return (group.school_name ?? '').toLowerCase().includes(q)
