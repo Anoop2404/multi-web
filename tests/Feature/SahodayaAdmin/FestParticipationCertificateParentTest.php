@@ -244,6 +244,10 @@ class FestParticipationCertificateParentTest extends TestCase
 
         $run = $this->actingAs($admin)->postJson("{$base}/print-complete", ['school_id' => $school->id]);
         $run->assertOk()->assertJsonPath('count', 1)->assertJsonPath('schools', 1);
+        // Both print variants of the run are offered; the plain one drops the background.
+        $this->assertStringContainsString('&plain=1', $run->json('print_url_plain'));
+        $this->assertStringNotContainsString('plain', $run->json('print_url_with_background'));
+        $this->actingAs($admin)->get($run->json('print_url_plain'))->assertOk();
         $this->assertSame(1, \App\Models\FestCertificatePrint::count());
         $this->assertSame(0, \App\Models\FestCertificateSchoolMark::count(), 'a school with a pending student is not auto-ticked');
 

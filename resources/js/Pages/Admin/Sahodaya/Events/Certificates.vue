@@ -401,11 +401,18 @@
                     <p class="text-xs text-gray-500">One certificate per student, listing every item they took part in — organized by school for distribution.</p>
                 </div>
                 <div v-if="participationBySchool.length" class="flex flex-wrap items-center gap-2 shrink-0">
-                    <button v-if="totalReadyToPrint" @click="printComplete(null)" :disabled="printingComplete"
-                            class="btn-primary py-1.5 px-3 text-xs disabled:opacity-40 disabled:cursor-not-allowed"
-                            title="Prints every student (all schools) whose items all have published results and who was not printed before, marks them printed, and opens a per-school report sheet">
-                        🖨️ Print complete students — all schools ({{ totalReadyToPrint }})
-                    </button>
+                    <details v-if="totalReadyToPrint" class="relative">
+                        <summary class="btn-primary py-1.5 px-3 text-xs inline-flex list-none cursor-pointer [&::-webkit-details-marker]:hidden"
+                                 title="Prints every student (all schools) whose items all have published results and who was not printed before, marks them printed, and opens a per-school report sheet">
+                            🖨️ Print complete students — all schools ({{ totalReadyToPrint }}) ▾
+                        </summary>
+                        <div class="absolute z-20 right-0 mt-1 w-60 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left text-xs">
+                            <button @click="printComplete(null, false, $event)" :disabled="printingComplete"
+                                    class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🖨️ With background</button>
+                            <button @click="printComplete(null, true, $event)" :disabled="printingComplete"
+                                    class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🖨️ Without background (plain)</button>
+                        </div>
+                    </details>
                 <details class="relative shrink-0">
                     <summary class="btn-secondary py-1.5 px-3 text-xs inline-flex list-none cursor-pointer [&::-webkit-details-marker]:hidden">
                         📦 All schools — folder per school ▾
@@ -438,7 +445,8 @@
             </div>
             <div v-if="printRun" class="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs text-emerald-900 flex flex-wrap items-center gap-x-4 gap-y-1">
                 <span>✓ Sent {{ printRun.count }} certificate{{ printRun.count === 1 ? '' : 's' }} from {{ printRun.schools }} school{{ printRun.schools === 1 ? '' : 's' }} to print and marked them printed.</span>
-                <a :href="printRun.print_url" target="_blank" rel="noopener" class="font-semibold underline">Open print page again ↗</a>
+                <a :href="printRun.print_url_with_background" target="_blank" rel="noopener" class="font-semibold underline">Print page (with background) ↗</a>
+                <a :href="printRun.print_url_plain" target="_blank" rel="noopener" class="font-semibold underline">Print page (no background) ↗</a>
                 <a :href="`${printRun.report_url}&preview=1`" target="_blank" rel="noopener" class="font-semibold underline">👁️ Report sheet ↗</a>
                 <a :href="printRun.report_url" class="font-semibold underline">⬇️ Report sheet (PDF)</a>
             </div>
@@ -515,11 +523,18 @@
                             </label>
                             <a :href="statusUrl('pdf', { preview: 1, school_id: group.school_id })" target="_blank" rel="noopener"
                                class="font-semibold text-slate-600 hover:text-slate-800" title="This school's students with printed / ready / awaiting status">📋 List</a>
-                            <button v-if="readyToPrint(group)" @click="printComplete(group.school_id)" :disabled="printingComplete"
-                                    class="font-semibold text-emerald-700 hover:text-emerald-900 disabled:opacity-40 disabled:cursor-not-allowed"
-                                    title="Prints only the students whose every item has published results, and marks them printed">
-                                🖨️ Print complete ({{ readyToPrint(group) }})
-                            </button>
+                            <details v-if="readyToPrint(group)" class="relative">
+                                <summary class="font-semibold text-emerald-700 hover:text-emerald-900 inline-flex items-center gap-1 list-none cursor-pointer [&::-webkit-details-marker]:hidden"
+                                         title="Prints only the students whose every item has published results, and marks them printed">
+                                    🖨️ Print complete ({{ readyToPrint(group) }}) ▾
+                                </summary>
+                                <div class="absolute z-20 right-0 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
+                                    <button @click="printComplete(group.school_id, false, $event)" :disabled="printingComplete"
+                                            class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🖨️ With background</button>
+                                    <button @click="printComplete(group.school_id, true, $event)" :disabled="printingComplete"
+                                            class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🖨️ Without background (plain)</button>
+                                </div>
+                            </details>
                             <button @click="renderAndCache({ school_id: group.school_id, cert_type: 'participation' })"
                                     class="font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed"
                                     :disabled="isBatchRunning">
@@ -850,9 +865,10 @@ function xsrfToken() {
     return match ? decodeURIComponent(match[1]) : '';
 }
 
-async function printComplete(schoolId) {
+async function printComplete(schoolId, plain = false, clickEvent = null) {
+    clickEvent?.target?.closest('details')?.removeAttribute('open');
     const what = schoolId ? 'this school' : 'all schools';
-    if (!window.confirm(`Print every complete student of ${what} and mark them as printed?`)) return;
+    if (!window.confirm(`Print every complete student of ${what} ${plain ? 'without background' : 'with background'} and mark them as printed?`)) return;
     printingComplete.value = true;
     printError.value = '';
     // Opened synchronously so the browser doesn't block it as a pop-up after the request.
@@ -861,7 +877,7 @@ async function printComplete(schoolId) {
         const res = await fetch(`${base}/print-complete`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': xsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
-            body: JSON.stringify({ school_id: schoolId ?? null }),
+            body: JSON.stringify({ school_id: schoolId ?? null, plain }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {

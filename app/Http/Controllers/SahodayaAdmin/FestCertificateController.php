@@ -452,6 +452,8 @@ class FestCertificateController extends SahodayaAdminController
             'count' => $toPrint->count(),
             'schools' => $toPrint->pluck('school_id')->unique()->count(),
             'print_url' => "{$base}/print-all?run={$run}".($request->boolean('plain') ? '&plain=1' : ''),
+            'print_url_with_background' => "{$base}/print-all?run={$run}",
+            'print_url_plain' => "{$base}/print-all?run={$run}&plain=1",
             'report_url' => "{$base}/print-complete/report?run={$run}",
         ]);
     }
