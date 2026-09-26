@@ -400,8 +400,9 @@ class FestCertificateController extends SahodayaAdminController
 
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $validated = $request->validate(['school_id' => 'nullable|string|max:64']);
+        $validated = $request->validate(['school_id' => 'nullable|string|max:64', 'include_printed' => 'nullable|boolean']);
         $schoolId = $validated['school_id'] ?? null;
+        $includePrinted = (bool) ($validated['include_printed'] ?? false);
 
         $groups = $this->participationPrintGroups($event)
             ->when($schoolId, fn ($c) => $c->filter(fn (array $g) => (string) $g['school_id'] === $schoolId));
@@ -410,15 +411,21 @@ class FestCertificateController extends SahodayaAdminController
             ->filter(fn (array $w) => $w['complete'] && ! $w['printed'])
             ->map(fn (array $w) => ['certificate_id' => $w['id'], 'school_id' => (string) $g['school_id']]));
 
-        if ($toPrint->isEmpty()) {
+        $completeCount = $groups->sum(fn (array $g) => collect($g['winners'])->where('complete', true)->count());
+
+        if ($toPrint->isEmpty() && ! ($includePrinted && $completeCount > 0)) {
             return response()->json(['message' => 'No complete students are left to print — every student with all results published has already been printed.'], 422);
         }
 
-        $run = (string) \Illuminate\Support\Str::uuid();
+        $run = $toPrint->isEmpty() ? null : (string) \Illuminate\Support\Str::uuid();
         $rootId = $event->rootEvent()->id;
         $now = now();
 
         \Illuminate\Support\Facades\DB::transaction(function () use ($toPrint, $run, $rootId, $now, $request, $groups) {
+            if ($toPrint->isEmpty()) {
+                return;
+            }
+
             foreach ($toPrint->chunk(500) as $chunk) {
                 FestCertificatePrint::insertOrIgnore($chunk->map(fn (array $r) => [
                     'event_id' => $rootId,
@@ -446,15 +453,24 @@ class FestCertificateController extends SahodayaAdminController
         });
 
         $base = "/sahodaya-admin/{$tenantId}/events/{$event->id}/certificates";
+        $plain = $request->boolean('plain') ? '&plain=1' : '';
+        $schoolQuery = $schoolId ? '&school_id='.urlencode($schoolId) : '';
+
+        // include_printed ("reprint all complete"): print every complete student, printed
+        // before or not (the not-yet-printed ones were just marked above).
+        $printUrl = $includePrinted
+            ? "{$base}/print-all?complete=1{$schoolQuery}{$plain}"
+            : "{$base}/print-all?run={$run}{$plain}";
 
         return response()->json([
             'run' => $run,
-            'count' => $toPrint->count(),
-            'schools' => $toPrint->pluck('school_id')->unique()->count(),
-            'print_url' => "{$base}/print-all?run={$run}".($request->boolean('plain') ? '&plain=1' : ''),
-            'print_url_with_background' => "{$base}/print-all?run={$run}",
-            'print_url_plain' => "{$base}/print-all?run={$run}&plain=1",
-            'report_url' => "{$base}/print-complete/report?run={$run}",
+            'count' => $includePrinted ? $completeCount : $toPrint->count(),
+            'newly_printed' => $toPrint->count(),
+            'schools' => $includePrinted ? $groups->filter(fn (array $g) => collect($g['winners'])->contains('complete', true))->count() : $toPrint->pluck('school_id')->unique()->count(),
+            'print_url' => $printUrl,
+            'print_url_with_background' => str_replace('&plain=1', '', $printUrl),
+            'print_url_plain' => str_replace('&plain=1', '', $printUrl).'&plain=1',
+            'report_url' => $run ? "{$base}/print-complete/report?run={$run}" : null,
         ]);
     }
 
@@ -634,6 +650,33 @@ class FestCertificateController extends SahodayaAdminController
         $schoolId = $request->query('school_id') ? (string) $request->query('school_id') : null;
 
         return [$this->printStatusData($event, $schoolId, $status), $status];
+    }
+
+    /**
+     * Clears the "printed" record (one school, or every school) so those students count as
+     * not printed again and "Print complete students" will pick them up. Only the print
+     * records go; the certificates themselves, and any manual "Downloaded" tick on a school,
+     * stay as they are.
+     */
+    public function clearPrintStatus(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $validated = $request->validate(['school_id' => 'nullable|string|max:64']);
+        $schoolId = $validated['school_id'] ?? null;
+
+        $cleared = FestCertificatePrint::whereIn('event_id', $event->rootEvent()->reportableEventIds())
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->delete();
+
+        app(\App\Services\Audit\PlatformAuditLogger::class)->festEvent($event, FestPageActivity::CERTIFICATES, 'fest.certificates.print-status-cleared', "{$cleared} printed record(s) cleared", [
+            'school_id' => $schoolId,
+            'count' => $cleared,
+        ]);
+
+        return back()->with('success', $cleared
+            ? "Cleared the printed status of {$cleared} student(s)."
+            : 'No printed records to clear.');
     }
 
     public function printStatusPdf(Request $request, string $tenantId, FestEvent $event)
@@ -1272,6 +1315,20 @@ class FestCertificateController extends SahodayaAdminController
         $certIds = $request->query('certificate_ids')
             ? array_filter(array_map('intval', explode(',', (string) $request->query('certificate_ids'))))
             : null;
+
+        // Every complete student (all their items have published results), printed before or
+        // not -- "reprint all complete". Changes no printed marks (printComplete() does that).
+        if ($request->boolean('complete')) {
+            $schoolFilter = $request->query('school_id') ? (string) $request->query('school_id') : null;
+            $completeIds = $this->participationPrintGroups($event)
+                ->when($schoolFilter, fn ($c) => $c->filter(fn (array $g) => (string) $g['school_id'] === $schoolFilter))
+                ->flatMap(fn (array $g) => collect($g['winners'])->filter(fn (array $w) => $w['complete'])->pluck('id'))
+                ->map(fn ($id) => (int) $id)
+                ->all();
+            abort_if($completeIds === [], 404, 'No complete students to print.');
+            $certIds = $completeIds;
+            $certType = 'participation';
+        }
 
         // Reprint: every student already sent to print by a "Print complete students" run
         // (optionally one school), e.g. to print again on another paper or without the

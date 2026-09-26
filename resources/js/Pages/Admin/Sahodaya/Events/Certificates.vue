@@ -401,10 +401,10 @@
                     <p class="text-xs text-gray-500">One certificate per student, listing every item they took part in — organized by school for distribution.</p>
                 </div>
                 <div v-if="participationBySchool.length" class="flex flex-wrap items-center gap-2 shrink-0">
-                    <details v-if="totalReadyToPrint || totalPrinted" class="relative">
+                    <details v-if="totalComplete || totalPrinted" class="relative">
                         <summary class="btn-primary py-1.5 px-3 text-xs inline-flex list-none cursor-pointer [&::-webkit-details-marker]:hidden"
                                  title="Print every student (all schools) whose items all have published results and who was not printed before — or reprint the ones already printed">
-                            🖨️ {{ totalReadyToPrint ? `Print complete students — all schools (${totalReadyToPrint})` : `Reprint printed — all schools (${totalPrinted})` }} ▾
+                            🖨️ {{ totalReadyToPrint ? `Print complete students — all schools (${totalReadyToPrint})` : `Reprint complete — all schools (${totalComplete})` }} ▾
                         </summary>
                         <div class="absolute z-20 right-0 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left text-xs">
                             <template v-if="totalReadyToPrint">
@@ -414,10 +414,17 @@
                                 <button @click="printComplete(null, true, $event)" :disabled="printingComplete"
                                         class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🖨️ Without background (plain)</button>
                             </template>
+                            <template v-if="totalComplete">
+                                <p class="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">Reprint all complete ({{ totalComplete }}) — printed + ready</p>
+                                <button @click="printComplete(null, false, $event, true)" :disabled="printingComplete"
+                                        class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🔁 With background</button>
+                                <button @click="printComplete(null, true, $event, true)" :disabled="printingComplete"
+                                        class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🔁 Without background (plain)</button>
+                            </template>
                             <template v-if="totalPrinted">
-                                <p class="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">Reprint printed ({{ totalPrinted }})</p>
-                                <a :href="reprintUrl(null, false)" target="_blank" rel="noopener" class="block px-3 py-2 rounded hover:bg-gray-50">🔁 Reprint with background ↗</a>
-                                <a :href="reprintUrl(null, true)" target="_blank" rel="noopener" class="block px-3 py-2 rounded hover:bg-gray-50">🔁 Reprint without background ↗</a>
+                                <div class="my-1 border-t border-gray-100"></div>
+                                <button @click="clearPrinted(null, 'ALL schools', totalPrinted, $event)"
+                                        class="block w-full text-left px-3 py-2 rounded hover:bg-red-50 text-red-700">↺ Clear printed status — all schools ({{ totalPrinted }})</button>
                             </template>
                         </div>
                     </details>
@@ -452,11 +459,13 @@
                 <span class="text-slate-500">One page per school: Sl No, student, Fest ID, category (C1, C2…), items, Complete when every item has results, and a Verification box.</span>
             </div>
             <div v-if="printRun" class="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs text-emerald-900 flex flex-wrap items-center gap-x-4 gap-y-1">
-                <span>✓ Sent {{ printRun.count }} certificate{{ printRun.count === 1 ? '' : 's' }} from {{ printRun.schools }} school{{ printRun.schools === 1 ? '' : 's' }} to print and marked them printed.</span>
+                <span>✓ Sent {{ printRun.count }} certificate{{ printRun.count === 1 ? '' : 's' }} from {{ printRun.schools }} school{{ printRun.schools === 1 ? '' : 's' }} to print<template v-if="printRun.newly_printed"> — {{ printRun.newly_printed }} newly marked printed</template>.</span>
                 <a :href="printRun.print_url_with_background" target="_blank" rel="noopener" class="font-semibold underline">Print page (with background) ↗</a>
                 <a :href="printRun.print_url_plain" target="_blank" rel="noopener" class="font-semibold underline">Print page (no background) ↗</a>
-                <a :href="`${printRun.report_url}&preview=1`" target="_blank" rel="noopener" class="font-semibold underline">👁️ Report sheet ↗</a>
-                <a :href="printRun.report_url" class="font-semibold underline">⬇️ Report sheet (PDF)</a>
+                <template v-if="printRun.report_url">
+                    <a :href="`${printRun.report_url}&preview=1`" target="_blank" rel="noopener" class="font-semibold underline">👁️ Report sheet ↗</a>
+                    <a :href="printRun.report_url" class="font-semibold underline">⬇️ Report sheet (PDF)</a>
+                </template>
             </div>
             <p v-if="printError" class="mb-3 text-xs text-red-700">{{ printError }}</p>
 
@@ -531,10 +540,15 @@
                             </label>
                             <a :href="statusUrl('pdf', { preview: 1, school_id: group.school_id })" target="_blank" rel="noopener"
                                class="font-semibold text-slate-600 hover:text-slate-800" title="This school's students with printed / ready / awaiting status">📋 List</a>
-                            <details v-if="readyToPrint(group) || printedCount(group)" class="relative">
+                            <button v-if="printedCount(group)" @click="clearPrinted(group.school_id, group.school_name, printedCount(group))"
+                                    class="font-semibold text-red-600 hover:text-red-800"
+                                    title="Clear this school's printed status so its students can be printed together again">
+                                ↺ Clear printed ({{ printedCount(group) }})
+                            </button>
+                            <details v-if="completeCount(group)" class="relative">
                                 <summary class="font-semibold text-emerald-700 hover:text-emerald-900 inline-flex items-center gap-1 list-none cursor-pointer [&::-webkit-details-marker]:hidden"
                                          title="Print students whose every item has published results, or reprint the ones already printed">
-                                    🖨️ {{ readyToPrint(group) ? `Print complete (${readyToPrint(group)})` : `Reprint (${printedCount(group)})` }} ▾
+                                    🖨️ {{ readyToPrint(group) ? `Print complete (${readyToPrint(group)})` : `Reprint complete (${completeCount(group)})` }} ▾
                                 </summary>
                                 <div class="absolute z-20 right-0 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
                                     <template v-if="readyToPrint(group)">
@@ -544,10 +558,17 @@
                                         <button @click="printComplete(group.school_id, true, $event)" :disabled="printingComplete"
                                                 class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🖨️ Without background (plain)</button>
                                     </template>
+                                    <template v-if="completeCount(group)">
+                                        <p class="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">Reprint all complete ({{ completeCount(group) }}) — printed + ready</p>
+                                        <button @click="printComplete(group.school_id, false, $event, true)" :disabled="printingComplete"
+                                                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🔁 With background</button>
+                                        <button @click="printComplete(group.school_id, true, $event, true)" :disabled="printingComplete"
+                                                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🔁 Without background (plain)</button>
+                                    </template>
                                     <template v-if="printedCount(group)">
-                                        <p class="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">Reprint printed ({{ printedCount(group) }})</p>
-                                        <a :href="reprintUrl(group.school_id, false)" target="_blank" rel="noopener" class="block px-3 py-2 rounded hover:bg-gray-50">🔁 Reprint with background ↗</a>
-                                        <a :href="reprintUrl(group.school_id, true)" target="_blank" rel="noopener" class="block px-3 py-2 rounded hover:bg-gray-50">🔁 Reprint without background ↗</a>
+                                        <div class="my-1 border-t border-gray-100"></div>
+                                        <button @click="clearPrinted(group.school_id, group.school_name, printedCount(group), $event)"
+                                                class="block w-full text-left px-3 py-2 rounded hover:bg-red-50 text-red-700">↺ Clear printed status ({{ printedCount(group) }})</button>
                                     </template>
                                 </div>
                             </details>
@@ -875,6 +896,17 @@ function printedCount(group) {
     return (group.winners ?? []).filter((w) => w.printed).length;
 }
 const totalPrinted = computed(() => props.participationBySchool.reduce((n, g) => n + printedCount(g), 0));
+
+function clearPrinted(schoolId, name, count, clickEvent = null) {
+    clickEvent?.target?.closest('details')?.removeAttribute('open');
+    if (!window.confirm(`Clear the printed status of ${count} student${count === 1 ? '' : 's'} (${name})? They will count as not printed again and can be printed together later. The certificates themselves are not deleted.`)) return;
+    router.post(`${base}/print-status/clear`, { school_id: schoolId ?? null }, { preserveScroll: true });
+}
+
+function completeCount(group) {
+    return (group.winners ?? []).filter((w) => w.complete).length;
+}
+const totalComplete = computed(() => props.participationBySchool.reduce((n, g) => n + completeCount(g), 0));
 function reprintUrl(schoolId, plain) {
     const params = new URLSearchParams({ reprint: '1' });
     if (schoolId) params.set('school_id', schoolId);
@@ -888,10 +920,13 @@ function xsrfToken() {
     return match ? decodeURIComponent(match[1]) : '';
 }
 
-async function printComplete(schoolId, plain = false, clickEvent = null) {
+async function printComplete(schoolId, plain = false, clickEvent = null, includePrinted = false) {
     clickEvent?.target?.closest('details')?.removeAttribute('open');
     const what = schoolId ? 'this school' : 'all schools';
-    if (!window.confirm(`Print every complete student of ${what} ${plain ? 'without background' : 'with background'} and mark them as printed?`)) return;
+    const prompt = includePrinted
+        ? `Reprint every complete student of ${what} (already printed and ready) ${plain ? 'without background' : 'with background'}? Students not printed yet are marked printed.`
+        : `Print every complete student of ${what} ${plain ? 'without background' : 'with background'} and mark them as printed?`;
+    if (!window.confirm(prompt)) return;
     printingComplete.value = true;
     printError.value = '';
     // Opened synchronously so the browser doesn't block it as a pop-up after the request.
@@ -900,7 +935,7 @@ async function printComplete(schoolId, plain = false, clickEvent = null) {
         const res = await fetch(`${base}/print-complete`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': xsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
-            body: JSON.stringify({ school_id: schoolId ?? null, plain }),
+            body: JSON.stringify({ school_id: schoolId ?? null, plain, include_printed: includePrinted }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {

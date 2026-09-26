@@ -249,6 +249,14 @@ class FestParticipationCertificateParentTest extends TestCase
         $this->assertStringNotContainsString('plain', $run->json('print_url_with_background'));
         $this->actingAs($admin)->get($run->json('print_url_plain'))->assertOk();
 
+        // Reprint ALL complete: printed + ready students together, even when nobody is newly ready.
+        $again = $this->actingAs($admin)->postJson("{$base}/print-complete", ['include_printed' => true, 'plain' => true]);
+        $again->assertOk()->assertJsonPath('count', 1)->assertJsonPath('newly_printed', 0);
+        $this->assertNull($again->json('report_url'));
+        $this->assertStringContainsString('complete=1', $again->json('print_url'));
+        $this->assertStringContainsString('plain=1', $again->json('print_url'));
+        $this->actingAs($admin)->get($again->json('print_url'))->assertOk();
+
         // Reprint: the already-printed student can be printed again (either variant), one school or all.
         $this->actingAs($admin)->get("{$base}/print-all?reprint=1&school_id={$school->id}")->assertOk();
         $this->actingAs($admin)->get("{$base}/print-all?reprint=1&plain=1")->assertOk();
@@ -411,5 +419,33 @@ class FestParticipationCertificateParentTest extends TestCase
 
         $this->actingAs($admin)->get("{$base}/pdf?preview=1&status=all")->assertOk();
         \Illuminate\Support\Facades\Http::assertSent(fn ($r) => str_contains((string) ($r->data()['html'] ?? ''), 'Late Student') && str_contains((string) $r->data()['html'], 'Two Leg Student'));
+    }
+    public function test_the_printed_status_can_be_cleared_for_one_school_or_all(): void
+    {
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $f = $this->fixture();
+        $school = \App\Models\Tenant::find($f['student']->tenant_id);
+        app(FestCertificateService::class)->generateParticipationForEvent($f['root']);
+        FestEventItem::whereIn('title', ['Pencil Drawing', 'Solo Song'])->update(['results_published_at' => now()]);
+
+        $admin = \App\Models\User::factory()->create(['tenant_id' => $f['root']->tenant_id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+        $base = "/sahodaya-admin/{$f['root']->tenant_id}/events/{$f['root']->id}/certificates";
+
+        $this->actingAs($admin)->postJson("{$base}/print-complete", [])->assertOk();
+        $this->assertSame(1, \App\Models\FestCertificatePrint::count());
+
+        // Another school's clear leaves this one alone.
+        $this->actingAs($admin)->post("{$base}/print-status/clear", ['school_id' => 'some-other-school'])->assertRedirect();
+        $this->assertSame(1, \App\Models\FestCertificatePrint::count());
+
+        // Clearing this school makes the student printable again.
+        $this->actingAs($admin)->post("{$base}/print-status/clear", ['school_id' => $school->id])->assertRedirect()->assertSessionHas('success');
+        $this->assertSame(0, \App\Models\FestCertificatePrint::count());
+        $this->actingAs($admin)->postJson("{$base}/print-complete", [])->assertOk()->assertJsonPath('count', 1);
+
+        // Clear everything.
+        $this->actingAs($admin)->post("{$base}/print-status/clear")->assertRedirect();
+        $this->assertSame(0, \App\Models\FestCertificatePrint::count());
     }
 }
