@@ -184,4 +184,35 @@ class FestParticipationCertificateParentTest extends TestCase
         $this->assertFalse($group()['downloaded']);
         $this->assertSame(0, \App\Models\FestCertificateSchoolMark::count());
     }
+
+    public function test_participation_tick_is_shared_between_the_parent_and_its_child_events(): void
+    {
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $f = $this->fixture();
+        app(FestCertificateService::class)->generateParticipationForEvent($f['root']);
+        $schoolId = $f['student']->tenant_id;
+
+        $admin = \App\Models\User::factory()->create(['tenant_id' => $f['root']->tenant_id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+        $params = fn (FestEvent $e) => ['tenantId' => $e->tenant_id, 'event' => $e->id];
+        $ticked = fn (FestEvent $e) => collect($this->actingAs($admin)->get(route('sahodaya.events.certificates.index', $params($e)))
+            ->viewData('page')['props']['participationBySchool'])->firstWhere('school_id', $schoolId)['downloaded'] ?? null;
+
+        // Ticked on a leg...
+        $this->actingAs($admin)->post(route('sahodaya.events.certificates.school-downloaded', $params($f['leg1'])), [
+            'school_id' => $schoolId, 'cert_type' => 'participation', 'downloaded' => true,
+        ])->assertRedirect();
+
+        // ...is visible from the parent (and from the leg it was made on).
+        $this->assertTrue($ticked($f['root']));
+        $this->assertTrue($ticked($f['leg1']));
+
+        // Unticking from the parent clears it everywhere, including the leg's own row.
+        $this->actingAs($admin)->post(route('sahodaya.events.certificates.school-downloaded', $params($f['root'])), [
+            'school_id' => $schoolId, 'cert_type' => 'participation', 'downloaded' => false,
+        ])->assertRedirect();
+        $this->assertFalse($ticked($f['leg1']));
+        $this->assertFalse($ticked($f['root']));
+        $this->assertSame(0, \App\Models\FestCertificateSchoolMark::count());
+    }
 }

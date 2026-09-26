@@ -308,11 +308,23 @@ class FestCertificateController extends SahodayaAdminController
     /**
      * The manual downloaded ticks for the event, keyed "certType|schoolId".
      *
+     * A participation certificate is one per person and common to the parent event and its
+     * children, so its tick is shared across the whole event family: it is read from every
+     * event in the root's tree (including ticks made on a regional leg before this was
+     * shared) and written against the root. Merit certificates differ per leg, so their
+     * tick stays on the event it was made on.
+     *
      * @return Collection<string, FestCertificateSchoolMark>
      */
     private function downloadMarks(FestEvent $event): Collection
     {
-        return FestCertificateSchoolMark::where('event_id', $event->id)
+        $family = $event->rootEvent()->reportableEventIds();
+
+        return FestCertificateSchoolMark::where(function ($q) use ($event, $family) {
+            $q->where(fn ($w) => $w->where('cert_type', 'winner')->where('event_id', $event->id))
+                ->orWhere(fn ($w) => $w->where('cert_type', 'participation')->whereIn('event_id', $family));
+        })
+            ->orderBy('marked_at')
             ->get()
             ->keyBy(fn ($m) => $m->cert_type.'|'.$m->school_id);
     }
@@ -340,8 +352,10 @@ class FestCertificateController extends SahodayaAdminController
             'downloaded' => 'required|boolean',
         ]);
 
+        $isParticipation = $validated['cert_type'] === 'participation';
+        $root = $event->rootEvent();
         $key = [
-            'event_id' => $event->id,
+            'event_id' => $isParticipation ? $root->id : $event->id,
             'school_id' => $validated['school_id'],
             'cert_type' => $validated['cert_type'],
         ];
@@ -352,7 +366,13 @@ class FestCertificateController extends SahodayaAdminController
                 'marked_at' => now(),
             ]);
         } else {
-            FestCertificateSchoolMark::where($key)->delete();
+            // Participation: clear it wherever in the family it was ticked.
+            FestCertificateSchoolMark::where('school_id', $key['school_id'])
+                ->where('cert_type', $key['cert_type'])
+                ->when($isParticipation,
+                    fn ($q) => $q->whereIn('event_id', $root->reportableEventIds()),
+                    fn ($q) => $q->where('event_id', $event->id))
+                ->delete();
         }
 
         return back();
