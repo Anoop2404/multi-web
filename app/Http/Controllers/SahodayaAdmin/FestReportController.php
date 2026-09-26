@@ -1435,9 +1435,9 @@ class FestReportController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $data = $this->finalResultSummaryData($request, $event);
-        $toRows = fn (array $rows) => array_map(fn (array $r) => [$r['rank'], $r['school'], $r['total']], $rows);
-        $headers = ['Rank', 'School', 'Total'];
-        $styles = [2 => 'overall'];
+        $toRows = fn (array $rows) => array_map(fn (array $r) => [$r['school'], $r['total'], $r['rank']], $rows);
+        $headers = ['School', 'Total', 'Rank'];
+        $styles = [1 => 'overall'];
 
         $sheets = ['Overall' => ['headers' => $headers, 'rows' => $toRows($data['overall']), 'columnStyles' => $styles]];
         foreach ($data['categories'] as $category) {
