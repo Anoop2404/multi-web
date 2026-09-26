@@ -332,11 +332,18 @@ class PdfGenerator
         // Kept only while in flight, for the one-off render() retry of a failed document.
         $inFlight = [];
 
-        $requests = (function () use ($documents, $url, $timeoutMs, &$inFlight) {
+        // ONE Guzzle handler (one curl multi handle) shared by every request, exactly as
+        // Laravel's own Http::pool() does. Without it each Http::async() request got its own
+        // handler, and Guzzle only drives a handler while something waits on that request —
+        // so the "concurrent" requests actually went out one after another (production: a
+        // single worker never had more than 1 render in flight at the converter).
+        $handler = \GuzzleHttp\Utils::chooseHandler();
+
+        $requests = (function () use ($documents, $url, $timeoutMs, &$inFlight, $handler) {
             foreach ($documents as $key => $document) {
                 $inFlight[$key] = $document;
 
-                $promise = Http::async()
+                $promise = Http::setHandler($handler)->async()
                     ->connectTimeout((int) config('services.pdf_converter.connect_timeout', 15))
                     ->timeout(self::converterHttpTimeout($timeoutMs))
                     ->post($url, self::converterPayload(
