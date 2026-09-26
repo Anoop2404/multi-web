@@ -343,4 +343,42 @@ class FestCategoryWisePointsReportTest extends TestCase
 
         $response->assertOk();
     }
+
+    public function test_final_result_summary_lists_only_the_top_three_schools_overall_and_per_category(): void
+    {
+        [$sahodaya, $event, $admin] = $this->fixture();
+
+        // Five schools; school N wins (6 - N) first places in the same category, so they
+        // rank 1..5 by points.
+        $items = collect(range(1, 5))->map(fn ($i) => FestEventItem::create([
+            'event_id' => $event->id, 'title' => "HS Item {$i}", 'participant_type' => 'individual',
+            'class_group' => 'hs', 'is_enabled' => true, 'results_published_at' => now(),
+        ]));
+
+        foreach (range(1, 5) as $n) {
+            $school = Tenant::create(['id' => (string) Str::uuid(), 'type' => 'school', 'name' => "Podium School {$n}", 'parent_id' => $sahodaya->id, 'membership_status' => 'approved', 'is_active' => true]);
+            $class = SchoolClass::create(['tenant_id' => $school->id, 'name' => '9']);
+            foreach ($items->take(6 - $n) as $k => $item) {
+                $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $class->id, 'name' => "S{$n}-{$k}", 'admission_no' => "A{$n}{$k}"]);
+                $registration = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+                $participant = FestParticipant::create(['registration_id' => $registration->id, 'student_id' => $student->id, 'participant_role' => 'performer']);
+                FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'position' => $n, 'grade' => 'A']);
+            }
+        }
+
+        $base = "/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/final-result-summary";
+
+        $this->actingAs($admin)->get("{$base}/pdf?preview=1")->assertOk();
+
+        $xml = $this->actingAs($admin)->get("{$base}/xls")->streamedContent();
+        $this->assertStringContainsString('ss:Name="Overall"', $xml);
+        $this->assertStringContainsString('ss:Name="', $xml);
+        $this->assertGreaterThanOrEqual(2, substr_count($xml, '<Worksheet'), 'an Overall sheet plus one per category');
+        foreach ([1, 2, 3] as $n) {
+            $this->assertStringContainsString("PODIUM SCHOOL {$n}", $xml);
+        }
+        foreach ([4, 5] as $n) {
+            $this->assertStringNotContainsString("PODIUM SCHOOL {$n}", $xml, 'only the top 3 ranks are listed');
+        }
+    }
 }

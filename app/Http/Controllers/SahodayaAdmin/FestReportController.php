@@ -1380,6 +1380,81 @@ class FestReportController extends SahodayaAdminController
         return \App\Support\ExcelExport::download(pathinfo(\App\Support\ReportFilename::build('category-points-summary', $event->title, $event->event_start, [$category], 'xls'), PATHINFO_FILENAME), $headers, $rows, \App\Support\ExcelExport::generatedOnNote(), [], $columnStyles);
     }
 
+    /**
+     * "Final result" summary: the overall top-3 schools, then each category's own top-3
+     * schools (rank <= 3 -- a tie for a place keeps every tied school), instead of the
+     * full school list the points tables print. Same totals/ranks as the Overall ranking
+     * and the per-category points tables, just cut down to the podium.
+     *
+     * @return array{overall: list<array{rank: int, school: string, total: int|float}>, categories: list<array{key: string, label: string, excluded: bool, rows: list<array{rank: int, school: string, total: int|float}>}>}
+     */
+    private function finalResultSummaryData(Request $request, FestEvent $event): array
+    {
+        $targetEvent = $this->regionAwareTargetEvent($request, $event);
+        $analytics = $this->scopedAnalytics($request, $targetEvent);
+        $scoreboards = app(\App\Services\Events\PublicFestScoreboardService::class);
+        $excludedKeys = \App\Support\FestOverallCategoryExclusion::excluded($targetEvent->rootEvent());
+
+        $podium = fn (iterable $schools, string $totalKey) => collect($schools)
+            ->filter(fn (array $s) => $s['rank'] <= 3 && ($s[$totalKey] ?? 0) > 0)
+            ->map(fn (array $s) => ['rank' => (int) $s['rank'], 'school' => strtoupper($s['school_name']), 'total' => $s[$totalKey]])
+            ->values()
+            ->all();
+
+        $overall = $podium($analytics->schoolItemPointsMatrix()['schools'], 'overall');
+
+        $categories = collect($analytics->categoryWiseItemRows())
+            ->keys()
+            ->map(fn (string $key) => [
+                'key'      => $key,
+                'label'    => $key === 'open' ? 'Open' : $scoreboards->categoryLabel($targetEvent, $key),
+                'excluded' => in_array($key, $excludedKeys, true),
+                'rows'     => $podium($analytics->categorySchoolPointsTable($key)['schools'], 'subtotal'),
+            ])
+            ->sortBy('label')
+            ->values()
+            ->all();
+
+        return ['overall' => $overall, 'categories' => $categories];
+    }
+
+    public function finalResultSummaryPdf(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $html = view('fest.reports.final-result-summary', $this->finalResultSummaryData($request, $event) + [
+            'event'   => $event,
+            'orgName' => $this->sahodaya->name,
+            'logoSrc' => \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya),
+        ])->render();
+
+        $filename = \App\Support\ReportFilename::build('final-result-summary', $event->title, $event->event_start);
+
+        return \App\Support\PdfGenerator::download($html, $filename, $request->boolean('inline') || $request->boolean('preview'));
+    }
+
+    /** Excel sibling: an "Overall" sheet, then one sheet per category. */
+    public function finalResultSummaryXls(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $this->finalResultSummaryData($request, $event);
+        $toRows = fn (array $rows) => array_map(fn (array $r) => [$r['rank'], $r['school'], $r['total']], $rows);
+        $headers = ['Rank', 'School', 'Total'];
+        $styles = [2 => 'overall'];
+
+        $sheets = ['Overall' => ['headers' => $headers, 'rows' => $toRows($data['overall']), 'columnStyles' => $styles]];
+        foreach ($data['categories'] as $category) {
+            $sheets[$category['label']] = ['headers' => $headers, 'rows' => $toRows($category['rows']), 'columnStyles' => $styles];
+        }
+
+        return \App\Support\ExcelExport::downloadMultiSheet(
+            pathinfo(\App\Support\ReportFilename::build('final-result-summary', $event->title, $event->event_start, [], 'xls'), PATHINFO_FILENAME),
+            $sheets,
+            \App\Support\ExcelExport::generatedOnNote(),
+        );
+    }
+
     /** JSON endpoint the Category-wise Points report's interactive per-category points table fetches on tab switch. */
     public function categoryWisePointsTable(Request $request, string $tenantId, FestEvent $event, string $category)
     {

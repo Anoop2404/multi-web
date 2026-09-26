@@ -1810,6 +1810,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
                 Route::get('/{event}/reports/category-wise-points/{category}/summary-pdf', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'categoryWisePointsSummaryPdf'])->where('category', '[^/]+')->name('reports.category-wise-points.summary-pdf');
                 Route::get('/{event}/reports/category-wise-points/{category}/summary-xls', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'categoryWisePointsSummaryXls'])->where('category', '[^/]+')->name('reports.category-wise-points.summary-xls');
                 Route::get('/{event}/reports/category-wise-points/{category}/table', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'categoryWisePointsTable'])->where('category', '[^/]+')->name('reports.category-wise-points.table');
+                Route::get('/{event}/reports/final-result-summary/pdf', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'finalResultSummaryPdf'])->name('reports.final-result-summary.pdf');
+                Route::get('/{event}/reports/final-result-summary/xls', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'finalResultSummaryXls'])->name('reports.final-result-summary.xls');
                 Route::get('/{event}/reports/category-item-matrix', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'categoryItemMatrix'])->name('reports.category-item-matrix');
                 Route::get('/{event}/reports/export/{exportType}', [\App\Http\Controllers\SahodayaAdmin\FestReportController::class, 'export'])->name('reports.export');
             });

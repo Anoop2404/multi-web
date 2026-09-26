@@ -18,6 +18,18 @@
             </button>
         </div>
 
+        <div class="card mb-4 px-5 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h3 class="section-title text-sm !mb-0">Final result summary</h3>
+                <p class="text-xs text-slate-500">Overall top 3 schools, then the top 3 schools of every category on its own page / sheet.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <a :href="`${base.replace('category-wise-points', 'final-result-summary')}/pdf?preview=1`" target="_blank" rel="noopener" class="btn-secondary text-xs">👁️ Preview PDF</a>
+                <a :href="`${base.replace('category-wise-points', 'final-result-summary')}/pdf`" class="btn-secondary text-xs">⬇️ PDF</a>
+                <a :href="`${base.replace('category-wise-points', 'final-result-summary')}/xls`" class="btn-secondary text-xs">⬇️ Excel</a>
+            </div>
+        </div>
+
         <div v-if="!categories.length" class="card p-8 text-center text-slate-400 text-sm">
             No categorized items found for this event.
         </div>
