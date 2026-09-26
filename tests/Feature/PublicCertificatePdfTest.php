@@ -91,6 +91,47 @@ class PublicCertificatePdfTest extends TestCase
         $this->assertSame("%PDF-MARKER\n", $response->getContent());
     }
 
+    /**
+     * With CloudFront configured, a fresh rendered PDF on S3 is not read into PHP at all:
+     * the route redirects to a short-lived signed CloudFront URL carrying the same
+     * inline/attachment disposition and file name the streamed response would have had.
+     */
+    public function test_rendered_pdf_on_s3_redirects_to_a_signed_cloudfront_url_when_configured(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin, 'school' => $school] = $this->makeSahodayaAdminAndSchool();
+        $certificate = $this->makeRenderedCertificate($sahodaya, $admin, $school);
+
+        $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+        openssl_pkey_export($key, $privatePem);
+        $keyPath = tempnam(sys_get_temp_dir(), 'cf-key-');
+        file_put_contents($keyPath, $privatePem);
+        config([
+            'filesystems.disks.s3.key' => 'test-key', 'filesystems.disks.s3.secret' => 'test-secret',
+            'filesystems.disks.s3.bucket' => 'test-bucket', 'filesystems.disks.s3.region' => 'ap-south-1',
+            'services.cloudfront' => ['url' => 'https://dprivate123.cloudfront.net', 'key_pair_id' => 'KTEST', 'private_key_path' => $keyPath, 'origin_path' => '', 'ttl' => 600],
+        ]);
+        \Illuminate\Support\Facades\Storage::fake('s3');
+        \Illuminate\Support\Facades\Storage::disk('s3')->put($certificate->file_path, "%PDF-ON-S3\n");
+        $certificate->forceFill(['storage_disk' => 's3'])->save();
+
+        try {
+            $view = $this->get(route('certificates.pdf', $certificate->verification_uuid));
+            $view->assertRedirect();
+            $this->assertStringStartsWith('https://dprivate123.cloudfront.net/', $view->headers->get('Location'));
+            $this->assertStringContainsString('response-content-disposition='.rawurlencode('inline; filename="'), $view->headers->get('Location'));
+            $this->assertStringContainsString('Key-Pair-Id=KTEST', $view->headers->get('Location'));
+
+            $download = $this->get(route('certificates.pdf', $certificate->verification_uuid).'?download=1');
+            $this->assertStringContainsString('response-content-disposition='.rawurlencode('attachment; filename="'), $download->headers->get('Location'));
+
+            // A stale certificate is never redirected to the stored (outdated) file.
+            $certificate->forceFill(['is_stale' => true])->save();
+            $this->assertFalse($this->get(route('certificates.pdf', $certificate->verification_uuid))->isRedirect());
+        } finally {
+            @unlink($keyPath);
+        }
+    }
+
     public function test_download_param_forces_attachment_disposition(): void
     {
         ['sahodaya' => $sahodaya, 'admin' => $admin, 'school' => $school] = $this->makeSahodayaAdminAndSchool();

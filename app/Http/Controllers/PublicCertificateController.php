@@ -134,15 +134,26 @@ class PublicCertificateController extends Controller
             $service = app(FestCertificateService::class);
             $plain = $request->boolean('plain');
 
+            $studentName = $service->payloadFor($certificate)['student']?->name ?? 'certificate';
+            $filename = str($studentName)->slug().'-'.$certificate->verification_uuid.($plain ? '-plain' : '').'.pdf';
+
+            // An already-rendered, fresh PDF on S3 is handed out as a signed CloudFront URL
+            // (when configured) so the file goes S3 -> CloudFront -> browser instead of being
+            // read into PHP and re-sent by this server. Anything else renders/streams below.
+            $cachedPath = $plain ? $certificate->plain_file_path : $certificate->file_path;
+            if ($cachedPath && ! $certificate->is_stale && \App\Support\TenantStorage::resolveDisk($certificate->storage_disk) === 's3'
+                && \App\Support\TenantStorage::cloudFrontConfigured()
+                && \App\Support\TenantStorage::exists($cachedPath, $certificate->storage_disk)
+                && ($url = \App\Support\TenantStorage::cloudFrontSignedUrl($cachedPath, $filename, ! $request->boolean('download')))) {
+                return redirect()->away($url);
+            }
+
             $pdf = $service->cachedOrFreshPdf($certificate, function () use ($certificate, $service, $sahodaya) {
                 $payload = $service->renderContext($certificate, embedAssets: true);
                 $payload['qr_src'] = app(FestIdCardQrService::class)->dataUri((TenantDomainSync::publicUrl($sahodaya) ?? url('/')).'/certificates/verify/'.$certificate->verification_uuid);
 
                 return $payload;
             }, $plain);
-
-            $studentName = $service->payloadFor($certificate)['student']?->name ?? 'certificate';
-            $filename = str($studentName)->slug().'-'.$certificate->verification_uuid.($plain ? '-plain' : '').'.pdf';
 
             return response($pdf, 200, [
                 'Content-Type' => 'application/pdf',

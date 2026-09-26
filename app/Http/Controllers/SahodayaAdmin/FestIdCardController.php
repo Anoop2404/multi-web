@@ -495,12 +495,16 @@ class FestIdCardController extends SahodayaAdminController
                 $state['error'] = 'Previous master PDF file is no longer on storage. Please generate it again.';
             } elseif ($existsOnS3) {
                 try {
-                    $state['s3_preview_url'] = \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl($path, now()->addHours(6), [
-                        'ResponseContentDisposition' => 'inline; filename="' . $filename . '"',
-                    ]);
-                    $state['s3_download_url'] = \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl($path, now()->addHours(6), [
-                        'ResponseContentDisposition' => 'attachment; filename="' . $filename . '"',
-                    ]);
+                    // Signed CloudFront links when configured (S3 -> CloudFront transfer is
+                    // free, and this master PDF can be hundreds of MB); presigned S3 otherwise.
+                    $state['s3_preview_url'] = \App\Support\TenantStorage::cloudFrontSignedUrl($path, $filename, true, 6 * 3600)
+                        ?? \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl($path, now()->addHours(6), [
+                            'ResponseContentDisposition' => 'inline; filename="' . $filename . '"',
+                        ]);
+                    $state['s3_download_url'] = \App\Support\TenantStorage::cloudFrontSignedUrl($path, $filename, false, 6 * 3600)
+                        ?? \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl($path, now()->addHours(6), [
+                            'ResponseContentDisposition' => 'attachment; filename="' . $filename . '"',
+                        ]);
                 } catch (\Throwable $e) {
                     \Illuminate\Support\Facades\Log::warning('Failed generating presigned S3 URLs: '.$e->getMessage());
                 }
@@ -574,11 +578,12 @@ class FestIdCardController extends SahodayaAdminController
             try {
                 if (\Illuminate\Support\Facades\Storage::disk('s3')->exists($relativePath)) {
                     $disposition = ($inline ? 'inline' : 'attachment') . '; filename="' . $filename . '"';
-                    $s3Url = \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl(
-                        $relativePath,
-                        now()->addHours(2),
-                        ['ResponseContentDisposition' => $disposition]
-                    );
+                    $s3Url = \App\Support\TenantStorage::cloudFrontSignedUrl($relativePath, $filename, $inline, 2 * 3600)
+                        ?? \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl(
+                            $relativePath,
+                            now()->addHours(2),
+                            ['ResponseContentDisposition' => $disposition]
+                        );
 
                     return redirect()->away($s3Url);
                 }

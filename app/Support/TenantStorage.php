@@ -4,8 +4,10 @@ namespace App\Support;
 
 use App\Models\Tenant;
 use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -104,10 +106,26 @@ class TenantStorage
         }
     }
 
-    /** Download or stream a private file; tries recorded disk then fallbacks. */
-    public static function downloadPrivate(string $relativePath, ?string $disk = null, ?string $filename = null, bool $inline = false): BinaryFileResponse|StreamedResponse|Response
+    /**
+     * Download or stream a private file; tries recorded disk then fallbacks. A file on S3 is
+     * handed to the browser as a signed CloudFront URL when that's configured (see
+     * cloudFrontSignedUrl()), so it never passes through the app server.
+     */
+    public static function downloadPrivate(string $relativePath, ?string $disk = null, ?string $filename = null, bool $inline = false): BinaryFileResponse|StreamedResponse|Response|RedirectResponse
     {
         $relativePath = ltrim($relativePath, '/');
+
+        if (self::resolveDisk($disk) === 's3' && self::cloudFrontConfigured()) {
+            try {
+                if (Storage::disk('s3')->exists($relativePath)
+                    && ($url = self::cloudFrontSignedUrl($relativePath, $filename, $inline))) {
+                    return redirect()->away($url);
+                }
+            } catch (\Throwable) {
+                // Fall through to streaming it as before.
+            }
+        }
+
         $disks = array_values(array_unique(array_filter([
             self::resolveDisk($disk),
             self::uploadDisk(),
@@ -134,6 +152,70 @@ class TenantStorage
         }
 
         abort(404, 'File not found.');
+    }
+
+    /**
+     * Whether private S3 downloads should go through CloudFront signed URLs
+     * (services.cloudfront url + key_pair_id + a readable private key file).
+     */
+    public static function cloudFrontConfigured(): bool
+    {
+        $config = (array) config('services.cloudfront', []);
+
+        return filled($config['url'] ?? null)
+            && filled($config['key_pair_id'] ?? null)
+            && filled($config['private_key_path'] ?? null)
+            && is_readable((string) $config['private_key_path'])
+            && self::isS3Configured();
+    }
+
+    /**
+     * A short-lived signed CloudFront URL for a private S3 object (relative path as stored,
+     * i.e. without the disk's root prefix), or null when CloudFront isn't configured or
+     * signing fails — callers then stream the file themselves as before. The browser
+     * downloads straight from CloudFront: S3 -> CloudFront transfer is free and the bytes
+     * never touch the app server.
+     *
+     * The distribution needs: this bucket as origin via Origin Access Control, viewer
+     * access restricted to the key group holding CLOUDFRONT_KEY_PAIR_ID, caching disabled
+     * (a re-rendered certificate keeps its key), and an origin request policy forwarding
+     * the response-content-disposition query string (download filename / inline view).
+     */
+    public static function cloudFrontSignedUrl(string $relativePath, ?string $filename = null, bool $inline = false, ?int $ttlSeconds = null): ?string
+    {
+        if (! self::cloudFrontConfigured()) {
+            return null;
+        }
+
+        $config = (array) config('services.cloudfront');
+
+        try {
+            // The object key as S3 stores it — the disk's root prefix ("domains/") included.
+            $key = ltrim(Storage::disk('s3')->path(ltrim($relativePath, '/')), '/');
+            $originPath = trim((string) ($config['origin_path'] ?? ''), '/');
+            if ($originPath !== '' && str_starts_with($key, $originPath.'/')) {
+                $key = substr($key, strlen($originPath) + 1);
+            }
+
+            $url = rtrim((string) $config['url'], '/').'/'.implode('/', array_map('rawurlencode', explode('/', $key)));
+
+            if ($filename !== null || ! $inline) {
+                $disposition = $inline ? 'inline' : 'attachment';
+                if ($filename !== null && $filename !== '') {
+                    $ascii = preg_replace('/[^\x20-\x7E]/', '_', str_replace(['"', '\\'], '', $filename));
+                    $disposition .= '; filename="'.$ascii.'"; filename*=UTF-8\'\''.rawurlencode($filename);
+                }
+                $url .= '?response-content-disposition='.rawurlencode($disposition);
+            }
+
+            $signer = new \Aws\CloudFront\UrlSigner((string) $config['key_pair_id'], (string) $config['private_key_path']);
+
+            return $signer->getSignedUrl($url, time() + max(60, $ttlSeconds ?? (int) ($config['ttl'] ?? 600)));
+        } catch (\Throwable $e) {
+            Log::warning('CloudFront signed URL failed; streaming the file instead: '.$e->getMessage());
+
+            return null;
+        }
     }
 
     /** Copy cloud object to a local temp path for batch processing (imports). */

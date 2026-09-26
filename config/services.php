@@ -50,4 +50,18 @@ return [
         'fallback' => env('PDF_CONVERTER_FALLBACK', false),
     ],
 
+    // Private S3 downloads (certificate PDFs, ZIP exports, school documents, ...) are handed
+    // to the browser as short-lived signed CloudFront URLs instead of being streamed through
+    // the app server, when url + key_pair_id + private_key_path are all set. The
+    // distribution must be restricted to this key group and read the bucket through OAC —
+    // see TenantStorage::cloudFrontSignedUrl(). Unset: downloads stream as before.
+    'cloudfront' => [
+        'url' => env('CLOUDFRONT_PRIVATE_URL'),
+        'key_pair_id' => env('CLOUDFRONT_KEY_PAIR_ID'),
+        'private_key_path' => env('CLOUDFRONT_PRIVATE_KEY_PATH'),
+        // The distribution's S3 origin path, if it has one (normally empty).
+        'origin_path' => env('CLOUDFRONT_ORIGIN_PATH', ''),
+        'ttl' => env('CLOUDFRONT_SIGNED_URL_TTL', 600),
+    ],
+
 ];
