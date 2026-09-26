@@ -14,10 +14,12 @@
         tr { page-break-inside: avoid; }
         th { background: #1d3557; color: #fff; font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em; text-align: left; padding: 0 8px; height: 30px; border: 1px solid #1d3557; }
         td { border: 1px solid #94a3b8; padding: 0 8px; height: 30px; font-size: 11.5px; vertical-align: middle; }
-        td.num, th.num { width: 30px; text-align: center; padding: 0 2px; }
-        td.id, th.id { width: 100px; }
-        td.chk, th.chk { width: 62px; text-align: center; }
-        td.printed, th.printed { width: 70px; text-align: center; font-weight: bold; color: #166534; }
+        td.num, th.num { width: 34px; text-align: center; padding: 0 2px; }
+        td.id, th.id { width: 62px; text-align: center; }
+        td.cat, th.cat { width: 56px; text-align: center; }
+        td.done, th.done { width: 74px; text-align: center; font-weight: bold; color: #166534; }
+        td.chk, th.chk { width: 78px; text-align: center; }
+        td.items { font-size: 10px; line-height: 1.35; padding-top: 3px; padding-bottom: 3px; }
         .box { display: inline-block; width: 14px; height: 14px; border: 1.5px solid #475569; vertical-align: middle; }
 </style>
 </head>
@@ -34,25 +36,25 @@
             <table>
                 <thead>
                     <tr>
-                        <th class="num">#</th>
-                        <th class="id">Student ID</th>
+                        <th class="num">Sl No</th>
+                        <th style="width: 24%;">Student</th>
                         <th class="id">Fest ID</th>
-                        <th>Student</th>
-                        <th class="chk">Verified</th>
-                        <th class="chk">Correct</th>
-                        <th class="printed">Printed</th>
+                        <th class="cat">Category</th>
+                        <th>Items</th>
+                        <th class="done">Complete</th>
+                        <th class="chk">Verification</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach($school['students'] as $i => $student)
                         <tr>
                             <td class="num">{{ $i + 1 }}</td>
-                            <td class="id">{{ $student['student_id'] }}</td>
-                            <td class="id">{{ $student['fest_id'] }}</td>
                             <td><strong>{{ $student['name'] }}</strong></td>
+                            <td class="id">{{ $student['fest_id'] }}</td>
+                            <td class="cat">{{ $student['category'] }}</td>
+                            <td class="items">{{ implode(', ', $student['items']) }}</td>
+                            <td class="done">{{ $student['complete'] ? 'Complete' : '' }}</td>
                             <td class="chk"><span class="box"></span></td>
-                            <td class="chk"><span class="box"></span></td>
-                            <td class="printed">{{ $student['status'] === 'printed' ? '✓' : '' }}</td>
                         </tr>
                     @endforeach
                 </tbody>

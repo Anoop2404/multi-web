@@ -365,6 +365,10 @@ class FestParticipationCertificateParentTest extends TestCase
         FestParticipant::create(['registration_id' => $reg->id, 'student_id' => $late->id, 'participant_type' => 'student', 'participant_role' => 'performer', 'chest_no' => 2]);
         app(FestCertificateService::class)->generateParticipationForEvent($f['root']);
 
+        // The school's class "10" belongs to "Category 3" for this Sahodaya -> C3.
+        $category = \App\Models\ClassCategory::create(['sahodaya_id' => $f['root']->tenant_id, 'code' => 'c3', 'label' => 'Category 3', 'min_class' => 8, 'max_class' => 10, 'is_active' => true, 'sort_order' => 3]);
+        \App\Models\MasterClass::create(['sahodaya_id' => $f['root']->tenant_id, 'class_category_id' => $category->id, 'name' => '10', 'display_order' => 10, 'is_active' => true]);
+
         FestEventItem::whereIn('title', ['Pencil Drawing', 'Solo Song'])->update(['results_published_at' => now()]);
 
         $admin = \App\Models\User::factory()->create(['tenant_id' => $f['root']->tenant_id, 'email_verified_at' => now()]);
@@ -375,10 +379,13 @@ class FestParticipationCertificateParentTest extends TestCase
         $xml = $this->actingAs($admin)->get("{$base}/xls")->streamedContent();
         $this->assertStringContainsString('Two Leg Student', $xml);
         $this->assertStringContainsString('Late Student', $xml);
-        foreach (['Student ID', 'Fest ID', 'Verified', 'Correct', 'Printed'] as $column) {
+        foreach (['Sl No', 'Student', 'Fest ID', 'Category', 'Items', 'Complete', 'Verification'] as $column) {
             $this->assertStringContainsString(">{$column}<", $xml);
         }
         $this->assertStringNotContainsString('Class', $xml, 'no class column');
+        $this->assertStringContainsString('Pencil Drawing', $xml);
+        $this->assertStringContainsString('>C3<', $xml, 'category is derived from the class (Category 3 -> C3)');
+        $this->assertStringContainsString('>Complete<', $xml, 'a student with every item published is marked Complete');
 
         // After printing the complete student, the "not printed" filter keeps only the other one.
         $this->actingAs($admin)->postJson(str_replace('print-status', 'print-complete', $base), [])->assertOk();

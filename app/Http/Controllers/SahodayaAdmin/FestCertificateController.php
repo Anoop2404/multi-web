@@ -545,10 +545,21 @@ class FestCertificateController extends SahodayaAdminController
             ->when($schoolId, fn ($c) => $c->filter(fn (array $g) => (string) $g['school_id'] === $schoolId))
             ->values();
 
-        $certIds = $groups->flatMap(fn (array $g) => collect($g['winners'])->pluck('id'));
-        $printedAt = FestCertificatePrint::whereIn('certificate_id', $certIds)->pluck('printed_at', 'certificate_id');
         $studentIds = $groups->flatMap(fn (array $g) => collect($g['winners'])->pluck('student_id'))->filter()->unique()->values();
-        $regNos = \App\Models\Student::whereIn('id', $studentIds)->pluck('reg_no', 'id');
+        $classNames = \App\Models\Student::with('schoolClass:id,name')
+            ->whereIn('id', $studentIds)
+            ->get(['id', 'school_class_id'])
+            ->mapWithKeys(fn ($st) => [$st->id => trim((string) $st->schoolClass?->name)]);
+
+        // Class -> category code ("Category 1" => C1) from the Sahodaya's class categories.
+        $categoryByClass = app(\App\Services\Membership\EffectiveMasterDataResolver::class)
+            ->masterClasses($this->sahodaya->id)
+            ->mapWithKeys(function ($class) {
+                $label = (string) $class->classCategory?->label;
+
+                return [trim((string) $class->name) => preg_match('/(\d+)/', $label, $m) ? 'C'.$m[1] : $label];
+            });
+
         // Fest ID = the registration number the student competes under (same field the
         // student-wise reports print as Fest ID); first one found across their entries.
         $festIds = FestParticipant::whereIn('student_id', $studentIds)
@@ -557,16 +568,16 @@ class FestCertificateController extends SahodayaAdminController
             ->orderBy('id')
             ->pluck('level_registration_number', 'student_id');
 
-        return $groups->map(function (array $g) use ($status, $printedAt, $regNos, $festIds) {
-            $students = collect($g['winners'])->map(function (array $w) use ($printedAt, $regNos, $festIds) {
-                $state = $w['printed'] ? 'printed' : ($w['complete'] ? 'ready' : 'awaiting');
-
+        return $groups->map(function (array $g) use ($status, $classNames, $categoryByClass, $festIds) {
+            $students = collect($g['winners'])->map(function (array $w) use ($classNames, $categoryByClass, $festIds) {
                 return [
                     'name' => $w['name'],
-                    'student_id' => $regNos->get($w['student_id']),
                     'fest_id' => $festIds->get($w['student_id']),
-                    'status' => $state,
-                    'printed_at' => $w['printed'] ? $printedAt->get($w['id']) : null,
+                    'category' => $categoryByClass->get($classNames->get($w['student_id'], ''), ''),
+                    'items' => collect($w['items'] ?? [])->pluck('title')->all(),
+                    // Every item they entered has published results.
+                    'complete' => (bool) $w['complete'],
+                    'status' => $w['printed'] ? 'printed' : ($w['complete'] ? 'ready' : 'awaiting'),
                 ];
             })
                 // Printed students first, the rest after; each block alphabetical.
@@ -630,19 +641,19 @@ class FestCertificateController extends SahodayaAdminController
                 $rows[] = [
                     strtoupper($school['name']),
                     $i + 1,
-                    $student['student_id'],
-                    $student['fest_id'],
                     $student['name'],
-                    '', // Verified -- ticked by hand
-                    '', // Correct -- ticked by hand
-                    $student['status'] === 'printed' ? 'Printed' : '',
+                    $student['fest_id'],
+                    $student['category'],
+                    implode(', ', $student['items']),
+                    $student['complete'] ? 'Complete' : '',
+                    '', // Verification -- ticked by hand
                 ];
             }
         }
 
         return \App\Support\ExcelExport::download(
             pathinfo(\App\Support\ReportFilename::build('certificate-print-status', $event->title, now(), [$status], 'xls'), PATHINFO_FILENAME),
-            ['School', '#', 'Student ID', 'Fest ID', 'Student', 'Verified', 'Correct', 'Printed'],
+            ['School', 'Sl No', 'Student', 'Fest ID', 'Category', 'Items', 'Complete', 'Verification'],
             $rows,
             \App\Support\ExcelExport::generatedOnNote(),
         );
