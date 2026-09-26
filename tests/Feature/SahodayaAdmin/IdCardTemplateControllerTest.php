@@ -5,11 +5,13 @@ namespace Tests\Feature\SahodayaAdmin;
 use App\Models\IdCardTemplate;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\IdCardDiePreset;
 use App\Support\TenancyDatabase;
 use App\Support\TenantStorage;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class IdCardTemplateControllerTest extends TestCase
@@ -146,5 +148,61 @@ class IdCardTemplateControllerTest extends TestCase
         } finally {
             TenantStorage::disk()->deleteDirectory($directory);
         }
+    }
+
+    public function test_admin_can_apply_the_measured_ten_card_die_to_one_template(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'Die Test Sahodaya',
+            'subdomain' => 'die-test',
+            'is_active' => true,
+        ]);
+
+        $admin = User::factory()->create([
+            'tenant_id' => $sahodaya->id,
+            'email_verified_at' => now(),
+        ]);
+        $admin->assignRole('sahodaya_admin');
+
+        if (TenancyDatabase::enabled()) {
+            TenancyDatabase::initializeForTenant($sahodaya);
+        }
+
+        $preset = IdCardDiePreset::options()[0];
+        $template = IdCardTemplate::create([
+            'tenant_id' => $sahodaya->id,
+            'title' => 'Customer-specific badge die',
+            'audience' => 'student',
+            'card_width_mm' => $preset['card_width_mm'],
+            'card_height_mm' => $preset['card_height_mm'],
+            'cards_per_page' => $preset['cards_per_page'],
+            'page_width_mm' => $preset['page_width_mm'],
+            'page_height_mm' => $preset['page_height_mm'],
+            'grid_json' => $preset['grid'],
+            'layout_json' => IdCardTemplate::defaultFields(),
+            'is_active' => false,
+        ]);
+
+        $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/id-card-templates")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('diePresets.0.key', 'badge-die-10-up-19x13')
+                ->where('diePresets.0.grid.cols', 5)
+                ->where('diePresets.0.grid.rows', 2));
+
+        $preview = $this->actingAs($admin)->get(
+            "/sahodaya-admin/{$sahodaya->id}/id-card-templates/{$template->id}/preview?mode=die",
+        );
+
+        $preview->assertOk();
+        $preview->assertSee('size: 482.6mm 330.2mm', false);
+        $preview->assertSee('left: 16.3mm; top: 25.1mm;', false);
+        $preview->assertSee('left: 376.3mm; top: 165.1mm;', false);
+        $this->assertSame(10, substr_count($preview->getContent(), 'class="die-card-slot"'));
     }
 }

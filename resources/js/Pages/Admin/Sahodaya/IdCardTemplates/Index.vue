@@ -120,13 +120,36 @@
                 </FormField>
 
                 <div class="sm:col-span-2 space-y-2 border rounded-lg p-3">
-                    <p class="text-sm font-semibold text-slate-700">Die-cut grid (optional)</p>
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <p class="text-sm font-semibold text-slate-700">Die-cut grid (optional)</p>
+                        <button v-if="hasDieGrid" type="button" class="text-xs font-semibold text-slate-500 hover:text-slate-800"
+                                @click="clearDieGrid">
+                            Clear die settings
+                        </button>
+                    </div>
                     <p class="text-xs text-slate-500">
                         Exact card placement for a physical die-cut sheet — overrides "cards per A4 page" above
                         with precise positions instead of a plain 2-per-row flow. Get these numbers from whoever
                         supplies the die-cutting template (or ask me to work them out from the die file). Leave
                         all six blank for the normal flow.
                     </p>
+                    <div v-if="diePresets.length" class="grid gap-2 sm:grid-cols-2">
+                        <button v-for="preset in diePresets" :key="preset.key" type="button"
+                                class="rounded-lg border p-3 text-left transition"
+                                :class="activeDiePresetKey === preset.key
+                                    ? 'border-emerald-300 bg-emerald-50 ring-1 ring-emerald-200'
+                                    : 'border-slate-200 bg-slate-50 hover:border-indigo-300 hover:bg-indigo-50/50'"
+                                @click="applyDiePreset(preset)">
+                            <span class="flex items-center justify-between gap-2">
+                                <span class="text-xs font-bold text-slate-800">{{ preset.label }}</span>
+                                <span class="text-[10px] font-bold uppercase tracking-wide"
+                                      :class="activeDiePresetKey === preset.key ? 'text-emerald-700' : 'text-indigo-600'">
+                                    {{ activeDiePresetKey === preset.key ? 'Applied' : 'Use this die' }}
+                                </span>
+                            </span>
+                            <span class="mt-1 block text-[11px] leading-4 text-slate-500">{{ preset.description }}</span>
+                        </button>
+                    </div>
                     <div class="grid gap-2 sm:grid-cols-3">
                         <div>
                             <label class="text-[10px] uppercase text-slate-400">Columns</label>
@@ -420,7 +443,10 @@
                             </td>
                             <td>{{ t.cards_per_page }}</td>
                             <td class="text-xs text-slate-600">
-                                <span v-if="t.grid_json">{{ t.grid_json.cols }}×{{ t.grid_json.rows }} die grid</span>
+                                <span v-if="t.grid_json">
+                                    {{ t.grid_json.cols }}×{{ t.grid_json.rows }} die ·
+                                    {{ t.page_width_mm }}×{{ t.page_height_mm }}mm
+                                </span>
                                 <span v-else>{{ t.page_width_mm && t.page_height_mm ? `${t.page_width_mm}×${t.page_height_mm}mm` : 'A4' }}</span>
                             </td>
                             <td>{{ t.is_active ? 'Yes' : 'No' }}</td>
@@ -467,6 +493,7 @@ const props = defineProps({
     fontFamilyOptions: { type: Array, default: () => [] },
     defaultFields: { type: Array, default: () => [] },
     templatePresets: { type: Array, default: () => [] },
+    diePresets: { type: Array, default: () => [] },
 });
 
 const editingId = ref(null);
@@ -698,6 +725,59 @@ const form = useForm({
     fields: blankFields(),
     is_active: true,
 });
+
+const hasDieGrid = computed(() => [
+    form.grid_cols,
+    form.grid_rows,
+    form.grid_first_col_center_mm,
+    form.grid_first_row_center_mm,
+    form.grid_col_pitch_mm,
+    form.grid_row_pitch_mm,
+].some(value => value !== null && value !== ''));
+
+function sameMeasurement(left, right) {
+    return Math.abs(Number(left) - Number(right)) < 0.0001;
+}
+
+const activeDiePresetKey = computed(() => props.diePresets.find((preset) => {
+    const grid = preset.grid;
+
+    return sameMeasurement(form.card_width_mm, preset.card_width_mm)
+        && sameMeasurement(form.card_height_mm, preset.card_height_mm)
+        && sameMeasurement(form.page_width_mm, preset.page_width_mm)
+        && sameMeasurement(form.page_height_mm, preset.page_height_mm)
+        && sameMeasurement(form.grid_cols, grid.cols)
+        && sameMeasurement(form.grid_rows, grid.rows)
+        && sameMeasurement(form.grid_first_col_center_mm, grid.first_col_center_mm)
+        && sameMeasurement(form.grid_first_row_center_mm, grid.first_row_center_mm)
+        && sameMeasurement(form.grid_col_pitch_mm, grid.col_pitch_mm)
+        && sameMeasurement(form.grid_row_pitch_mm, grid.row_pitch_mm);
+})?.key ?? null);
+
+function applyDiePreset(preset) {
+    form.card_width_mm = preset.card_width_mm;
+    form.card_height_mm = preset.card_height_mm;
+    form.cards_per_page = preset.cards_per_page;
+    form.page_width_mm = preset.page_width_mm;
+    form.page_height_mm = preset.page_height_mm;
+    form.grid_cols = preset.grid.cols;
+    form.grid_rows = preset.grid.rows;
+    form.grid_first_col_center_mm = preset.grid.first_col_center_mm;
+    form.grid_first_row_center_mm = preset.grid.first_row_center_mm;
+    form.grid_col_pitch_mm = preset.grid.col_pitch_mm;
+    form.grid_row_pitch_mm = preset.grid.row_pitch_mm;
+}
+
+function clearDieGrid() {
+    form.page_width_mm = null;
+    form.page_height_mm = null;
+    form.grid_cols = null;
+    form.grid_rows = null;
+    form.grid_first_col_center_mm = null;
+    form.grid_first_row_center_mm = null;
+    form.grid_col_pitch_mm = null;
+    form.grid_row_pitch_mm = null;
+}
 
 // Object URL for a newly-picked (not yet uploaded) background file, so the live
 // canvas can show it immediately — revoked whenever it's replaced or cleared to

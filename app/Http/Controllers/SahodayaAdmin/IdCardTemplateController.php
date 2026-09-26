@@ -9,6 +9,7 @@ use App\Services\Certificates\CertificateBackgroundConverter;
 use App\Services\Events\IdCardTemplatePresetInstaller;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestItemCategoryLabel;
+use App\Support\IdCardDiePreset;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -56,6 +57,7 @@ class IdCardTemplateController extends SahodayaAdminController
             'fontFamilyOptions'  => CertificateTemplate::fontFamilyOptions(),
             'defaultFields'      => IdCardTemplate::defaultFields(),
             'templatePresets'    => $presetInstaller->options(),
+            'diePresets'         => IdCardDiePreset::options(),
         ]);
     }
 
