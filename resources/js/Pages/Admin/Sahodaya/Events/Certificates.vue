@@ -458,6 +458,34 @@
                 <a :href="statusUrl('xls')" class="btn-secondary py-1 px-3 text-xs">⬇️ Excel</a>
                 <span class="text-slate-500">One page per school: Sl No, student, Fest ID, category (C1, C2…), items, Complete when every item has results, and a Verification box.</span>
             </div>
+            <div class="mb-3 flex flex-wrap items-center gap-2">
+                <details v-if="totalPrinted" class="relative">
+                    <summary class="btn-secondary py-1.5 px-3 text-xs inline-flex list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+                        📦 Already printed — ZIP ({{ totalPrinted }}) ▾
+                    </summary>
+                    <div class="absolute z-20 left-0 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left text-xs">
+                        <button @click="queueZipDownload({ certificate_ids: printedCertificateIds().join(','), cert_type: 'participation', group_by: 'school' }, $event)" :disabled="isBatchRunning"
+                                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">📦 With background</button>
+                        <button @click="queueZipDownload({ certificate_ids: printedCertificateIds().join(','), cert_type: 'participation', group_by: 'school', plain: '1' }, $event)" :disabled="isBatchRunning"
+                                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">📦 Without background (plain)</button>
+                    </div>
+                </details>
+                <details v-if="totalLeftToPrint" class="relative">
+                    <summary class="btn-secondary py-1.5 px-3 text-xs inline-flex list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+                        📦 Left to print — ZIP ({{ totalLeftToPrint }}) ▾
+                    </summary>
+                    <div class="absolute z-20 left-0 mt-1 w-72 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left text-xs">
+                        <p class="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">Not printed yet — includes students still awaiting results</p>
+                        <button @click="queueZipDownload({ certificate_ids: leftToPrintCertificateIds().join(','), cert_type: 'participation', group_by: 'school' }, $event)" :disabled="isBatchRunning"
+                                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">📦 With background</button>
+                        <button @click="queueZipDownload({ certificate_ids: leftToPrintCertificateIds().join(','), cert_type: 'participation', group_by: 'school', plain: '1' }, $event)" :disabled="isBatchRunning"
+                                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">📦 Without background (plain)</button>
+                        <div class="my-1 border-t border-gray-100"></div>
+                        <a :href="statusUrl('pdf', { preview: 1, status: 'unprinted' })" target="_blank" rel="noopener" class="block px-3 py-2 rounded hover:bg-gray-50">👁️ List of who's left ↗</a>
+                    </div>
+                </details>
+                <span v-if="!totalPrinted && !totalLeftToPrint" class="text-xs text-gray-400">No participation certificates generated yet.</span>
+            </div>
             <div v-if="printRun" class="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs text-emerald-900 flex flex-wrap items-center gap-x-4 gap-y-1">
                 <span>✓ Sent {{ printRun.count }} certificate{{ printRun.count === 1 ? '' : 's' }} from {{ printRun.schools }} school{{ printRun.schools === 1 ? '' : 's' }} to print<template v-if="printRun.newly_printed"> — {{ printRun.newly_printed }} newly marked printed</template>.</span>
                 <a :href="printRun.print_url_with_background" target="_blank" rel="noopener" class="font-semibold underline">Print page (with background) ↗</a>
@@ -902,6 +930,14 @@ function clearPrinted(schoolId, name, count, clickEvent = null) {
     if (!window.confirm(`Clear the printed status of ${count} student${count === 1 ? '' : 's'} (${name})? They will count as not printed again and can be printed together later. The certificates themselves are not deleted.`)) return;
     router.post(`${base}/print-status/clear`, { school_id: schoolId ?? null }, { preserveScroll: true });
 }
+
+function printedCertificateIds() {
+    return props.participationBySchool.flatMap((g) => (g.winners ?? []).filter((w) => w.printed).map((w) => w.id));
+}
+function leftToPrintCertificateIds() {
+    return props.participationBySchool.flatMap((g) => (g.winners ?? []).filter((w) => !w.printed).map((w) => w.id));
+}
+const totalLeftToPrint = computed(() => props.participationBySchool.reduce((n, g) => n + (g.winners ?? []).filter((w) => !w.printed).length, 0));
 
 function completeCount(group) {
     return (group.winners ?? []).filter((w) => w.complete).length;
