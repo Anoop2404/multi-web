@@ -38,6 +38,11 @@ export function useEventSettingsForms(props) {
     const policyForm = useForm({
         preset_key: props.participationPolicy?.preset_key ?? '',
         max_total_per_student: props.participationPolicy?.max_total_per_student ?? '',
+        max_overall_per_student: props.participationPolicy?.max_overall_per_student ?? '',
+        max_pair_per_student: props.participationPolicy?.max_pair_per_student ?? '',
+        max_common_per_student: props.participationPolicy?.max_common_per_student ?? '',
+        pair_points_mode: props.participationPolicy?.pair_points_mode ?? 'group',
+        combo_profiles: props.participationPolicy?.combo_profiles ?? [],
         max_onstage_per_student: props.participationPolicy?.max_onstage_per_student ?? '',
         max_offstage_per_student: props.participationPolicy?.max_offstage_per_student ?? '',
         max_offstage_writing_per_student: props.participationPolicy?.max_offstage_writing_per_student ?? '',

@@ -101,119 +101,8 @@
             <!-- 2-Column Website Builder Workspace -->
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-                <!-- ── LEFT BUILDER SIDEBAR ────────────────────────────────────── -->
-                <aside class="lg:col-span-4 xl:col-span-3 space-y-4">
-
-                    <!-- Workspace Pages Navigation -->
-                    <div class="bg-white rounded-2xl border border-gray-100 shadow-xs p-3">
-                        <div class="px-3 pt-2 pb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                            Website Architecture
-                        </div>
-                        <nav class="space-y-1">
-                            <button type="button"
-                                    @click="selectTab('overview')"
-                                    class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition text-left"
-                                    :class="activeTab === 'overview'
-                                        ? 'bg-[#1e1b4b] text-white shadow-xs font-bold'
-                                        : 'text-gray-700 hover:bg-gray-50'">
-                                <div class="flex items-center gap-2.5">
-                                    <SvgIcon name="layers" class="w-4 h-4 shrink-0" />
-                                    <span>Site Overview</span>
-                                </div>
-                                <span v-if="activeTab === 'overview'" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                            </button>
-
-                            <button type="button"
-                                    @click="selectTab('sections')"
-                                    class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition text-left"
-                                    :class="(activeTab === 'sections' || activeTab === 'section-edit')
-                                        ? 'bg-[#1e1b4b] text-white shadow-xs font-bold'
-                                        : 'text-gray-700 hover:bg-gray-50'">
-                                <div class="flex items-center gap-2.5">
-                                    <SvgIcon name="grid" class="w-4 h-4 shrink-0" />
-                                    <span>Page Sections Hub</span>
-                                </div>
-                                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                                      :class="(activeTab === 'sections' || activeTab === 'section-edit') ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'">
-                                    {{ sections.length }}
-                                </span>
-                            </button>
-
-                            <button type="button"
-                                    @click="selectTab('navigation')"
-                                    class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition text-left"
-                                    :class="activeTab === 'navigation'
-                                        ? 'bg-[#1e1b4b] text-white shadow-xs font-bold'
-                                        : 'text-gray-700 hover:bg-gray-50'">
-                                <div class="flex items-center gap-2.5">
-                                    <SvgIcon name="compass" class="w-4 h-4 shrink-0" />
-                                    <span>Navigation & Menu</span>
-                                </div>
-                                <span v-if="activeTab === 'navigation'" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                            </button>
-
-                            <button type="button"
-                                    @click="selectTab('theme')"
-                                    class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition text-left"
-                                    :class="activeTab === 'theme'
-                                        ? 'bg-[#1e1b4b] text-white shadow-xs font-bold'
-                                        : 'text-gray-700 hover:bg-gray-50'">
-                                <div class="flex items-center gap-2.5">
-                                    <SvgIcon name="palette" class="w-4 h-4 shrink-0" />
-                                    <span>Theme & Styling</span>
-                                </div>
-                                <span v-if="activeTab === 'theme'" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                            </button>
-
-                            <button type="button"
-                                    @click="selectTab('footer')"
-                                    class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition text-left"
-                                    :class="activeTab === 'footer'
-                                        ? 'bg-[#1e1b4b] text-white shadow-xs font-bold'
-                                        : 'text-gray-700 hover:bg-gray-50'">
-                                <div class="flex items-center gap-2.5">
-                                    <SvgIcon name="layout" class="w-4 h-4 shrink-0" />
-                                    <span>Footer Links</span>
-                                </div>
-                                <span v-if="activeTab === 'footer'" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                            </button>
-
-                            <!-- Super Admin Exclusive Sections -->
-                            <template v-if="isSuperAdmin">
-                                <div class="pt-2 pb-1 px-3 text-[10px] font-bold uppercase tracking-wider text-purple-600">
-                                    Super Admin Tools
-                                </div>
-
-                                <button type="button"
-                                        @click="selectTab('experience')"
-                                        class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition text-left"
-                                        :class="activeTab === 'experience'
-                                            ? 'bg-purple-900 text-white shadow-xs font-bold'
-                                            : 'text-gray-700 hover:bg-purple-50/60'">
-                                    <div class="flex items-center gap-2.5">
-                                        <SvgIcon name="sliders" class="w-4 h-4 shrink-0" />
-                                        <span>Templates & Drafts</span>
-                                    </div>
-                                    <span v-if="activeTab === 'experience'" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                                </button>
-
-                                <button type="button"
-                                        @click="selectTab('readiness')"
-                                        class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition text-left"
-                                        :class="activeTab === 'readiness'
-                                            ? 'bg-purple-900 text-white shadow-xs font-bold'
-                                            : 'text-gray-700 hover:bg-purple-50/60'">
-                                    <div class="flex items-center gap-2.5">
-                                        <SvgIcon name="check-circle" class="w-4 h-4 shrink-0" />
-                                        <span>Publish & Readiness</span>
-                                    </div>
-                                    <span v-if="readinessReport?.ready" class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                                    <span v-else class="w-2 h-2 rounded-full bg-amber-400"></span>
-                                </button>
-                            </template>
-                        </nav>
-                    </div>
-
+                <!-- ── LEFT BUILDER SIDEBAR (Section Tree when viewing or editing sections) ───── -->
+                <aside v-if="activeTab === 'sections' || activeTab === 'section-edit'" class="lg:col-span-4 xl:col-span-3 space-y-4">
                     <!-- Page Sections Menu Tree -->
                     <div class="bg-white rounded-2xl border border-gray-100 shadow-xs p-3">
                         <div class="flex items-center justify-between px-3 pt-2 pb-2">
@@ -255,11 +144,10 @@
                             </p>
                         </div>
                     </div>
-
                 </aside>
 
                 <!-- ── RIGHT MAIN WORKSPACE CONTENT ───────────────────────────── -->
-                <main class="lg:col-span-8 xl:col-span-9 min-w-0 space-y-6">
+                <main :class="(activeTab === 'sections' || activeTab === 'section-edit') ? 'lg:col-span-8 xl:col-span-9' : 'lg:col-span-12'" class="min-w-0 space-y-6">
 
                     <!-- 1. DEDICATED SECTION ADMIN PAGE -->
                     <div v-if="activeTab === 'section-edit' && currentEditingSection" class="space-y-6">

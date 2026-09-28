@@ -14,6 +14,7 @@ use App\Support\FestCategoryMerge;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestOverallCategoryExclusion;
 use App\Support\FestSportsAgeGroup;
+use App\Support\SchoolClassCategoryResolver;
 use Illuminate\Support\Collection;
 
 class EventContext
@@ -177,6 +178,82 @@ class EventContext
         }
 
         return $this->scoreboardBySchoolForEvent();
+    }
+
+    /**
+     * Filters the overall scoreboard by school tier ('secondary' or 'senior_secondary')
+     * and recalibrates ranks 1..N within that tier.
+     *
+     * @return list<array{school_id: string, school_name: string, total_points: int, rank: int, school_tier: string}>
+     */
+    public function scoreboardBySchoolTier(string $tier): array
+    {
+        $all = $this->scoreboardBySchool();
+        if (empty($all)) {
+            return [];
+        }
+
+        $schools = Tenant::whereIn('id', array_column($all, 'school_id'))->get()->keyBy('id');
+        $filtered = [];
+
+        foreach ($all as $row) {
+            $school = $schools->get($row['school_id']);
+            if (! $school) {
+                continue;
+            }
+            $schoolTier = SchoolClassCategoryResolver::feeTierFor($school);
+            $matches = match ($tier) {
+                'senior_secondary' => $schoolTier === 'senior_secondary',
+                'secondary' => in_array($schoolTier, ['secondary', 'other'], true),
+                default => true,
+            };
+            if ($matches) {
+                $row['school_tier'] = $schoolTier;
+                $filtered[] = $row;
+            }
+        }
+
+        $rank = 0;
+        $prevPoints = null;
+        foreach ($filtered as &$item) {
+            if ($prevPoints === null || (int) $item['total_points'] < (int) $prevPoints) {
+                $rank++;
+            }
+            $prevPoints = (int) $item['total_points'];
+            $item['rank'] = $rank;
+        }
+
+        return $filtered;
+    }
+
+    /**
+     * Returns school tier boards for secondary and senior secondary championship divisions
+     * when both school types are present in the competition.
+     *
+     * @return list<array{key: string, label: string, rows: list<array<string, mixed>>}>
+     */
+    public function schoolTierBoards(): array
+    {
+        $secondary = $this->scoreboardBySchoolTier('secondary');
+        $seniorSecondary = $this->scoreboardBySchoolTier('senior_secondary');
+
+        $boards = [];
+        if (! empty($secondary)) {
+            $boards[] = [
+                'key' => 'secondary',
+                'label' => 'Overall Championship — Secondary Schools',
+                'rows' => $secondary,
+            ];
+        }
+        if (! empty($seniorSecondary)) {
+            $boards[] = [
+                'key' => 'senior_secondary',
+                'label' => 'Overall Championship — Senior Secondary Schools',
+                'rows' => $seniorSecondary,
+            ];
+        }
+
+        return $boards;
     }
 
     /**

@@ -65,7 +65,7 @@ class FestGradePointService
         $item = $mark->item ?? $mark->participant?->registration?->item;
         $itemId = $mark->item_id ?? $item?->id;
         $participantType = strtolower((string) ($item?->participant_type ?? 'individual'));
-        $isGroup = $participantType !== 'individual';
+        $isGroup = $this->isGroupItemForPoints($event, $item);
 
         if ($mark->score !== null && $itemId) {
             $effectiveGrade = $this->resolveGradeFromScore($event, (int) $itemId, (float) $mark->score, $item);
@@ -177,12 +177,38 @@ class FestGradePointService
      *
      * @return array{rank_points: ?int, grade_points: ?int, total: int}
      */
+    public function isGroupItemForPoints(FestEvent $event, ?FestEventItem $item): bool
+    {
+        $participantType = strtolower((string) ($item?->participant_type ?? 'individual'));
+        if ($participantType === 'individual') {
+            return false;
+        }
+
+        if ($participantType === 'pair') {
+            $policy = app(FestParticipationPolicyService::class)->resolveForEvent($event, $item?->class_group);
+            $mode = $policy['pair_points_mode'] ?? null;
+            if ($mode === 'individual') {
+                return false;
+            }
+            if ($mode === 'group') {
+                return true;
+            }
+            if (($policy['preset_key'] ?? '') === 'sahodaya_language_fest') {
+                return false;
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
     public function pointsBreakdown(FestEvent $event, FestMark $mark): array
     {
         $total = $this->pointsForMark($event, $mark);
 
         $item = $mark->item ?? $mark->participant?->registration?->item;
-        $isGroup = strtolower((string) ($item?->participant_type ?? 'individual')) !== 'individual';
+        $isGroup = $this->isGroupItemForPoints($event, $item);
         $scale = $isGroup ? 'group' : 'individual';
 
         $grade = $this->normalizeMcsGrade($mark->grade);

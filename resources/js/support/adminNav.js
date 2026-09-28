@@ -72,12 +72,7 @@ export function superadminNav(options = {}) {
     groups.push({
         section: 'Site Builder & Themes',
         items: [
-            { label: 'Sections', href: '/admin/builder/sections', icon: 'layers' },
-            { label: 'Theme & Skin', href: '/admin/builder/theme', icon: 'settings' },
-            { label: 'Navigation', href: '/admin/builder/nav', icon: 'grid' },
-            { label: 'Footer', href: '/admin/builder/footer', icon: 'layers' },
-            { label: 'Widgets', href: '/admin/builder/widgets', icon: 'settings' },
-            { label: 'Skin Presets', href: '/admin/skin-presets', icon: 'edit' },
+            { label: 'Skin Presets', href: '/admin/skin-presets', icon: 'palette' },
         ],
     });
 

@@ -296,6 +296,23 @@
                                             <span>→</span>
                                         </Link>
 
+                                        <a v-if="tenantType === 'sahodaya'"
+                                           :href="`/sahodaya-admin/${tenant.id}/site-builder`"
+                                           target="_blank"
+                                           class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 hover:bg-purple-100 transition"
+                                           title="Open Website Builder">
+                                            <span>Builder</span>
+                                            <span>↗</span>
+                                        </a>
+                                        <a v-else-if="tenantType === 'school'"
+                                           :href="`/school-admin/${tenant.id}/site-builder`"
+                                           target="_blank"
+                                           class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-sky-50 text-sky-700 hover:bg-sky-100 transition"
+                                           title="Open School Website Builder">
+                                            <span>Builder</span>
+                                            <span>↗</span>
+                                        </a>
+
                                         <Link v-if="!readOnly" :href="`/admin/tenants/${tenant.id}/edit`"
                                               class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
                                               title="Edit organization">

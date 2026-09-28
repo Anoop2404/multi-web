@@ -51,16 +51,34 @@ class FestParticipationLimitService
     private function itemDimensions(?FestEventItem $item): array
     {
         if (! $item) {
-            return ['on_stage' => false, 'off_stage' => false, 'group' => false, 'offstage_writing' => false, 'offstage_drawing' => false];
+            return [
+                'on_stage' => false,
+                'off_stage' => false,
+                'individual' => false,
+                'pair' => false,
+                'group' => false,
+                'common' => false,
+                'offstage_writing' => false,
+                'offstage_drawing' => false,
+            ];
         }
 
-        $isGroup = $item->isTeamItem();
-        $isOffStage = ! $isGroup && ($item->stage_type ?? '') === 'off_stage';
+        $participantType = strtolower((string) ($item->participant_type ?? 'individual'));
+        $isPair = $participantType === 'pair';
+        $isGroup = in_array($participantType, ['group', 'team', 'trio'], true)
+            || ($item->isTeamItem() && ! $isPair);
+        $isIndividual = ! $isGroup && ! $isPair;
+        $isCommon = ($item->category ?? '') === 'common'
+            || (($item->criteria_json['arts_category'] ?? null) === 'common');
+        $isOffStage = $isIndividual && ($item->stage_type ?? '') === 'off_stage';
 
         return [
-            'on_stage' => ! $isGroup && ($item->stage_type ?? '') === 'on_stage',
+            'on_stage' => $isIndividual && ($item->stage_type ?? '') === 'on_stage',
             'off_stage' => $isOffStage,
+            'individual' => $isIndividual,
+            'pair' => $isPair,
             'group' => $isGroup,
+            'common' => $isCommon,
             'offstage_writing' => $isOffStage && ($item->category ?? '') === 'literary',
             'offstage_drawing' => $isOffStage && ($item->category ?? '') === 'fine_arts',
         ];
@@ -197,7 +215,9 @@ class FestParticipationLimitService
             $onStageUsed = 0;
             $offStageUsed = 0;
             $groupUsed = 0;
+            $pairUsed = 0;
             $totalUsed = 0;
+            $allCountableUsed = 0;
             $items = [];
 
             foreach ($entry['regs'] as $reg) {
@@ -214,9 +234,13 @@ class FestParticipationLimitService
                     if ($dims['group']) {
                         $groupUsed++;
                     }
-                    if (! $dims['group'] && $reg->item && ! $this->excludedFromTotalCount($reg->item)) {
+                    if ($dims['pair']) {
+                        $pairUsed++;
+                    }
+                    if ($dims['individual'] && ! $this->excludedFromTotalCount($reg->item)) {
                         $totalUsed++;
                     }
+                    $allCountableUsed++;
                 }
 
                 $itemCategory = $this->itemCategory($reg->item, $classGroupLabels, $ageGroupLabels);
@@ -226,7 +250,7 @@ class FestParticipationLimitService
                     'item_title' => $reg->item?->title,
                     'category_key'   => $itemCategory['key'],
                     'category_label' => $itemCategory['label'],
-                    'dimension'  => $dims['group'] ? 'group' : ($dims['on_stage'] ? 'on_stage' : ($dims['off_stage'] ? 'off_stage' : null)),
+                    'dimension'  => $dims['group'] ? 'group' : ($dims['pair'] ? 'pair' : ($dims['on_stage'] ? 'on_stage' : ($dims['off_stage'] ? 'off_stage' : 'individual'))),
                     'status'     => $reg->status,
                     'countable'  => $isCountable,
                 ];
@@ -273,21 +297,18 @@ class FestParticipationLimitService
             $onStage = $dimension($onStageUsed, $onStageLimit);
             $offStage = $dimension($offStageUsed, $offStageLimit);
             $groupLimit = $policy['max_group_per_student'] ?? null;
+            $pairLimit = $policy['max_pair_per_student'] ?? null;
             $individual = $dimension($onStageUsed + $offStageUsed, $individualLimit);
             $group = $dimension($groupUsed, $groupLimit);
-            // Total is the genuinely combined figure across BOTH buckets — Individual's
-            // own usage/cap plus Group's, summed on both sides. It used to just re-read
-            // max_total_per_student a second time, making it a bare duplicate of the
-            // Individual badge; the summary header's own "Over individual (combined)"
-            // vs "Over group" stat split already implied these two were meant to roll up
-            // into one combined figure here, not repeat one of them verbatim. $totalUsed
-            // (on-stage + off-stage, excluding group and any excludedFromTotalCount
-            // items — see the loop above) still anchors the individual side so that
-            // per-item exclusion rule keeps applying.
-            $totalLimit = (! empty($individualLimit) || ! empty($groupLimit))
-                ? (int) ($individualLimit ?: 0) + (int) ($groupLimit ?: 0)
-                : null;
-            $total = $dimension($totalUsed + $groupUsed, $totalLimit);
+            $pair = $dimension($pairUsed, $pairLimit);
+            // Total is either max_overall_per_student (if configured) or the sum across buckets.
+            $overallLimit = $policy['max_overall_per_student'] ?? null;
+            $totalLimit = ! empty($overallLimit)
+                ? (int) $overallLimit
+                : ((! empty($individualLimit) || ! empty($groupLimit) || ! empty($pairLimit))
+                    ? (int) ($individualLimit ?: 0) + (int) ($groupLimit ?: 0) + (int) ($pairLimit ?: 0)
+                    : null);
+            $total = $dimension($allCountableUsed, $totalLimit);
 
             $rows[] = [
                 'student_id'  => (int) $studentId,
@@ -301,8 +322,9 @@ class FestParticipationLimitService
                 'off_stage'   => $offStage,
                 'individual'  => $individual,
                 'group'       => $group,
+                'pair'        => $pair,
                 'total'       => $total,
-                'exceeds_any' => $onStage['exceeds'] || $offStage['exceeds'] || $individual['exceeds'] || $group['exceeds'] || $total['exceeds'],
+                'exceeds_any' => $onStage['exceeds'] || $offStage['exceeds'] || $individual['exceeds'] || $group['exceeds'] || $pair['exceeds'] || $total['exceeds'],
                 'items'       => $items,
             ];
         }
@@ -685,7 +707,10 @@ class FestParticipationLimitService
             $counts = [
                 'onstage' => $this->filterRegs($studentRegs, 'on_stage')->count(),
                 'offstage' => $this->filterRegs($studentRegs, 'off_stage')->count(),
+                'individual' => $this->filterRegs($studentRegs, 'individual')->count(),
+                'pair' => $this->filterRegs($studentRegs, 'pair')->count(),
                 'group' => $this->filterRegs($studentRegs, 'group')->count(),
+                'common' => $this->filterRegs($studentRegs, 'common')->count(),
             ];
 
             $dims = $this->itemDimensions($item);
@@ -696,26 +721,61 @@ class FestParticipationLimitService
             if ($dims['off_stage']) {
                 $counts['offstage']++;
             }
+            if ($dims['individual']) {
+                $counts['individual']++;
+            }
+            if ($dims['pair']) {
+                $counts['pair']++;
+            }
             if ($dims['group']) {
                 $counts['group']++;
+            }
+            if ($dims['common']) {
+                $counts['common']++;
             }
 
             $satisfied = false;
             foreach ($profiles as $profile) {
-                if ($counts['onstage'] <= (int) ($profile['onstage'] ?? 99)
-                    && $counts['offstage'] <= (int) ($profile['offstage'] ?? 99)
-                    && $counts['group'] <= (int) ($profile['group'] ?? 99)
-                    && ($counts['onstage'] + $counts['offstage'] + $counts['group']) <=
-                        ((int) ($profile['onstage'] ?? 0) + (int) ($profile['offstage'] ?? 0) + (int) ($profile['group'] ?? 0))
-                ) {
-                    $satisfied = true;
-                    break;
+                $hasTypeKeys = isset($profile['individual']) || isset($profile['pair']) || isset($profile['common']);
+
+                if ($hasTypeKeys) {
+                    $maxInd = (int) ($profile['individual'] ?? 99);
+                    $maxPair = (int) ($profile['pair'] ?? 99);
+                    $maxGrp = (int) ($profile['group'] ?? 99);
+                    $maxCom = (int) ($profile['common'] ?? 99);
+                    $totalCap = (int) ($profile['total'] ?? (
+                        (isset($profile['individual']) ? (int) $profile['individual'] : 0) +
+                        (isset($profile['pair']) ? (int) $profile['pair'] : 0) +
+                        (isset($profile['group']) ? (int) $profile['group'] : 0) +
+                        (isset($profile['common']) ? (int) $profile['common'] : 0)
+                    ));
+
+                    if ($counts['individual'] <= $maxInd
+                        && $counts['pair'] <= $maxPair
+                        && $counts['group'] <= $maxGrp
+                        && $counts['common'] <= $maxCom
+                        && ($counts['individual'] + $counts['pair'] + $counts['group'] + $counts['common']) <= $totalCap
+                    ) {
+                        $satisfied = true;
+                        break;
+                    }
+                } else {
+                    $groupTotal = $counts['group'] + $counts['pair'];
+                    if ($counts['onstage'] <= (int) ($profile['onstage'] ?? 99)
+                        && $counts['offstage'] <= (int) ($profile['offstage'] ?? 99)
+                        && $groupTotal <= (int) ($profile['group'] ?? 99)
+                        && ($counts['onstage'] + $counts['offstage'] + $groupTotal) <=
+                            ((int) ($profile['onstage'] ?? 0) + (int) ($profile['offstage'] ?? 0) + (int) ($profile['group'] ?? 0))
+                    ) {
+                        $satisfied = true;
+                        break;
+                    }
                 }
             }
 
             if (! $satisfied) {
                 $name = Student::where('id', $studentId)->value('name') ?? 'Student';
-                $errors[] = "{$name} does not satisfy any allowed MCS item combination profile.";
+                $errors[] = "{$name} does not satisfy any allowed item combination profile.";
             }
         }
 
@@ -732,6 +792,8 @@ class FestParticipationLimitService
         $isOnStage = $dims['on_stage'];
         $isOffStage = $dims['off_stage'];
         $isGroup = $dims['group'];
+        $isPair = $dims['pair'];
+        $isCommon = $dims['common'];
 
         if ($isOnStage && ! empty($policy['max_onstage_per_student'])) {
             $count = $this->filterRegs($studentRegs, 'on_stage')->count() + 1;
@@ -765,11 +827,37 @@ class FestParticipationLimitService
             }
         }
 
+        if ($isPair) {
+            if (! empty($policy['max_pair_per_student'])) {
+                $count = $this->filterRegs($studentRegs, 'pair')->count() + 1;
+                if ($count > (int) $policy['max_pair_per_student']) {
+                    $name = Student::where('id', $studentId)->value('name') ?? 'Student';
+                    $errors[] = "{$name} exceeds max {$policy['max_pair_per_student']} pair items.";
+                }
+            } elseif (! empty($policy['max_group_per_student'])) {
+                $count = $this->filterRegs($studentRegs, 'group_or_pair')->count() + 1;
+                if ($count > (int) $policy['max_group_per_student']) {
+                    $name = Student::where('id', $studentId)->value('name') ?? 'Student';
+                    $errors[] = "{$name} exceeds max {$policy['max_group_per_student']} group items.";
+                }
+            }
+        }
+
         if ($isGroup && ! empty($policy['max_group_per_student'])) {
-            $count = $this->filterRegs($studentRegs, 'group')->count() + 1;
+            $count = (! empty($policy['max_pair_per_student']))
+                ? ($this->filterRegs($studentRegs, 'group')->count() + 1)
+                : ($this->filterRegs($studentRegs, 'group_or_pair')->count() + 1);
             if ($count > (int) $policy['max_group_per_student']) {
                 $name = Student::where('id', $studentId)->value('name') ?? 'Student';
                 $errors[] = "{$name} exceeds max {$policy['max_group_per_student']} group items.";
+            }
+        }
+
+        if ($isCommon && ! empty($policy['max_common_per_student'])) {
+            $count = $this->filterRegs($studentRegs, 'common')->count() + 1;
+            if ($count > (int) $policy['max_common_per_student']) {
+                $name = Student::where('id', $studentId)->value('name') ?? 'Student';
+                $errors[] = "{$name} exceeds max {$policy['max_common_per_student']} common items.";
             }
         }
 
@@ -778,6 +866,14 @@ class FestParticipationLimitService
             if ($count > (int) $policy['max_total_per_student']) {
                 $name = Student::where('id', $studentId)->value('name') ?? 'Student';
                 $errors[] = "{$name} exceeds max {$policy['max_total_per_student']} total items.";
+            }
+        }
+
+        if (! empty($policy['max_overall_per_student'])) {
+            $count = $studentRegs->count() + 1;
+            if ($count > (int) $policy['max_overall_per_student']) {
+                $name = Student::where('id', $studentId)->value('name') ?? 'Student';
+                $errors[] = "{$name} exceeds max {$policy['max_overall_per_student']} total items for this event.";
             }
         }
 
@@ -890,6 +986,10 @@ class FestParticipationLimitService
     /** @param Collection<int, FestRegistration> $regs */
     private function filterRegs($regs, string $dimension)
     {
+        if ($dimension === 'group_or_pair') {
+            return $regs->filter(fn (FestRegistration $r) => ($this->itemDimensions($r->item)['group'] ?? false) || ($this->itemDimensions($r->item)['pair'] ?? false));
+        }
+
         return $regs->filter(fn (FestRegistration $r) => $this->itemDimensions($r->item)[$dimension] ?? false);
     }
 
@@ -904,18 +1004,18 @@ class FestParticipationLimitService
     }
 
     /**
-     * A group/team item never counts toward "total items" — same rule itemDimensions()
+     * A group/team or pair item never counts toward "total individual items" — same rule itemDimensions()
      * documents and countableTotalForStudent() below already applied to a student's
      * EXISTING registrations, but this method (which gates whether a NEW registration even
      * gets checked against max_total_per_student at all, see validateStudent()) only
-     * excluded relay/march_past, not group. That let a school sitting exactly at their
-     * individual (on-stage+off-stage) total limit get blocked from registering a group item
-     * — "exceeds max N total items" — even though group has its own separate
-     * max_group_per_student cap and was never meant to compete with total for the same slots.
+     * excluded relay/march_past, not group.
      */
     private function excludedFromTotalCount(FestEventItem $item): bool
     {
-        return $this->itemDimensions($item)['group']
+        $dims = $this->itemDimensions($item);
+
+        return $dims['group']
+            || $dims['pair']
             || in_array($item->sport_discipline, ['relay', 'march_past'], true);
     }
 

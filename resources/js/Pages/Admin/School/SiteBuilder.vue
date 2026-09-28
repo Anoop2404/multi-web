@@ -31,7 +31,7 @@
 
             <!-- Tabs -->
             <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 flex flex-wrap gap-1">
-                <button v-for="tab in tabs" :key="tab.id" @click="activeTab = tab.id"
+                <button v-for="tab in tabs" :key="tab.id" @click="switchTab(tab.id)"
                         class="px-4 py-2 rounded-xl text-sm font-semibold transition"
                         :class="activeTab === tab.id
                             ? 'bg-[#041525] text-white shadow-sm'
@@ -557,9 +557,11 @@ import ExperiencePicker from '@/Components/sahodaya/website/ExperiencePicker.vue
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import ImageUploadField from '@/Components/Website/ImageUploadField.vue';
 import RichTextEditor from '@/Components/ui/RichTextEditor.vue';
-import { ref, reactive, computed, defineComponent, h, onMounted } from 'vue';
+import { ref, reactive, computed, defineComponent, h, onMounted, onUnmounted, watch } from 'vue';
+import { usePage } from '@inertiajs/vue3';
 import { useConfirm } from '@/composables/useConfirm';
 
+const page = usePage();
 const { confirm } = useConfirm();
 
 const props = defineProps({
@@ -589,7 +591,43 @@ const tabs = [
     { id: 'navigation', label: 'Navigation & Admissions' },
     { id: 'footer', label: 'Footer Links' },
 ];
-const activeTab = ref(props.navNeedsSetup ? 'navigation' : 'sections');
+
+function getInitialTab() {
+    if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const tab = params.get('tab');
+        if (tab && tabs.some(t => t.id === tab)) {
+            return tab;
+        }
+    }
+    return props.navNeedsSetup ? 'navigation' : 'sections';
+}
+
+const activeTab = ref(getInitialTab());
+
+function syncTabFromUrl(url = (typeof window !== 'undefined' ? window.location.href : '')) {
+    if (!url) return;
+    try {
+        const parsed = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+        const tab = parsed.searchParams.get('tab');
+        if (tab && tabs.some(t => t.id === tab) && activeTab.value !== tab) {
+            activeTab.value = tab;
+        }
+    } catch {
+        // ignore invalid URL
+    }
+}
+
+function switchTab(tabId) {
+    activeTab.value = tabId;
+    if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('tab') !== tabId) {
+            url.searchParams.set('tab', tabId);
+            window.history.pushState({}, '', url.toString());
+        }
+    }
+}
 
 const sections    = ref([...(props.sections ?? [])]);
 const expandedId  = ref(null);
@@ -795,8 +833,26 @@ async function restoreSiteVersion(version) {
     loadVersions();
 }
 
+function handlePopstate() {
+    syncTabFromUrl();
+}
+
 onMounted(() => {
+    syncTabFromUrl();
+    if (typeof window !== 'undefined') {
+        window.addEventListener('popstate', handlePopstate);
+    }
     if (currentSiteData.id) loadVersions();
+});
+
+onUnmounted(() => {
+    if (typeof window !== 'undefined') {
+        window.removeEventListener('popstate', handlePopstate);
+    }
+});
+
+watch(() => page.url, (newUrl) => {
+    syncTabFromUrl(newUrl);
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

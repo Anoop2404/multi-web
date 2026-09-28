@@ -3,7 +3,7 @@
         <PageHeader title="Forms builder" eyebrow="Website"
                     description="Create public forms with honeypot spam protection. Public URL: /forms/{slug}.">
             <template #actions>
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/site-builder`" class="btn-secondary text-sm">Site builder</Link>
+                <Link v-if="isSuperAdmin" :href="`/sahodaya-admin/${sahodaya.id}/site-builder`" class="btn-secondary text-sm">Site builder</Link>
             </template>
         </PageHeader>
 
@@ -49,15 +49,27 @@
 </template>
 
 <script setup>
-import { Link, router, useForm } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import { Link, router, useForm, usePage } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import { useConfirm } from '@/composables/useConfirm';
+const page = usePage();
 
 const props = defineProps({
     sahodaya: Object,
     publicUrl: String,
     forms: { type: Array, default: () => [] },
     sites: { type: Array, default: () => [] },
+    isSuperAdmin: { type: Boolean, default: false },
+});
+
+const isSuperAdmin = computed(() => {
+    return Boolean(
+        props.isSuperAdmin
+        || page.props.isSuperAdmin
+        || page.props.auth?.user?.roles?.includes('superadmin')
+        || page.props.auth?.user?.is_super_admin
+    );
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/website/forms`;

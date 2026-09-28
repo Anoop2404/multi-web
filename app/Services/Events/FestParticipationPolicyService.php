@@ -35,7 +35,18 @@ class FestParticipationPolicyService
         }
 
         if ($policy) {
-            return $policy->toLimitArray();
+            $limits = $policy->toLimitArray();
+            if ($policy->preset_key) {
+                $preset = $this->preset($policy->preset_key);
+                unset($preset['label']);
+                foreach ($preset as $k => $v) {
+                    if (! array_key_exists($k, $limits) || $limits[$k] === null || $limits[$k] === '') {
+                        $limits[$k] = $v;
+                    }
+                }
+            }
+
+            return $limits;
         }
 
         if ($event->state_program_id) {
@@ -106,6 +117,8 @@ class FestParticipationPolicyService
                 'max_onstage_per_school', 'max_offstage_per_school', 'max_group_per_school',
                 'max_onstage_per_student', 'max_offstage_per_student', 'max_group_per_student',
                 'max_offstage_writing_per_student', 'max_offstage_drawing_per_student',
+                'max_pair_per_student', 'max_common_per_student', 'max_overall_per_student',
+                'pair_points_mode', 'combo_profiles', 'rules_config',
                 'max_total_per_student', 'one_entry_per_item_per_school',
                 'count_submitted_registrations', 'exclude_standbys_from_limits',
                 'require_fee_before_approval',
@@ -140,6 +153,8 @@ class FestParticipationPolicyService
                 'max_onstage_per_school', 'max_offstage_per_school', 'max_group_per_school',
                 'max_onstage_per_student', 'max_offstage_per_student', 'max_group_per_student',
                 'max_offstage_writing_per_student', 'max_offstage_drawing_per_student',
+                'max_pair_per_student', 'max_common_per_student', 'max_overall_per_student',
+                'pair_points_mode', 'combo_profiles', 'rules_config',
                 'max_total_per_student', 'one_entry_per_item_per_school',
                 'count_submitted_registrations', 'exclude_standbys_from_limits',
                 'require_fee_before_approval',

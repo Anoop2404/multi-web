@@ -296,15 +296,32 @@ class FestItemCatalog
     }
 
     /** @return list<array<string, mixed>> */
-    public static function scienceFestItems(): array
+    public static function mcsScienceFestItems(): array
     {
         return self::loadCatalogRows(
-            require __DIR__.'/data/cksc_science_fest_items.php',
+            require __DIR__.'/data/mcs_science_fest_items.php',
             enrichGroups: true,
             defaults: [
                 'owner_level' => 'sahodaya',
                 'max_per_school' => 1,
-                'qualify_count' => 2,
+                'qualify_count' => 1,
+                'participant_type' => 'individual',
+                'gender' => 'mixed',
+                'source' => 'mcs',
+            ],
+        );
+    }
+
+    /** @return list<array<string, mixed>> */
+    public static function scienceFestItems(): array
+    {
+        return self::loadCatalogRows(
+            require __DIR__.'/data/mcs_science_fest_items.php',
+            enrichGroups: true,
+            defaults: [
+                'owner_level' => 'sahodaya',
+                'max_per_school' => 1,
+                'qualify_count' => 1,
                 'participant_type' => 'individual',
                 'gender' => 'mixed',
             ],

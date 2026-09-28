@@ -4,7 +4,7 @@
             <PageHeader title="Custom Domains & DNS" eyebrow="Website Settings"
                         description="Point and verify custom domain names for this Sahodaya cluster website. Subdomain hosting remains active automatically.">
                 <template #actions>
-                    <Link :href="`/sahodaya-admin/${sahodaya.id}/site-builder`" class="btn-secondary text-xs">
+                    <Link v-if="isSuperAdmin" :href="`/sahodaya-admin/${sahodaya.id}/site-builder`" class="btn-secondary text-xs">
                         Site Builder →
                     </Link>
                 </template>

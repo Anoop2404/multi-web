@@ -121,6 +121,7 @@ import {
     detectSchoolMembershipFromUrl,
     detectSchoolProgramFromUrl,
     detectSchoolTrainingFromUrl,
+    detectSchoolWebsiteFromUrl,
     schoolAdminNav,
     schoolEventCoordinatorNav,
     schoolFestScopedNav,
@@ -130,6 +131,7 @@ import {
     schoolNavItemActive,
     schoolProgramScopedNav,
     schoolTrainingHubNav,
+    schoolWebsiteScopedNav,
 } from '@/support/schoolAdminNav.js';
 import { detectSchoolEventFromUrl, schoolEventScopedNav } from '@/support/schoolEventNav.js';
 import { computed, ref, watch } from 'vue';
@@ -224,6 +226,10 @@ const navGroups = computed(() => {
 
     if (detectSchoolTrainingFromUrl(page.url)) {
         return schoolTrainingHubNav(tid.value, options);
+    }
+
+    if (detectSchoolWebsiteFromUrl(page.url)) {
+        return schoolWebsiteScopedNav(tid.value, options);
     }
 
     const schoolEventCtx = detectSchoolEventFromUrl(page.url);

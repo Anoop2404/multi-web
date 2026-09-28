@@ -98,6 +98,7 @@ class FestResultsController extends SahodayaAdminController
             'event' => $event,
             'scoreboard' => $eventContext->scoreboardBySchool(),
             'categoryBoards' => $categoryBoards,
+            'schoolTierBoards' => $eventContext->schoolTierBoards(),
             'qualifications' => $qualifications,
             'nextEvents' => $nextEvents,
             'suggestedNextId' => $suggestedNext?->id,

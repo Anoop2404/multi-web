@@ -69,6 +69,70 @@ export function detectSchoolTrainingFromUrl(url) {
     return /\/school-admin\/[^/]+\/training(?:\/|$)/.test(path);
 }
 
+/** @returns {boolean} */
+export function detectSchoolWebsiteFromUrl(url) {
+    const path = (url ?? '').split('?')[0];
+
+    return /\/school-admin\/[^/]+\/site-builder(?:\/|$)/.test(path)
+        || /\/school-admin\/[^/]+\/website(?:\/|$)/.test(path)
+        || /\/school-admin\/[^/]+\/news(?:\/|$)/.test(path)
+        || /\/school-admin\/[^/]+\/events(?:\/|$)/.test(path)
+        || /\/school-admin\/[^/]+\/gallery(?:\/|$)/.test(path)
+        || /\/school-admin\/[^/]+\/staff(?:\/|$)/.test(path)
+        || /\/school-admin\/[^/]+\/achievements(?:\/|$)/.test(path)
+        || /\/school-admin\/[^/]+\/downloads(?:\/|$)/.test(path)
+        || /\/school-admin\/[^/]+\/job-vacancies(?:\/|$)/.test(path)
+        || /\/school-admin\/[^/]+\/alumni(?:\/|$)/.test(path)
+        || /\/school-admin\/[^/]+\/testimonials(?:\/|$)/.test(path)
+        || /\/school-admin\/[^/]+\/contact(?:\/|$)/.test(path);
+}
+
+/** Dedicated sidebar navigation when managing school public website, CMS & builder */
+export function schoolWebsiteScopedNav(schoolId, options = {}) {
+    const { canNav = () => true, publicWebsiteEnabled = true } = options;
+
+    if (!canNav('website')) {
+        return [];
+    }
+
+    const base = schoolAdminHref(schoolId);
+
+    return [
+        {
+            section: 'School Home',
+            items: [
+                { label: 'School dashboard', href: base, icon: 'grid', exact: true },
+                { label: 'Website hub', href: `${base}/website/hub`, icon: 'layers', exact: true },
+            ],
+        },
+        ...(publicWebsiteEnabled ? [{
+            section: 'Website Builder',
+            items: [
+                { label: 'Page Sections', href: `${base}/site-builder?tab=sections`, icon: 'grid', matchQuery: { tab: 'sections' } },
+                { label: 'Design & Styling', href: `${base}/site-builder?tab=design`, icon: 'palette', matchQuery: { tab: 'design' } },
+                { label: 'Templates', href: `${base}/site-builder?tab=template`, icon: 'sliders', matchQuery: { tab: 'template' } },
+                { label: 'Public Page Text', href: `${base}/site-builder?tab=content`, icon: 'edit', matchQuery: { tab: 'content' } },
+                { label: 'Navigation & Admissions', href: `${base}/site-builder?tab=navigation`, icon: 'compass', matchQuery: { tab: 'navigation' } },
+                { label: 'Footer Links', href: `${base}/site-builder?tab=footer`, icon: 'layout', matchQuery: { tab: 'footer' } },
+            ],
+        }] : []),
+        {
+            section: 'Public Content',
+            items: [
+                { label: 'News & Articles', href: `${base}/news`, icon: 'file-text' },
+                { label: 'Events Calendar', href: `${base}/events`, icon: 'calendar' },
+                { label: 'Photo Gallery', href: `${base}/gallery`, icon: 'image' },
+                { label: 'Staff Directory', href: `${base}/staff`, icon: 'users' },
+                { label: 'Achievements', href: `${base}/achievements`, icon: 'award' },
+                { label: 'Downloads & Circulars', href: `${base}/downloads`, icon: 'download' },
+                { label: 'Testimonials', href: `${base}/testimonials`, icon: 'star' },
+                { label: 'Website Forms', href: `${base}/website/forms`, icon: 'clipboard' },
+                { label: 'Contact Page', href: `${base}/contact`, icon: 'mail' },
+            ],
+        },
+    ];
+}
+
 /** Sidebar when managing annual membership / registration. */
 export function schoolMembershipScopedNav(schoolId, options = {}) {
     const { canNav = () => true, navVisibility = null } = options;
@@ -538,6 +602,10 @@ export function schoolNavItemActive(pageUrl, href, exact = false, matchQuery = n
         }
 
         return true;
+    }
+
+    if (params.get('tab') && target.endsWith('/site-builder') && !href.includes('tab=')) {
+        return false;
     }
 
     if (exact) {
