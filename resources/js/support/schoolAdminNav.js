@@ -105,33 +105,47 @@ export function schoolWebsiteScopedNav(schoolId, options = {}) {
                 { label: 'Website hub', href: `${base}/website/hub`, icon: 'layers', exact: true },
             ],
         },
-        ...(publicWebsiteEnabled ? [{
-            section: 'Website Builder',
-            items: [
-                { label: 'Page Sections', href: `${base}/site-builder?tab=sections`, icon: 'grid', matchQuery: { tab: 'sections' } },
-                ...(isSuperAdmin ? [
-                    { label: 'Design & Styling', href: `${base}/site-builder?tab=design`, icon: 'palette', matchQuery: { tab: 'design' } },
-                    { label: 'Templates', href: `${base}/site-builder?tab=template`, icon: 'sliders', matchQuery: { tab: 'template' } },
-                ] : []),
-                { label: 'Public Page Text', href: `${base}/site-builder?tab=content`, icon: 'edit', matchQuery: { tab: 'content' } },
-                { label: 'Navigation & Admissions', href: `${base}/site-builder?tab=navigation`, icon: 'compass', matchQuery: { tab: 'navigation' } },
-                { label: 'Footer Links', href: `${base}/site-builder?tab=footer`, icon: 'layout', matchQuery: { tab: 'footer' } },
-            ],
-        }] : []),
-        {
-            section: 'Public Content',
-            items: [
-                { label: 'News & Articles', href: `${base}/news`, icon: 'file-text' },
-                { label: 'Events Calendar', href: `${base}/events`, icon: 'calendar' },
-                { label: 'Photo Gallery', href: `${base}/gallery`, icon: 'image' },
-                { label: 'Staff Directory', href: `${base}/staff`, icon: 'users' },
-                { label: 'Achievements', href: `${base}/achievements`, icon: 'award' },
-                { label: 'Downloads & Circulars', href: `${base}/downloads`, icon: 'download' },
-                { label: 'Testimonials', href: `${base}/testimonials`, icon: 'star' },
-                { label: 'Website Forms', href: `${base}/website/forms`, icon: 'clipboard' },
-                { label: 'Contact Page', href: `${base}/contact`, icon: 'mail' },
-            ],
-        },
+        ...(publicWebsiteEnabled ? [
+            {
+                section: 'Website Sections (CMS)',
+                items: [
+                    { label: 'All Page Sections', href: `${base}/site-builder?tab=sections`, icon: 'grid', exact: true, matchQuery: { tab: 'sections', type: '' } },
+                    { label: 'Hero & Sliders', href: `${base}/site-builder?tab=sections&type=hero`, icon: 'image', matchQuery: { tab: 'sections', type: 'hero' } },
+                    { label: 'About School', href: `${base}/site-builder?tab=sections&type=about`, icon: 'book-open', matchQuery: { tab: 'sections', type: 'about' } },
+                    { label: 'Principal\'s Desk', href: `${base}/site-builder?tab=sections&type=principal_message`, icon: 'user', matchQuery: { tab: 'sections', type: 'principal_message' } },
+                    { label: 'Campus Facilities', href: `${base}/site-builder?tab=sections&type=facilities`, icon: 'building', matchQuery: { tab: 'sections', type: 'facilities' } },
+                    { label: 'Academic Programmes', href: `${base}/site-builder?tab=sections&type=academic_programmes`, icon: 'file-text', matchQuery: { tab: 'sections', type: 'academic_programmes' } },
+                    { label: 'Admissions Info', href: `${base}/site-builder?tab=sections&type=admissions`, icon: 'clipboard', matchQuery: { tab: 'sections', type: 'admissions' } },
+                    { label: 'CBSE Disclosures', href: `${base}/site-builder?tab=sections&type=mandatory_disclosure`, icon: 'shield', matchQuery: { tab: 'sections', type: 'mandatory_disclosure' } },
+                ],
+            },
+            {
+                section: 'Content & Media',
+                items: [
+                    { label: 'News & Articles', href: `${base}/news`, icon: 'file-text' },
+                    { label: 'Events Calendar', href: `${base}/events`, icon: 'calendar' },
+                    { label: 'Photo Gallery', href: `${base}/gallery`, icon: 'image' },
+                    { label: 'Staff Directory', href: `${base}/staff`, icon: 'users' },
+                    { label: 'Achievements', href: `${base}/achievements`, icon: 'award' },
+                    { label: 'Downloads & Circulars', href: `${base}/downloads`, icon: 'download' },
+                    { label: 'Testimonials', href: `${base}/testimonials`, icon: 'star' },
+                    { label: 'Website Forms', href: `${base}/website/forms`, icon: 'clipboard' },
+                    { label: 'Contact Details', href: `${base}/contact`, icon: 'mail' },
+                ],
+            },
+            {
+                section: 'Navigation & Setup',
+                items: [
+                    { label: 'Navigation Menu', href: `${base}/site-builder?tab=navigation`, icon: 'compass', matchQuery: { tab: 'navigation' } },
+                    { label: 'Footer Links', href: `${base}/site-builder?tab=footer`, icon: 'layout', matchQuery: { tab: 'footer' } },
+                    { label: 'Public Page Text & SEO', href: `${base}/site-builder?tab=content`, icon: 'edit', matchQuery: { tab: 'content' } },
+                    ...(isSuperAdmin ? [
+                        { label: 'Design System', href: `${base}/site-builder?tab=design`, icon: 'palette', matchQuery: { tab: 'design' } },
+                        { label: 'Template Blueprint', href: `${base}/site-builder?tab=template`, icon: 'sliders', matchQuery: { tab: 'template' } },
+                    ] : []),
+                ],
+            },
+        ] : []),
     ];
 }
 
@@ -473,16 +487,17 @@ export function schoolAdminNav(schoolId, options = {}) {
         });
     }
 
-    // ── Website (collapses to single hub entry) ────────────────────────
+    // ── Website & CMS ────────────────────────────────────────────────
     if (publicWebsiteEnabled && canNav('website')) {
-        // Unlike the old site-builder-only entry point (which covered just Page
-        // Sections/Navigation/Footer and left the rest unreachable except via nav
-        // search), Website/Hub.vue actually links out to all 12 of these — safe to
-        // collapse to one sidebar entry.
         groups.push({
-            section: 'Website',
+            section: 'Website & CMS',
             items: [
-                { label: 'Website hub', href: `${base}/website/hub`, icon: 'layers' },
+                { label: 'Website Hub', href: `${base}/website/hub`, icon: 'layers' },
+                { label: 'Page Sections', href: `${base}/site-builder?tab=sections`, icon: 'grid' },
+                { label: 'News & Articles', href: `${base}/news`, icon: 'file-text' },
+                { label: 'Events Calendar', href: `${base}/events`, icon: 'calendar' },
+                { label: 'Photo Gallery', href: `${base}/gallery`, icon: 'image' },
+                { label: 'Staff Directory', href: `${base}/staff`, icon: 'users' },
             ],
         });
     }

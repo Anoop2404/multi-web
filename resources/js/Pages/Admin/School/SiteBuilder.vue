@@ -578,6 +578,16 @@
 
             <!-- 2. Sections Hub / Overview (When not editing a specific section) -->
             <div v-else class="space-y-4">
+                <div v-if="missingSectionType" class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+                    <div>
+                        <p class="font-bold">“{{ sectionTypeLabel(missingSectionType) }}” section not found</p>
+                        <p class="text-xs text-amber-800 mt-0.5">This section is not currently part of your school's active website layout. All active layout sections are listed below.</p>
+                    </div>
+                    <button type="button" @click="closeSectionEditor" class="px-3.5 py-1.5 rounded-xl bg-white border border-amber-300 text-xs font-bold text-amber-900 hover:bg-amber-100 transition shadow-xs">
+                        View all active sections
+                    </button>
+                </div>
+
                 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 flex flex-wrap items-center justify-between gap-3">
                     <div class="flex flex-wrap items-center gap-3">
                         <h2 class="font-bold text-gray-900 text-lg">Page Sections</h2>
@@ -841,8 +851,11 @@ const nextSection = computed(() => {
     return idx >= 0 && idx < sections.value.length - 1 ? sections.value[idx + 1] : null;
 });
 
+const missingSectionType = ref(null);
+
 function editSection(section) {
     if (!section) return;
+    missingSectionType.value = null;
     selectedSectionId.value = section.id;
     activeTab.value = 'sections';
     if (!editConfigs[section.id]) {
@@ -851,17 +864,20 @@ function editSection(section) {
     if (typeof window !== 'undefined') {
         const url = new URL(window.location.href);
         url.searchParams.set('tab', 'sections');
-        url.searchParams.set('section', section.id);
+        url.searchParams.set('type', section.section_type);
+        url.searchParams.delete('section');
         window.history.pushState({}, '', url.toString());
     }
 }
 
 function closeSectionEditor() {
     selectedSectionId.value = null;
+    missingSectionType.value = null;
     if (typeof window !== 'undefined') {
         const url = new URL(window.location.href);
         url.searchParams.set('tab', 'sections');
         url.searchParams.delete('section');
+        url.searchParams.delete('type');
         window.history.pushState({}, '', url.toString());
     }
 }
@@ -879,6 +895,7 @@ function syncTabFromUrl(url = (typeof window !== 'undefined' ? window.location.h
         const parsed = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
         const tab = parsed.searchParams.get('tab');
         const sectionParam = parsed.searchParams.get('section');
+        const typeParam = parsed.searchParams.get('type');
         if (tab) {
             if (tabs.value.some(t => t.id === tab)) {
                 if (activeTab.value !== tab) activeTab.value = tab;
@@ -888,15 +905,29 @@ function syncTabFromUrl(url = (typeof window !== 'undefined' ? window.location.h
         }
         if (sectionParam) {
             const secId = parseInt(sectionParam, 10);
-            if (sections.value.some(s => s.id === secId)) {
+            const sec = sections.value.find(s => s.id === secId);
+            if (sec) {
+                missingSectionType.value = null;
                 selectedSectionId.value = secId;
                 if (!editConfigs[secId]) {
-                    const sec = sections.value.find(s => s.id === secId);
-                    if (sec) editConfigs[secId] = { ...(sec.config ?? {}) };
+                    editConfigs[secId] = { ...(sec.config ?? {}) };
                 }
             }
-        } else if (tab === 'sections' && !sectionParam) {
+        } else if (typeParam) {
+            const sec = sections.value.find(s => s.section_type === typeParam);
+            if (sec) {
+                missingSectionType.value = null;
+                selectedSectionId.value = sec.id;
+                if (!editConfigs[sec.id]) {
+                    editConfigs[sec.id] = { ...(sec.config ?? {}) };
+                }
+            } else {
+                selectedSectionId.value = null;
+                missingSectionType.value = typeParam;
+            }
+        } else if (tab === 'sections' && !sectionParam && !typeParam) {
             selectedSectionId.value = null;
+            missingSectionType.value = null;
         }
     } catch {
         // ignore invalid URL
@@ -912,10 +943,12 @@ watch(tabs, (newTabs) => {
 function switchTab(tabId) {
     activeTab.value = tabId;
     selectedSectionId.value = null;
+    missingSectionType.value = null;
     if (typeof window !== 'undefined') {
         const url = new URL(window.location.href);
         url.searchParams.set('tab', tabId);
         url.searchParams.delete('section');
+        url.searchParams.delete('type');
         window.history.pushState({}, '', url.toString());
     }
 }
