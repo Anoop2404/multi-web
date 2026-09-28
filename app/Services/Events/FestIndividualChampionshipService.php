@@ -3,8 +3,10 @@
 namespace App\Services\Events;
 
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestEventPhase;
 use App\Models\FestMark;
+use App\Models\Student;
 use App\Models\Tenant;
 use App\Support\FestCategoryMerge;
 use App\Support\FestClassGroupScheme;
@@ -14,71 +16,78 @@ use Illuminate\Support\Collection;
 /**
  * Individual (student) championship leaderboard — computed live, straight off
  * published marks, every time it's read. No "Recalculate" button or stored
- * snapshot to go stale: enter marks anywhere under the hub and every phase's
- * Championship page (and the public Results "Championship" tab, and the
- * Individual Championship export) reflects it immediately, summed automatically
- * across whichever phase leaf events actually have marks. Shared by the admin
- * Championship page (FestChampionshipController), the public portal
- * (FestPortalController::results()), and the report export
- * (FestReportService), so all three always agree.
+ * snapshot to go stale.
  */
 class FestIndividualChampionshipService
 {
     /** The only categories this leaderboard may ever bucket a student into. */
-    private const INDIVIDUAL_CATEGORY_KEYS = ['lp', 'up', 'hs', 'hss', 'open'];
+    public const INDIVIDUAL_CATEGORY_KEYS = ['lp', 'up', 'hs', 'hss', 'open'];
 
     public function __construct(
         private FestGradePointService $gradePoints,
     ) {}
 
+    /**
+     * Resolves individual championship config for event.
+     *
+     * @return array<string, mixed>
+     */
+    public function getConfig(FestEvent $event): array
+    {
+        $root = $event->rootEvent();
+        $stored = $root->aggregation_config['individual_championship_config'] ?? [];
+
+        return [
+            'male_title' => $stored['male_title'] ?? 'Kalaprathibha',
+            'female_title' => $stored['female_title'] ?? 'Kalathilakam',
+            'runner_up_title' => $stored['runner_up_title'] ?? 'Runner Up',
+            'max_counting_items' => (int) ($stored['max_counting_items'] ?? 0), // 0 = unlimited / all items
+            'multi_person_mode' => $stored['multi_person_mode'] ?? 'tie_break_only', // 'tie_break_only', 'include_weighted', 'exclude'
+            'group_weight_percent' => (int) ($stored['group_weight_percent'] ?? 100),
+            'must_have_first_place' => (bool) ($stored['must_have_first_place'] ?? false),
+            'minimum_points' => (int) ($stored['minimum_points'] ?? 0),
+            'excluded_item_categories' => (array) ($stored['excluded_item_categories'] ?? []),
+            'active_categories' => ! empty($stored['active_categories']) ? (array) $stored['active_categories'] : null,
+        ];
+    }
+
     /** @return Collection<int, array<string, mixed>> */
     public function leaderboardForEvent(FestEvent $event, bool $directPhotoUrls = false): Collection
     {
-        return $this->rankAndFormat($this->pointsForEvent($event), $directPhotoUrls);
+        return $this->rankAndFormat($this->pointsForEvent($event), $directPhotoUrls, $this->getConfig($event));
     }
 
     /**
-     * Ranked within category AND gender together (e.g. "HS Boys" vs "HS Girls" are
-     * separate #1s) — grouping by category alone would let a category's "#1" silently
-     * be whichever gender happened to score higher, hiding the other gender's real
-     * champion behind "#2" or worse. overall_rank stays a single global ranking across
-     * every category/gender combined — a reference number, not a title, so it's
-     * deliberately not category/gender-scoped the way `rank` is.
+     * Ranked within category AND gender together.
      *
-     * @param  Collection<int, object>  $allRows  Each row needs student_id, student
-     *   (relation), category, gender, points, group_points.
+     * @param  Collection<int, object>  $allRows
      * @return Collection<int, array<string, mixed>>
      */
-    public function rankAndFormat(Collection $allRows, bool $directPhotoUrls = false): Collection
+    public function rankAndFormat(Collection $allRows, bool $directPhotoUrls = false, ?array $config = null): Collection
     {
-        // Ranking (both the category+gender rank and overall_rank below) depends on
-        // row order — sort explicitly rather than trusting the caller's collection
-        // order, so every caller (a single event's live points, or leaves summed
-        // together) gets the same stable points/group_points/student_id tiebreak chain.
-        // Primarily by individual points; a tie is broken by group points (a student
-        // whose group/team results also outscore the other's ranks higher), then by
-        // student_id only to keep the order fully deterministic.
-        // NOTE: Collection::sortBy()'s [ [callback, direction], ... ] array form only
-        // honors 'desc' for a plain string key — with a Closure key it silently sorts
-        // ascending regardless of the direction given, so this uses an explicit
-        // comparator instead (verified against Laravel's actual behavior, not assumed).
+        $config = $config ?? [];
+        $minPoints = (int) ($config['minimum_points'] ?? 0);
+        $mustFirst = (bool) ($config['must_have_first_place'] ?? false);
+
+        if ($minPoints > 0) {
+            $allRows = $allRows->filter(fn ($r) => ($r->points ?? 0) >= $minPoints);
+        }
+        if ($mustFirst) {
+            $allRows = $allRows->filter(fn ($r) => ($r->firsts ?? 0) > 0);
+        }
+
         $allRows = $allRows->sort(function ($a, $b) {
-            return [$b->points, $b->group_points, $a->student_id]
-                <=> [$a->points, $a->group_points, $b->student_id];
+            return [$b->points, $b->firsts ?? 0, $b->group_points, $a->student_id]
+                <=> [$a->points, $a->firsts ?? 0, $a->group_points, $b->student_id];
         })->values();
 
-        // Dense ("1, 2, 2, 3") ranking within each category+gender group: students
-        // tied on both points and group_points share the same rank, and the next
-        // distinct total continues from there rather than skipping ranks for however
-        // many students just tied (that "1, 2, 2, 4" skip-style would misrepresent how
-        // many students are genuinely ahead of a given rank).
         $rankedByCategoryAndGender = $allRows->groupBy(fn ($row) => $row->category.'|'.$row->gender)
             ->flatMap(function ($groupRows) {
                 $rank = 0;
                 $previousKey = null;
 
                 return $groupRows->values()->map(function ($row) use (&$rank, &$previousKey) {
-                    $key = $row->points.'|'.$row->group_points;
+                    $key = $row->points.'|'.($row->firsts ?? 0).'|'.$row->group_points;
                     if ($key !== $previousKey) {
                         $rank++;
                         $previousKey = $key;
@@ -101,6 +110,7 @@ class FestIndividualChampionshipService
                 'rank'         => $rank,
                 'overall_rank' => $overallRankByStudent[$row->student_id] ?? null,
                 'points'       => $row->points,
+                'firsts'       => $row->firsts ?? 0,
                 'group_points' => $row->group_points,
                 'category'     => $row->category,
                 'gender'       => $row->gender,
@@ -121,34 +131,161 @@ class FestIndividualChampionshipService
     }
 
     /**
-     * A hub's individual championship is every student's total across every phase —
-     * live-sums pointsForEvent() over each phase leaf under the hub, the same
-     * "sum the isolated per-phase numbers" principle FestPhaseScoreboardService
-     * applies for schools (see its class docblock).
+     * Crowned champions summary per category and overall.
      *
-     * @return Collection<int, array<string, mixed>>
+     * @return array<string, mixed>
      */
-    public function crossPhaseStanding(FestEvent $hub, bool $directPhotoUrls = false): Collection
+    public function championsSummary(FestEvent $event, bool $directPhotoUrls = false): array
     {
-        return $this->rankAndFormat($this->sumAcrossLeaves($this->allPhaseLeaves($hub)), $directPhotoUrls);
+        $config = $this->getConfig($event);
+        $leaderboard = $this->leaderboardForEvent($event, $directPhotoUrls);
+        $root = $event->rootEvent();
+        $canonicalLabels = FestClassGroupScheme::canonicalLabels(null, $root);
+
+        $categories = $leaderboard->pluck('category')->unique()->values();
+
+        $categoryChampions = [];
+        foreach ($categories as $catKey) {
+            $catRows = $leaderboard->filter(fn ($r) => $r['category'] === $catKey);
+
+            $boys = $catRows->filter(fn ($r) => $r['gender'] === 'male')->values();
+            $girls = $catRows->filter(fn ($r) => $r['gender'] === 'female')->values();
+
+            $maleChamp = $boys->firstWhere('rank', 1);
+            $maleRunner = $boys->firstWhere('rank', 2);
+            $femaleChamp = $girls->firstWhere('rank', 1);
+            $femaleRunner = $girls->firstWhere('rank', 2);
+
+            $categoryChampions[] = [
+                'category' => $catKey,
+                'category_label' => $canonicalLabels[$catKey] ?? strtoupper($catKey),
+                'male_champion' => $maleChamp ? $maleChamp + ['title' => $config['male_title']] : null,
+                'male_runner_up' => $maleRunner ? $maleRunner + ['title' => $config['runner_up_title']] : null,
+                'female_champion' => $femaleChamp ? $femaleChamp + ['title' => $config['female_title']] : null,
+                'female_runner_up' => $femaleRunner ? $femaleRunner + ['title' => $config['runner_up_title']] : null,
+            ];
+        }
+
+        // Overall fest champions (top overall boy and girl across any category)
+        $allBoys = $leaderboard->filter(fn ($r) => $r['gender'] === 'male')->sortBy('overall_rank')->values();
+        $allGirls = $leaderboard->filter(fn ($r) => $r['gender'] === 'female')->sortBy('overall_rank')->values();
+
+        return [
+            'config' => $config,
+            'category_champions' => $categoryChampions,
+            'overall_male_champion' => $allBoys->first() ? $allBoys->first() + ['title' => 'Overall ' . $config['male_title']] : null,
+            'overall_female_champion' => $allGirls->first() ? $allGirls->first() + ['title' => 'Overall ' . $config['female_title']] : null,
+        ];
     }
 
     /**
-     * Same combine as crossPhaseStanding(), restricted to $visibleLeafIds — the public
-     * portal must not let an unpublished phase's contribution leak into the combined
-     * total just because a sibling phase is already published. Callers decide "visible"
-     * the same way FestPortalController::crossPhaseScoreboard() already does for the
-     * school-level board: each leaf's own results_published (or an authorized admin
-     * preview of it).
+     * Full item-by-item breakdown for a student.
      *
-     * @param  Collection<int, int>  $visibleLeafIds
-     * @return Collection<int, array<string, mixed>>
+     * @return array<string, mixed>
      */
+    public function studentItemBreakdown(FestEvent $event, int $studentId): array
+    {
+        $student = Student::find($studentId);
+        if (! $student) {
+            return [];
+        }
+
+        $config = $this->getConfig($event);
+        $maxCounting = $config['max_counting_items'];
+        $multiMode = $config['multi_person_mode'];
+        $groupWeight = $config['group_weight_percent'];
+
+        $marks = FestMark::where('event_id', $event->id)
+            ->whereHas('participant', fn ($q) => $q->where('student_id', $studentId))
+            ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
+            ->with(['item', 'participant'])
+            ->get();
+
+        $items = [];
+        $soloItems = [];
+
+        foreach ($marks as $mark) {
+            $item = $mark->item;
+            if (! $item) {
+                continue;
+            }
+
+            $rawPoints = $this->gradePoints->pointsForMark($event, $mark);
+            $isMulti = FestTeamSquadRules::isMultiPerson($item->participant_type);
+
+            $entry = [
+                'item_id' => $item->id,
+                'item_code' => $item->item_code,
+                'title' => $item->title,
+                'class_group' => $item->class_group,
+                'category' => $item->category,
+                'participant_type' => $item->participant_type,
+                'is_multi_person' => $isMulti,
+                'score' => $mark->score,
+                'grade' => $mark->grade,
+                'position' => $mark->position,
+                'raw_points' => $rawPoints,
+                'counted_points' => 0,
+                'is_counted' => false,
+                'is_tie_break' => false,
+            ];
+
+            if ($isMulti) {
+                if ($multiMode === 'include_weighted') {
+                    $entry['counted_points'] = round(($rawPoints * $groupWeight) / 100, 2);
+                    $entry['is_counted'] = true;
+                } elseif ($multiMode === 'tie_break_only') {
+                    $entry['counted_points'] = 0;
+                    $entry['is_tie_break'] = true;
+                }
+            } else {
+                $soloItems[] = &$entry;
+            }
+
+            $items[] = &$entry;
+            unset($entry);
+        }
+
+        // Apply item capping on solo items
+        usort($soloItems, fn ($a, $b) => $b['raw_points'] <=> $a['raw_points']);
+        foreach ($soloItems as $idx => &$itemRef) {
+            if ($maxCounting <= 0 || $idx < $maxCounting) {
+                $itemRef['counted_points'] = $itemRef['raw_points'];
+                $itemRef['is_counted'] = true;
+            } else {
+                $itemRef['counted_points'] = 0;
+                $itemRef['is_counted'] = false;
+            }
+        }
+        unset($itemRef);
+
+        return [
+            'student' => [
+                'id' => $student->id,
+                'name' => $student->name,
+                'reg_no' => $student->reg_no,
+                'gender' => $student->gender,
+                'school' => Tenant::where('id', $student->tenant_id)->value('name'),
+            ],
+            'items' => $items,
+            'total_points' => collect($items)->sum('counted_points'),
+            'group_tiebreak_points' => collect($items)->where('is_tie_break', true)->sum('raw_points'),
+            'firsts_count' => collect($items)->where('position', 1)->count(),
+        ];
+    }
+
+    /** @return Collection<int, array<string, mixed>> */
+    public function crossPhaseStanding(FestEvent $hub, bool $directPhotoUrls = false): Collection
+    {
+        return $this->rankAndFormat($this->sumAcrossLeaves($this->allPhaseLeaves($hub)), $directPhotoUrls, $this->getConfig($hub));
+    }
+
+    /** @return Collection<int, array<string, mixed>> */
     public function crossPhaseStandingForVisibleLeaves(FestEvent $hub, Collection $visibleLeafIds, bool $directPhotoUrls = false): Collection
     {
         $visible = $this->allPhaseLeaves($hub)->filter(fn (FestEvent $leaf) => $visibleLeafIds->contains($leaf->id));
 
-        return $this->rankAndFormat($this->sumAcrossLeaves($visible), $directPhotoUrls);
+        return $this->rankAndFormat($this->sumAcrossLeaves($visible), $directPhotoUrls, $this->getConfig($hub));
     }
 
     /** @return Collection<int, FestEvent> */
@@ -180,15 +317,13 @@ class FestIndividualChampionshipService
             ->map(function (Collection $studentRows) {
                 $first = $studentRows->first();
 
-                // A student's category/gender shouldn't change phase to phase (same
-                // student, same age bracket, all within one academic-year event) —
-                // taking the first row's is safe and avoids re-deriving it here.
                 return (object) [
                     'student_id'   => $first->student_id,
                     'student'      => $first->student,
                     'category'     => $first->category,
                     'gender'       => $first->gender,
                     'points'       => $studentRows->sum('points'),
+                    'firsts'       => $studentRows->sum('firsts'),
                     'group_points' => $studentRows->sum('group_points'),
                 ];
             })
@@ -196,59 +331,49 @@ class FestIndividualChampionshipService
     }
 
     /**
-     * Live aggregate of one event's own published marks into per-student championship
-     * points — the computation FestChampionshipController::recalculate() used to run
-     * on demand and cache into fest_individual_championship_points; now run fresh on
-     * every read instead, so there is nothing to go stale and nothing an admin needs
-     * to remember to click.
+     * Live aggregate of one event's own published marks into per-student championship points.
      *
      * @return Collection<int, object>
      */
-    public function pointsForEvent(FestEvent $event): Collection
+    public function pointsForEvent(FestEvent $event, array $options = []): Collection
     {
+        $config = array_merge($this->getConfig($event), $options);
         $categoryMap = FestCategoryMerge::map($event->rootEvent());
-        $aggregated = [];
+        $maxCounting = $config['max_counting_items'];
+        $multiMode = $config['multi_person_mode'];
+        $groupWeight = $config['group_weight_percent'];
+        $excludedCategories = (array) ($config['excluded_item_categories'] ?? []);
 
-        // Only counts a mark once its own item has actually published results — same
-        // rule the public scoreboard's "Latest Item Winners" widget and tv() use
-        // (FestPortalController::scoreboardDynamicData()'s $winnerMarks query). A mark
-        // just sitting entered-but-unpublished must not move the championship standing;
-        // this is the live replacement for the old admin "Recalculate" button, so it
-        // needs the same publish discipline that button's manual timing used to provide.
+        $studentItems = [];
+
         FestMark::where('event_id', $event->id)
             ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
             ->with(['item', 'participant.student', 'participant.registration.item'])
-            ->each(function (FestMark $mark) use ($event, $categoryMap, &$aggregated) {
+            ->each(function (FestMark $mark) use ($event, $categoryMap, $excludedCategories, &$studentItems) {
                 $student = $mark->participant?->student;
                 if (! $student) {
                     return;
                 }
 
                 $item = $mark->participant->registration?->item;
-                $points = $this->gradePoints->pointsForMark($event, $mark);
-                // fest_individual_championship_points.category is constrained to
-                // lp/up/hs/hss/open — but English Fest / Kalotsav-style events store
-                // class_group in a different scheme (category_1, category_2, ...).
-                // canonicalKey() maps every known alias onto the constrained scheme;
-                // anything it doesn't recognize falls back to 'open' rather than
-                // violating the DB check constraint outright.
-                $rawClassGroup = $item?->class_group ?: 'open';
+                if (! $item) {
+                    return;
+                }
+
+                if (! empty($excludedCategories)) {
+                    $itemCat = strtolower((string) $item->category);
+                    if (in_array($itemCat, $excludedCategories, true)) {
+                        return;
+                    }
+                }
+
+                $rawClassGroup = $item->class_group ?: 'open';
                 $canonicalCategory = FestClassGroupScheme::canonicalKey($rawClassGroup);
                 $canonicalCategory = in_array($canonicalCategory, self::INDIVIDUAL_CATEGORY_KEYS, true) ? $canonicalCategory : 'open';
-                // Admin-configured category merge (e.g. fold "Category 3" into "Open") —
-                // same aggregation_config.championship_category_map the school/team
-                // cumulative scoreboard already reads, and the same source keys the merge
-                // settings UI offers (the event's real scheme keys, tried before falling
-                // back to the canonical lp/up/hs/hss/open bucket). Only honored when the
-                // mapped target is itself one of the five allowed values.
+
                 $merged = $categoryMap[$rawClassGroup] ?? $categoryMap[$canonicalCategory] ?? $canonicalCategory;
                 $category = in_array($merged, self::INDIVIDUAL_CATEGORY_KEYS, true) ? $merged : $canonicalCategory;
-                // Individual championship is always shown split Boys/Girls — there is no
-                // correct way to guess which bucket a student with gender 'other' or no
-                // gender on file at all belongs in, so rather than inventing a third
-                // "Open" bucket (or silently mislabeling them into one binary bucket) they
-                // are simply left out of the individual championship until their profile
-                // has male/female set. This does not affect the school-level scoreboard.
+
                 $gender = match ($student->gender) {
                     'male'   => 'male',
                     'female' => 'female',
@@ -258,29 +383,67 @@ class FestIndividualChampionshipService
                     return;
                 }
 
-                if (! isset($aggregated[$student->id])) {
-                    $aggregated[$student->id] = (object) [
-                        'student_id'   => $student->id,
-                        'student'      => $student,
-                        'points'       => 0,
-                        'group_points' => 0,
-                        'category'     => $category,
-                        'gender'       => $gender,
-                    ];
-                }
+                $points = $this->gradePoints->pointsForMark($event, $mark);
+                $isMulti = FestTeamSquadRules::isMultiPerson($item->participant_type);
 
-                // Pair/trio/group/team items save one FestMark row per teammate with the
-                // same position/points — crediting the full value to every member's
-                // individual total would let an 11-person group's 1st place outweigh a
-                // genuine solo achievement. Group results are tracked separately and only
-                // used as a tiebreak, never added to the primary `points` total.
-                if ($item && FestTeamSquadRules::isMultiPerson($item->participant_type)) {
-                    $aggregated[$student->id]->group_points += $points;
-                } else {
-                    $aggregated[$student->id]->points += $points;
-                }
+                $studentItems[$student->id]['student'] = $student;
+                $studentItems[$student->id]['category'] = $category;
+                $studentItems[$student->id]['gender'] = $gender;
+                $studentItems[$student->id]['marks'][] = [
+                    'mark' => $mark,
+                    'points' => $points,
+                    'is_multi' => $isMulti,
+                    'position' => $mark->position,
+                ];
             });
 
-        return collect(array_values($aggregated));
+        $aggregated = [];
+
+        foreach ($studentItems as $studentId => $data) {
+            $student = $data['student'];
+            $category = $data['category'];
+            $gender = $data['gender'];
+            $marksList = $data['marks'];
+
+            $firsts = 0;
+            $soloPointsList = [];
+            $groupPoints = 0;
+            $countedWeightedGroupPoints = 0;
+
+            foreach ($marksList as $entry) {
+                if ($entry['position'] === 1) {
+                    $firsts++;
+                }
+
+                if ($entry['is_multi']) {
+                    if ($multiMode === 'include_weighted') {
+                        $countedWeightedGroupPoints += round(($entry['points'] * $groupWeight) / 100, 2);
+                    } elseif ($multiMode === 'tie_break_only') {
+                        $groupPoints += $entry['points'];
+                    }
+                } else {
+                    $soloPointsList[] = $entry['points'];
+                }
+            }
+
+            // Cap solo items if max_counting_items > 0
+            rsort($soloPointsList);
+            if ($maxCounting > 0 && count($soloPointsList) > $maxCounting) {
+                $soloPointsList = array_slice($soloPointsList, 0, $maxCounting);
+            }
+            $totalPoints = array_sum($soloPointsList) + $countedWeightedGroupPoints;
+
+            $aggregated[] = (object) [
+                'student_id'   => $student->id,
+                'student'      => $student,
+                'points'       => $totalPoints,
+                'firsts'       => $firsts,
+                'group_points' => $groupPoints,
+                'category'     => $category,
+                'gender'       => $gender,
+            ];
+        }
+
+        return collect($aggregated);
     }
 }

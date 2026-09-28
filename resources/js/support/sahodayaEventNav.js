@@ -149,6 +149,7 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
         // Trophies over groups of items — "Dance Champion" and the like. A settings permission
         // rather than a results one: creating a trophy decides what is awarded, not who won.
         { label: 'Prize categories', href: `${base}/prizes`, icon: 'award', permissions: FEST_SETTINGS },
+        { label: 'Trophy Distribution', href: `${base}/trophies`, icon: 'award', permissions: FEST_RESULTS },
     ];
 
     if (caps.championship) {

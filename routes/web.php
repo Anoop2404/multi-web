@@ -1720,8 +1720,24 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/certificates/{certificate}/collect', [FestCertificateOpsController::class, 'collect'])->name('certificates.collect');
             Route::post('/certificates/bulk-collect', [FestCertificateOpsController::class, 'bulkCollect'])->name('certificates.bulk-collect');
             Route::get('/{event}/championship', [FestChampionshipController::class, 'index'])->name('championship.index');
+            Route::put('/{event}/championship/config', [FestChampionshipController::class, 'updateConfig'])->name('championship.config');
+            Route::get('/{event}/championship/students/{studentId}/breakdown', [FestChampionshipController::class, 'studentBreakdown'])->name('championship.student-breakdown');
+            Route::post('/{event}/championship/sync-to-trophies', [FestChampionshipController::class, 'syncToTrophyTemplate'])->name('championship.sync-to-trophies');
             Route::put('/{event}/championship/category-merge', [FestChampionshipController::class, 'updateCategoryMerge'])->name('championship.category-merge');
             Route::put('/{event}/championship/excluded-overall-categories', [FestChampionshipController::class, 'updateExcludedOverallCategories'])->name('championship.excluded-overall-categories');
+
+            // Trophy Distribution — Valedictory presentation list, templates, parent-child sync, 60-trophy preset
+            Route::prefix('/{event}/trophies')->name('trophies.')->group(function () {
+                $trophies = \App\Http\Controllers\SahodayaAdmin\FestTrophyController::class;
+
+                Route::get('/', [$trophies, 'index'])->name('index');
+                Route::post('/', [$trophies, 'save'])->name('save');
+                Route::delete('/{trophy}', [$trophies, 'destroy'])->name('destroy');
+                Route::post('/seed-preset', [$trophies, 'seedPreset'])->name('seed-preset');
+                Route::post('/copy-parent', [$trophies, 'copyFromParent'])->name('copy-parent');
+                Route::post('/push-children', [$trophies, 'pushToChildren'])->name('push-children');
+                Route::get('/export-pdf', [$trophies, 'exportPdf'])->name('export-pdf');
+            });
             Route::get('/{event}/marks/import', [FestMarksImportController::class, 'importForm'])->name('marks.import');
             Route::get('/{event}/marks/import-template', [FestMarksImportController::class, 'importTemplate'])->name('marks.import-template');
             Route::post('/{event}/marks/import', [FestMarksImportController::class, 'importStore'])->name('marks.import.store');

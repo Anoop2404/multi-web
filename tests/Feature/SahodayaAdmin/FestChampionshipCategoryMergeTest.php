@@ -170,4 +170,68 @@ class FestChampionshipCategoryMergeTest extends TestCase
             ['target' => 'lp', 'sources' => ['hs']],
         ]])->assertStatus(422);
     }
+
+    public function test_can_update_individual_championship_builder_config(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event] = $this->makeFixture();
+
+        $response = $this->actingAs($admin)->put(route('sahodaya.events.championship.config', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]), [
+            'male_title' => 'Kalaprathibha Special',
+            'female_title' => 'Kalathilakam Special',
+            'runner_up_title' => 'Second Best',
+            'max_counting_items' => 3,
+            'multi_person_mode' => 'tie_break_only',
+            'group_weight_percent' => 100,
+            'must_have_first_place' => true,
+            'minimum_points' => 10,
+        ]);
+
+        $response->assertSessionHas('success');
+        $this->assertEquals('Kalaprathibha Special', $event->fresh()->aggregation_config['individual_championship_config']['male_title']);
+        $this->assertEquals(3, $event->fresh()->aggregation_config['individual_championship_config']['max_counting_items']);
+    }
+
+    public function test_can_fetch_student_item_breakdown_json(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event, 'student' => $student] = $this->makeFixture();
+
+        $response = $this->actingAs($admin)->get(route('sahodaya.events.championship.student-breakdown', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id, 'studentId' => $student->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonStructure(['student', 'items', 'total_points']);
+    }
+
+    public function test_trophies_index_seed_and_export(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event] = $this->makeFixture();
+
+        // Index page
+        $res = $this->actingAs($admin)->get(route('sahodaya.events.trophies.index', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]));
+        $res->assertOk();
+
+        // Seed 60-trophy preset
+        $seedRes = $this->actingAs($admin)->post(route('sahodaya.events.trophies.seed-preset', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]));
+        $seedRes->assertSessionHas('success');
+        $this->assertEquals(60, \App\Models\FestTrophy::where('event_id', $event->id)->count());
+
+        // Sync individual champions
+        $syncRes = $this->actingAs($admin)->post(route('sahodaya.events.championship.sync-to-trophies', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]));
+        $syncRes->assertSessionHas('success');
+
+        // Export PDF
+        $pdfRes = $this->actingAs($admin)->get(route('sahodaya.events.trophies.export-pdf', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]));
+        $pdfRes->assertOk();
+    }
 }
