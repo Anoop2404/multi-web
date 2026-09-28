@@ -4,14 +4,14 @@
     <meta charset="utf-8">
     <title>{{ $sheetTitle ?? 'Digital Sum Sheet' }} — {{ $event->title }}</title>
     <style>
-        @page { margin: 16px 20px; size: portrait; margin-bottom: 24px;}
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11.5px; color: #1e293b; line-height: 1.4; }
+        @page { margin: 16px 20px; size: {{ $orientation ?? 'portrait' }}; margin-bottom: 24px;}
+        body { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 11.5px; color: #1e293b; line-height: 1.4; }
         .sheet { page-break-after: always; }
         .sheet:last-child { page-break-after: avoid; }
         .header { border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 12px; }
-        .table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .table th { background: #0f3d7a; color: #ffffff; font-size: 10.5px; font-weight: bold; text-transform: uppercase; text-align: left; padding: 6px 8px; border: 1px solid #0f3d7a; }
-        .table td { border: 1px solid #cbd5e1; padding: 6px 8px; font-size: 11px; }
+        .table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
+        .table th { background: #0f3d7a; color: #ffffff; font-weight: bold; text-transform: uppercase; text-align: left; border: 1px solid #0f3d7a; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; vertical-align: bottom; }
+        .table td { border: 1px solid #cbd5e1; word-wrap: break-word; overflow-wrap: break-word; }
         .table tr:nth-child(even) { background-color: #f8fafc; }
         .num { text-align: right; }
         .center { text-align: center; }
@@ -69,33 +69,76 @@
                 </div>
             </div>
 
+            @php
+                $jCount = max(1, (int) ($sheet['judge_count'] ?? 1));
+                $colCount = $jCount > 1 ? ($jCount + 3) : 3;
+
+                if ($colCount <= 4) {
+                    $thFont = '10.5px';
+                    $tdFont = '11px';
+                    $thPadding = '6px 8px';
+                    $tdPadding = '6px 8px';
+                    $slWidth = '38px';
+                    $chestWidth = '85px';
+                    $totalWidth = '90px';
+                } elseif ($colCount <= 6) {
+                    $thFont = '10px';
+                    $tdFont = '10.5px';
+                    $thPadding = '5px 6px';
+                    $tdPadding = '6px 6px';
+                    $slWidth = '34px';
+                    $chestWidth = '70px';
+                    $totalWidth = '75px';
+                } else {
+                    $thFont = '9px';
+                    $tdFont = '10px';
+                    $thPadding = '4px 4px';
+                    $tdPadding = '5px 4px';
+                    $slWidth = '30px';
+                    $chestWidth = '58px';
+                    $totalWidth = '62px';
+                }
+            @endphp
+
             <table class="table">
+                <colgroup>
+                    <col style="width: {{ $slWidth }};">
+                    <col style="width: {{ $chestWidth }};">
+                    @if($sheet['judge_count'] > 1)
+                        @for($j = 1; $j <= $sheet['judge_count']; $j++)
+                            <col>
+                        @endfor
+                        <col style="width: {{ $totalWidth }};">
+                    @else
+                        <col>
+                    @endif
+                </colgroup>
                 <thead>
                     <tr>
-                        <th class="center" style="width: 40px;">Sl No</th>
-                        <th style="width: 90px;">Chest No</th>
+                        <th class="center" style="font-size: {{ $thFont }}; padding: {{ $thPadding }};">Sl No</th>
+                        <th style="font-size: {{ $thFont }}; padding: {{ $thPadding }};">Chest No</th>
                         @if($sheet['judge_count'] > 1)
                             @for($j = 1; $j <= $sheet['judge_count']; $j++)
-                                <th>Judge {{ $j }}</th>
+                                <th style="font-size: {{ $thFont }}; padding: {{ $thPadding }};">Judge {{ $j }}</th>
                             @endfor
-                            <th>Grand Total</th>
+                            <th style="font-size: {{ $thFont }}; padding: {{ $thPadding }};">Grand Total</th>
                         @else
-                            <th>Score</th>
+                            <th style="font-size: {{ $thFont }}; padding: {{ $thPadding }};">Score</th>
                         @endif
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($sheet['rows'] as $row)
                         <tr>
-                            <td class="center">{{ $loop->iteration }}</td>
-                            <td style="font-weight: bold; font-family: monospace;">{{ ($blankChest ?? false) ? '' : ($row['chest_no'] ? '#'.$row['chest_no'] : '—') }}</td>
+                            <td class="center" style="font-size: {{ $tdFont }}; padding: {{ $tdPadding }};">{{ $loop->iteration }}</td>
+                            <td style="font-weight: bold; font-family: monospace; font-size: {{ $tdFont }}; padding: {{ $tdPadding }};">{{ ($blankChest ?? false) ? '' : ($row['chest_no'] ? '#'.$row['chest_no'] : '—') }}</td>
                             @if($sheet['judge_count'] > 1)
                                 @foreach($row['scores'] as $s)
-                                    <td class="num">{{ $s === null ? '' : rtrim(rtrim(number_format($s, 2), '0'), '.') }}</td>
+                                    <td class="num" style="font-size: {{ $tdFont }}; padding: {{ $tdPadding }};">{{ $s === null ? '' : rtrim(rtrim(number_format($s, 2), '0'), '.') }}</td>
                                 @endforeach
-                                <td class="num">{{ $row['total'] === null ? '' : rtrim(rtrim(number_format($row['total'], 2), '0'), '.') }}</td>
+                                <td class="num" style="font-size: {{ $tdFont }}; padding: {{ $tdPadding }};">{{ $row['total'] === null ? '' : rtrim(rtrim(number_format($row['total'], 2), '0'), '.') }}</td>
                             @else
-                                <td class="num">{{ $row['scores'][0] === null ? '' : rtrim(rtrim(number_format($row['scores'][0], 2), '0'), '.') }}</td>
+                                <td class="num" style="font-size: {{ $tdFont }}; padding: {{ $tdPadding }};">{{ $row['scores'][0] === null ? '' : rtrim(rtrim(number_format($row['scores'][0], 2), '0'), '.') }}</td>
                             @endif
                         </tr>
                     @empty

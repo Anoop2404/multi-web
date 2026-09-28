@@ -1263,15 +1263,22 @@ class FestMarkEntryController extends SahodayaAdminController
         }
         $fileName = \Illuminate\Support\Str::slug(implode(' ', $nameParts)).'.pdf';
 
+        $maxColumns = collect($sheets)->map(fn ($sheet) => ($sheet['judge_count'] ?? 1) > 1 ? (($sheet['judge_count'] ?? 1) + 3) : 3)->max() ?? 3;
+        $orientation = $request->input('orientation');
+        if (!in_array($orientation, ['portrait', 'landscape'], true)) {
+            $orientation = $maxColumns > 4 ? 'landscape' : 'portrait';
+        }
+
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.mark-criteria-sheet', [
-            'event'      => $event,
-            'sahodaya'   => $this->sahodaya,
-            'sheets'     => $sheets,
-            'sheetTitle' => $sheetTitle.($blankChest ? ' — Blank Chest No' : ''),
-            'orgName'    => $this->sahodaya->name ?? 'Sahodaya',
-            'logoSrc'    => TenantBranding::logoEmbedSrc($this->sahodaya),
-            'blankChest' => $blankChest,
-        ])->setPaper('a4', 'portrait');
+            'event'       => $event,
+            'sahodaya'    => $this->sahodaya,
+            'sheets'      => $sheets,
+            'sheetTitle'  => $sheetTitle.($blankChest ? ' — Blank Chest No' : ''),
+            'orgName'     => $this->sahodaya->name ?? 'Sahodaya',
+            'logoSrc'     => TenantBranding::logoEmbedSrc($this->sahodaya),
+            'blankChest'  => $blankChest,
+            'orientation' => $orientation,
+        ])->setPaper('a4', $orientation);
 
         if ($request->boolean('inline') || $request->boolean('preview')) {
             return $pdf->stream($fileName);
@@ -1407,13 +1414,28 @@ class FestMarkEntryController extends SahodayaAdminController
             }
         }
 
+        $maxColumns = collect($sheets)->map(function ($sheet) {
+            if (!empty($sheet['is_sum_sheet'])) {
+                return (int) ($sheet['judge_count'] ?? 1) + 3;
+            }
+            $critCount = !empty($sheet['criteria']) && $sheet['criteria']->isNotEmpty() ? $sheet['criteria']->count() : 0;
+            return $critCount > 0 ? ($critCount + 3) : 3;
+        })->max() ?? 3;
+
+        $orientation = $request->input('orientation');
+        if (!in_array($orientation, ['portrait', 'landscape'], true)) {
+            // Auto-detect based on contents: more than 4 columns (or >= 3 criteria/judges) gets wide, so switch to landscape
+            $orientation = $maxColumns > 4 ? 'landscape' : 'portrait';
+        }
+
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.mark-entry-sheet', [
             'sahodaya'   => $this->sahodaya,
             'event'      => $event,
             'sheets'     => $sheets,
             'logoSrc'    => TenantBranding::logoEmbedSrc($this->sahodaya),
             'blankChest' => $blankChest,
-        ])->setPaper('a4', 'portrait');
+            'orientation' => $orientation,
+        ])->setPaper('a4', $orientation);
 
         $nameParts = [$event->title];
         if ($itemId && ! $itemIds) {
@@ -1531,13 +1553,20 @@ class FestMarkEntryController extends SahodayaAdminController
 
         abort_if($sheets === [], 404, 'No multi-judge items found for this selection -- a Sum Sheet only applies to items scored by more than one judge.');
 
+        $maxColumns = collect($sheets)->map(fn ($sheet) => (int) ($sheet['judge_count'] ?? 1) + 3)->max() ?? 3;
+        $orientation = $request->input('orientation');
+        if (!in_array($orientation, ['portrait', 'landscape'], true)) {
+            $orientation = $maxColumns > 4 ? 'landscape' : 'portrait';
+        }
+
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.mark-entry-sheet', [
-            'sahodaya'   => $this->sahodaya,
-            'event'      => $event,
-            'sheets'     => $sheets,
-            'logoSrc'    => TenantBranding::logoEmbedSrc($this->sahodaya),
-            'blankChest' => $blankChest,
-        ])->setPaper('a4', 'portrait');
+            'sahodaya'    => $this->sahodaya,
+            'event'       => $event,
+            'sheets'      => $sheets,
+            'logoSrc'     => TenantBranding::logoEmbedSrc($this->sahodaya),
+            'blankChest'  => $blankChest,
+            'orientation' => $orientation,
+        ])->setPaper('a4', $orientation);
 
         $nameParts = [$event->title];
         if ($itemId && ! $itemIds) {

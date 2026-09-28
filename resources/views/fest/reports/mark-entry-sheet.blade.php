@@ -6,21 +6,21 @@
     <style>
         {{-- Top margin reserved for the fixed running header below -- must stay >= that
              header's rendered height or dompdf/Chromium will let content overlap it. --}}
-        @page { margin: 108px 20px 24px; size: portrait; }
+        @page { margin: 108px 20px 24px; size: {{ $orientation ?? 'portrait' }}; }
         {{-- 'Helvetica Neue' isn't one of dompdf's bundled/resolvable font names --
              confirmed visually against Chest Number List/Attendance Sheet/Timesheet
              (all using 'DejaVu Sans', which dompdf DOES resolve correctly): this
              report's org name/body text was silently falling back to a serif font
              instead, a real visible mismatch across otherwise-identical headers. --}}
-        body { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 11.5px; color: #1e293b; line-height: 1.4; }
+        body { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 11px; color: #1e293b; line-height: 1.4; }
         .sheet { page-break-after: always; }
         .sheet:last-child { page-break-after: avoid; }
         .title { font-size: 16px; font-weight: bold; color: #0f172a; text-transform: uppercase; margin: 0; }
         .subtitle { font-size: 13px; font-weight: bold; color: #475569; margin-top: 2px; }
         .meta { margin-top: 6px; font-size: 11px; color: #475569; }
-        .table { width: 100%; border-collapse: collapse; margin-top: 4px; }
-        .table th { background: #0f172a; color: #ffffff; font-size: 11px; font-weight: bold; text-transform: uppercase; text-align: left; padding: 6px 8px; border: 1px solid #0f172a; }
-        .table td { border: 1px solid #cbd5e1; padding: 9px 8px; font-size: 11.5px; height: 26px; }
+        .table { width: 100%; border-collapse: collapse; margin-top: 4px; table-layout: fixed; }
+        .table th { background: #0f172a; color: #ffffff; font-weight: bold; text-transform: uppercase; text-align: left; border: 1px solid #0f172a; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; vertical-align: bottom; line-height: 1.25; }
+        .table td { border: 1px solid #cbd5e1; height: 26px; word-wrap: break-word; overflow-wrap: break-word; }
         .table tr:nth-child(even) { background-color: #f8fafc; }
         .center { text-align: center; }
         .sign-box { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 12px; }
@@ -57,11 +57,58 @@
                     \App\Support\FestTeamSquadRules::isMultiPerson($sheet['item']->participant_type ?? null) ? 'Group' : 'Individual',
                     \App\Support\FestSportsAgeGroup::genderLabel($sheet['item']->gender ?? null),
                 ]);
+
+                $isSum = !empty($sheet['is_sum_sheet']);
+                $critCount = (!$isSum && !empty($sheet['criteria']) && $sheet['criteria']->isNotEmpty()) ? $sheet['criteria']->count() : 0;
+                $colCount = $isSum ? (($sheet['judge_count'] ?? 1) + 3) : ($critCount > 0 ? ($critCount + 3) : 3);
+
+                // Auto-scale fonts, paddings, and column widths based on the column count
+                if ($colCount <= 4) {
+                    $thFont = '11px';
+                    $tdFont = '11.5px';
+                    $thPadding = '6px 8px';
+                    $tdPadding = '9px 8px';
+                    $slWidth = '38px';
+                    $chestWidth = '85px';
+                    $totalWidth = '90px';
+                } elseif ($colCount <= 6) {
+                    $thFont = '10px';
+                    $tdFont = '11px';
+                    $thPadding = '5px 6px';
+                    $tdPadding = '8px 6px';
+                    $slWidth = '34px';
+                    $chestWidth = '70px';
+                    $totalWidth = '75px';
+                } elseif ($colCount <= 8) {
+                    $thFont = '9px';
+                    $tdFont = '10.5px';
+                    $thPadding = '4px 5px';
+                    $tdPadding = '7px 5px';
+                    $slWidth = '30px';
+                    $chestWidth = '62px';
+                    $totalWidth = '68px';
+                } else { // 9+ columns (e.g. 6+ criteria or 6+ judges)
+                    $thFont = '8.5px';
+                    $tdFont = '10px';
+                    $thPadding = '4px 4px';
+                    $tdPadding = '6px 4px';
+                    $slWidth = '28px';
+                    $chestWidth = '54px';
+                    $totalWidth = '58px';
+                }
             @endphp
 
             @if(!empty($sheet['is_sum_sheet']))
                 {{-- Consolidated sheet: one column per judge (their paper subtotal) + Grand Total --}}
                 <table class="table">
+                    <colgroup>
+                        <col style="width: {{ $slWidth }};">
+                        <col style="width: {{ $chestWidth }};">
+                        @for($j = 1; $j <= $sheet['judge_count']; $j++)
+                            <col>
+                        @endfor
+                        <col style="width: {{ $totalWidth }};">
+                    </colgroup>
                     <thead>
                         @if(!empty($itemInfoParts))
                         <tr class="item-context-row">
@@ -74,25 +121,25 @@
                         </tr>
                         @endif
                         <tr>
-                            <th class="center" style="width: 40px;">SL NO</th>
-                            <th style="width: 90px;">CHEST NO.</th>
+                            <th class="center" style="font-size: {{ $thFont }}; padding: {{ $thPadding }};">SL NO</th>
+                            <th style="font-size: {{ $thFont }}; padding: {{ $thPadding }};">CHEST NO.</th>
                             @for($j = 1; $j <= $sheet['judge_count']; $j++)
-                                <th>JUDGE {{ $j }}</th>
+                                <th style="font-size: {{ $thFont }}; padding: {{ $thPadding }};">JUDGE {{ $j }}</th>
                             @endfor
-                            <th style="width: 100px;">GRAND TOTAL</th>
+                            <th style="font-size: {{ $thFont }}; padding: {{ $thPadding }};">GRAND TOTAL</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($sheet['rows'] as $idx => $row)
                             <tr>
-                                <td class="center" style="color: #64748b; font-weight: bold;">{{ $idx + 1 }}</td>
-                                <td style="font-weight: bold; font-family: monospace; font-size: 12px; color: #0f172a;">
+                                <td class="center" style="color: #64748b; font-weight: bold; font-size: {{ $tdFont }}; padding: {{ $tdPadding }};">{{ $idx + 1 }}</td>
+                                <td style="font-weight: bold; font-family: monospace; font-size: {{ $tdFont }}; padding: {{ $tdPadding }}; color: #0f172a;">
                                     {{ ($blankChest ?? false) ? '' : ($row['chest_no'] ? '#'.$row['chest_no'] : '—') }}
                                 </td>
                                 @for($j = 1; $j <= $sheet['judge_count']; $j++)
-                                    <td></td>
+                                    <td style="font-size: {{ $tdFont }}; padding: {{ $tdPadding }};"></td>
                                 @endfor
-                                <td></td>
+                                <td style="font-size: {{ $tdFont }}; padding: {{ $tdPadding }};"></td>
                             </tr>
                         @empty
                             <tr>
@@ -105,10 +152,22 @@
                 </table>
             @else
                 <table class="table">
+                    <colgroup>
+                        <col style="width: {{ $slWidth }};">
+                        <col style="width: {{ $chestWidth }};">
+                        @if($critCount > 0)
+                            @foreach($sheet['criteria'] as $c)
+                                <col>
+                            @endforeach
+                            <col style="width: {{ $totalWidth }};">
+                        @else
+                            <col>
+                        @endif
+                    </colgroup>
                     <thead>
                         @if(!empty($itemInfoParts))
                         <tr class="item-context-row">
-                            <th colspan="{{ 2 + ($sheet['criteria']->isNotEmpty() ? $sheet['criteria']->count() + 1 : 1) }}">
+                            <th colspan="{{ $colCount }}">
                                 @if(!empty($sheet['sheet_label']))
                                     <span style="font-weight: bold; margin-right: 6px;">{{ $sheet['sheet_label'] }} —</span>
                                 @endif
@@ -117,37 +176,37 @@
                         </tr>
                         @endif
                         <tr>
-                            <th class="center" style="width: 40px;">SL NO</th>
-                            <th style="width: 90px;">CHEST NO.</th>
-                            @if($sheet['criteria']->isNotEmpty())
+                            <th class="center" style="font-size: {{ $thFont }}; padding: {{ $thPadding }};">SL NO</th>
+                            <th style="font-size: {{ $thFont }}; padding: {{ $thPadding }};">CHEST NO.</th>
+                            @if($critCount > 0)
                                 @foreach($sheet['criteria'] as $c)
-                                    <th>{{ $c->label }}<br><small>/ {{ rtrim(rtrim(number_format($c->max_score, 2), '0'), '.') }}</small></th>
+                                    <th style="font-size: {{ $thFont }}; padding: {{ $thPadding }};">{{ $c->label }}<br><small>/ {{ rtrim(rtrim(number_format($c->max_score, 2), '0'), '.') }}</small></th>
                                 @endforeach
-                                <th style="width: 90px;">TOTAL</th>
+                                <th style="font-size: {{ $thFont }}; padding: {{ $thPadding }};">TOTAL</th>
                             @else
-                                <th>MARKS / SCORE</th>
+                                <th style="font-size: {{ $thFont }}; padding: {{ $thPadding }};">MARKS / SCORE</th>
                             @endif
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($sheet['rows'] as $idx => $row)
                             <tr>
-                                <td class="center" style="color: #64748b; font-weight: bold;">{{ $idx + 1 }}</td>
-                                <td style="font-weight: bold; font-family: monospace; font-size: 12px; color: #0f172a;">
+                                <td class="center" style="color: #64748b; font-weight: bold; font-size: {{ $tdFont }}; padding: {{ $tdPadding }};">{{ $idx + 1 }}</td>
+                                <td style="font-weight: bold; font-family: monospace; font-size: {{ $tdFont }}; padding: {{ $tdPadding }}; color: #0f172a;">
                                     {{ ($blankChest ?? false) ? '' : ($row['chest_no'] ? '#'.$row['chest_no'] : '—') }}
                                 </td>
-                                @if($sheet['criteria']->isNotEmpty())
+                                @if($critCount > 0)
                                     @foreach($sheet['criteria'] as $c)
-                                        <td></td>
+                                        <td style="font-size: {{ $tdFont }}; padding: {{ $tdPadding }};"></td>
                                     @endforeach
-                                    <td></td>
+                                    <td style="font-size: {{ $tdFont }}; padding: {{ $tdPadding }};"></td>
                                 @else
-                                    <td></td>
+                                    <td style="font-size: {{ $tdFont }}; padding: {{ $tdPadding }};"></td>
                                 @endif
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ 2 + ($sheet['criteria']->isNotEmpty() ? $sheet['criteria']->count() + 1 : 1) }}" class="center" style="padding: 16px; color: #64748b;">
+                                <td colspan="{{ $colCount }}" class="center" style="padding: 16px; color: #64748b;">
                                     No approved registrations for this item.
                                 </td>
                             </tr>
