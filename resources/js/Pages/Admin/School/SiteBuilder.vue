@@ -866,14 +866,25 @@ function closeSectionEditor() {
     }
 }
 
+function titleCase(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+}
+
 function syncTabFromUrl(url = (typeof window !== 'undefined' ? window.location.href : '')) {
     if (!url) return;
     try {
         const parsed = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
         const tab = parsed.searchParams.get('tab');
         const sectionParam = parsed.searchParams.get('section');
-        if (tab && tabs.value.some(t => t.id === tab) && activeTab.value !== tab) {
-            activeTab.value = tab;
+        if (tab) {
+            if (tabs.value.some(t => t.id === tab)) {
+                if (activeTab.value !== tab) activeTab.value = tab;
+            } else {
+                activeTab.value = 'sections';
+            }
         }
         if (sectionParam) {
             const secId = parseInt(sectionParam, 10);
@@ -891,6 +902,12 @@ function syncTabFromUrl(url = (typeof window !== 'undefined' ? window.location.h
         // ignore invalid URL
     }
 }
+
+watch(tabs, (newTabs) => {
+    if (!newTabs.some(t => t.id === activeTab.value)) {
+        activeTab.value = 'sections';
+    }
+}, { immediate: true });
 
 function switchTab(tabId) {
     activeTab.value = tabId;

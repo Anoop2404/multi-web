@@ -31,6 +31,7 @@ class HandleInertiaRequests extends Middleware
                     ['roles' => $this->roleNames($request)]
                 ) : null,
             ],
+            'isSuperAdmin' => fn () => (bool) $request->user()?->isSuperAdmin(),
             'impersonating' => fn () => $this->impersonating($request),
             'announcements' => fn () => $this->activeAnnouncements($request),
             'flash' => [
