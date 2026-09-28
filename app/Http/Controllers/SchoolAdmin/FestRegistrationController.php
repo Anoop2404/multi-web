@@ -1396,7 +1396,20 @@ class FestRegistrationController extends SchoolAdminController
 
         abort_unless($schoolFee, 404, 'No registration fee record found for this school.');
 
-        $receipt = $schoolFee->feeReceipt;
+        $approvedReceipts = $schoolFee->receipts()->where('status', 'approved')->orderBy('id')->get();
+        $requestedReceiptId = $request->query('receipt_id');
+
+        $isConsolidated = false;
+        if ($requestedReceiptId) {
+            $receipt = $approvedReceipts->firstWhere('id', (int) $requestedReceiptId);
+            abort_unless($receipt, 404, 'Receipt not found or not approved.');
+        } elseif ($request->boolean('consolidated') || ($approvedReceipts->count() > 1 && $schoolFee->isFullyPaid())) {
+            $isConsolidated = true;
+            $receipt = $schoolFee->feeReceipt ?? $approvedReceipts->last();
+        } else {
+            $receipt = $schoolFee->feeReceipt ?? $approvedReceipts->last();
+        }
+
         abort_if(! $receipt || $receipt->status !== 'approved', 403, 'Receipt is not yet approved by Sahodaya admin.');
 
         $batchRegistrationIds = $schoolFee->registration_batch_id
@@ -1423,6 +1436,7 @@ class FestRegistrationController extends SchoolAdminController
             'event'          => $event,
             'school'         => $this->school,
             'sahodaya'       => \App\Models\Tenant::findOrFail($this->school->parent_id),
+            'isConsolidated' => $isConsolidated,
         ]);
     }
 

@@ -171,7 +171,7 @@ class ProgramFeeReceiptService
         return $updated ? $this->readGeneratedReceipt($updated) : null;
     }
 
-    public function renderFestSchoolEventFee(FestSchoolEventFee $schoolFee, ?FeeReceipt $receipt = null): ?string
+    public function renderFestSchoolEventFee(FestSchoolEventFee $schoolFee, ?FeeReceipt $receipt = null, ?bool $isConsolidated = null): ?string
     {
         $schoolFee->loadMissing(['feeReceipt', 'event', 'school']);
         $receipt = $receipt ?? $schoolFee->feeReceipt;
@@ -198,13 +198,14 @@ class ProgramFeeReceiptService
         $feeService = app(FestSchoolEventFeeService::class);
 
         return View::make('receipts.fest-fee-official', [
-            'receipt'       => $receipt,
-            'schoolFee'     => $schoolFee,
-            'breakdown'     => $feeService->breakdown($event, $schoolFee, $feeService->resolveSchedule($event)),
-            'registrations' => $registrations,
-            'event'         => $event,
-            'school'        => $school,
-            'sahodaya'      => $sahodaya,
+            'receipt'        => $receipt,
+            'schoolFee'      => $schoolFee,
+            'breakdown'      => $feeService->breakdown($event, $schoolFee, $feeService->resolveSchedule($event)),
+            'registrations'  => $registrations,
+            'event'          => $event,
+            'school'         => $school,
+            'sahodaya'       => $sahodaya,
+            'isConsolidated' => $isConsolidated ?? request()->boolean('consolidated'),
         ])->render();
     }
 

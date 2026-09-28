@@ -420,16 +420,16 @@
                                 <!-- Approved Receipt Badge & Reversal Link -->
                                 <div v-if="row.fee_receipt?.receipt_number && row.fee_receipt?.status === 'approved'"
                                      class="flex items-center justify-end gap-2 pt-0.5">
-                                    <a :href="`/sahodaya-admin/${sahodaya.id}/finance/payments/receipts/${row.fee_receipt.id}`"
+                                    <a :href="`/sahodaya-admin/${sahodaya.id}/finance/payments/receipts/${row.fee_receipt.id}${row.status === 'approved' && ((row.all_receipts?.length || 0) > 1) ? '?consolidated=1' : ''}`"
                                        target="_blank" rel="noopener"
-                                       title="View & print official fee receipt"
+                                       :title="(row.all_receipts?.length || 0) > 1 ? 'View consolidated fee receipt' : 'View & print official fee receipt'"
                                        class="text-[11px] font-mono font-bold text-emerald-700 hover:text-emerald-900 underline decoration-emerald-300 hover:decoration-emerald-600 transition">
                                         #{{ row.fee_receipt.receipt_number }} ↗
                                     </a>
                                     <button type="button" @click="openProofModal(row)"
-                                            title="Reverse or reject this approved receipt if needed"
+                                            title="View all receipts or reverse/reject if needed"
                                             class="text-[10px] font-semibold text-slate-400 hover:text-rose-600 transition">
-                                        Choose receipt
+                                        {{ (row.all_receipts?.length || 0) > 1 ? 'All receipts' : 'Choose receipt' }}
                                     </button>
                                 </div>
                             </td>
@@ -466,6 +466,12 @@
                     <div>
                         <span class="text-slate-500">Approved Paid:</span>
                         <strong class="text-emerald-700 ml-1">₹{{ fmt(activeProofModalRow.amount_paid) }}</strong>
+                        <a v-if="activeProofModalRow.fee_receipt?.id && (activeProofModalRow.all_receipts?.length || 0) > 1"
+                           :href="`/sahodaya-admin/${sahodaya.id}/finance/payments/receipts/${activeProofModalRow.fee_receipt.id}?consolidated=1`"
+                           target="_blank" rel="noopener"
+                           class="ml-2 text-[11px] font-bold text-sky-700 hover:text-sky-900 underline">
+                            Consolidated Receipt ↗
+                        </a>
                     </div>
                     <div>
                         <span class="text-slate-500">Status:</span>
@@ -517,6 +523,12 @@
                             <div class="text-right">
                                 <span class="text-base font-black text-slate-900 tabular-nums">₹{{ fmt(rc.amount) }}</span>
                                 <div class="mt-2 flex items-center justify-end gap-2 flex-wrap">
+                                    <a v-if="rc.status === 'approved' && rc.receipt_number"
+                                       :href="`/sahodaya-admin/${sahodaya.id}/finance/payments/receipts/${rc.id}`"
+                                       target="_blank" rel="noopener"
+                                       class="btn-secondary !py-1 !px-2.5 text-xs text-emerald-700 hover:bg-emerald-50 font-bold shadow-xs">
+                                        View Receipt ↗
+                                    </a>
                                     <a v-if="rc.proof_url" :href="rc.proof_url" target="_blank" rel="noopener"
                                        class="btn-secondary !py-1 !px-2.5 text-xs text-indigo-700 font-bold shadow-xs">
                                         View Image ↗

@@ -120,12 +120,12 @@ class FestSchoolEventFeeController extends SahodayaAdminController
         $this->syncBatchRollup($event, $schoolEventFee->school_id);
 
         $schoolEventFee->load(['school', 'feeReceipt', 'event']);
-        $festHtml = app(ProgramFeeReceiptService::class)->renderFestSchoolEventFee($schoolEventFee);
+        $festHtml = app(ProgramFeeReceiptService::class)->renderFestSchoolEventFee($schoolEventFee, $receipt);
         $slug = ProgramRouteMap::slugFromEventType($event->event_type) ?? 'kalotsav';
 
         app(OfflineProgramFeeOrchestrator::class)->notifyApproved(
             $schoolEventFee->school,
-            $schoolEventFee->feeReceipt,
+            $receipt,
             ProgramRouteMap::labelForSlug($slug).' fee',
             $event->title,
             $festHtml,
