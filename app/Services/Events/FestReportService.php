@@ -26,6 +26,7 @@ use App\Support\SchoolEventCoordinator;
 use App\Support\TenantBranding;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use App\Services\Events\Reports\FestReportScope;
 
@@ -764,10 +765,10 @@ class FestReportService
             ->get(['id', 'name', 'venue_id']);
     }
 
-    public function schoolRankingRows(): Collection
+    public function schoolRankingRows(?string $schoolTier = null): Collection
     {
         $ctx = EventContext::for($this->event);
-        $board = collect($ctx->scoreboardBySchool());
+        $board = collect($schoolTier ? $ctx->scoreboardBySchoolTier($schoolTier) : $ctx->scoreboardBySchool());
 
         $marks = FestMark::whereIn('event_id', $this->eventIds())
             ->whereNotNull('position')
@@ -813,6 +814,8 @@ class FestReportService
             'registration-list' => $this->registrationListPdf($request),
             'school-wise' => $this->schoolWisePdf($request),
             'overall-ranking' => $this->overallRankingPdf(),
+            'overall-ranking-secondary' => $this->overallRankingPdf('secondary'),
+            'overall-ranking-senior-secondary' => $this->overallRankingPdf('senior_secondary'),
             'category-item-matrix-xls' => $this->categoryItemMatrixXls($analytics()),
             'category-item-matrix-pdf' => $this->categoryItemMatrixPdf($analytics()),
             'category-totals-xls' => $this->categoryTotalsXls($analytics()),
@@ -1204,11 +1207,19 @@ class FestReportService
         );
     }
 
-    private function overallRankingPdf(): \Symfony\Component\HttpFoundation\Response
+    private function overallRankingPdf(?string $schoolTier = null): \Symfony\Component\HttpFoundation\Response
     {
+        $tier = $schoolTier ?: request()->input('school_tier');
+        $title = match ($tier) {
+            'secondary' => 'Overall Championship — Secondary Schools',
+            'senior_secondary' => 'Overall Championship — Senior Secondary Schools',
+            default => 'Overall School Ranking',
+        };
+
         return $this->chromeReportPdf('fest.reports.overall-ranking', [
-            'schools' => $this->schoolRankingRows(),
-        ], $this->slug().'-overall-ranking.pdf', 'Overall School Ranking');
+            'schools' => $this->schoolRankingRows($tier),
+            'title' => $title,
+        ], $this->slug().'-'.Str::slug($title).'.pdf', $title);
     }
 
     /**

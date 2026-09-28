@@ -99,7 +99,7 @@ class FestReportCatalog
     public static function resultExportTypes(): array
     {
         return [
-            'results', 'school-wise', 'overall-ranking', 'house-wise', 'item-wise',
+            'results', 'school-wise', 'overall-ranking', 'overall-ranking-secondary', 'overall-ranking-senior-secondary', 'house-wise', 'item-wise',
             'cumulative', 'sahodaya-ranking', 'promotions', 'promotions-pdf', 'medal-tally',
         ];
     }
@@ -118,7 +118,9 @@ class FestReportCatalog
             ['id' => 'student-wise-pdf', 'label' => 'Student-wise Participation Report (PDF)', 'format' => 'pdf', 'params' => ['school_id', 'search'], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'results', 'label' => 'Results (spreadsheet)', 'format' => 'xls', 'params' => [], 'phase' => 'after', 'audience' => 'staff'],
             ['id' => 'school-wise', 'label' => 'School-wise Detailed Results', 'format' => 'pdf', 'params' => ['school_id', 'class_group'], 'phase' => 'after', 'audience' => 'staff'],
-            ['id' => 'overall-ranking', 'label' => 'Overall School Ranking', 'format' => 'pdf', 'params' => [], 'phase' => 'after', 'audience' => 'public'],
+            ['id' => 'overall-ranking', 'label' => 'Overall School Ranking', 'format' => 'pdf', 'params' => ['school_tier'], 'phase' => 'after', 'audience' => 'public'],
+            ['id' => 'overall-ranking-secondary', 'label' => 'Overall Championship — Secondary Schools', 'format' => 'pdf', 'params' => [], 'phase' => 'after', 'audience' => 'public'],
+            ['id' => 'overall-ranking-senior-secondary', 'label' => 'Overall Championship — Senior Secondary Schools', 'format' => 'pdf', 'params' => [], 'phase' => 'after', 'audience' => 'public'],
             ['id' => 'category-item-matrix-xls', 'label' => 'Category & Item-wise Consolidated Report (Excel)', 'format' => 'xls', 'params' => [], 'phase' => 'after', 'audience' => 'staff'],
             ['id' => 'category-item-matrix-pdf', 'label' => 'Category & Item-wise Consolidated Report (PDF)', 'format' => 'pdf', 'params' => [], 'phase' => 'after', 'audience' => 'staff'],
             ['id' => 'category-totals-xls', 'label' => 'Category-wise Totals (Excel)', 'format' => 'xls', 'params' => [], 'phase' => 'after', 'audience' => 'staff'],
@@ -225,6 +227,8 @@ class FestReportCatalog
         'results'                        => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'school-wise'                   => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => true],
         'overall-ranking'               => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'overall-ranking-secondary'     => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
+        'overall-ranking-senior-secondary' => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
         'category-item-matrix-xls'      => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
         'category-item-matrix-pdf'      => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
         'category-totals-xls'          => ['dataset' => 'results', 'supported_scopes' => ['self', 'combined', 'region'], 'supports_competition_phase' => false],
@@ -521,7 +525,7 @@ class FestReportCatalog
     {
         return match ($exportId) {
             'school-wise' => 'school-detailed',
-            'overall-ranking' => 'overall-ranking',
+            'overall-ranking', 'overall-ranking-secondary', 'overall-ranking-senior-secondary' => 'overall-ranking',
             'category-item-matrix-xls', 'category-item-matrix-pdf' => 'category-item-matrix',
             'category-totals-xls', 'category-totals-pdf' => 'category-item-matrix',
             'individual-championship-xls', 'individual-championship-pdf' => 'championship',
