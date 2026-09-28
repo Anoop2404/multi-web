@@ -85,6 +85,7 @@ abstract class SchoolAdminController extends Controller
                 : SahodayaNavVisibility::standaloneDefaults(),
             'membershipPaid' => app(\App\Services\Membership\SchoolMembershipGate::class)->isPaid($this->school),
             'publicWebsiteEnabled' => TenantPublicSite::isEnabled($this->school),
+            'isSuperAdmin' => (bool) request()->user()?->isSuperAdmin(),
         ], $props));
     }
 

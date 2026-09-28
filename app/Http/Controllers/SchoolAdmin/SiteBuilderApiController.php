@@ -26,6 +26,8 @@ class SiteBuilderApiController extends SchoolAdminController
 
     public function applyExperienceDraft(Request $request, SahodayaTemplateApplier $applier): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         $data = $request->validate([
             'site_id' => 'required|integer',
             'template_key' => 'required|string|max:80',
@@ -42,6 +44,8 @@ class SiteBuilderApiController extends SchoolAdminController
 
     public function cancelExperienceDraft(Request $request, SahodayaTemplateApplier $applier): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         $site = $this->requestSite($request);
         $applier->cancelDraft($site);
         $this->school->invalidateCache();
@@ -51,6 +55,8 @@ class SiteBuilderApiController extends SchoolAdminController
 
     public function publishExperienceDraft(Request $request, SahodayaTemplateApplier $applier): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         $site = $this->requestSite($request);
         $site = $applier->publishDraft($site);
         $this->school->invalidateCache();
@@ -73,6 +79,8 @@ class SiteBuilderApiController extends SchoolAdminController
 
     public function restoreExperienceVersion(Request $request, string $tenantId, int $versionId): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         $site = $this->requestSite($request);
         $version = WebsiteSiteVersion::where('website_site_id', $site->id)->findOrFail($versionId);
         $site = app(SahodayaTemplateApplier::class)->restore($site, $version);
@@ -87,6 +95,8 @@ class SiteBuilderApiController extends SchoolAdminController
 
     public function saveDesign(Request $request): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         $site = $this->requestSite($request);
         $data = $request->validate([
             'site_id' => 'required|integer',
@@ -156,6 +166,8 @@ class SiteBuilderApiController extends SchoolAdminController
 
     public function storeSection(Request $request): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         $this->assertAllowedSection($request->input('section_type'), $request->input('variant'));
 
         return app(BuilderApiController::class)->storeSection($request, $this->school->id);
@@ -175,6 +187,8 @@ class SiteBuilderApiController extends SchoolAdminController
 
     public function deleteSection(string $tenantId, int $sectionId): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         return app(BuilderApiController::class)->deleteSection(request(), $this->school->id, $sectionId);
     }
 
@@ -388,5 +402,10 @@ class SiteBuilderApiController extends SchoolAdminController
         }
 
         return $paths;
+    }
+
+    private function assertSuperAdmin(): void
+    {
+        abort_unless(request()->user()?->isSuperAdmin(), 403, 'Template architecture and structural site changes are restricted to Platform Super Admins only.');
     }
 }

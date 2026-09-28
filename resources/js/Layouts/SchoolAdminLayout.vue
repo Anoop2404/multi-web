@@ -205,6 +205,7 @@ const navGroups = computed(() => {
         navVisibility: page.props.navVisibility ?? null,
         membershipPaid: page.props.membershipPaid !== false,
         isStandalone: !school.value?.parent_id,
+        isSuperAdmin: Boolean(page.props.isSuperAdmin || page.props.auth?.user?.roles?.includes('superadmin') || page.props.auth?.user?.is_super_admin),
     };
 
     const mcqExamId = detectSchoolMcqExamIdFromUrl(page.url);

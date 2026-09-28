@@ -89,7 +89,7 @@ export function detectSchoolWebsiteFromUrl(url) {
 
 /** Dedicated sidebar navigation when managing school public website, CMS & builder */
 export function schoolWebsiteScopedNav(schoolId, options = {}) {
-    const { canNav = () => true, publicWebsiteEnabled = true } = options;
+    const { canNav = () => true, publicWebsiteEnabled = true, isSuperAdmin = false } = options;
 
     if (!canNav('website')) {
         return [];
@@ -109,8 +109,10 @@ export function schoolWebsiteScopedNav(schoolId, options = {}) {
             section: 'Website Builder',
             items: [
                 { label: 'Page Sections', href: `${base}/site-builder?tab=sections`, icon: 'grid', matchQuery: { tab: 'sections' } },
-                { label: 'Design & Styling', href: `${base}/site-builder?tab=design`, icon: 'palette', matchQuery: { tab: 'design' } },
-                { label: 'Templates', href: `${base}/site-builder?tab=template`, icon: 'sliders', matchQuery: { tab: 'template' } },
+                ...(isSuperAdmin ? [
+                    { label: 'Design & Styling', href: `${base}/site-builder?tab=design`, icon: 'palette', matchQuery: { tab: 'design' } },
+                    { label: 'Templates', href: `${base}/site-builder?tab=template`, icon: 'sliders', matchQuery: { tab: 'template' } },
+                ] : []),
                 { label: 'Public Page Text', href: `${base}/site-builder?tab=content`, icon: 'edit', matchQuery: { tab: 'content' } },
                 { label: 'Navigation & Admissions', href: `${base}/site-builder?tab=navigation`, icon: 'compass', matchQuery: { tab: 'navigation' } },
                 { label: 'Footer Links', href: `${base}/site-builder?tab=footer`, icon: 'layout', matchQuery: { tab: 'footer' } },

@@ -66,6 +66,7 @@ class SiteBuilderController extends SchoolAdminController
             'navLayoutOptions' => NavConfigDefaults::layoutOptions('school'),
             'navNeedsSetup' => empty($navConfig['items']),
             'mediaUrls' => $mediaUrls,
+            'isSuperAdmin' => (bool) request()->user()?->isSuperAdmin(),
         ]);
     }
 }

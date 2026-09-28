@@ -325,6 +325,7 @@ abstract class SahodayaAdminController extends Controller
                 ->forTenant($this->sahodaya->id)
                 ->programsForNav(),
             'publicWebsiteEnabled'    => TenantPublicSite::isEnabled($this->sahodaya),
+            'isSuperAdmin'            => (bool) request()->user()?->isSuperAdmin(),
         ], $props));
     }
 
