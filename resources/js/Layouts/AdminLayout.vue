@@ -72,7 +72,14 @@
                     </button>
                     <h2 class="text-base font-bold text-[#041525] truncate">{{ title }}</h2>
                 </div>
-                <div class="flex items-center gap-2 shrink-0">
+                <div class="flex items-center gap-3 shrink-0">
+                    <span v-if="isSuperAdmin" class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>Super Admin</span>
+                    </span>
+                    <span v-if="$page.props.auth?.user?.name" class="hidden md:inline text-xs text-gray-500 max-w-[12rem] truncate">
+                        {{ $page.props.auth.user.name }}
+                    </span>
                     <slot name="header-actions" />
                 </div>
             </header>
@@ -118,7 +125,11 @@ const isStateStaff = computed(() => userRoles.value.includes('state_staff'));
 const isSuperAdmin = computed(() => userRoles.value.includes('superadmin'));
 
 const navGroups = computed(() => {
-    if (isSuperAdmin.value) return superadminNav();
+    if (isSuperAdmin.value) {
+        return superadminNav({
+            pendingReceiptsCount: page.props.pendingReceiptsCount || 0,
+        });
+    }
     if (isStateAdmin.value) return stateAdminNav();
     return [];
 });

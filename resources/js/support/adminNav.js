@@ -19,6 +19,7 @@ export function superadminNav(options = {}) {
             items: [
                 { label: 'All Sahodayas', href: '/admin/sahodayas', icon: 'building', exact: true },
                 { label: 'Add Sahodaya', href: '/admin/sahodayas/create', icon: 'plus' },
+                { label: 'Cluster Databases', href: '/admin/sahodayas/databases', icon: 'layers' },
             ],
         },
         {

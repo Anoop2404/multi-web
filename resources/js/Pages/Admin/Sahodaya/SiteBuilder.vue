@@ -4,545 +4,1087 @@
                          :pendingSubmissionsCount="pendingSubmissionsCount"
                          :pendingPaymentsCount="pendingPaymentsCount"
                          :show-header-title="false">
-        <PageHeader title="Website builder" eyebrow="Website"
-                    description="Manage each public website independently without changing another site's sections." />
-        <div class="space-y-5 max-w-5xl">
+        <PageHeader title="Website Builder" eyebrow="Public Website"
+                    description="Design, customize, and manage every page section, navigation menu, and theme for this Sahodaya public website." />
 
-            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-wrap items-end justify-between gap-4">
+        <div class="space-y-6 max-w-7xl pb-16">
+            <!-- Top Controls Card: Site Selector, Status & Public Toggle -->
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-xs p-5 flex flex-wrap items-center justify-between gap-4">
                 <div class="min-w-[240px] flex-1">
                     <label for="website-site-selector" class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5">
-                        Editing website
+                        Active Website Workspace
                     </label>
-                    <select id="website-site-selector" :value="currentSite?.id" @change="switchSite($event.target.value)"
-                            class="w-full max-w-lg border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-purple-200 focus:outline-none">
-                        <option v-for="site in sites" :key="site.id" :value="site.id">
-                            {{ site.name }}{{ site.is_primary ? ' — Primary website' : ' — Microsite' }}
-                        </option>
-                    </select>
-                    <p class="text-xs text-gray-500 mt-2">
-                        Sections, experience and V2 design belong to this website. Navigation links and footer contact content remain shared by this Sahodaya.
-                    </p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-xs font-bold px-2.5 py-1 rounded-full"
-                          :class="currentSite?.is_primary ? 'bg-purple-50 text-purple-700' : 'bg-sky-50 text-sky-700'">
-                        {{ currentSite?.is_primary ? 'Primary' : 'Microsite' }}
-                    </span>
-                    <a v-if="selectedPublicUrl" :href="selectedPublicUrl" target="_blank"
-                       class="text-sm font-semibold text-purple-700 hover:text-purple-900">
-                        View published ↗
-                    </a>
-                </div>
-            </div>
-
-            <!-- Public website toggle -->
-            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                    <h2 class="font-bold text-gray-900">Public Website</h2>
-                    <p class="text-sm text-gray-500 mt-1">
-                        <template v-if="publicWebsiteEnabled">
-                            Visitors see your full marketing website at {{ publicUrl || 'your domain' }}.
-                        </template>
-                        <template v-else>
-                            Visitors see the registration portal with School Registration and Admin Login only.
-                        </template>
-                    </p>
-                </div>
-                <label class="flex items-center gap-3 cursor-pointer shrink-0">
-                    <span class="text-sm font-semibold text-gray-600">{{ publicWebsiteEnabled ? 'Enabled' : 'Disabled' }}</span>
-                    <button type="button" @click="togglePublicWebsite" :disabled="publicWebsiteSaving"
-                            class="relative inline-flex h-7 w-12 items-center rounded-full transition"
-                            :class="publicWebsiteEnabled ? 'bg-green-500' : 'bg-gray-300'">
-                        <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition"
-                              :class="publicWebsiteEnabled ? 'translate-x-6' : 'translate-x-1'"></span>
-                    </button>
-                </label>
-            </div>
-
-            <div v-if="isSuperAdmin && experienceDraft" class="rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 text-white bg-gradient-to-r from-indigo-950 to-purple-800">
-                <div><p class="text-xs font-bold uppercase tracking-wider text-purple-200">Unpublished experience draft</p><h2 class="font-bold mt-1">{{ experienceName(experienceDraft.template_key) }}</h2><p class="text-sm text-white/75 mt-1">The live website is unchanged until you publish this draft.</p></div>
-                <div class="flex flex-wrap gap-2"><a :href="selectedPreviewUrl" target="_blank" class="px-4 py-2 text-sm font-bold rounded-xl bg-white/10 hover:bg-white/20">Preview draft ↗</a><button @click="cancelExperienceDraft" class="px-4 py-2 text-sm font-bold rounded-xl bg-white/10 hover:bg-white/20">Cancel draft</button><button @click="publishExperienceDraft" :disabled="experienceSaving || !readinessReport.ready" class="px-4 py-2 text-sm font-bold rounded-xl bg-amber-400 text-indigo-950 disabled:opacity-50">Publish experience</button></div>
-            </div>
-
-            <!-- Tabs -->
-            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 flex flex-wrap gap-1">
-                <button v-for="tab in tabs" :key="tab.id" @click="activeTab = tab.id"
-                        class="px-4 py-2 rounded-xl text-sm font-semibold transition"
-                        :class="activeTab === tab.id
-                            ? 'bg-[#1e1b4b] text-white shadow-sm'
-                            : 'text-gray-600 hover:bg-gray-50'">
-                    {{ tab.label }}
-                </button>
-                <a v-if="selectedPreviewUrl" :href="selectedPreviewUrl" target="_blank"
-                   class="ml-auto self-center text-xs text-purple-600 hover:text-purple-800 font-semibold px-3">
-                    Preview draft ↗
-                </a>
-            </div>
-
-            <div v-if="activeTab === 'experience'" class="space-y-5"><div class="flex justify-end"><PreviewToolbar v-if="selectedPreviewUrl" :url="selectedPreviewUrl" /></div><ExperiencePicker :experiences="experiences" :selected-key="selectedExperienceKey" :current-key="currentSite?.template_key" @select="selectedExperienceKey = $event" @apply="applyExperienceDraft" /></div>
-
-            <div v-if="activeTab === 'readiness'" class="space-y-5">
-                <ReadinessPanel :report="readinessReport" />
-                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-wrap items-center justify-between gap-4"><div><h3 class="font-bold text-gray-950">Publication and rollback</h3><p class="text-sm text-gray-500 mt-1">Publishing a V2 experience stores a complete restore point for the current website.</p></div><div class="flex gap-2"><button @click="refreshReadiness" class="px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold">Run checks</button><button v-if="experienceDraft" @click="publishExperienceDraft" :disabled="!readinessReport.ready || experienceSaving" class="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold disabled:opacity-50">Publish V2 draft</button></div></div>
-                <div v-if="siteVersions.length" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6"><h3 class="font-bold text-gray-950 mb-4">Restore points</h3><div class="divide-y divide-gray-100"><div v-for="version in siteVersions" :key="version.id" class="py-3 flex items-center justify-between gap-4"><div><p class="text-sm font-semibold text-gray-800">{{ experienceName(version.template_key) || 'Classic website' }}</p><p class="text-xs text-gray-400">{{ version.action.replace(/_/g, ' ') }} · {{ formatDate(version.created_at) }}</p></div><button @click="restoreSiteVersion(version)" class="text-xs font-bold text-purple-700">Restore</button></div></div></div>
-                <div v-if="currentSite?.is_primary" class="rounded-2xl border border-gray-200 bg-gray-50 p-5 flex flex-wrap items-center justify-between gap-4"><div><h3 class="font-bold text-gray-800">Legacy Confederation Classic</h3><p class="text-sm text-gray-500 mt-1">Kept only for existing sites that still need the original CKSC-compatible layout.</p></div><button @click="applyCkscTemplate" :disabled="ckscTemplateSaving" class="px-4 py-2 text-sm font-bold rounded-xl border border-gray-300 bg-white">{{ ckscTemplateSaving ? 'Applying…' : 'Apply legacy template' }}</button></div>
-            </div>
-
-            <!-- ── Navigation & Login ─────────────────────────────────────── -->
-            <div v-if="activeTab === 'navigation'" class="space-y-5">
-                <div v-if="!navConfig.items?.length"
-                     class="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                        <h3 class="font-bold text-amber-900">No navigation menu yet</h3>
-                        <p class="text-sm text-amber-800 mt-1">Your public site navbar is empty. Load the default Sahodaya menu or add items below.</p>
-                    </div>
-                    <button @click="loadDefaultNav" :disabled="defaultNavSaving"
-                            class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-xl disabled:opacity-50">
-                        {{ defaultNavSaving ? 'Loading…' : 'Load default navigation menu' }}
-                    </button>
-                </div>
-
-                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-600 mb-1.5">Navbar style</label>
-                        <select v-model="navConfig.layout_variant"
-                                class="w-full max-w-md border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-purple-200 focus:outline-none">
-                            <option v-for="opt in navLayoutOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    <div class="flex items-center gap-3">
+                        <select id="website-site-selector" :value="currentSite?.id" @change="switchSite($event.target.value)"
+                                class="w-full max-w-md border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-purple-200 focus:outline-none">
+                            <option v-for="site in sites" :key="site.id" :value="site.id">
+                                {{ site.name }}{{ site.is_primary ? ' — Primary Website' : ' — Microsite' }}
+                            </option>
                         </select>
+                        <span class="text-xs font-bold px-2.5 py-1 rounded-full shrink-0"
+                              :class="currentSite?.is_primary ? 'bg-purple-50 text-purple-700 border border-purple-200/50' : 'bg-sky-50 text-sky-700 border border-sky-200/50'">
+                            {{ currentSite?.is_primary ? 'Primary Website' : 'Microsite' }}
+                        </span>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
-                    <div class="flex flex-wrap items-start justify-between gap-4">
-                        <div>
-                            <h2 class="font-bold text-gray-900">Portal Login</h2>
-                            <p class="text-sm text-gray-500 mt-1">
-                                One Login button in the navbar opens the portal page with registration and admin login options.
-                            </p>
+                <div class="flex items-center flex-wrap gap-3">
+                    <!-- Public Website Toggle -->
+                    <div class="flex items-center gap-3 px-3.5 py-2 rounded-xl border border-gray-100 bg-gray-50/70">
+                        <div class="text-right">
+                            <span class="block text-xs font-bold text-gray-700">Public Website</span>
+                            <span class="text-[11px] text-gray-500">{{ publicWebsiteEnabled ? 'Live Online' : 'Portal Mode Only' }}</span>
                         </div>
-                        <button @click="ensurePortalLinks" :disabled="portalSaving"
-                                class="btn-primary px-4 py-2 text-sm font-bold rounded-xl transition disabled:opacity-50">
-                            {{ portalSaving ? 'Adding…' : '+ Add portal links to menu & footer' }}
+                        <button type="button" @click="isSuperAdmin && togglePublicWebsite()" :disabled="!isSuperAdmin || publicWebsiteSaving"
+                                class="relative inline-flex h-6 w-11 items-center rounded-full transition"
+                                :class="[publicWebsiteEnabled ? 'bg-green-500' : 'bg-gray-300', isSuperAdmin ? 'cursor-pointer' : 'cursor-not-allowed opacity-60']"
+                                :title="isSuperAdmin ? 'Toggle public website availability' : 'Superadmin permission required'">
+                            <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition"
+                                  :class="publicWebsiteEnabled ? 'translate-x-6' : 'translate-x-1'"></span>
                         </button>
                     </div>
 
-                    <div class="grid sm:grid-cols-2 gap-4 p-4 bg-purple-50/50 rounded-xl border border-purple-100">
-                        <label class="flex items-center gap-3 cursor-pointer">
-                            <input type="checkbox" v-model="navConfig.portal_cta.show_in_navbar" class="w-4 h-4 rounded text-purple-600">
-                            <span class="text-sm font-medium text-gray-700">Show Login button in navbar</span>
-                        </label>
-                        <label class="flex items-center gap-3 cursor-pointer">
-                            <input type="checkbox" v-model="navConfig.portal_cta.show_in_menu" class="w-4 h-4 rounded text-purple-600">
-                            <span class="text-sm font-medium text-gray-700">Include registration & login in menu</span>
-                        </label>
-                    </div>
-
-                    <div class="grid sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Navbar button label</label>
-                            <input v-model="navConfig.portal_cta.portal_label"
-                                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-200 focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Portal page URL</label>
-                            <input v-model="navConfig.portal_cta.portal_url"
-                                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:ring-2 focus:ring-purple-200 focus:outline-none">
-                        </div>
-                    </div>
-
-                    <p class="text-xs font-bold text-gray-500 uppercase tracking-wide pt-2">Portal landing page options</p>
-                    <div class="grid sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Registration button label</label>
-                            <input v-model="navConfig.portal_cta.register_label"
-                                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-200 focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Registration URL</label>
-                            <input v-model="navConfig.portal_cta.register_url"
-                                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:ring-2 focus:ring-purple-200 focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Admin login button label</label>
-                            <input v-model="navConfig.portal_cta.login_label"
-                                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-200 focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Admin login URL</label>
-                            <input v-model="navConfig.portal_cta.login_url"
-                                   class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:ring-2 focus:ring-purple-200 focus:outline-none">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
-                    <div class="flex items-center justify-between">
-                        <h3 class="font-bold text-gray-900">Navigation Menu Items</h3>
-                        <button @click="addNavItem"
-                                class="text-xs px-3 py-1.5 rounded-xl bg-[#1e1b4b] text-white font-semibold hover:bg-[#312e81] transition">
-                            + Add Item
-                        </button>
-                    </div>
-                    <div class="space-y-2">
-                        <div v-for="(item, idx) in navConfig.items" :key="idx"
-                             class="flex flex-wrap items-center gap-3 bg-gray-50 rounded-xl p-3">
-                            <input v-model="item.label" placeholder="Label"
-                                   class="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200">
-                            <input v-model="item.url" placeholder="/url"
-                                   class="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-200">
-                            <button @click="removeNavItem(idx)" class="text-red-400 hover:text-red-600 text-lg px-1">&times;</button>
-                        </div>
-                        <p v-if="!navConfig.items?.length" class="text-sm text-gray-400 text-center py-4">No menu items yet.</p>
-                    </div>
-                    <div class="flex items-center gap-3 pt-2 border-t border-gray-100">
-                        <button @click="saveNav" :disabled="navSaving"
-                                class="px-5 py-2.5 bg-[#1e1b4b] hover:bg-[#312e81] text-white text-sm font-bold rounded-xl transition disabled:opacity-50">
-                            {{ navSaving ? 'Saving…' : 'Save Navigation' }}
-                        </button>
-                        <span v-if="navSaved" class="text-sm text-green-600 font-medium">Saved!</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ── Footer links ───────────────────────────────────────────── -->
-            <div v-if="activeTab === 'footer'" class="space-y-5">
-                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
-                    <div>
-                        <h2 class="font-bold text-gray-900">Footer Quick Links</h2>
-                        <p class="text-sm text-gray-500 mt-1">Registration and login links appear here for visitors scrolling to the footer.</p>
-                    </div>
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" v-model="footerIncludePortal" class="w-4 h-4 rounded text-purple-600">
-                        <span class="text-sm font-medium text-gray-700">Include school registration & login links when saving</span>
-                    </label>
-                    <div class="space-y-2">
-                        <div v-for="(link, idx) in footerConfig.quick_links" :key="idx"
-                             class="flex flex-wrap items-center gap-3 bg-gray-50 rounded-xl p-3">
-                            <input v-model="link.label" placeholder="Label"
-                                   class="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-3 py-2 text-sm">
-                            <input v-model="link.url" placeholder="/url"
-                                   class="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono">
-                            <button @click="removeFooterLink(idx)" class="text-red-400 hover:text-red-600 text-lg px-1">&times;</button>
-                        </div>
-                    </div>
-                    <button @click="addFooterLink"
-                            class="text-xs px-3 py-1.5 rounded-xl border border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition">
-                        + Add link
-                    </button>
-                    <div class="flex items-center gap-3 pt-2 border-t border-gray-100">
-                        <button @click="saveFooter" :disabled="footerSaving"
-                                class="px-5 py-2.5 bg-[#1e1b4b] hover:bg-[#312e81] text-white text-sm font-bold rounded-xl transition disabled:opacity-50">
-                            {{ footerSaving ? 'Saving…' : 'Save Footer' }}
-                        </button>
-                        <span v-if="footerSaved" class="text-sm text-green-600 font-medium">Saved!</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ── Theme colours ─────────────────────────────────────────── -->
-            <div v-if="activeTab === 'theme'" class="space-y-5">
-                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
-                    <div>
-                        <h2 class="font-bold text-gray-900">Design character</h2>
-                        <p class="text-sm text-gray-500 mt-1">
-                            Controls navbar, buttons, hero gradient, section headings, and footer across your public site.
-                        </p>
-                    </div>
-
-                    <!-- Live preview -->
-                    <div class="rounded-2xl overflow-hidden border border-gray-100">
-                        <div class="h-28 flex items-end p-5 text-white"
-                             :style="{ background: `linear-gradient(135deg, ${themeConfig.primary}, ${themeConfig.secondary})` }">
-                            <div>
-                                <p class="text-xs uppercase tracking-wider opacity-80">Hero preview</p>
-                                <p class="font-bold text-lg">{{ sahodaya.name }}</p>
-                            </div>
-                        </div>
-                        <div class="flex gap-0">
-                            <div class="flex-1 h-10 flex items-center justify-center text-xs font-bold text-white"
-                                 :style="{ background: themeConfig.primary }">Primary</div>
-                            <div class="flex-1 h-10 flex items-center justify-center text-xs font-bold text-white"
-                                 :style="{ background: themeConfig.secondary }">Secondary</div>
-                            <div class="flex-1 h-10 flex items-center justify-center text-xs font-bold text-gray-900"
-                                 :style="{ background: themeConfig.accent_color }">Accent</div>
-                        </div>
-                    </div>
-
-                    <!-- Presets -->
-                    <div>
-                        <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Quick presets</p>
-                        <div class="flex flex-wrap gap-2">
-                            <button v-for="preset in themePresets" :key="preset.id" type="button"
-                                    @click="applyThemePreset(preset)"
-                                    class="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition text-sm">
-                                <span class="flex gap-0.5">
-                                    <span class="w-4 h-4 rounded-full border border-white shadow-sm" :style="{ background: preset.primary }"></span>
-                                    <span class="w-4 h-4 rounded-full border border-white shadow-sm -ml-2" :style="{ background: preset.secondary }"></span>
-                                </span>
-                                {{ preset.label }}
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Custom colours -->
-                    <div class="grid sm:grid-cols-3 gap-4">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Primary colour</label>
-                            <div class="flex items-center gap-2">
-                                <input type="color" v-model="themeConfig.primary" class="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer">
-                                <input type="text" v-model="themeConfig.primary"
-                                       class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono uppercase">
-                            </div>
-                            <p class="text-xs text-gray-400 mt-1">Navbar, headings, buttons</p>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Secondary colour</label>
-                            <div class="flex items-center gap-2">
-                                <input type="color" v-model="themeConfig.secondary" class="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer">
-                                <input type="text" v-model="themeConfig.secondary"
-                                       class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono uppercase">
-                            </div>
-                            <p class="text-xs text-gray-400 mt-1">Hero gradient end, page headers</p>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Accent colour</label>
-                            <div class="flex items-center gap-2">
-                                <input type="color" v-model="themeConfig.accent_color" class="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer">
-                                <input type="text" v-model="themeConfig.accent_color"
-                                       class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono uppercase">
-                            </div>
-                            <p class="text-xs text-gray-400 mt-1">Highlights, badges, CTAs</p>
-                        </div>
-                    </div>
-
-                    <div class="grid sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Heading font</label>
-                            <select v-model="themeConfig.font_heading"
-                                    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white">
-                                <option value="Inter">Inter</option>
-                                <option value="Roboto">Roboto</option>
-                                <option value="Poppins">Poppins</option>
-                                <option value="Montserrat">Montserrat</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1.5">Body font</label>
-                            <select v-model="themeConfig.font_body"
-                                    class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white">
-                                <option value="Inter">Inter</option>
-                                <option value="Roboto">Roboto</option>
-                                <option value="Poppins">Poppins</option>
-                                <option value="Montserrat">Montserrat</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-gray-100">
-                        <label class="text-xs font-bold text-gray-600">Type scale<select v-model="designConfig.type_scale" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="compact">Compact</option><option value="balanced">Balanced</option><option value="editorial">Editorial</option></select></label>
-                        <label class="text-xs font-bold text-gray-600">Density<select v-model="designConfig.density" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="spacious">Spacious</option></select></label>
-                        <label class="text-xs font-bold text-gray-600">Surface<select v-model="designConfig.surface" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="flat">Flat</option><option value="bordered">Bordered</option><option value="soft">Soft</option><option value="elevated">Elevated</option></select></label>
-                        <label class="text-xs font-bold text-gray-600">Corners<select v-model="designConfig.corners" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="square">Square</option><option value="soft">Soft</option><option value="rounded">Rounded</option></select></label>
-                        <label class="text-xs font-bold text-gray-600">Buttons<select v-model="designConfig.buttons" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="solid">Solid</option><option value="bordered">Bordered</option><option value="understated">Understated</option></select></label>
-                        <label class="text-xs font-bold text-gray-600">Images<select v-model="designConfig.images" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="documentary">Documentary</option><option value="vibrant">Vibrant</option><option value="formal">Formal</option><option value="monochrome">Monochrome</option></select></label>
-                        <label class="text-xs font-bold text-gray-600">Motion<select v-model="designConfig.motion" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="none">None</option><option value="restrained">Restrained</option><option value="expressive">Expressive</option></select></label>
-                        <label class="text-xs font-bold text-gray-600">Homepage mode<select v-model="designConfig.homepage_mode" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><option value="evergreen">Evergreen</option><option value="registration_open">Registration open</option><option value="event_live">Event live</option><option value="results_published">Results published</option></select></label>
-                        <label class="text-xs font-bold text-gray-600">Manual mode expires<input v-model="designConfig.homepage_mode_override_until" type="datetime-local" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm"><span class="block mt-1 font-normal text-gray-400">Leave blank to follow ERP event status.</span></label>
-                    </div>
-
-                    <div class="flex items-center gap-3 pt-2 border-t border-gray-100">
-                        <button @click="saveDesign" :disabled="themeSaving"
-                                class="px-5 py-2.5 bg-[#1e1b4b] hover:bg-[#312e81] text-white text-sm font-bold rounded-xl transition disabled:opacity-50">
-                            {{ themeSaving ? 'Saving…' : 'Save design' }}
-                        </button>
-                        <span v-if="themeSaved" class="text-sm text-green-600 font-medium">Saved! Refresh public site to see changes.</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ── Page Sections ──────────────────────────────────────────── -->
-            <template v-if="activeTab === 'sections'">
-            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-3.5 flex items-center justify-between gap-3">
-                <div class="flex items-center gap-3">
-                    <h2 class="font-bold text-gray-900">Page Sections</h2>
-                    <span class="text-xs text-gray-400">{{ sections.length }} total · {{ sections.filter(s => s.is_active).length }} active</span>
-                </div>
-                <div class="flex items-center gap-3">
                     <a v-if="selectedPreviewUrl" :href="selectedPreviewUrl" target="_blank"
-                       class="text-xs text-purple-600 hover:text-purple-800 font-semibold flex items-center gap-1">
-                        Preview draft ↗
+                       class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold transition">
+                        <span>Preview Draft</span>
+                        <span>↗</span>
                     </a>
-                    <button @click="openAddModal"
-                            class="flex items-center gap-2 px-4 py-2 bg-[#1e1b4b] hover:bg-[#312e81] text-white text-sm font-bold rounded-xl transition">
-                        + Add Section
-                    </button>
+
+                    <a v-if="selectedPublicUrl" :href="selectedPublicUrl" target="_blank"
+                       class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1e1b4b] hover:bg-[#312e81] text-white text-xs font-bold transition shadow-xs">
+                        <span>View Published</span>
+                        <span>↗</span>
+                    </a>
                 </div>
             </div>
 
-            <!-- Empty state -->
-            <div v-if="sections.length === 0"
-                 class="bg-white rounded-2xl border border-dashed border-gray-200 p-16 text-center">
-                <div class="text-5xl mb-3">🏗️</div>
-                <p class="font-semibold text-gray-600">No sections yet</p>
-                <p class="text-sm text-gray-400 mt-1 mb-4">Build your website layout by adding sections below.</p>
-                <button @click="openAddModal"
-                        class="px-5 py-2.5 bg-[#1e1b4b] text-white text-sm font-bold rounded-xl hover:bg-[#312e81] transition">
-                    + Add First Section
-                </button>
+            <!-- Super Admin Access Only Guard -->
+            <div v-if="!isSuperAdmin" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center max-w-xl mx-auto space-y-4 my-8">
+                <div class="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-3xl mx-auto">
+                    🔒
+                </div>
+                <h2 class="text-xl font-extrabold text-gray-900">Super Admin Access Only</h2>
+                <p class="text-sm text-gray-500 leading-relaxed">
+                    The Website Builder, theme styling, and homepage section layouts are centrally managed by Platform Super Administrators to ensure CBSE Sahodaya network brand and design integrity.
+                </p>
+                <div class="pt-2">
+                    <a :href="`/sahodaya-admin/${sahodaya.id}/public-content`"
+                       class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1e1b4b] text-white text-xs font-bold hover:bg-[#312e81] transition shadow-xs">
+                        <span>Go to Public Content (News, Circulars & Bearers) →</span>
+                    </a>
+                </div>
             </div>
 
-            <!-- Section cards -->
-            <div class="space-y-3">
-                <div v-for="(section, idx) in sections" :key="section.id"
-                     class="bg-white rounded-2xl border shadow-sm transition"
-                     :class="section.is_active ? 'border-gray-100' : 'border-gray-100 opacity-60'">
+            <template v-else>
+                <div class="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white rounded-2xl p-4 border border-purple-800 shadow-xs flex items-center justify-between gap-4">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span class="text-xs font-bold uppercase tracking-wider text-purple-200">Super Admin Mode</span>
+                        <span class="text-xs text-slate-300 hidden sm:inline">• Full authority to add/edit page sections, switch layout variants, adjust theme tokens, and publish live.</span>
+                    </div>
+                </div>
 
-                    <!-- Card header row -->
-                    <div class="px-5 py-4 flex items-center gap-4" draggable="true" @dragstart="dragIndex = idx" @dragover.prevent @drop="dropSection(idx)" @dragend="dragIndex = null">
-                        <!-- Reorder handles -->
-                        <div class="flex flex-col gap-0.5 shrink-0">
-                            <button @click="moveUp(idx)" :disabled="idx === 0"
-                                    class="w-6 h-5 flex items-center justify-center text-gray-300 hover:text-gray-600 disabled:opacity-20 rounded transition text-xs font-bold">▲</button>
-                            <button @click="moveDown(idx)" :disabled="idx === sections.length - 1"
-                                    class="w-6 h-5 flex items-center justify-center text-gray-300 hover:text-gray-600 disabled:opacity-20 rounded transition text-xs font-bold">▼</button>
+            <!-- Unpublished Experience Draft Banner -->
+            <div v-if="isSuperAdmin && experienceDraft" class="rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 text-white bg-gradient-to-r from-indigo-950 to-purple-800">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-wider text-purple-200">Unpublished experience draft</p>
+                    <h2 class="font-bold mt-1 text-lg">{{ experienceName(experienceDraft.template_key) }}</h2>
+                    <p class="text-sm text-white/75 mt-1">The live website remains unchanged until you publish this draft blueprint.</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <a :href="selectedPreviewUrl" target="_blank" class="px-4 py-2 text-sm font-bold rounded-xl bg-white/10 hover:bg-white/20">Preview Draft ↗</a>
+                    <button @click="cancelExperienceDraft" class="px-4 py-2 text-sm font-bold rounded-xl bg-white/10 hover:bg-white/20">Cancel Draft</button>
+                    <button @click="publishExperienceDraft" :disabled="experienceSaving || !readinessReport.ready" class="px-4 py-2 text-sm font-bold rounded-xl bg-amber-400 text-indigo-950 font-bold disabled:opacity-50">Publish Experience</button>
+                </div>
+            </div>
+
+            <!-- 2-Column Website Builder Workspace -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+                <!-- ── LEFT BUILDER SIDEBAR ────────────────────────────────────── -->
+                <aside class="lg:col-span-4 xl:col-span-3 space-y-4">
+
+                    <!-- Workspace Pages Navigation -->
+                    <div class="bg-white rounded-2xl border border-gray-100 shadow-xs p-3">
+                        <div class="px-3 pt-2 pb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                            Website Architecture
                         </div>
+                        <nav class="space-y-1">
+                            <button type="button"
+                                    @click="selectTab('overview')"
+                                    class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition text-left"
+                                    :class="activeTab === 'overview'
+                                        ? 'bg-[#1e1b4b] text-white shadow-xs font-bold'
+                                        : 'text-gray-700 hover:bg-gray-50'">
+                                <div class="flex items-center gap-2.5">
+                                    <SvgIcon name="layers" class="w-4 h-4 shrink-0" />
+                                    <span>Site Overview</span>
+                                </div>
+                                <span v-if="activeTab === 'overview'" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                            </button>
 
-                        <!-- Type icon + labels -->
-                        <div class="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0"
-                             :style="{ background: sectionColor(section.section_type) }">
-                            {{ sectionIcon(section.section_type) }}
-                        </div>
-
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-center flex-wrap gap-2 mb-0.5">
-                                <span class="text-sm font-bold text-gray-900 capitalize">
-                                    {{ sectionTypeLabel(section.section_type) }}
+                            <button type="button"
+                                    @click="selectTab('sections')"
+                                    class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition text-left"
+                                    :class="(activeTab === 'sections' || activeTab === 'section-edit')
+                                        ? 'bg-[#1e1b4b] text-white shadow-xs font-bold'
+                                        : 'text-gray-700 hover:bg-gray-50'">
+                                <div class="flex items-center gap-2.5">
+                                    <SvgIcon name="grid" class="w-4 h-4 shrink-0" />
+                                    <span>Page Sections Hub</span>
+                                </div>
+                                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                                      :class="(activeTab === 'sections' || activeTab === 'section-edit') ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'">
+                                    {{ sections.length }}
                                 </span>
-                                <span class="text-[11px] font-mono bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{{ section.variant }}</span>
-                                <span class="text-[11px] font-semibold bg-sky-50 text-sky-700 px-2 py-0.5 rounded-full">{{ sourceBadge(section.section_type) }}</span>
-                                <span v-if="!section.is_active" class="text-[11px] font-semibold bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full">Hidden</span>
+                            </button>
+
+                            <button type="button"
+                                    @click="selectTab('navigation')"
+                                    class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition text-left"
+                                    :class="activeTab === 'navigation'
+                                        ? 'bg-[#1e1b4b] text-white shadow-xs font-bold'
+                                        : 'text-gray-700 hover:bg-gray-50'">
+                                <div class="flex items-center gap-2.5">
+                                    <SvgIcon name="compass" class="w-4 h-4 shrink-0" />
+                                    <span>Navigation & Menu</span>
+                                </div>
+                                <span v-if="activeTab === 'navigation'" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                            </button>
+
+                            <button type="button"
+                                    @click="selectTab('theme')"
+                                    class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition text-left"
+                                    :class="activeTab === 'theme'
+                                        ? 'bg-[#1e1b4b] text-white shadow-xs font-bold'
+                                        : 'text-gray-700 hover:bg-gray-50'">
+                                <div class="flex items-center gap-2.5">
+                                    <SvgIcon name="palette" class="w-4 h-4 shrink-0" />
+                                    <span>Theme & Styling</span>
+                                </div>
+                                <span v-if="activeTab === 'theme'" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                            </button>
+
+                            <button type="button"
+                                    @click="selectTab('footer')"
+                                    class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition text-left"
+                                    :class="activeTab === 'footer'
+                                        ? 'bg-[#1e1b4b] text-white shadow-xs font-bold'
+                                        : 'text-gray-700 hover:bg-gray-50'">
+                                <div class="flex items-center gap-2.5">
+                                    <SvgIcon name="layout" class="w-4 h-4 shrink-0" />
+                                    <span>Footer Links</span>
+                                </div>
+                                <span v-if="activeTab === 'footer'" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                            </button>
+
+                            <!-- Super Admin Exclusive Sections -->
+                            <template v-if="isSuperAdmin">
+                                <div class="pt-2 pb-1 px-3 text-[10px] font-bold uppercase tracking-wider text-purple-600">
+                                    Super Admin Tools
+                                </div>
+
+                                <button type="button"
+                                        @click="selectTab('experience')"
+                                        class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition text-left"
+                                        :class="activeTab === 'experience'
+                                            ? 'bg-purple-900 text-white shadow-xs font-bold'
+                                            : 'text-gray-700 hover:bg-purple-50/60'">
+                                    <div class="flex items-center gap-2.5">
+                                        <SvgIcon name="sliders" class="w-4 h-4 shrink-0" />
+                                        <span>Templates & Drafts</span>
+                                    </div>
+                                    <span v-if="activeTab === 'experience'" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                                </button>
+
+                                <button type="button"
+                                        @click="selectTab('readiness')"
+                                        class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition text-left"
+                                        :class="activeTab === 'readiness'
+                                            ? 'bg-purple-900 text-white shadow-xs font-bold'
+                                            : 'text-gray-700 hover:bg-purple-50/60'">
+                                    <div class="flex items-center gap-2.5">
+                                        <SvgIcon name="check-circle" class="w-4 h-4 shrink-0" />
+                                        <span>Publish & Readiness</span>
+                                    </div>
+                                    <span v-if="readinessReport?.ready" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                                    <span v-else class="w-2 h-2 rounded-full bg-amber-400"></span>
+                                </button>
+                            </template>
+                        </nav>
+                    </div>
+
+                    <!-- Page Sections Menu Tree -->
+                    <div class="bg-white rounded-2xl border border-gray-100 shadow-xs p-3">
+                        <div class="flex items-center justify-between px-3 pt-2 pb-2">
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500">Page Sections</span>
+                                <span class="text-[10px] font-bold bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">{{ sections.length }}</span>
                             </div>
-                            <p class="text-xs text-gray-400 truncate">
-                                {{ sectionPreview(section) }}
-                            </p>
+                            <button v-if="isSuperAdmin" @click="openAddModal"
+                                    class="text-[11px] font-bold text-purple-700 hover:text-purple-900 hover:underline">
+                                + Add
+                            </button>
                         </div>
 
-                        <!-- Action buttons -->
-                        <div class="flex items-center gap-2 shrink-0">
-                            <button @click="toggleActive(section)"
-                                    class="text-xs font-semibold px-3 py-1.5 rounded-xl border transition"
-                                    :class="section.is_active
-                                        ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
-                                        : 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100'">
-                                {{ section.is_active ? 'Hide' : 'Show' }}
+                        <div class="space-y-1 max-h-[460px] overflow-y-auto pr-1">
+                            <button v-for="(sec, idx) in sections" :key="sec.id"
+                                    type="button"
+                                    @click="selectSection(sec)"
+                                    class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs transition group"
+                                    :class="activeTab === 'section-edit' && selectedSectionId === sec.id
+                                        ? 'bg-purple-50 text-purple-900 font-bold border border-purple-200/70 shadow-xs'
+                                        : 'text-gray-700 hover:bg-gray-50 border border-transparent'">
+                                <span class="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0"
+                                      :style="{ background: sectionColor(sec.section_type) }">
+                                    {{ sectionIcon(sec.section_type) }}
+                                </span>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="truncate font-semibold capitalize">{{ sectionTypeLabel(sec.section_type) }}</span>
+                                        <span v-if="!sec.is_active" class="text-[9px] bg-gray-100 text-gray-400 px-1 py-0.2 rounded shrink-0">Hidden</span>
+                                    </div>
+                                    <p class="text-[10px] text-gray-400 truncate">{{ sec.variant }}</p>
+                                </div>
+                                <span class="w-2 h-2 rounded-full shrink-0"
+                                      :class="sec.is_active ? 'bg-emerald-500' : 'bg-gray-300'"></span>
                             </button>
-                            <button @click="toggleEdit(section)"
-                                    class="text-xs font-semibold px-3 py-1.5 rounded-xl border transition"
-                                    :class="expandedId === section.id
-                                        ? 'border-[#1e1b4b] bg-[#1e1b4b] text-white'
-                                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'">
-                                {{ expandedId === section.id ? '↑ Close' : '✏️ Edit' }}
-                            </button>
-                            <button @click="removeSection(section)"
-                                    class="text-xs font-semibold px-3 py-1.5 rounded-xl border border-red-100 bg-red-50 text-red-500 hover:bg-red-100 transition">
-                                Delete
-                            </button>
+
+                            <p v-if="!sections.length" class="text-xs text-gray-400 text-center py-4">
+                                No sections created yet.
+                            </p>
                         </div>
                     </div>
 
-                    <!-- Inline editor (accordion) -->
-                    <div v-if="expandedId === section.id"
-                         class="border-t border-gray-100 bg-gray-50/50 rounded-b-2xl px-5 py-5 space-y-5">
+                </aside>
 
-                        <!-- Variant selector -->
-                        <div class="flex flex-wrap items-end gap-4 pb-4 border-b border-gray-100">
+                <!-- ── RIGHT MAIN WORKSPACE CONTENT ───────────────────────────── -->
+                <main class="lg:col-span-8 xl:col-span-9 min-w-0 space-y-6">
+
+                    <!-- 1. DEDICATED SECTION ADMIN PAGE -->
+                    <div v-if="activeTab === 'section-edit' && currentEditingSection" class="space-y-6">
+
+                        <!-- Breadcrumbs & Pager Row -->
+                        <div class="bg-white rounded-2xl border border-gray-100 shadow-xs p-4 flex flex-wrap items-center justify-between gap-3">
+                            <div class="flex items-center gap-2 text-xs">
+                                <button @click="selectTab('overview')" class="text-gray-500 hover:text-purple-700 font-medium">Site Overview</button>
+                                <span class="text-gray-300">/</span>
+                                <button @click="selectTab('sections')" class="text-gray-500 hover:text-purple-700 font-medium">Page Sections</button>
+                                <span class="text-gray-300">/</span>
+                                <span class="font-bold text-[#1e1b4b] capitalize">{{ sectionTypeLabel(currentEditingSection.section_type) }}</span>
+                            </div>
+
+                            <!-- Pager buttons to step between sections -->
+                            <div class="flex items-center gap-2">
+                                <button @click="prevSection && selectSection(prevSection)" :disabled="!prevSection"
+                                        class="px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">
+                                    ← Prev Section
+                                </button>
+                                <span class="text-xs text-gray-400 font-mono">
+                                    {{ currentSectionIndex + 1 }} of {{ sections.length }}
+                                </span>
+                                <button @click="nextSection && selectSection(nextSection)" :disabled="!nextSection"
+                                        class="px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">
+                                    Next Section →
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Section Header Banner Card -->
+                        <div class="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 flex flex-wrap items-start justify-between gap-4">
+                            <div class="flex items-start gap-4">
+                                <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-xs"
+                                     :style="{ background: sectionColor(currentEditingSection.section_type) }">
+                                    {{ sectionIcon(currentEditingSection.section_type) }}
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <h2 class="text-xl font-extrabold text-[#041525] capitalize">
+                                            {{ sectionTypeLabel(currentEditingSection.section_type) }} Section
+                                        </h2>
+                                        <span class="text-xs font-mono bg-purple-50 text-purple-700 px-2.5 py-0.5 rounded-full font-bold">
+                                            {{ currentEditingSection.variant }}
+                                        </span>
+                                        <span class="text-xs font-semibold bg-sky-50 text-sky-700 px-2.5 py-0.5 rounded-full">
+                                            Data: {{ sourceBadge(currentEditingSection.section_type) }}
+                                        </span>
+                                        <span class="text-xs font-bold px-2.5 py-0.5 rounded-full"
+                                              :class="currentEditingSection.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'">
+                                            {{ currentEditingSection.is_active ? '● Live on Site' : '○ Hidden' }}
+                                        </span>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-1 max-w-xl">
+                                        {{ sectionPreview(currentEditingSection) }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Header Section Actions -->
+                            <div class="flex items-center gap-2">
+                                <button v-if="isSuperAdmin" @click="toggleActive(currentEditingSection)"
+                                        class="text-xs font-semibold px-3 py-2 rounded-xl border transition"
+                                        :class="currentEditingSection.is_active
+                                            ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                            : 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100'">
+                                    {{ currentEditingSection.is_active ? 'Hide Section' : 'Show Section' }}
+                                </button>
+                                <button v-if="isSuperAdmin" @click="duplicateSection(currentEditingSection)" :disabled="saving[currentEditingSection.id]"
+                                        class="text-xs font-semibold px-3 py-2 rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition">
+                                    Duplicate
+                                </button>
+                                <button v-if="isSuperAdmin" @click="removeSection(currentEditingSection)"
+                                        class="text-xs font-semibold px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition">
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Card 1: Layout Variant Selector -->
+                        <div class="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 space-y-4">
+                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                    <h3 class="font-bold text-gray-900 text-sm">Layout Design Variant</h3>
+                                    <p class="text-xs text-gray-500 mt-0.5">Select how this {{ sectionTypeLabel(currentEditingSection.section_type) }} content is visually structured on the page.</p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div v-if="isSuperAdmin && (currentEditingSection.archived_configs || []).length">
+                                        <select @change="restoreArchived(currentEditingSection, $event.target.value)"
+                                                class="text-xs border border-gray-200 rounded-xl px-3 py-1.5 text-gray-500 bg-white focus:ring-2 focus:ring-purple-200 focus:outline-none">
+                                            <option value="">↩ Restore previous content…</option>
+                                            <option v-for="(arc, ai) in currentEditingSection.archived_configs" :key="ai" :value="ai">
+                                                {{ arc.variant }} — {{ formatDate(arc.archived_at) }}
+                                            </option>
+                                        </select>
+                                    </div>
+                                    <div v-if="isSuperAdmin && sectionVersions[currentEditingSection.id]?.length">
+                                        <select @change="restorePublishedVersion(currentEditingSection, $event.target.value)" class="text-xs border border-gray-200 rounded-xl px-3 py-1.5 text-gray-500 bg-white">
+                                            <option value="">Restore saved version…</option>
+                                            <option v-for="version in sectionVersions[currentEditingSection.id]" :key="version.id" :value="version.id">
+                                                {{ version.note || 'Saved' }} — {{ formatDate(version.created_at) }}
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-2">
+                                <button v-for="v in variantsFor(currentEditingSection.section_type)" :key="v"
+                                        type="button"
+                                        @click="isSuperAdmin && switchVariant(currentEditingSection, v)"
+                                        :class="[
+                                            'p-3.5 rounded-xl text-left border-2 transition',
+                                            currentEditingSection.variant === v
+                                                ? 'border-[#1e1b4b] bg-[#1e1b4b]/5 shadow-xs'
+                                                : 'border-gray-100 hover:border-purple-200 bg-white',
+                                            !isSuperAdmin ? 'cursor-default' : ''
+                                        ]">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <span class="text-xs font-bold text-gray-800 capitalize">{{ v.replace(/-/g, ' ') }}</span>
+                                        <span v-if="currentEditingSection.variant === v" class="text-xs text-[#1e1b4b]">✓</span>
+                                    </div>
+                                    <p class="text-[11px] text-gray-400 line-clamp-2">
+                                        {{ fieldDefs[currentEditingSection.section_type]?.[v]?.description || 'Variant template design' }}
+                                    </p>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Card 2: Section Content Configuration -->
+                        <div class="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 space-y-5">
                             <div>
-                                <label class="block text-xs font-bold text-gray-600 mb-1.5">Layout Variant</label>
-                                <div class="flex flex-wrap gap-2">
-                                    <button v-for="v in variantsFor(section.section_type)" :key="v"
-                                            type="button"
-                                            @click="switchVariant(section, v)"
-                                            :class="[
-                                                'px-3 py-1.5 rounded-xl text-xs font-semibold border transition',
-                                                section.variant === v
-                                                    ? 'bg-[#1e1b4b] text-white border-[#1e1b4b]'
-                                                    : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300'
-                                            ]">
-                                        {{ v }}
+                                <h3 class="font-bold text-gray-900 text-sm">Section Content Fields</h3>
+                                <p class="text-xs text-gray-500 mt-0.5">Customize headlines, descriptions, call-to-actions, and uploaded images for this section.</p>
+                            </div>
+
+                            <fieldset :disabled="!isSuperAdmin" :class="{ 'pointer-events-none opacity-85': !isSuperAdmin }">
+                                <div v-if="fieldsFor(currentEditingSection.section_type, currentEditingSection.variant).length">
+                                    <SectionFieldEditor
+                                        :fields="fieldsFor(currentEditingSection.section_type, currentEditingSection.variant)"
+                                        :config="editConfigs[currentEditingSection.id] || currentEditingSection.config || {}"
+                                        :upload-media="uploadSiteMedia"
+                                        :media-preview="mediaPreviewUrl"
+                                        @update="val => editConfigs[currentEditingSection.id] = val" />
+                                </div>
+                                <div v-else class="bg-sky-50 border border-sky-100 rounded-xl p-5 text-center space-y-2">
+                                    <div class="text-3xl">🗄️</div>
+                                    <h4 class="text-sm font-bold text-sky-900">Automated Data-Driven Section</h4>
+                                    <p class="text-xs text-sky-700 max-w-md mx-auto">
+                                        This section dynamically pulls content directly from your CBSE Sahodaya database records (e.g. registered member schools, active office bearers, upcoming calendar events, or published circulars). No manual text inputs are required.
+                                    </p>
+                                </div>
+                            </fieldset>
+                        </div>
+
+                        <!-- Card 3: Section Spacing & Layout Appearance -->
+                        <div class="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 space-y-4">
+                            <div>
+                                <h3 class="font-bold text-gray-900 text-sm">Appearance, Spacing & Container Width</h3>
+                                <p class="text-xs text-gray-500 mt-0.5">Adjust background style, padding density, and alignment for this section.</p>
+                            </div>
+
+                            <fieldset :disabled="!isSuperAdmin" :class="{ 'pointer-events-none opacity-85': !isSuperAdmin }">
+                                <SectionLayoutEditor v-model="editLayouts[currentEditingSection.id]" />
+                            </fieldset>
+                        </div>
+
+                        <!-- Bottom Sticky Toolbar for Section Admin -->
+                        <div class="sticky bottom-4 z-20 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-200/80 shadow-lg p-4 flex flex-wrap items-center justify-between gap-4">
+                            <div class="flex items-center gap-3">
+                                <button @click="selectTab('sections')"
+                                        class="px-4 py-2 border border-gray-200 text-xs font-bold text-gray-600 rounded-xl hover:bg-gray-50 transition">
+                                    ← All Sections
+                                </button>
+                                <span v-if="currentEditingSection.has_unpublished_changes || currentEditingSection.status === 'draft'"
+                                      class="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200/60 px-2.5 py-1 rounded-lg">
+                                    Unpublished draft changes
+                                </span>
+                                <span v-else class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">
+                                    All changes published
+                                </span>
+                            </div>
+
+                            <div class="flex items-center gap-3">
+                                <template v-if="isSuperAdmin">
+                                    <button @click="saveSection(currentEditingSection)"
+                                            :disabled="saving[currentEditingSection.id]"
+                                            class="px-5 py-2.5 bg-[#1e1b4b] hover:bg-[#312e81] text-white text-xs font-bold rounded-xl transition disabled:opacity-50 shadow-xs">
+                                        {{ saving[currentEditingSection.id] ? 'Saving…' : 'Save Section Draft' }}
+                                    </button>
+                                    <button @click="publishSection(currentEditingSection)"
+                                            :disabled="saving[currentEditingSection.id]"
+                                            class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition disabled:opacity-50 shadow-xs">
+                                        Publish Live
+                                    </button>
+                                </template>
+                                <span v-else class="text-xs text-gray-500 font-medium bg-gray-100 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                                    🔒 Read-only view. Superadmin privileges required to modify.
+                                </span>
+
+                                <a v-if="selectedPreviewUrl" :href="selectedPreviewUrl" target="_blank"
+                                   class="text-xs text-purple-700 hover:underline font-bold px-2">
+                                    Preview Site ↗
+                                </a>
+                            </div>
+                        </div>
+
+                    </div>
+
+
+                    <!-- 2. SITE OVERVIEW DASHBOARD -->
+                    <div v-else-if="activeTab === 'overview'" class="space-y-6">
+
+                        <!-- Overview Summary Cards -->
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <div class="bg-white rounded-2xl border border-gray-100 shadow-xs p-4 space-y-1">
+                                <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Sections</span>
+                                <div class="text-2xl font-black text-[#1e1b4b]">{{ sections.length }}</div>
+                                <span class="text-xs text-emerald-600 font-semibold">{{ sections.filter(s => s.is_active).length }} Active on Site</span>
+                            </div>
+
+                            <div class="bg-white rounded-2xl border border-gray-100 shadow-xs p-4 space-y-1">
+                                <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Theme Colors</span>
+                                <div class="flex items-center gap-1.5 pt-1">
+                                    <span class="w-6 h-6 rounded-lg border border-white shadow-xs" :style="{ background: themeConfig.primary }" :title="`Primary: ${themeConfig.primary}`"></span>
+                                    <span class="w-6 h-6 rounded-lg border border-white shadow-xs" :style="{ background: themeConfig.secondary }" :title="`Secondary: ${themeConfig.secondary}`"></span>
+                                    <span class="w-6 h-6 rounded-lg border border-white shadow-xs" :style="{ background: themeConfig.accent_color }" :title="`Accent: ${themeConfig.accent_color}`"></span>
+                                </div>
+                                <span class="text-xs text-gray-400 font-mono">{{ themeConfig.font_heading }} font</span>
+                            </div>
+
+                            <div class="bg-white rounded-2xl border border-gray-100 shadow-xs p-4 space-y-1">
+                                <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Experience Blueprint</span>
+                                <div class="text-sm font-bold text-gray-900 truncate mt-1">
+                                    {{ currentSite?.template_key || 'Classic Modern' }}
+                                </div>
+                                <span class="text-xs text-purple-700 font-semibold">{{ currentSite?.experience_version || 'V2' }} Design</span>
+                            </div>
+
+                            <div class="bg-white rounded-2xl border border-gray-100 shadow-xs p-4 space-y-1">
+                                <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Public Status</span>
+                                <div class="text-sm font-bold truncate mt-1" :class="publicWebsiteEnabled ? 'text-emerald-700' : 'text-gray-600'">
+                                    {{ publicWebsiteEnabled ? '● Fully Enabled' : '○ Registration Only' }}
+                                </div>
+                                <a v-if="selectedPublicUrl" :href="selectedPublicUrl" target="_blank" class="text-xs text-purple-600 hover:underline">
+                                    Open domain ↗
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Homepage Layout Sequence -->
+                        <div class="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 space-y-5">
+                            <div class="flex flex-wrap items-center justify-between gap-4">
+                                <div>
+                                    <h3 class="font-extrabold text-[#041525] text-base">Homepage Blueprint & Section Flow</h3>
+                                    <p class="text-xs text-gray-500 mt-0.5">The sequence below represents the visual flow of sections appearing from top to bottom on the homepage.</p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button @click="selectTab('sections')"
+                                            class="px-3.5 py-1.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 transition">
+                                        Reorder Sections Hub →
+                                    </button>
+                                    <button v-if="isSuperAdmin" @click="openAddModal"
+                                            class="px-3.5 py-1.5 bg-[#1e1b4b] hover:bg-[#312e81] text-white text-xs font-bold rounded-xl transition shadow-xs">
+                                        + Add Section
                                     </button>
                                 </div>
                             </div>
-                            <div v-if="(section.archived_configs || []).length" class="ml-auto">
-                                <select @change="restoreArchived(section, $event.target.value)"
-                                        class="text-xs border border-gray-200 rounded-xl px-3 py-2 text-gray-500 bg-white focus:ring-2 focus:ring-purple-200 focus:outline-none">
-                                    <option value="">↩ Restore previous content…</option>
-                                    <option v-for="(arc, ai) in section.archived_configs" :key="ai"
-                                            :value="ai">
-                                        {{ arc.variant }} — {{ formatDate(arc.archived_at) }}
-                                    </option>
+
+                            <!-- List of Section Cards -->
+                            <div class="space-y-3">
+                                <div v-for="(sec, idx) in sections" :key="sec.id"
+                                     class="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border transition group"
+                                     :class="sec.is_active ? 'border-gray-100 bg-white hover:border-purple-200 hover:shadow-xs' : 'border-dashed border-gray-200 bg-gray-50/60 opacity-70'">
+
+                                    <div class="flex items-center gap-3.5 min-w-0">
+                                        <span class="w-6 h-6 rounded-full bg-gray-100 text-gray-500 text-[11px] font-bold flex items-center justify-center font-mono shrink-0">
+                                            {{ idx + 1 }}
+                                        </span>
+                                        <div class="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0"
+                                             :style="{ background: sectionColor(sec.section_type) }">
+                                            {{ sectionIcon(sec.section_type) }}
+                                        </div>
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2 flex-wrap">
+                                                <h4 class="font-bold text-sm text-gray-900 capitalize">{{ sectionTypeLabel(sec.section_type) }}</h4>
+                                                <span class="text-[11px] font-mono bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full font-semibold">{{ sec.variant }}</span>
+                                                <span class="text-[11px] font-semibold bg-sky-50 text-sky-700 px-2 py-0.5 rounded-full">Data: {{ sourceBadge(sec.section_type) }}</span>
+                                                <span v-if="!sec.is_active" class="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Hidden from site</span>
+                                            </div>
+                                            <p class="text-xs text-gray-400 truncate max-w-lg mt-0.5">
+                                                {{ sectionPreview(sec) }}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        <button v-if="isSuperAdmin" @click="toggleActive(sec)"
+                                                class="text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition"
+                                                :class="sec.is_active
+                                                    ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                                    : 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100'">
+                                            {{ sec.is_active ? 'Hide' : 'Show' }}
+                                        </button>
+                                        <button @click="selectSection(sec)"
+                                                class="px-3.5 py-1.5 rounded-lg bg-[#1e1b4b] hover:bg-[#312e81] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs">
+                                            <span>{{ isSuperAdmin ? 'Edit Section Page' : 'View Section Page' }}</span>
+                                            <span>→</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Architecture Quick Links -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div @click="selectTab('navigation')" class="bg-white rounded-2xl border border-gray-100 shadow-xs p-5 hover:border-purple-200 transition cursor-pointer group">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <div class="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
+                                        <SvgIcon name="compass" class="w-4 h-4" />
+                                    </div>
+                                    <h4 class="font-bold text-sm text-gray-900 group-hover:text-purple-700 transition">Navigation & Header</h4>
+                                </div>
+                                <p class="text-xs text-gray-500">Configure navbar styles, menu links, and portal registration CTA buttons.</p>
+                            </div>
+
+                            <div @click="selectTab('theme')" class="bg-white rounded-2xl border border-gray-100 shadow-xs p-5 hover:border-purple-200 transition cursor-pointer group">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <div class="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
+                                        <SvgIcon name="palette" class="w-4 h-4" />
+                                    </div>
+                                    <h4 class="font-bold text-sm text-gray-900 group-hover:text-purple-700 transition">Theme & Styling</h4>
+                                </div>
+                                <p class="text-xs text-gray-500">Tune color palette tokens, typography scales, card density, and surface elevations.</p>
+                            </div>
+
+                            <div @click="selectTab('footer')" class="bg-white rounded-2xl border border-gray-100 shadow-xs p-5 hover:border-purple-200 transition cursor-pointer group">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <div class="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
+                                        <SvgIcon name="layout" class="w-4 h-4" />
+                                    </div>
+                                    <h4 class="font-bold text-sm text-gray-900 group-hover:text-purple-700 transition">Footer Links</h4>
+                                </div>
+                                <p class="text-xs text-gray-500">Manage footer quick links, copyright notices, and public contact information.</p>
+                            </div>
+                        </div>
+
+                    </div>
+
+
+                    <!-- 3. PAGE SECTIONS MANAGEMENT & REORDER HUB -->
+                    <div v-else-if="activeTab === 'sections'" class="space-y-6">
+
+                        <div class="bg-white rounded-2xl border border-gray-100 shadow-xs px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+                            <div>
+                                <h3 class="font-bold text-gray-900 text-base">Page Sections Hub</h3>
+                                <p class="text-xs text-gray-500 mt-0.5">Reorder sections using the drag handles or up/down buttons, toggle visibility, or select any section to open its dedicated page editor.</p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs text-gray-400 font-semibold">
+                                    {{ sections.length }} total · {{ sections.filter(s => s.is_active).length }} active
+                                </span>
+                                <button v-if="isSuperAdmin" @click="openAddModal"
+                                        class="flex items-center gap-2 px-4 py-2 bg-[#1e1b4b] hover:bg-[#312e81] text-white text-xs font-bold rounded-xl transition shadow-xs">
+                                    + Add New Section
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Empty state -->
+                        <div v-if="sections.length === 0"
+                             class="bg-white rounded-2xl border border-dashed border-gray-200 p-16 text-center">
+                            <div class="text-5xl mb-3">🏗️</div>
+                            <p class="font-semibold text-gray-600">No sections added yet</p>
+                            <p class="text-sm text-gray-400 mt-1 mb-4">Build your public website layout by adding sections below.</p>
+                            <button v-if="isSuperAdmin" @click="openAddModal"
+                                    class="px-5 py-2.5 bg-[#1e1b4b] text-white text-xs font-bold rounded-xl hover:bg-[#312e81] transition shadow-xs">
+                                + Add First Section
+                            </button>
+                        </div>
+
+                        <!-- Section cards list -->
+                        <div class="space-y-3">
+                            <div v-for="(section, idx) in sections" :key="section.id"
+                                 class="bg-white rounded-2xl border shadow-xs transition"
+                                 :class="section.is_active ? 'border-gray-100' : 'border-gray-100 opacity-60'">
+
+                                <div class="px-5 py-4 flex items-center gap-4" :draggable="isSuperAdmin" @dragstart="isSuperAdmin && (dragIndex = idx)" @dragover.prevent @drop="isSuperAdmin && dropSection(idx)" @dragend="dragIndex = null">
+                                    <!-- Reorder handles -->
+                                    <div v-if="isSuperAdmin" class="flex flex-col gap-0.5 shrink-0">
+                                        <button @click="moveUp(idx)" :disabled="idx === 0"
+                                                 class="w-6 h-5 flex items-center justify-center text-gray-300 hover:text-gray-600 disabled:opacity-20 rounded transition text-xs font-bold" title="Move Up">▲</button>
+                                        <button @click="moveDown(idx)" :disabled="idx === sections.length - 1"
+                                                 class="w-6 h-5 flex items-center justify-center text-gray-300 hover:text-gray-600 disabled:opacity-20 rounded transition text-xs font-bold" title="Move Down">▼</button>
+                                    </div>
+
+                                    <!-- Type icon + labels -->
+                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 shadow-xs"
+                                         :style="{ background: sectionColor(section.section_type) }">
+                                        {{ sectionIcon(section.section_type) }}
+                                    </div>
+
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center flex-wrap gap-2 mb-0.5">
+                                            <span class="text-sm font-bold text-gray-900 capitalize">
+                                                {{ sectionTypeLabel(section.section_type) }}
+                                            </span>
+                                            <span class="text-[11px] font-mono bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{{ section.variant }}</span>
+                                            <span class="text-[11px] font-semibold bg-sky-50 text-sky-700 px-2 py-0.5 rounded-full">{{ sourceBadge(section.section_type) }}</span>
+                                            <span v-if="!section.is_active" class="text-[11px] font-semibold bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full">Hidden</span>
+                                            <span v-if="section.has_unpublished_changes || section.status === 'draft'" class="text-[11px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">Draft Changes</span>
+                                        </div>
+                                        <p class="text-xs text-gray-400 truncate">
+                                            {{ sectionPreview(section) }}
+                                        </p>
+                                    </div>
+
+                                    <!-- Action buttons -->
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        <button v-if="isSuperAdmin" @click="toggleActive(section)"
+                                                class="text-xs font-semibold px-3 py-1.5 rounded-xl border transition"
+                                                :class="section.is_active
+                                                    ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                                    : 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100'">
+                                            {{ section.is_active ? 'Hide' : 'Show' }}
+                                        </button>
+
+                                        <button @click="selectSection(section)"
+                                                class="text-xs font-bold px-3.5 py-1.5 rounded-xl bg-[#1e1b4b] hover:bg-[#312e81] text-white transition flex items-center gap-1.5 shadow-xs">
+                                            <span>{{ isSuperAdmin ? '✏️ Edit Page' : '👁️ View Page' }}</span>
+                                            <span>→</span>
+                                        </button>
+
+                                        <button v-if="isSuperAdmin" @click="duplicateSection(section)" :disabled="saving[section.id]"
+                                                class="text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition" title="Duplicate Section">
+                                            Duplicate
+                                        </button>
+
+                                        <button v-if="isSuperAdmin" @click="removeSection(section)"
+                                                class="text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-red-100 bg-red-50 text-red-500 hover:bg-red-100 transition" title="Delete Section">
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+
+                    <!-- 4. NAVIGATION & LOGIN MENU -->
+                    <div v-else-if="activeTab === 'navigation'" class="space-y-6">
+
+                        <div v-if="!isSuperAdmin" class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-800 flex items-center gap-3">
+                            <span class="text-base">🔒</span>
+                            <div>
+                                <p class="font-bold">Navigation configuration is locked</p>
+                                <p class="text-amber-700 mt-0.5">Only Super Admins can alter navbar links, portal URLs, and navigation styles. Sahodaya administrators have read-only access.</p>
+                            </div>
+                        </div>
+
+                        <div v-if="!navConfig.items?.length"
+                             class="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
+                            <div>
+                                <h3 class="font-bold text-amber-900">No navigation menu configured yet</h3>
+                                <p class="text-sm text-amber-800 mt-1">Your public site navbar is empty. Load the default Sahodaya menu or add items below.</p>
+                            </div>
+                            <button v-if="isSuperAdmin" @click="loadDefaultNav" :disabled="defaultNavSaving"
+                                    class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl disabled:opacity-50">
+                                {{ defaultNavSaving ? 'Loading…' : 'Load default navigation menu' }}
+                            </button>
+                        </div>
+
+                        <div class="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-600 mb-1.5">Navbar Style Preset</label>
+                                <select v-model="navConfig.layout_variant" :disabled="!isSuperAdmin"
+                                        class="w-full max-w-md border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-purple-200 focus:outline-none disabled:bg-gray-50 disabled:cursor-not-allowed">
+                                    <option v-for="opt in navLayoutOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                                 </select>
                             </div>
-                            <div v-if="sectionVersions[section.id]?.length" :class="(section.archived_configs || []).length ? '' : 'ml-auto'">
-                                <select @change="restorePublishedVersion(section, $event.target.value)" class="text-xs border border-gray-200 rounded-xl px-3 py-2 text-gray-500 bg-white"><option value="">Restore saved version…</option><option v-for="version in sectionVersions[section.id]" :key="version.id" :value="version.id">{{ version.note || 'Saved' }} — {{ formatDate(version.created_at) }}</option></select>
+                        </div>
+
+                        <fieldset :disabled="!isSuperAdmin" class="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 space-y-6">
+                            <div class="flex flex-wrap items-start justify-between gap-4">
+                                <div>
+                                    <h2 class="font-bold text-gray-900">Portal Login & Registration CTA</h2>
+                                    <p class="text-sm text-gray-500 mt-1">
+                                        The prominent Login button in the header navbar redirects visitors directly to your portal options.
+                                    </p>
+                                </div>
+                                <button v-if="isSuperAdmin" @click="ensurePortalLinks" :disabled="portalSaving"
+                                        class="px-4 py-2 text-xs font-bold rounded-xl border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 transition disabled:opacity-50">
+                                    {{ portalSaving ? 'Adding…' : '+ Sync Portal links to menu & footer' }}
+                                </button>
+                            </div>
+
+                            <div class="grid sm:grid-cols-2 gap-4 p-4 bg-purple-50/50 rounded-xl border border-purple-100">
+                                <label class="flex items-center gap-3" :class="isSuperAdmin ? 'cursor-pointer' : 'cursor-not-allowed'">
+                                    <input type="checkbox" v-model="navConfig.portal_cta.show_in_navbar" :disabled="!isSuperAdmin" class="w-4 h-4 rounded text-purple-600">
+                                    <span class="text-sm font-medium text-gray-700">Show Login button in header navbar</span>
+                                </label>
+                                <label class="flex items-center gap-3" :class="isSuperAdmin ? 'cursor-pointer' : 'cursor-not-allowed'">
+                                    <input type="checkbox" v-model="navConfig.portal_cta.show_in_menu" :disabled="!isSuperAdmin" class="w-4 h-4 rounded text-purple-600">
+                                    <span class="text-sm font-medium text-gray-700">Include registration & login in dropdown menu</span>
+                                </label>
+                            </div>
+
+                            <div class="grid sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-600 mb-1.5">Navbar button label</label>
+                                    <input v-model="navConfig.portal_cta.portal_label" :disabled="!isSuperAdmin"
+                                           class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-purple-200 focus:outline-none disabled:bg-gray-50 disabled:cursor-not-allowed">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-600 mb-1.5">Portal page URL</label>
+                                    <input v-model="navConfig.portal_cta.portal_url" :disabled="!isSuperAdmin"
+                                           class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-purple-200 focus:outline-none disabled:bg-gray-50 disabled:cursor-not-allowed">
+                                </div>
+                            </div>
+
+                            <p class="text-xs font-bold text-gray-500 uppercase tracking-wide pt-2">Direct Destination URLs</p>
+                            <div class="grid sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-600 mb-1.5">Registration button label</label>
+                                    <input v-model="navConfig.portal_cta.register_label" :disabled="!isSuperAdmin"
+                                           class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-purple-200 focus:outline-none disabled:bg-gray-50 disabled:cursor-not-allowed">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-600 mb-1.5">Registration URL</label>
+                                    <input v-model="navConfig.portal_cta.register_url" :disabled="!isSuperAdmin"
+                                           class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-purple-200 focus:outline-none disabled:bg-gray-50 disabled:cursor-not-allowed">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-600 mb-1.5">Admin login button label</label>
+                                    <input v-model="navConfig.portal_cta.login_label" :disabled="!isSuperAdmin"
+                                           class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-purple-200 focus:outline-none disabled:bg-gray-50 disabled:cursor-not-allowed">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-600 mb-1.5">Admin login URL</label>
+                                    <input v-model="navConfig.portal_cta.login_url" :disabled="!isSuperAdmin"
+                                           class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-purple-200 focus:outline-none disabled:bg-gray-50 disabled:cursor-not-allowed">
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <div class="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 space-y-4">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="font-bold text-gray-900">Header Menu Navigation Items</h3>
+                                    <p class="text-xs text-gray-500 mt-0.5">Top navbar links displayed to public visitors.</p>
+                                </div>
+                                <button v-if="isSuperAdmin" @click="addNavItem"
+                                        class="text-xs px-3.5 py-2 rounded-xl bg-[#1e1b4b] text-white font-semibold hover:bg-[#312e81] transition shadow-xs">
+                                    + Add Menu Item
+                                </button>
+                            </div>
+                            <div class="space-y-2">
+                                <div v-for="(item, idx) in navConfig.items" :key="idx"
+                                     class="flex flex-wrap items-center gap-3 bg-gray-50 rounded-xl p-3 border border-gray-100">
+                                    <input v-model="item.label" :disabled="!isSuperAdmin" placeholder="Label (e.g. About Us)"
+                                           class="flex-1 min-w-[140px] border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:bg-gray-100 disabled:cursor-not-allowed">
+                                    <input v-model="item.url" :disabled="!isSuperAdmin" placeholder="/url-or-anchor"
+                                           class="flex-1 min-w-[140px] border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:bg-gray-100 disabled:cursor-not-allowed">
+                                    <button v-if="isSuperAdmin" @click="removeNavItem(idx)" class="text-red-400 hover:text-red-600 text-lg px-2" title="Remove Item">&times;</button>
+                                </div>
+                                <p v-if="!navConfig.items?.length" class="text-sm text-gray-400 text-center py-4">No menu items added yet.</p>
+                            </div>
+                            <div v-if="isSuperAdmin" class="flex items-center gap-3 pt-3 border-t border-gray-100">
+                                <button @click="saveNav" :disabled="navSaving"
+                                        class="px-5 py-2.5 bg-[#1e1b4b] hover:bg-[#312e81] text-white text-xs font-bold rounded-xl transition disabled:opacity-50 shadow-xs">
+                                    {{ navSaving ? 'Saving…' : 'Save Navigation Menu' }}
+                                </button>
+                                <span v-if="navSaved" class="text-xs text-green-600 font-bold">Saved successfully!</span>
                             </div>
                         </div>
 
-                        <!-- Content fields -->
-                        <div v-if="fieldsFor(section.section_type, section.variant).length">
-                            <SectionFieldEditor
-                                :fields="fieldsFor(section.section_type, section.variant)"
-                                :config="editConfigs[section.id] || section.config || {}"
-                                :upload-media="uploadSiteMedia"
-                                :media-preview="mediaPreviewUrl"
-                                @update="val => editConfigs[section.id] = val" />
-                        </div>
-                        <div v-else class="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-xs text-amber-700">
-                            This section has no configurable fields — its content comes from your database
-                            (office bearers, member schools, events, etc.).
+                    </div>
+
+
+                    <!-- 5. THEME & STYLING TOKENS -->
+                    <div v-else-if="activeTab === 'theme'" class="space-y-6">
+
+                        <div v-if="!isSuperAdmin" class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-800 flex items-center gap-3">
+                            <span class="text-base">🔒</span>
+                            <div>
+                                <p class="font-bold">Design system & theme tokens are locked</p>
+                                <p class="text-amber-700 mt-0.5">Colors, typography scales, density tokens, and design presets are centrally managed by Super Admins. Sahodaya administrators have read-only preview access.</p>
+                            </div>
                         </div>
 
-                        <SectionLayoutEditor v-model="editLayouts[section.id]" />
+                        <div class="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 space-y-6">
+                            <div>
+                                <h2 class="font-bold text-gray-900 text-base">Design Character & Brand Identity</h2>
+                                <p class="text-xs text-gray-500 mt-1">
+                                    Controls headers, buttons, hero gradients, typography, and section styling across your public website.
+                                </p>
+                            </div>
 
-                        <!-- Save row -->
-                        <div class="flex items-center gap-3 pt-2 border-t border-gray-100 flex-wrap">
-                            <button @click="saveSection(section)"
-                                    :disabled="saving[section.id]"
-                                    class="px-5 py-2.5 bg-[#1e1b4b] hover:bg-[#312e81] text-white text-sm font-bold rounded-xl transition disabled:opacity-50">
-                                {{ saving[section.id] ? 'Saving…' : 'Save draft' }}
+                            <!-- Live preview card -->
+                            <div class="rounded-2xl overflow-hidden border border-gray-200/80 shadow-xs">
+                                <div class="h-28 flex items-end p-5 text-white"
+                                     :style="{ background: `linear-gradient(135deg, ${themeConfig.primary}, ${themeConfig.secondary})` }">
+                                    <div>
+                                        <p class="text-[10px] font-bold uppercase tracking-wider opacity-80">Live Header Preview</p>
+                                        <p class="font-bold text-lg leading-tight">{{ sahodaya.name }}</p>
+                                    </div>
+                                </div>
+                                <div class="flex gap-0 text-center font-bold text-xs">
+                                    <div class="flex-1 py-2.5 text-white" :style="{ background: themeConfig.primary }">Primary Token</div>
+                                    <div class="flex-1 py-2.5 text-white" :style="{ background: themeConfig.secondary }">Secondary Token</div>
+                                    <div class="flex-1 py-2.5 text-gray-900" :style="{ background: themeConfig.accent_color }">Accent Token</div>
+                                </div>
+                            </div>
+
+                            <!-- Presets library -->
+                            <div v-if="isSuperAdmin">
+                                <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Curated Color Presets</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <button v-for="preset in themePresets" :key="preset.id" type="button"
+                                            @click="applyThemePreset(preset)"
+                                            class="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition text-xs font-medium bg-white">
+                                        <span class="flex gap-0.5">
+                                            <span class="w-3.5 h-3.5 rounded-full border border-white shadow-xs" :style="{ background: preset.primary }"></span>
+                                            <span class="w-3.5 h-3.5 rounded-full border border-white shadow-xs -ml-1.5" :style="{ background: preset.secondary }"></span>
+                                        </span>
+                                        {{ preset.label }}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <fieldset :disabled="!isSuperAdmin" class="space-y-6">
+                                <!-- Custom colours -->
+                                <div class="grid sm:grid-cols-3 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-600 mb-1.5">Primary Colour</label>
+                                        <div class="flex items-center gap-2">
+                                            <input type="color" v-model="themeConfig.primary" :disabled="!isSuperAdmin" class="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer disabled:cursor-not-allowed">
+                                            <input type="text" v-model="themeConfig.primary" :disabled="!isSuperAdmin"
+                                                   class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono uppercase disabled:bg-gray-50">
+                                        </div>
+                                        <p class="text-[11px] text-gray-400 mt-1">Navbar, primary CTAs, headings</p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-600 mb-1.5">Secondary Colour</label>
+                                        <div class="flex items-center gap-2">
+                                            <input type="color" v-model="themeConfig.secondary" :disabled="!isSuperAdmin" class="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer disabled:cursor-not-allowed">
+                                            <input type="text" v-model="themeConfig.secondary" :disabled="!isSuperAdmin"
+                                                   class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono uppercase disabled:bg-gray-50">
+                                        </div>
+                                        <p class="text-[11px] text-gray-400 mt-1">Hero gradient end, banners</p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-600 mb-1.5">Accent Highlight Colour</label>
+                                        <div class="flex items-center gap-2">
+                                            <input type="color" v-model="themeConfig.accent_color" :disabled="!isSuperAdmin" class="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer disabled:cursor-not-allowed">
+                                            <input type="text" v-model="themeConfig.accent_color" :disabled="!isSuperAdmin"
+                                                   class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono uppercase disabled:bg-gray-50">
+                                        </div>
+                                        <p class="text-[11px] text-gray-400 mt-1">Highlights, badges, badges</p>
+                                    </div>
+                                </div>
+
+                                <div class="grid sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-600 mb-1.5">Heading Font Family</label>
+                                        <select v-model="themeConfig.font_heading" :disabled="!isSuperAdmin"
+                                                class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white disabled:bg-gray-50 disabled:cursor-not-allowed">
+                                            <option value="Inter">Inter</option>
+                                            <option value="Roboto">Roboto</option>
+                                            <option value="Poppins">Poppins</option>
+                                            <option value="Montserrat">Montserrat</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-600 mb-1.5">Body Font Family</label>
+                                        <select v-model="themeConfig.font_body" :disabled="!isSuperAdmin"
+                                                class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white disabled:bg-gray-50 disabled:cursor-not-allowed">
+                                            <option value="Inter">Inter</option>
+                                            <option value="Roboto">Roboto</option>
+                                            <option value="Poppins">Poppins</option>
+                                            <option value="Montserrat">Montserrat</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-gray-100">
+                                    <label class="text-xs font-bold text-gray-600">Type scale<select v-model="designConfig.type_scale" :disabled="!isSuperAdmin" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm disabled:bg-gray-50"><option value="compact">Compact</option><option value="balanced">Balanced</option><option value="editorial">Editorial</option></select></label>
+                                    <label class="text-xs font-bold text-gray-600">Density<select v-model="designConfig.density" :disabled="!isSuperAdmin" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm disabled:bg-gray-50"><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="spacious">Spacious</option></select></label>
+                                    <label class="text-xs font-bold text-gray-600">Surface<select v-model="designConfig.surface" :disabled="!isSuperAdmin" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm disabled:bg-gray-50"><option value="flat">Flat</option><option value="bordered">Bordered</option><option value="soft">Soft</option><option value="elevated">Elevated</option></select></label>
+                                    <label class="text-xs font-bold text-gray-600">Corners<select v-model="designConfig.corners" :disabled="!isSuperAdmin" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm disabled:bg-gray-50"><option value="square">Square</option><option value="soft">Soft</option><option value="rounded">Rounded</option></select></label>
+                                    <label class="text-xs font-bold text-gray-600">Buttons<select v-model="designConfig.buttons" :disabled="!isSuperAdmin" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm disabled:bg-gray-50"><option value="solid">Solid</option><option value="bordered">Bordered</option><option value="understated">Understated</option></select></label>
+                                    <label class="text-xs font-bold text-gray-600">Images<select v-model="designConfig.images" :disabled="!isSuperAdmin" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm disabled:bg-gray-50"><option value="documentary">Documentary</option><option value="vibrant">Vibrant</option><option value="formal">Formal</option><option value="monochrome">Monochrome</option></select></label>
+                                    <label class="text-xs font-bold text-gray-600">Motion<select v-model="designConfig.motion" :disabled="!isSuperAdmin" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm disabled:bg-gray-50"><option value="none">None</option><option value="restrained">Restrained</option><option value="expressive">Expressive</option></select></label>
+                                    <label class="text-xs font-bold text-gray-600">Homepage mode<select v-model="designConfig.homepage_mode" :disabled="!isSuperAdmin" class="mt-1.5 w-full rounded-xl border-gray-200 text-sm disabled:bg-gray-50"><option value="evergreen">Evergreen</option><option value="registration_open">Registration open</option><option value="event_live">Event live</option><option value="results_published">Results published</option></select></label>
+                                </div>
+                            </fieldset>
+
+                            <div v-if="isSuperAdmin" class="flex items-center gap-3 pt-3 border-t border-gray-100">
+                                <button @click="saveDesign" :disabled="themeSaving"
+                                        class="px-5 py-2.5 bg-[#1e1b4b] hover:bg-[#312e81] text-white text-xs font-bold rounded-xl transition disabled:opacity-50 shadow-xs">
+                                    {{ themeSaving ? 'Saving…' : 'Save Design Tokens' }}
+                                </button>
+                                <span v-if="themeSaved" class="text-xs text-green-600 font-bold">Saved! Refresh preview to see styling updates.</span>
+                            </div>
+                        </div>
+
+                    </div>
+
+
+                    <!-- 6. FOOTER LINKS & CONTACT -->
+                    <div v-else-if="activeTab === 'footer'" class="space-y-6">
+
+                        <div v-if="!isSuperAdmin" class="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-800 flex items-center gap-3">
+                            <span class="text-base">🔒</span>
+                            <div>
+                                <p class="font-bold">Footer configuration is locked</p>
+                                <p class="text-amber-700 mt-0.5">Only Super Admins can alter footer quick links, branding taglines, and contact strips. Sahodaya administrators have read-only access.</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 space-y-4">
+                            <div>
+                                <h2 class="font-bold text-gray-900 text-base">Footer Quick Links & Contact Details</h2>
+                                <p class="text-xs text-gray-500 mt-1">Manage links, contact phone/email, and copyright statements displayed in the footer.</p>
+                            </div>
+
+                            <label class="flex items-center gap-3 pt-2" :class="isSuperAdmin ? 'cursor-pointer' : 'cursor-not-allowed'">
+                                <input type="checkbox" v-model="footerIncludePortal" :disabled="!isSuperAdmin" class="w-4 h-4 rounded text-purple-600">
+                                <span class="text-xs font-medium text-gray-700">Include school registration & admin login links automatically when saving</span>
+                            </label>
+
+                            <div class="space-y-2 pt-2">
+                                <div v-for="(link, idx) in footerConfig.quick_links" :key="idx"
+                                     class="flex flex-wrap items-center gap-3 bg-gray-50 rounded-xl p-3 border border-gray-100">
+                                    <input v-model="link.label" :disabled="!isSuperAdmin" placeholder="Label (e.g. CBSE Academic Portal)"
+                                           class="flex-1 min-w-[140px] border border-gray-200 rounded-lg px-3 py-2 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed">
+                                    <input v-model="link.url" :disabled="!isSuperAdmin" placeholder="/url-or-anchor"
+                                           class="flex-1 min-w-[140px] border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono disabled:bg-gray-100 disabled:cursor-not-allowed">
+                                    <button v-if="isSuperAdmin" @click="removeFooterLink(idx)" class="text-red-400 hover:text-red-600 text-lg px-2" title="Remove Link">&times;</button>
+                                </div>
+                            </div>
+
+                            <button v-if="isSuperAdmin" @click="addFooterLink"
+                                    class="text-xs px-3.5 py-1.5 rounded-xl border border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition">
+                                + Add Footer Link
                             </button>
-                            <button @click="publishSection(section)"
-                                    :disabled="saving[section.id]"
-                                    class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition disabled:opacity-50">
-                                Publish
+
+                            <div v-if="isSuperAdmin" class="flex items-center gap-3 pt-3 border-t border-gray-100">
+                                <button @click="saveFooter" :disabled="footerSaving"
+                                        class="px-5 py-2.5 bg-[#1e1b4b] hover:bg-[#312e81] text-white text-xs font-bold rounded-xl transition disabled:opacity-50 shadow-xs">
+                                    {{ footerSaving ? 'Saving…' : 'Save Footer Settings' }}
+                                </button>
+                                <span v-if="footerSaved" class="text-xs text-green-600 font-bold">Saved successfully!</span>
+                            </div>
+                        </div>
+
+                    </div>
+
+
+                    <!-- 7. TEMPLATES & DRAFTS (Super Admin) -->
+                    <div v-else-if="activeTab === 'experience' && isSuperAdmin" class="space-y-6">
+                        <div class="flex justify-end">
+                            <PreviewToolbar v-if="selectedPreviewUrl" :url="selectedPreviewUrl" />
+                        </div>
+                        <ExperiencePicker :experiences="experiences"
+                                          :selected-key="selectedExperienceKey"
+                                          :current-key="currentSite?.template_key"
+                                          @select="selectedExperienceKey = $event"
+                                          @apply="applyExperienceDraft" />
+                    </div>
+
+
+                    <!-- 8. READINESS & PUBLISH (Super Admin) -->
+                    <div v-else-if="activeTab === 'readiness' && isSuperAdmin" class="space-y-6">
+                        <ReadinessPanel :report="readinessReport" />
+
+                        <div class="bg-white rounded-2xl border border-gray-100 shadow-xs p-6 flex flex-wrap items-center justify-between gap-4">
+                            <div>
+                                <h3 class="font-bold text-gray-950">Publication and rollback snapshot</h3>
+                                <p class="text-xs text-gray-500 mt-1">Publishing a V2 experience stores a complete restore point for the current website.</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button @click="refreshReadiness" class="px-4 py-2 rounded-xl border border-gray-200 text-xs font-bold">Run Checks</button>
+                                <button v-if="experienceDraft" @click="publishExperienceDraft" :disabled="!readinessReport.ready || experienceSaving" class="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold disabled:opacity-50">Publish V2 Draft</button>
+                            </div>
+                        </div>
+
+                        <div v-if="siteVersions.length" class="bg-white rounded-2xl border border-gray-100 shadow-xs p-6">
+                            <h3 class="font-bold text-gray-950 mb-4 text-sm">Automated Restore Points</h3>
+                            <div class="divide-y divide-gray-100">
+                                <div v-for="version in siteVersions" :key="version.id" class="py-3 flex items-center justify-between gap-4">
+                                    <div>
+                                        <p class="text-xs font-bold text-gray-800">{{ experienceName(version.template_key) || 'Classic Website' }}</p>
+                                        <p class="text-[11px] text-gray-400">{{ version.action.replace(/_/g, ' ') }} · {{ formatDate(version.created_at) }}</p>
+                                    </div>
+                                    <button @click="restoreSiteVersion(version)" class="text-xs font-bold text-purple-700 hover:underline">Restore</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-if="currentSite?.is_primary" class="rounded-2xl border border-gray-200 bg-gray-50 p-5 flex flex-wrap items-center justify-between gap-4">
+                            <div>
+                                <h3 class="font-bold text-gray-800 text-sm">Legacy Confederation Classic</h3>
+                                <p class="text-xs text-gray-500 mt-1">Kept only for legacy sites that still need the original CKSC-compatible layout.</p>
+                            </div>
+                            <button @click="applyCkscTemplate" :disabled="ckscTemplateSaving" class="px-4 py-2 text-xs font-bold rounded-xl border border-gray-300 bg-white hover:bg-gray-50">
+                                {{ ckscTemplateSaving ? 'Applying…' : 'Apply Legacy Template' }}
                             </button>
-                            <button @click="duplicateSection(section)" :disabled="saving[section.id]" class="px-4 py-2.5 border border-gray-200 text-sm text-gray-600 rounded-xl hover:bg-white transition">Duplicate</button>
-                            <button @click="expandedId = null"
-                                    class="px-4 py-2.5 border border-gray-200 text-sm text-gray-500 rounded-xl hover:bg-gray-50 transition">
-                                Cancel
-                            </button>
-                            <span v-if="section.has_unpublished_changes || section.status === 'draft'"
-                                  class="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-1 rounded-lg">
-                                Unpublished changes
-                            </span>
-                            <a v-if="selectedPreviewUrl" :href="selectedPreviewUrl" target="_blank"
-                               class="ml-auto text-xs text-purple-600 hover:underline font-semibold">
-                                Preview drafts ↗
-                            </a>
                         </div>
                     </div>
-                </div>
+
+                </main>
             </div>
             </template>
         </div>
 
-        <!-- Add section modal -->
+        <!-- Add Section Modal -->
         <Teleport to="body">
             <div v-if="addModal.open" class="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
                 <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                     <div class="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between z-10">
-                        <h3 class="font-bold text-gray-900 text-lg">Add Section</h3>
+                        <h3 class="font-bold text-gray-900 text-base">Add Section to Website</h3>
                         <button @click="addModal.open = false"
-                                class="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 transition text-gray-400 text-xl">×</button>
+                                class="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 transition text-gray-400 text-xl">&times;</button>
                     </div>
 
                     <!-- Section type grid -->
@@ -553,21 +1095,21 @@
                                 <button v-for="(variants, type) in sectionTypes" :key="type"
                                         @click="addModal.selectedType = type; addModal.selectedVariant = variants[0]"
                                         class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-purple-200 hover:bg-purple-50/50 transition text-left group">
-                                    <span class="text-xl w-9 h-9 rounded-lg flex items-center justify-center bg-gray-50 group-hover:bg-purple-100 transition">
+                                    <span class="text-xl w-9 h-9 rounded-lg flex items-center justify-center bg-gray-50 group-hover:bg-purple-100 transition shrink-0">
                                         {{ sectionIcon(type) }}
                                     </span>
-                                    <span class="text-sm font-semibold text-gray-700">{{ sectionTypeLabel(type) }}</span>
+                                    <span class="text-xs font-semibold text-gray-700 capitalize">{{ sectionTypeLabel(type) }}</span>
                                 </button>
                             </div>
                         </div>
 
                         <div v-else class="space-y-5">
                             <button @click="addModal.selectedType = null" class="text-xs text-purple-600 hover:underline font-semibold flex items-center gap-1">
-                                ← Back
+                                ← Back to section types
                             </button>
                             <div>
                                 <p class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">
-                                    Choose a design for {{ sectionTypeLabel(addModal.selectedType) }}
+                                    Choose design for {{ sectionTypeLabel(addModal.selectedType) }}
                                 </p>
                                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                     <button v-for="v in (sectionTypes[addModal.selectedType] || [])" :key="v"
@@ -580,7 +1122,7 @@
                                             ]">
                                         <p class="text-xs font-bold text-gray-700 capitalize">{{ v.replace(/-/g,' ') }}</p>
                                         <p class="text-[11px] text-gray-400">
-                                            {{ fieldDefs[addModal.selectedType]?.[v]?.description || '' }}
+                                            {{ fieldDefs[addModal.selectedType]?.[v]?.description || 'Variant design layout' }}
                                         </p>
                                     </button>
                                 </div>
@@ -588,11 +1130,11 @@
 
                             <div class="flex gap-3 pt-2 border-t border-gray-100">
                                 <button @click="createSection" :disabled="!addModal.selectedVariant || addModal.saving"
-                                        class="flex-1 py-3 bg-[#1e1b4b] hover:bg-[#312e81] text-white font-bold rounded-xl transition disabled:opacity-50 text-sm">
-                                    {{ addModal.saving ? 'Adding…' : `Add ${sectionTypeLabel(addModal.selectedType)}` }}
+                                        class="flex-1 py-2.5 bg-[#1e1b4b] hover:bg-[#312e81] text-white font-bold rounded-xl transition disabled:opacity-50 text-xs shadow-xs">
+                                    {{ addModal.saving ? 'Adding…' : `Add ${sectionTypeLabel(addModal.selectedType)} Section` }}
                                 </button>
                                 <button @click="addModal.open = false"
-                                        class="px-6 py-3 border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 transition text-sm">
+                                        class="px-5 py-2.5 border border-gray-200 text-gray-600 font-semibold rounded-xl hover:bg-gray-50 transition text-xs">
                                     Cancel
                                 </button>
                             </div>
@@ -606,12 +1148,14 @@
 
 <script setup>
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
-import { ref, reactive, computed, defineComponent, h, onMounted } from 'vue';
+import { ref, reactive, computed, defineComponent, h, onMounted, watch } from 'vue';
 import ExperiencePicker from '@/Components/sahodaya/website/ExperiencePicker.vue';
 import ReadinessPanel from '@/Components/sahodaya/website/ReadinessPanel.vue';
 import SectionLayoutEditor from '@/Components/sahodaya/website/SectionLayoutEditor.vue';
 import PreviewToolbar from '@/Components/sahodaya/website/PreviewToolbar.vue';
+import SvgIcon from '@/Components/icons/SvgIcon.vue';
 import { useConfirm } from '@/composables/useConfirm';
+import { usePage } from '@inertiajs/vue3';
 
 const props = defineProps({
     sahodaya:                Object,
@@ -638,34 +1182,13 @@ const props = defineProps({
     isSuperAdmin:            { type: Boolean, default: false },
 });
 
+const page = usePage();
 const { confirm } = useConfirm();
 
-// Choosing/publishing/rolling back a template or design version is platform-assigned,
-// not self-service — a Sahodaya admin only manages section content. Superadmin still
-// reaches these same tabs by browsing into this Sahodaya's own admin panel.
-const tabs = props.isSuperAdmin
-    ? [
-        { id: 'experience', label: 'Experience' },
-        { id: 'sections', label: 'Sections' },
-        { id: 'navigation', label: 'Navigation & Login' },
-        { id: 'theme', label: 'Design' },
-        { id: 'footer', label: 'Footer Links' },
-        { id: 'readiness', label: 'Readiness & Publish' },
-    ]
-    : [
-        { id: 'sections', label: 'Sections' },
-        { id: 'navigation', label: 'Navigation & Login' },
-        { id: 'theme', label: 'Design' },
-        { id: 'footer', label: 'Footer Links' },
-    ];
-const activeTab = ref(
-    props.navNeedsSetup ? 'navigation'
-        : (props.isSuperAdmin && props.currentSite?.experience_version !== 'v2') ? 'experience'
-        : 'sections'
-);
+const activeTab = ref('overview');
+const selectedSectionId = ref(null);
 
 const sections    = ref([...(props.sections ?? [])]);
-const expandedId  = ref(null);
 const editConfigs = reactive({});
 const editLayouts = reactive({});
 const saving      = reactive({});
@@ -739,8 +1262,125 @@ const selectedPreviewUrl = computed(() => {
     return `${props.publicUrl.replace(/\/$/, '')}/preview-site?site_id=${currentSite.value.id}`;
 });
 
+const currentEditingSection = computed(() => {
+    if (!selectedSectionId.value) return null;
+    return sections.value.find(s => s.id === selectedSectionId.value) || null;
+});
+
+const currentSectionIndex = computed(() => {
+    if (!selectedSectionId.value) return -1;
+    return sections.value.findIndex(s => s.id === selectedSectionId.value);
+});
+
+const prevSection = computed(() => {
+    const idx = currentSectionIndex.value;
+    return idx > 0 ? sections.value[idx - 1] : null;
+});
+
+const nextSection = computed(() => {
+    const idx = currentSectionIndex.value;
+    return (idx >= 0 && idx < sections.value.length - 1) ? sections.value[idx + 1] : null;
+});
+
 const addModal = reactive({
     open: false, selectedType: null, selectedVariant: null, saving: false,
+});
+
+// ── Tab & Section Selection with URL synchronization ─────────────────────────
+
+function selectTab(tabId) {
+    activeTab.value = tabId;
+    selectedSectionId.value = null;
+    syncUrl();
+}
+
+function selectSection(section) {
+    if (!section) return;
+    selectedSectionId.value = section.id;
+    activeTab.value = 'section-edit';
+    if (!editConfigs[section.id]) {
+        editConfigs[section.id] = { ...(section.config ?? {}) };
+    }
+    if (!editLayouts[section.id]) {
+        editLayouts[section.id] = { ...(section.layout_json ?? {}) };
+    }
+    loadSectionVersions(section);
+    syncUrl();
+}
+
+function syncUrl() {
+    try {
+        const url = new URL(window.location.href);
+        if (activeTab.value === 'section-edit' && selectedSectionId.value) {
+            url.searchParams.set('tab', 'section');
+            url.searchParams.set('section', selectedSectionId.value);
+        } else if (activeTab.value === 'overview') {
+            url.searchParams.delete('tab');
+            url.searchParams.delete('section');
+        } else {
+            url.searchParams.set('tab', activeTab.value);
+            url.searchParams.delete('section');
+        }
+        window.history.replaceState({}, '', url.toString());
+        page.url = url.pathname + url.search;
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function syncFromUrl(targetUrl = window.location.href) {
+    try {
+        const parsed = new URL(targetUrl, window.location.origin);
+        const tab = parsed.searchParams.get('tab');
+        const sectionParam = parsed.searchParams.get('section');
+
+        if ((tab === 'section' || tab === 'section-edit') && sectionParam) {
+            const secId = Number(sectionParam) || sectionParam;
+            const found = sections.value.find(s => String(s.id) === String(secId));
+            if (found) {
+                selectedSectionId.value = found.id;
+                activeTab.value = 'section-edit';
+                if (!editConfigs[found.id]) {
+                    editConfigs[found.id] = { ...(found.config ?? {}) };
+                }
+                if (!editLayouts[found.id]) {
+                    editLayouts[found.id] = { ...(found.layout_json ?? {}) };
+                }
+                loadSectionVersions(found);
+                return;
+            }
+        }
+
+        if (tab && ['sections', 'navigation', 'theme', 'footer', 'experience', 'readiness', 'overview'].includes(tab)) {
+            activeTab.value = tab;
+            selectedSectionId.value = null;
+            return;
+        }
+
+        // Fallbacks
+        if (props.navNeedsSetup) {
+            activeTab.value = 'navigation';
+        } else if (props.isSuperAdmin && props.currentSite?.experience_version !== 'v2') {
+            activeTab.value = 'experience';
+        } else {
+            activeTab.value = 'overview';
+        }
+        selectedSectionId.value = null;
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+onMounted(() => {
+    syncFromUrl();
+    window.addEventListener('popstate', () => syncFromUrl());
+    if (props.isSuperAdmin) {
+        loadVersions();
+    }
+});
+
+watch(() => page.url, (newUrl) => {
+    syncFromUrl(newUrl);
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -769,7 +1409,7 @@ function variantsFor(type) { return props.sectionTypes[type] ?? []; }
 function fieldsFor(type, variant) { return props.fieldDefs?.[type]?.[variant]?.fields ?? []; }
 function sectionPreview(s) {
     const cfg = s.config ?? {};
-    return cfg.heading ?? cfg.title ?? cfg.tagline ?? (fieldsFor(s.section_type, s.variant).length ? 'Click Edit to configure content' : 'Data-driven section');
+    return cfg.heading ?? cfg.title ?? cfg.tagline ?? (fieldsFor(s.section_type, s.variant).length ? 'Click to configure section content' : 'Data-driven database section');
 }
 function sourceBadge(type) {
     if (['office_bearers', 'member_schools', 'events_programs', 'news_circulars', 'sports_meet', 'resource_centre', 'sahodaya_action_hub'].includes(type)) return 'ERP';
@@ -781,7 +1421,7 @@ function formatDate(d) {
     try { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return ''; }
 }
 
-// ── API calls (using fetch directly — same pattern as super-admin builder) ───
+// ── API calls ────────────────────────────────────────────────────────────────
 
 function csrf() { return document.querySelector('meta[name=csrf-token]')?.content ?? ''; }
 const baseUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/site-builder/api`);
@@ -1054,20 +1694,11 @@ async function togglePublicWebsite() {
 
 // ── Section actions ───────────────────────────────────────────────────────────
 
-function toggleEdit(section) {
-    if (expandedId.value === section.id) {
-        expandedId.value = null;
-    } else {
-        expandedId.value = section.id;
-        if (!editConfigs[section.id]) {
-            editConfigs[section.id] = { ...(section.config ?? {}) };
-        }
-        if (!editLayouts[section.id]) editLayouts[section.id] = { ...(section.layout_json ?? {}) };
-        loadSectionVersions(section);
-    }
+async function loadSectionVersions(section) {
+    if (!section?.id) return;
+    sectionVersions[section.id] = await apiGet(`/sections/${section.id}/versions`);
 }
 
-async function loadSectionVersions(section) { sectionVersions[section.id] = await apiGet(`/sections/${section.id}/versions`); }
 async function restorePublishedVersion(section, versionId) {
     if (!versionId || !(await confirm({ message: 'Restore this saved version as an unpublished draft?', destructive: false }))) return;
     const updated = await apiPost(`/sections/${section.id}/versions/${versionId}/restore`, {});
@@ -1089,7 +1720,6 @@ async function saveSection(section) {
         const updated = await apiPatch(`/sections/${section.id}`, { config, layout_json: editLayouts[section.id] ?? section.layout_json ?? {}, status: 'draft' });
         const idx = sections.value.findIndex(s => s.id === section.id);
         if (idx !== -1) Object.assign(sections.value[idx], updated);
-        expandedId.value = null;
     } finally {
         saving[section.id] = false;
     }
@@ -1103,7 +1733,6 @@ async function publishSection(section) {
         const updated = await apiPost(`/sections/${section.id}/publish`, {});
         const idx = sections.value.findIndex(s => s.id === section.id);
         if (idx !== -1) Object.assign(sections.value[idx], updated);
-        expandedId.value = null;
     } finally {
         saving[section.id] = false;
     }
@@ -1111,7 +1740,7 @@ async function publishSection(section) {
 
 async function switchVariant(section, newVariant) {
     if (newVariant === section.variant) return;
-    const msg = `Switch from "${section.variant}" to "${newVariant}"?\n\nCurrent content will be archived and you can restore it any time.`;
+    const msg = `Switch layout from "${section.variant}" to "${newVariant}"?\n\nCurrent content will be archived and you can restore it anytime.`;
     if (!(await confirm({ message: msg, destructive: false }))) return;
     const updated = await apiPatch(`/sections/${section.id}`, { variant: newVariant });
     const idx = sections.value.findIndex(s => s.id === section.id);
@@ -1130,6 +1759,9 @@ async function removeSection(section) {
     if (!(await confirm({ message: `Delete the "${sectionTypeLabel(section.section_type)} / ${section.variant}" section?\n\nThis cannot be undone.` }))) return;
     await apiDelete(`/sections/${section.id}`);
     sections.value = sections.value.filter(s => s.id !== section.id);
+    if (selectedSectionId.value === section.id) {
+        selectTab('sections');
+    }
 }
 
 async function duplicateSection(section) {
@@ -1137,6 +1769,7 @@ async function duplicateSection(section) {
     try {
         const copy = await apiPost(`/sections/${section.id}/duplicate`, {});
         sections.value.push(copy);
+        selectSection(copy);
     } finally { saving[section.id] = false; }
 }
 
@@ -1186,20 +1819,14 @@ async function createSection() {
         const newSection = await r.json();
         sections.value.push(newSection);
         addModal.open = false;
-        // Auto-open editor for the new section
-        expandedId.value = newSection.id;
-        editConfigs[newSection.id] = {};
-        editLayouts[newSection.id] = {};
+        // Open dedicated page editor for newly created section
+        selectSection(newSection);
     } finally {
         addModal.saving = false;
     }
 }
 
-if (props.isSuperAdmin) {
-    onMounted(loadVersions);
-}
-
-// ── Inline field editor component ─────────────────────────────────────────────
+// ── Inline Field Editor Component ────────────────────────────────────────────
 
 const SectionFieldEditor = defineComponent({
     props: {
@@ -1228,19 +1855,19 @@ const SectionFieldEditor = defineComponent({
             const uploading = !!mediaUploading[key];
 
             return h('div', { class: 'space-y-2 col-span-2' }, [
-                h('label', { class: 'text-[11px] text-gray-400 font-medium block' }, label),
+                h('label', { class: 'text-xs text-gray-500 font-bold block' }, label),
                 preview
-                    ? h('div', { class: 'relative rounded-lg overflow-hidden border border-gray-200 bg-gray-50' }, [
+                    ? h('div', { class: 'relative rounded-xl overflow-hidden border border-gray-200 bg-gray-50' }, [
                         h('img', {
                             src: preview,
                             alt: label,
-                            class: 'w-full h-28 object-cover',
+                            class: 'w-full h-32 object-cover',
                         }),
                         h('button', {
                             type: 'button',
                             onClick: () => onChange(''),
-                            class: 'absolute top-1 right-1 bg-white/90 text-red-500 text-xs px-2 py-0.5 rounded shadow',
-                        }, 'Remove'),
+                            class: 'absolute top-2 right-2 bg-white/95 text-red-600 text-xs px-2.5 py-1 rounded-lg font-bold shadow-xs hover:bg-white',
+                        }, 'Remove Image'),
                     ])
                     : null,
                 h('input', {
@@ -1262,7 +1889,7 @@ const SectionFieldEditor = defineComponent({
                             e.target.value = '';
                         }
                     },
-                    class: 'block w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100',
+                    class: 'block w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100',
                 }),
                 mediaError[key]
                     ? h('p', { class: 'text-xs text-red-600 font-medium' }, mediaError[key])
@@ -1270,11 +1897,11 @@ const SectionFieldEditor = defineComponent({
                 h('input', {
                     type: 'url',
                     value: value ?? '',
-                    placeholder: 'Or paste image URL',
+                    placeholder: 'Or paste external image URL',
                     onInput: e => onChange(e.target.value),
-                    class: 'w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-purple-200 focus:outline-none',
+                    class: 'w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-purple-200 focus:outline-none',
                 }),
-                uploading ? h('p', { class: 'text-xs text-purple-600' }, 'Uploading…') : null,
+                uploading ? h('p', { class: 'text-xs text-purple-600 font-semibold' }, 'Uploading image…') : null,
             ]);
         }
 
@@ -1308,18 +1935,18 @@ const SectionFieldEditor = defineComponent({
 
         return () => h('div', { class: 'space-y-4' }, (props.fields ?? []).map(field => {
             if (field.type === 'repeater') {
-                return h('div', { key: field.key, class: 'space-y-2' }, [
+                return h('div', { key: field.key, class: 'space-y-3' }, [
                     h('div', { class: 'flex items-center justify-between' }, [
-                        h('label', { class: 'text-xs font-bold text-gray-700' }, field.label),
+                        h('label', { class: 'text-xs font-bold text-gray-800' }, field.label),
                         h('button', {
                             type: 'button',
                             onClick: () => onRepeaterAdd(field.key, field.fields),
-                            class: 'text-xs text-purple-600 hover:text-purple-800 font-semibold',
-                        }, '+ Add'),
+                            class: 'text-xs px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold transition',
+                        }, '+ Add Item'),
                     ]),
                     ...(local[field.key] ?? []).map((item, idx) =>
-                        h('div', { key: idx, class: 'border border-gray-200 bg-white rounded-xl p-3 space-y-2' }, [
-                            h('div', { class: 'grid grid-cols-2 gap-2' },
+                        h('div', { key: idx, class: 'border border-gray-200 bg-white rounded-xl p-4 space-y-3 shadow-2xs' }, [
+                            h('div', { class: 'grid grid-cols-2 gap-3' },
                                 (field.fields ?? []).map(sub =>
                                     sub.type === 'media'
                                         ? renderMediaField(
@@ -1329,45 +1956,45 @@ const SectionFieldEditor = defineComponent({
                                             mediaKey(field.key, sub.key, idx),
                                         )
                                         : h('div', { key: sub.key }, [
-                                        h('label', { class: 'text-[11px] text-gray-400 font-medium' }, sub.label),
+                                        h('label', { class: 'text-[11px] text-gray-500 font-bold block mb-1' }, sub.label),
                                         sub.type === 'textarea'
                                             ? h('textarea', {
                                                 rows: 2,
                                                 value: item[sub.key] ?? '',
                                                 onInput: e => onRepeaterField(field.key, idx, sub.key, e.target.value),
-                                                class: 'w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-purple-200 focus:outline-none',
+                                                class: 'w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-purple-200 focus:outline-none',
                                             })
                                             : h('input', {
                                                 type: sub.type === 'url' ? 'url' : sub.type === 'color' ? 'color' : 'text',
                                                 value: item[sub.key] ?? '',
                                                 onInput: e => onRepeaterField(field.key, idx, sub.key, e.target.value),
-                                                class: 'w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-purple-200 focus:outline-none',
+                                                class: 'w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-purple-200 focus:outline-none',
                                             }),
                                     ])
                                 )
                             ),
-                            h('div', { class: 'flex items-center justify-between' }, [
+                            h('div', { class: 'flex items-center justify-between pt-2 border-t border-gray-100' }, [
                                 h('div', { class: 'flex items-center gap-2' }, [
                                     h('button', {
                                         type: 'button',
                                         onClick: () => onRepeaterMove(field.key, idx, -1),
                                         disabled: idx === 0,
-                                        class: 'text-xs text-gray-500 hover:text-gray-800 disabled:opacity-30 disabled:cursor-not-allowed',
+                                        class: 'text-xs text-gray-500 hover:text-gray-800 disabled:opacity-30 disabled:cursor-not-allowed px-2 py-0.5 rounded border border-gray-200',
                                         title: 'Move up',
                                     }, '↑'),
                                     h('button', {
                                         type: 'button',
                                         onClick: () => onRepeaterMove(field.key, idx, 1),
                                         disabled: idx === (local[field.key] ?? []).length - 1,
-                                        class: 'text-xs text-gray-500 hover:text-gray-800 disabled:opacity-30 disabled:cursor-not-allowed',
+                                        class: 'text-xs text-gray-500 hover:text-gray-800 disabled:opacity-30 disabled:cursor-not-allowed px-2 py-0.5 rounded border border-gray-200',
                                         title: 'Move down',
                                     }, '↓'),
                                 ]),
                                 h('button', {
                                     type: 'button',
                                     onClick: () => onRepeaterRemove(field.key, idx),
-                                    class: 'text-xs text-red-400 hover:text-red-600',
-                                }, 'Remove'),
+                                    class: 'text-xs text-red-500 hover:text-red-700 font-semibold',
+                                }, 'Delete Item'),
                             ]),
                         ])
                     ),
@@ -1375,14 +2002,14 @@ const SectionFieldEditor = defineComponent({
             }
 
             if (field.type === 'switch') {
-                return h('label', { key: field.key, class: 'flex items-center gap-3 cursor-pointer' }, [
+                return h('label', { key: field.key, class: 'flex items-center gap-3 cursor-pointer p-3 bg-gray-50 rounded-xl' }, [
                     h('input', {
                         type: 'checkbox',
                         checked: !!local[field.key],
                         onChange: e => onInput(field.key, e.target.checked),
                         class: 'w-4 h-4 rounded text-purple-600',
                     }),
-                    h('span', { class: 'text-sm font-medium text-gray-700' }, field.label),
+                    h('span', { class: 'text-xs font-bold text-gray-700' }, field.label),
                 ]);
             }
 
@@ -1419,7 +2046,7 @@ const SectionFieldEditor = defineComponent({
                             type: 'color',
                             value: local[field.key] ?? field.default ?? '#5b21b6',
                             onInput: e => onInput(field.key, e.target.value),
-                            class: 'w-8 h-8 rounded-lg border border-gray-200 cursor-pointer',
+                            class: 'w-9 h-9 rounded-lg border border-gray-200 cursor-pointer',
                         }),
                         h('input', {
                             type: 'text',

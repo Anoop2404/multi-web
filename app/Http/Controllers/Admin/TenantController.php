@@ -798,14 +798,31 @@ class TenantController extends Controller
         $checklist ??= app(TenantProvisioningChecklistService::class);
 
         $filters = $request->validate([
-            'search' => 'nullable|string|max:100',
-            'status' => 'nullable|in:active,inactive,all',
+            'search'  => 'nullable|string|max:100',
+            'status'  => 'nullable|in:active,inactive,all',
+            'cluster' => 'nullable|string|max:50',
         ]);
 
         $search = trim((string) ($filters['search'] ?? ''));
+        $cluster = trim((string) ($filters['cluster'] ?? ''));
         $loginMatchIds = $search !== ''
             ? $this->tenantIdsMatchingPortalLogin($type, $search)
             : [];
+
+        $baseCountQuery = Tenant::query()->where('type', $type);
+        if ($type === 'sahodaya' && StateScope::shouldScope($request)) {
+            StateScope::apply($baseCountQuery, 'state_id', $request);
+        }
+
+        $stats = [
+            'total'          => (clone $baseCountQuery)->count(),
+            'active'         => (clone $baseCountQuery)->where('is_active', true)->count(),
+            'inactive'       => (clone $baseCountQuery)->where('is_active', false)->count(),
+            'with_domain'    => (clone $baseCountQuery)->whereNotNull('domain')->where('domain', '!=', '')->count(),
+            'clusters_count' => $type === 'school'
+                ? (clone $baseCountQuery)->distinct('parent_id')->whereNotNull('parent_id')->count('parent_id')
+                : Tenant::query()->where('type', 'school')->count(),
+        ];
 
         $query = Tenant::query()
             ->where('type', $type)
@@ -814,7 +831,8 @@ class TenantController extends Controller
                 $q->where(function ($inner) use ($term, $loginMatchIds) {
                     $inner->where('name', 'like', $term)
                         ->orWhere('domain', 'like', $term)
-                        ->orWhere('subdomain', 'like', $term);
+                        ->orWhere('subdomain', 'like', $term)
+                        ->orWhere('school_prefix', 'like', $term);
                     if ($loginMatchIds !== []) {
                         $inner->orWhereIn('id', $loginMatchIds);
                     }
@@ -822,19 +840,9 @@ class TenantController extends Controller
             })
             ->when(($filters['status'] ?? 'all') === 'active', fn ($q) => $q->where('is_active', true))
             ->when(($filters['status'] ?? 'all') === 'inactive', fn ($q) => $q->where('is_active', false))
+            ->when($type === 'school' && $cluster !== '' && $cluster !== 'all', fn ($q) => $q->where('parent_id', $cluster))
             ->orderBy('name');
 
-        // The Sahodaya list is reachable by state_admin/state_staff (admin.sahodayas.* is behind
-        // EnsureStateAdmin, unlike admin.schools.* and admin.tenants.*, which are superadmin-only),
-        // but nothing scoped it — so a state admin saw every other state's Sahodayas too. Same
-        // data-isolation gap FRD-13 Finding A closed for programs and remittances, and it got
-        // sharper once promotion started turning the state's master list into real tenants with
-        // contact details attached.
-        //
-        // Fails closed like the rest of the state admin: a state user with no state assigned, or
-        // tenants with no state_id yet, see nothing rather than everything. Superadmin is never
-        // scoped. Legacy tenants predate tenants.state_id, so they need backfilling to appear —
-        // promotions stamp it when run with --state.
         if ($type === 'sahodaya' && StateScope::shouldScope($request)) {
             StateScope::apply($query, 'state_id', $request);
         }
@@ -859,19 +867,23 @@ class TenantController extends Controller
             })
         );
 
+        $clusters = $type === 'school'
+            ? Tenant::where('type', 'sahodaya')->orderBy('name')->get(['id', 'name'])
+            : [];
+
         return inertia('Tenants/Index', [
             'tenants'          => $tenants,
             'tenantType'       => $type,
             'pageTitle'        => $pageTitle,
             'createUrl'        => $createUrl,
-            // Sahodayas only, superadmin only: a school shares its parent's database, so it has
-            // nothing of its own to provision.
             'databasesUrl'     => $type === 'sahodaya' && $request->user()?->isSuperAdmin()
                 ? route('admin.sahodayas.databases.index')
                 : null,
             'readOnly'         => $readOnly,
             'tenantBaseDomain' => config('tenancy.tenant_base_domain'),
-            'filters'          => array_merge(['search' => '', 'status' => 'all'], $filters),
+            'filters'          => array_merge(['search' => '', 'status' => 'all', 'cluster' => 'all'], $filters),
+            'stats'            => $stats,
+            'clusters'         => $clusters,
         ]);
     }
 

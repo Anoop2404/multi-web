@@ -18,6 +18,8 @@ class SiteBuilderController extends SahodayaAdminController
 {
     public function index(Request $request): \Inertia\Response
     {
+        abort_unless($request->user()?->isSuperAdmin(), 403, 'The Website Builder is restricted to Platform Super Admins only.');
+
         $sites = WebsiteSite::query()
             ->where('tenant_id', $this->sahodaya->id)
             ->orderByDesc('is_primary')

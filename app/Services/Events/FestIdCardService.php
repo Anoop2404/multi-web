@@ -482,6 +482,7 @@ class FestIdCardService
         }
 
         $includeDataUris = (bool) ($filters['include_data_uris'] ?? false);
+        $schedules = $this->schedulesForParticipants($event, $participants->pluck('id'));
 
         return $participants
             ->groupBy(function (FestParticipant $p) {

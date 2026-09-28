@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', $locale ?? 'en') }}">
+<html lang="{{ str_replace('_', '-', $locale ?? 'en') }}" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -59,7 +59,7 @@
 
     @vite(['resources/css/app.css', 'resources/js/public.js'])
 </head>
-<body class="font-body text-gray-800 bg-white experience-{{ $experience['key'] ?? 'classic' }} mode-{{ $experience['homepage_mode'] ?? 'evergreen' }}" data-experience="{{ $experience['key'] ?? 'classic' }}" data-motion="{{ ($tenantTheme ?? [])['motion'] ?? 'expressive' }}" style="background-color: var(--site-page-bg); color: var(--site-text)">
+<body class="font-body text-gray-800 bg-white antialiased selection:bg-indigo-600 selection:text-white min-h-screen flex flex-col justify-between experience-{{ $experience['key'] ?? 'classic' }} mode-{{ $experience['homepage_mode'] ?? 'evergreen' }}" data-experience="{{ $experience['key'] ?? 'classic' }}" data-motion="{{ ($tenantTheme ?? [])['motion'] ?? 'expressive' }}" style="background-color: var(--site-page-bg); color: var(--site-text)">
 
     {{-- Global widgets: topbar (phone/email/socials) --}}
     @include('partials.widgets.topbar')
@@ -73,7 +73,7 @@
     {{-- News ticker below navbar --}}
     @include('partials.widgets.ticker')
 
-    <main>
+    <main class="flex-grow">
         @yield('content')
     </main>
 

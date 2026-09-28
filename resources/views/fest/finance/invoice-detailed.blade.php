@@ -33,7 +33,13 @@ table.data th{background:#1d3557;color:#fff;text-align:left;font-size:12px}
         <td><strong>Status:</strong> {{ strtoupper($invoice->status) }}</td>
     </tr>
     <tr>
-        <td colspan="2"><strong>Participation items:</strong> {{ $invoice->participation_item_count }}</td>
+        <td colspan="2">
+            @if(in_array($event->fee_settings['fee_model'] ?? null, ['student_count_slab', 'per_student'], true))
+                <strong>Participating students:</strong> {{ $invoice->participation_item_count }}
+            @else
+                <strong>Participation items:</strong> {{ $invoice->participation_item_count }}
+            @endif
+        </td>
     </tr>
 </table>
 <table class="data">

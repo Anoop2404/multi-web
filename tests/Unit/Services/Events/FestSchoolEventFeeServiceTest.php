@@ -1327,4 +1327,75 @@ class FestSchoolEventFeeServiceTest extends TestCase
         $this->assertSame('uploaded', $receipts[1]->status);
         $this->assertSame(0.0, $fee->claimableBalance(), 'Nothing should remain claimable once pending proofs cover the full amount due.');
     }
+
+    public function test_malabar_student_count_slab_invoice_and_breakdown_shows_student_reg_fee_calculation(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school, 'event' => $event, 'item' => $item] = $this->festContext();
+
+        // Configure Malabar Sahodaya preset: Slabs + ₹450 per participating student
+        $event->update([
+            'fee_settings' => [
+                'fee_model' => 'student_count_slab',
+                'per_student_amount' => 450,
+                'student_count_slabs' => [
+                    ['min_count' => 1, 'max_count' => 49, 'amount' => 6000],
+                    ['min_count' => 50, 'max_count' => 99, 'amount' => 8000],
+                    ['min_count' => 100, 'max_count' => 149, 'amount' => 10000],
+                    ['min_count' => 150, 'max_count' => null, 'amount' => 12000],
+                ],
+            ],
+        ]);
+
+        $schoolClass = SchoolClass::where('tenant_id', $school->id)->first()
+            ?? SchoolClass::create([
+                'tenant_id' => $school->id,
+                'name' => '10',
+                'class_category_id' => 1,
+                'is_active' => true,
+            ]);
+
+        // Register 56 unique students
+        for ($i = 1; $i <= 56; $i++) {
+            $student = Student::create([
+                'tenant_id' => $school->id,
+                'school_class_id' => $schoolClass->id,
+                'name' => "Student {$i}",
+                'gender' => 'male',
+                'dob' => '2012-01-01',
+                'status' => 'active',
+            ]);
+            $this->approvedRegistration($event, $item, $school, $student);
+        }
+
+        $feeService = app(FestSchoolEventFeeService::class);
+        $fee = $feeService->recalculate($event, $school->id);
+
+        // 56 students -> 50-99 slab = ₹8,000. 56 × ₹450 = ₹25,200. Total = ₹33,200.
+        $this->assertEquals(33200.0, (float) $fee->total_due);
+        $this->assertEquals(56, $fee->participation_item_count);
+
+        // Verify fee breakdown items
+        $schedule = $feeService->resolveSchedule($event);
+        $breakdown = $feeService->breakdown($event, $fee, $schedule);
+        $items = $breakdown['items'];
+
+        $this->assertCount(2, $items);
+        $this->assertSame('Student count fee (50–99 students)', $items[0]['label']);
+        $this->assertEquals(8000.0, $items[0]['amount']);
+        $this->assertSame('Student registration fee (56 students × ₹450)', $items[1]['label']);
+        $this->assertEquals(25200.0, $items[1]['amount']);
+
+        // Verify Invoice lines
+        $invoiceService = app(\App\Services\Events\FestInvoiceService::class);
+        $invoice = $invoiceService->issueForSchool($event, $school);
+        $this->assertEquals(33200.0, (float) $invoice->total_amount);
+
+        $invoiceLines = $invoiceService->participationLines($event, $invoice);
+        $this->assertCount(2, $invoiceLines);
+        $this->assertSame('Student count fee (50–99 students)', $invoiceLines[0]['label']);
+        $this->assertEquals(8000.0, $invoiceLines[0]['amount']);
+        $this->assertSame('Student registration fee (56 students × ₹450)', $invoiceLines[1]['label']);
+        $this->assertEquals(25200.0, $invoiceLines[1]['amount']);
+    }
 }
+

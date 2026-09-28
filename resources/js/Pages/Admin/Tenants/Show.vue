@@ -1,595 +1,581 @@
 <template>
     <AdminLayout :title="tenant.name">
-        <div class="mb-4">
-            <Link :href="listUrl" class="text-sm text-gray-400 hover:text-gray-600">
-                ← Back to {{ tenant.type === 'sahodaya' ? 'Sahodayas' : 'Schools' }}
-            </Link>
-        </div>
-        <div class="space-y-6">
-            <!-- Header card -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-start justify-between">
-                <div>
-                    <div class="flex items-center gap-3 mb-2">
-                        <h2 class="text-xl font-bold text-gray-900">{{ tenant.name }}</h2>
-                        <span :class="tenant.type === 'sahodaya' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'"
-                              class="px-2 py-0.5 rounded-full text-xs font-semibold capitalize">
-                            {{ tenant.type }}
-                        </span>
-                        <span :class="tenant.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
-                              class="px-2 py-0.5 rounded-full text-xs font-medium">
-                            {{ tenant.is_active ? 'Active' : 'Inactive' }}
-                        </span>
-                    </div>
-                    <p v-if="publicUrl" class="text-sm text-indigo-600 font-mono mt-1">
-                        <a :href="publicUrl" target="_blank" rel="noopener">{{ publicUrl }}</a>
-                    </p>
-                    <p v-else-if="subdomainUrl" class="text-sm text-indigo-600 font-mono mt-1">
-                        <a :href="subdomainUrl" target="_blank" rel="noopener">{{ subdomainUrl }}</a>
-                    </p>
-                    <p v-else class="text-sm text-gray-500 font-mono">No public URL — set custom domain or subdomain</p>
-                    <div v-if="tenant.domain && subdomainUrl" class="text-xs text-gray-400 font-mono mt-1">
-                        Subdomain: <a :href="subdomainUrl" target="_blank" rel="noopener" class="hover:text-indigo-600">{{ subdomainUrl }}</a>
-                    </div>
-                    <div v-if="tenant.domains?.length" class="mt-2 flex flex-wrap gap-2">
-                        <span v-for="d in tenant.domains" :key="d.id"
-                              class="text-[10px] font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
-                            {{ d.domain }}
-                        </span>
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-2 flex-wrap justify-end">
-                    <Link :href="`/admin/tenants/${tenant.id}/edit`"
-                          class="px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
-                        Edit
-                    </Link>
-                    <Link :href="`/admin/builder/sections?tenant=${tenant.id}`"
-                          class="px-4 py-2 rounded-lg text-white text-sm font-medium transition">
-                        Site Builder →
-                    </Link>
-                    <Link v-if="tenant.type === 'sahodaya'"
-                          :href="`/sahodaya-admin/${tenant.id}`"
-                          class="btn-primary px-4 py-2 rounded-lg text-sm font-medium transition">
-                        Sahodaya Admin →
-                    </Link>
-                </div>
+        <div class="max-w-7xl mx-auto space-y-6">
+            <!-- Breadcrumbs -->
+            <div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                <Link :href="listUrl" class="hover:text-indigo-600 transition flex items-center gap-1">
+                    <span>← Back to {{ tenant.type === 'sahodaya' ? 'Sahodaya Clusters' : 'Member Schools' }}</span>
+                </Link>
+                <span>/</span>
+                <span class="text-slate-800 font-bold truncate max-w-xs">{{ tenant.name }}</span>
             </div>
 
-            <!-- Setup checklist -->
-            <div v-if="setupChecklist && !setupChecklist.complete" class="bg-amber-50 rounded-xl border border-amber-200 p-5">
-                <div class="flex items-center gap-2 mb-3">
-                    <span class="text-amber-600">⚠️</span>
-                    <h3 class="font-bold text-amber-900">Setup incomplete — {{ setupChecklist.pending_count }} step(s) remaining</h3>
-                </div>
-                <ul class="space-y-1.5">
-                    <li v-for="(step, key) in setupChecklist.steps" :key="key" class="flex items-center gap-2 text-sm">
-                        <span :class="step.completed ? 'text-emerald-600' : 'text-amber-500'">
-                            {{ step.completed ? '✓' : '○' }}
-                        </span>
-                        <span :class="step.completed ? 'text-gray-500 line-through' : 'text-gray-800 font-medium'">{{ step.label }}</span>
-                    </li>
-                </ul>
-            </div>
+            <!-- Hero Header Card -->
+            <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-[0_2px_12px_rgba(15,23,42,0.03)] flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div class="flex items-start sm:items-center gap-4">
+                    <!-- Logo / Avatar -->
+                    <div class="w-16 h-16 rounded-2xl border border-slate-200 overflow-hidden shrink-0 bg-slate-50 flex items-center justify-center shadow-xs">
+                        <img v-if="logoUrl" :src="logoUrl" :alt="tenant.name" class="w-full h-full object-cover">
+                        <span v-else class="text-2xl font-black text-indigo-600">{{ tenant.name?.charAt(0) }}</span>
+                    </div>
 
-            <!-- Sidebar menu manager (superadmin → Sahodaya) -->
-            <div v-if="navManager" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h3 class="font-bold text-gray-900 mb-1">Sidebar menu access</h3>
-                <p class="text-sm text-gray-500 mb-4">
-                    Turn off any menu or program to hide it for this Sahodaya <span class="font-medium">and all its schools</span>.
-                    A disabled item cannot be re-enabled by the Sahodaya admin.
-                </p>
-
-                <form @submit.prevent="saveNavVisibility" class="space-y-5">
-                    <div>
-                        <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Menus</h4>
-                        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                            <label v-for="(label, key) in navManager.menus" :key="key"
-                                   class="flex items-center gap-2 rounded-lg border border-gray-100 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                                <input type="checkbox" class="rounded border-gray-300"
-                                       :checked="navForm.menus[key] !== false"
-                                       @change="navForm.menus[key] = $event.target.checked">
-                                <span class="text-sm text-gray-700">{{ label }}</span>
-                            </label>
+                    <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-2 mb-1">
+                            <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">{{ tenant.name }}</h1>
+                            <span :class="tenant.type === 'sahodaya' ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-blue-100 text-blue-700 border-blue-200'"
+                                  class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border">
+                                {{ tenant.type }}
+                            </span>
+                            <span :class="tenant.is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'"
+                                  class="px-2.5 py-0.5 rounded-full text-xs font-bold border flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full" :class="tenant.is_active ? 'bg-emerald-500' : 'bg-slate-400'"></span>
+                                {{ tenant.is_active ? 'Active' : 'Inactive' }}
+                            </span>
+                            <span v-if="tenant.school_prefix"
+                                  class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-slate-100 text-slate-700">
+                                {{ tenant.school_prefix }}
+                            </span>
                         </div>
-                    </div>
 
-                    <div>
-                        <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Fest programs</h4>
-                        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                            <label v-for="(label, key) in navManager.programs" :key="key"
-                                   class="flex items-center gap-2 rounded-lg border border-gray-100 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                                <input type="checkbox" class="rounded border-gray-300"
-                                       :checked="navForm.programs[key] !== false"
-                                       @change="navForm.programs[key] = $event.target.checked">
-                                <span class="text-sm text-gray-700">{{ label }}</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center gap-3">
-                        <button type="submit" class="btn-primary px-4 py-2 rounded-lg text-sm font-medium" :disabled="navForm.processing">
-                            {{ navForm.processing ? 'Saving…' : 'Save menu access' }}
-                        </button>
-                        <span v-if="navForm.recentlySuccessful" class="text-sm text-green-600">Saved.</span>
-                    </div>
-                </form>
-            </div>
-
-            <!-- School membership (superadmin) -->
-            <div v-if="tenant.type === 'school'" class="bg-white rounded-xl shadow-sm border border-red-100 p-6">
-                <h3 class="font-bold text-gray-900 mb-1">Membership status</h3>
-                <p class="text-sm text-gray-500 mb-4">
-                    Reject an approved school to block portal access, or permanently delete test registrations.
-                </p>
-
-                <div class="flex flex-wrap items-center gap-2 mb-4">
-                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold capitalize"
-                          :class="membershipStatusClass(tenant.membership_status)">
-                        {{ tenant.membership_status || 'pending' }}
-                    </span>
-                    <span v-if="tenant.school_prefix" class="text-xs font-mono text-gray-500 bg-gray-50 px-2 py-1 rounded">
-                        {{ tenant.school_prefix }}
-                    </span>
-                </div>
-
-                <p v-if="tenant.application_payload?.rejection_reason"
-                   class="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-4">
-                    <span class="font-semibold">Rejection reason:</span>
-                    {{ tenant.application_payload.rejection_reason }}
-                </p>
-
-                <form v-if="tenant.membership_status !== 'rejected'"
-                      @submit.prevent="rejectSchool"
-                      class="space-y-3 max-w-lg mb-6 pb-6 border-b border-gray-100">
-                    <div>
-                        <label class="form-label mb-1.5">Reject school (with reason)</label>
-                        <textarea v-model="rejectForm.reason" rows="3" required
-                                  placeholder="Reason shown to the school admin by email…"
-                                  class="field focus:ring-red-200"></textarea>
-                        <p v-if="rejectForm.errors.reason" class="text-xs text-red-500 mt-1">{{ rejectForm.errors.reason }}</p>
-                    </div>
-                    <button type="submit" :disabled="rejectForm.processing"
-                            class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-50">
-                        Reject school
-                    </button>
-                </form>
-
-                <div class="space-y-2">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Danger zone</p>
-                    <div class="flex flex-wrap gap-2">
-                        <button type="button" @click="deleteTenant"
-                                class="px-4 py-2 rounded-lg border border-red-200 text-red-700 text-sm font-semibold hover:bg-red-50">
-                            Delete school permanently
-                        </button>
-                        <button type="button" @click="showEraseStudents = !showEraseStudents"
-                                class="px-4 py-2 rounded-lg border border-red-200 text-red-700 text-sm font-semibold hover:bg-red-50">
-                            Erase all students…
-                        </button>
-                    </div>
-                    <p class="text-xs text-gray-400">
-                        Removes the school, its admin login(s), and domain records. Tenant DB rows for this school are not purged.
-                    </p>
-
-                    <div v-if="showEraseStudents" class="mt-3 max-w-lg rounded-lg border border-red-200 bg-red-50 p-4 space-y-3">
-                        <p class="text-sm font-semibold text-red-800">Permanently erase every student record</p>
-                        <p class="text-xs text-red-700">
-                            This is a hard delete, not a withdraw — it bypasses soft-delete entirely, including students already
-                            withdrawn. There is no recovery afterwards, and this reaches into {{ tenant.name }}'s Sahodaya database
-                            directly from Super Admin.
-                        </p>
-                        <div>
-                            <label class="text-xs font-semibold text-red-800 mb-1 block">
-                                Type the school name (<strong>{{ tenant.name }}</strong>) to confirm
-                            </label>
-                            <input v-model="eraseStudentsForm.confirm_school_name" type="text" autocomplete="off"
-                                   class="field focus:ring-red-300">
-                            <p v-if="eraseStudentsForm.errors.confirm_school_name" class="text-xs text-red-600 mt-1">
-                                {{ eraseStudentsForm.errors.confirm_school_name }}
-                            </p>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <button type="button" @click="eraseStudents"
-                                    :disabled="eraseStudentsForm.processing || !eraseStudentsConfirmMatches"
-                                    class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-50">
-                                {{ eraseStudentsForm.processing ? 'Erasing…' : 'Erase all students permanently' }}
-                            </button>
-                            <button type="button" @click="showEraseStudents = false; eraseStudentsForm.reset();"
-                                    class="text-sm text-gray-500 hover:text-gray-700">
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-
-                    <div v-if="erasureBatches && erasureBatches.length" class="mt-4 max-w-lg">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Erasure history</p>
-                        <div class="space-y-2">
-                            <div v-for="batch in erasureBatches" :key="batch.id"
-                                 class="rounded-lg border p-3 text-xs"
-                                 :class="batch.restored_at ? 'border-gray-200 bg-gray-50' : 'border-red-200 bg-red-50'">
-                                <div class="flex items-center justify-between gap-2">
-                                    <div>
-                                        <p class="font-semibold" :class="batch.restored_at ? 'text-gray-600' : 'text-red-800'">
-                                            {{ batch.student_count }} student(s) erased
-                                        </p>
-                                        <p class="text-gray-500 mt-0.5">
-                                            {{ formatDateTime(batch.erased_at) }}
-                                            <span v-if="batch.erased_by_name || batch.erased_by_email">
-                                                by {{ batch.erased_by_name || batch.erased_by_email }}
-                                            </span>
-                                        </p>
-                                        <p v-if="batch.restored_at" class="text-emerald-700 mt-0.5">
-                                            Restored {{ formatDateTime(batch.restored_at) }}
-                                            <span v-if="batch.restored_by_name">by {{ batch.restored_by_name }}</span>
-                                        </p>
-                                    </div>
-                                    <button v-if="!batch.restored_at" type="button"
-                                            @click="restoreErasure(batch)"
-                                            :disabled="restoringBatchId === batch.id"
-                                            class="shrink-0 px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-50">
-                                        {{ restoringBatchId === batch.id ? 'Restoring…' : 'Restore' }}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Branding -->
-            <div class="card">
-                <h3 class="font-bold text-gray-900 mb-1">Logo</h3>
-                <p class="text-sm text-gray-500 mb-4">
-                    Shown on the registration portal, login page, and admin sidebar.
-                    <span v-if="tenant.type === 'sahodaya'"> Sahodaya admins can also update this under Membership Settings.</span>
-                </p>
-                <div class="flex flex-wrap items-center gap-5">
-                    <div v-if="logoUrl" class="w-20 h-20 rounded-full border border-gray-200 overflow-hidden shrink-0 bg-white">
-                        <img :src="logoUrl" :alt="tenant.name" class="w-full h-full object-cover scale-[1.18]">
-                    </div>
-                    <div v-else class="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center text-2xl font-bold text-gray-400 shrink-0">
-                        {{ tenant.name?.charAt(0) }}
-                    </div>
-                    <form @submit.prevent="uploadLogo" class="flex flex-wrap items-center gap-3">
-                        <input type="file" accept="image/*" @change="onLogoSelected"
-                               class="text-sm text-gray-600 max-w-xs">
-                        <button type="submit" :disabled="!logoForm.logo || logoForm.processing"
-                                class="btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                            {{ logoForm.processing ? 'Saving…' : 'Save logo' }}
-                        </button>
-                        <p v-if="logoForm.errors.logo" class="w-full text-xs text-red-500">{{ logoForm.errors.logo }}</p>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Database (Sahodaya only) -->
-            <div v-if="tenant.type === 'sahodaya' && database" class="card">
-                <h3 class="font-bold text-gray-900 mb-1">Database</h3>
-                <p class="text-sm text-gray-500 mb-4">
-                    Create the PostgreSQL database manually, then enter its name.
-                    Username and password are optional — leave both blank to connect with the central app DB user (same as today).
-                </p>
-
-                <div class="flex flex-wrap gap-2 mb-4">
-                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold"
-                          :class="database.ready ? 'bg-green-100 text-green-700' : database.exists ? 'bg-amber-100 text-amber-700' : database.configured ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'">
-                        {{ database.ready ? 'Ready' : database.exists ? 'Needs migrations' : database.configured ? 'Database not found' : 'Not configured' }}
-                    </span>
-                    <span v-if="database.name" class="text-xs font-mono text-gray-500 px-2 py-1 bg-gray-50 rounded">{{ database.name }}</span>
-                    <span v-if="database.username" class="text-xs font-mono text-gray-500 px-2 py-1 bg-gray-50 rounded">user: {{ database.username }}</span>
-                    <span v-if="database.has_password" class="text-xs font-mono text-emerald-700 px-2 py-1 bg-emerald-50 rounded">custom password set</span>
-                </div>
-
-                <form @submit.prevent="saveDatabase" class="space-y-4 mb-4">
-                    <div class="grid sm:grid-cols-3 gap-3">
-                        <div class="sm:col-span-3">
-                            <label class="form-label mb-1.5">PostgreSQL database name <span class="text-red-500">*</span></label>
-                            <input v-model="databaseForm.database_name" type="text" required
-                                   :placeholder="database.suggested_name"
-                                   class="field font-mono focus:ring-indigo-300">
-                            <p class="text-xs text-gray-400 mt-1">Lowercase letters, numbers, underscores. Suggested: {{ database.suggested_name }}</p>
-                            <p v-if="databaseForm.errors.database_name" class="text-xs text-red-500 mt-1">{{ databaseForm.errors.database_name }}</p>
-                        </div>
-                        <div>
-                            <label class="form-label mb-1.5">DB username <span class="font-normal text-gray-400">(optional)</span></label>
-                            <input v-model="databaseForm.db_username" type="text" class="field font-mono" autocomplete="off"
-                                   placeholder="Optional — blank uses central DB user">
-                            <p v-if="databaseForm.errors.db_username" class="text-xs text-red-500 mt-1">{{ databaseForm.errors.db_username }}</p>
-                        </div>
-                        <div>
-                            <label class="form-label mb-1.5">DB password <span class="font-normal text-gray-400">(optional)</span></label>
-                            <input v-model="databaseForm.db_password" type="password" class="field font-mono" autocomplete="new-password"
-                                   :placeholder="database.has_password ? '•••••••• (leave blank to keep)' : 'Optional — blank uses central password'">
-                            <p v-if="databaseForm.errors.db_password" class="text-xs text-red-500 mt-1">{{ databaseForm.errors.db_password }}</p>
-                        </div>
-                        <div v-if="database.has_password" class="flex items-end">
-                            <label class="flex items-center gap-2 text-sm text-gray-600 pb-2.5">
-                                <input v-model="databaseForm.clear_db_password" type="checkbox" class="rounded">
-                                Remove custom password (use central)
-                            </label>
-                        </div>
-                    </div>
-                    <button type="submit" :disabled="databaseForm.processing"
-                            class="px-4 py-2.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50">
-                        Save database connection
-                    </button>
-                </form>
-
-                <div class="rounded-lg border border-slate-100 bg-slate-50/70 p-4 mb-4 space-y-3">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-600">
-                        Optional: create first Sahodaya admin after migrations
-                    </p>
-                    <div class="grid sm:grid-cols-3 gap-3">
-                        <div>
-                            <label class="form-label mb-1.5">Admin name</label>
-                            <input v-model="databaseForm.admin_name" type="text" class="field" placeholder="Cluster admin">
-                        </div>
-                        <div>
-                            <label class="form-label mb-1.5">Admin email</label>
-                            <input v-model="databaseForm.admin_email" type="email" class="field" placeholder="admin@example.com" autocomplete="off">
-                            <p v-if="databaseForm.errors.admin_email" class="text-xs text-red-500 mt-1">{{ databaseForm.errors.admin_email }}</p>
-                        </div>
-                        <div>
-                            <label class="form-label mb-1.5">Admin password <span class="font-normal text-gray-400">(optional)</span></label>
-                            <input v-model="databaseForm.admin_password" type="text" class="field font-mono" placeholder="Only if creating an admin" autocomplete="off">
-                            <p v-if="databaseForm.errors.admin_password" class="text-xs text-red-500 mt-1">{{ databaseForm.errors.admin_password }}</p>
-                        </div>
-                    </div>
-                    <p class="text-xs text-gray-500">
-                        Only the database name is required. Save it, create the empty PostgreSQL database, then Run migrations.
-                        Fill admin email + password only if you want the first portal login created after migrate.
-                    </p>
-                </div>
-
-                <form @submit.prevent="runMigrations" class="flex flex-wrap items-center gap-3">
-                    <label class="flex items-center gap-2 text-sm text-gray-600">
-                        <input v-model="migrateForm.seed" type="checkbox" class="rounded">
-                        Seed default profile & site template
-                    </label>
-                    <button type="submit" :disabled="migrateForm.processing || !database.configured"
-                            class="px-4 py-2.5 rounded-lg text-white text-sm font-semibold disabled:opacity-50">
-                        Run migrations
-                    </button>
-                </form>
-
-                <p v-if="!database.ready && database.exists" class="text-sm text-amber-700 mt-3">
-                    Database exists but is not fully migrated (missing roles/users). Run migrations before creating portal admins.
-                </p>
-
-                <p class="text-xs text-gray-400 mt-3 font-mono">
-                    CLI: php artisan sahodaya:provision-databases --tenant={{ tenant.id }} --create
-                </p>
-            </div>
-
-            <!-- Portal admin login (Sahodaya or school) -->
-            <div v-if="tenant.type === 'sahodaya' || tenant.type === 'school'" class="bg-white rounded-xl shadow-sm border p-6"
-                 :class="tenant.type === 'sahodaya' ? 'border-purple-100' : 'border-blue-100'">
-                <h3 class="font-bold text-gray-900 mb-1">{{ portalAdminTitle }}</h3>
-                <p class="text-sm text-gray-500 mb-4">{{ portalAdminHint }}</p>
-
-                <div v-if="tenant.type === 'sahodaya' && database && !database.ready"
-                     class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 mb-4">
-                    Finish database setup (save name → create PostgreSQL DB → run migrations) before creating portal admins.
-                </div>
-
-                <template v-else>
-
-                <p v-if="loginUrl" class="text-sm mb-4">
-                    <span class="text-gray-500">Login URL:</span>
-                    <a :href="loginUrl" target="_blank" rel="noopener" class="ml-1 font-mono text-indigo-600 hover:underline">{{ loginUrl }}</a>
-                </p>
-                <p v-else class="text-sm text-amber-600 mb-4">Set a custom domain or subdomain on the parent Sahodaya first.</p>
-
-                <div v-if="portalAdmins.length" class="mb-5 overflow-hidden rounded-lg border border-gray-100">
-                    <table class="w-full text-sm">
-                        <thead class="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                            <tr>
-                                <th class="px-4 py-2.5 font-semibold">Name</th>
-                                <th class="px-4 py-2.5 font-semibold">Username (login)</th>
-                                <th class="px-4 py-2.5 font-semibold">Password</th>
-                                <th class="px-4 py-2.5 font-semibold text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-50">
-                            <tr v-for="admin in portalAdmins" :key="admin.id">
-                                <td class="px-4 py-3 font-medium text-gray-800">{{ admin.name }}</td>
-                                <td class="px-4 py-3 font-mono text-gray-800 text-xs select-all">{{ admin.username || admin.email }}</td>
-                                <td class="px-4 py-3 font-mono text-xs select-all">
-                                    <button v-if="revealedPasswords[admin.id]" type="button" @click="revealPassword(admin)"
-                                            class="text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded" title="Click to hide">
-                                        {{ revealedPasswords[admin.id] }}
-                                    </button>
-                                    <span v-else-if="!admin.has_password" class="text-amber-700" title="Set or reset the password below to store a recoverable copy">Not stored — set a new password to show</span>
-                                    <button v-else type="button" @click="revealPassword(admin)"
-                                            :disabled="revealingId === admin.id"
-                                            class="link-brand text-xs">
-                                        {{ revealingId === admin.id ? 'Loading…' : 'Show password' }}
-                                    </button>
-                                </td>
-                                <td class="px-4 py-3 text-right space-x-2 whitespace-nowrap">
-                                    <button type="button" @click="openImpersonate(admin)"
-                                            class="text-xs font-semibold text-amber-700 hover:text-amber-900">
-                                        Impersonate
-                                    </button>
-                                    <button type="button" @click="editAdmin(admin)"
-                                            class="link-brand text-xs">
-                                        Edit
-                                    </button>
-                                    <button type="button" @click="removeAdmin(admin)"
-                                            class="text-xs font-semibold text-red-600 hover:text-red-800">
-                                        Remove
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <p class="px-4 py-2 text-[11px] text-slate-500 bg-slate-50 border-t border-gray-100">
-                        Passwords are shown in plain text for superadmin recovery. Updating the password here stores a new recoverable copy.
-                    </p>
-                </div>
-
-                <div class="mb-5 rounded-lg border border-slate-200 bg-slate-50/80 p-4 space-y-3 max-w-2xl">
-                    <div>
-                        <p class="text-sm font-semibold text-slate-900">Find an existing login</p>
-                        <p class="text-xs text-slate-500">
-                            Search by email or username to see whether this account already exists before creating a new one.
-                        </p>
-                    </div>
-                    <div class="flex flex-col sm:flex-row gap-2">
-                        <input v-model="loginLookupQuery" type="text" class="field flex-1" placeholder="Type email or username">
-                        <button type="button" class="btn-primary text-sm" @click="searchLogin">
-                            Search
-                        </button>
-                    </div>
-                    <div v-if="loginLookup.searched" class="rounded-lg border p-3 text-sm"
-                         :class="loginLookup.matches.length ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'">
-                        <p class="font-semibold" :class="loginLookup.matches.length ? 'text-emerald-800' : 'text-amber-800'">
-                            {{ loginLookup.matches.length ? 'Existing login found' : 'No login found' }}
-                        </p>
-                        <p v-if="loginLookup.message" class="text-xs mt-1 text-amber-700">{{ loginLookup.message }}</p>
-                        <div v-if="loginLookup.matches.length" class="mt-3 space-y-2">
-                            <div v-for="match in loginLookup.matches" :key="match.id" class="rounded-lg bg-white border border-slate-200 p-3">
-                                <p class="font-medium text-slate-900">{{ match.name }}</p>
-                                <p class="text-xs text-slate-500 mt-1">
-                                    Email: <span class="font-mono">{{ match.email || '—' }}</span>
-                                </p>
-                                <p class="text-xs text-slate-500">
-                                    Username: <span class="font-mono">{{ match.username || '—' }}</span>
-                                </p>
-                                <p class="text-xs text-slate-500">
-                                    Roles: {{ (match.roles || []).join(', ') || '—' }}
-                                </p>
-                                <p v-if="match.matched_on?.length" class="text-xs text-emerald-700 mt-1">
-                                    Matched on {{ match.matched_on.join(' and ') }}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <form @submit.prevent="saveAdmin" class="space-y-4 max-w-lg">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        {{ adminForm.user_id ? 'Update login' : 'Create login' }}
-                    </p>
-                    <div>
-                        <label class="form-label mb-1.5">Full name</label>
-                        <input v-model="adminForm.name" type="text" required
-                               class="field focus:ring-indigo-300">
-                        <p v-if="adminForm.errors.name" class="text-xs text-red-500 mt-1">{{ adminForm.errors.name }}</p>
-                    </div>
-                    <div>
-                        <label class="form-label mb-1.5">Email (username)</label>
-                        <input v-model="adminForm.email" type="email" required autocomplete="off"
-                               class="field focus:ring-indigo-300">
-                        <p v-if="adminForm.errors.email" class="text-xs text-red-500 mt-1">{{ adminForm.errors.email }}</p>
-                    </div>
-                    <div>
-                        <label class="form-label mb-1.5">Username <span class="font-normal text-gray-400">(optional)</span></label>
-                        <input v-model="adminForm.username" type="text" autocomplete="off"
-                               class="field focus:ring-indigo-300" placeholder="e.g. testschool1">
-                        <p class="text-xs text-gray-400 mt-1">
-                            Leave blank to use the email as the login username.
-                        </p>
-                        <p v-if="adminForm.errors.username" class="text-xs text-red-500 mt-1">{{ adminForm.errors.username }}</p>
-                    </div>
-                    <div>
-                        <label class="form-label mb-1.5">Password</label>
-                        <input v-model="adminForm.password" type="text" :required="!adminForm.user_id" autocomplete="off"
-                               class="field font-mono focus:ring-indigo-300">
-                        <p class="text-xs text-gray-400 mt-1">
-                            {{ adminForm.user_id ? 'Leave blank to keep the current password.' : 'Required for new logins.' }}
-                        </p>
-                        <p v-if="adminForm.errors.password" class="text-xs text-red-500 mt-1">{{ adminForm.errors.password }}</p>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-3">
-                        <button type="submit" :disabled="adminForm.processing"
-                                class="btn-primary disabled:opacity-50">
-                            {{ adminForm.user_id ? 'Save changes' : 'Create login' }}
-                        </button>
-                        <button v-if="adminForm.user_id" type="button" @click="resetAdminForm"
-                                class="px-4 py-2.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50">
-                            Cancel edit
-                        </button>
-                    </div>
-                </form>
-                </template>
-            </div>
-
-            <!-- Sahodaya control center -->
-            <div v-if="tenant.type === 'sahodaya'" class="bg-white rounded-xl shadow-sm border border-purple-100 p-6">
-                <h3 class="font-bold text-gray-900 mb-1">Sahodaya control</h3>
-                <p class="text-sm text-gray-500 mb-4">Website data, registration process, fees, and school rules for this cluster.</p>
-                <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <Link v-for="item in sahodayaLinks" :key="item.href" :href="item.href"
-                          class="flex items-start gap-3 p-4 rounded-lg border border-gray-100 hover:border-purple-200 hover:bg-purple-50 transition">
-                        <span class="text-xl leading-none">{{ item.icon }}</span>
-                        <div>
-                            <p class="text-sm font-semibold text-gray-800">{{ item.label }}</p>
-                            <p class="text-xs text-gray-400 mt-0.5">{{ item.hint }}</p>
-                        </div>
-                    </Link>
-                </div>
-            </div>
-
-            <div class="grid lg:grid-cols-2 gap-6">
-                <!-- Sections overview -->
-                <div class="card">
-                    <h3 class="font-bold text-gray-900 mb-4">Sections ({{ tenantOverview.sections?.length ?? 0 }})</h3>
-                    <div v-if="tenantOverview.sections?.length" class="space-y-2">
-                        <div v-for="section in tenantOverview.sections" :key="section.id"
-                             class="flex items-center justify-between text-sm py-2 border-b border-gray-50 last:border-0">
-                            <span class="font-mono text-gray-600 text-xs">{{ section.section_type }}/{{ section.variant }}</span>
-                            <span :class="section.is_active ? 'text-green-600' : 'text-gray-300'" class="text-xs font-medium">
-                                {{ section.is_active ? '● Active' : '○ Hidden' }}
+                        <!-- Web Link Strip -->
+                        <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-mono mt-1.5">
+                            <a v-if="publicUrl" :href="publicUrl" target="_blank" rel="noopener"
+                               class="text-indigo-600 hover:text-indigo-800 font-semibold hover:underline flex items-center gap-1">
+                                <span>🌐 {{ publicUrl }}</span>
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                            </a>
+                            <a v-else-if="subdomainUrl" :href="subdomainUrl" target="_blank" rel="noopener"
+                               class="text-slate-600 hover:text-indigo-600 hover:underline flex items-center gap-1">
+                                <span>🔗 {{ subdomainUrl }}</span>
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                            </a>
+                            <span v-if="tenant.parent?.name" class="font-sans text-slate-500 font-medium">
+                                Cluster: <strong class="text-slate-700">{{ tenant.parent.name }}</strong>
                             </span>
                         </div>
                     </div>
-                    <p v-else class="text-sm text-gray-400">No sections configured yet.</p>
                 </div>
 
-                <!-- Settings overview -->
-                <div class="card">
-                    <h3 class="font-bold text-gray-900 mb-4">Settings ({{ tenantOverview.settings?.length ?? 0 }} keys)</h3>
-                    <div v-if="tenantOverview.settings?.length" class="space-y-1.5">
-                        <div v-for="setting in tenantOverview.settings" :key="setting.key"
-                             class="flex items-center justify-between text-sm">
-                            <span class="font-mono text-gray-500 text-xs">{{ setting.key }}</span>
-                            <span class="text-xs text-gray-400">configured</span>
+                <!-- Action Controls -->
+                <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+                    <Link :href="`/admin/tenants/${tenant.id}/edit`"
+                          class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-xs">
+                        Edit Profile
+                    </Link>
+
+                    <a v-if="loginUrl" :href="loginUrl" target="_blank" rel="noopener"
+                       class="px-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-xs flex items-center gap-1.5">
+                        <span>Portal Login</span>
+                        <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                    </a>
+
+                    <Link v-if="tenant.type === 'sahodaya'"
+                          :href="`/sahodaya-admin/${tenant.id}`"
+                          class="px-4 py-2 rounded-xl bg-purple-600 text-xs font-bold text-white hover:bg-purple-700 transition shadow-xs">
+                        Sahodaya Admin Panel →
+                    </Link>
+                </div>
+            </div>
+
+            <!-- Setup Checklist Notice -->
+            <div v-if="setupChecklist && !setupChecklist.complete"
+                 class="bg-amber-50 rounded-2xl border border-amber-200/80 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-amber-600 text-lg">⚠️</span>
+                        <h3 class="font-bold text-amber-950 text-sm">
+                            Setup Incomplete — {{ setupChecklist.pending_count }} requirement(s) pending
+                        </h3>
+                    </div>
+                    <p class="text-xs text-amber-800 mt-1">
+                        Complete these steps so member schools and coordinators experience seamless portal access.
+                    </p>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                    <span v-for="(step, key) in setupChecklist.steps" :key="key"
+                          :class="step.completed ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-white text-amber-900 border-amber-200'"
+                          class="px-2.5 py-1 rounded-lg text-xs font-semibold border flex items-center gap-1">
+                        <span>{{ step.completed ? '✓' : '○' }}</span>
+                        <span>{{ step.label }}</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Tabs Navigation -->
+            <div class="bg-white rounded-2xl border border-slate-200/80 p-1.5 shadow-xs flex flex-wrap gap-1">
+                <button type="button" @click="activeTab = 'overview'"
+                        :class="['px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer',
+                                 activeTab === 'overview' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50']">
+                    📋 Overview & Identity
+                </button>
+
+                <button type="button" @click="activeTab = 'admins'"
+                        :class="['px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5',
+                                 activeTab === 'admins' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50']">
+                    <span>🔑 Portal Admin Accounts</span>
+                    <span class="px-1.5 py-0.2 rounded-full text-[10px]" :class="activeTab === 'admins' ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-700'">
+                        {{ portalAdmins.length }}
+                    </span>
+                </button>
+
+                <button v-if="tenant.type === 'sahodaya'" type="button" @click="activeTab = 'database'"
+                        :class="['px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer',
+                                 activeTab === 'database' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50']">
+                    🗄️ Database & Permissions
+                </button>
+
+                <button type="button" @click="activeTab = 'danger'"
+                        :class="['px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ml-auto',
+                                 activeTab === 'danger' ? 'bg-rose-600 text-white shadow-xs' : 'text-rose-600 hover:bg-rose-50']">
+                    ⚠️ Super Admin Actions
+                </button>
+            </div>
+
+            <!-- TAB 1: OVERVIEW & IDENTITY -->
+            <div v-if="activeTab === 'overview'" class="space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Identity & Logo Card -->
+                    <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+                        <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Official Logo & Branding</h3>
+                        <p class="text-xs text-slate-500">
+                            Rendered across portal logins, official certificates, admit cards, and email headers.
+                        </p>
+
+                        <div class="flex items-center gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100">
+                            <div class="w-16 h-16 rounded-xl border border-slate-200 bg-white overflow-hidden flex items-center justify-center shrink-0">
+                                <img v-if="logoUrl" :src="logoUrl" :alt="tenant.name" class="w-full h-full object-cover">
+                                <span v-else class="text-xl font-black text-slate-400">{{ tenant.name?.charAt(0) }}</span>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-xs font-bold text-slate-700">Square PNG or JPG</p>
+                                <p class="text-[11px] text-slate-400 mt-0.5">Recommended 400×400px</p>
+                            </div>
+                        </div>
+
+                        <form @submit.prevent="uploadLogo" class="space-y-3 pt-2">
+                            <input type="file" accept="image/*" @change="onLogoSelected"
+                                   class="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+                            <button type="submit" :disabled="!logoForm.logo || logoForm.processing"
+                                    class="w-full py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 disabled:opacity-40 transition">
+                                {{ logoForm.processing ? 'Uploading logo…' : 'Update Logo' }}
+                            </button>
+                            <p v-if="logoForm.errors.logo" class="text-xs text-rose-500">{{ logoForm.errors.logo }}</p>
+                        </form>
+                    </div>
+
+                    <!-- Domain & Network Info -->
+                    <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4 lg:col-span-2">
+                        <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Web Addresses & Routing</h3>
+                        <div class="grid sm:grid-cols-2 gap-4">
+                            <div class="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-1.5">
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Primary Custom Domain</p>
+                                <p v-if="tenant.domain" class="text-sm font-mono font-bold text-indigo-700">{{ tenant.domain }}</p>
+                                <p v-else class="text-xs text-slate-400 italic">No custom domain attached</p>
+                            </div>
+
+                            <div class="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-1.5">
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Managed Subdomain</p>
+                                <p v-if="tenant.subdomain" class="text-sm font-mono font-bold text-slate-800">
+                                    {{ tenant.subdomain }}.{{ tenantBaseDomain }}
+                                </p>
+                                <p v-else class="text-xs text-slate-400 italic">No subdomain defined</p>
+                            </div>
+                        </div>
+
+                        <div v-if="tenant.domains?.length" class="pt-2">
+                            <p class="text-xs font-semibold text-slate-500 mb-2">Registered Domain Aliases:</p>
+                            <div class="flex flex-wrap gap-2">
+                                <span v-for="d in tenant.domains" :key="d.id"
+                                      class="px-2.5 py-1 rounded-lg text-xs font-mono bg-slate-100 text-slate-700 border border-slate-200">
+                                    {{ d.domain }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Parent Cluster Info for Schools -->
+                        <div v-if="tenant.type === 'school'" class="pt-4 border-t border-slate-100 flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-bold text-slate-900">Affiliated Sahodaya Cluster</p>
+                                <p class="text-xs text-slate-500 mt-0.5">
+                                    {{ tenant.parent?.name || 'Not assigned to a Sahodaya cluster yet' }}
+                                </p>
+                            </div>
+                            <Link v-if="tenant.parent_id" :href="`/admin/tenants/${tenant.parent_id}`"
+                                  class="text-xs font-bold text-indigo-600 hover:text-indigo-800">
+                                View Cluster →
+                            </Link>
                         </div>
                     </div>
-                    <p v-else class="text-sm text-gray-400">No settings configured.</p>
                 </div>
 
-                <!-- Child schools (for sahodaya) -->
-                <div v-if="tenant.type === 'sahodaya' && tenant.children?.length" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 lg:col-span-2">
-                    <h3 class="font-bold text-gray-900 mb-4">Member Schools ({{ tenant.children.length }})</h3>
+                <!-- Child schools list if Sahodaya -->
+                <div v-if="tenant.type === 'sahodaya' && tenant.children?.length"
+                     class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                            Member Schools in this Cluster ({{ tenant.children.length }})
+                        </h3>
+                    </div>
                     <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         <Link v-for="school in tenant.children" :key="school.id"
                               :href="`/admin/tenants/${school.id}`"
-                              class="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50 transition text-sm">
-                            <span class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0">
-                                {{ school.name.charAt(0).toUpperCase() }}
+                              class="p-3.5 rounded-xl border border-slate-200/80 hover:border-indigo-300 hover:bg-indigo-50/30 transition flex items-center gap-3">
+                            <span class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0">
+                                {{ school.name.charAt(0) }}
                             </span>
-                            <span class="font-medium text-gray-800 truncate">{{ school.name }}</span>
+                            <span class="text-xs font-bold text-slate-800 truncate">{{ school.name }}</span>
                         </Link>
                     </div>
                 </div>
             </div>
+
+            <!-- TAB 2: PORTAL ADMIN ACCOUNTS -->
+            <div v-if="activeTab === 'admins'" class="space-y-6">
+                <!-- Admins Table Card -->
+                <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100">
+                        <div>
+                            <h3 class="text-base font-extrabold text-slate-900 tracking-tight">{{ portalAdminTitle }}</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">{{ portalAdminHint }}</p>
+                        </div>
+                        <div v-if="loginUrl" class="text-xs font-mono text-slate-600 flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
+                            <span class="text-slate-400">Login URL:</span>
+                            <a :href="loginUrl" target="_blank" rel="noopener" class="text-indigo-600 font-bold hover:underline">{{ loginUrl }}</a>
+                        </div>
+                    </div>
+
+                    <div v-if="portalAdmins.length" class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200">
+                                <tr>
+                                    <th class="px-4 py-3">Admin Name</th>
+                                    <th class="px-4 py-3">Username (Login ID)</th>
+                                    <th class="px-4 py-3">Password Access</th>
+                                    <th class="px-4 py-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr v-for="admin in portalAdmins" :key="admin.id" class="hover:bg-slate-50/50">
+                                    <td class="px-4 py-3.5 font-bold text-slate-900">{{ admin.name }}</td>
+                                    <td class="px-4 py-3.5">
+                                        <div class="flex items-center gap-2">
+                                            <code class="px-2 py-0.5 rounded bg-slate-100 font-mono text-xs font-semibold text-slate-800">
+                                                {{ admin.username || admin.email }}
+                                            </code>
+                                            <button type="button" @click="copyText(admin.username || admin.email)" class="text-slate-400 hover:text-slate-600">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3.5">
+                                        <button v-if="revealedPasswords[admin.id]" type="button" @click="revealPassword(admin)"
+                                                class="px-2 py-1 rounded bg-emerald-50 text-emerald-800 font-mono text-xs font-bold border border-emerald-200" title="Click to hide">
+                                            {{ revealedPasswords[admin.id] }}
+                                        </button>
+                                        <span v-else-if="!admin.has_password" class="text-amber-700 text-xs italic">
+                                            Not stored — reset password below
+                                        </span>
+                                        <button v-else type="button" @click="revealPassword(admin)"
+                                                :disabled="revealingId === admin.id"
+                                                class="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-xs">
+                                            {{ revealingId === admin.id ? 'Decrypting…' : '👁️ Reveal Password' }}
+                                        </button>
+                                    </td>
+                                    <td class="px-4 py-3.5 text-right whitespace-nowrap space-x-2">
+                                        <button type="button" @click="openImpersonate(admin)"
+                                                class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 font-bold text-xs hover:bg-amber-100 transition">
+                                            Impersonate
+                                        </button>
+                                        <button type="button" @click="editAdmin(admin)"
+                                                class="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition">
+                                            Edit
+                                        </button>
+                                        <button type="button" @click="removeAdmin(admin)"
+                                                class="px-2.5 py-1 rounded-lg border border-rose-200 text-rose-700 font-bold text-xs hover:bg-rose-50 transition">
+                                            Remove
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p v-else class="text-xs text-amber-700 font-semibold p-4 rounded-xl bg-amber-50 border border-amber-200">
+                        No administrator accounts exist yet for this tenant. Use the form below to create one.
+                    </p>
+                </div>
+
+                <!-- Create / Update Admin Form & Lookup -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Admin Form -->
+                    <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+                        <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                            {{ adminForm.user_id ? 'Update Admin Account' : 'Create New Portal Admin' }}
+                        </h3>
+
+                        <form @submit.prevent="saveAdmin" class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
+                                <input v-model="adminForm.name" type="text" required
+                                       class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 transition outline-none">
+                                <p v-if="adminForm.errors.name" class="text-xs text-rose-500 mt-1">{{ adminForm.errors.name }}</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+                                <input v-model="adminForm.email" type="email" required autocomplete="off"
+                                       class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 transition outline-none">
+                                <p v-if="adminForm.errors.email" class="text-xs text-rose-500 mt-1">{{ adminForm.errors.email }}</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">
+                                    Login Username <span class="font-normal text-slate-400">(optional)</span>
+                                </label>
+                                <input v-model="adminForm.username" type="text" autocomplete="off" placeholder="Leave blank to use email"
+                                       class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 transition outline-none">
+                                <p v-if="adminForm.errors.username" class="text-xs text-rose-500 mt-1">{{ adminForm.errors.username }}</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">
+                                    Password
+                                </label>
+                                <input v-model="adminForm.password" type="text" :required="!adminForm.user_id" autocomplete="off"
+                                       placeholder="Enter login password"
+                                       class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-medium focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 transition outline-none">
+                                <p class="text-[11px] text-slate-400 mt-1">
+                                    {{ adminForm.user_id ? 'Leave blank to preserve current password.' : 'Stored securely and recoverable by Super Admin.' }}
+                                </p>
+                                <p v-if="adminForm.errors.password" class="text-xs text-rose-500 mt-1">{{ adminForm.errors.password }}</p>
+                            </div>
+
+                            <div class="flex items-center gap-3 pt-2">
+                                <button type="submit" :disabled="adminForm.processing"
+                                        class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition disabled:opacity-50 shadow-xs">
+                                    {{ adminForm.user_id ? 'Save Account Changes' : 'Create Admin Account' }}
+                                </button>
+                                <button v-if="adminForm.user_id" type="button" @click="resetAdminForm"
+                                        class="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition">
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Find Existing Login Lookup -->
+                    <div class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+                        <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Account Lookup Tool</h3>
+                        <p class="text-xs text-slate-500">
+                            Check if an admin or principal email already exists across this platform cluster.
+                        </p>
+
+                        <div class="flex gap-2">
+                            <input v-model="loginLookupQuery" type="text" placeholder="Search email or username..."
+                                   class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:bg-white">
+                            <button type="button" @click="searchLogin"
+                                    class="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition">
+                                Search
+                            </button>
+                        </div>
+
+                        <div v-if="loginLookup.searched" class="p-4 rounded-xl border text-xs space-y-2"
+                             :class="loginLookup.matches.length ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'">
+                            <p class="font-bold" :class="loginLookup.matches.length ? 'text-emerald-900' : 'text-slate-700'">
+                                {{ loginLookup.matches.length ? `Found ${loginLookup.matches.length} matching account(s)` : 'No existing account matched' }}
+                            </p>
+                            <div v-for="match in loginLookup.matches" :key="match.id" class="p-3 rounded-lg bg-white border border-slate-200 space-y-1">
+                                <p class="font-bold text-slate-900">{{ match.name }}</p>
+                                <p class="text-slate-500 font-mono text-[11px]">{{ match.email }}</p>
+                                <p class="text-indigo-600 font-semibold text-[11px]">Roles: {{ (match.roles || []).join(', ') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: DATABASE & PERMISSIONS (Sahodaya only) -->
+            <div v-if="activeTab === 'database' && tenant.type === 'sahodaya'" class="space-y-6">
+                <!-- Database Configuration -->
+                <div v-if="database" class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Dedicated Cluster Database</h3>
+                        <span class="px-2.5 py-1 rounded-full text-xs font-bold border"
+                              :class="database.ready ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'">
+                            {{ database.ready ? '✓ Database Ready & Connected' : '⚠️ Pending Migrations / Provisioning' }}
+                        </span>
+                    </div>
+
+                    <form @submit.prevent="saveDatabase" class="space-y-4">
+                        <div class="grid sm:grid-cols-3 gap-3">
+                            <div class="sm:col-span-3">
+                                <label class="block text-xs font-bold text-slate-700 mb-1">PostgreSQL Database Name</label>
+                                <input v-model="databaseForm.database_name" type="text" required
+                                       :placeholder="database.suggested_name"
+                                       class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs focus:bg-white">
+                                <p class="text-[11px] text-slate-400 mt-1">Suggested naming convention: {{ database.suggested_name }}</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">DB Username (optional)</label>
+                                <input v-model="databaseForm.db_username" type="text"
+                                       class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs focus:bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">DB Password (optional)</label>
+                                <input v-model="databaseForm.db_password" type="password"
+                                       class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs focus:bg-white">
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <button type="submit" :disabled="databaseForm.processing"
+                                    class="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition">
+                                Save Connection Details
+                            </button>
+                            <button type="button" @click="runMigrations" :disabled="migrateForm.processing || !database.configured"
+                                    class="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition disabled:opacity-40">
+                                {{ migrateForm.processing ? 'Migrating…' : 'Run Migrations' }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Navigation & Program Permissions -->
+                <div v-if="navManager" class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+                    <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Sidebar Navigation Permissions</h3>
+                    <p class="text-xs text-slate-500">
+                        Select which modules and festival programs are unlocked for this Sahodaya and its affiliated schools.
+                    </p>
+
+                    <form @submit.prevent="saveNavVisibility" class="space-y-4">
+                        <div>
+                            <p class="text-xs font-bold text-slate-700 mb-2">Available Menu Sections</p>
+                            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                <label v-for="(label, key) in navManager.menus" :key="key"
+                                       class="flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                                    <input type="checkbox" class="rounded text-indigo-600"
+                                           :checked="navForm.menus[key] !== false"
+                                           @change="navForm.menus[key] = $event.target.checked">
+                                    <span class="text-xs font-semibold text-slate-800">{{ label }}</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <p class="text-xs font-bold text-slate-700 mb-2">Festival Programs</p>
+                            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                <label v-for="(label, key) in navManager.programs" :key="key"
+                                       class="flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                                    <input type="checkbox" class="rounded text-indigo-600"
+                                           :checked="navForm.programs[key] !== false"
+                                           @change="navForm.programs[key] = $event.target.checked">
+                                    <span class="text-xs font-semibold text-slate-800">{{ label }}</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition">
+                            {{ navForm.processing ? 'Saving…' : 'Save Sidebar Permissions' }}
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- TAB 4: SUPER ADMIN DANGER ZONE -->
+            <div v-if="activeTab === 'danger'" class="space-y-6">
+                <!-- Rejection for schools -->
+                <div v-if="tenant.type === 'school'" class="bg-white rounded-2xl p-6 border border-rose-200 shadow-xs space-y-4">
+                    <div class="flex items-center gap-2 text-rose-700 font-bold text-sm">
+                        <span>⛔</span>
+                        <span>School Membership Status: {{ tenant.membership_status || 'Pending' }}</span>
+                    </div>
+
+                    <form v-if="tenant.membership_status !== 'rejected'" @submit.prevent="rejectSchool" class="space-y-3 max-w-lg">
+                        <label class="block text-xs font-bold text-slate-700">Reject Membership (School admin will be notified)</label>
+                        <textarea v-model="rejectForm.reason" rows="2" required placeholder="Specify reason for rejection..."
+                                  class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"></textarea>
+                        <button type="submit" :disabled="rejectForm.processing"
+                                class="px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition disabled:opacity-40">
+                            Reject School
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Hard student erasure (Schools only) -->
+                <div v-if="tenant.type === 'school'" class="bg-white rounded-2xl p-6 border border-rose-200 shadow-xs space-y-4">
+                    <h3 class="text-sm font-extrabold text-rose-800 uppercase tracking-wider">Hard Student Data Erasure</h3>
+                    <p class="text-xs text-rose-700 leading-relaxed">
+                        Permanently purge every student record, mark entry, and event registration for this school.
+                        A full snapshot is automatically saved into an Erasure Batch and can be restored at any time.
+                    </p>
+
+                    <div class="space-y-3 max-w-lg pt-2">
+                        <label class="block text-xs font-bold text-slate-700">
+                            Type school name (<strong>{{ tenant.name }}</strong>) to confirm:
+                        </label>
+                        <input v-model="eraseStudentsForm.confirm_school_name" type="text"
+                               placeholder="Confirm school name..."
+                               class="w-full px-3 py-2 bg-rose-50/50 border border-rose-200 rounded-xl text-xs font-semibold">
+
+                        <button type="button" @click="eraseStudents"
+                                :disabled="eraseStudentsForm.processing || !eraseStudentsConfirmMatches"
+                                class="px-4 py-2.5 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition disabled:opacity-40">
+                            {{ eraseStudentsForm.processing ? 'Erasing…' : 'Erase All Students (With Recovery Snapshot)' }}
+                        </button>
+                    </div>
+
+                    <!-- Restoration History -->
+                    <div v-if="erasureBatches?.length" class="pt-4 border-t border-slate-100 space-y-2">
+                        <p class="text-xs font-bold text-slate-800">Snapshot Recovery History</p>
+                        <div v-for="batch in erasureBatches" :key="batch.id"
+                             class="p-3 rounded-xl border flex items-center justify-between text-xs"
+                             :class="batch.restored_at ? 'bg-slate-50 border-slate-200' : 'bg-rose-50/60 border-rose-200'">
+                            <div>
+                                <p class="font-bold text-slate-900">{{ batch.student_count }} student(s) erased on {{ formatDateTime(batch.erased_at) }}</p>
+                                <p class="text-[11px] text-slate-500 mt-0.5">Erased by: {{ batch.erased_by_name || batch.erased_by_email }}</p>
+                            </div>
+                            <button v-if="!batch.restored_at" type="button" @click="restoreErasure(batch)"
+                                    :disabled="restoringBatchId === batch.id"
+                                    class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 transition">
+                                {{ restoringBatchId === batch.id ? 'Restoring…' : 'Restore Data' }}
+                            </button>
+                            <span v-else class="text-emerald-700 font-bold text-xs">✓ Restored</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Permanent Tenant Deletion -->
+                <div class="bg-white rounded-2xl p-6 border border-rose-200 shadow-xs space-y-3">
+                    <h3 class="text-sm font-extrabold text-rose-800 uppercase tracking-wider">Permanent Tenant Deletion</h3>
+                    <p class="text-xs text-slate-600">
+                        Permanently purge this {{ tenant.type === 'school' ? 'school' : 'Sahodaya cluster' }}, its domains, and all login credentials.
+                        This operation is non-reversible.
+                    </p>
+                    <button type="button" @click="deleteTenant"
+                            class="px-4 py-2.5 rounded-xl border border-rose-300 bg-rose-50 text-rose-700 text-xs font-bold hover:bg-rose-100 transition">
+                        Permanently Delete {{ tenant.type === 'school' ? 'School' : 'Sahodaya' }}
+                    </button>
+                </div>
+            </div>
         </div>
 
-        <Modal :show="impersonateModal.open" title="Impersonate admin" size="sm" @close="impersonateModal.open = false">
-            <p class="text-sm text-gray-600 mb-3">
-                You're about to view this account as <strong>{{ impersonateModal.admin?.name }}</strong>
-                ({{ impersonateModal.admin?.email }}). This is fully audited — give a reason before continuing.
+        <!-- Impersonate Modal -->
+        <Modal :show="impersonateModal.open" title="Impersonate Admin" size="sm" @close="impersonateModal.open = false">
+            <p class="text-xs text-slate-600 mb-3">
+                You are about to securely view this portal as <strong>{{ impersonateModal.admin?.name }}</strong>
+                ({{ impersonateModal.admin?.email }}). Every action during this session is logged to platform audit trails.
             </p>
-            <textarea v-model="impersonateForm.reason" rows="3" class="field w-full"
-                      placeholder="Why are you impersonating this account? (e.g. investigating a support ticket)"></textarea>
-            <p v-if="impersonateForm.errors.reason" class="text-xs text-red-600 mt-1">{{ impersonateForm.errors.reason }}</p>
+            <textarea v-model="impersonateForm.reason" rows="3" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none"
+                      placeholder="Audit reason (e.g. diagnosing school verification ticket)..."></textarea>
+            <p v-if="impersonateForm.errors.reason" class="text-xs text-rose-600 mt-1">{{ impersonateForm.errors.reason }}</p>
             <template #footer>
-                <button type="button" @click="impersonateModal.open = false" class="btn-ghost px-4 py-2 text-sm">Cancel</button>
-                <button type="button" @click="confirmImpersonate" :disabled="impersonateForm.processing"
-                        class="px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-semibold hover:bg-amber-700 disabled:opacity-50">
-                    {{ impersonateForm.processing ? 'Starting…' : 'Start impersonation' }}
-                </button>
+                <div class="flex items-center justify-end gap-2">
+                    <button type="button" @click="impersonateModal.open = false" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
+                    <button type="button" @click="confirmImpersonate" :disabled="impersonateForm.processing"
+                            class="px-4 py-2 rounded-xl bg-amber-600 text-white text-xs font-bold hover:bg-amber-700 transition">
+                        {{ impersonateForm.processing ? 'Connecting…' : 'Start Session' }}
+                    </button>
+                </div>
             </template>
         </Modal>
     </AdminLayout>
@@ -597,7 +583,8 @@
 
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
-import { Link, router, useForm, usePage } from '@inertiajs/vue3';
+import Modal from '@/Components/ui/Modal.vue';
+import { Link, router, useForm } from '@inertiajs/vue3';
 import { computed, reactive, ref } from 'vue';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -611,24 +598,17 @@ const props = defineProps({
     logoUrl: { type: String, default: null },
     listUrl: { type: String, default: '/admin/sahodayas' },
     database: { type: Object, default: null },
-    tenantOverview: {
-        type: Object,
-        default: () => ({ sections: [], settings: [] }),
-    },
-    sahodayaAdmins: {
-        type: Array,
-        default: () => [],
-    },
-    schoolAdmins: {
-        type: Array,
-        default: () => [],
-    },
+    tenantOverview: { type: Object, default: () => ({ sections: [], settings: [] }) },
+    sahodayaAdmins: { type: Array, default: () => [] },
+    schoolAdmins: { type: Array, default: () => [] },
     loginUrl: { type: String, default: null },
     loginLookup: { type: Object, default: () => ({ query: '', matches: [], searched: false, message: null }) },
     navManager: { type: Object, default: null },
     erasureBatches: { type: Array, default: () => [] },
     setupChecklist: { type: Object, default: null },
 });
+
+const activeTab = ref('overview');
 
 const navForm = useForm({
     programs: { ...(props.navManager?.overrides?.programs ?? {}) },
@@ -644,13 +624,13 @@ const portalAdmins = computed(() =>
 );
 
 const portalAdminTitle = computed(() =>
-    props.tenant.type === 'school' ? 'School admin login' : 'Sahodaya admin login'
+    props.tenant.type === 'school' ? 'School Portal Administrators' : 'Sahodaya Cluster Administrators'
 );
 
 const portalAdminHint = computed(() =>
     props.tenant.type === 'school'
-        ? 'School admins sign in on the parent Sahodaya portal website.'
-        : 'Sahodaya admins sign in on this cluster\'s portal website, not the superadmin site.'
+        ? 'School admins authenticate on their parent Sahodaya portal to submit registrations, upload documents, and view scores.'
+        : 'Sahodaya cluster admins sign into this cluster\'s administration hub.'
 );
 
 const portalAdminEndpoint = computed(() =>
@@ -682,7 +662,6 @@ const adminForm = useForm({
 });
 const loginLookupQuery = ref(props.loginLookup?.query ?? '');
 const rejectForm = useForm({ reason: '' });
-const showEraseStudents = ref(false);
 const eraseStudentsForm = useForm({ confirm_school_name: '' });
 
 const eraseStudentsConfirmMatches = computed(() =>
@@ -690,51 +669,38 @@ const eraseStudentsConfirmMatches = computed(() =>
 );
 
 async function eraseStudents() {
-    if (! eraseStudentsConfirmMatches.value) return;
-    if (! (await confirm({ message: `Permanently erase EVERY student record for "${props.tenant.name}"? This can be restored afterwards from the Danger zone if needed, but the data will not be visible anywhere until it is.`, destructive: true }))) {
+    if (!eraseStudentsConfirmMatches.value) return;
+    if (!(await confirm({ message: `Permanently erase EVERY student record for "${props.tenant.name}"? This will be snapshotted and can be restored from the Danger Zone.`, destructive: true }))) {
         return;
     }
 
     eraseStudentsForm.delete(`/admin/tenants/${props.tenant.id}/erase-students`, {
         preserveScroll: true,
-        onSuccess: () => {
-            showEraseStudents.value = false;
-            eraseStudentsForm.reset();
-        },
+        onSuccess: () => eraseStudentsForm.reset(),
     });
 }
 
 const restoringBatchId = ref(null);
 
 function formatDateTime(value) {
-    if (! value) return '';
+    if (!value) return '';
     return new Date(value).toLocaleString();
 }
 
 async function restoreErasure(batch) {
-    if (! (await confirm({ message: `Restore ${batch.student_count} erased student record(s) for "${props.tenant.name}"? This reinserts them exactly as they were.`, destructive: false }))) {
+    if (!(await confirm({ message: `Restore ${batch.student_count} erased student record(s) for "${props.tenant.name}"?`, destructive: false }))) {
         return;
     }
 
     restoringBatchId.value = batch.id;
     router.post(`/admin/tenants/${props.tenant.id}/erasure-batches/${batch.id}/restore`, {}, {
         preserveScroll: true,
-        onFinish: () => {
-            restoringBatchId.value = null;
-        },
+        onFinish: () => { restoringBatchId.value = null; },
     });
 }
 
-function membershipStatusClass(status) {
-    return {
-        approved: 'bg-green-100 text-green-700',
-        pending:  'bg-amber-100 text-amber-800',
-        rejected: 'bg-red-100 text-red-700',
-    }[status] || 'bg-gray-100 text-gray-600';
-}
-
 async function rejectSchool() {
-    if (! (await confirm({ message: `Reject "${props.tenant.name}"? The school admin will be notified by email.`, destructive: true }))) {
+    if (!(await confirm({ message: `Reject "${props.tenant.name}"? The school admin will be notified by email.`, destructive: true }))) {
         return;
     }
 
@@ -744,7 +710,7 @@ async function rejectSchool() {
 }
 
 async function deleteTenant() {
-    if (! (await confirm({ message: `Permanently delete "${props.tenant.name}" and its admin account(s)? This cannot be undone.`, destructive: true }))) {
+    if (!(await confirm({ message: `Permanently delete "${props.tenant.name}" and all associated credentials? This cannot be undone.`, destructive: true }))) {
         return;
     }
 
@@ -780,6 +746,7 @@ function editAdmin(admin) {
     adminForm.username = admin.username || '';
     adminForm.password = '';
     adminForm.clearErrors();
+    activeTab.value = 'admins';
 }
 
 function resetAdminForm() {
@@ -842,7 +809,7 @@ function confirmImpersonate() {
 
 async function removeAdmin(admin) {
     const label = props.tenant.type === 'school' ? 'school admin' : 'Sahodaya admin';
-    if (! (await confirm({ message: `Remove ${label} ${admin.email}?`, destructive: true }))) {
+    if (!(await confirm({ message: `Remove ${label} ${admin.email}?`, destructive: true }))) {
         return;
     }
 
@@ -855,18 +822,8 @@ async function removeAdmin(admin) {
     });
 }
 
-const sahodayaLinks = computed(() => {
-    const id = props.tenant.id;
-    return [
-        { href: `/sahodaya-admin/${id}/public-content`,      icon: '🌐', label: 'Website Content', hint: 'Announcements, programmes, links' },
-        { href: `/sahodaya-admin/${id}/membership/settings`, icon: '⚙️', label: 'Registration Config', hint: 'Logo, fees, form fields' },
-        { href: `/sahodaya-admin/${id}/schools`,             icon: '🏫', label: 'Member Schools', hint: 'Applications & approvals' },
-        { href: `/sahodaya-admin/${id}/membership/submissions`, icon: '👨‍🎓', label: 'Student Counts', hint: 'View totals by school' },
-        { href: `/sahodaya-admin/${id}/membership/payments`, icon: '💳', label: 'Payments', hint: 'Verify membership fees' },
-        { href: `/sahodaya-admin/${id}/membership/reports`, icon: '📊', label: 'Reports', hint: 'Summary & CSV exports' },
-        { href: `/sahodaya-admin/${id}/circulars`,          icon: '📄', label: 'Circulars', hint: 'Official notices' },
-        { href: `/sahodaya-admin/${id}/office-bearers`,     icon: '👥', label: 'Office Bearers', hint: 'Leadership profiles' },
-        { href: `/sahodaya-admin/${id}/kalotsav`, icon: '🏆', label: 'Kalotsav', hint: 'Events & catalog' },
-    ];
-});
+function copyText(txt) {
+    if (!txt) return;
+    navigator.clipboard?.writeText(txt);
+}
 </script>

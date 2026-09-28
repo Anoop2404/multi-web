@@ -124,6 +124,8 @@ class SiteBuilderApiController extends SahodayaAdminController
 
     public function saveDesign(Request $request): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         $site = $this->requestSite($request);
         $data = $request->validate([
             'site_id' => 'required|integer',
@@ -162,6 +164,7 @@ class SiteBuilderApiController extends SahodayaAdminController
 
     public function storeSection(Request $request): JsonResponse
     {
+        $this->assertSuperAdmin();
         $this->assertAllowedSection($request->input('section_type'), $request->input('variant'));
 
         return app(BuilderApiController::class)->storeSection($request, $this->sahodaya->id);
@@ -169,6 +172,8 @@ class SiteBuilderApiController extends SahodayaAdminController
 
     public function updateSection(Request $request, string $tenantId, int $sectionId): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         if ($request->filled('section_type') || $request->filled('variant')) {
             $this->assertAllowedSection(
                 $request->input('section_type'),
@@ -181,21 +186,29 @@ class SiteBuilderApiController extends SahodayaAdminController
 
     public function deleteSection(string $tenantId, int $sectionId): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         return app(BuilderApiController::class)->deleteSection(request(), $this->sahodaya->id, $sectionId);
     }
 
     public function toggleSection(string $tenantId, int $sectionId): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         return app(BuilderApiController::class)->toggleSection(request(), $this->sahodaya->id, $sectionId);
     }
 
     public function reorderSections(Request $request): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         return app(BuilderApiController::class)->reorderSections($request, $this->sahodaya->id);
     }
 
     public function duplicateSection(Request $request, string $tenantId, int $sectionId): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         $site = $this->requestSite($request);
         $source = $site->sectionQuery()->findOrFail($sectionId);
         $copy = $source->replicate(['published_config', 'published_layout_json', 'published_at']);
@@ -212,6 +225,8 @@ class SiteBuilderApiController extends SahodayaAdminController
 
     public function publishSection(string $tenantId, int $sectionId): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         return app(BuilderApiController::class)->publishSection(request(), $this->sahodaya->id, $sectionId);
     }
 
@@ -222,6 +237,8 @@ class SiteBuilderApiController extends SahodayaAdminController
 
     public function restoreSectionVersion(string $tenantId, int $sectionId, int $versionId): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         return app(BuilderApiController::class)->restoreSectionVersion(request(), $this->sahodaya->id, $sectionId, $versionId);
     }
 
@@ -238,6 +255,8 @@ class SiteBuilderApiController extends SahodayaAdminController
 
     public function saveNav(Request $request): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         $data = $request->validate([
             'style'          => 'nullable|string|max:50',
             'layout_variant' => 'nullable|string|max:50',
@@ -274,6 +293,8 @@ class SiteBuilderApiController extends SahodayaAdminController
 
     public function saveFooter(Request $request): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         $data = $request->validate([
             'layout_variant'        => 'nullable|string|max:50',
             'tagline'               => 'nullable|string|max:500',
@@ -424,6 +445,8 @@ class SiteBuilderApiController extends SahodayaAdminController
 
     public function saveTheme(Request $request): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         $data = $request->validate([
             'primary'       => 'required|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'secondary'     => 'required|string|regex:/^#[0-9A-Fa-f]{6}$/',
@@ -440,6 +463,8 @@ class SiteBuilderApiController extends SahodayaAdminController
 
     public function uploadMedia(Request $request): JsonResponse
     {
+        $this->assertSuperAdmin();
+
         $request->validate([
             'file' => 'required|image|mimes:jpeg,jpg,png,webp,gif|max:5120',
         ]);

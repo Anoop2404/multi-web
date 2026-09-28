@@ -447,6 +447,39 @@ class FestSchoolEventFeeService
     }
 
     /**
+     * Human-readable label for the matched student count slab bracket (e.g. "50–99 students" or "150+ students").
+     */
+    public function studentCountSlabLabel(int $studentCount, array $schedule): ?string
+    {
+        $slabs = collect($schedule['student_count_slabs'] ?? [])
+            ->filter(fn ($slab) => is_array($slab) && isset($slab['amount']) && $slab['amount'] !== '')
+            ->map(fn ($slab) => [
+                'min_count' => (int) ($slab['min_count'] ?? 0),
+                'max_count' => isset($slab['max_count']) && $slab['max_count'] !== '' && $slab['max_count'] !== null
+                    ? (int) $slab['max_count']
+                    : null,
+            ])
+            ->sortBy('min_count')
+            ->values();
+
+        if ($slabs->isEmpty()) {
+            return null;
+        }
+
+        $match = $slabs->first(fn ($slab) => $studentCount >= $slab['min_count']
+            && ($slab['max_count'] === null || $studentCount <= $slab['max_count']))
+            ?? $slabs->last();
+
+        if (! $match) {
+            return null;
+        }
+
+        return $match['max_count'] !== null
+            ? "{$match['min_count']}–{$match['max_count']} students"
+            : "{$match['min_count']}+ students";
+    }
+
+    /**
      * Which count to look up a 'student_count_slab' bracket by, per
      * fee_settings.student_count_slab_basis: the school's students registered for this event
      * (default — same $eventRegisteredCount already computed by the caller), or the school's
@@ -454,7 +487,7 @@ class FestSchoolEventFeeService
      * changes basis this way — the optional per-student surcharge always bills against actual
      * registered students, so callers keep using $eventRegisteredCount for that term.
      */
-    private function studentCountSlabBasisCount(string $schoolId, array $schedule, int $eventRegisteredCount): int
+    public function studentCountSlabBasisCount(string $schoolId, array $schedule, int $eventRegisteredCount): int
     {
         if (($schedule['student_count_slab_basis'] ?? 'event_registrations') !== 'school_total_enrollment') {
             return $eventRegisteredCount;
@@ -1576,14 +1609,40 @@ class FestSchoolEventFeeService
             ];
         } elseif ($feeModel === 'student_count_slab' && $fee->participation_fee > 0) {
             $studentCount = $fee->participation_item_count;
-            $items[] = [
-                'label' => "Student count fee ({$studentCount} student".($studentCount === 1 ? '' : 's').')',
-                'amount' => (float) $fee->participation_fee,
-                // Same reasoning as the per_student branch above — one stepped charge for
-                // the whole school, not N billable items.
-                'line_type' => 'student_reg',
-                'quantity' => $studentCount,
-            ];
+            $perStudent = (float) ($schedule['per_student_amount'] ?? 0);
+            $basisCount = $this->studentCountSlabBasisCount($fee->school_id, $schedule, $studentCount);
+            $slabAmount = $this->studentCountSlabFee($basisCount, $schedule);
+            $studentRegAmount = round($studentCount * $perStudent, 2);
+            $slabLabel = $this->studentCountSlabLabel($basisCount, $schedule);
+
+            if ($slabAmount > 0) {
+                $items[] = [
+                    'label' => $slabLabel
+                        ? "Student count fee ({$slabLabel})"
+                        : "Student count fee ({$studentCount} student".($studentCount === 1 ? '' : 's').')',
+                    'amount' => (float) $slabAmount,
+                    'line_type' => 'slab_fee',
+                    'quantity' => 1,
+                ];
+            }
+
+            if ($studentRegAmount > 0) {
+                $items[] = [
+                    'label' => "Student registration fee ({$studentCount} students × ₹".number_format($perStudent, 0).')',
+                    'amount' => (float) $studentRegAmount,
+                    'line_type' => 'student_reg',
+                    'quantity' => $studentCount,
+                ];
+            }
+
+            if ($slabAmount <= 0 && $studentRegAmount <= 0) {
+                $items[] = [
+                    'label' => "Student count fee ({$studentCount} student".($studentCount === 1 ? '' : 's').')',
+                    'amount' => (float) $fee->participation_fee,
+                    'line_type' => 'student_reg',
+                    'quantity' => $studentCount,
+                ];
+            }
         } elseif ($fee->participation_fee > 0) {
             $label = match ($feeModel) {
                 'flat_school' => 'Flat school fee',

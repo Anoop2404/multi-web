@@ -80,8 +80,73 @@ export function detectSahodayaTrainingHubFromUrl(url) {
     if (detectSahodayaTrainingProgramIdFromUrl(path)) {
         return false;
     }
-
     return /\/training(?:\/|$)/.test(path);
+}
+
+/** @returns {boolean} */
+export function detectSahodayaWebsiteFromUrl(url) {
+    const path = (url ?? '').split('?')[0];
+
+    return /\/site-builder(?:\/|$)/.test(path)
+        || /\/website\/(?:domains|sites|forms)(?:\/|$)/.test(path)
+        || /\/public-content(?:\/|$)/.test(path)
+        || /\/office-bearers(?:\/|$)/.test(path)
+        || /\/circulars(?:\/|$)/.test(path);
+}
+
+/** Dedicated sidebar navigation when managing public website, CMS & builder */
+export function sahodayaWebsiteScopedNav(sahodayaId, options = {}) {
+    const {
+        canNav = () => true,
+        publicWebsiteEnabled = true,
+        isSuperAdmin = false,
+    } = options;
+
+    if (!canNav('website')) {
+        return [];
+    }
+
+    const base = `/sahodaya-admin/${sahodayaId}`;
+
+    return [
+        {
+            section: 'Sahodaya',
+            items: [
+                { label: 'Main dashboard', href: base, icon: 'grid', exact: true },
+            ],
+        },
+        ...(isSuperAdmin ? [{
+            section: 'Website Builder',
+            items: [
+                { label: 'Site Overview', href: `${base}/site-builder`, icon: 'layers', exact: true, matchQuery: { tab: '' } },
+                { label: 'Page Sections', href: `${base}/site-builder?tab=sections`, icon: 'grid', matchQuery: { tab: 'sections' } },
+                { label: 'Navigation & Menu', href: `${base}/site-builder?tab=navigation`, icon: 'compass', matchQuery: { tab: 'navigation' } },
+                { label: 'Theme & Styling', href: `${base}/site-builder?tab=theme`, icon: 'palette', matchQuery: { tab: 'theme' } },
+                { label: 'Footer Links', href: `${base}/site-builder?tab=footer`, icon: 'layout', matchQuery: { tab: 'footer' } },
+                { label: 'Templates & Drafts', href: `${base}/site-builder?tab=experience`, icon: 'sliders', matchQuery: { tab: 'experience' } },
+                { label: 'Publish & Readiness', href: `${base}/site-builder?tab=readiness`, icon: 'check-circle', matchQuery: { tab: 'readiness' } },
+            ],
+        }] : []),
+        {
+            section: 'Public Content',
+            items: [
+                { label: 'News & Announcements', href: `${base}/public-content`, icon: 'edit' },
+                { label: 'Office Bearers', href: `${base}/office-bearers`, icon: 'users' },
+                { label: 'Circulars & Notices', href: `${base}/circulars`, icon: 'file-text' },
+                { label: 'Website Forms', href: `${base}/website/forms`, icon: 'clipboard' },
+            ],
+        },
+        {
+            section: 'Network & Domains',
+            items: [
+                ...(isSuperAdmin ? [
+                    { label: 'Custom Domains', href: `${base}/website/domains`, icon: 'globe' },
+                    { label: 'Microsites', href: `${base}/website/sites`, icon: 'grid' },
+                ] : []),
+                { label: 'Question Bank', href: `${base}/question-bank`, icon: 'book-open' },
+            ],
+        },
+    ];
 }
 
 /** Sidebar when browsing membership workflow pages. */
@@ -342,6 +407,7 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
     const {
         canNav = () => true,
         publicWebsiteEnabled = true,
+        isSuperAdmin = false,
         approvedSchoolsCount = 0,
         pendingPaymentsCount = 0,
         pendingSubmissionsCount = 0,
@@ -380,12 +446,22 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
     if (canNav('website') && menuOn('website')) {
         const websiteItems = [];
         if (publicWebsiteEnabled) {
+            if (isSuperAdmin) {
+                websiteItems.push(
+                    { label: 'Site Overview', href: `${base}/site-builder`, icon: 'layers', exact: true, matchQuery: { tab: '' } },
+                    { label: 'Page Sections', href: `${base}/site-builder?tab=sections`, icon: 'grid', matchQuery: { tab: 'sections' } },
+                    { label: 'Navigation & Menu', href: `${base}/site-builder?tab=navigation`, icon: 'compass', matchQuery: { tab: 'navigation' } },
+                    { label: 'Theme & Design', href: `${base}/site-builder?tab=theme`, icon: 'palette', matchQuery: { tab: 'theme' } },
+                    { label: 'Footer Links', href: `${base}/site-builder?tab=footer`, icon: 'layout', matchQuery: { tab: 'footer' } },
+                    { label: 'Templates & Drafts', href: `${base}/site-builder?tab=experience`, icon: 'sliders', matchQuery: { tab: 'experience' } },
+                    { label: 'Publish & Readiness', href: `${base}/site-builder?tab=readiness`, icon: 'check-circle', matchQuery: { tab: 'readiness' } },
+                    { label: 'Custom Domains', href: `${base}/website/domains`, icon: 'globe' },
+                    { label: 'Microsites', href: `${base}/website/sites`, icon: 'grid' },
+                );
+            }
             websiteItems.push(
-                { label: 'Site Builder', href: `${base}/site-builder`, icon: 'layers' },
-                { label: 'Domains', href: `${base}/website/domains`, icon: 'globe' },
-                { label: 'Microsites', href: `${base}/website/sites`, icon: 'grid' },
-                { label: 'Forms', href: `${base}/website/forms`, icon: 'clipboard' },
-                { label: 'Content', href: `${base}/public-content`, icon: 'edit' },
+                { label: 'Website Forms', href: `${base}/website/forms`, icon: 'clipboard' },
+                { label: 'News & Announcements', href: `${base}/public-content`, icon: 'edit' },
                 { label: 'Office Bearers', href: `${base}/office-bearers`, icon: 'users' },
                 { label: 'Circulars', href: `${base}/circulars`, icon: 'file-text' },
             );
@@ -552,11 +628,40 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
 }
 
 /** Resolve active state for admin nav href. */
-export function adminNavItemActive(pageUrl, href, exact = false) {
+export function adminNavItemActive(pageUrl, href, exact = false, matchQuery = null) {
     const pageHash = pageUrl.includes('#') ? pageUrl.split('#')[1]?.split('?')[0] ?? '' : '';
     const hrefHash = href.includes('#') ? href.split('#')[1]?.split('?')[0] ?? '' : '';
     const path = pageUrl.split('#')[0].split('?')[0];
     const target = href.split('#')[0].split('?')[0];
+
+    const searchString = pageUrl.includes('?') ? pageUrl.split('?')[1].split('#')[0] : '';
+    const params = new URLSearchParams(searchString);
+
+    if (matchQuery) {
+        const pathMatches = exact
+            ? (path === target || path === `${target}/`)
+            : (path === target || path.startsWith(`${target}/`));
+
+        if (!pathMatches) {
+            return false;
+        }
+
+        for (const [key, expected] of Object.entries(matchQuery)) {
+            const actual = params.get(key) ?? '';
+            if (expected === '' || expected == null) {
+                if (actual !== '' && actual !== 'overview') {
+                    return false;
+                }
+            } else if (String(actual) !== String(expected)) {
+                if (expected === 'sections' && actual === 'section') {
+                    continue;
+                }
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     if (hrefHash) {
         const pathMatches = exact
@@ -567,6 +672,10 @@ export function adminNavItemActive(pageUrl, href, exact = false) {
     }
 
     if (pageHash && (path === target || path.startsWith(`${target}/`))) {
+        return false;
+    }
+
+    if (params.get('tab') && target.endsWith('/site-builder') && !href.includes('tab=')) {
         return false;
     }
 

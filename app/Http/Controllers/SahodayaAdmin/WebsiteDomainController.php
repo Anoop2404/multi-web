@@ -31,11 +31,14 @@ class WebsiteDomainController extends SahodayaAdminController
             'publicUrl' => TenantDomainSync::publicUrl($tenant),
             'baseDomain' => config('tenancy.tenant_base_domain'),
             'sites' => WebsiteSite::where('tenant_id', $tenant->id)->orderByDesc('is_primary')->get(),
+            'isSuperAdmin' => (bool) request()->user()?->isSuperAdmin(),
         ]);
     }
 
     public function store(Request $request)
     {
+        abort_unless($request->user()?->isSuperAdmin(), 403, 'Custom domain configuration can only be performed by Super Admin.');
+
         $data = $request->validate([
             'domain' => [
                 'required', 'string', 'max:255',
@@ -65,6 +68,8 @@ class WebsiteDomainController extends SahodayaAdminController
 
     public function verify(string $tenantId, int $domainId)
     {
+        abort_unless(request()->user()?->isSuperAdmin(), 403, 'Custom domain verification can only be performed by Super Admin.');
+
         $domain = $this->sahodaya->domains()->findOrFail($domainId);
         abort_unless($domain->dns_token, 422, 'No verification token.');
 
@@ -90,6 +95,8 @@ class WebsiteDomainController extends SahodayaAdminController
 
     public function destroy(string $tenantId, int $domainId)
     {
+        abort_unless(request()->user()?->isSuperAdmin(), 403, 'Custom domain deletion can only be performed by Super Admin.');
+
         $domain = $this->sahodaya->domains()->findOrFail($domainId);
         $wasCustom = $this->sahodaya->domain && $domain->domain === TenantDomainSync::normalizeCustomDomain($this->sahodaya->domain);
 

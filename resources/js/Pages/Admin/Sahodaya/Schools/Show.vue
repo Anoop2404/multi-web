@@ -317,9 +317,12 @@
                 </div>
             </div>
 
-            <!-- Danger zone -->
-            <div class="bg-white rounded-2xl border border-red-200 shadow-sm p-5">
-                <h3 class="font-bold text-red-800 mb-1">Delete school permanently</h3>
+            <!-- Danger zone (Super Admin Only) -->
+            <div v-if="isSuperAdmin" class="bg-white rounded-2xl border border-red-200 shadow-sm p-5">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="font-bold text-red-800">Delete school permanently</h3>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-red-100 text-red-800">Super Admin Only</span>
+                </div>
                 <p class="text-sm text-red-700/90 mb-4">
                     Removes this school, all students, fest registrations, payments, portal users, and website content.
                     This cannot be undone.
@@ -414,6 +417,7 @@ const props = defineProps({
     pendingSubmissionsCount: Number, pendingPaymentsCount: Number,
     school: Object, detailFields: Array, registration: Object,
     recentPayments: Array, academicYear: String,
+    isSuperAdmin: { type: Boolean, default: false },
 });
 
 const deleteReason = ref('');

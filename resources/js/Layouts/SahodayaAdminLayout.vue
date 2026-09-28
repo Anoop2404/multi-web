@@ -46,7 +46,7 @@
                 </p>
                 <SidebarNavGroup v-for="group in filteredNavGroups" :key="group.section"
                                   :group="group"
-                                  :item-active="(item) => adminNavItemActive(page.url, item.href, item.exact)"
+                                  :item-active="(item) => adminNavItemActive(page.url, item.href, item.exact, item.matchQuery)"
                                   :storage-key="`nav-open:sahodaya:${group.section}`"
                                   :force-open="Boolean(navSearch.trim())" />
             </nav>
@@ -125,6 +125,7 @@ import {
     detectSahodayaMembershipFromUrl,
     detectSahodayaTrainingHubFromUrl,
     detectSahodayaTrainingProgramIdFromUrl,
+    detectSahodayaWebsiteFromUrl,
     sahodayaAdminNav,
     sahodayaMcqExamScopedNav,
     sahodayaMcqHubNav,
@@ -132,6 +133,7 @@ import {
     sahodayaMembershipScopedNav,
     sahodayaTrainingHubNav,
     sahodayaTrainingProgramScopedNav,
+    sahodayaWebsiteScopedNav,
 } from '@/support/sahodayaAdminNav.js';
 import { computed, defineComponent, h, ref, watch } from 'vue';
 import { useStaleRefresh } from '@/composables/useStaleRefresh.js';
@@ -205,7 +207,12 @@ const navGroups = computed(() => {
         navVisibility: page.props.navVisibility ?? null,
         competitionPrograms: page.props.competitionPrograms ?? {},
         scopedEventTypes: page.props.scopedEventTypes ?? null,
+        isSuperAdmin: Boolean(page.props.auth?.user?.roles?.includes('superadmin') || page.props.isSuperAdmin),
     };
+
+    if (detectSahodayaWebsiteFromUrl(page.url)) {
+        return sahodayaWebsiteScopedNav(props.sahodaya.id, options);
+    }
 
     const examId = detectSahodayaMcqExamIdFromUrl(page.url);
     if (examId) {

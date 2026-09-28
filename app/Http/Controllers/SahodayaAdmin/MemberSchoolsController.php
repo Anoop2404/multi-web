@@ -248,6 +248,7 @@ class MemberSchoolsController extends SahodayaAdminController
             'registration'   => $registration,
             'recentPayments' => $payments,
             'academicYear'   => $year,
+            'isSuperAdmin'   => (bool) request()->user()?->isSuperAdmin(),
         ]);
     }
 
@@ -1000,6 +1001,7 @@ class MemberSchoolsController extends SahodayaAdminController
         SchoolDataPurger $purger,
         PlatformAuditLogger $audit,
     ) {
+        abort_unless($request->user()?->isSuperAdmin(), 403, 'Permanent school tenant deletion can only be performed by Super Admin.');
         abort_if($school->parent_id !== $this->sahodaya->id || $school->type !== 'school', 404);
 
         $data = $request->validate([

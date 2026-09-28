@@ -43,12 +43,16 @@ class FestInvoiceService
             ->where('school_id', $school->id)
             ->first();
 
-        $itemCount = $feeService->billableItemCount($event, $school->id);
+        if (! $fee) {
+            $fee = $feeService->recalculate($event, $school->id);
+        }
+
+        $itemCount = (int) ($fee->participation_item_count ?? $feeService->billableItemCount($event, $school->id));
         $participationLines = $this->participationLinesForSchool($event, $school->id, $schedule);
 
-        $schoolReg = $fee?->school_registration_fee ?? $feeService->schoolRegistrationAmount($school, $schedule);
-        $partFee = $fee?->participation_fee ?? $feeService->participationFee($itemCount, $schedule);
-        $total = (float) $schoolReg + (float) $partFee;
+        $schoolReg = (float) ($fee->school_registration_fee ?? $feeService->schoolRegistrationAmount($school, $schedule));
+        $partFee = (float) ($fee->participation_fee ?? $feeService->participationFee($itemCount, $schedule));
+        $total = (float) ($fee->total_due ?? ($schoolReg + $partFee));
 
         $status = ($fee?->status === 'approved' || $existing?->status === 'paid')
             ? 'paid'
@@ -261,12 +265,19 @@ class FestInvoiceService
                 ->all();
         }
 
+        $schedule = app(FestSchoolEventFeeService::class)->resolveSchedule($event);
+        $feeModel = $schedule['fee_model'] ?? 'none';
+
+        // For student_count_slab and per_student, always derive accurate breakdown lines
+        // so that student registration fee (N students × rate) and slab fees are always displayed.
+        if (in_array($feeModel, ['student_count_slab', 'per_student'], true)) {
+            return $this->participationLinesForSchool($event, $invoice->school_id, $schedule);
+        }
+
         $stored = $invoice->breakdown_json['participation_lines'] ?? null;
         if (is_array($stored) && $stored !== []) {
             return $stored;
         }
-
-        $schedule = app(FestSchoolEventFeeService::class)->resolveSchedule($event);
 
         return $this->participationLinesForSchool($event, $invoice->school_id, $schedule);
     }
@@ -304,6 +315,66 @@ class FestInvoiceService
     /** @return list<array{label: string, amount: float, item_id: ?int, item_title: string, head_name: ?string}> */
     private function participationLinesForSchool(FestEvent $event, string $schoolId, array $schedule): array
     {
+        $feeModel = $schedule['fee_model'] ?? 'none';
+
+        if ($feeModel === 'student_count_slab') {
+            $feeService = app(FestSchoolEventFeeService::class);
+            $studentCount = $feeService->billableStudentCount($event, $schoolId);
+            $perStudent = (float) ($schedule['per_student_amount'] ?? 0);
+            $basisCount = $feeService->studentCountSlabBasisCount($schoolId, $schedule, $studentCount);
+            $slabAmount = $feeService->studentCountSlabFee($basisCount, $schedule);
+            $studentRegAmount = round($studentCount * $perStudent, 2);
+            $slabLabel = $feeService->studentCountSlabLabel($basisCount, $schedule);
+
+            $lines = [];
+
+            if ($slabAmount > 0) {
+                $label = $slabLabel
+                    ? "Student count fee ({$slabLabel})"
+                    : "Student count fee ({$studentCount} students)";
+                $lines[] = [
+                    'label'      => $label,
+                    'amount'     => $slabAmount,
+                    'item_id'    => null,
+                    'item_title' => $label,
+                    'head_name'  => null,
+                ];
+            }
+
+            if ($studentRegAmount > 0) {
+                $label = "Student registration fee ({$studentCount} students × ₹" . number_format($perStudent, 0) . ")";
+                $lines[] = [
+                    'label'      => $label,
+                    'amount'     => $studentRegAmount,
+                    'item_id'    => null,
+                    'item_title' => $label,
+                    'head_name'  => null,
+                ];
+            }
+
+            if ($lines !== []) {
+                return $lines;
+            }
+        }
+
+        if ($feeModel === 'per_student') {
+            $feeService = app(FestSchoolEventFeeService::class);
+            $studentCount = $feeService->billableStudentCount($event, $schoolId);
+            $perStudent = (float) ($schedule['per_student_amount'] ?? 0);
+            $studentRegAmount = round($studentCount * $perStudent, 2);
+
+            if ($studentRegAmount > 0) {
+                $label = "Student registration fee ({$studentCount} students × ₹" . number_format($perStudent, 0) . ")";
+                return [[
+                    'label'      => $label,
+                    'amount'     => $studentRegAmount,
+                    'item_id'    => null,
+                    'item_title' => $label,
+                    'head_name'  => null,
+                ]];
+            }
+        }
+
         return app(FestItemFeeResolver::class)
             ->participationBreakdown($event, $schoolId, $schedule)['lines'];
     }

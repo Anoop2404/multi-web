@@ -25,8 +25,11 @@ th{background:#1d3557;color:#fff;font-size:12px}
 <div class="meta">
     <p><strong>Invoice #:</strong> {{ $invoice->invoice_number }}</p>
     <p><strong>School:</strong> {{ $invoice->school?->name ?? $invoice->school_id }}</p>
-    <p><strong>Date:</strong> {{ $invoice->issued_at?->format('d M Y') ?? now()->format('d M Y') }}</p>
-    <p><strong>Participation items:</strong> {{ $invoice->participation_item_count }}</p>
+    @if(in_array($event->fee_settings['fee_model'] ?? null, ['student_count_slab', 'per_student'], true))
+        <p><strong>Participating students:</strong> {{ $invoice->participation_item_count }}</p>
+    @else
+        <p><strong>Participation items:</strong> {{ $invoice->participation_item_count }}</p>
+    @endif
 </div>
 <table>
     <thead>
