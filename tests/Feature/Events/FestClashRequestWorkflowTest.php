@@ -105,8 +105,7 @@ class FestClashRequestWorkflowTest extends TestCase
             'tenantId' => $school->id, 'event' => $event->id,
         ]), [
             'participant_id' => $participant->id,
-            'schedule_id_a' => $scheduleA->id,
-            'schedule_id_b' => $scheduleB->id,
+            'schedule_ids' => [$scheduleA->id, $scheduleB->id],
             'description' => 'Student is scheduled on two stages 15 minutes apart — cannot attend both.',
         ]);
 
@@ -121,11 +120,103 @@ class FestClashRequestWorkflowTest extends TestCase
             'schedule_id_b' => $scheduleB->id,
             'status' => 'pending',
         ]);
+        $stored = FestClashRequest::where('participant_id', $participant->id)->sole();
+        $this->assertSame([$scheduleA->id, $scheduleB->id], $stored->schedule_ids);
+    }
+
+    public function test_a_clash_request_needs_at_least_two_clashing_slots(): void
+    {
+        ['school' => $school, 'schoolAdmin' => $schoolAdmin, 'event' => $event, 'participant' => $participant, 'scheduleA' => $scheduleA] = $this->fixture();
+
+        $response = $this->actingAs($schoolAdmin)->post(route('school.kalotsav.clash-requests.store', [
+            'tenantId' => $school->id, 'event' => $event->id,
+        ]), [
+            'participant_id' => $participant->id,
+            'schedule_ids' => [$scheduleA->id],
+            'description' => 'Only one slot picked.',
+        ]);
+
+        $response->assertSessionHasErrors('schedule_ids');
+        $this->assertDatabaseMissing('fest_clash_requests', ['participant_id' => $participant->id]);
+    }
+
+    public function test_a_three_way_clash_can_be_reported_in_one_request(): void
+    {
+        ['school' => $school, 'schoolAdmin' => $schoolAdmin, 'event' => $event, 'participant' => $participant, 'scheduleA' => $scheduleA, 'scheduleB' => $scheduleB] = $this->fixture();
+
+        $itemC = FestEventItem::create(['event_id' => $event->id, 'title' => 'Mono Act', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $registrationC = FestRegistration::create(['event_id' => $event->id, 'item_id' => $itemC->id, 'school_id' => $school->id, 'status' => 'approved', 'submitted_at' => now()]);
+        FestParticipant::create(['registration_id' => $registrationC->id, 'student_id' => $participant->student_id, 'participant_type' => 'student', 'participant_role' => 'performer']);
+        $scheduleC = FestSchedule::create(['event_id' => $event->id, 'item_id' => $itemC->id, 'participant_id' => $participant->id, 'scheduled_at' => now()->addDay()->setTime(10, 5), 'stage' => 'Open Air Stage']);
+
+        $response = $this->actingAs($schoolAdmin)->post(route('school.kalotsav.clash-requests.store', [
+            'tenantId' => $school->id, 'event' => $event->id,
+        ]), [
+            'participant_id' => $participant->id,
+            'schedule_ids' => [$scheduleA->id, $scheduleB->id, $scheduleC->id],
+            'description' => 'Student is scheduled on three stages within the same 20 minutes.',
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $stored = FestClashRequest::where('participant_id', $participant->id)->sole();
+        $this->assertCount(3, $stored->schedule_ids);
+        $this->assertEqualsCanonicalizing([$scheduleA->id, $scheduleB->id, $scheduleC->id], $stored->schedule_ids);
+        $this->assertCount(3, $stored->schedules());
+
+        // The Sahodaya review page shows every one of the three clashing items, not just two.
+        $sahodayaAdmin = User::factory()->create(['tenant_id' => $event->tenant_id, 'email_verified_at' => now()]);
+        $sahodayaAdmin->assignRole('sahodaya_admin');
+        $page = $this->actingAs($sahodayaAdmin)->get(route('sahodaya.events.clash-requests.index', ['tenantId' => $event->tenant_id, 'event' => $event->id]));
+        $rowSchedules = collect($page->viewData('page')['props']['requests']['data'])->firstWhere('id', $stored->id)['schedules'];
+        $this->assertCount(3, $rowSchedules);
+        $this->assertEqualsCanonicalizing(['Recitation', 'Elocution', 'Mono Act'], collect($rowSchedules)->pluck('item_title')->all());
+    }
+
+    /**
+     * The printable clash form carries the SCHOOL'S OWN Sahodaya's name (not a hardcoded
+     * one), and a request with 3 clashing slots prints all 3 item boxes, not just 2.
+     */
+    public function test_the_printable_clash_form_is_branded_with_its_own_sahodaya_and_prints_every_clashing_item(): void
+    {
+        config(['services.pdf_converter.url' => 'https://pdf.example.test/generate-pdf']);
+        \Illuminate\Support\Facades\Http::fake(['pdf.example.test/*' => \Illuminate\Support\Facades\Http::response('%PDF-1.4 fake', 200)]);
+
+        ['school' => $school, 'schoolAdmin' => $schoolAdmin, 'sahodaya' => $sahodaya, 'event' => $event, 'participant' => $participant, 'scheduleA' => $scheduleA, 'scheduleB' => $scheduleB] = $this->fixture();
+
+        $itemC = FestEventItem::create(['event_id' => $event->id, 'title' => 'Group Song', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $registrationC = FestRegistration::create(['event_id' => $event->id, 'item_id' => $itemC->id, 'school_id' => $school->id, 'status' => 'approved', 'submitted_at' => now()]);
+        FestParticipant::create(['registration_id' => $registrationC->id, 'student_id' => $participant->student_id, 'participant_type' => 'student', 'participant_role' => 'performer']);
+        $scheduleC = FestSchedule::create(['event_id' => $event->id, 'item_id' => $itemC->id, 'participant_id' => $participant->id, 'scheduled_at' => now()->addDay()->setTime(10, 10), 'stage' => 'Green Room']);
+
+        $clashRequest = FestClashRequest::create([
+            'event_id' => $event->id, 'school_id' => $school->id, 'participant_id' => $participant->id,
+            'schedule_id_a' => $scheduleA->id, 'schedule_id_b' => $scheduleB->id,
+            'schedule_ids' => [$scheduleA->id, $scheduleB->id, $scheduleC->id],
+            'description' => 'Three-way clash.', 'status' => 'pending',
+        ]);
+
+        // Blank form, no id — an admin filling it in by hand at the venue.
+        $this->actingAs($schoolAdmin)->get(route('school.kalotsav.clash-requests.print-form', [
+            'tenantId' => $school->id, 'event' => $event->id,
+        ]).'?preview=1')->assertOk();
+        \Illuminate\Support\Facades\Http::assertSent(fn ($r) => str_contains((string) $r->data()['html'], $sahodaya->name));
+
+        // Pre-filled from the request — every one of the 3 clashing items, not just 2.
+        $this->actingAs($schoolAdmin)->get(route('school.kalotsav.clash-requests.print-form', [
+            'tenantId' => $school->id, 'event' => $event->id,
+        ]).'?clash_request='.$clashRequest->id)->assertOk();
+        \Illuminate\Support\Facades\Http::assertSent(function ($r) {
+            $html = (string) $r->data()['html'];
+
+            return str_contains($html, 'Recitation') && str_contains($html, 'Elocution') && str_contains($html, 'Group Song');
+        });
     }
 
     public function test_school_cannot_file_a_clash_request_for_a_participant_belonging_to_another_school(): void
     {
-        ['school' => $school, 'schoolAdmin' => $schoolAdmin, 'sahodaya' => $sahodaya, 'event' => $event] = $this->fixture();
+        ['school' => $school, 'schoolAdmin' => $schoolAdmin, 'sahodaya' => $sahodaya, 'event' => $event, 'scheduleA' => $scheduleA, 'scheduleB' => $scheduleB] = $this->fixture();
 
         $otherSchool = Tenant::create([
             'id' => (string) Str::uuid(), 'type' => 'school', 'name' => 'Other School',
@@ -153,6 +244,9 @@ class FestClashRequestWorkflowTest extends TestCase
             'tenantId' => $school->id, 'event' => $event->id,
         ]), [
             'participant_id' => $otherParticipant->id,
+            // Valid, existing slots (this school's own), so validation passes and the
+            // request reaches — and is stopped by — the participant-ownership check.
+            'schedule_ids' => [$scheduleA->id, $scheduleB->id],
             'description' => 'Trying to file for someone else\'s student.',
         ]);
 

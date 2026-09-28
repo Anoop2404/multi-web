@@ -9,6 +9,7 @@
                         <tr>
                             <th>School</th>
                             <th>Participant</th>
+                            <th>Clashing items</th>
                             <th>Description</th>
                             <th>Requested resolution</th>
                             <th>Status</th>
@@ -19,6 +20,12 @@
                         <tr v-for="r in requests.data" :key="r.id">
                             <td>{{ r.school?.name }}</td>
                             <td>{{ r.participant?.student?.name || '—' }}</td>
+                            <td class="text-sm">
+                                <ul v-if="r.schedules?.length" class="list-disc list-inside">
+                                    <li v-for="s in r.schedules" :key="s.id">{{ s.item_title }}</li>
+                                </ul>
+                                <span v-else class="text-slate-400">—</span>
+                            </td>
                             <td class="text-sm max-w-xs">{{ r.description }}</td>
                             <td class="text-sm max-w-xs">{{ r.requested_resolution || '—' }}</td>
                             <td><span class="text-xs capitalize">{{ r.status }}</span></td>
@@ -30,7 +37,7 @@
                             </td>
                         </tr>
                         <tr v-if="!requests.data?.length">
-                            <td colspan="6" class="text-center text-slate-400 py-8">No clash reports.</td>
+                            <td colspan="7" class="text-center text-slate-400 py-8">No clash reports.</td>
                         </tr>
                     </tbody>
                 </table>

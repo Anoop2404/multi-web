@@ -17,14 +17,26 @@ class FestClashReviewController extends SahodayaAdminController
         // admin reviewing from the hub page needs every region's requests aggregated here,
         // same as FestRegistrationReviewController's reportableEventIds() fix in Phase 1.
         $requests = FestClashRequest::whereIn('event_id', $event->reportableEventIds())
-            ->with([
-                'school:id,name',
-                'participant.student',
-                'scheduleA.item',
-                'scheduleB.item',
-            ])
+            ->with(['school:id,name', 'participant.student'])
             ->latest()
             ->paginate(30);
+
+        // Batched instead of one schedules() query per row — see the same pattern's
+        // rationale on FestCertificateService::payloadsFor().
+        $allScheduleIds = collect($requests->items())
+            ->flatMap(fn (FestClashRequest $r) => $r->schedule_ids ?: array_filter([$r->schedule_id_a, $r->schedule_id_b]))
+            ->unique()
+            ->values();
+        $schedulesById = \App\Models\FestSchedule::with('item:id,title')->whereIn('id', $allScheduleIds)->get()->keyBy('id');
+
+        $requests->through(fn (FestClashRequest $r) => $r->toArray() + [
+            'schedules' => collect($r->schedule_ids ?: array_filter([$r->schedule_id_a, $r->schedule_id_b]))
+                ->map(fn ($id) => $schedulesById->get($id))
+                ->filter()
+                ->map(fn ($s) => ['id' => $s->id, 'item_title' => $s->item?->title])
+                ->values()
+                ->all(),
+        ]);
 
         return $this->inertia('Sahodaya/Events/ClashReview', [
             'event'    => $event->only('id', 'title'),
