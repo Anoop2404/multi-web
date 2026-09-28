@@ -378,6 +378,24 @@
                 </div>
             </div>
         </div>
+
+        <div v-if="schoolTierBoards && schoolTierBoards.length" class="mb-6">
+            <h3 class="section-title mb-3">Championship by School Level</h3>
+            <div class="grid lg:grid-cols-2 gap-4">
+                <div v-for="board in schoolTierBoards" :key="board.key" class="card card--flush overflow-hidden">
+                    <div class="px-4 py-2.5 border-b border-slate-100 bg-slate-50/80">
+                        <h4 class="section-title text-sm !mb-0">{{ board.label }}</h4>
+                    </div>
+                    <ol class="card-list">
+                        <li v-for="row in board.rows" :key="row.school_id" class="p-3 flex justify-between text-sm">
+                            <span><strong>#{{ row.rank }}</strong> {{ row.school_name }}</span>
+                            <span class="font-mono">{{ row.total_points }} pts</span>
+                        </li>
+                        <li v-if="!board.rows.length" class="p-3 text-gray-400 text-sm">No results yet</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
         </div>
 
         <div class="card">
@@ -426,6 +444,7 @@ import { useConfirm } from '@/composables/useConfirm';
 const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, scoreboard: Array, categoryBoards: { type: Array, default: () => [] },
+    schoolTierBoards: { type: Array, default: () => [] },
     qualifications: Array, nextEvents: Array,
     suggestedNextId: Number, levelLabels: Object,
     activityLogs: { type: Array, default: () => [] },
@@ -537,9 +556,13 @@ const headPublishCounts = computed(() => {
 
 const exportLinks = computed(() => {
     const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/export`;
+    const rpt = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/export`;
     return [
         { type: 'registrations', label: 'Registrations', href: `${base}/registrations` },
         { type: 'results', label: 'Results', href: `${base}/results` },
+        { type: 'overall-ranking', label: 'Overall Ranking', href: `${rpt}/overall-ranking` },
+        { type: 'overall-secondary', label: 'Secondary Championship', href: `${rpt}/overall-ranking-secondary` },
+        { type: 'overall-senior-secondary', label: 'Sr. Secondary Championship', href: `${rpt}/overall-ranking-senior-secondary` },
         { type: 'attendance', label: 'Attendance', href: `${base}/attendance` },
         { type: 'fees', label: 'Fees', href: `${base}/fees` },
     ];
