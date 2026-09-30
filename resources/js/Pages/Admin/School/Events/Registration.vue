@@ -148,13 +148,16 @@
                 <p class="font-semibold text-slate-800">Bulk import from CSV</p>
                 <button type="button" class="text-slate-400 hover:text-slate-600 text-lg leading-none" @click="showBulkImport = false">×</button>
             </div>
-            <p class="text-xs text-slate-500 mb-3">Columns: item_id, item_title, reg_no, team_name, role (performer|standby)</p>
+            <p class="text-xs text-slate-500 mb-3">
+                Columns: item_id, item_title, reg_no, team_name, role (performer|standby).
+                Select the event first — the template then lists that event's real items with their item_id already
+                filled in, so two items sharing the same name never get mixed up.
+            </p>
             <div class="flex flex-wrap gap-2 items-end">
-                <a :href="`${programBase}/import-template`"
-                   class="btn-secondary text-xs">Download template</a>
                 <SearchableSelect v-model="importEventId" class="max-w-xs"
                                   :options="eventSelectOptions"
                                   all-label="Select event" />
+                <a :href="importTemplateUrl" class="btn-secondary text-xs">Download template</a>
                 <input type="file" accept=".csv,text/csv" class="text-xs" @change="onImportFile" />
                 <button type="button" class="btn-primary text-xs" :disabled="!importEventId || !importFile || importForm.processing"
                         @click="submitImport">
@@ -1060,6 +1063,9 @@ function itemGroupLabelOptions(event) {
 const importEventId = ref('');
 const importFile = ref(null);
 const importForm = useForm({ event_id: '', file: null });
+// The template lists the chosen event's real items (with their item_id) so a duplicate
+// item name never gets mixed up during import — pass the event along once one is picked.
+const importTemplateUrl = computed(() => `${programBase.value}/import-template${importEventId.value ? `?event_id=${importEventId.value}` : ''}`);
 const showAddStudent = ref(false);
 const showBulkImport = ref(false);
 const showBulkAssign = ref(false);

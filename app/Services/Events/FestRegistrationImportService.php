@@ -36,7 +36,14 @@ class FestRegistrationImportService
 
         $grouped = [];
         foreach ($rows as $lineNum => $row) {
-            $item = $this->resolveItem($event, $row);
+            [$item, $ambiguousTitle] = $this->resolveItem($event, $row);
+            if ($ambiguousTitle !== null) {
+                return [
+                    'imported' => 0,
+                    'skipped' => count($rows),
+                    'errors'   => ['Row '.($lineNum + 2).": more than one item is titled \"{$ambiguousTitle}\" in this event — re-download the template and fill in that row's item_id column instead of item_title."],
+                ];
+            }
             if (! $item) {
                 return [
                     'imported' => 0,
@@ -220,20 +227,39 @@ class FestRegistrationImportService
         return $exception->getMessage();
     }
 
-    /** @param array<string, string> $row */
-    private function resolveItem(FestEvent $event, array $row): ?FestEventItem
+    /**
+     * item_id is the reliable match (the template's own real item_id column exists
+     * precisely so a row never has to rely on the title) — item_title is only a fallback
+     * for a hand-edited row with item_id left blank. Two items in the same event can
+     * share the exact same title (the same item name repeated across categories/genders/
+     * age groups); silently taking the first match there used to register the row into
+     * whichever one happened to come first, so an ambiguous title is now reported back
+     * to the caller instead of guessed.
+     *
+     * @param  array<string, string>  $row
+     * @return array{0: ?FestEventItem, 1: ?string} [item, ambiguous title (set only when
+     *                                               item_title matched more than one item)]
+     */
+    private function resolveItem(FestEvent $event, array $row): array
     {
         if (! empty($row['item_id'])) {
-            return FestEventItem::where('event_id', $event->id)->find($row['item_id']);
+            return [FestEventItem::where('event_id', $event->id)->find($row['item_id']), null];
         }
 
         if (! empty($row['item_title'])) {
-            return FestEventItem::where('event_id', $event->id)
+            $matches = FestEventItem::where('event_id', $event->id)
                 ->where('title', $row['item_title'])
-                ->first();
+                ->limit(2)
+                ->get();
+
+            if ($matches->count() > 1) {
+                return [null, $row['item_title']];
+            }
+
+            return [$matches->first(), null];
         }
 
-        return null;
+        return [null, null];
     }
 
     /**

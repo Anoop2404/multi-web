@@ -1595,27 +1595,77 @@ class FestRegistrationController extends SchoolAdminController
         ];
     }
 
-    public function importTemplate(string $tenantId, string $program)
+    /**
+     * Bulk-import template. With ?event_id=, lists that event's REAL items (id + title +
+     * category/gender/type) so the school fills in reg_no/team_name/role next to items
+     * it already knows are correct — item_id is what importFromSpreadsheet()/resolveItem()
+     * actually matches on. Without it (no event chosen yet), falls back to the old generic
+     * example rows.
+     *
+     * Bringing the real item_id matters because two items in the same event can share the
+     * exact same title (e.g. the same item name repeated across categories/genders/age
+     * groups) — resolveItem() only falls back to matching by item_title when item_id is
+     * blank, and a duplicate title there silently resolves to whichever item happens to
+     * come first, registering the student into the wrong one. A template pre-filled with
+     * the real item_id for every row removes that ambiguity entirely.
+     */
+    public function importTemplate(Request $request, string $tenantId, string $program)
     {
         $meta = SchoolFestProgram::meta($program);
         $program = $meta['slug'];
+        $headers = ['item_id', 'item_title', 'category', 'reg_no', 'team_name', 'role'];
+
+        $eventId = $request->query('event_id');
+        $event = $eventId ? FestEvent::find($eventId) : null;
+
+        if ($event && $event->tenant_id === $this->school->parent_id) {
+            $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
+            $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
+
+            $rows = FestEventItem::where('event_id', $event->id)
+                ->where('is_enabled', true)
+                ->orderBy('title')
+                ->get()
+                ->map(fn (FestEventItem $item) => [
+                    $item->id,
+                    $item->title,
+                    \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels, $artsCategoryLabels) ?? '',
+                    '', '', 'performer',
+                ])
+                ->all();
+
+            if ($rows !== []) {
+                return \App\Support\ExcelExport::download(
+                    "fest-registration-{$program}-{$event->id}-template",
+                    $headers,
+                    $rows,
+                    'Every row already carries this item\'s real item_id — fill in reg_no (and team_name for group items) next to the correct item and leave item_id as-is. Two items can share the same name; the category column and item_id tell them apart.',
+                );
+            }
+        }
+
         $headers = ['item_id', 'item_title', 'reg_no', 'team_name', 'role'];
         $rows = [
-            ['123', 'Mono Act', 'S2024001', '', 'performer'],
-            ['123', 'Group Dance', 'S2024002', 'Team Alpha', 'performer'],
-            ['123', 'Group Dance', 'S2024003', 'Team Alpha', 'performer'],
+            ['', 'Mono Act', 'S2024001', '', 'performer'],
+            ['', 'Group Dance', 'S2024002', 'Team Alpha', 'performer'],
+            ['', 'Group Dance', 'S2024003', 'Team Alpha', 'performer'],
         ];
 
         if ($meta['eventType'] === 'sports') {
             $rows = [
-                ['456', 'U14 — 100m Boys', 'S2024001', '', 'performer'],
-                ['456', 'U14 — 100m Boys', 'S2024002', '', 'performer'],
-                ['789', 'U14 — Football Boys', 'S2024003', 'Team A', 'performer'],
-                ['789', 'U14 — Football Boys', 'S2024004', 'Team A', 'performer'],
+                ['', 'U14 — 100m Boys', 'S2024001', '', 'performer'],
+                ['', 'U14 — 100m Boys', 'S2024002', '', 'performer'],
+                ['', 'U14 — Football Boys', 'S2024003', 'Team A', 'performer'],
+                ['', 'U14 — Football Boys', 'S2024004', 'Team A', 'performer'],
             ];
         }
 
-        return \App\Support\ExcelExport::download("fest-registration-{$program}-template", $headers, $rows);
+        return \App\Support\ExcelExport::download(
+            "fest-registration-{$program}-template",
+            $headers,
+            $rows,
+            'Select an event above first, then download the template again — it will list that event\'s real items with their item_id, so duplicate item names never get mixed up. These example rows are placeholders only; leave item_id blank if you use item_title instead, but two items with the same title will not import reliably.',
+        );
     }
 
     public function importStore(Request $request, string $tenantId, string $program, FestRegistrationImportService $importService)

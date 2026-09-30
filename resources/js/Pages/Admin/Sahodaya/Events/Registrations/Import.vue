@@ -6,6 +6,7 @@
 
         <div class="card max-w-xl space-y-4">
             <p class="text-sm text-slate-600">Each row needs school_id or school_prefix, item reference, and participant details.</p>
+            <p class="text-xs text-slate-500">The template lists this event's real items with their item_id already filled in — keep it as-is when two items share the same name, so the right one always gets picked.</p>
             <div class="flex flex-wrap gap-3 items-center">
                 <a :href="`${base}/registrations/import-template`" class="text-sm font-semibold text-[color:var(--brand-blue)]">Download Excel template</a>
             </div>

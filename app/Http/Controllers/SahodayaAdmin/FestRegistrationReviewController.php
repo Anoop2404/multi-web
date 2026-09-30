@@ -842,15 +842,41 @@ class FestRegistrationReviewController extends SahodayaAdminController
         return back()->with('success', "Rejected {$result['rejected']} registration(s).");
     }
 
+    /**
+     * Lists this event's REAL items (id + title + category/gender/type), one row each, so
+     * the Sahodaya fills in school_id/reg_no next to items it already knows are correct —
+     * item_id is what FestRegistrationImportService::resolveItem() actually matches on.
+     * Two items can share the exact same title (a name repeated across categories/genders/
+     * age groups); without a real item_id, resolveItem() falls back to matching by
+     * item_title and silently picks whichever matching item comes first, registering the
+     * cluster into the wrong one — the old template's single fake example row ('123') gave
+     * no real ids to copy from, so this bug was easy to hit in practice.
+     */
     public function importTemplate(string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
+        $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
+
+        $rows = FestEventItem::where('event_id', $event->id)
+            ->where('is_enabled', true)
+            ->orderBy('title')
+            ->get()
+            ->map(fn (FestEventItem $item) => [
+                '', '', $item->id, $item->title,
+                FestItemCategoryLabel::resolve($item, $classGroupLabels, $artsCategoryLabels) ?? '',
+                '', '', 'performer',
+            ])
+            ->all();
+
+        if ($rows === []) {
+            $rows = [['', 'SCH001', '', 'Mono Act', '', 'S2024001', '', 'performer']];
+        }
+
         return ExcelExport::download("fest-cluster-registration-{$event->id}-template", [
-            'school_id', 'school_prefix', 'item_id', 'item_title', 'reg_no', 'team_name', 'role',
-        ], [
-            ['', 'SCH001', '123', 'Mono Act', 'S2024001', '', 'performer'],
-        ]);
+            'school_id', 'school_prefix', 'item_id', 'item_title', 'category', 'reg_no', 'team_name', 'role',
+        ], $rows, 'Every row already carries this item\'s real item_id — fill in school_id (or school_prefix) and reg_no next to the correct item, and leave item_id as-is. Two items can share the same name; the category column and item_id tell them apart.');
     }
 
     public function importStore(Request $request, string $tenantId, FestEvent $event, FestRegistrationImportService $importService, PlatformAuditLogger $audit)
