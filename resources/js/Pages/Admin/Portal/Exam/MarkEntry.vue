@@ -10,44 +10,47 @@
             Results are published for this exam. Marks are locked. Ask the Sahodaya admin to unpublish results to reopen for correction.
         </div>
         <div class="card card--flush">
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                    <tr>
-                        <th class="p-3">Student</th>
-                        <th class="p-3">Correct</th>
-                        <th class="p-3">Wrong</th>
-                        <th class="p-3">Unanswered</th>
-                        <th class="p-3">Score</th>
-                        <th class="p-3">Grade</th>
-                        <th class="p-3"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="r in registrations.data" :key="r.id" class="border-t">
-                        <td class="p-3">{{ r.student?.name }}</td>
-                        <td class="p-3"><input v-model.number="forms[r.id].correct_count" type="number" min="0" class="w-14 field" :disabled="exam.results_published"></td>
-                        <td class="p-3"><input v-model.number="forms[r.id].wrong_count" type="number" min="0" class="w-14 field" :disabled="exam.results_published"></td>
-                        <td class="p-3"><input v-model.number="forms[r.id].unanswered_count" type="number" min="0" class="w-14 field" :disabled="exam.results_published"></td>
-                        <td class="p-3"><input v-model.number="forms[r.id].score" type="number" min="0" step="0.01" class="w-16 field" :disabled="exam.results_published"></td>
-                        <td class="p-3">
-                            <SearchableSelect
-                                v-model="forms[r.id].grade"
-                                class="w-14"
-                                :options="gradeOptions"
-                                :all-option="true"
-                                all-label="—"
-                                :disabled="exam.results_published"
-                            />
-                        </td>
-                        <td class="p-3">
-                            <button v-if="!exam.results_published" @click="save(r)" class="text-xs font-semibold text-indigo-600">Save</button>
-                        </td>
-                    </tr>
-                    <tr v-if="!registrations.data?.length">
-                        <td colspan="7" class="p-6 text-center text-gray-400">No present students to mark.</td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm min-w-[38rem]">
+                    <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                        <tr>
+                            <th class="p-3">Student</th>
+                            <th class="p-3">Correct</th>
+                            <th class="p-3">Wrong</th>
+                            <th class="p-3">Unanswered</th>
+                            <th class="p-3">Score</th>
+                            <th class="p-3">Grade</th>
+                            <th class="p-3"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="r in registrations.data" :key="r.id" class="border-t">
+                            <td class="p-3">{{ r.student?.name }}</td>
+                            <td class="p-3"><input v-model.number="forms[r.id].correct_count" type="number" min="0" class="w-14 field" :disabled="exam.results_published"></td>
+                            <td class="p-3"><input v-model.number="forms[r.id].wrong_count" type="number" min="0" class="w-14 field" :disabled="exam.results_published"></td>
+                            <td class="p-3"><input v-model.number="forms[r.id].unanswered_count" type="number" min="0" class="w-14 field" :disabled="exam.results_published"></td>
+                            <td class="p-3"><input v-model.number="forms[r.id].score" type="number" min="0" step="0.01" class="w-16 field" :disabled="exam.results_published"></td>
+                            <td class="p-3">
+                                <SearchableSelect
+                                    v-model="forms[r.id].grade"
+                                    class="w-14"
+                                    :options="gradeOptions"
+                                    :all-option="true"
+                                    all-label="—"
+                                    escape-overflow
+                                    :disabled="exam.results_published"
+                                />
+                            </td>
+                            <td class="p-3">
+                                <button v-if="!exam.results_published" @click="save(r)" class="text-xs font-semibold text-indigo-600">Save</button>
+                            </td>
+                        </tr>
+                        <tr v-if="!registrations.data?.length">
+                            <td colspan="7" class="p-6 text-center text-gray-400">No present students to mark.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
             <PaginationLinks :links="registrations.links" :meta="{ from: registrations.from, to: registrations.to, total: registrations.total }" />
         </div>
     </PortalLayout>

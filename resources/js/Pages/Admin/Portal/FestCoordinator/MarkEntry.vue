@@ -45,7 +45,7 @@
                 </div>
 
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
+                    <table class="w-full text-sm min-w-[44rem]">
                         <thead class="bg-gray-50 text-left text-xs uppercase text-slate-500">
                             <tr>
                                 <th class="p-2">Participant</th>
@@ -96,6 +96,7 @@
                                             :options="rankSelectOptions(item)"
                                             :all-option="true"
                                             all-label="—"
+                                            escape-overflow
                                             :disabled="isAbsent(participant, item)"
                                             @update:model-value="(value) => setRank(participant.id, item, markForms, value)" />
                                     <input v-else

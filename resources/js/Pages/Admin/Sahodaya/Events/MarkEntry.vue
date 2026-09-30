@@ -206,32 +206,26 @@
 
                 <!-- Datatable -->
                 <div class="overflow-x-auto bg-white">
-                    <table class="w-full text-xs text-left">
-                        <thead class="bg-slate-50/80 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[10px] font-bold">
+                    <table class="w-full text-xs text-left min-w-[58rem]">
+                        <thead class="bg-slate-50/90 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[10px] font-bold">
                             <tr>
-                                <!-- Sticky on both scroll edges: this table has up to 10
-                                     columns (sports items add Time/Distance; judge-panel
-                                     items add one column per judge) and routinely overflows
-                                     narrow screens — without these, scrolling right to reach
-                                     Rank/Score/Grade loses track of which row you're on, and
-                                     reaching Save requires scrolling all the way back. -->
-                                <th class="p-3.5 w-10 text-center sticky left-0 z-20 bg-slate-50 border-r border-slate-200">#</th>
-                                <th class="p-3.5 w-24">Chest No.</th>
-                                <th class="p-3.5 w-28">Order</th>
-                                <th class="p-3.5 w-28">Fest ID</th>
-                                <th class="p-3.5 w-32">Attendance</th>
-                                <th v-if="showMeasurement(section.item)" class="p-3.5 w-36">Time / Distance</th>
-                                <th class="p-3.5 w-32">Rank</th>
-                                 <template v-if="hasJudgePanel">
-                                    <th v-for="j in judgeNumbers" :key="j" class="p-3.5 w-32">
+                                <th class="px-2.5 py-3 w-10 text-center sticky left-0 z-20 bg-slate-50 border-r border-slate-200">#</th>
+                                <th class="px-2.5 py-3 min-w-[5rem] w-20">Chest No.</th>
+                                <th class="px-2.5 py-3 min-w-[4.5rem] w-20">Order</th>
+                                <th class="px-2.5 py-3 min-w-[5.5rem] w-24">Fest ID</th>
+                                <th class="px-2.5 py-3 min-w-[6.5rem] w-28">Attendance</th>
+                                <th v-if="showMeasurement(section.item)" class="px-2.5 py-3 min-w-[7.5rem] w-32">Time / Distance</th>
+                                <th class="px-2.5 py-3 min-w-[6.5rem] w-28">Rank</th>
+                                <template v-if="hasJudgePanel">
+                                    <th v-for="j in judgeNumbers" :key="j" class="px-2.5 py-3 min-w-[5.5rem] w-24 text-center">
                                         Judge {{ j }}
-                                        <span v-if="perJudgeMax" class="block font-normal text-slate-400 normal-case">/ {{ perJudgeMax }}</span>
+                                        <span v-if="perJudgeMax" class="block font-normal text-slate-400 normal-case text-[9px]">/ {{ perJudgeMax }}</span>
                                     </th>
-                                    <th class="p-3.5 w-28">Grand Total</th>
+                                    <th class="px-2.5 py-3 min-w-[5rem] w-20 text-center">Grand Total</th>
                                 </template>
-                                <th v-else class="p-3.5 w-32">Marks / Score</th>
-                                <th v-if="showGradeColumn" class="p-3.5 w-24">Grade</th>
-                                <th class="p-3.5 text-right w-24 sticky right-0 z-20 bg-slate-50 border-l border-slate-200">Actions</th>
+                                <th v-else class="px-2.5 py-3 min-w-[6rem] w-24 text-center">Marks / Score</th>
+                                <th v-if="showGradeColumn" class="px-2.5 py-3 min-w-[5rem] w-20 text-center">Grade</th>
+                                <th class="px-3 py-3 text-right min-w-[5.5rem] w-24">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -239,33 +233,28 @@
                                 :class="isAbsent(participant, item) ? 'bg-rose-50/30' : 'hover:bg-slate-50/70 transition'">
                                 
                                 <!-- Serial No -->
-                                <td class="p-3.5 text-slate-400 text-center font-mono font-medium sticky left-0 z-10 border-r border-slate-200"
+                                <td class="px-2.5 py-2 text-slate-400 text-center font-mono font-medium sticky left-0 z-10 border-r border-slate-200"
                                     :class="isAbsent(participant, item) ? 'bg-rose-50' : 'bg-white'">{{ pIdx + 1 }}</td>
 
                                 <!-- Chest No. -->
-                                <td class="p-3.5 font-mono font-bold text-slate-900">
-                                    <span v-if="participant.chest_no" class="inline-flex items-center bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100 text-xs">
+                                <td class="px-2.5 py-2 font-mono font-bold text-slate-900 whitespace-nowrap">
+                                    <span v-if="participant.chest_no" class="inline-flex items-center bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100 text-xs font-bold">
                                         #{{ participant.chest_no }}
                                     </span>
                                     <span v-else class="text-slate-400 font-normal">—</span>
                                 </td>
 
-                                <!-- Order No. — unique per item. Options scale with the item's
-                                     own participant count (like Rank), and selecting one
-                                     saves immediately (like Attendance) — no separate Save
-                                     click — then re-sorts the table below by it. -->
-                                <td class="p-3.5">
+                                <!-- Order No. -->
+                                <td class="px-2.5 py-2">
                                     <SearchableSelect :model-value="participant.order_no ?? ''"
                                             :disabled="itemLocked"
                                             :options="orderOptionsFor(section, participant.id).map((n) => ({ value: n, label: String(n) }))"
-                                            :all-option="true" all-label="—"
+                                            :all-option="true" all-label="—" escape-overflow
                                             @update:model-value="(value) => saveOrderNo(participant, value)" />
                                 </td>
 
-                                <!-- Fest ID — the participant's per-event registration number
-                                     (FestParticipant.level_registration_number), same field
-                                     shown as "Fest ID" on the Chest Number report. -->
-                                <td class="p-3.5 font-mono text-slate-700 text-xs">
+                                <!-- Fest ID -->
+                                <td class="px-2.5 py-2 font-mono text-slate-700 text-xs whitespace-nowrap">
                                     <span v-if="participantRegNo(participant)" class="bg-slate-100 text-slate-800 px-2 py-0.5 rounded border border-slate-200">
                                         {{ participantRegNo(participant) }}
                                     </span>
@@ -275,7 +264,7 @@
                                 </td>
 
                                 <!-- Attendance -->
-                                <td class="p-3.5">
+                                <td class="px-2.5 py-2">
                                     <SearchableSelect :model-value="attendanceStatus(participant, item)"
                                             :class="isAbsent(participant, item) ? '!border-rose-300 !bg-rose-50 !text-rose-700' : ''"
                                             :disabled="itemLocked"
@@ -285,68 +274,67 @@
                                 </td>
 
                                 <!-- Time / Distance (if applicable) -->
-                                <td v-if="showMeasurement(section.item)" class="p-3.5">
+                                <td v-if="showMeasurement(section.item)" class="px-2.5 py-2">
                                     <div class="flex items-center gap-1">
                                         <input v-model="markForms[participant.id].measurement_value"
-                                               class="field text-sm !py-2"
+                                               class="field text-sm !py-1.5 !px-2 w-20"
                                                placeholder="7.45"
                                                :disabled="isAbsent(participant, item) || itemLocked">
                                         <input v-model="markForms[participant.id].measurement_unit"
-                                               class="field text-sm w-16 !py-2"
+                                               class="field text-sm w-14 !py-1.5 !px-1.5"
                                                placeholder="s/m"
                                                :disabled="isAbsent(participant, item) || itemLocked">
                                     </div>
                                 </td>
 
                                 <!-- Rank Dropdown -->
-                                <td class="p-3.5">
+                                <td class="px-2.5 py-2">
                                     <SearchableSelect :model-value="markForms[participant.id].position ?? ''"
                                             :disabled="isAbsent(participant, item) || itemLocked"
                                             :options="rankOptionsFor(section).map((opt) => ({ value: opt.rank, label: opt.label }))"
-                                            :all-option="true" all-label="—"
+                                            :all-option="true" all-label="—" escape-overflow
                                             @update:model-value="(value) => setRank(participant.id, item, markForms, value)" />
                                 </td>
 
                                 <!-- Per-judge subtotal columns + computed Grand Total -->
                                 <template v-if="hasJudgePanel">
-                                    <td v-for="j in judgeNumbers" :key="j" class="p-3.5">
+                                    <td v-for="j in judgeNumbers" :key="j" class="px-2.5 py-2 text-center">
                                         <input v-model.number="judgeForms[participant.id][j]" type="number" min="0" step="0.5"
                                                :max="perJudgeMax"
-                                               class="field text-sm font-semibold tabular-nums w-28 !py-2 !px-3 judge-mark-input" placeholder="0"
+                                               class="field text-sm font-semibold tabular-nums w-20 !py-1.5 !px-2 text-center judge-mark-input" placeholder="0"
                                                :disabled="isAbsent(participant, item) || itemLocked"
                                                @keydown="onJudgeInputKeydown">
                                     </td>
-                                    <td class="p-3.5 font-mono text-base font-bold text-slate-900 tabular-nums">
+                                    <td class="px-2.5 py-2 font-mono text-sm font-bold text-slate-900 tabular-nums text-center">
                                         {{ participantGrandTotal(participant.id, item) }}
                                     </td>
                                 </template>
 
                                 <!-- Marks / Score (Optional) -->
-                                <td v-else class="p-3.5">
+                                <td v-else class="px-2.5 py-2 text-center">
                                     <input v-model.number="markForms[participant.id].score" type="number" min="0" step="0.5"
-                                           class="field text-sm font-bold tabular-nums w-28 !py-2 !px-3" placeholder="Pts (Optional)"
+                                           class="field text-sm font-bold tabular-nums w-20 !py-1.5 !px-2 text-center" placeholder="Pts"
                                            :disabled="isAbsent(participant, item) || itemLocked"
                                            @input="onScoreInput(participant.id, item)">
                                 </td>
 
                                 <!-- Grade (Optional for Kalolsavam / Fest) -->
-                                <td v-if="showGradeColumn" class="p-3.5">
+                                <td v-if="showGradeColumn" class="px-2.5 py-2">
                                     <SearchableSelect v-model="markForms[participant.id].grade"
                                             :disabled="isAbsent(participant, item) || itemLocked"
-                                            :options="gradeOptions" :all-option="true" all-label="—"
+                                            :options="gradeOptions" :all-option="true" all-label="—" escape-overflow
                                             @change="markForms[participant.id]._user_edited_grade = true" />
                                 </td>
 
                                 <!-- Action Button -->
-                                <td class="p-3.5 text-right sticky right-0 z-10 border-l border-slate-200"
-                                    :class="isAbsent(participant, item) ? 'bg-rose-50' : 'bg-white'">
-                                    <div class="flex items-center justify-end gap-2">
+                                <td class="px-3 py-2 text-right whitespace-nowrap">
+                                    <div class="flex items-center justify-end gap-1.5">
                                         <span v-if="savedIds.has(participant.id)" class="text-xs font-bold text-emerald-600">Saved ✓</span>
-                                        <span v-else-if="failedIds.has(participant.id)" class="text-xs font-bold text-rose-600">Not saved — see message above</span>
-                                        <button type="button" class="btn-primary text-xs !py-1 !px-3"
+                                        <span v-else-if="failedIds.has(participant.id)" class="text-xs font-bold text-rose-600" title="Not saved — see message above">Failed ✕</span>
+                                        <button type="button" class="btn-primary text-xs !py-1 !px-2.5 whitespace-nowrap shadow-xs"
                                                 :disabled="savingIds.has(participant.id) || isAbsent(participant, item) || itemLocked"
                                                 @click="saveMark(participant, item)">
-                                            {{ savingIds.has(participant.id) ? 'Saving...' : 'Save' }}
+                                            {{ savingIds.has(participant.id) ? '…' : 'Save' }}
                                         </button>
                                     </div>
                                 </td>
