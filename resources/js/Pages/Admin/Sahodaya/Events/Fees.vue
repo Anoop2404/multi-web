@@ -126,7 +126,7 @@
                         ₹{{ fmt(summary.recorded_credit) }} is already recorded as credit owed to schools.
                     </template>
                     <template v-if="Number(summary.unreconciled_overpayment || 0) > 0">
-                        ₹{{ fmt(summary.unreconciled_overpayment) }} is unreconciled and can be converted into school credits or refunded.
+                        ₹{{ fmt(summary.unreconciled_overpayment) }} is unreconciled. If an overpayment is due to a duplicate receipt uploaded or approved twice, click <strong>Show Overpaid Schools</strong> below and use <strong>📷 Proofs → Cancel Duplicate</strong> to void it.
                     </template>
                 </p>
             </div>
@@ -199,8 +199,15 @@
                                 {{ idx + 1 }}
                             </td>
                             <td class="p-3.5">
-                                <div class="font-bold text-slate-900 leading-snug">
-                                    {{ row.school }}
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="font-bold text-slate-900 leading-snug">
+                                        {{ row.school }}
+                                    </span>
+                                    <span v-if="Number(row.amount_paid || 0) - Number(row.total_due || 0) > 0.01"
+                                          class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300"
+                                          title="Approved receipts exceed event dues">
+                                        <span>⚠️</span> Overpaid +₹{{ fmt(Number(row.amount_paid) - Number(row.total_due)) }}
+                                    </span>
                                 </div>
                                 <div v-if="row.head" class="text-[11px] font-semibold text-indigo-700 mt-0.5">
                                     Head: {{ row.head }}
@@ -296,9 +303,19 @@
                                 <span class="font-black text-slate-900 text-base tabular-nums">
                                     ₹{{ fmt(row.total_due) }}
                                 </span>
+                                <div v-if="Number(row.amount_paid || 0) - Number(row.total_due || 0) > 0.01"
+                                     class="text-[10px] font-extrabold text-amber-900 bg-amber-100 border border-amber-300 rounded px-1.5 py-0.5 mt-1 inline-flex items-center gap-1"
+                                     title="Approved receipts exceed total dues">
+                                    +₹{{ fmt(Number(row.amount_paid) - Number(row.total_due)) }} excess
+                                </div>
                             </td>
                             <td class="p-3.5 space-y-1">
-                                <span v-if="isNoFeeDue(row)" class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                <div v-if="Number(row.amount_paid || 0) - Number(row.total_due || 0) > 0.01"
+                                     class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-100 text-amber-950 border border-amber-300 shadow-2xs"
+                                     title="Approved receipts exceed event dues">
+                                    <span>⚠️</span> Overpaid (+₹{{ fmt(Number(row.amount_paid) - Number(row.total_due)) }})
+                                </div>
+                                <span v-else-if="isNoFeeDue(row)" class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
                                     No fee due
                                 </span>
                                 <span v-else-if="row.status === 'approved'" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-xs">
@@ -330,11 +347,6 @@
                                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 mt-1">
                                     Credit owed: ₹{{ fmt(row.available_credit) }}
                                 </p>
-                                <p v-if="Number(row.amount_paid || 0) - Number(row.total_due || 0) > 0.01"
-                                   class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 mt-1"
-                                   title="Approved receipts exceed event dues">
-                                    +₹{{ fmt(Number(row.amount_paid) - Number(row.total_due)) }} excess
-                                </p>
                             </td>
 
                             <!-- Action Column: Multi-Proof Management -->
@@ -350,11 +362,18 @@
                                             @click="openProofModal(row)"
                                             :class="row.status === 'proof_uploaded'
                                                 ? 'bg-amber-500 hover:bg-amber-600 text-white font-bold animate-pulse shadow-xs'
-                                                : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200 shadow-2xs'"
+                                                : (Number(row.amount_paid || 0) - Number(row.total_due || 0) > 0.01
+                                                    ? 'bg-amber-100 hover:bg-amber-200 text-amber-950 font-black border border-amber-400 ring-2 ring-amber-300/60 shadow-xs'
+                                                    : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200 shadow-2xs')"
                                             class="px-2.5 py-1 rounded-lg text-xs inline-flex items-center gap-1.5 transition">
                                         <span>📷 Proofs</span>
                                         <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-black/10 font-black">
                                             {{ realProofsCount(row) }}
+                                        </span>
+                                        <span v-if="Number(row.amount_paid || 0) - Number(row.total_due || 0) > 0.01"
+                                              class="text-[10px] font-black text-amber-900"
+                                              title="Excess payment detected — click to review duplicate receipts">
+                                            ⚠️ Cancel Duplicate
                                         </span>
                                     </button>
                                     <a v-else-if="row.fee_receipt?.file_path && !row.fee_receipt?.is_system_credit"
@@ -479,7 +498,7 @@
                 </div>
 
                 <!-- Financial Summary Bar -->
-                <div class="px-6 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
+                <div class="px-6 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
                     <div>
                         <span class="text-slate-500">Total Due:</span>
                         <strong class="text-slate-900 ml-1">₹{{ fmt(activeProofModalRow.total_due) }}</strong>
@@ -487,6 +506,10 @@
                     <div>
                         <span class="text-slate-500">Approved Paid:</span>
                         <strong class="text-emerald-700 ml-1">₹{{ fmt(activeProofModalRow.amount_paid) }}</strong>
+                        <span v-if="Number(activeProofModalRow.amount_paid || 0) - Number(activeProofModalRow.total_due || 0) > 0.01"
+                              class="ml-2 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-200 text-amber-950 border border-amber-400 animate-pulse">
+                            ⚠️ Excess: +₹{{ fmt(Number(activeProofModalRow.amount_paid) - Number(activeProofModalRow.total_due)) }}
+                        </span>
                         <a v-if="activeProofModalRow.fee_receipt?.id && (activeProofModalRow.all_receipts?.length || 0) > 1"
                            :href="`/sahodaya-admin/${sahodaya.id}/finance/payments/receipts/${activeProofModalRow.fee_receipt.id}?consolidated=1`"
                            target="_blank" rel="noopener"
@@ -505,25 +528,50 @@
 
                 <!-- Proofs List -->
                 <div class="p-6 max-h-[60vh] overflow-y-auto space-y-3">
+                    <!-- Overpayment Warning Banner -->
+                    <div v-if="Number(activeProofModalRow.amount_paid || 0) - Number(activeProofModalRow.total_due || 0) > 0.01"
+                         class="p-4 rounded-xl border border-amber-300 bg-amber-50 text-amber-950 flex items-start gap-3 shadow-xs">
+                        <span class="text-2xl shrink-0">⚠️</span>
+                        <div class="text-xs space-y-1">
+                            <h5 class="font-black text-amber-900 text-sm">
+                                Overpayment Detected: +₹{{ fmt(Number(activeProofModalRow.amount_paid) - Number(activeProofModalRow.total_due)) }} Excess
+                            </h5>
+                            <p class="text-amber-800 leading-relaxed">
+                                Approved receipts total <strong>₹{{ fmt(activeProofModalRow.amount_paid) }}</strong>, but event dues are only <strong>₹{{ fmt(activeProofModalRow.total_due) }}</strong>.
+                                If a payment proof was uploaded or approved twice (duplicate payment), click <strong class="text-rose-800">"Cancel Duplicate / Reverse"</strong> on the duplicate receipt below to reverse it, post a ledger reversal, and fix the balance.
+                            </p>
+                        </div>
+                    </div>
+
                     <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500">
                         Uploaded Payment Proofs ({{ realProofsCount(activeProofModalRow) }})
                     </h4>
 
                     <div v-for="(rc, idx) in (activeProofModalRow.all_receipts || [])" :key="rc.id"
                          class="p-4 rounded-xl border transition shadow-xs"
-                         :class="rc.is_system_credit ? 'border-amber-200 bg-amber-50/40' : (rc.status === 'uploaded' ? 'border-amber-300 bg-amber-50/50 ring-2 ring-amber-200' : (rc.status === 'approved' ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white'))">
+                         :class="rc.is_system_credit
+                            ? 'border-amber-200 bg-amber-50/40'
+                            : (rc.status === 'uploaded'
+                                ? 'border-amber-300 bg-amber-50/50 ring-2 ring-amber-200'
+                                : (isPotentialDuplicate(rc, activeProofModalRow.all_receipts)
+                                    ? 'border-amber-400 bg-amber-50/70 ring-2 ring-amber-300'
+                                    : (rc.status === 'approved' ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white')))">
                         <div class="flex items-start justify-between gap-3">
                             <div>
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-2 flex-wrap">
                                     <span class="text-xs font-bold text-slate-900">
                                         {{ rc.is_system_credit ? '💳 Fee credit applied' : `Proof Upload #${activeProofModalRow.all_receipts.length - idx}` }}
                                     </span>
                                     <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded"
-                                          :class="rc.is_system_credit ? 'bg-amber-100 text-amber-800' : (rc.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : (rc.status === 'uploaded' ? 'bg-amber-100 text-amber-900 font-bold' : 'bg-slate-100 text-slate-600'))">
+                                          :class="rc.is_system_credit ? 'bg-amber-100 text-amber-800' : (rc.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : (rc.status === 'uploaded' ? 'bg-amber-100 text-amber-900 font-bold' : (rc.status === 'reversed' ? 'bg-rose-100 text-rose-800 font-bold' : 'bg-slate-100 text-slate-600')))">
                                         {{ rc.is_system_credit ? 'Not an uploaded proof' : (rc.status === 'uploaded' ? 'Awaiting Review' : rc.status) }}
                                     </span>
                                     <span v-if="rc.receipt_number" class="text-xs font-mono font-bold text-emerald-700">
                                         #{{ rc.receipt_number }}
+                                    </span>
+                                    <span v-if="isPotentialDuplicate(rc, activeProofModalRow.all_receipts)"
+                                          class="text-[10px] font-black px-2 py-0.5 rounded bg-amber-200 text-amber-950 border border-amber-300">
+                                        ⚠️ Potential Duplicate (matches amount/ref)
                                     </span>
                                 </div>
                                 <p class="text-xs text-slate-500 mt-1">
@@ -537,11 +585,11 @@
                                     </template>
                                 </p>
                                 <p v-if="rc.rejection_reason" class="text-xs text-rose-600 font-medium mt-1">
-                                    Rejection Reason: {{ rc.rejection_reason }}
+                                    {{ rc.status === 'reversed' ? 'Reversal Reason' : 'Rejection Reason' }}: {{ rc.rejection_reason }}
                                 </p>
                             </div>
 
-                            <div class="text-right">
+                            <div class="text-right shrink-0">
                                 <span class="text-base font-black text-slate-900 tabular-nums">₹{{ fmt(rc.amount) }}</span>
                                 <div class="mt-2 flex items-center justify-end gap-2 flex-wrap">
                                     <a v-if="rc.status === 'approved' && rc.receipt_number"
@@ -563,8 +611,18 @@
                                     <button v-if="!rc.is_system_credit && (rc.status === 'uploaded' || rc.status === 'approved')"
                                             type="button"
                                             @click="beginReceiptRejection(rc)"
-                                            class="btn-secondary !py-1 !px-2.5 text-xs font-bold text-rose-700 hover:bg-rose-50 shadow-xs">
-                                        {{ rc.status === 'approved' ? 'Reverse this payment' : 'Reject this proof' }}
+                                            class="btn-secondary !py-1 !px-2.5 text-xs font-bold shadow-xs inline-flex items-center gap-1"
+                                            :class="rc.status === 'approved'
+                                                ? ((Number(activeProofModalRow.amount_paid || 0) - Number(activeProofModalRow.total_due || 0) > 0.01) || isPotentialDuplicate(rc, activeProofModalRow.all_receipts)
+                                                    ? 'bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 font-extrabold'
+                                                    : 'text-rose-700 hover:bg-rose-50 border border-rose-200')
+                                                : 'text-rose-700 hover:bg-rose-50 border border-rose-200'">
+                                        <span>🗑️</span>
+                                        <span>
+                                            {{ rc.status === 'approved'
+                                                ? ((Number(activeProofModalRow.amount_paid || 0) - Number(activeProofModalRow.total_due || 0) > 0.01) ? 'Cancel Duplicate / Reverse' : 'Reverse Payment')
+                                                : 'Reject this proof' }}
+                                        </span>
                                     </button>
                                     <button v-if="!rc.is_system_credit && rc.status === 'reversed'"
                                             type="button"
@@ -576,28 +634,49 @@
                             </div>
                         </div>
 
+                        <!-- Rejection / Reversal / Duplicate Cancellation Confirmation Box -->
                         <div v-if="receiptAction?.id === rc.id"
-                             class="mt-4 rounded-lg border p-3"
+                             class="mt-4 rounded-lg border p-3.5"
                              :class="rc.status === 'reversed' ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'">
                             <p class="text-xs font-bold" :class="rc.status === 'reversed' ? 'text-emerald-900' : 'text-rose-900'">
                                 {{ rc.status === 'reversed'
                                     ? `Restore reversed receipt ${rc.receipt_number ? `#${rc.receipt_number}` : `#${rc.id}`} for ₹${fmt(rc.amount)} back to approved?`
                                     : rc.status === 'approved'
-                                        ? `Reverse approved receipt ${rc.receipt_number ? `#${rc.receipt_number}` : `#${rc.id}`} for ₹${fmt(rc.amount)}?`
+                                        ? `Cancel duplicate / reverse receipt ${rc.receipt_number ? `#${rc.receipt_number}` : `#${rc.id}`} for ₹${fmt(rc.amount)}?`
                                         : `Reject this ₹${fmt(rc.amount)} payment proof?` }}
                             </p>
                             <p class="mt-1 text-[11px]" :class="rc.status === 'reversed' ? 'text-emerald-700' : 'text-rose-700'">
                                 {{ rc.status === 'reversed'
                                     ? 'An offsetting ledger entry will be posted and the school balance recalculated as paid — use this only to undo an accidental reversal.'
                                     : rc.status === 'approved'
-                                        ? 'Compensating ledger entries will be posted and the school balance will be recalculated.'
+                                        ? 'Canceling this duplicate receipt will deduct ₹' + fmt(rc.amount) + ' from the school\'s paid amount, reverse ledger journal entries, and resolve excess overpayment.'
                                         : 'The school will be allowed to upload a replacement proof.' }}
                             </p>
-                            <label class="mt-3 block text-[11px] font-bold text-slate-700">
+
+                            <!-- Quick Reason Presets for Duplicate / Reversal -->
+                            <div v-if="rc.status === 'approved'" class="mt-2.5">
+                                <span class="text-[10px] font-bold text-slate-600 block mb-1">Click a quick reason preset or type custom reason below:</span>
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <button type="button" @click="receiptActionReason = 'Duplicate payment proof approved in error'"
+                                            class="px-2 py-1 rounded text-[10px] font-semibold bg-white hover:bg-rose-100 text-rose-900 border border-rose-200 shadow-2xs transition">
+                                        Duplicate payment proof
+                                    </button>
+                                    <button type="button" @click="receiptActionReason = 'Excess / wrong amount entered'"
+                                            class="px-2 py-1 rounded text-[10px] font-semibold bg-white hover:bg-rose-100 text-rose-900 border border-rose-200 shadow-2xs transition">
+                                        Excess / Wrong amount
+                                    </button>
+                                    <button type="button" @click="receiptActionReason = 'Bank chargeback or transaction reversed by bank'"
+                                            class="px-2 py-1 rounded text-[10px] font-semibold bg-white hover:bg-rose-100 text-rose-900 border border-rose-200 shadow-2xs transition">
+                                        Bank reversal
+                                    </button>
+                                </div>
+                            </div>
+
+                            <label class="mt-2.5 block text-[11px] font-bold text-slate-700">
                                 Reason <span class="font-normal text-slate-500">(optional)</span>
                                 <textarea v-model="receiptActionReason" rows="2" maxlength="500"
                                           class="field mt-1 text-xs"
-                                          :placeholder="rc.status === 'reversed' ? 'Example: Reversed by mistake, wrong receipt selected...' : 'Example: Duplicate payment proof, incorrect transaction, bank chargeback...'"></textarea>
+                                          :placeholder="rc.status === 'reversed' ? 'Example: Reversed by mistake, wrong receipt selected...' : 'Example: Duplicate payment proof, wrong receipt, bank reversal...'"></textarea>
                             </label>
                             <div class="mt-3 flex items-center justify-end gap-2">
                                 <button type="button" class="btn-secondary text-xs"
@@ -610,7 +689,7 @@
                                         :class="rc.status === 'reversed' ? '!bg-emerald-700 hover:!bg-emerald-800' : '!bg-rose-700 hover:!bg-rose-800'"
                                         :disabled="receiptActionBusy"
                                         @click="submitReceiptRejection(rc)">
-                                    {{ receiptActionBusy ? 'Processing…' : (rc.status === 'reversed' ? 'Confirm restore' : rc.status === 'approved' ? 'Confirm reversal' : 'Confirm rejection') }}
+                                    {{ receiptActionBusy ? 'Processing…' : (rc.status === 'reversed' ? 'Confirm Restore' : rc.status === 'approved' ? `Confirm Cancel Duplicate (₹${fmt(rc.amount)})` : 'Confirm Rejection') }}
                                 </button>
                             </div>
                         </div>
@@ -669,7 +748,7 @@ const sportEventSwitcherOptions = computed(() => props.childEvents.map(ev => ({
     label: ev.short_title || ev.title,
 })));
 
-const search = ref('');
+const search = ref(typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('search') || '') : '');
 const activeProofModalRow = ref(null);
 const receiptAction = ref(null);
 const receiptActionReason = ref('');
@@ -750,11 +829,25 @@ function realProofsCount(row) {
     return (row.all_receipts ?? []).filter(r => !r.is_system_credit).length;
 }
 
+function isPotentialDuplicate(rc, allReceipts) {
+    if (!rc || rc.is_system_credit || rc.status !== 'approved') return false;
+    const sameAmountOrRef = (allReceipts || []).filter(other =>
+        other.id !== rc.id &&
+        !other.is_system_credit &&
+        other.status === 'approved' &&
+        (
+            (other.transaction_ref && rc.transaction_ref && other.transaction_ref.trim().toLowerCase() === rc.transaction_ref.trim().toLowerCase()) ||
+            Math.abs(Number(other.amount) - Number(rc.amount)) < 0.01
+        )
+    );
+    return sameAmountOrRef.length > 0;
+}
+
 const overpaidSchoolsCount = computed(() => {
     return props.rows.filter(r => hasRegisteredItems(r) && (Number(r.amount_paid || 0) - Number(r.total_due || 0)) > 0.01).length;
 });
 
-const statusFilter = ref('all');
+const statusFilter = ref(typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('status') || 'all') : 'all');
 const statusFilterOptions = computed(() => {
     const rows = props.rows;
     const activeRows = rows.filter(hasRegisteredItems);

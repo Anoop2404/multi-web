@@ -255,6 +255,7 @@ class PaymentReconciliationController extends SahodayaAdminController
         return [
             'carrier_type' => $type,
             'carrier_id' => $fee->id,
+            'event_id' => ($type === 'fest' && $fee instanceof FestSchoolEventFee) ? $fee->event_id : null,
             'school_id' => $fee->school_id,
             'school_name' => $schoolNames->get($fee->school_id, $fee->school_id),
             'program' => $program,

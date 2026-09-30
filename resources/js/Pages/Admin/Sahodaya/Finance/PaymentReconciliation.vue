@@ -117,6 +117,11 @@
                                         Record ₹{{ fmt(row.unreconciled) }} credit
                                     </button>
                                     <span v-else class="status-badge status-badge--approved">Credit reconciled</span>
+                                    <Link v-if="row.carrier_type === 'fest' && row.event_id"
+                                          :href="`/sahodaya-admin/${sahodaya.id}/events/${row.event_id}/fees?search=${encodeURIComponent(row.school_name)}`"
+                                          class="text-xs text-rose-700 hover:text-rose-900 font-bold hover:underline inline-flex items-center gap-1">
+                                        <span>🗑️ Cancel duplicate in event fees ↗</span>
+                                    </Link>
                                     <button v-if="row.paid_drift > 0" type="button"
                                             class="btn-secondary text-xs"
                                             :disabled="busyKey === rowKey(row)"
