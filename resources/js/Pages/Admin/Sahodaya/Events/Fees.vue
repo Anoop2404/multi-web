@@ -111,23 +111,39 @@
         </div>
 
         <div v-if="Number(summary.overpayment || 0) > 0"
-             class="mb-6 rounded-xl border p-4 text-sm"
+             class="mb-6 rounded-xl border p-4 text-xs shadow-2xs flex flex-wrap items-center justify-between gap-3"
              :class="Number(summary.unreconciled_overpayment || 0) > 0
-                ? 'border-red-200 bg-red-50 text-red-900'
-                : 'border-amber-200 bg-amber-50 text-amber-950'">
-            <p class="font-bold">
-                {{ Number(summary.unreconciled_overpayment || 0) > 0 ? 'Payment reconciliation required' : 'School credit recorded' }}
-            </p>
-            <p class="mt-1 leading-relaxed">
-                Approved receipts exceed the current event dues by
-                <strong>₹{{ fmt(summary.overpayment) }}</strong>.
-                <template v-if="Number(summary.recorded_credit || 0) > 0">
-                    ₹{{ fmt(summary.recorded_credit) }} is recorded as credit owed to schools.
-                </template>
-                <template v-if="Number(summary.unreconciled_overpayment || 0) > 0">
-                    ₹{{ fmt(summary.unreconciled_overpayment) }} has no matching outstanding credit and must be reviewed in Finance → Credits &amp; payouts.
-                </template>
-            </p>
+                ? 'border-amber-300 bg-amber-50/90 text-amber-950'
+                : 'border-emerald-200 bg-emerald-50/80 text-emerald-950'">
+            <div class="space-y-1">
+                <p class="font-bold flex items-center gap-1.5 text-sm text-amber-900">
+                    <span>⚠️</span>
+                    {{ Number(summary.unreconciled_overpayment || 0) > 0 ? 'Payment Reconciliation: Overpayment Detected' : 'School Credit Recorded' }}
+                </p>
+                <p class="leading-relaxed text-amber-900/80">
+                    Approved receipts exceed current event dues by <strong>₹{{ fmt(summary.overpayment) }}</strong> across {{ overpaidSchoolsCount }} school(s).
+                    <template v-if="Number(summary.recorded_credit || 0) > 0">
+                        ₹{{ fmt(summary.recorded_credit) }} is already recorded as credit owed to schools.
+                    </template>
+                    <template v-if="Number(summary.unreconciled_overpayment || 0) > 0">
+                        ₹{{ fmt(summary.unreconciled_overpayment) }} is unreconciled and can be converted into school credits or refunded.
+                    </template>
+                </p>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+                <button type="button" @click="statusFilter = 'overpaid'"
+                        class="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-900 font-bold text-xs hover:bg-amber-200 border border-amber-300 transition">
+                    Show {{ overpaidSchoolsCount }} Overpaid Schools
+                </button>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/finance/payment-reconciliation?event_id=${event.id}`"
+                      class="px-3 py-1.5 rounded-lg bg-amber-700 text-white font-bold text-xs hover:bg-amber-800 transition shadow-xs">
+                    Reconcile &amp; Record Credit →
+                </Link>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/finance/payments/credits`"
+                      class="px-3 py-1.5 rounded-lg bg-white text-slate-700 font-semibold text-xs hover:bg-slate-50 border border-slate-200 transition">
+                    Issued Credits Register ↗
+                </Link>
+            </div>
         </div>
 
         <!-- Filter Chips Bar & Search Toolbar -->
@@ -313,6 +329,11 @@
                                 <p v-if="row.available_credit > 0"
                                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 mt-1">
                                     Credit owed: ₹{{ fmt(row.available_credit) }}
+                                </p>
+                                <p v-if="Number(row.amount_paid || 0) - Number(row.total_due || 0) > 0.01"
+                                   class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 mt-1"
+                                   title="Approved receipts exceed event dues">
+                                    +₹{{ fmt(Number(row.amount_paid) - Number(row.total_due)) }} excess
                                 </p>
                             </td>
 
@@ -729,19 +750,27 @@ function realProofsCount(row) {
     return (row.all_receipts ?? []).filter(r => !r.is_system_credit).length;
 }
 
+const overpaidSchoolsCount = computed(() => {
+    return props.rows.filter(r => hasRegisteredItems(r) && (Number(r.amount_paid || 0) - Number(r.total_due || 0)) > 0.01).length;
+});
+
 const statusFilter = ref('all');
 const statusFilterOptions = computed(() => {
     const rows = props.rows;
     const activeRows = rows.filter(hasRegisteredItems);
-    return [
+    const opts = [
         { value: 'all', label: 'Registered schools', count: activeRows.filter(r => !isUnpaidPending(r)).length },
         { value: 'proof_uploaded', label: 'Awaiting approval', count: activeRows.filter(r => r.status === 'proof_uploaded').length },
         { value: 'partial', label: 'Partial', count: activeRows.filter(r => r.status === 'partial').length },
         { value: 'approved', label: 'Approved', count: activeRows.filter(r => r.status === 'approved' && !isNoFeeDue(r)).length },
         { value: 'rejected', label: 'Rejected', count: activeRows.filter(r => r.status === 'rejected').length },
         { value: 'pending', label: 'Not uploaded yet', count: activeRows.filter(isUnpaidPending).length },
-        { value: 'everything', label: 'All schools (incl. 0 items)', count: rows.length },
     ];
+    if (overpaidSchoolsCount.value > 0) {
+        opts.push({ value: 'overpaid', label: 'Overpaid (excess)', count: overpaidSchoolsCount.value });
+    }
+    opts.push({ value: 'everything', label: 'All schools (incl. 0 items)', count: rows.length });
+    return opts;
 });
 
 const filteredRows = computed(() => {
@@ -753,6 +782,8 @@ const filteredRows = computed(() => {
         rows = rows.filter(r => hasRegisteredItems(r) && isUnpaidPending(r));
     } else if (statusFilter.value === 'approved') {
         rows = rows.filter(r => hasRegisteredItems(r) && r.status === 'approved' && !isNoFeeDue(r));
+    } else if (statusFilter.value === 'overpaid') {
+        rows = rows.filter(r => hasRegisteredItems(r) && (Number(r.amount_paid || 0) - Number(r.total_due || 0)) > 0.01);
     } else if (statusFilter.value !== 'everything') {
         rows = rows.filter(r => hasRegisteredItems(r) && r.status === statusFilter.value);
     }

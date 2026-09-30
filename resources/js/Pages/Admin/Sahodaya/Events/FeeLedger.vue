@@ -114,20 +114,30 @@
 
         <!-- Overpayment / Reconciliation Alert Banner (if applicable) -->
         <div v-if="Number(summary.overpayment || 0) > 0"
-             class="mb-6 rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-xs text-amber-950 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+             class="mb-6 rounded-xl border border-amber-300 bg-amber-50/90 p-4 text-xs text-amber-950 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
             <div class="space-y-1">
                 <p class="font-bold flex items-center gap-1.5 text-sm text-amber-900">
                     <span>⚠️</span> Payment Reconciliation: ₹{{ fmt(summary.overpayment) }} Overpayment Detected
                 </p>
                 <p class="leading-relaxed text-amber-900/80">
-                    Approved fee receipts exceed current event dues by <strong>₹{{ fmt(summary.overpayment) }}</strong> across overpaying schools.
-                    You can record school credit or process refunds under Finance → Credits &amp; payouts.
+                    Approved fee receipts exceed current event dues by <strong>₹{{ fmt(summary.overpayment) }}</strong> across {{ overpaidSchoolsCount }} school(s).
+                    Unreconciled excess receipts can be converted into school credits under <strong>Payment Reconciliation</strong> or filtered immediately below.
                 </p>
             </div>
-            <Link :href="`/sahodaya-admin/${sahodaya.id}/finance/payments/credits`"
-                  class="px-3 py-1.5 rounded-lg bg-amber-700 text-white font-bold text-xs hover:bg-amber-800 transition shadow-xs">
-                Credits &amp; Payouts →
-            </Link>
+            <div class="flex items-center gap-2 flex-wrap">
+                <button type="button" @click="schoolStatusFilter = 'overpaid'; activeView = 'schools'"
+                        class="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-900 font-bold text-xs hover:bg-amber-200 border border-amber-300 transition">
+                    Show {{ overpaidSchoolsCount }} Overpaid Schools
+                </button>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/finance/payment-reconciliation?event_id=${event.id}`"
+                      class="px-3 py-1.5 rounded-lg bg-amber-700 text-white font-bold text-xs hover:bg-amber-800 transition shadow-xs">
+                    Reconcile &amp; Record Credit →
+                </Link>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/finance/payments/credits`"
+                      class="px-3 py-1.5 rounded-lg bg-white text-slate-700 font-semibold text-xs hover:bg-slate-50 border border-slate-200 transition">
+                    Issued Credits Register ↗
+                </Link>
+            </div>
         </div>
 
         <!-- View Tabs Bar -->
@@ -220,8 +230,13 @@
                                 <td class="p-3 text-right font-bold text-slate-900 tabular-nums">
                                     ₹{{ fmt(row.total_due) }}
                                 </td>
-                                <td class="p-3 text-right font-bold text-emerald-700 tabular-nums">
-                                    ₹{{ fmt(row.amount_paid) }}
+                                <td class="p-3 text-right tabular-nums">
+                                    <div class="font-bold text-emerald-700">₹{{ fmt(row.amount_paid) }}</div>
+                                    <span v-if="Number(row.amount_paid || 0) - Number(row.total_due || 0) > 0.01"
+                                          class="inline-flex items-center px-1.5 py-0.5 mt-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200"
+                                          title="Receipts exceed total due">
+                                        +₹{{ fmt(Number(row.amount_paid) - Number(row.total_due)) }} excess
+                                    </span>
                                 </td>
                                 <td class="p-3 text-right font-bold tabular-nums"
                                     :class="row.balance_due > 0 ? 'text-rose-700' : 'text-slate-400'">
@@ -383,7 +398,7 @@
             <section class="card card--flush overflow-hidden bg-white border border-slate-200/90 rounded-xl shadow-xs">
                 <div class="p-4 border-b border-slate-100 flex items-center justify-between">
                     <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
-                        <span>🏫</span> School Payments ({{ schoolPayments.length }})
+                        <span>🏫</span> School Payments ({{ filteredSchoolPayments.length }})
                     </h3>
                     <span class="text-xs font-bold text-emerald-700">₹{{ fmt(summary.collected) }} settled</span>
                 </div>
@@ -398,7 +413,7 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
-                            <tr v-for="(row, i) in schoolPayments" :key="i" class="hover:bg-slate-50/70 transition">
+                            <tr v-for="(row, i) in filteredSchoolPayments" :key="i" class="hover:bg-slate-50/70 transition">
                                 <td class="p-2.5">
                                     <div class="font-semibold text-slate-900 truncate max-w-[14rem]">{{ row.school }}</div>
                                     <div class="text-[10px] text-slate-400">Due: ₹{{ fmt(row.total_due) }}</div>
@@ -414,8 +429,12 @@
                                         Pending
                                     </span>
                                 </td>
-                                <td class="p-2.5 text-right font-mono font-bold text-emerald-700 tabular-nums">
-                                    ₹{{ fmt(row.amount_paid) }}
+                                <td class="p-2.5 text-right font-mono tabular-nums">
+                                    <div class="font-bold text-emerald-700">₹{{ fmt(row.amount_paid) }}</div>
+                                    <span v-if="Number(row.amount_paid || 0) - Number(row.total_due || 0) > 0.01"
+                                          class="inline-block text-[9px] font-bold text-amber-700 bg-amber-50 px-1 rounded">
+                                        +₹{{ fmt(Number(row.amount_paid) - Number(row.total_due)) }}
+                                    </span>
                                 </td>
                                 <td class="p-2.5 text-[11px] font-mono text-slate-600">
                                     {{ row.receipt_number || '—' }}
@@ -509,14 +528,22 @@ const copiedCode = ref(false);
 
 const exportUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/fees/export`);
 
+const overpaidSchoolsCount = computed(() => {
+    return props.schoolPayments.filter(r => (Number(r.amount_paid || 0) - Number(r.total_due || 0)) > 0.01).length;
+});
+
 const schoolStatusFilterOptions = computed(() => {
     const list = props.schoolPayments;
-    return [
+    const opts = [
         { value: 'all', label: 'All Schools', count: list.length },
         { value: 'approved', label: 'Approved', count: list.filter(r => r.status === 'approved').length },
         { value: 'partial', label: 'Partial', count: list.filter(r => r.status === 'partial').length },
         { value: 'pending', label: 'Pending', count: list.filter(r => r.status === 'pending' || r.status === 'proof_uploaded').length },
     ];
+    if (overpaidSchoolsCount.value > 0) {
+        opts.push({ value: 'overpaid', label: 'Overpaid / Excess', count: overpaidSchoolsCount.value });
+    }
+    return opts;
 });
 
 const filteredSchoolPayments = computed(() => {
@@ -524,6 +551,8 @@ const filteredSchoolPayments = computed(() => {
 
     if (schoolStatusFilter.value === 'pending') {
         list = list.filter(r => r.status === 'pending' || r.status === 'proof_uploaded');
+    } else if (schoolStatusFilter.value === 'overpaid') {
+        list = list.filter(r => (Number(r.amount_paid || 0) - Number(r.total_due || 0)) > 0.01);
     } else if (schoolStatusFilter.value !== 'all') {
         list = list.filter(r => r.status === schoolStatusFilter.value);
     }

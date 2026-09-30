@@ -52,11 +52,20 @@
         </div>
 
         <section class="card !p-0 overflow-hidden mb-6">
-            <div class="p-4 border-b border-slate-200">
-                <h2 class="font-bold text-slate-900">Fee balance exceptions</h2>
-                <p class="text-xs text-slate-500 mt-1">
-                    Recording credit preserves the original approved receipt and posts the excess to Fee Credits Payable.
-                </p>
+            <div class="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 class="font-bold text-slate-900">Fee balance exceptions</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Recording credit preserves the original approved receipt and posts the excess to Fee Credits Payable.
+                    </p>
+                </div>
+                <div class="relative flex items-center min-w-[14rem] max-w-xs">
+                    <input v-model="quickSearch" type="search" placeholder="Quick search school, program..."
+                           class="field text-xs !py-1.5 pl-7 pr-7 w-full shadow-2xs" autocomplete="off">
+                    <button v-if="quickSearch" type="button" @click="quickSearch = ''"
+                            class="absolute right-2 text-xs text-slate-400 hover:text-slate-700 font-bold p-0.5">✕</button>
+                    <span class="absolute left-2.5 text-slate-400 text-xs">🔍</span>
+                </div>
             </div>
 
             <div class="overflow-x-auto">
@@ -74,7 +83,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="row in rows" :key="`${row.carrier_type}-${row.carrier_id}`">
+                        <tr v-for="row in filteredRows" :key="`${row.carrier_type}-${row.carrier_id}`">
                             <td>
                                 <p class="font-bold text-slate-900">{{ row.school_name }}</p>
                                 <p class="text-xs text-slate-500">{{ row.program }}</p>
@@ -117,9 +126,9 @@
                                 </div>
                             </td>
                         </tr>
-                        <tr v-if="!rows.length">
+                        <tr v-if="!filteredRows.length">
                             <td colspan="8" class="p-10 text-center text-sm text-slate-500">
-                                No fee balance exceptions match these filters.
+                                {{ rows.length ? 'No fee balance exceptions match your search.' : 'No fee balance exceptions match these filters.' }}
                             </td>
                         </tr>
                     </tbody>
@@ -199,6 +208,20 @@ const filterForm = reactive({
 const busyKey = ref('');
 const { confirm } = useConfirm();
 const base = `/sahodaya-admin/${props.sahodaya.id}/finance/payment-reconciliation`;
+
+const quickSearch = ref('');
+
+const filteredRows = computed(() => {
+    let list = props.rows;
+    const q = quickSearch.value.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(row => {
+        const sName = (row.school_name ?? '').toLowerCase();
+        const prog = (row.program ?? '').toLowerCase();
+        const receipts = (row.receipts ?? []).map(r => `${r.number ?? ''} ${r.transaction_ref ?? ''}`).join(' ').toLowerCase();
+        return sName.includes(q) || prog.includes(q) || receipts.includes(q);
+    });
+});
 
 const eventOptions = computed(() => props.events.map((event) => ({ value: event.id, label: event.title })));
 
