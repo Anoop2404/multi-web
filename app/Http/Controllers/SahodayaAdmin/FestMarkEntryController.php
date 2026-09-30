@@ -53,7 +53,9 @@ class FestMarkEntryController extends SahodayaAdminController
         // part of this bulk "print blank forms" picker.
         'sum_sheet', 'sum_sheet_no_chest',
         'result_declaration',
-        'chest_number_list', 'attendance_sheet', 'timesheet',
+        'chest_number_list',
+        'attendance_sheet', 'attendance_sheet_no_chest',
+        'timesheet', 'timesheet_no_chest',
     ];
 
     public function index(Request $request, string $tenantId, FestEvent $event)
@@ -1805,7 +1807,10 @@ class FestMarkEntryController extends SahodayaAdminController
         $pdfBytesByType = [];
 
         foreach ($types as $type) {
-            $extra = in_array($type, ['judge_sheet_no_chest', 'sum_sheet_no_chest'], true) ? ['blank_chest' => 1] : [];
+            $extra = in_array($type, ['judge_sheet_no_chest', 'sum_sheet_no_chest', 'attendance_sheet_no_chest', 'timesheet_no_chest'], true) ? ['blank_chest' => 1] : [];
+            if ($type === 'attendance_sheet') {
+                $extra['show_chest'] = 1;
+            }
             // attendance_sheet/timesheet go through FestReportService::export(), whose
             // $this->preview defaults to true unless download=1 is explicitly set -- and
             // attendanceSheetPdf()/timesheetPdf() BOTH return raw HTML (Content-Type: text/html)
@@ -1830,9 +1835,9 @@ class FestMarkEntryController extends SahodayaAdminController
                     'result_declaration' => $this->resultDeclarationSheet($subRequest, $tenantId, $event, $numbering),
                     'chest_number_list' => app()->makeWith(\App\Http\Controllers\SahodayaAdmin\FestChestNumberController::class, ['request' => $subRequest])
                         ->print($subRequest, $tenantId, $event),
-                    'attendance_sheet' => tap(new \App\Services\Events\FestReportService($event), fn ($s) => $s->preview = false)
+                    'attendance_sheet', 'attendance_sheet_no_chest' => tap(new \App\Services\Events\FestReportService($event), fn ($s) => $s->preview = false)
                         ->export('attendance-sheet', $subRequest),
-                    'timesheet' => tap(new \App\Services\Events\FestReportService($event), fn ($s) => $s->preview = false)
+                    'timesheet', 'timesheet_no_chest' => tap(new \App\Services\Events\FestReportService($event), fn ($s) => $s->preview = false)
                         ->export('timesheet', $subRequest),
                     default => null,
                 };

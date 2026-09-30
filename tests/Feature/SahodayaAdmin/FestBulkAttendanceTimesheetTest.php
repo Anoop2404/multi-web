@@ -125,4 +125,30 @@ class FestBulkAttendanceTimesheetTest extends TestCase
         $this->assertStringContainsString('Item One', $csv);
         $this->assertStringContainsString('Item Two', $csv);
     }
+
+    public function test_attendance_sheet_with_blank_chest_includes_chest_column_with_blank_cell(): void
+    {
+        [$sahodaya, $event, $admin, $items] = $this->fixture();
+
+        $response = $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/export/attendance-sheet?item_id={$items[0]->id}&blank_chest=1&preview=1");
+
+        $response->assertOk();
+        $content = $response->getContent();
+        $this->assertStringContainsString('Chest No', $content);
+        $this->assertStringContainsString('<td class="text-center chest-no"></td>', $content);
+    }
+
+    public function test_timesheet_with_blank_chest_includes_chest_column_with_blank_cell(): void
+    {
+        [$sahodaya, $event, $admin, $items] = $this->fixture();
+
+        $response = $this->actingAs($admin)
+            ->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/export/timesheet?item_id={$items[0]->id}&blank_chest=1&preview=1");
+
+        $response->assertOk();
+        $content = $response->getContent();
+        $this->assertStringContainsString('Chest', $content);
+        $this->assertStringContainsString('<td class="text-center chest-no"></td>', $content);
+    }
 }

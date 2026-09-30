@@ -62,12 +62,12 @@ class FestBulkReportComboTest extends TestCase
 
         $response = $this->actingAs($admin)->post(
             "/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/bulk-report-combo",
-            ['report_types' => ['chest_number_list', 'attendance_sheet', 'timesheet']]
+            ['report_types' => ['chest_number_list', 'attendance_sheet', 'attendance_sheet_no_chest', 'timesheet', 'timesheet_no_chest']]
         );
 
         $response->assertRedirect();
         $this->assertSame(
-            ['chest_number_list', 'attendance_sheet', 'timesheet'],
+            ['chest_number_list', 'attendance_sheet', 'attendance_sheet_no_chest', 'timesheet', 'timesheet_no_chest'],
             SahodayaProfile::where('tenant_id', $sahodaya->id)->first()->bulk_report_combo,
         );
     }

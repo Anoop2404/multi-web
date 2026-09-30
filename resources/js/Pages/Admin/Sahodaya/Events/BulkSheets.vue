@@ -190,9 +190,13 @@ const reportTypeOptions = [
     // this generic reports/export/{type} dispatcher, which defaults to preview and needs
     // download=1 for an actual attachment -- see FestReportService::export()'s $this->preview.
     { key: 'attendance_sheet', label: '📋 Attendance Sheet',
-        url: (o = {}) => bulkSheetUrl('reports/export/attendance-sheet', o.preview ? {} : { download: 1 }, o) },
+        url: (o = {}) => bulkSheetUrl('reports/export/attendance-sheet', { show_chest: 1, ...(o.preview ? {} : { download: 1 }) }, o) },
+    { key: 'attendance_sheet_no_chest', label: '📋 Attendance Sheet — No Chest No',
+        url: (o = {}) => bulkSheetUrl('reports/export/attendance-sheet', { blank_chest: 1, ...(o.preview ? {} : { download: 1 }) }, o) },
     { key: 'timesheet', label: '⏱️ Timesheet',
         url: (o = {}) => bulkSheetUrl('reports/export/timesheet', o.preview ? {} : { download: 1 }, o) },
+    { key: 'timesheet_no_chest', label: '⏱️ Timesheet — No Chest No',
+        url: (o = {}) => bulkSheetUrl('reports/export/timesheet', { blank_chest: 1, ...(o.preview ? {} : { download: 1 }) }, o) },
 ];
 const comboSelectedTypes = ref([...props.bulkReportCombo]);
 const savingCombo = ref(false);

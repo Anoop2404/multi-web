@@ -292,7 +292,7 @@
 
                     <tr>
                         <td class="text-center">{{ $serialOffset + $i + 1 }}</td>
-                        <td class="text-center chest-no">{{ $row['reference'] ?? '—' }}</td>
+                        <td class="text-center chest-no">{{ ($blankChest ?? false) ? '' : (($row['reference'] ?? '') === '—' ? '' : ($row['reference'] ?? '')) }}</td>
                         <td class="text-center chest-no">{{ $row['fest_id'] ?? '—' }}</td>
                         <td>
                             <strong style="font-size: 9px;">{{ $row['name'] ?? '' }}</strong>

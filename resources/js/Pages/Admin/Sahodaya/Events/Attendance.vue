@@ -438,6 +438,7 @@ const attendanceSheetPdfHref = computed(() => {
     let href = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/export/attendance-sheet?download=1`;
     if (itemFilter.value) href += `&item_id=${itemFilter.value}`;
     if (showChestOnSheet.value) href += '&show_chest=1';
+    else href += '&blank_chest=1';
     return href;
 });
 
@@ -445,18 +446,21 @@ const attendanceSheetPreviewHref = computed(() => {
     let href = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/export/attendance-sheet?preview=1`;
     if (itemFilter.value) href += `&item_id=${itemFilter.value}`;
     if (showChestOnSheet.value) href += '&show_chest=1';
+    else href += '&blank_chest=1';
     return href;
 });
 
 const timesheetPdfHref = computed(() => {
     let href = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/export/timesheet?download=1`;
     if (itemFilter.value) href += `&item_id=${itemFilter.value}`;
+    if (!showChestOnSheet.value) href += '&blank_chest=1';
     return href;
 });
 
 const timesheetPreviewHref = computed(() => {
     let href = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/export/timesheet?preview=1`;
     if (itemFilter.value) href += `&item_id=${itemFilter.value}`;
+    if (!showChestOnSheet.value) href += '&blank_chest=1';
     return href;
 });
 

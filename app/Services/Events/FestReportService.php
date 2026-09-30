@@ -1557,10 +1557,17 @@ class FestReportService
 
     private function attendanceSheetPdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
-        // Off by default (chest no was dropped from this sheet entirely per organizer
-        // feedback — it's just a hand-marking checklist), but some organizers still want
-        // it shown, e.g. to double-check attendance against a printed chest-number list.
-        $showChest = $request->boolean('show_chest');
+        // When blank_chest is requested (or blank sheet variant), keep the Chest No
+        // column present on the sheet so on-ground officials can write chest numbers
+        // in by hand, but leave the cells empty. Otherwise, default to showing the
+        // chest number column unless explicitly opted out via show_chest=0.
+        $blankChest = $request->boolean('blank_chest') || $request->boolean('blank');
+        $showChest = $request->has('show_chest')
+            ? $request->boolean('show_chest')
+            : true;
+        if ($blankChest) {
+            $showChest = true;
+        }
 
         $bulkItemIds = $this->resolveBulkItemIds($request);
         abort_if($bulkItemIds === [], 404, 'No competition items found.');
@@ -1675,6 +1682,7 @@ class FestReportService
             // unresolved placeholder text on that path.
             'isDomPdf'          => $isDomPdf,
             'showChest'         => $showChest,
+            'blankChest'        => $blankChest,
         ];
 
         // Preview mode: return raw HTML (browser handles S3 images, proper page layout)
@@ -1699,11 +1707,12 @@ class FestReportService
             'itemLine'   => $singleItemMetaStr ?: $singleItemName,
         ]);
         $itemsLabel = $singleItemName ?? ($bulkItemIds !== null ? count($bulkItemIds).'-items' : 'all-items');
+        $filenameExtra = $blankChest ? ['blank-chest'] : [];
         $filename = ReportFilename::build(
             'attendance-sheet',
             $sahodaya?->name ?? 'Sahodaya',
             $this->event->event_start,
-            [$this->event->title, $itemsLabel],
+            [$this->event->title, $itemsLabel, ...$filenameExtra],
         );
 
         return $this->renderPdf(
@@ -1727,6 +1736,8 @@ class FestReportService
      */
     private function timesheetPdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
+        $blankChest = $request->boolean('blank_chest') || $request->boolean('blank');
+
         $bulkItemIds = $this->resolveBulkItemIds($request);
         abort_if($bulkItemIds === [], 404, 'No competition items found.');
 
@@ -1791,6 +1802,7 @@ class FestReportService
             'singleItemName'    => $singleItemName,
             'singleItemMetaStr' => $singleItemMetaStr,
             'isDomPdf'          => $isDomPdf,
+            'blankChest'        => $blankChest,
         ];
 
         if ($isPreview) {
@@ -1808,11 +1820,12 @@ class FestReportService
             'itemLine'   => $singleItemMetaStr ?: $singleItemName,
         ]);
         $itemsLabel = $singleItemName ?? ($bulkItemIds !== null ? count($bulkItemIds).'-items' : 'all-items');
+        $filenameExtra = $blankChest ? ['blank-chest'] : [];
         $filename = ReportFilename::build(
             'timesheet',
             $sahodaya?->name ?? 'Sahodaya',
             $this->event->event_start,
-            [$this->event->title, $itemsLabel],
+            [$this->event->title, $itemsLabel, ...$filenameExtra],
         );
 
         return $this->renderPdf(
