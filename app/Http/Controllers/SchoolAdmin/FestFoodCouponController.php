@@ -5,12 +5,14 @@ namespace App\Http\Controllers\SchoolAdmin;
 use App\Models\FestEvent;
 use App\Models\FestFoodCoupon;
 use App\Models\Tenant;
+use App\Services\Events\FestIdCardQrService;
 use App\Support\TenantBranding;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
 
 class FestFoodCouponController extends SchoolAdminController
 {
-    public function index(string $tenantId)
+    public function index(string $tenantId, Request $request)
     {
         $school = $this->school;
 
@@ -19,41 +21,86 @@ class FestFoodCouponController extends SchoolAdminController
             ->orderByDesc('event_start')
             ->get(['id', 'title', 'event_start', 'status']);
 
-        $eventId = request()->query('event_id') ? (int) request()->query('event_id') : null;
+        $eventId = $request->query('event_id') ? (int) $request->query('event_id') : null;
         $event = $eventId ? FestEvent::find($eventId) : null;
+        $mealType = $request->query('meal_type');
 
-        $coupons = FestFoodCoupon::where('school_id', $school->id)
+        $query = FestFoodCoupon::where('school_id', $school->id)
             ->when($eventId, fn ($q) => $q->where('event_id', $eventId))
+            ->when($mealType, fn ($q) => $q->where('meal_type', $mealType))
             ->with('event')
             ->orderByDesc('valid_date')
-            ->get();
+            ->orderBy('meal_type')
+            ->orderBy('sequence_no');
+
+        $coupons = $query->get();
 
         return $this->inertia('School/Fest/FoodCoupons', [
-            'events'  => $events,
-            'event'   => $event ? $event->only('id', 'title', 'event_type', 'event_start', 'event_end') : null,
-            'coupons' => $coupons,
-            'filters' => ['event_id' => $eventId],
+            'events'   => $events,
+            'event'    => $event ? $event->only('id', 'title', 'event_type', 'event_start', 'event_end') : null,
+            'coupons'  => $coupons,
+            'filters'  => [
+                'event_id' => $eventId,
+                'meal_type' => $mealType,
+            ],
+            'mealTypes'=> FestFoodCoupon::MEAL_LABELS,
         ]);
     }
 
-    public function print(string $tenantId, FestEvent $event)
+    public function print(string $tenantId, FestEvent $event, Request $request, FestIdCardQrService $qrService)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        $coupons = FestFoodCoupon::where('event_id', $event->id)
+        $query = FestFoodCoupon::where('event_id', $event->id)
             ->where('school_id', $this->school->id)
-            ->where('status', 'issued')
-            ->orderBy('coupon_code')
+            ->where('status', 'issued');
+
+        if ($meal = $request->query('meal_type')) {
+            $query->where('meal_type', $meal);
+        }
+
+        $coupons = $query->orderBy('meal_type')
+            ->orderBy('sequence_no')
             ->get();
 
+        if ($coupons->isEmpty()) {
+            return back()->with('error', 'No issued food coupons found to print.');
+        }
+
         $sahodaya = Tenant::find($event->tenant_id);
+        $bgDataUri = $event->foodCouponBgImageDataUri($sahodaya);
+        $baseUrl = url('/');
+
+        $preparedCoupons = [];
+        foreach ($coupons as $c) {
+            $verifyUrl = $c->verificationUrl($baseUrl);
+            $qrData = $qrService->dataUri($verifyUrl);
+            $headCount = max(1, (int) $c->head_count);
+
+            for ($i = 0; $i < $headCount; $i++) {
+                $subCode = $headCount > 1 ? ($c->coupon_code . '-' . ($i + 1)) : $c->coupon_code;
+                $preparedCoupons[] = [
+                    'id' => $c->id,
+                    'coupon_code' => $subCode,
+                    'qr_token' => $c->qr_token,
+                    'meal_type' => $c->meal_type,
+                    'formatted_date' => $c->valid_date?->format('d M Y') ?? 'N/A',
+                    'head_count' => 1,
+                    'is_extra' => $c->is_extra,
+                    'school_name' => $this->school->name,
+                    'qr_src' => $qrData,
+                ];
+            }
+        }
 
         return Pdf::loadView('fest.catering.food-coupons', [
-            'event'    => $event,
-            'school'   => $this->school,
-            'coupons'  => $coupons,
-            'sahodaya' => $sahodaya,
-            'logoSrc'  => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
-        ])->download('food-coupons-'.$this->school->school_prefix.'-'.$event->id.'.pdf');
+            'event'     => $event,
+            'school'    => $this->school,
+            'sahodaya'  => $sahodaya,
+            'logoSrc'   => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
+            'bgDataUri' => $bgDataUri,
+            'coupons'   => $preparedCoupons,
+        ])->setPaper('a4', 'portrait')
+          ->download('food-coupons-'.$this->school->school_prefix.'-'.$event->id.'.pdf');
     }
 }

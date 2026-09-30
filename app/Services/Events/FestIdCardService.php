@@ -782,6 +782,7 @@ class FestIdCardService
                 'member_count'    => count($members),
                 'id_label'        => 'Team ID',
                 'id_number'       => $festId,
+                'fest_id'         => $festId,
                 'secondary_label' => 'Members',
                 'secondary_value' => (string) count($members),
                 'qr_src'          => $this->qrService->dataUri($qrPayload),
@@ -921,11 +922,19 @@ class FestIdCardService
         }
         $rollNo = $p->student?->roll_number ?: ($studentSeqId ?: $studentRegNo);
 
+        $festIdValue = ($festId && $festId !== '—') ? $festId : null;
+
         // Em spaces survive HTML whitespace collapsing, keeping the three footer
         // groups visibly separated in both browser previews and generated PDFs.
         $studentInfoInline = implode("\u{2003}\u{2003}", array_filter([
             $categoryDisplay !== '—' ? "CATEGORY: {$categoryDisplay}" : null,
             $rollNo && $rollNo !== '—' ? "ROLL NO: {$rollNo}" : null,
+            $genderDisplay !== '' ? "GENDER: ".mb_strtoupper($genderDisplay) : null,
+        ]));
+
+        $studentInfoInlineFestId = implode("\u{2003}\u{2003}", array_filter([
+            $categoryDisplay !== '—' ? "CATEGORY: {$categoryDisplay}" : null,
+            $festIdValue ? "FEST ID: {$festIdValue}" : ($rollNo && $rollNo !== '—' ? "ROLL NO: {$rollNo}" : null),
             $genderDisplay !== '' ? "GENDER: ".mb_strtoupper($genderDisplay) : null,
         ]));
 
@@ -948,9 +957,11 @@ class FestIdCardService
             'student_reg_no'  => $studentRegNo,
             'student_seq_id'  => $studentSeqId ?: $studentRegNo,
             'roll_no'         => $rollNo,
+            'fest_id'         => $festIdValue,
             'student_id'      => $studentRegNo,
             'student_class'   => $studentClass,
             'student_info_inline' => $studentInfoInline,
+            'student_info_inline_fest_id' => $studentInfoInlineFestId,
             'class_category'  => $classCategory,
             'event_name'      => $event->title,
             'phase_name'      => $phaseName,
@@ -1438,6 +1449,7 @@ class FestIdCardService
                 'schedule'        => null,
                 'id_label'        => 'Volunteer ID',
                 'id_number'       => $volId,
+                'fest_id'         => $volId,
                 'secondary_label' => 'Event',
                 'secondary_value' => str($event->title)->limit(28)->toString(),
                 'qr_src'          => $this->qrService->dataUri($qrPayload),
@@ -1488,6 +1500,7 @@ class FestIdCardService
                 'schedule'        => null,
                 'id_label'        => 'Staff ID',
                 'id_number'       => $staffId,
+                'fest_id'         => $staffId,
                 'secondary_label' => 'Access',
                 'secondary_value' => str($user?->email ?? '—')->limit(24)->toString(),
                 'qr_src'          => $this->qrService->dataUri($qrPayload),
@@ -1622,6 +1635,7 @@ class FestIdCardService
             'item_count'      => count($itemTitles),
             'id_label'        => 'Fest ID',
             'id_number'       => $festId,
+            'fest_id'         => $festId,
             'secondary_label' => null,
             'secondary_value' => null,
             'qr_src'          => $this->qrService->dataUri($qrPayload),

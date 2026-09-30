@@ -1577,6 +1577,10 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/food-coupons', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'index'])->name('food-coupons.index');
             Route::post('/{event}/food-coupons/issue', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'issueFromCatering'])->name('food-coupons.issue');
             Route::post('/{event}/food-coupons/issue-from-bill', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'issueFromBill'])->name('food-coupons.issue-from-bill');
+            Route::post('/{event}/food-coupons/generate-extra', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'generateExtra'])->name('food-coupons.generate-extra');
+            Route::post('/{event}/food-coupons/ungenerate', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'ungenerate'])->name('food-coupons.ungenerate');
+            Route::post('/{event}/food-coupons/template-background', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'uploadTemplateBackground'])->name('food-coupons.template-background');
+            Route::delete('/{event}/food-coupons/template-background', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'removeTemplateBackground'])->name('food-coupons.template-background.remove');
             Route::post('/{event}/food-coupons/{coupon}/redeem', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'redeem'])->name('food-coupons.redeem');
             Route::get('/{event}/food-coupons/print', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'print'])->name('food-coupons.print');
             Route::get('/{event}/food-menu', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'index'])->name('food-menu.index');
@@ -2273,6 +2277,14 @@ Route::get('/certificates/pdf/{uuid}', [PublicCertificateController::class, 'pdf
 Route::get('/verify/{uuid}', [PublicCertificateController::class, 'verify'])
     ->middleware(['web', 'throttle:60,1'])
     ->name('verify');
+
+Route::get('/food-coupons/verify/{token}', [\App\Http\Controllers\FestFoodCouponVerificationController::class, 'verify'])
+    ->middleware(['web', 'throttle:120,1'])
+    ->name('food-coupons.verify');
+
+Route::post('/food-coupons/verify/{token}/redeem', [\App\Http\Controllers\FestFoodCouponVerificationController::class, 'redeem'])
+    ->middleware(['web', 'throttle:60,1'])
+    ->name('food-coupons.verify.redeem');
 
 // ── Live display screens (Phase 20) ──────────────────────────────────────────
 Route::get('/display/{tenantId}/{slug}', [DisplayScreenController::class, 'show'])

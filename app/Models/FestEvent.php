@@ -64,7 +64,7 @@ class FestEvent extends Model
         'schedule_mode', 'competition_time',
         'notification_settings',
         'strict_item_payment_gating',
-        'food_payee_type', 'food_host_school_id', 'require_payment_for_coupons', 'food_order_opens_at', 'food_order_closes_at', 'food_order_day_windows',
+        'food_payee_type', 'food_host_school_id', 'food_coupon_bg_image', 'require_payment_for_coupons', 'food_order_opens_at', 'food_order_closes_at', 'food_order_day_windows',
         'phase_mode_enabled', 'workflow_mode', 'source_phase_id', 'registration_batch_id', 'workflow_leaf_key',
         'reporting_batch_min_registrations', 'reporting_batch_size',
         'certificate_signatories',
@@ -202,6 +202,32 @@ class FestEvent extends Model
         }
 
         return $sahodayaProfile ? $sahodayaProfile->paymentQrCodeUrl() : null;
+    }
+
+    /** Resolved food coupon background template image URL */
+    public function foodCouponBgImageUrl(?Tenant $sahodaya = null): ?string
+    {
+        if (blank($this->food_coupon_bg_image)) {
+            return null;
+        }
+
+        $path = (string) $this->food_coupon_bg_image;
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://') || str_starts_with($path, '/')) {
+            return $path;
+        }
+
+        return \App\Support\TenantStorage::assetUrl($sahodaya, $path)
+            ?? ('/storage/' . ltrim($path, '/'));
+    }
+
+    /** Base64 data URI of coupon background image for PDF rendering */
+    public function foodCouponBgImageDataUri(?Tenant $sahodaya = null): ?string
+    {
+        if (blank($this->food_coupon_bg_image)) {
+            return null;
+        }
+
+        return \App\Support\TenantStorage::backgroundDataUri($sahodaya, $this->food_coupon_bg_image);
     }
 
     public function requiresManualApproval(): bool

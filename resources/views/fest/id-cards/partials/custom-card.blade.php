@@ -14,10 +14,16 @@
             if ($value === null || $value === '') {
                 if ($source === 'subtitle') {
                     $value = $card['school_name'] ?? null;
+                } elseif ($source === 'fest_id') {
+                    $value = $card['level_registration_number'] ?? $card['id_number'] ?? null;
                 } elseif ($source === 'id_number') {
-                    $value = $card['roll_no'] ?? $card['student_seq_id'] ?? null;
+                    $value = $card['fest_id'] ?? $card['roll_no'] ?? $card['student_seq_id'] ?? null;
+                } elseif ($source === 'roll_no') {
+                    $value = $card['student_seq_id'] ?? null;
                 } elseif ($source === 'student_id') {
                     $value = $card['student_reg_no'] ?? null;
+                } elseif ($source === 'student_info_inline_fest_id') {
+                    $value = $card['student_info_inline'] ?? null;
                 }
             }
             if ($type === 'text' && !empty($field['text_format'])) {

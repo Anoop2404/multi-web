@@ -236,9 +236,9 @@
                             <div v-if="field.type === 'text'" class="sm:col-span-6">
                                 <label class="text-[10px] uppercase text-slate-400">Text format (optional)</label>
                                 <input v-model="field.text_format" type="text" maxlength="255" class="field text-sm"
-                                       placeholder="Example: CATEGORY: {category}  ROLL NO: {roll_no}  GENDER: {gender_upper}">
+                                       placeholder="Example: CATEGORY: {category}  FEST ID: {fest_id}  GENDER: {gender_upper}">
                                 <p class="mt-1 text-[11px] text-slate-400">
-                                    Use {source_name} placeholders to combine dynamic values and editable labels in one line. Leave blank to show the selected data source directly.
+                                    Use {source_name} placeholders (e.g. {fest_id}, {roll_no}, {category}, {gender_upper}) to combine dynamic values and editable labels in one line. Leave blank to show the selected data source directly.
                                 </p>
                             </div>
                             <div v-if="field.type === 'item_row'">

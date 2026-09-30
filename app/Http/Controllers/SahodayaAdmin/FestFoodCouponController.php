@@ -2,63 +2,133 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
-use App\Support\FestPageActivity;
 use App\Models\FestCateringOrder;
 use App\Models\FestEvent;
 use App\Models\FestFoodBill;
 use App\Models\FestFoodCoupon;
 use App\Models\Tenant;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Events\FestIdCardQrService;
 use App\Services\Events\FestPartitionService;
+use App\Support\FestPageActivity;
 use App\Support\TenantBranding;
+use App\Support\TenantStorage;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class FestFoodCouponController extends SahodayaAdminController
 {
-    public function index(string $tenantId, FestEvent $event, FestPartitionService $partitions)
+    public function index(string $tenantId, FestEvent $event, FestPartitionService $partitions, Request $request)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $coupons = FestFoodCoupon::where('event_id', $event->id)
-            ->orderByDesc('valid_date')
-            ->orderBy('school_id')
+        $query = FestFoodCoupon::where('event_id', $event->id)
+            ->with('school');
+
+        // Optional filters
+        if ($meal = $request->query('meal_type')) {
+            $query->where('meal_type', $meal);
+        }
+        if ($schoolId = $request->query('school_id')) {
+            $query->where('school_id', $schoolId);
+        }
+        if ($date = $request->query('valid_date')) {
+            $query->where('valid_date', $date);
+        }
+        if ($status = $request->query('status')) {
+            $query->where('status', $status);
+        }
+        if ($request->query('extra_only') === '1') {
+            $query->where('is_extra', true);
+        }
+
+        $coupons = $query->orderBy('valid_date', 'desc')
+            ->orderBy('meal_type')
+            ->orderBy('sequence_no')
             ->get();
 
-        $schools = Tenant::whereIn('id', $coupons->pluck('school_id')->unique())
-            ->pluck('name', 'id');
+        $allEventCoupons = FestFoodCoupon::where('event_id', $event->id)->get();
 
-        // Coupons are always empty on a partitioned hub by construction — they're issued
-        // per region, against each region's own catering orders/bills. Without hub
-        // awareness here this page silently showed an empty list with no explanation why.
+        $schools = Tenant::where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $schoolMap = $schools->pluck('name', 'id')->all();
+
         $isPartitionedHub = $partitions->isPartitionedHub($event);
 
+        // Dates for filtering
+        $eventDates = [];
+        if ($event->event_start && $event->event_end) {
+            for ($d = $event->event_start->copy(); $d->lte($event->event_end); $d->addDay()) {
+                $eventDates[] = $d->format('Y-m-d');
+            }
+        }
+        if (empty($eventDates)) {
+            $eventDates = $allEventCoupons->pluck('valid_date')
+                ->filter()
+                ->map(fn ($d) => $d->format('Y-m-d'))
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
+        }
+
         return $this->inertia('Sahodaya/Events/FoodCoupons', $this->withEventActivity($event, FestPageActivity::FOOD_COUPONS, [
-            'event'   => $event,
+            'event'   => [
+                ...$event->only('id', 'title', 'event_type', 'event_start', 'event_end', 'require_payment_for_coupons'),
+                'food_coupon_bg_image_url' => $event->foodCouponBgImageUrl($this->sahodaya),
+                'has_template_bg' => filled($event->food_coupon_bg_image),
+            ],
             'hierarchy' => $event->hierarchyContext(),
             'isPartitionedHub' => $isPartitionedHub,
             'foodRegionSummary' => $isPartitionedHub ? $partitions->foodRegionDrillDownSummary($event) : [],
             'coupons' => $coupons->map(fn (FestFoodCoupon $c) => [
-                ...$c->toArray(),
-                'school_name' => $schools[$c->school_id] ?? $c->school_id,
+                'id' => $c->id,
+                'coupon_code' => $c->coupon_code,
+                'qr_token' => $c->qr_token,
+                'sequence_no' => $c->sequence_no,
+                'meal_type' => $c->meal_type,
+                'valid_date' => $c->valid_date?->format('Y-m-d'),
+                'head_count' => $c->head_count,
+                'is_extra' => (bool) $c->is_extra,
+                'batch_id' => $c->batch_id,
+                'status' => $c->status,
+                'issued_at' => $c->issued_at?->toIso8601String(),
+                'redeemed_at' => $c->redeemed_at?->toIso8601String(),
+                'notes' => $c->notes,
+                'school_id' => $c->school_id,
+                'school_name' => $c->school_id ? ($schoolMap[$c->school_id] ?? $c->school_id) : 'General Buffer / Extra',
             ]),
+            'schools' => $schools,
+            'eventDates' => $eventDates,
+            'mealTypes' => FestFoodCoupon::MEAL_LABELS,
+            'mealPrefixes' => FestFoodCoupon::MEAL_PREFIXES,
             'summary' => [
-                'issued'   => $coupons->where('status', 'issued')->count(),
-                'redeemed' => $coupons->where('status', 'redeemed')->count(),
+                'total'    => $allEventCoupons->count(),
+                'issued'   => $allEventCoupons->where('status', 'issued')->count(),
+                'redeemed' => $allEventCoupons->where('status', 'redeemed')->count(),
+                'extra'    => $allEventCoupons->where('is_extra', true)->count(),
+                'breakfast'=> $allEventCoupons->where('meal_type', 'breakfast')->count(),
+                'lunch'    => $allEventCoupons->where('meal_type', 'lunch')->count(),
+                'dinner'   => $allEventCoupons->where('meal_type', 'dinner')->count(),
+                'snacks'   => $allEventCoupons->where('meal_type', 'snacks')->count(),
+            ],
+            'filters' => [
+                'meal_type' => $request->query('meal_type', ''),
+                'school_id' => $request->query('school_id', ''),
+                'valid_date' => $request->query('valid_date', ''),
+                'status' => $request->query('status', ''),
+                'extra_only' => $request->query('extra_only') === '1',
             ],
         ]));
     }
 
     /**
-     * Older headcount/coupon flow. FestCateringOrder is free-form headcount with no price
-     * or payment record at all, so once an event requires payment for coupons, this flow
-     * has nothing to check payment against and is blocked outright rather than silently
-     * issuing free coupons on a "payment required" event — see Food Module audit
-     * 2026-08-17, Finding 1: this was previously a complete, unguarded bypass of
-     * require_payment_for_coupons via the legacy flow. Events that don't require payment
-     * are unaffected. The flag's "real" enforcement is issueFromBill() below, the
-     * priced-menu equivalent, which actually has a balance to check.
-     * See docs/REGION_SCOPED_ADMIN_AND_EVENT_FLOW_PLAN.md §2.6/§2.7.
+     * Issue individual 1-head food coupons from confirmed catering orders.
      */
     public function issueFromCatering(string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
     {
@@ -73,49 +143,53 @@ class FestFoodCouponController extends SahodayaAdminController
             ->where('status', 'confirmed')
             ->get();
 
+        $batchId = 'cat_' . Str::random(8);
         $created = 0;
-        foreach ($orders as $order) {
-            $exists = FestFoodCoupon::where('event_id', $event->id)
-                ->where('school_id', $order->school_id)
-                ->where('valid_date', $order->meal_date)
-                ->where('meal_type', $order->meal_type)
-                ->exists();
 
-            if ($exists) {
-                continue;
+        DB::transaction(function () use ($event, $orders, $batchId, &$created) {
+            foreach ($orders as $order) {
+                $exists = FestFoodCoupon::where('event_id', $event->id)
+                    ->where('school_id', $order->school_id)
+                    ->where('valid_date', $order->meal_date)
+                    ->where('meal_type', $order->meal_type)
+                    ->where('is_extra', false)
+                    ->exists();
+
+                if ($exists) {
+                    continue;
+                }
+
+                $codeData = FestFoodCoupon::generateSerializedCode($event, $order->meal_type);
+
+                FestFoodCoupon::create([
+                    'event_id'    => $event->id,
+                    'school_id'   => $order->school_id,
+                    'coupon_code' => $codeData['code'],
+                    'sequence_no' => $codeData['sequence_no'],
+                    'qr_token'    => FestFoodCoupon::generateQrToken(),
+                    'meal_type'   => $order->meal_type,
+                    'valid_date'  => $order->meal_date,
+                    'head_count'  => $order->head_count,
+                    'is_extra'    => false,
+                    'batch_id'    => $batchId,
+                    'status'      => 'issued',
+                    'issued_at'   => now(),
+                    'notes'       => $order->notes ?: "Catering order #{$order->id}",
+                ]);
+                $created++;
             }
+        });
 
-            FestFoodCoupon::create([
-                'event_id'    => $event->id,
-                'school_id'   => $order->school_id,
-                'coupon_code' => FestFoodCoupon::generateCode($event),
-                'meal_type'   => $order->meal_type,
-                'valid_date'  => $order->meal_date,
-                'head_count'  => $order->head_count,
-                'status'      => 'issued',
-                'issued_at'   => now(),
-                'notes'       => $order->notes,
-            ]);
-            $created++;
-        }
-
-        $audit->festEvent($event, FestPageActivity::FOOD_COUPONS, 'fest.food_coupons.issued', "{$created} food coupon(s) issued", [
+        $audit->festEvent($event, FestPageActivity::FOOD_COUPONS, 'fest.food_coupons.issued', "{$created} food coupon(s) issued from confirmed catering orders", [
             'count' => $created,
+            'batch_id' => $batchId,
         ]);
 
         return back()->with('success', "{$created} food coupon(s) issued from confirmed catering orders.");
     }
 
     /**
-     * Priced-menu/billing equivalent of issueFromCatering() — closes the gap where schools
-     * ordering through FestFoodBill/FestFoodOrderItem got no coupons at all (the old method
-     * only ever read FestCateringOrder). One coupon per (school, menu_date, meal_type) group
-     * of ordered quantities, mirroring the shape issueFromCatering() already produces so the
-     * redemption/print flow (FestFoodCoupon, print(), redeem()) needs no changes.
-     *
-     * When $event->require_payment_for_coupons is on, only settled bills are eligible —
-     * unlike the free catering flow, a FestFoodBill has a real balance, so "paid" is
-     * meaningful here.
+     * Issue food coupons from settled food bills.
      */
     public function issueFromBill(string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
     {
@@ -130,85 +204,283 @@ class FestFoodCouponController extends SahodayaAdminController
             ->with('orderItems')
             ->get();
 
+        $batchId = 'bill_' . Str::random(8);
         $created = 0;
-        foreach ($bills as $bill) {
-            $grouped = $bill->orderItems->groupBy(
-                fn ($item) => $item->menu_date->toDateString().'|'.$item->meal_type
-            );
 
-            foreach ($grouped as $key => $items) {
-                [$menuDate, $mealType] = explode('|', $key, 2);
-                $headCount = (int) $items->sum('quantity');
+        DB::transaction(function () use ($event, $bills, $batchId, &$created) {
+            foreach ($bills as $bill) {
+                $grouped = $bill->orderItems->groupBy(
+                    fn ($item) => $item->menu_date->toDateString().'|'.$item->meal_type
+                );
 
-                if ($headCount <= 0) {
-                    continue;
+                foreach ($grouped as $key => $items) {
+                    [$menuDate, $mealType] = explode('|', $key, 2);
+                    $headCount = (int) $items->sum('quantity');
+
+                    if ($headCount <= 0) {
+                        continue;
+                    }
+
+                    $exists = FestFoodCoupon::where('event_id', $event->id)
+                        ->where('school_id', $bill->school_id)
+                        ->where('valid_date', $menuDate)
+                        ->where('meal_type', $mealType)
+                        ->where('is_extra', false)
+                        ->exists();
+
+                    if ($exists) {
+                        continue;
+                    }
+
+                    $codeData = FestFoodCoupon::generateSerializedCode($event, $mealType);
+
+                    FestFoodCoupon::create([
+                        'event_id'    => $event->id,
+                        'school_id'   => $bill->school_id,
+                        'coupon_code' => $codeData['code'],
+                        'sequence_no' => $codeData['sequence_no'],
+                        'qr_token'    => FestFoodCoupon::generateQrToken(),
+                        'meal_type'   => $mealType,
+                        'valid_date'  => $menuDate,
+                        'head_count'  => $headCount,
+                        'is_extra'    => false,
+                        'batch_id'    => $batchId,
+                        'status'      => 'issued',
+                        'issued_at'   => now(),
+                        'notes'       => "Issued from priced food-menu order (bill #{$bill->id})",
+                    ]);
+                    $created++;
                 }
-
-                $exists = FestFoodCoupon::where('event_id', $event->id)
-                    ->where('school_id', $bill->school_id)
-                    ->where('valid_date', $menuDate)
-                    ->where('meal_type', $mealType)
-                    ->exists();
-
-                if ($exists) {
-                    continue;
-                }
-
-                FestFoodCoupon::create([
-                    'event_id'    => $event->id,
-                    'school_id'   => $bill->school_id,
-                    'coupon_code' => FestFoodCoupon::generateCode($event),
-                    'meal_type'   => $mealType,
-                    'valid_date'  => $menuDate,
-                    'head_count'  => $headCount,
-                    'status'      => 'issued',
-                    'issued_at'   => now(),
-                    'notes'       => "Issued from priced food-menu order (bill #{$bill->id})",
-                ]);
-                $created++;
             }
-        }
+        });
 
-        $audit->festEvent($event, FestPageActivity::FOOD_COUPONS, 'fest.food_coupons.issued', "{$created} food coupon(s) issued from food billing", [
+        $audit->festEvent($event, FestPageActivity::FOOD_COUPONS, 'fest.food_coupons.issued', "{$created} food coupon(s) issued from food bills", [
             'count' => $created,
+            'batch_id' => $batchId,
             'require_payment' => $requirePayment,
         ]);
 
         return back()->with('success', "{$created} food coupon(s) issued from ".($requirePayment ? 'settled' : 'open').' food bills.');
     }
 
+    /**
+     * Admin generator for extra/buffer food coupons.
+     */
+    public function generateExtra(string $tenantId, FestEvent $event, Request $request, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'meal_type'  => 'required|string|in:breakfast,lunch,dinner,snacks,tea,other',
+            'valid_date' => 'required|date',
+            'quantity'   => 'required|integer|min:1|max:500',
+            'school_id'  => 'nullable|string',
+            'notes'      => 'nullable|string|max:255',
+        ]);
+
+        $batchId = 'extra_' . Str::random(8);
+        $quantity = (int) $data['quantity'];
+        $created = 0;
+
+        DB::transaction(function () use ($event, $data, $batchId, $quantity, &$created) {
+            for ($i = 0; $i < $quantity; $i++) {
+                $codeData = FestFoodCoupon::generateSerializedCode($event, $data['meal_type']);
+
+                FestFoodCoupon::create([
+                    'event_id'    => $event->id,
+                    'school_id'   => !empty($data['school_id']) ? $data['school_id'] : null,
+                    'coupon_code' => $codeData['code'],
+                    'sequence_no' => $codeData['sequence_no'],
+                    'qr_token'    => FestFoodCoupon::generateQrToken(),
+                    'meal_type'   => $data['meal_type'],
+                    'valid_date'  => $data['valid_date'],
+                    'head_count'  => 1,
+                    'is_extra'    => true,
+                    'batch_id'    => $batchId,
+                    'status'      => 'issued',
+                    'issued_at'   => now(),
+                    'notes'       => !empty($data['notes']) ? $data['notes'] : 'Admin extra / buffer',
+                ]);
+                $created++;
+            }
+        });
+
+        $audit->festEvent($event, FestPageActivity::FOOD_COUPONS, 'fest.food_coupons.extra_generated', "{$created} extra food coupon(s) generated for {$data['meal_type']}", [
+            'count' => $created,
+            'meal_type' => $data['meal_type'],
+            'batch_id' => $batchId,
+        ]);
+
+        return back()->with('success', "{$created} extra food coupon(s) generated successfully.");
+    }
+
+    /**
+     * Ungenerate / delete unredeemed coupons.
+     */
+    public function ungenerate(string $tenantId, FestEvent $event, Request $request, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'scope'      => 'required|string|in:all_unredeemed,extra_only,by_meal_type,selected',
+            'meal_type'  => 'nullable|string|in:breakfast,lunch,dinner,snacks,tea,other',
+            'valid_date' => 'nullable|date',
+            'coupon_ids' => 'nullable|array',
+            'coupon_ids.*' => 'integer',
+        ]);
+
+        $query = FestFoodCoupon::where('event_id', $event->id)
+            ->where('status', 'issued'); // NEVER delete redeemed coupons
+
+        if ($data['scope'] === 'extra_only') {
+            $query->where('is_extra', true);
+        } elseif ($data['scope'] === 'by_meal_type') {
+            if (!empty($data['meal_type'])) {
+                $query->where('meal_type', $data['meal_type']);
+            }
+            if (!empty($data['valid_date'])) {
+                $query->where('valid_date', $data['valid_date']);
+            }
+        } elseif ($data['scope'] === 'selected') {
+            $ids = $data['coupon_ids'] ?? [];
+            if (empty($ids)) {
+                return back()->with('error', 'No coupons were selected to ungenerate.');
+            }
+            $query->whereIn('id', $ids);
+        }
+
+        $deletedCount = $query->delete();
+
+        $audit->festEvent($event, FestPageActivity::FOOD_COUPONS, 'fest.food_coupons.ungenerated', "{$deletedCount} unredeemed food coupon(s) ungenerated/removed", [
+            'count' => $deletedCount,
+            'scope' => $data['scope'],
+        ]);
+
+        return back()->with('success', "{$deletedCount} unredeemed coupon(s) removed.");
+    }
+
+    /**
+     * Upload template background image for 10-per-A4 sheet coupons.
+     */
+    public function uploadTemplateBackground(string $tenantId, FestEvent $event, Request $request, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $request->validate([
+            'background_image' => 'required|image|mimes:jpeg,jpg,png,webp|max:5120',
+        ]);
+
+        $path = TenantStorage::storeUploadedFile(
+            $request->file('background_image'),
+            "events/{$event->id}/food-coupon-template"
+        );
+
+        $event->update(['food_coupon_bg_image' => $path]);
+
+        $audit->festEvent($event, FestPageActivity::FOOD_COUPONS, 'fest.food_coupons.template_updated', 'Food coupon template background image uploaded', [
+            'path' => $path,
+        ]);
+
+        return back()->with('success', 'Food coupon template background image saved.');
+    }
+
+    /**
+     * Remove template background image.
+     */
+    public function removeTemplateBackground(string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $event->update(['food_coupon_bg_image' => null]);
+
+        $audit->festEvent($event, FestPageActivity::FOOD_COUPONS, 'fest.food_coupons.template_removed', 'Food coupon template background image removed', []);
+
+        return back()->with('success', 'Food coupon template background image removed.');
+    }
+
+    /**
+     * Mark a coupon as redeemed.
+     */
     public function redeem(string $tenantId, FestEvent $event, FestFoodCoupon $coupon, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($coupon->event_id !== $event->id, 404);
-
-        // Prevent double-redeem: only issued coupons can be marked redeemed.
         abort_if($coupon->status !== 'issued', 422, 'Only issued coupons can be redeemed.');
 
         $coupon->update(['status' => 'redeemed', 'redeemed_at' => now()]);
 
         $audit->festEvent($event, FestPageActivity::FOOD_COUPONS, 'fest.food_coupon.redeemed', 'Food coupon marked redeemed', [
             'coupon_id' => $coupon->id,
+            'coupon_code' => $coupon->coupon_code,
         ]);
 
-        return back()->with('success', 'Coupon marked redeemed.');
+        return back()->with('success', "Coupon {$coupon->coupon_code} marked redeemed.");
     }
 
-    public function print(string $tenantId, FestEvent $event)
+    /**
+     * Print issued coupons in 10-per-A4 sheet format.
+     */
+    public function print(string $tenantId, FestEvent $event, Request $request, FestIdCardQrService $qrService)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $coupons = FestFoodCoupon::where('event_id', $event->id)
+        $query = FestFoodCoupon::where('event_id', $event->id)
             ->where('status', 'issued')
-            ->with('school')
-            ->orderBy('valid_date')
+            ->with('school');
+
+        if ($meal = $request->query('meal_type')) {
+            $query->where('meal_type', $meal);
+        }
+        if ($schoolId = $request->query('school_id')) {
+            $query->where('school_id', $schoolId);
+        }
+        if ($date = $request->query('valid_date')) {
+            $query->where('valid_date', $date);
+        }
+        if ($request->query('extra_only') === '1') {
+            $query->where('is_extra', true);
+        }
+
+        $coupons = $query->orderBy('meal_type')
+            ->orderBy('sequence_no')
             ->get();
 
+        if ($coupons->isEmpty()) {
+            return back()->with('error', 'No issued food coupons match the selected filter criteria to print.');
+        }
+
+        $bgDataUri = $event->foodCouponBgImageDataUri($this->sahodaya);
+        $baseUrl = url('/');
+
+        $preparedCoupons = [];
+        foreach ($coupons as $c) {
+            $verifyUrl = $c->verificationUrl($baseUrl);
+            $qrData = $qrService->dataUri($verifyUrl);
+            $headCount = max(1, (int) $c->head_count);
+
+            for ($i = 0; $i < $headCount; $i++) {
+                $subCode = $headCount > 1 ? ($c->coupon_code . '-' . ($i + 1)) : $c->coupon_code;
+                $preparedCoupons[] = [
+                    'id' => $c->id,
+                    'coupon_code' => $subCode,
+                    'qr_token' => $c->qr_token,
+                    'meal_type' => $c->meal_type,
+                    'formatted_date' => $c->valid_date?->format('d M Y') ?? 'N/A',
+                    'head_count' => 1,
+                    'is_extra' => $c->is_extra,
+                    'school_name' => $c->school_display_name,
+                    'qr_src' => $qrData,
+                ];
+            }
+        }
+
         return Pdf::loadView('fest.catering.food-coupons', [
-            'event'    => $event,
-            'sahodaya' => $this->sahodaya,
-            'logoSrc'  => TenantBranding::logoEmbedSrc($this->sahodaya),
-            'coupons'  => $coupons,
-        ])->download('food-coupons-'.$event->id.'.pdf');
+            'event'     => $event,
+            'sahodaya'  => $this->sahodaya,
+            'logoSrc'   => TenantBranding::logoEmbedSrc($this->sahodaya),
+            'bgDataUri' => $bgDataUri,
+            'coupons'   => $preparedCoupons,
+        ])->setPaper('a4', 'portrait')
+          ->download('food-coupons-'.$event->id.'.pdf');
     }
 }

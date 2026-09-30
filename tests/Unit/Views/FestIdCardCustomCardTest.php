@@ -124,4 +124,48 @@ class FestIdCardCustomCardTest extends TestCase
         $this->assertNotContains(false, $positions);
         $this->assertSame($positions, collect($positions)->sort()->values()->all());
     }
+
+    public function test_fest_id_renders_directly_as_source(): void
+    {
+        $html = view('fest.id-cards.partials.custom-card', [
+            'cardWidthMm' => 89,
+            'cardHeightMm' => 135,
+            'backgroundUrl' => null,
+            'card' => [
+                'fest_id' => 'FEST-2026-0042',
+                'roll_no' => '10495',
+            ],
+            'fields' => [[
+                'key' => 'fest_id_field',
+                'type' => 'text',
+                'source' => 'fest_id',
+            ]],
+        ])->render();
+
+        $this->assertStringContainsString('FEST-2026-0042', $html);
+    }
+
+    public function test_text_format_can_use_fest_id_instead_of_roll_no(): void
+    {
+        $html = view('fest.id-cards.partials.custom-card', [
+            'cardWidthMm' => 89,
+            'cardHeightMm' => 135,
+            'backgroundUrl' => null,
+            'card' => [
+                'category' => 'III',
+                'fest_id' => 'KLM-0789',
+                'roll_no' => '10495',
+                'gender_upper' => 'MALE',
+            ],
+            'fields' => [[
+                'key' => 'student_info_inline_fest_id',
+                'type' => 'text',
+                'source' => 'student_info_inline_fest_id',
+                'text_format' => 'CATEGORY: {category} | FEST ID: {fest_id} | GENDER: {gender_upper}',
+            ]],
+        ])->render();
+
+        $this->assertStringContainsString('CATEGORY: III | FEST ID: KLM-0789 | GENDER: MALE', $html);
+        $this->assertStringNotContainsString('10495', $html);
+    }
 }

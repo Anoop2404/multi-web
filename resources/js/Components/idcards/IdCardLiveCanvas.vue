@@ -148,6 +148,7 @@ const SAMPLE = {
     item_label: 'Sample Item',
     role_label: 'STUDENT',
     id_number: 'SAMPLE-0001',
+    fest_id: 'FEST-2026-001',
     secondary_value: 'Sample',
     chest_number: '000',
     category: 'III',
@@ -160,6 +161,7 @@ const SAMPLE = {
     student_id: 'STU/27/10495',
     student_class: 'X',
     student_info_inline: 'CATEGORY: II\u2003\u2003ROLL NO: 10495\u2003\u2003GENDER: FEMALE',
+    student_info_inline_fest_id: 'CATEGORY: II\u2003\u2003FEST ID: FEST-2026-001\u2003\u2003GENDER: FEMALE',
     schedule: 'Sample schedule line',
     footer: 'Sample footer',
     items_inline: 'Painting Water Colour | Recitation - Malayalam | Essay Writing Malayalam | Light Music - Malayalam | Classical Music - Karnatic',
@@ -187,14 +189,23 @@ function sampleValue(source) {
         if (props.card[source] !== undefined && props.card[source] !== null && props.card[source] !== '') {
             return props.card[source];
         }
+        if (source === 'fest_id' && (props.card.level_registration_number || props.card.id_number)) {
+            return props.card.level_registration_number || props.card.id_number;
+        }
         if (source === 'student_id' && props.card.student_reg_no) {
             return props.card.student_reg_no;
         }
         if (source === 'subtitle' && props.card.school_name) {
             return props.card.school_name;
         }
-        if (source === 'id_number' && (props.card.roll_no || props.card.student_seq_id || props.card.id_number)) {
-            return props.card.roll_no || props.card.student_seq_id || props.card.id_number;
+        if (source === 'id_number' && (props.card.fest_id || props.card.id_number || props.card.roll_no || props.card.student_seq_id)) {
+            return props.card.fest_id || props.card.id_number || props.card.roll_no || props.card.student_seq_id;
+        }
+        if (source === 'roll_no' && (props.card.roll_no || props.card.student_seq_id)) {
+            return props.card.roll_no || props.card.student_seq_id;
+        }
+        if (source === 'student_info_inline_fest_id' && (props.card.student_info_inline_fest_id || props.card.student_info_inline)) {
+            return props.card.student_info_inline_fest_id || props.card.student_info_inline;
         }
         return '';
     }
