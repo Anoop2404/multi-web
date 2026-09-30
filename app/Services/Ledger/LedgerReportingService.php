@@ -209,34 +209,101 @@ class LedgerReportingService
                 ->get()
             : collect();
 
-        $schoolPayments = FestSchoolEventFee::where('event_id', $event->id)
+        $schoolFees = FestSchoolEventFee::where('event_id', $event->id)
             ->forAmountAggregation()
-            ->with(['school', 'feeReceipt', 'head'])
+            ->with(['school', 'feeReceipt', 'receipts', 'head', 'registrationBatch'])
             ->orderBy('school_id')
             ->get()
-            ->map(fn (FestSchoolEventFee $fee) => [
-                'school'          => $fee->school?->name ?? $fee->school_id,
-                'head'            => $fee->head?->name,
-                'status'          => $fee->status,
-                'total_due'       => (float) $fee->total_due,
-                'receipt_number'  => $fee->feeReceipt?->receipt_number,
-                'payment_date'    => $fee->feeReceipt?->payment_date?->toDateString(),
-                'transaction_ref' => $fee->feeReceipt?->transaction_ref,
-                'ledger_posted'   => $fee->status === 'approved' && $fee->feeReceipt?->status === 'approved',
-            ]);
+            ->map(function (FestSchoolEventFee $fee) {
+                $primaryReceipt = $fee->feeReceipt ?? $fee->receipts->sortByDesc('id')->first();
+                $hasPendingProof = $fee->receipts->contains(fn ($r) => !empty($r->file_path) && !in_array($r->status, ['approved', 'rejected', 'superseded', 'reversed'], true));
+                $effectiveStatus = $fee->status;
+                if ($effectiveStatus !== 'approved' && $hasPendingProof) {
+                    $effectiveStatus = 'proof_uploaded';
+                }
 
-        $approvedReceiptIds = FestSchoolEventFee::where('event_id', $event->id)
-            ->forAmountAggregation()
-            ->pluck('id');
-        $grossReceipts = (float) \App\Models\FeeReceipt::query()
-            ->where('feeable_type', FestSchoolEventFee::class)
-            ->whereIn('feeable_id', $approvedReceiptIds)
-            ->where('status', \App\Models\FeeReceipt::STATUS_APPROVED)
-            ->sum('amount');
-        $settled = (float) FestSchoolEventFee::where('event_id', $event->id)
-            ->forAmountAggregation()
-            ->get(['total_due', 'amount_paid'])
-            ->sum(fn (FestSchoolEventFee $fee) => min((float) $fee->total_due, (float) $fee->amount_paid));
+                return [
+                    'id'                    => $fee->id,
+                    'school_id'             => $fee->school_id,
+                    'school'                => $fee->school?->name ?? $fee->school_id,
+                    'head'                  => $fee->head?->name,
+                    'registration_batch_id' => $fee->registration_batch_id,
+                    'registration_batch'    => $fee->registrationBatch?->name,
+                    'status'                => $effectiveStatus,
+                    'total_due'             => (float) $fee->total_due,
+                    'amount_paid'           => (float) $fee->amount_paid,
+                    'balance_due'           => (float) $fee->outstandingBalance(),
+                    'receipt_number'        => $primaryReceipt?->receipt_number,
+                    'payment_date'          => $primaryReceipt?->payment_date?->format('d M Y'),
+                    'transaction_ref'       => $primaryReceipt?->transaction_ref,
+                    'ledger_posted'         => $effectiveStatus === 'approved' && ((float) $fee->amount_paid > 0 || $primaryReceipt?->status === 'approved'),
+                    'receipts'              => $fee->receipts->sortByDesc('id')->map(fn ($r) => [
+                        'id'              => $r->id,
+                        'receipt_number'  => $r->receipt_number,
+                        'amount'          => (float) $r->amount,
+                        'status'          => $r->status,
+                        'transaction_ref' => $r->transaction_ref,
+                        'payment_date'    => $r->payment_date?->format('d M Y'),
+                    ])->values()->all(),
+                ];
+            });
+
+        $batchRows = $schoolFees->filter(fn (array $r) => $r['registration_batch_id'] !== null);
+        $otherRows = $schoolFees->filter(fn (array $r) => $r['registration_batch_id'] === null);
+
+        $combinedBatchRows = $batchRows->groupBy('school_id')->map(function ($group) use ($event) {
+            $first = $group->first();
+            $schoolId = $first['school_id'];
+
+            $rollup = FestSchoolEventFee::where('event_id', $event->rootEvent()->id)
+                ->where('school_id', $schoolId)
+                ->whereNull('registration_batch_id')
+                ->whereNull('phase_id')
+                ->whereNull('head_id')
+                ->first();
+
+            $totalDue = $rollup ? (float) $rollup->total_due : round((float) $group->sum('total_due'), 2);
+            $amountPaid = $rollup ? (float) $rollup->amount_paid : round((float) $group->sum('amount_paid'), 2);
+            $balanceDue = round(max(0, $totalDue - $amountPaid), 2);
+
+            $allReceipts = $group->flatMap(fn (array $r) => $r['receipts'])->sortByDesc('id')->unique('id')->values()->all();
+            $primaryReceipt = collect($allReceipts)->first();
+
+            $hasPendingProof = $group->contains(fn ($r) => ($r['status'] ?? '') === 'proof_uploaded');
+            $status = $rollup?->status ?? $first['status'];
+            if ($status !== 'approved' && $hasPendingProof) {
+                $status = 'proof_uploaded';
+            }
+
+            return [
+                'id'                    => $rollup?->id ?? $first['id'],
+                'school_id'             => $schoolId,
+                'school'                => $first['school'],
+                'head'                  => null,
+                'registration_batch_id' => null,
+                'registration_batch'    => null,
+                'status'                => $status,
+                'total_due'             => $totalDue,
+                'amount_paid'           => $amountPaid,
+                'balance_due'           => $balanceDue,
+                'receipt_number'        => $primaryReceipt['receipt_number'] ?? null,
+                'payment_date'          => $primaryReceipt['payment_date'] ?? null,
+                'transaction_ref'       => $primaryReceipt['transaction_ref'] ?? null,
+                'ledger_posted'         => $status === 'approved' || $amountPaid >= $totalDue,
+                'receipts'              => $allReceipts,
+            ];
+        })->values();
+
+        $schoolPayments = $otherRows->concat($combinedBatchRows)
+            ->filter(fn ($row) => (float) ($row['total_due'] ?? 0) > 0 || (float) ($row['amount_paid'] ?? 0) > 0)
+            ->sortBy(fn ($row) => strtolower($row['school']))
+            ->values();
+
+        $settled = (float) $schoolPayments->sum(fn ($row) => min((float) $row['total_due'], (float) $row['amount_paid']));
+        $totalPaid = (float) $schoolPayments->sum('amount_paid');
+        $totalDue = (float) $schoolPayments->sum('total_due');
+        $pendingBalance = (float) $schoolPayments->sum('balance_due');
+        $overpayment = (float) $schoolPayments->sum(fn ($row) => max(0, (float) $row['amount_paid'] - (float) $row['total_due']));
 
         return [
             'head'             => $head,
@@ -245,13 +312,17 @@ class LedgerReportingService
             'transactions'     => $transactions,
             'school_payments'  => $schoolPayments,
             'summary'          => [
-                'total_due'      => (float) $schoolPayments->sum('total_due'),
-                'collected'      => round($settled, 2),
-                'gross_receipts' => round($grossReceipts, 2),
-                'overpayment'    => round(max(0, $grossReceipts - $settled), 2),
-                'pending'        => $schoolPayments->where('status', 'pending')->count(),
-                'awaiting'       => $schoolPayments->where('status', 'proof_uploaded')->count(),
-                'ledger_credits' => (float) $transactions->where('entry_type', 'credit')->sum('amount'),
+                'total_schools'   => $schoolPayments->pluck('school_id')->unique()->count(),
+                'total_due'       => round($totalDue, 2),
+                'collected'       => round($settled, 2),
+                'gross_receipts'  => round($totalPaid, 2),
+                'pending_balance' => round($pendingBalance, 2),
+                'overpayment'     => round($overpayment, 2),
+                'approved'        => $schoolPayments->where('status', 'approved')->count(),
+                'partial'         => $schoolPayments->where('status', 'partial')->count(),
+                'pending'         => $schoolPayments->where('status', 'pending')->count(),
+                'awaiting'        => $schoolPayments->where('status', 'proof_uploaded')->count(),
+                'ledger_credits'  => (float) $transactions->where('entry_type', 'credit')->sum('amount'),
             ],
         ];
     }

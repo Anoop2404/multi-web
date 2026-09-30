@@ -282,6 +282,8 @@ class FestEventFeesController extends SahodayaAdminController
                 'entry_type'       => $t->entry_type,
                 'amount'           => (float) $t->amount,
                 'description'      => $t->description,
+                'reference_id'     => $t->reference_id,
+                'reference_type'   => $t->reference_type,
             ])->values(),
             'levelLabel' => config("fest_fees.level_labels.{$event->level_round}", $event->level_round),
         ]));
@@ -367,9 +369,11 @@ class FestEventFeesController extends SahodayaAdminController
                 $items = $regs->map(fn ($r) => $r->item?->title)->filter()->unique()->values()->all();
 
                 return [
+                    'id'                      => $fee->id,
                     'school_id'               => $fee->school_id,
                     'school_name'             => $fee->school?->name ?? $fee->school_id,
                     'head_name'               => $fee->head?->name,
+                    'registration_batch_id'   => $fee->registration_batch_id,
                     'registration_batch'      => $fee->registrationBatch?->name,
                     'status'                  => $effectiveStatus,
                     'school_registration_fee' => (float) $fee->school_registration_fee,
@@ -380,7 +384,7 @@ class FestEventFeesController extends SahodayaAdminController
                     // See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14 — money owed BACK
                     // to this school (rejected/cancelled paid items), shown alongside
                     // balance_due rather than netted into it.
-                    'available_credit'        => $fee->outstandingCredit(),
+                    'available_credit'        => (float) $fee->outstandingCredit(),
                     'item_count'              => (int) $fee->participation_item_count,
                     'receipt_no'              => $primaryReceipt?->receipt_number,
                     'payment_date'            => $primaryReceipt?->payment_date?->format('d M Y'),
@@ -389,7 +393,62 @@ class FestEventFeesController extends SahodayaAdminController
                     'items'                   => $items,
                     'receipts'                => $receipts,
                 ];
-            })
+            });
+
+        // Combine multi-level batch rows per school (just like index()), so the PDF report
+        // is consolidated per school instead of repeating each school across multiple level rows.
+        $batchRows = $schoolFees->filter(fn (array $r) => $r['registration_batch_id'] !== null);
+        $otherRows = $schoolFees->filter(fn (array $r) => $r['registration_batch_id'] === null);
+
+        $combinedBatchRows = $batchRows->groupBy('school_id')->map(function ($group) use ($event) {
+            $first = $group->first();
+            $schoolId = $first['school_id'];
+
+            $rollup = FestSchoolEventFee::where('event_id', $event->rootEvent()->id)
+                ->where('school_id', $schoolId)
+                ->whereNull('registration_batch_id')
+                ->whereNull('phase_id')
+                ->whereNull('head_id')
+                ->first();
+
+            $allReceipts = $group->flatMap(fn (array $r) => $r['receipts'])->sortByDesc('id')->unique('id')->values()->all();
+            $primaryReceipt = collect($allReceipts)->first();
+
+            $totalDue = $rollup ? (float) $rollup->total_due : round((float) $group->sum('total_due'), 2);
+            $amountPaid = $rollup ? (float) $rollup->amount_paid : round((float) $group->sum('amount_paid'), 2);
+            $balanceDue = round(max(0, $totalDue - $amountPaid), 2);
+
+            $hasPendingProof = $group->contains(fn ($r) => ($r['status'] ?? '') === 'proof_uploaded');
+            $status = $rollup?->status ?? $first['status'];
+            if ($status !== 'approved' && $hasPendingProof) {
+                $status = 'proof_uploaded';
+            }
+
+            return [
+                'id'                      => $rollup?->id ?? $first['id'],
+                'school_id'               => $schoolId,
+                'school_name'             => $first['school_name'],
+                'head_name'               => null,
+                'registration_batch_id'   => null,
+                'registration_batch'      => null,
+                'status'                  => $status,
+                'school_registration_fee' => round((float) $group->sum('school_registration_fee'), 2),
+                'participation_fee'       => round((float) $group->sum('participation_fee'), 2),
+                'total_due'               => $totalDue,
+                'amount_paid'             => $amountPaid,
+                'balance_due'             => $balanceDue,
+                'available_credit'        => round((float) $group->sum('available_credit'), 2),
+                'item_count'              => (int) $group->sum('item_count'),
+                'receipt_no'              => $primaryReceipt['receipt_number'] ?? null,
+                'payment_date'            => $primaryReceipt['payment_date'] ?? null,
+                'txn_ref'                 => $primaryReceipt['transaction_ref'] ?? null,
+                'breakdown'               => ['items' => $group->flatMap(fn (array $r) => $r['breakdown']['items'] ?? [])->values()->all()],
+                'items'                   => $group->flatMap(fn (array $r) => $r['items'])->unique()->values()->all(),
+                'receipts'                => $allReceipts,
+            ];
+        })->values();
+
+        $schoolFees = $otherRows->concat($combinedBatchRows)
             ->filter(fn ($row) => ($row['item_count'] ?? 0) > 0 || count($row['items'] ?? []) > 0 || (float) ($row['total_due'] ?? 0) > 0);
 
         $statusRank = [
@@ -407,10 +466,16 @@ class FestEventFeesController extends SahodayaAdminController
 
         $summary = [
             'total_schools' => $schoolFees->pluck('school_id')->unique()->count(),
-            'total_due'     => $schoolFees->sum('total_due'),
-            'total_paid'    => $schoolFees->sum('amount_paid'),
-            'total_balance' => $schoolFees->sum('balance_due'),
-            'total_credit'  => $schoolFees->sum('available_credit'),
+            'total_due'     => round((float) $schoolFees->sum('total_due'), 2),
+            'total_paid'    => round((float) $schoolFees->sum('amount_paid'), 2),
+            'total_settled' => round((float) $schoolFees->sum(
+                fn (array $row) => min((float) ($row['total_due'] ?? 0), (float) ($row['amount_paid'] ?? 0))
+            ), 2),
+            'total_balance' => round((float) $schoolFees->sum('balance_due'), 2),
+            'total_credit'  => round((float) $schoolFees->sum('available_credit'), 2),
+            'overpayment'   => round((float) $schoolFees->sum(
+                fn (array $row) => max(0, (float) ($row['amount_paid'] ?? 0) - (float) ($row['total_due'] ?? 0))
+            ), 2),
             'approved'      => $schoolFees->where('status', 'approved')->count(),
             'proof_uploaded'=> $schoolFees->where('status', 'proof_uploaded')->count(),
             'partial'       => $schoolFees->where('status', 'partial')->count(),

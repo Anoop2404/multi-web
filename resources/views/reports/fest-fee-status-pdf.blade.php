@@ -207,6 +207,11 @@
             <td>
                 <div class="summary-label">Total Collected</div>
                 <div class="summary-value text-green">Rs.{{ number_format($summary['total_paid'], 2) }}</div>
+                @if(($summary['overpayment'] ?? 0) > 0 && ($summary['total_settled'] ?? 0) > 0)
+                    <div style="font-size: 8px; color: #166534; font-weight: normal; margin-top: 1px;">
+                        (Rs.{{ number_format($summary['total_settled'], 2) }} settled)
+                    </div>
+                @endif
             </td>
             <td>
                 <div class="summary-label">Pending Balance</div>
@@ -214,7 +219,12 @@
                     Rs.{{ number_format($summary['total_balance'], 2) }}
                 </div>
             </td>
-            @if(($summary['total_credit'] ?? 0) > 0)
+            @if(($summary['overpayment'] ?? 0) > 0)
+                <td>
+                    <div class="summary-label">Excess / Overpayment</div>
+                    <div class="summary-value text-amber">Rs.{{ number_format($summary['overpayment'], 2) }}</div>
+                </td>
+            @elseif(($summary['total_credit'] ?? 0) > 0)
                 <td>
                     <div class="summary-label">Credit Owed to Schools</div>
                     <div class="summary-value text-green">Rs.{{ number_format($summary['total_credit'], 2) }}</div>
@@ -224,6 +234,12 @@
                 <div class="summary-label">Paid / Approved</div>
                 <div class="summary-value text-green">{{ $summary['approved'] }} schools</div>
             </td>
+            @if(($summary['partial'] ?? 0) > 0)
+                <td>
+                    <div class="summary-label">Partial Paid</div>
+                    <div class="summary-value text-amber">{{ $summary['partial'] }} schools</div>
+                </td>
+            @endif
             <td>
                 <div class="summary-label">Proof Pending</div>
                 <div class="summary-value text-amber">{{ $summary['proof_uploaded'] }} schools</div>
