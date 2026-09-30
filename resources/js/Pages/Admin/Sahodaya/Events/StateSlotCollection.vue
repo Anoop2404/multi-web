@@ -4,7 +4,8 @@
             <div class="card">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <h3 class="font-semibold">Get a confirmed list before State registration</h3>
+                        <Link :href="actionUrls.overview" class="text-xs text-gray-500 hover:text-gray-800">← All State events</Link>
+                        <h3 class="font-semibold mt-1">Get a confirmed list before State registration</h3>
                         <p class="text-xs text-gray-500 mt-0.5 max-w-2xl">
                             Opening this auto-fills each item's top ranks, same as "Fill from the top" on
                             the winner sheet, and asks each winning school to accept or opt out of their
@@ -102,7 +103,7 @@
 
 <script setup>
 import { computed } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { router, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 
 const props = defineProps({

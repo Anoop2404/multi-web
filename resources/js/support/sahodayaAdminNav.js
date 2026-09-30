@@ -529,6 +529,7 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
             programOn('english-fest') && programAllowed('english_fest') ? { label: 'English Fest', href: `${base}/english-fest`, icon: 'file-text' } : null,
             programOn('science-fest') && programAllowed('science_fest') ? { label: 'Science Fest', href: `${base}/science-fest`, icon: 'layers' } : null,
             !isScoped ? { label: 'All events', href: `${base}/events`, icon: 'calendar', exact: true } : null,
+            !isScoped ? { label: 'State slot collection', href: `${base}/state-slot-collection`, icon: 'flag' } : null,
             !isScoped ? { label: 'Competition types', href: `${base}/competition-types`, icon: 'layers' } : null,
             // Appeals/payments/display screens/certificate & ID card templates/find-certificate
             // all live behind one sidebar entry now — see Fest/ToolsHub.vue, which itself

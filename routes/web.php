@@ -1007,6 +1007,12 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::delete('/{taxonomyMaster}', [\App\Http\Controllers\SahodayaAdmin\FestTaxonomyMasterController::class, 'destroy'])->name('destroy');
         });
 
+        // One place to reach State Slot Collection across every hub event linked to a State
+        // program, instead of having to open each event's own Levels tab first — see
+        // FestStateSlotCollectionController::overview() and the per-event routes under
+        // events/{event}/state-slot-collection above.
+        Route::get('/state-slot-collection', [\App\Http\Controllers\SahodayaAdmin\FestStateSlotCollectionController::class, 'overview'])->name('state-slot-collection.overview');
+
         Route::prefix('scoring-rubric-templates')->name('scoring-rubric-templates.')->group(function () {
             Route::get('/', [\App\Http\Controllers\SahodayaAdmin\FestScoringRubricTemplateController::class, 'index'])->name('index');
             Route::post('/', [\App\Http\Controllers\SahodayaAdmin\FestScoringRubricTemplateController::class, 'store'])->name('store');
