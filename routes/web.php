@@ -1460,6 +1460,16 @@ Route::prefix('sahodaya-admin/{tenantId}')
                 Route::post('/auto-fill', [$winners, 'autoFill'])->name('auto-fill');
                 Route::post('/register', [$winners, 'register'])->name('register');
             });
+
+            // A confirmed list from schools before the winner sheet above is registered with State
+            // — see FestStateSlotCollectionService.
+            Route::prefix('/{event}/state-slot-collection')->name('state-slot-collection.')->group(function () {
+                $slots = \App\Http\Controllers\SahodayaAdmin\FestStateSlotCollectionController::class;
+
+                Route::get('/', [$slots, 'index'])->name('index');
+                Route::post('/open', [$slots, 'open'])->name('open');
+                Route::post('/approve', [$slots, 'approve'])->name('approve');
+            });
             Route::post('/{event}/spawn-school-rounds', [FestEventController::class, 'spawnSchoolRounds'])->name('spawn-school-rounds');
             Route::post('/{event}/link-school-round', [FestEventController::class, 'linkSchoolRound'])->name('link-school-round');
             Route::post('/{event}/promote-discipline-events', [FestEventController::class, 'promoteDisciplineEvents'])->name('promote-discipline-events');

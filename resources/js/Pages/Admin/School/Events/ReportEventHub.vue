@@ -10,6 +10,20 @@
 
             <FestEventMetaBar v-if="eventMeta" :meta="eventMeta" :show-edit-hint="false" />
 
+            <div v-if="stateSlotsUrl" class="mb-6 p-3.5 rounded-xl border border-amber-200 bg-amber-50/60 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h5 class="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                        <span>🏛️</span> State Slot Choices
+                    </h5>
+                    <p class="text-[11px] text-amber-800/90 leading-relaxed mt-0.5">
+                        If your school has a winner offered a State slot, accept or opt out here.
+                    </p>
+                </div>
+                <Link :href="stateSlotsUrl" class="btn-secondary text-xs justify-center !py-2 !px-4 !bg-white hover:!bg-amber-100 !border-amber-300 !text-amber-900">
+                    Open
+                </Link>
+            </div>
+
             <section v-if="featuredReports.length" class="mb-6">
                 <h3 class="section-title mb-3">Quick access</h3>
                 <div class="grid gap-3 sm:grid-cols-2">
@@ -123,6 +137,7 @@ const props = defineProps({
     hasItemHeads: Boolean,
     headWiseReportBase: String,
     headWiseExportUrl: String,
+    stateSlotsUrl: { type: String, default: null },
 });
 
 const { programSlug, programLabel, programBase } = useSchoolProgramContext(props);

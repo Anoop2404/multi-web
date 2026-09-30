@@ -158,6 +158,16 @@ class FestStateWinnerRegistrationController extends SahodayaAdminController
         abort_if(! $readiness['can_register'], 422, implode(' ', $readiness['blocking']));
         abort_if($readiness['chosen'] === 0, 422, 'Nothing is chosen yet, so there is nothing to register.');
 
+        // Slot collection (FestStateSlotCollectionController) is a school-confirmation round ahead
+        // of this step — once opened, the list isn't final until every offered slot is answered and
+        // the admin approves it there. Registering out from under an unfinished round could send a
+        // school's winner before they ever saw the offer.
+        abort_if(
+            $event->state_slot_collection_open && ! $event->state_slot_collection_approved_at,
+            422,
+            'Slot collection is still open and not yet approved — approve it on the State Slot Collection page before registering with State.',
+        );
+
         abort_if(! $program->state_domain_id, 422, 'This State program has no State address configured, so nothing can be sent to it.');
         $domain = StateDomain::findOrFail($program->state_domain_id);
 
@@ -165,7 +175,7 @@ class FestStateWinnerRegistrationController extends SahodayaAdminController
 
         if (! $batch->isCertified()) {
             $nominations->certifyCheckerNomination(
-                ['batch_id' => $batch->id, 'notes' => $data['notes'] ?? null],
+                ['id' => $batch->id, 'maker_id' => $batch->maker_id, 'notes' => $data['notes'] ?? null],
                 $request->user(),
             );
         }

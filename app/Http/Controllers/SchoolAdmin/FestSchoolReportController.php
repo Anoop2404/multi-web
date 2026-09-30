@@ -143,6 +143,12 @@ class FestSchoolReportController extends SchoolAdminController
                 'school'      => $this->school->only('id', 'name'),
                 'event'       => $event->only('id', 'title', 'status', 'event_start', 'event_end', 'venue', 'results_published', 'schedule_published'),
                 'eventMeta'   => FestEventMeta::reportSnapshot($event),
+                // Discoverable entry point into the State slot collection round — see
+                // App\Services\State\FestStateSlotCollectionService. Shown whenever the event is
+                // linked to a State program; the page itself says if there's nothing to respond to yet.
+                'stateSlotsUrl' => $event->state_program_id
+                    ? ProgramRouteMap::schoolBase($this->school->id, ProgramRouteMap::prefixFromSlug($meta['slug']))."/events/{$event->id}/state-slots"
+                    : null,
             ],
         ));
     }

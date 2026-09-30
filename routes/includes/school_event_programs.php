@@ -84,6 +84,17 @@ foreach ($festPrograms as $cfg) {
         Route::get('/qualifiers/export', [FestSchoolReportController::class, 'exportQualifiers'])
             ->defaults('program', $slug)
             ->name('qualifiers.export');
+        // A school's own slots before the Sahodaya registers its winners with State — see
+        // App\Services\State\FestStateSlotCollectionService.
+        Route::get('/events/{event}/state-slots', [\App\Http\Controllers\SchoolAdmin\FestStateSlotController::class, 'index'])
+            ->defaults('program', $slug)
+            ->name('event.state-slots');
+        Route::post('/events/{event}/state-slots/{selection}/accept', [\App\Http\Controllers\SchoolAdmin\FestStateSlotController::class, 'accept'])
+            ->defaults('program', $slug)
+            ->name('event.state-slots.accept');
+        Route::post('/events/{event}/state-slots/{selection}/opt-out', [\App\Http\Controllers\SchoolAdmin\FestStateSlotController::class, 'optOut'])
+            ->defaults('program', $slug)
+            ->name('event.state-slots.opt-out');
         Route::get('/import-template', [FestRegistrationController::class, 'importTemplate'])
             ->defaults('program', $slug)
             ->name('import-template');

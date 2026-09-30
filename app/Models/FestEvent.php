@@ -68,6 +68,8 @@ class FestEvent extends Model
         'phase_mode_enabled', 'workflow_mode', 'source_phase_id', 'registration_batch_id', 'workflow_leaf_key',
         'reporting_batch_min_registrations', 'reporting_batch_size',
         'certificate_signatories',
+        'state_slot_collection_open', 'state_slot_collection_opened_at',
+        'state_slot_collection_approved_at', 'state_slot_collection_approved_by',
         // sahodaya_customized_at was stamped via updateQuietly() since 2026-08-13 but was
         // never added here — mass-assignment silently dropped it every time, so the
         // customization-indicator badge it drives never actually turned on. fee_customized_at
@@ -85,6 +87,9 @@ class FestEvent extends Model
         'is_cascaded' => 'boolean',
         'nav_hidden' => 'boolean',
         'results_published' => 'boolean',
+        'state_slot_collection_open' => 'boolean',
+        'state_slot_collection_opened_at' => 'datetime',
+        'state_slot_collection_approved_at' => 'datetime',
         'tv_show_overall_standings' => 'boolean',
         'scoring_locked' => 'boolean',
         'appeals_open' => 'boolean',
