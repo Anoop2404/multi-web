@@ -266,7 +266,8 @@ class FestClashRequestController extends SchoolAdminController
             $html,
             'clash-form.pdf',
             $request->boolean('inline') || $request->boolean('preview') || ! $request->has('download'),
-            true
+            isLandscape: true,
+            requireBrowserRenderer: true,
         );
     }
 }
