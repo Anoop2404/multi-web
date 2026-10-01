@@ -95,7 +95,7 @@ class SettingsController extends SchoolAdminController
                 $payment['upi'] = $data['payment_upi'] ?? null;
             }
             if ($request->hasFile('payment_qr_code')) {
-                $payment['qr_code'] = TenantStorage::storeUploadedFile($request->file('payment_qr_code'), 'payment_qr_codes');
+                $payment['qr_code'] = TenantStorage::storeUploadedFile($request->file('payment_qr_code'), 'payment_qr_codes', 'public');
             } elseif ($request->boolean('remove_payment_qr_code')) {
                 $payment['qr_code'] = null;
             }

@@ -83,6 +83,8 @@ class FestEventSettingsController extends SahodayaAdminController
         $ledgerAccount = app(\App\Services\Ledger\LedgerAccountSetupService::class)
             ->festLedgerMeta($event, $this->sahodaya->id);
 
+        $event->setAttribute('payment_qr_code_url', $event->paymentQrCodeUrl());
+
         return $this->inertia('Sahodaya/Events/Settings', [
             'event'        => $event->load(['items.head']),
             'itemHeads'    => $itemHeads,

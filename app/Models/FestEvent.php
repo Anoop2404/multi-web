@@ -192,14 +192,14 @@ class FestEvent extends Model
     public function paymentQrCodeUrl(?SahodayaProfile $sahodayaProfile = null): ?string
     {
         $customQr = $this->fee_settings['payment_qr_code'] ?? null;
-        if (filled($customQr)) {
-            $path = (string) $customQr;
-            if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://') || str_starts_with($path, '/')) {
-                return $path;
+        $upi = $this->fee_settings['payment_upi'] ?? null;
+        $tenant = \App\Models\Tenant::find($this->tenant_id);
+
+        if (filled($customQr) || filled($upi)) {
+            $resolved = \App\Support\TenantStorage::resolvePaymentQrCode($tenant, $customQr ? (string) $customQr : null, $upi ? (string) $upi : null);
+            if ($resolved) {
+                return $resolved;
             }
-            return \App\Support\TenantStorage::assetUrl(null, $path)
-                ?? \App\Support\TenantStorage::logoUrl(null, $path)
-                ?? ('/storage/' . ltrim($path, '/'));
         }
 
         if (! $sahodayaProfile) {
@@ -214,13 +214,9 @@ class FestEvent extends Model
     {
         $customQr = $this->fee_settings['food_payment_qr_code'] ?? null;
         if (filled($customQr)) {
-            $path = (string) $customQr;
-            if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://') || str_starts_with($path, '/')) {
-                return $path;
-            }
-            return \App\Support\TenantStorage::assetUrl(null, $path)
-                ?? \App\Support\TenantStorage::logoUrl(null, $path)
-                ?? ('/storage/' . ltrim($path, '/'));
+            $tenant = \App\Models\Tenant::find($this->tenant_id);
+
+            return \App\Support\TenantStorage::resolvePaymentQrCode($tenant, (string) $customQr);
         }
 
         return null;

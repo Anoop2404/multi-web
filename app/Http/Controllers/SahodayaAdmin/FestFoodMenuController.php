@@ -84,6 +84,14 @@ class FestFoodMenuController extends SahodayaAdminController
             'catalogItems' => $catalogItems,
             'mealTypes' => $this->mealTypeOptions(),
             'eventDates' => $eventDates,
+            'sahodayaPaymentDetails' => $sahodayaProfile ? [
+                'bank_name' => $sahodayaProfile->payment_bank_name,
+                'account_no' => $sahodayaProfile->payment_account_no,
+                'ifsc' => $sahodayaProfile->payment_ifsc,
+                'upi' => $sahodayaProfile->payment_upi,
+                'qr_code_url' => $sahodayaProfile->paymentQrCodeUrl(),
+                'instructions' => $sahodayaProfile->payment_instructions,
+            ] : null,
             'schoolOptions' => $schools->map->only('id', 'name')->values(),
             // Keyed by school id so the payee form can prefill whichever host school gets
             // picked -- only schools that actually have something on file are included.

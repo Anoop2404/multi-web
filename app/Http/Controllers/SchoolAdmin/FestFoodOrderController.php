@@ -161,27 +161,58 @@ class FestFoodOrderController extends SchoolAdminController
         $payeeDetails = null;
         $foodCustomQr = $event->foodPaymentQrCodeUrl();
         if ($payeeType === 'host_school' && $hostSchool) {
+            $payment = $hostSchool->paymentDetails();
+            $resolvedQr = $foodCustomQr ?? $hostSchool->paymentQrCodeUrl();
+            if (! $resolvedQr && filled($payment['upi'] ?? null)) {
+                $resolvedQr = \App\Support\TenantStorage::resolvePaymentQrCode($hostSchool, null, $payment['upi']);
+            }
             $payeeDetails = [
                 'name' => $hostSchool->name,
-                ...$hostSchool->paymentDetails(),
-                'qr_code_url' => $foodCustomQr ?? $hostSchool->paymentQrCodeUrl(),
+                ...$payment,
+                'qr_code_url' => $resolvedQr,
             ];
         } elseif ($payeeType !== 'host_school') {
             $sahodayaProfile = \App\Models\SahodayaProfile::where('tenant_id', $event->tenant_id)->first();
             if ($sahodayaProfile) {
+                $sahodayaTenant = Tenant::where('id', $event->tenant_id)->first();
+                $resolvedQr = $foodCustomQr ?? $sahodayaProfile->paymentQrCodeUrl();
+                if (! $resolvedQr && filled($sahodayaProfile->payment_upi)) {
+                    $resolvedQr = \App\Support\TenantStorage::resolvePaymentQrCode($sahodayaTenant, null, $sahodayaProfile->payment_upi);
+                }
                 $payeeDetails = [
-                    'name' => Tenant::where('id', $event->tenant_id)->value('name'),
+                    'name' => $sahodayaTenant?->name ?? 'Sahodaya Office',
                     'bank_name' => $sahodayaProfile->payment_bank_name,
                     'account_no' => $sahodayaProfile->payment_account_no,
                     'ifsc' => $sahodayaProfile->payment_ifsc,
                     'upi' => $sahodayaProfile->payment_upi,
-                    'qr_code_url' => $foodCustomQr ?? $sahodayaProfile->paymentQrCodeUrl(),
+                    'qr_code_url' => $resolvedQr,
                 ];
             }
         }
-        // No bank/UPI/QR field is worth showing an empty "Where to pay" card for.
-        if ($payeeDetails && ! array_filter(array_intersect_key($payeeDetails, array_flip(['bank_name', 'account_no', 'ifsc', 'upi', 'qr_code_url'])))) {
-            $payeeDetails = null;
+
+        if ($payeeDetails) {
+            // Normalize UPI string and generate deep-link URI if needed
+            if (filled($payeeDetails['upi'] ?? null)) {
+                $rawUpi = trim((string) $payeeDetails['upi']);
+                $vpa = $rawUpi;
+                $uri = null;
+                if (str_starts_with($rawUpi, 'upi://')) {
+                    $parsed = parse_url($rawUpi);
+                    parse_str($parsed['query'] ?? '', $query);
+                    $vpa = $query['pa'] ?? $rawUpi;
+                    $uri = $rawUpi;
+                } else {
+                    $payeeName = $payeeDetails['name'] ?? 'Payment';
+                    $uri = 'upi://pay?pa='.urlencode($vpa).'&pn='.urlencode($payeeName).'&cu=INR';
+                }
+                $payeeDetails['display_upi'] = $vpa;
+                $payeeDetails['upi_uri'] = $uri;
+            }
+
+            // No bank/UPI/QR field is worth showing an empty "Where to pay" card for.
+            if (! array_filter(array_intersect_key($payeeDetails, array_flip(['bank_name', 'account_no', 'ifsc', 'upi', 'qr_code_url'])))) {
+                $payeeDetails = null;
+            }
         }
 
         return $this->inertia('School/Fest/FoodOrder', [

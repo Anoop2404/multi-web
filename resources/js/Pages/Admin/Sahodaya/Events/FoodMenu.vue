@@ -423,8 +423,44 @@
                         </label>
                     </div>
 
-                    <!-- Sahodaya QR Code Settings -->
-                    <div v-if="payeeForm.food_payee_type === 'sahodaya'" class="pt-3 border-t border-slate-100 space-y-3">
+                    <!-- Sahodaya QR Code & Bank Details Settings -->
+                    <div v-if="payeeForm.food_payee_type === 'sahodaya'" class="pt-3 border-t border-slate-100 space-y-4">
+                        <!-- Sahodaya Current Bank Details Summary -->
+                        <div class="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <h4 class="font-bold text-xs uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
+                                    <span>🏛️</span> Sahodaya Bank Details on File
+                                </h4>
+                                <a :href="`/sahodaya-admin/${sahodaya.id}/membership-settings`"
+                                   class="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 hover:underline">
+                                    Edit in Sahodaya Settings →
+                                </a>
+                            </div>
+
+                            <div v-if="sahodayaPaymentDetails && (sahodayaPaymentDetails.bank_name || sahodayaPaymentDetails.account_no || sahodayaPaymentDetails.ifsc || sahodayaPaymentDetails.upi)"
+                                 class="grid sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs bg-white rounded-lg p-3 border border-indigo-100">
+                                <div>
+                                    <span class="text-slate-400 block text-[11px]">Bank Name</span>
+                                    <span class="font-semibold text-slate-800">{{ sahodayaPaymentDetails.bank_name || '—' }}</span>
+                                </div>
+                                <div>
+                                    <span class="text-slate-400 block text-[11px]">Account Number</span>
+                                    <span class="font-mono font-bold text-slate-800">{{ sahodayaPaymentDetails.account_no || '—' }}</span>
+                                </div>
+                                <div>
+                                    <span class="text-slate-400 block text-[11px]">IFSC Code</span>
+                                    <span class="font-mono font-bold text-slate-800">{{ sahodayaPaymentDetails.ifsc || '—' }}</span>
+                                </div>
+                                <div>
+                                    <span class="text-slate-400 block text-[11px]">UPI ID</span>
+                                    <span class="font-mono font-bold text-slate-800 break-all">{{ sahodayaPaymentDetails.upi || '—' }}</span>
+                                </div>
+                            </div>
+                            <div v-else class="text-xs text-amber-800 bg-amber-50 rounded-lg p-3 border border-amber-200">
+                                ⚠️ No default bank details configured in Sahodaya Settings yet. Schools will not see bank account details on checkout until configured.
+                            </div>
+                        </div>
+
                         <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
                             <div>
                                 <h4 class="font-bold text-xs uppercase tracking-wider text-slate-700">Sahodaya Food Payment QR Code</h4>
@@ -491,11 +527,17 @@
                         </FormField>
 
                         <div v-if="payeeForm.food_host_school_id" class="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
-                            <div>
-                                <h4 class="font-bold text-xs uppercase tracking-wider text-slate-700">Host School Bank & UPI Account</h4>
-                                <p class="text-xs text-slate-500 mt-0.5">
-                                    These details are displayed to ordering schools on their food checkout page.
-                                </p>
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h4 class="font-bold text-xs uppercase tracking-wider text-slate-700">Host School Bank & UPI Account</h4>
+                                    <p class="text-xs text-slate-500 mt-0.5">
+                                        These details are displayed to ordering schools on their food checkout page.
+                                    </p>
+                                </div>
+                                <span v-if="schoolPaymentDetails?.[payeeForm.food_host_school_id]"
+                                      class="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
+                                    ✓ Pre-filled from profile
+                                </span>
                             </div>
                             <div class="grid sm:grid-cols-2 gap-3 text-xs">
                                 <FormField label="Bank Name" :error="payeeForm.errors.payment_bank_name">
@@ -725,6 +767,7 @@ const props = defineProps({
     eventDates: { type: Array, default: () => [] },
     schoolOptions: { type: Array, default: () => [] },
     schoolPaymentDetails: { type: Object, default: () => ({}) },
+    sahodayaPaymentDetails: { type: Object, default: null },
     activityLogs: { type: Array, default: () => [] },
     isPartitionedHub: { type: Boolean, default: false },
     foodRegionSummary: { type: Array, default: () => [] },
@@ -898,7 +941,9 @@ const currentPayeeQrUrl = computed(() => {
         const d = props.schoolPaymentDetails?.[payeeForm.food_host_school_id];
         return d?.qr_code_url || (payeeForm.food_host_school_id === props.event.food_host_school_id ? props.event.food_payment_qr_code_url : null);
     }
-    return props.event.food_payment_qr_code_url || props.event.sahodaya_payment_qr_code_url;
+    return props.event.food_payment_qr_code_url
+        || props.event.sahodaya_payment_qr_code_url
+        || props.sahodayaPaymentDetails?.qr_code_url;
 });
 
 function handleQrFileChange(e) {

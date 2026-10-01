@@ -151,18 +151,12 @@ class SahodayaProfile extends Model
 
     public function paymentQrCodeUrl(): ?string
     {
-        if (blank($this->payment_qr_code)) {
-            return null;
-        }
+        $tenant = $this->tenant ?? \App\Models\Tenant::find($this->tenant_id);
 
-        $path = (string) $this->payment_qr_code;
-
-        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://') || str_starts_with($path, '/')) {
-            return $path;
-        }
-
-        return \App\Support\TenantStorage::assetUrl(null, $path)
-            ?? \App\Support\TenantStorage::logoUrl(null, $path)
-            ?? ('/storage/' . ltrim($path, '/'));
+        return \App\Support\TenantStorage::resolvePaymentQrCode(
+            $tenant,
+            $this->payment_qr_code,
+            $this->payment_upi,
+        );
     }
 }

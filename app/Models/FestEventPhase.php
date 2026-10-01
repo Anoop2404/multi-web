@@ -131,10 +131,10 @@ class FestEventPhase extends Model
     public function paymentQrCodeUrl(?FestEvent $event = null, ?SahodayaProfile $sahodayaProfile = null): ?string
     {
         if (filled($this->payment_qr_code)) {
-            $path = (string) $this->payment_qr_code;
-            return str_starts_with($path, '/') || str_starts_with($path, 'http')
-                ? $path
-                : '/storage/' . ltrim($path, '/');
+            $event = $event ?? $this->event;
+            $tenant = $event ? \App\Models\Tenant::find($event->tenant_id) : null;
+
+            return \App\Support\TenantStorage::resolvePaymentQrCode($tenant, (string) $this->payment_qr_code);
         }
 
         if (! $event) {

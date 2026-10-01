@@ -133,7 +133,7 @@ class MembershipSettingsController extends SahodayaAdminController
         ]);
 
         if ($request->hasFile('payment_qr_code')) {
-            $data['payment_qr_code'] = \App\Support\TenantStorage::storeUploadedFile($request->file('payment_qr_code'), 'payment_qr_codes');
+            $data['payment_qr_code'] = \App\Support\TenantStorage::storeUploadedFile($request->file('payment_qr_code'), 'payment_qr_codes', 'public');
         } elseif ($request->boolean('remove_payment_qr_code')) {
             $data['payment_qr_code'] = null;
         }

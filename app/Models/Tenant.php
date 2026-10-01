@@ -240,18 +240,13 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     /** Mirrors SahodayaProfile::paymentQrCodeUrl(). */
     public function paymentQrCodeUrl(): ?string
     {
-        $path = $this->paymentDetails()['qr_code'];
-        if (blank($path)) {
-            return null;
-        }
+        $details = $this->paymentDetails();
 
-        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://') || str_starts_with($path, '/')) {
-            return $path;
-        }
-
-        return \App\Support\TenantStorage::assetUrl(null, $path)
-            ?? \App\Support\TenantStorage::logoUrl(null, $path)
-            ?? ('/storage/'.ltrim($path, '/'));
+        return \App\Support\TenantStorage::resolvePaymentQrCode(
+            $this,
+            $details['qr_code'] ?? null,
+            $details['upi'] ?? null,
+        );
     }
 
     public function invalidateCache(): void
