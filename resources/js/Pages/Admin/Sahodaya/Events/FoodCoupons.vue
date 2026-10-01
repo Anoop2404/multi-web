@@ -15,17 +15,28 @@
             <!-- Action Toolbar -->
             <div class="flex flex-wrap items-center justify-between gap-3 mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                 <div class="flex flex-wrap items-center gap-2">
-                    <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/catering`" class="text-sm font-medium text-indigo-600 hover:text-indigo-800 mr-2">
+                    <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/catering`" class="text-sm font-medium text-indigo-600 hover:text-indigo-800 mr-1">
                         ← Catering
                     </Link>
-                    <button type="button" @click="issueCoupons" class="btn-primary" :disabled="issuingCatering">
-                        <span v-if="issuingCatering">Issuing...</span>
-                        <span v-else>Issue from Catering</span>
-                    </button>
-                    <button type="button" @click="issueFromBill" class="btn-secondary" :disabled="issuingBill">
-                        <span v-if="issuingBill">Issuing...</span>
-                        <span v-else>Issue from Food Bills</span>
-                    </button>
+                    <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/food-billing`" class="text-sm font-medium text-indigo-600 hover:text-indigo-800 mr-2">
+                        Food Billing →
+                    </Link>
+                    <template v-if="event.require_payment_for_coupons">
+                        <button type="button" @click="issueFromBill" class="btn-primary flex items-center gap-1.5 shadow-sm" :disabled="issuingBill">
+                            <span v-if="issuingBill">Issuing...</span>
+                            <span v-else>🍽️ Issue from Food Bills (Settled Orders)</span>
+                        </button>
+                    </template>
+                    <template v-else>
+                        <button type="button" @click="issueCoupons" class="btn-primary flex items-center gap-1.5" :disabled="issuingCatering">
+                            <span v-if="issuingCatering">Issuing...</span>
+                            <span v-else>Issue from Catering</span>
+                        </button>
+                        <button type="button" @click="issueFromBill" class="btn-secondary flex items-center gap-1.5" :disabled="issuingBill">
+                            <span v-if="issuingBill">Issuing...</span>
+                            <span v-else>Issue from Food Bills</span>
+                        </button>
+                    </template>
                     <button type="button" @click="showExtraModal = true" class="px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition flex items-center gap-1.5 shadow-sm">
                         <span>+</span> Generate Extra Coupons
                     </button>
@@ -349,12 +360,15 @@
                 <div v-if="event.food_coupon_bg_image_url" class="border rounded-xl p-3 bg-white text-center">
                     <p class="text-xs font-semibold text-slate-700 mb-2">Current Background Template:</p>
                     <div class="relative inline-block max-w-full overflow-hidden rounded-lg border border-slate-300 shadow-sm">
-                        <img :src="event.food_coupon_bg_image_url" alt="Coupon Template Background" class="max-h-48 object-contain">
+                        <img v-if="!bgImgError" :src="event.food_coupon_bg_image_url" alt="Coupon Template Background" class="max-h-48 object-contain" @error="bgImgError = true">
+                        <div v-else class="p-6 text-xs text-amber-800 bg-amber-50">
+                            ⚠️ Preview could not be loaded in browser. Re-upload your background to refresh.
+                        </div>
                     </div>
                     <div class="mt-3">
                         <button type="button" @click="removeTemplateBg" class="text-xs text-rose-600 hover:text-rose-800 font-semibold" :disabled="removingBg">
                             <span v-if="removingBg">Removing...</span>
-                            <span v-else>Remove Current Background (Revert to Default)</span>
+                            <span v-else>Remove Current Background</span>
                         </button>
                     </div>
                 </div>
@@ -507,6 +521,7 @@ const ungenerateForm = reactive({
 });
 
 const bgFileInput = ref(null);
+const bgImgError = ref(false);
 
 // Selected coupon IDs for batch operations
 const selectedIds = ref([]);

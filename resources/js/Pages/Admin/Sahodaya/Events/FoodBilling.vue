@@ -7,8 +7,12 @@
         <EventHierarchyBadge :hierarchy="hierarchy" :hub-href="hubHref" />
 
         <div class="flex flex-wrap gap-2 items-center mb-4">
-            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/food-menu`" class="text-sm text-indigo-600">← Food Menu</Link>
-            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/food-billing/report`" class="text-sm text-indigo-600 ml-auto">Day-wise report →</Link>
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/food-menu`" class="text-sm text-indigo-600 font-medium">← Food Menu</Link>
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/food-coupons`"
+                  class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-xs flex items-center gap-1.5 ml-2">
+                🎟️ Food Coupons & Generator
+            </Link>
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/food-billing/report`" class="text-sm text-indigo-600 font-medium ml-auto">Day-wise report →</Link>
             <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/food-billing/export`"
                class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700">Export CSV</a>
         </div>

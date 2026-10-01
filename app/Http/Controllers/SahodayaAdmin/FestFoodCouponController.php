@@ -260,6 +260,13 @@ class FestFoodCouponController extends SahodayaAdminController
             'require_payment' => $requirePayment,
         ]);
 
+        if ($created === 0) {
+            if ($requirePayment && $bills->isEmpty()) {
+                return back()->with('error', 'No settled food orders found for this event to issue coupons from. Ensure participating schools have placed orders and payments are approved.');
+            }
+            return back()->with('info', 'All food coupons for settled orders have already been issued.');
+        }
+
         return back()->with('success', "{$created} food coupon(s) issued from ".($requirePayment ? 'settled' : 'open').' food bills.');
     }
 

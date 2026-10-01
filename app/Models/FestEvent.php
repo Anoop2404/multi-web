@@ -230,7 +230,17 @@ class FestEvent extends Model
         }
 
         $path = (string) $this->food_coupon_bg_image;
-        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://') || str_starts_with($path, '/')) {
+        if (str_starts_with($path, 'data:image/')) {
+            return $path;
+        }
+
+        // Generate base64 data URI first so browser displays without 404
+        $dataUri = \App\Support\TenantStorage::backgroundDataUri($sahodaya, $path);
+        if ($dataUri) {
+            return $dataUri;
+        }
+
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
             return $path;
         }
 
