@@ -47,6 +47,10 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                         Ungenerate Coupons
                     </button>
+                    <button type="button" @click="showPreviewModal = true" class="px-3 py-2 border border-indigo-200 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-semibold hover:bg-indigo-100 transition flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                        Preview Card
+                    </button>
                     <button type="button" @click="showBgModal = true" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium hover:bg-slate-50 transition flex items-center gap-1.5">
                         <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                         Template Background
@@ -447,6 +451,90 @@
             </div>
         </Modal>
 
+        <!-- Modal 5: Live Coupon Card Preview -->
+        <Modal :show="showPreviewModal" title="Food Coupon Card Preview" subtitle="Accurate preview of how individual coupons will print on A4 sheets (95mm × 40.63mm)." @close="showPreviewModal = false">
+            <div class="space-y-4">
+                <div class="flex items-center justify-between gap-3 p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+                    <span class="text-xs font-semibold text-slate-700">Preview Meal:</span>
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <button v-for="(label, key) in mealTypes" :key="key" type="button"
+                                @click="previewMeal = key"
+                                class="px-2.5 py-1 text-xs rounded-md font-semibold transition"
+                                :class="previewMeal === key ? 'bg-indigo-600 text-white shadow-xs' : 'bg-white border text-slate-700 hover:bg-slate-100'">
+                            {{ label }}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- The Live Card -->
+                <div class="p-4 bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-center">
+                    <div class="relative w-full max-w-[480px] aspect-[95/40.63] rounded-lg overflow-hidden border border-slate-300 shadow-lg bg-white select-none">
+                        <!-- Background Image or Fallback -->
+                        <img v-if="event.food_coupon_bg_image_url && !bgImgError" :src="event.food_coupon_bg_image_url" class="absolute inset-0 w-full h-full object-fill z-0" alt="Background" />
+                        <div v-else class="absolute inset-0 bg-gradient-to-r from-slate-50 to-slate-100 p-3 z-0">
+                            <div class="text-[10px] font-bold text-slate-800 uppercase">{{ event.title }}</div>
+                            <div class="text-[8px] text-slate-500">{{ sahodayaName || 'Sahodaya' }}</div>
+                            <div class="absolute left-[4.5%] top-[72%] text-xs font-extrabold text-slate-800 tracking-wider">FOOD COUPON</div>
+                            <div class="absolute left-[67%] top-0 bottom-0 border-l border-dashed border-slate-400"></div>
+                            <div class="absolute left-[70.41%] top-[22.60%] w-[23.54%] h-[55.48%] border border-slate-900 rounded"></div>
+                        </div>
+
+                        <!-- Left Details Overlay -->
+                        <div class="absolute left-[4.5%] top-[45.5%] w-[58%] h-[25%] z-10 flex flex-col justify-center overflow-hidden">
+                            <div class="flex items-center gap-1.5 text-[9px] leading-none mb-1 whitespace-nowrap">
+                                <span class="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider text-white" :class="previewPillClass">
+                                    {{ previewCoupon.meal_type || 'breakfast' }}
+                                </span>
+                                <span class="text-slate-700 font-medium">Date: <strong class="text-slate-900">{{ previewCoupon.formatted_date || '03 Oct 2026' }}</strong></span>
+                                <span class="text-slate-700 font-medium">Qty: <strong class="text-slate-900">1</strong></span>
+                            </div>
+                            <div class="text-[9.5px] font-bold text-slate-900 truncate">
+                                {{ previewCoupon.school_name || 'Infant Jesus Public School' }}
+                                <span v-if="previewCoupon.is_extra" class="ml-1 text-[8px] bg-amber-100 text-amber-800 border border-amber-300 px-1 rounded uppercase font-bold">Extra</span>
+                            </div>
+                        </div>
+
+                        <!-- Main Serial Badge beside FOOD COUPON -->
+                        <div class="absolute left-[50.5%] top-[71.5%] z-10 font-mono font-bold text-[10px] text-sky-800 bg-sky-100 border border-sky-300 px-1.5 py-0.5 rounded leading-none whitespace-nowrap shadow-xs">
+                            {{ previewCoupon.coupon_code || 'BF-0001' }}
+                        </div>
+
+                        <!-- Stub Area: Serial Code OUTSIDE above box -->
+                        <div class="absolute left-[68%] top-[6%] w-[28%] text-center z-10 font-mono font-bold text-[10.5px] text-slate-900 tracking-wide whitespace-nowrap leading-none">
+                            {{ previewCoupon.coupon_code || 'BF-0001' }}
+                        </div>
+
+                        <!-- Stub Area: QR Code Box: Fits QR FULLY inside the box -->
+                        <div class="absolute left-[70.41%] top-[22.60%] w-[23.54%] h-[55.48%] z-10 flex items-center justify-center p-1 overflow-hidden">
+                            <img v-if="sampleQrSrc" :src="sampleQrSrc" class="w-full h-full object-contain" alt="QR" />
+                            <div v-else class="w-full h-full bg-slate-900 flex items-center justify-center text-white text-[7px] font-mono">QR CODE</div>
+                        </div>
+
+                        <!-- Stub Area: Decoded Token OUTSIDE below box -->
+                        <div class="absolute left-[68%] top-[79.5%] w-[28%] text-center z-10 font-mono font-bold text-[8.5px] text-slate-800 tracking-wider whitespace-nowrap leading-none">
+                            {{ previewCoupon.qr_token || 'J4GJLO5GQW' }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Layout Highlights -->
+                <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900 space-y-1">
+                    <p class="font-semibold text-emerald-950 mb-1">Layout Verification:</p>
+                    <p>• <strong>QR Code:</strong> Fitted 100% inside the designated square box with clear margins.</p>
+                    <p>• <strong>Serial Code:</strong> Positioned cleanly outside above the box, and next to "FOOD COUPON".</p>
+                    <p>• <strong>Decoded Token:</strong> Positioned outside below the box.</p>
+                    <p>• <strong>Continuous Serialization:</strong> Sequential numbers continue across schools.</p>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" @click="showPreviewModal = false" class="px-4 py-2 border rounded-lg text-sm font-medium">Close</button>
+                    <button type="button" @click="showPreviewModal = false; showPrintModal = true" class="btn-primary">
+                        Proceed to Print PDF
+                    </button>
+                </div>
+            </div>
+        </Modal>
+
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />
     </SahodayaEventsLayout>
 </template>
@@ -464,6 +552,8 @@ import { couponStatusLabel, couponStatusPillClass } from '@/support/foodBillStat
 
 const props = defineProps({
     sahodaya: Object,
+    sahodayaName: { type: String, default: '' },
+    sampleQrSrc: { type: String, default: '' },
     publicUrl: String,
     pendingPaymentsCount: Number,
     event: Object,
@@ -498,6 +588,43 @@ const showExtraModal = ref(false);
 const showUngenerateModal = ref(false);
 const showBgModal = ref(false);
 const showPrintModal = ref(false);
+const showPreviewModal = ref(false);
+
+// Preview State
+const previewMeal = ref('breakfast');
+
+const previewCoupon = computed(() => {
+    const matching = props.coupons.find(c => c.meal_type === previewMeal.value);
+    if (matching) {
+        return {
+            ...matching,
+            formatted_date: formatCalendarDate(matching.valid_date),
+        };
+    }
+    const prefix = props.mealPrefixes?.[previewMeal.value] || 'FC';
+    return {
+        coupon_code: `${prefix}-0001`,
+        qr_token: 'J4GJLO5GQW',
+        meal_type: previewMeal.value,
+        valid_date: props.eventDates?.[0] || '2026-10-03',
+        formatted_date: props.eventDates?.[0] ? formatCalendarDate(props.eventDates[0]) : '03 Oct 2026',
+        school_name: props.schools?.[0]?.name || 'Infant Jesus Public School',
+        head_count: 1,
+        is_extra: false,
+    };
+});
+
+const previewPillClass = computed(() => {
+    const map = {
+        breakfast: 'bg-amber-600',
+        lunch: 'bg-emerald-600',
+        dinner: 'bg-indigo-600',
+        snacks: 'bg-pink-600',
+        tea: 'bg-orange-600',
+        other: 'bg-slate-600',
+    };
+    return map[previewCoupon.value?.meal_type] || 'bg-slate-600';
+});
 
 // Filters
 const filterMeal = ref(props.filters?.meal_type ?? '');

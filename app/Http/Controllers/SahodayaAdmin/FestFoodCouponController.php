@@ -104,6 +104,8 @@ class FestFoodCouponController extends SahodayaAdminController
                 'school_name' => $c->school_id ? ($schoolMap[$c->school_id] ?? $c->school_id) : 'General Buffer / Extra',
             ]),
             'schools' => $schools,
+            'sahodayaName' => $this->sahodaya->name,
+            'sampleQrSrc' => app(FestIdCardQrService::class)->dataUri(url('/food-coupons/verify/SAMPLE1234'), 300),
             'eventDates' => $eventDates,
             'mealTypes' => FestFoodCoupon::MEAL_LABELS,
             'mealPrefixes' => FestFoodCoupon::MEAL_PREFIXES,

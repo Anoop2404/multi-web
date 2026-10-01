@@ -59,10 +59,28 @@
         }
 
         /* ------------------------------------------------------------------ */
-        /* STUB BOX (x: 70.41%, y: 22.60%, w: 23.54%, h: 55.48%)              */
-        /* Contains: Serial No, Centered QR Code, Decoded QR Token            */
+        /* STUB AREA (Right Section)                                          */
+        /* - Serial Code: OUTSIDE above the box                               */
+        /* - QR Code: FULLY INSIDE the designated square box                  */
+        /* - Decoded QR Token: OUTSIDE below the box                          */
         /* ------------------------------------------------------------------ */
-        .box-container {
+        .stub-serial-outside {
+            position: absolute;
+            left: 68%;
+            top: 7%;
+            width: 28%;
+            text-align: center;
+            font-family: 'DejaVu Sans Mono', monospace;
+            font-weight: bold;
+            font-size: 7.8pt;
+            color: #0f172a;
+            letter-spacing: 0.5px;
+            line-height: 1.1;
+            z-index: 3;
+            white-space: nowrap;
+        }
+
+        .stub-qr-box {
             position: absolute;
             left: 70.41%;
             top: 22.60%;
@@ -71,55 +89,32 @@
             z-index: 3;
             text-align: center;
             overflow: hidden;
-            padding: 0.5mm 0.5mm 0.3mm 0.5mm;
+            padding: 1mm;
         }
 
-        .box-serial-no {
-            font-family: 'DejaVu Sans Mono', monospace;
-            font-weight: bold;
-            font-size: 7pt;
-            color: #0f172a;
-            letter-spacing: 0.4px;
-            line-height: 1.1;
-            margin-bottom: 0.3mm;
-            text-align: center;
-        }
-
-        .box-qr-wrap {
-            text-align: center;
-            line-height: 0;
-        }
-
-        .box-qr-img {
-            width: 14mm;
-            height: 14mm;
+        .stub-qr-img {
+            width: 20mm;
+            height: 20mm;
+            max-width: 100%;
+            max-height: 100%;
             display: inline-block;
+            vertical-align: middle;
         }
 
-        .box-decoded-val {
+        .stub-decoded-outside {
+            position: absolute;
+            left: 68%;
+            top: 79.5%;
+            width: 28%;
+            text-align: center;
             font-family: 'DejaVu Sans Mono', monospace;
             font-weight: bold;
-            font-size: 5.6pt;
+            font-size: 6.2pt;
             color: #0f172a;
-            letter-spacing: 0.6px;
+            letter-spacing: 0.8px;
             line-height: 1.1;
-            margin-top: 0.4mm;
-            text-align: center;
-        }
-
-        .box-stub-label {
-            position: absolute;
-            left: 70.41%;
-            top: 80.5%;
-            width: 23.54%;
-            text-align: center;
-            font-family: 'DejaVu Sans', sans-serif;
-            font-size: 4.5pt;
-            font-weight: bold;
-            color: #64748b;
-            text-transform: uppercase;
-            letter-spacing: 0.4px;
             z-index: 3;
+            white-space: nowrap;
         }
 
         /* ------------------------------------------------------------------ */
@@ -304,18 +299,20 @@
                             {{ $c['coupon_code'] }}
                         </div>
 
-                        {{-- Stub Box: Serial No, Centered QR Code, Decoded QR Value --}}
-                        <div class="box-container">
-                            <div class="box-serial-no">{{ $c['coupon_code'] }}</div>
-                            <div class="box-qr-wrap">
-                                @if(!empty($c['qr_src']))
-                                    <img src="{{ $c['qr_src'] }}" class="box-qr-img" alt="QR" />
-                                @endif
-                            </div>
-                            <div class="box-decoded-val">{{ $c['qr_token'] }}</div>
+                        {{-- Stub Area: Serial Code OUTSIDE above box, QR Code FULLY INSIDE box, Decoded Token OUTSIDE below box --}}
+                        <div class="stub-serial-outside">
+                            {{ $c['coupon_code'] }}
                         </div>
 
-                        <div class="box-stub-label">FOOD STUB</div>
+                        <div class="stub-qr-box">
+                            @if(!empty($c['qr_src']))
+                                <img src="{{ $c['qr_src'] }}" class="stub-qr-img" alt="QR" />
+                            @endif
+                        </div>
+
+                        <div class="stub-decoded-outside">
+                            {{ $c['qr_token'] }}
+                        </div>
                     </div>
                 </td>
                 @endforeach
