@@ -327,6 +327,9 @@ foreach ($festPrograms as $cfg) {
         Route::post('/events/{event}/clash-requests', [FestClashRequestController::class, 'store'])
             ->defaults('program', $slug)
             ->name('clash-requests.store');
+        Route::patch('/events/{event}/clash-requests/{clashRequest}', [FestClashRequestController::class, 'update'])
+            ->defaults('program', $slug)
+            ->name('clash-requests.update');
         Route::get('/events/{event}/clash-requests/print-form', [FestClashRequestController::class, 'printForm'])
             ->defaults('program', $slug)
             ->name('clash-requests.print-form');

@@ -382,4 +382,56 @@ class FestClashRequestWorkflowTest extends TestCase
         $this->assertStringContainsString('10:00 AM – 11:00 AM', $html);
         $this->assertStringContainsString('10:15 AM – 11:15 AM', $html);
     }
+
+    public function test_index_automatically_brings_detected_schedule_clashes_as_clash_requests(): void
+    {
+        ['event' => $event, 'school' => $school, 'schoolAdmin' => $schoolAdmin, 'participant' => $participant, 'scheduleA' => $scheduleA, 'scheduleB' => $scheduleB] = $this->fixture();
+
+        // Initially no clash requests exist
+        $this->assertDatabaseMissing('fest_clash_requests', [
+            'event_id' => $event->id,
+            'school_id' => $school->id,
+        ]);
+
+        // When school opens clash-requests index, detected clashes are auto-synced as requests
+        $response = $this->actingAs($schoolAdmin)->get(
+            "/school-admin/{$school->id}/kalotsav/events/{$event->id}/clash-requests"
+        );
+        $response->assertOk();
+
+        $this->assertDatabaseHas('fest_clash_requests', [
+            'event_id' => $event->id,
+            'school_id' => $school->id,
+            'participant_id' => $participant->id,
+            'status' => 'pending',
+        ]);
+
+        $created = FestClashRequest::where('event_id', $event->id)->where('school_id', $school->id)->first();
+        $this->assertNotNull($created);
+        $this->assertStringContainsString('Recitation', $created->description);
+        $this->assertStringContainsString('Elocution', $created->description);
+    }
+
+    public function test_school_can_update_requested_resolution_on_clash_request(): void
+    {
+        ['event' => $event, 'school' => $school, 'schoolAdmin' => $schoolAdmin, 'participant' => $participant, 'scheduleA' => $scheduleA, 'scheduleB' => $scheduleB] = $this->fixture();
+
+        $clashRequest = FestClashRequest::create([
+            'event_id'             => $event->id,
+            'school_id'            => $school->id,
+            'participant_id'       => $participant->id,
+            'schedule_ids'         => [$scheduleA->id, $scheduleB->id],
+            'description'          => 'Detected schedule clash.',
+            'status'               => 'pending',
+            'requested_by_user_id' => $schoolAdmin->id,
+        ]);
+
+        $response = $this->actingAs($schoolAdmin)->patch(
+            "/school-admin/{$school->id}/kalotsav/events/{$event->id}/clash-requests/{$clashRequest->id}",
+            ['requested_resolution' => 'Please move Recitation to the afternoon session.']
+        );
+
+        $response->assertRedirect();
+        $this->assertSame('Please move Recitation to the afternoon session.', $clashRequest->fresh()->requested_resolution);
+    }
 }

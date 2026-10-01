@@ -8,6 +8,7 @@ use App\Models\FestParticipant;
 use App\Models\FestSchedule;
 use App\Models\Student;
 use App\Services\Events\FestRegistrationRouterService;
+use App\Services\Events\FestScheduleConflictService;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestItemCategoryLabel;
 use App\Support\PdfGenerator;
@@ -22,32 +23,102 @@ class FestClashRequestController extends SchoolAdminController
     {
         $meta = SchoolFestProgram::meta($program);
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
-
-        // A school hitting this page against the hub id directly (instead of its assigned
-        // region/finale child) would read/write FestClashRequest rows keyed to the wrong
-        // event_id — inconsistent with the participant/schedule data on the same page, which
-        // already reads via reportableEventIds(). Same sibling-region gap class as Phase 1's
-        // food-ordering fix (Phase 9 audit).
         app(FestRegistrationRouterService::class)->assertSchoolCanAccess($event, $this->school->id);
+
+        // 1. Auto-sync detected schedule conflicts as clash requests for this school.
+        // Schools shouldn't have to manually re-type conflicts that the algorithm already detects.
+        $conflictService = new FestScheduleConflictService($event);
+        $detectedClashes = $conflictService->detectAll($this->school->id);
+
+        if (! empty($detectedClashes)) {
+            $clashesByStudent = collect($detectedClashes)->groupBy('student_id');
+
+            foreach ($clashesByStudent as $studentId => $studentClashes) {
+                $scheduleIds = $studentClashes->flatMap(fn ($c) => [
+                    $c['schedule1_id'] ?? null,
+                    $c['schedule2_id'] ?? null,
+                ])->filter()->unique()->values()->all();
+
+                if (count($scheduleIds) < 2) {
+                    continue;
+                }
+
+                // Check if a clash request already exists for this student & overlapping schedules
+                $existing = FestClashRequest::where('event_id', $event->id)
+                    ->where('school_id', $this->school->id)
+                    ->where(function ($q) use ($studentId, $scheduleIds) {
+                        $q->whereHas('participant', fn ($p) => $p->where('student_id', $studentId))
+                            ->where(function ($sq) use ($scheduleIds) {
+                                foreach ($scheduleIds as $sId) {
+                                    $sq->orWhereJsonContains('schedule_ids', $sId)
+                                        ->orWhere('schedule_id_a', $sId)
+                                        ->orWhere('schedule_id_b', $sId);
+                                }
+                            });
+                    })
+                    ->first();
+
+                if (! $existing) {
+                    $participant = FestParticipant::whereHas('registration', fn ($q) => $q
+                        ->whereIn('event_id', $event->reportableEventIds())
+                        ->where('school_id', $this->school->id))
+                        ->where('student_id', $studentId)
+                        ->first();
+
+                    if ($participant) {
+                        $itemSummaries = [];
+                        foreach ($studentClashes as $sc) {
+                            $summary = "{$sc['event1']} ({$sc['item1_time']}) overlaps with {$sc['event2']} ({$sc['item2_time']})";
+                            if (! in_array($summary, $itemSummaries, true)) {
+                                $itemSummaries[] = $summary;
+                            }
+                        }
+
+                        FestClashRequest::create([
+                            'event_id'             => $event->id,
+                            'school_id'            => $this->school->id,
+                            'participant_id'       => $participant->id,
+                            'schedule_id_a'        => $scheduleIds[0] ?? null,
+                            'schedule_id_b'        => $scheduleIds[1] ?? null,
+                            'schedule_ids'         => $scheduleIds,
+                            'description'          => 'Detected schedule clash: ' . implode('; ', $itemSummaries),
+                            'status'               => 'pending',
+                            'requested_by_user_id' => auth()->id(),
+                        ]);
+                    }
+                }
+            }
+        }
 
         $requestRows = FestClashRequest::where('event_id', $event->id)
             ->where('school_id', $this->school->id)
-            ->with(['participant.student'])
+            ->with(['participant.student', 'participant.group'])
             ->latest()
             ->get();
 
-        // Batched instead of one schedules() query per row.
         $requestScheduleIds = $requestRows
             ->flatMap(fn (FestClashRequest $r) => $r->schedule_ids ?: array_filter([$r->schedule_id_a, $r->schedule_id_b]))
             ->unique()
             ->values();
-        $requestSchedulesById = FestSchedule::with('item:id,title')->whereIn('id', $requestScheduleIds)->get()->keyBy('id');
+
+        $requestSchedulesById = FestSchedule::with(['item:id,title,duration_minutes,calling_buffer_minutes,timing_mode', 'festStage.venue', 'venue'])
+            ->whereIn('id', $requestScheduleIds)
+            ->get()
+            ->keyBy('id');
 
         $requests = $requestRows->map(fn (FestClashRequest $r) => $r->toArray() + [
-            'schedules' => collect($r->schedule_ids ?: array_filter([$r->schedule_id_a, $r->schedule_id_b]))
+            'student_name' => $r->participant?->student?->name,
+            'roll_no'      => $r->participant?->level_registration_number ?? $r->participant?->chest_no ?? $r->participant?->student?->reg_no,
+            'schedules'    => collect($r->schedule_ids ?: array_filter([$r->schedule_id_a, $r->schedule_id_b]))
                 ->map(fn ($id) => $requestSchedulesById->get($id))
                 ->filter()
-                ->map(fn ($s) => ['id' => $s->id, 'item_title' => $s->item?->title])
+                ->map(fn ($s) => [
+                    'id'         => $s->id,
+                    'item_title' => $s->item?->title,
+                    'stage'      => $this->formatScheduleStage($s),
+                    'time'       => $this->formatScheduleSlotTime($s),
+                    'date'       => $s->scheduled_at?->format('d M Y'),
+                ])
                 ->values()
                 ->all(),
         ]);
@@ -62,17 +133,26 @@ class FestClashRequestController extends SchoolAdminController
             ->with(['student', 'registration.item'])
             ->get()
             ->map(function (FestParticipant $p) use ($event, $classGroupLabels, $artsCategoryLabels) {
+                $studentId = $p->student_id;
                 $schedules = FestSchedule::whereIn('event_id', $event->reportableEventIds())
-                    ->where('participant_id', $p->id)
-                    ->with('item')
+                    ->where(function ($q) use ($p, $studentId) {
+                        $q->where('participant_id', $p->id);
+                        if ($studentId) {
+                            $q->orWhereHas('participant', fn ($sq) => $sq->where('student_id', $studentId));
+                        }
+                    })
+                    ->with(['item', 'festStage.venue', 'venue'])
                     ->orderBy('scheduled_at')
                     ->get()
+                    ->unique('id')
+                    ->values()
                     ->map(fn (FestSchedule $s) => [
                         'id'             => $s->id,
                         'item_title'     => $s->item?->title,
                         'category_label' => FestItemCategoryLabel::resolve($s->item, $classGroupLabels, $artsCategoryLabels),
                         'scheduled_at'   => $s->scheduled_at?->toIso8601String(),
-                        'stage'          => $s->stage,
+                        'stage'          => $this->formatScheduleStage($s),
+                        'time'           => $this->formatScheduleSlotTime($s),
                     ]);
 
                 return [
@@ -90,6 +170,7 @@ class FestClashRequestController extends SchoolAdminController
             'programMeta'  => $meta,
             'requests'     => $requests,
             'participants' => $participants,
+            'detectedCount'=> count($detectedClashes),
         ]);
     }
 
@@ -101,9 +182,6 @@ class FestClashRequestController extends SchoolAdminController
 
         $data = $request->validate([
             'participant_id'       => 'required|exists:fest_participants,id',
-            // A clash is two or more overlapping slots — the detected-clashes report
-            // already flags every overlapping pair for a student with 3+ items, so this
-            // form must be able to report all of them in one go, not just two.
             'schedule_ids'         => 'required|array|min:2',
             'schedule_ids.*'       => 'required|exists:fest_schedules,id',
             'description'          => 'required|string|max:2000',
@@ -117,17 +195,20 @@ class FestClashRequestController extends SchoolAdminController
             ->firstOrFail();
 
         $scheduleIds = array_values(array_unique(array_map('intval', $data['schedule_ids'])));
-        $ownedCount = FestSchedule::whereIn('id', $scheduleIds)
-            ->where('participant_id', $participant->id)
+        $studentId = $participant->student_id;
+        $schedules = FestSchedule::whereIn('id', $scheduleIds)
             ->whereIn('event_id', $event->reportableEventIds())
-            ->count();
-        abort_unless($ownedCount === count($scheduleIds), 422, 'One of the selected slots does not belong to this participant.');
+            ->with('participant')
+            ->get();
+        $allBelong = $schedules->count() === count($scheduleIds) && $schedules->every(function ($s) use ($participant, $studentId) {
+            return $s->participant_id === $participant->id || ($studentId && $s->participant?->student_id === $studentId);
+        });
+        abort_unless($allBelong, 422, 'One of the selected slots does not belong to this participant.');
 
         FestClashRequest::create([
             'event_id'               => $event->id,
             'school_id'              => $this->school->id,
             'participant_id'         => $data['participant_id'],
-            // Kept for older code/reports that still read the pair columns directly.
             'schedule_id_a'          => $scheduleIds[0] ?? null,
             'schedule_id_b'          => $scheduleIds[1] ?? null,
             'schedule_ids'           => $scheduleIds,
@@ -139,6 +220,23 @@ class FestClashRequestController extends SchoolAdminController
 
         return redirect('/school-admin/'.$this->school->id.'/'.ProgramRouteMap::prefixFromSlug($meta['slug'])."/events/{$event->id}/clash-requests")
             ->with('success', 'Clash report submitted.');
+    }
+
+    public function update(Request $request, string $tenantId, FestEvent $event, FestClashRequest $clashRequest, string $program)
+    {
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+        app(FestRegistrationRouterService::class)->assertSchoolCanAccess($event, $this->school->id);
+        abort_unless($clashRequest->school_id === $this->school->id, 403);
+
+        $data = $request->validate([
+            'requested_resolution' => 'nullable|string|max:2000',
+        ]);
+
+        $clashRequest->update([
+            'requested_resolution' => $data['requested_resolution'] ?? null,
+        ]);
+
+        return back()->with('success', 'Resolution suggestion updated.');
     }
 
     /**
