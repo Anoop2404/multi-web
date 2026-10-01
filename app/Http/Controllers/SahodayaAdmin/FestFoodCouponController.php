@@ -372,7 +372,8 @@ class FestFoodCouponController extends SahodayaAdminController
 
         $path = TenantStorage::storeUploadedFile(
             $request->file('background_image'),
-            "events/{$event->id}/food-coupon-template"
+            "events/{$event->id}/food-coupon-template",
+            'public'
         );
 
         $event->update(['food_coupon_bg_image' => $path]);

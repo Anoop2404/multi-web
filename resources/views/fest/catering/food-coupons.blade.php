@@ -7,17 +7,17 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         @page {
             size: A4 portrait;
-            margin: 5mm;
+            margin: 6mm 7mm;
         }
         body {
             font-family: 'DejaVu Sans', Arial, sans-serif;
             color: #0f172a;
-            font-size: 8px;
+            font-size: 7px;
             background: #ffffff;
         }
         .page {
             width: 100%;
-            height: 285mm;
+            height: 284mm;
             page-break-inside: avoid;
         }
         .page-break {
@@ -26,24 +26,29 @@
         .coupon-grid {
             width: 100%;
             border-collapse: separate;
-            border-spacing: 2.5mm 2mm;
+            border-spacing: 4mm 5.5mm;
         }
         .coupon-cell {
             width: 50%;
-            height: 52mm;
+            height: 40.63mm;
             vertical-align: top;
             padding: 0;
         }
         .coupon-card {
             position: relative;
-            width: 96mm;
-            height: 52mm;
-            max-height: 52mm;
-            border: 1px dashed #94a3b8;
-            border-radius: 3mm;
+            width: 95mm;
+            height: 40.63mm;
+            max-height: 40.63mm;
             overflow: hidden;
             background: #ffffff;
+            border-radius: 2mm;
         }
+
+        /* Border when no custom background image is used */
+        .coupon-card--bordered {
+            border: 1px dashed #94a3b8;
+        }
+
         .coupon-bg {
             position: absolute;
             top: 0;
@@ -52,148 +57,203 @@
             height: 100%;
             z-index: 1;
         }
-        .coupon-inner {
-            position: relative;
-            z-index: 2;
-            width: 100%;
-            height: 100%;
-            padding: 2.5mm;
-        }
-        /* Top Banner */
-        .coupon-header {
-            display: table;
-            width: 100%;
-            padding-bottom: 1.5mm;
-            border-bottom: 0.5px solid #e2e8f0;
-        }
-        .coupon-org {
-            display: table-cell;
-            vertical-align: middle;
-            font-size: 6.5px;
-            font-weight: bold;
-            color: #475569;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 60mm;
-        }
-        .coupon-meal-badge {
-            display: table-cell;
-            vertical-align: middle;
-            text-align: right;
-        }
-        .meal-pill {
-            display: inline-block;
-            font-size: 6.5px;
-            font-weight: bold;
-            text-transform: uppercase;
-            padding: 1.2px 5px;
-            border-radius: 2mm;
-            letter-spacing: 0.4px;
-        }
-        .meal-pill--breakfast { background: #fef3c7; color: #b45309; border: 0.5px solid #f59e0b; }
-        .meal-pill--lunch     { background: #ecfdf5; color: #047857; border: 0.5px solid #10b981; }
-        .meal-pill--dinner    { background: #e0e7ff; color: #4338ca; border: 0.5px solid #6366f1; }
-        .meal-pill--snacks    { background: #fdf2f8; color: #9d174d; border: 0.5px solid #ec4899; }
-        .meal-pill--other     { background: #f1f5f9; color: #334155; border: 0.5px solid #94a3b8; }
 
-        /* Main Content */
-        .coupon-main {
-            display: table;
-            width: 100%;
-            margin-top: 1.5mm;
-            height: 38mm;
+        /* ------------------------------------------------------------------ */
+        /* STUB BOX (x: 70.41%, y: 22.60%, w: 23.54%, h: 55.48%)              */
+        /* Contains: Serial No, Centered QR Code, Decoded QR Token            */
+        /* ------------------------------------------------------------------ */
+        .box-container {
+            position: absolute;
+            left: 70.41%;
+            top: 22.60%;
+            width: 23.54%;
+            height: 55.48%;
+            z-index: 3;
+            text-align: center;
+            overflow: hidden;
+            padding: 0.6mm 0.5mm 0.4mm 0.5mm;
         }
-        .coupon-left {
-            display: table-cell;
-            vertical-align: top;
-            width: 68mm;
-            padding-right: 1.5mm;
-        }
-        .coupon-code-row {
-            margin-bottom: 1mm;
-        }
-        .coupon-code-label {
-            font-size: 5.5px;
-            text-transform: uppercase;
-            color: #64748b;
-            letter-spacing: 0.5px;
-        }
-        .coupon-code-val {
-            font-size: 15px;
-            font-weight: 800;
-            color: #0f172a;
+
+        .box-serial-no {
             font-family: 'DejaVu Sans Mono', monospace;
+            font-weight: bold;
+            font-size: 6.8pt;
+            color: #0f172a;
+            letter-spacing: 0.4px;
+            line-height: 1.1;
+            margin-bottom: 0.4mm;
+            text-align: center;
+        }
+
+        .box-qr-wrap {
+            text-align: center;
+            line-height: 0;
+        }
+
+        .box-qr-img {
+            width: 14.5mm;
+            height: 14.5mm;
+            display: inline-block;
+        }
+
+        .box-decoded-val {
+            font-family: 'DejaVu Sans Mono', monospace;
+            font-weight: bold;
+            font-size: 5.5pt;
+            color: #0f172a;
             letter-spacing: 0.5px;
             line-height: 1.1;
+            margin-top: 0.4mm;
+            text-align: center;
         }
-        .coupon-event {
-            font-size: 7px;
-            font-weight: 700;
+
+        .box-stub-label {
+            position: absolute;
+            left: 70.41%;
+            top: 80.5%;
+            width: 23.54%;
+            text-align: center;
+            font-family: 'DejaVu Sans', sans-serif;
+            font-size: 4.5pt;
+            font-weight: bold;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            z-index: 3;
+        }
+
+        /* ------------------------------------------------------------------ */
+        /* MAIN VOUCHER DETAILS (Left Section)                                */
+        /* ------------------------------------------------------------------ */
+        .left-details-container {
+            position: absolute;
+            left: 4.5%;
+            top: 47%;
+            width: 58%;
+            height: 24%;
+            z-index: 3;
+            overflow: hidden;
+        }
+
+        .left-meta-row {
+            line-height: 1;
+            margin-bottom: 0.7mm;
+            white-space: nowrap;
+        }
+
+        .meal-pill {
+            display: inline-block;
+            font-family: 'DejaVu Sans', sans-serif;
+            font-size: 5pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            padding: 0.5mm 1.8mm;
+            border-radius: 0.8mm;
+            letter-spacing: 0.3px;
+            line-height: 1;
+            vertical-align: middle;
+        }
+        .meal-pill--breakfast { background: #f59e0b; color: #ffffff; }
+        .meal-pill--lunch     { background: #10b981; color: #ffffff; }
+        .meal-pill--dinner    { background: #4f46e5; color: #ffffff; }
+        .meal-pill--snacks    { background: #ec4899; color: #ffffff; }
+        .meal-pill--other     { background: #64748b; color: #ffffff; }
+
+        .meta-text {
+            font-size: 5pt;
+            color: #334155;
+            margin-left: 1.5mm;
+            vertical-align: middle;
+        }
+        .meta-text strong {
+            color: #0f172a;
+        }
+
+        .left-school-row {
+            font-size: 5.2pt;
+            font-weight: bold;
             color: #1e293b;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            max-width: 66mm;
-            margin-bottom: 1mm;
+            line-height: 1.2;
         }
-        .coupon-school {
-            font-size: 7px;
-            font-weight: 600;
-            color: #334155;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 66mm;
-            margin-bottom: 0.8mm;
-        }
-        .coupon-meta {
-            font-size: 6px;
-            color: #64748b;
-            line-height: 1.3;
-        }
-        .coupon-right {
-            display: table-cell;
-            vertical-align: middle;
-            text-align: center;
-            width: 24mm;
-            padding-left: 1mm;
-            border-left: 0.5px dashed #cbd5e1;
-        }
-        .qr-img {
-            width: 19mm;
-            height: 19mm;
-            display: block;
-            margin: 0 auto;
-        }
-        .decoded-label {
-            font-size: 5px;
-            color: #94a3b8;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            margin-top: 1mm;
-        }
-        .decoded-val {
-            font-size: 6.5px;
-            font-weight: bold;
-            font-family: 'DejaVu Sans Mono', monospace;
-            color: #0f172a;
-            letter-spacing: 0.5px;
-            text-align: center;
-            word-break: break-all;
-        }
-        .extra-badge {
+
+        .left-extra-pill {
             display: inline-block;
             background: #fffbeb;
             color: #b45309;
             border: 0.5px solid #fde68a;
-            font-size: 5.5px;
+            font-size: 4.8pt;
             font-weight: bold;
-            padding: 0.5px 3px;
-            border-radius: 1mm;
+            padding: 0.3mm 1.5mm;
+            border-radius: 0.8mm;
             text-transform: uppercase;
+            margin-left: 1.5mm;
+        }
+
+        /* Serial badge beside "FOOD COUPON" */
+        .coupon-serial-badge {
+            position: absolute;
+            left: 51.5%;
+            top: 72.5%;
+            font-family: 'DejaVu Sans Mono', monospace;
+            font-weight: bold;
+            font-size: 7pt;
+            color: #1e3a8a;
+            background: #dbeafe;
+            border: 0.5px solid #93c5fd;
+            padding: 0.5mm 1.8mm;
+            border-radius: 1mm;
+            white-space: nowrap;
+            z-index: 3;
+            line-height: 1.1;
+        }
+
+        /* Fallback elements when NO template background exists */
+        .fallback-header {
+            position: absolute;
+            left: 4.5%;
+            top: 4%;
+            width: 59%;
+            z-index: 3;
+        }
+        .fallback-event-title {
+            font-size: 7pt;
+            font-weight: bold;
+            color: #0f172a;
+            text-transform: uppercase;
+        }
+        .fallback-sahodaya {
+            font-size: 5.5pt;
+            color: #64748b;
+        }
+        .fallback-title {
+            position: absolute;
+            left: 4.5%;
+            top: 72%;
+            font-size: 11pt;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: 0.5px;
+            z-index: 3;
+        }
+        .fallback-stub-border {
+            position: absolute;
+            left: 67%;
+            top: 0;
+            bottom: 0;
+            border-left: 0.5px dashed #94a3b8;
+            z-index: 2;
+        }
+        .fallback-box-border {
+            position: absolute;
+            left: 70.41%;
+            top: 22.60%;
+            width: 23.54%;
+            height: 55.48%;
+            border: 1px solid #0f172a;
+            z-index: 2;
         }
     </style>
 </head>
@@ -210,49 +270,51 @@
             <tr>
                 @foreach($row as $c)
                 <td class="coupon-cell">
-                    <div class="coupon-card">
+                    <div class="coupon-card {{ empty($bgDataUri) ? 'coupon-card--bordered' : '' }}">
                         @if(!empty($bgDataUri))
                             <img src="{{ $bgDataUri }}" class="coupon-bg" alt="" />
+                        @else
+                            <div class="fallback-header">
+                                <div class="fallback-event-title">{{ $event->title ?? 'Sahodaya Event' }}</div>
+                                <div class="fallback-sahodaya">{{ $sahodaya->name ?? 'Sahodaya' }}</div>
+                            </div>
+                            <div class="fallback-title">FOOD COUPON</div>
+                            <div class="fallback-stub-border"></div>
+                            <div class="fallback-box-border"></div>
                         @endif
 
-                        <div class="coupon-inner">
-                            <div class="coupon-header">
-                                <span class="coupon-org">{{ $sahodaya->name ?? 'Sahodaya Event' }}</span>
-                                <span class="coupon-meal-badge">
-                                    <span class="meal-pill meal-pill--{{ $c['meal_type'] }}">{{ ucfirst($c['meal_type']) }}</span>
-                                </span>
+                        {{-- Left Portion: Dynamic details (Meal, Date, Entitlement, School) --}}
+                        <div class="left-details-container">
+                            <div class="left-meta-row">
+                                <span class="meal-pill meal-pill--{{ $c['meal_type'] }}">{{ ucfirst($c['meal_type']) }}</span>
+                                <span class="meta-text"><strong>Date:</strong> {{ $c['formatted_date'] }}</span>
+                                <span class="meta-text"><strong>Qty:</strong> {{ $c['head_count'] ?? 1 }}</span>
                             </div>
-
-                            <div class="coupon-main">
-                                <div class="coupon-left">
-                                    <div class="coupon-code-row">
-                                        <div class="coupon-code-label">Serialized Code</div>
-                                        <div class="coupon-code-val">{{ $c['coupon_code'] }}</div>
-                                    </div>
-
-                                    <div class="coupon-event">{{ $event->title }}</div>
-                                    <div class="coupon-school">
-                                        {{ $c['school_name'] }}
-                                        @if($c['is_extra'])
-                                            <span class="extra-badge">Extra</span>
-                                        @endif
-                                    </div>
-
-                                    <div class="coupon-meta">
-                                        <div><strong>Date:</strong> {{ $c['formatted_date'] }}</div>
-                                        <div><strong>Entitlement:</strong> {{ $c['head_count'] ?? 1 }} Person ({{ ucfirst($c['meal_type']) }})</div>
-                                    </div>
-                                </div>
-
-                                <div class="coupon-right">
-                                    @if(!empty($c['qr_src']))
-                                        <img src="{{ $c['qr_src'] }}" class="qr-img" alt="QR" />
-                                    @endif
-                                    <div class="decoded-label">Decoded Value</div>
-                                    <div class="decoded-val">{{ $c['qr_token'] }}</div>
-                                </div>
+                            <div class="left-school-row">
+                                <span>{{ $c['school_name'] }}</span>
+                                @if(!empty($c['is_extra']))
+                                    <span class="left-extra-pill">EXTRA BUFFER</span>
+                                @endif
                             </div>
                         </div>
+
+                        {{-- Serial No Badge beside "FOOD COUPON" --}}
+                        <div class="coupon-serial-badge">
+                            {{ $c['coupon_code'] }}
+                        </div>
+
+                        {{-- Stub Box: Serial No, Centered QR Code, Decoded QR Value --}}
+                        <div class="box-container">
+                            <div class="box-serial-no">{{ $c['coupon_code'] }}</div>
+                            <div class="box-qr-wrap">
+                                @if(!empty($c['qr_src']))
+                                    <img src="{{ $c['qr_src'] }}" class="box-qr-img" alt="QR" />
+                                @endif
+                            </div>
+                            <div class="box-decoded-val">{{ $c['qr_token'] }}</div>
+                        </div>
+
+                        <div class="box-stub-label">FOOD STUB</div>
                     </div>
                 </td>
                 @endforeach

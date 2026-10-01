@@ -83,7 +83,9 @@ class FestFoodCouponVerificationController extends Controller
     private function resolveCoupon(string $token): ?array
     {
         if (tenancy()->initialized) {
-            $coupon = FestFoodCoupon::where('qr_token', $token)->first();
+            $coupon = FestFoodCoupon::where('qr_token', $token)
+                ->orWhere('coupon_code', $token)
+                ->first();
             if ($coupon) {
                 $tenant = tenancy()->tenant;
                 $event = FestEvent::find($coupon->event_id);
@@ -100,7 +102,9 @@ class FestFoodCouponVerificationController extends Controller
         $sahodayas = Tenant::where('type', 'sahodaya')->get();
         foreach ($sahodayas as $sahodaya) {
             $found = TenancyDatabase::withTenantDatabase($sahodaya, function () use ($token) {
-                return FestFoodCoupon::where('qr_token', $token)->first();
+                return FestFoodCoupon::where('qr_token', $token)
+                    ->orWhere('coupon_code', $token)
+                    ->first();
             });
 
             if ($found) {

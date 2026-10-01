@@ -1,12 +1,12 @@
 <template>
-    <div class="group relative flex flex-col justify-between rounded-2xl border transition-all duration-200 bg-white p-4"
+    <div class="group relative flex flex-col justify-between rounded-2xl border transition-all duration-200 bg-white p-4 sm:p-5"
          :class="[
              inOrder ? 'border-emerald-300 ring-2 ring-emerald-100 shadow-sm bg-gradient-to-b from-emerald-50/20 to-white' : 'border-slate-200/80 hover:border-slate-300 hover:shadow-md shadow-sm',
              muted ? 'opacity-60 bg-slate-50' : ''
          ]">
         
         <!-- Top header row: Veg badge + Corner slot (e.g. sort order or status) -->
-        <div class="flex items-center justify-between gap-2 mb-2.5">
+        <div class="flex items-center justify-between gap-2 mb-3">
             <VegBadge :name="name" :description="description" show-label />
             <div v-if="$slots.corner" class="shrink-0">
                 <slot name="corner" />
@@ -15,15 +15,15 @@
 
         <!-- Body: Icon + Details -->
         <div class="flex items-start gap-3.5 mb-3 flex-1 min-w-0">
-            <div class="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0 border border-amber-100/80 bg-gradient-to-br from-amber-50 to-orange-50 text-slate-800 shadow-xs"
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 border border-amber-100/80 bg-gradient-to-br from-amber-50 to-orange-50 text-slate-800 shadow-xs"
                  aria-hidden="true">
                 {{ icon }}
             </div>
             <div class="min-w-0 flex-1">
-                <h4 class="text-sm font-bold text-slate-900 leading-snug line-clamp-2 group-hover:text-slate-950">{{ name }}</h4>
-                <p v-if="description" class="text-xs text-slate-500 line-clamp-2 mt-1 leading-relaxed">{{ description }}</p>
+                <h4 class="text-base font-bold text-slate-900 leading-snug line-clamp-2 group-hover:text-slate-950">{{ name }}</h4>
+                <p v-if="description" class="text-xs sm:text-sm text-slate-500 line-clamp-2 mt-1 leading-relaxed">{{ description }}</p>
                 <div class="mt-2 flex items-baseline gap-1.5">
-                    <span class="text-base font-extrabold text-slate-900 tracking-tight">₹{{ Number(price).toFixed(2) }}</span>
+                    <span class="text-lg sm:text-xl font-black text-slate-900 tracking-tight">₹{{ Number(price).toFixed(2) }}</span>
                 </div>
             </div>
         </div>

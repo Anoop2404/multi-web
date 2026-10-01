@@ -167,10 +167,10 @@
             </div>
         </div>
 
-        <!-- Main Layout: Menu (Left 2 cols) & Right Order / Payment Panel (Right 1 col) -->
-        <div class="grid lg:grid-cols-3 gap-6 items-start">
+        <!-- Main Layout: Menu (Left 7 cols) & Right Order / Payment Panel (Right 5 cols) -->
+        <div class="grid lg:grid-cols-12 gap-6 lg:gap-8 items-start">
             <!-- Left: Food Menu Items -->
-            <div class="lg:col-span-2 space-y-8">
+            <div class="lg:col-span-7 xl:col-span-7 space-y-8">
                 <div v-for="group in filteredGroupedMenu" :key="group.date" class="space-y-6">
                     <!-- Date Section Header -->
                     <div class="flex flex-wrap items-center gap-3 border-b-2 border-slate-200 pb-2">
@@ -253,22 +253,24 @@
             </div>
 
             <!-- Right Column: Sticky Order & Payment Panel with Sub-Tabs -->
-            <div id="your-order" class="space-y-4 lg:sticky lg:top-4">
+            <div id="your-order" class="lg:col-span-5 xl:col-span-5 space-y-5 lg:sticky lg:top-4">
                 <!-- Panel Tab Switcher -->
                 <div class="flex rounded-2xl bg-slate-200/80 p-1.5 shadow-inner">
                     <button type="button" @click="rightPanelTab = 'order'"
-                            class="flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5"
+                            class="flex-1 py-2.5 rounded-xl text-sm font-extrabold transition flex items-center justify-center gap-2"
                             :class="rightPanelTab === 'order' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'">
-                        <span>🛒 Order Tray</span>
-                        <span v-if="totalOrderedCount > 0" class="bg-indigo-100 text-indigo-700 text-[10px] px-1.5 py-0.5 rounded-full">
+                        <span class="text-base">🛒</span>
+                        <span>Order Tray</span>
+                        <span v-if="totalOrderedCount > 0" class="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-bold">
                             {{ totalOrderedCount }}
                         </span>
                     </button>
                     <button type="button" @click="rightPanelTab = 'history'"
-                            class="flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5"
+                            class="flex-1 py-2.5 rounded-xl text-sm font-extrabold transition flex items-center justify-center gap-2"
                             :class="rightPanelTab === 'history' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'">
-                        <span>📜 Payment History</span>
-                        <span v-if="payments.length > 0" class="bg-slate-100 text-slate-700 text-[10px] px-1.5 py-0.5 rounded-full"
+                        <span class="text-base">📜</span>
+                        <span>Payment History</span>
+                        <span v-if="payments.length > 0" class="bg-slate-100 text-slate-700 text-xs px-2 py-0.5 rounded-full font-bold"
                               :class="pendingPaymentsCount > 0 ? 'bg-amber-100 text-amber-800' : ''">
                             {{ payments.length }}
                         </span>
@@ -278,19 +280,19 @@
                 <!-- ============================================== -->
                 <!-- SUB-TAB 1: ORDER TRAY & CHECKOUT               -->
                 <!-- ============================================== -->
-                <div v-if="rightPanelTab === 'order'" class="space-y-4">
+                <div v-if="rightPanelTab === 'order'" class="space-y-5">
                     <!-- Cart Container -->
                     <div class="rounded-2xl border border-slate-200 bg-white shadow-md overflow-hidden">
                         <!-- Cart Header -->
-                        <div class="bg-gradient-to-r from-slate-900 to-indigo-950 p-4 text-white flex items-center justify-between">
-                            <div class="flex items-center gap-2.5">
-                                <span class="text-xl">🛒</span>
+                        <div class="bg-gradient-to-r from-slate-900 to-indigo-950 p-4 sm:p-5 text-white flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <span class="text-2xl">🛒</span>
                                 <div>
-                                    <h3 class="font-bold text-base leading-tight">Order Tray</h3>
-                                    <p class="text-[11px] text-slate-300">Contingent pre-ordered items</p>
+                                    <h3 class="font-extrabold text-base sm:text-lg leading-tight">Order Tray</h3>
+                                    <p class="text-xs text-slate-300">Contingent pre-ordered items</p>
                                 </div>
                             </div>
-                            <span class="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold text-white">
+                            <span class="rounded-full bg-white/20 px-3 py-1 text-xs sm:text-sm font-extrabold text-white">
                                 {{ totalOrderedCount }} item{{ totalOrderedCount === 1 ? '' : 's' }}
                             </span>
                         </div>
@@ -298,31 +300,31 @@
                         <!-- Items List -->
                         <div class="max-h-80 overflow-y-auto divide-y divide-slate-100">
                             <div v-if="!orderItems.length" class="p-8 text-center">
-                                <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-2xl mx-auto mb-2 text-slate-400">
+                                <div class="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center text-3xl mx-auto mb-3 text-slate-400">
                                     🍽️
                                 </div>
-                                <p class="font-semibold text-sm text-slate-800">Your tray is empty</p>
-                                <p class="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+                                <p class="font-bold text-base text-slate-800">Your tray is empty</p>
+                                <p class="text-xs sm:text-sm text-slate-500 mt-1 max-w-xs mx-auto">
                                     Select dishes from the menu to pre-order food for your students and accompanying staff.
                                 </p>
                             </div>
 
-                            <div v-for="oi in orderItems" :key="oi.id" class="p-3.5 hover:bg-slate-50/80 transition flex items-start justify-between gap-3">
+                            <div v-for="oi in orderItems" :key="oi.id" class="p-4 hover:bg-slate-50/80 transition flex items-start justify-between gap-3">
                                 <div class="min-w-0 flex-1">
                                     <div class="flex items-center gap-1.5">
                                         <VegBadge :name="oi.item_name" />
-                                        <p class="truncate text-sm font-bold text-slate-900">{{ oi.item_name }}</p>
+                                        <p class="truncate text-sm sm:text-base font-bold text-slate-900">{{ oi.item_name }}</p>
                                     </div>
-                                    <div class="flex items-center gap-2 text-xs text-slate-500 mt-1">
+                                    <div class="flex items-center gap-2 text-xs sm:text-sm text-slate-500 mt-1">
                                         <span>{{ formatCalendarDate(oi.menu_date) }}</span>
                                         <span>·</span>
                                         <span class="font-medium text-slate-700">{{ oi.quantity }} × ₹{{ Number(oi.unit_price).toFixed(2) }}</span>
                                     </div>
                                 </div>
                                 <div class="text-right shrink-0">
-                                    <p class="text-sm font-bold text-slate-900">₹{{ Number(oi.line_total).toFixed(2) }}</p>
+                                    <p class="text-sm sm:text-base font-extrabold text-slate-900">₹{{ Number(oi.line_total).toFixed(2) }}</p>
                                     <button v-if="canOrderItem(oi)" type="button"
-                                            class="text-[11px] font-semibold text-rose-600 hover:text-rose-800 mt-0.5 inline-block"
+                                            class="text-xs font-bold text-rose-600 hover:text-rose-800 mt-1 inline-block"
                                             @click="removeItem(oi)">
                                         Remove
                                     </button>
@@ -331,97 +333,102 @@
                         </div>
 
                         <!-- Financial Summary -->
-                        <div v-if="bill" class="border-t border-slate-200 bg-slate-50/70 p-4 space-y-2.5">
-                            <div class="flex justify-between text-xs text-slate-600">
+                        <div v-if="bill" class="border-t border-slate-200 bg-slate-50/70 p-4 sm:p-5 space-y-3">
+                            <div class="flex justify-between text-sm text-slate-600">
                                 <span>Subtotal</span>
-                                <span class="font-semibold text-slate-900">₹{{ Number(bill.amount_total).toFixed(2) }}</span>
+                                <span class="font-bold text-slate-900">₹{{ Number(bill.amount_total).toFixed(2) }}</span>
                             </div>
-                            <div class="flex justify-between text-xs text-slate-600">
+                            <div class="flex justify-between text-sm text-slate-600">
                                 <span>Amount Paid</span>
-                                <span class="font-semibold text-emerald-700">₹{{ Number(bill.amount_paid).toFixed(2) }}</span>
+                                <span class="font-bold text-emerald-700">₹{{ Number(bill.amount_paid).toFixed(2) }}</span>
                             </div>
-                            <div class="flex justify-between text-sm font-bold pt-2 border-t border-slate-200">
-                                <span>Balance Due</span>
+                            <div class="flex justify-between text-base font-black pt-2.5 border-t border-slate-200">
+                                <span class="text-slate-900">Balance Due</span>
                                 <span :class="Number(bill.balance_due) > 0 ? 'text-rose-700' : 'text-emerald-700'">
                                     ₹{{ Number(bill.balance_due).toFixed(2) }}
                                 </span>
                             </div>
 
                             <!-- Progress Bar -->
-                            <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden mt-1">
-                                <div class="bg-emerald-500 h-1.5 rounded-full transition-all"
+                            <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden mt-1.5">
+                                <div class="bg-emerald-500 h-2 rounded-full transition-all"
                                      :style="{ width: `${paymentProgress}%` }"></div>
                             </div>
-                            <p class="text-[10px] text-right text-slate-400">{{ paymentProgress.toFixed(0) }}% settled</p>
+                            <p class="text-xs text-right text-slate-500 font-medium">{{ paymentProgress.toFixed(0) }}% settled</p>
                         </div>
                     </div>
 
                     <!-- Where to Pay Card -->
-                    <div v-if="payeeDetails" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-                        <div class="flex items-center justify-between gap-2">
-                            <h4 class="font-bold text-sm text-slate-900 flex items-center gap-1.5 shrink-0">
-                                <span>💳</span> Where to pay
+                    <div v-if="payeeDetails" class="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm space-y-4">
+                        <div class="flex items-center justify-between gap-3">
+                            <h4 class="font-black text-base sm:text-lg text-slate-900 flex items-center gap-2 shrink-0">
+                                <span class="text-xl">💳</span> Where to pay
                             </h4>
-                            <span class="text-[11px] text-slate-500 font-medium truncate max-w-[14rem] text-right" :title="payeeLabel">
+                            <span class="text-xs text-slate-600 font-bold truncate max-w-[16rem] text-right bg-slate-100 px-2.5 py-1 rounded-lg" :title="payeeLabel">
                                 {{ payeeLabel }}
                             </span>
                         </div>
 
-                        <div class="rounded-xl border border-slate-100 bg-slate-50/80 p-3 space-y-2 text-xs">
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50/90 p-4 sm:p-5 space-y-3.5 text-sm">
                             <div v-if="payeeDetails.bank_name" class="flex items-center justify-between gap-3">
-                                <span class="text-slate-500 shrink-0">Bank</span>
-                                <span class="font-medium text-slate-800 text-right truncate">{{ payeeDetails.bank_name }}</span>
+                                <span class="text-xs sm:text-sm text-slate-500 font-bold uppercase tracking-wider shrink-0">Bank</span>
+                                <span class="font-extrabold text-slate-900 text-sm sm:text-base text-right truncate">{{ payeeDetails.bank_name }}</span>
                             </div>
                             <div v-if="payeeDetails.account_no" class="flex items-center justify-between gap-3">
-                                <span class="text-slate-500 shrink-0">A/C Number</span>
-                                <div class="flex items-center gap-1.5 min-w-0">
-                                    <span class="font-mono font-bold text-slate-900 text-right break-all">{{ payeeDetails.account_no }}</span>
+                                <span class="text-xs sm:text-sm text-slate-500 font-bold uppercase tracking-wider shrink-0">A/C Number</span>
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span class="font-mono font-black text-base sm:text-lg text-slate-900 text-right tracking-wider break-all select-all">{{ payeeDetails.account_no }}</span>
                                     <button type="button" @click="copyText(payeeDetails.account_no, 'Account No')"
-                                            class="shrink-0 text-indigo-600 hover:text-indigo-800 text-[10px] font-semibold underline px-1 py-0.5 rounded hover:bg-indigo-50">
-                                        {{ copiedField === 'Account No' ? 'Copied!' : 'Copy' }}
+                                            class="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-indigo-700 border border-slate-200 hover:bg-indigo-50 shadow-2xs transition">
+                                        {{ copiedField === 'Account No' ? '✓ Copied' : 'Copy' }}
                                     </button>
                                 </div>
                             </div>
                             <div v-if="payeeDetails.ifsc" class="flex items-center justify-between gap-3">
-                                <span class="text-slate-500 shrink-0">IFSC Code</span>
-                                <div class="flex items-center gap-1.5 min-w-0">
-                                    <span class="font-mono font-bold text-slate-900 text-right">{{ payeeDetails.ifsc }}</span>
+                                <span class="text-xs sm:text-sm text-slate-500 font-bold uppercase tracking-wider shrink-0">IFSC Code</span>
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span class="font-mono font-black text-base sm:text-lg text-slate-900 text-right tracking-wider select-all">{{ payeeDetails.ifsc }}</span>
                                     <button type="button" @click="copyText(payeeDetails.ifsc, 'IFSC')"
-                                            class="shrink-0 text-indigo-600 hover:text-indigo-800 text-[10px] font-semibold underline px-1 py-0.5 rounded hover:bg-indigo-50">
-                                        {{ copiedField === 'IFSC' ? 'Copied!' : 'Copy' }}
+                                            class="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-indigo-700 border border-slate-200 hover:bg-indigo-50 shadow-2xs transition">
+                                        {{ copiedField === 'IFSC' ? '✓ Copied' : 'Copy' }}
                                     </button>
                                 </div>
                             </div>
-                            <div v-if="displayUpi" class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pt-1.5 border-t border-slate-200/60">
-                                <span class="text-slate-500 shrink-0">UPI ID / VPA</span>
-                                <div class="flex items-center justify-end gap-1.5 min-w-0 w-full sm:w-auto">
-                                    <span class="font-mono font-bold text-slate-900 text-xs break-all text-right select-all">{{ displayUpi }}</span>
+                            <div v-if="displayUpi" class="pt-2 border-t border-slate-200 space-y-1.5">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs sm:text-sm text-slate-500 font-bold uppercase tracking-wider shrink-0">UPI ID / VPA</span>
                                     <button type="button" @click="copyText(displayUpi, 'UPI')"
-                                            class="shrink-0 text-indigo-600 hover:text-indigo-800 text-[10px] font-semibold underline px-1 py-0.5 rounded hover:bg-indigo-50">
-                                        {{ copiedField === 'UPI' ? 'Copied!' : 'Copy' }}
+                                            class="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-indigo-700 border border-slate-200 hover:bg-indigo-50 shadow-2xs transition">
+                                        {{ copiedField === 'UPI' ? '✓ Copied' : 'Copy UPI' }}
                                     </button>
+                                </div>
+                                <div class="font-mono font-black text-sm sm:text-base text-indigo-950 bg-white border border-indigo-200 px-3.5 py-2 rounded-xl break-all select-all shadow-2xs">
+                                    {{ displayUpi }}
                                 </div>
                             </div>
                         </div>
 
                         <!-- QR Code with preview modal -->
-                        <div v-if="payeeDetails.qr_code_url && !qrImageFailed" class="flex items-center gap-3 pt-1">
+                        <div v-if="payeeDetails.qr_code_url && !qrImageFailed" class="flex items-center gap-4 pt-2 border-t border-slate-100">
                             <div class="relative shrink-0 group cursor-pointer" @click="showQrModal = true">
                                 <img :src="payeeDetails.qr_code_url" alt="Payment QR Code"
-                                     class="w-16 h-16 object-contain rounded-lg border border-slate-200 bg-white p-1 group-hover:ring-2 group-hover:ring-indigo-400 transition"
+                                     class="w-24 h-24 sm:w-28 sm:h-28 object-contain rounded-xl border-2 border-slate-200 bg-white p-1.5 group-hover:ring-2 group-hover:ring-indigo-500 transition shadow-xs"
                                      @error="qrImageFailed = true">
-                                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-lg transition"></div>
+                                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-xl transition flex items-center justify-center">
+                                    <span class="opacity-0 group-hover:opacity-100 transition bg-slate-900/80 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">🔍 Zoom</span>
+                                </div>
                             </div>
-                            <div class="min-w-0">
-                                <p class="text-xs font-bold text-slate-800">Scan & Pay via UPI</p>
-                                <p class="text-[11px] text-slate-500">Google Pay, PhonePe, Paytm, BHIM</p>
-                                <div class="flex items-center gap-2 mt-1">
+                            <div class="min-w-0 space-y-1">
+                                <p class="text-sm sm:text-base font-extrabold text-slate-900">Scan & Pay via UPI</p>
+                                <p class="text-xs text-slate-500 leading-snug">Google Pay, PhonePe, Paytm, BHIM</p>
+                                <div class="flex flex-wrap items-center gap-2 pt-1">
                                     <button type="button" @click="showQrModal = true"
-                                            class="text-xs text-indigo-600 font-semibold hover:underline">
-                                        View larger QR →
+                                            class="text-xs sm:text-sm text-indigo-600 font-bold hover:underline inline-flex items-center gap-1">
+                                        <span>View larger QR</span>
+                                        <span>↗</span>
                                     </button>
                                     <a v-if="upiDeepLink" :href="upiDeepLink"
-                                       class="sm:hidden inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                       class="sm:hidden inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
                                         Open UPI App ↗
                                     </a>
                                 </div>
@@ -430,17 +437,19 @@
                     </div>
 
                     <!-- Focused Payment Submission Entry Point -->
-                    <div v-if="bill && Number(bill.balance_due) > 0 && canOrder" class="rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4 shadow-sm space-y-3">
+                    <div v-if="bill && Number(bill.balance_due) > 0 && canOrder" class="rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50/80 to-blue-50/40 p-5 shadow-sm space-y-3.5">
                         <div class="flex items-start justify-between gap-3">
                             <div>
-                                <h4 class="font-bold text-sm text-slate-900">Ready to record your payment?</h4>
-                                <p class="text-xs text-slate-600 mt-1 leading-relaxed">
-                                    Upload the receipt in a focused form after completing the transfer.
+                                <h4 class="font-extrabold text-base text-slate-900">Ready to record your payment?</h4>
+                                <p class="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
+                                    Upload the receipt or transaction details after completing the transfer.
                                 </p>
                             </div>
-                            <span class="shrink-0 text-xs font-extrabold text-rose-700">₹{{ Number(bill.balance_due).toFixed(2) }} due</span>
+                            <span class="shrink-0 text-sm font-black text-rose-700 bg-white px-3 py-1 rounded-lg border border-rose-200 shadow-2xs">
+                                ₹{{ Number(bill.balance_due).toFixed(2) }} due
+                            </span>
                         </div>
-                        <button type="button" class="btn-primary w-full text-xs font-bold py-2.5 justify-center shadow-sm" @click="openPaymentModal">
+                        <button type="button" class="btn-primary w-full text-sm font-extrabold py-3 justify-center shadow-md hover:shadow-lg transition" @click="openPaymentModal">
                             Upload Payment Proof
                         </button>
                     </div>
@@ -451,22 +460,22 @@
                 <!-- ============================================== -->
                 <div v-if="rightPanelTab === 'history'" class="space-y-4">
                     <!-- Financial Status Card -->
-                    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
                         <div class="flex items-center justify-between">
-                            <h4 class="font-bold text-sm text-slate-900">Payment Status</h4>
-                            <span v-if="bill" class="text-xs font-bold px-2.5 py-0.5 rounded-full"
+                            <h4 class="font-extrabold text-base text-slate-900">Payment Status</h4>
+                            <span v-if="bill" class="text-xs font-extrabold px-3 py-1 rounded-full"
                                   :class="Number(bill.balance_due) <= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'">
                                 {{ Number(bill.balance_due) <= 0 ? 'Fully Paid' : 'Balance Due' }}
                             </span>
                         </div>
-                        <div class="grid grid-cols-2 gap-2 text-center text-xs">
-                            <div class="p-2.5 rounded-xl bg-emerald-50 border border-emerald-100">
-                                <p class="text-slate-500 font-medium">Total Paid</p>
-                                <p class="text-base font-black text-emerald-700 mt-0.5">₹{{ (bill ? Number(bill.amount_paid) : 0).toFixed(2) }}</p>
+                        <div class="grid grid-cols-2 gap-3 text-center">
+                            <div class="p-3.5 rounded-xl bg-emerald-50 border border-emerald-100">
+                                <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Total Paid</p>
+                                <p class="text-lg sm:text-xl font-black text-emerald-700 mt-1">₹{{ (bill ? Number(bill.amount_paid) : 0).toFixed(2) }}</p>
                             </div>
-                            <div class="p-2.5 rounded-xl bg-rose-50 border border-rose-100">
-                                <p class="text-slate-500 font-medium">Balance Due</p>
-                                <p class="text-base font-black text-rose-700 mt-0.5">₹{{ (bill ? Number(bill.balance_due) : 0).toFixed(2) }}</p>
+                            <div class="p-3.5 rounded-xl bg-rose-50 border border-rose-100">
+                                <p class="text-xs text-slate-500 font-bold uppercase tracking-wider">Balance Due</p>
+                                <p class="text-lg sm:text-xl font-black text-rose-700 mt-1">₹{{ (bill ? Number(bill.balance_due) : 0).toFixed(2) }}</p>
                             </div>
                         </div>
                     </div>
