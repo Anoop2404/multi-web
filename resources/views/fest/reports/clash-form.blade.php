@@ -235,7 +235,7 @@
                                 </span>
                                 &nbsp;&nbsp;&nbsp;&nbsp;
                                 <span class="label">Scheduled Time:</span>
-                                <span class="value" style="min-width: 75px; border-bottom: {{ empty($item['time']) ? '1px solid #475569' : 'none' }};">
+                                <span class="value" style="min-width: 140px; border-bottom: {{ empty($item['time']) ? '1px solid #475569' : 'none' }};">
                                     {{ $item['time'] ?? '' }}
                                 </span>
                             </div>

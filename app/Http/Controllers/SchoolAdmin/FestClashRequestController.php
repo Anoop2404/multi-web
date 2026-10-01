@@ -175,9 +175,13 @@ class FestClashRequestController extends SchoolAdminController
             $data['category'] = FestItemCategoryLabel::resolve($schedules->first()?->item, $classGroupLabels, $artsCategoryLabels);
             $data['items'] = $schedules->map(fn (FestSchedule $s) => [
                 'title' => $s->item?->title,
-                'stage' => $s->festStage?->name ?? $s->stage,
-                'time'  => $s->scheduled_at?->format('h:i A'),
+                'stage' => $this->formatScheduleStage($s),
+                'time'  => $this->formatScheduleSlotTime($s, $data['date'] ?? null),
             ])->all();
+
+            while (count($data['items']) < 2) {
+                $data['items'][] = [];
+            }
         } elseif ($studentId = $request->query('student_id')) {
             $student = Student::where('tenant_id', $this->school->id)->findOrFail($studentId);
             $participant = FestParticipant::whereHas('registration', fn ($q) => $q
@@ -238,8 +242,8 @@ class FestClashRequestController extends SchoolAdminController
             $data['category'] = FestItemCategoryLabel::resolve($schedules->first()?->item ?? $participant?->registration?->item, $classGroupLabels, $artsCategoryLabels);
             $data['items'] = $schedules->map(fn (FestSchedule $s) => [
                 'title' => $s->item?->title,
-                'stage' => $s->festStage?->name ?? $s->stage,
-                'time'  => $s->scheduled_at?->format('h:i A'),
+                'stage' => $this->formatScheduleStage($s),
+                'time'  => $this->formatScheduleSlotTime($s, $data['date'] ?? null),
             ])->all();
 
             while (count($data['items']) < 2) {
@@ -267,7 +271,39 @@ class FestClashRequestController extends SchoolAdminController
             'clash-form.pdf',
             $request->boolean('inline') || $request->boolean('preview') || ! $request->has('download'),
             isLandscape: true,
-            requireBrowserRenderer: true,
         );
+    }
+
+    private function formatScheduleSlotTime(?FestSchedule $schedule, ?string $reportDate = null): ?string
+    {
+        if (! $schedule || ! $schedule->scheduled_at) {
+            return null;
+        }
+
+        $startAt = $schedule->scheduled_at;
+        $durationMinutes = $schedule->item?->estimatedDurationMinutes()
+            ?? $schedule->item?->duration_minutes
+            ?? 60;
+        $endAt = $startAt->copy()->addMinutes($durationMinutes);
+
+        $datePrefix = ($reportDate && $startAt->format('d M Y') !== $reportDate)
+            ? $startAt->format('d M, ')
+            : '';
+
+        return "{$datePrefix}{$startAt->format('h:i A')} – {$endAt->format('h:i A')}";
+    }
+
+    private function formatScheduleStage(?FestSchedule $schedule): ?string
+    {
+        if (! $schedule) {
+            return null;
+        }
+
+        $stageName = $schedule->festStage?->name ?? $schedule->stage;
+        $venueName = $schedule->festStage?->venue?->name ?? $schedule->venue?->name;
+
+        return ($stageName && $venueName && ! str_contains(strtolower((string) $stageName), strtolower((string) $venueName)))
+            ? "{$stageName} · {$venueName}"
+            : ($stageName ?? $venueName);
     }
 }

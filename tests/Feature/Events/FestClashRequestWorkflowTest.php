@@ -379,5 +379,7 @@ class FestClashRequestWorkflowTest extends TestCase
         $this->assertStringContainsString('Recitation', $html);
         $this->assertStringContainsString('Elocution', $html);
         $this->assertStringContainsString('Essay Writing', $html);
+        $this->assertStringContainsString('10:00 AM – 11:00 AM', $html);
+        $this->assertStringContainsString('10:15 AM – 11:15 AM', $html);
     }
 }
