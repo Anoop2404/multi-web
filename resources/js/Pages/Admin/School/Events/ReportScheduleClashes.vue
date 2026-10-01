@@ -3,6 +3,12 @@
         <PageHeader :title="`Schedule clashes — ${event.title}`" :eyebrow="programLabel"
                     description="Students from your school with overlapping item schedules.">
             <template #actions>
+                <a :href="`${programBase}/events/${event.id}/clash-requests/print-form?preview=1`" target="_blank" rel="noopener" class="btn-secondary text-sm">
+                    🖨️ Blank clash form
+                </a>
+                <Link :href="`${programBase}/events/${event.id}/clash-requests`" class="btn-secondary text-sm">
+                    ⚠️ Clash requests
+                </Link>
                 <Link :href="`${programBase}/reports/${event.id}`" class="btn-secondary text-sm">← Reports</Link>
                 <ReportDownloadButtons :pdf-url="pdfUrl" :csv-url="csvUrl" />
             </template>
@@ -33,17 +39,20 @@
                                 <th>Student</th>
                                 <th>Item 1</th>
                                 <th>Item 2</th>
+                                <th class="text-right">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             <template v-for="(c, i) in filteredParticipant" :key="'p-'+i">
                                 <tr v-if="shouldShowDateDivider(c, filteredParticipant[i - 1])" class="bg-slate-100">
-                                    <td colspan="3" class="px-3 py-2 text-sm font-bold uppercase tracking-wide text-slate-700">
+                                    <td colspan="4" class="px-3 py-2 text-sm font-bold uppercase tracking-wide text-slate-700">
                                         {{ c.date || 'Unscheduled' }}
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td>{{ c.student_name }}</td>
+                                    <td>
+                                        <p class="font-semibold text-slate-900">{{ c.student_name }}</p>
+                                    </td>
                                     <td>
                                         <p class="font-medium">{{ c.event1 }}</p>
                                         <p class="text-xs text-slate-500">{{ itemMetaLine(c, 1) }}</p>
@@ -51,6 +60,13 @@
                                     <td>
                                         <p class="font-medium">{{ c.event2 }}</p>
                                         <p class="text-xs text-slate-500">{{ itemMetaLine(c, 2) }}</p>
+                                    </td>
+                                    <td class="text-right whitespace-nowrap">
+                                        <a :href="clashFormUrl(c)" target="_blank" rel="noopener"
+                                           class="btn-secondary text-xs !py-1 !px-2.5 inline-flex items-center gap-1 font-semibold text-indigo-700 hover:text-indigo-900 hover:bg-indigo-50 border-indigo-200"
+                                           title="Generate printable clash form for this student">
+                                            <span>🖨️ Clash form</span>
+                                        </a>
                                     </td>
                                 </tr>
                             </template>
@@ -163,5 +179,13 @@ function itemMetaLine(clash, n) {
 // so a date-group boundary is just "this row's date differs from the previous row's".
 function shouldShowDateDivider(row, prevRow) {
     return (row.date ?? null) !== (prevRow?.date ?? null);
+}
+
+function clashFormUrl(c) {
+    const sIds = [c.schedule1_id, c.schedule2_id].filter(Boolean).join(',');
+    const q = new URLSearchParams({ preview: '1' });
+    if (c.student_id) q.set('student_id', String(c.student_id));
+    if (sIds) q.set('schedule_ids', sIds);
+    return `${programBase.value}/events/${props.event.id}/clash-requests/print-form?${q.toString()}`;
 }
 </script>

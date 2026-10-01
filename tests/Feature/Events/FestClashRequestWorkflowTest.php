@@ -361,5 +361,23 @@ class FestClashRequestWorkflowTest extends TestCase
             "/school-admin/{$school->id}/kalotsav/events/{$event->id}/clash-requests/print-form?clash_request={$clashRequest->id}&preview=1"
         );
         $prefilledResponse->assertOk();
+
+        // 3. Pre-filled directly by student_id and schedule_ids (even with 3+ overlapping items)
+        $itemC = FestEventItem::create(['event_id' => $event->id, 'title' => 'Essay Writing', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $registrationC = FestRegistration::create(['event_id' => $event->id, 'item_id' => $itemC->id, 'school_id' => $school->id, 'status' => 'approved', 'submitted_at' => now()]);
+        FestParticipant::create(['registration_id' => $registrationC->id, 'student_id' => $participant->student_id, 'participant_type' => 'student', 'participant_role' => 'performer']);
+        $scheduleC = FestSchedule::create([
+            'event_id' => $event->id, 'item_id' => $itemC->id, 'participant_id' => $participant->id,
+            'scheduled_at' => now()->addDay()->setTime(10, 20), 'stage' => 'Hall C',
+        ]);
+
+        $studentClashResponse = $this->actingAs($schoolAdmin)->get(
+            "/school-admin/{$school->id}/kalotsav/events/{$event->id}/clash-requests/print-form?student_id={$participant->student_id}&schedule_ids={$scheduleA->id},{$scheduleB->id}&preview=1&raw_html=1"
+        );
+        $studentClashResponse->assertOk();
+        $html = $studentClashResponse->getContent();
+        $this->assertStringContainsString('Recitation', $html);
+        $this->assertStringContainsString('Elocution', $html);
+        $this->assertStringContainsString('Essay Writing', $html);
     }
 }

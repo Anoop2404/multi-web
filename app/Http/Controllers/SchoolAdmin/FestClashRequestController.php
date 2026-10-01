@@ -6,6 +6,7 @@ use App\Models\FestClashRequest;
 use App\Models\FestEvent;
 use App\Models\FestParticipant;
 use App\Models\FestSchedule;
+use App\Models\Student;
 use App\Services\Events\FestRegistrationRouterService;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestItemCategoryLabel;
@@ -173,9 +174,74 @@ class FestClashRequestController extends SchoolAdminController
             $data['category'] = FestItemCategoryLabel::resolve($schedules->first()?->item, $classGroupLabels, $artsCategoryLabels);
             $data['items'] = $schedules->map(fn (FestSchedule $s) => [
                 'title' => $s->item?->title,
-                'stage' => $s->stage,
+                'stage' => $s->festStage?->name ?? $s->stage,
                 'time'  => $s->scheduled_at?->format('h:i A'),
             ])->all();
+        } elseif ($studentId = $request->query('student_id')) {
+            $student = Student::where('tenant_id', $this->school->id)->findOrFail($studentId);
+            $participant = FestParticipant::whereHas('registration', fn ($q) => $q
+                ->where('event_id', $event->id)
+                ->where('school_id', $this->school->id)
+            )->where('student_id', $student->id)->with(['student', 'group', 'registration.item'])->first();
+
+            $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
+            $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
+
+            $scheduleIds = array_filter(array_map('intval', explode(',', (string) $request->query('schedule_ids'))));
+
+            if (!empty($scheduleIds)) {
+                $baseSchedules = FestSchedule::where('event_id', $event->id)
+                    ->whereIn('id', $scheduleIds)
+                    ->with(['item', 'festStage.venue'])
+                    ->orderBy('scheduled_at')
+                    ->get();
+
+                // If this student has additional overlapping schedules around that same time window,
+                // include them too so all clashing items (2, 3, or more) appear on the clash form.
+                $windowStart = $baseSchedules->min('scheduled_at');
+                $windowEnd = $baseSchedules->map(fn ($s) => $s->scheduled_at?->copy()->addMinutes($s->item?->estimatedDurationMinutes() ?? 60))->max();
+
+                $allStudentSchedules = FestSchedule::where('event_id', $event->id)
+                    ->whereNotNull('scheduled_at')
+                    ->whereHas('participant', fn ($q) => $q->where('student_id', $student->id))
+                    ->with(['item', 'festStage.venue'])
+                    ->orderBy('scheduled_at')
+                    ->get();
+
+                $overlapping = $allStudentSchedules->filter(function (FestSchedule $s) use ($windowStart, $windowEnd, $scheduleIds) {
+                    if (in_array($s->id, $scheduleIds, true)) {
+                        return true;
+                    }
+                    if (!$windowStart || !$windowEnd || !$s->scheduled_at) {
+                        return false;
+                    }
+                    $sEnd = $s->scheduled_at->copy()->addMinutes($s->item?->estimatedDurationMinutes() ?? 60);
+                    return $s->scheduled_at->lessThan($windowEnd) && $sEnd->greaterThan($windowStart);
+                })->values();
+
+                $schedules = $overlapping->isNotEmpty() ? $overlapping : $baseSchedules;
+            } else {
+                $schedules = FestSchedule::where('event_id', $event->id)
+                    ->whereNotNull('scheduled_at')
+                    ->whereHas('participant', fn ($q) => $q->where('student_id', $student->id))
+                    ->with(['item', 'festStage.venue'])
+                    ->orderBy('scheduled_at')
+                    ->get();
+            }
+
+            $data['date'] = now()->format('d M Y');
+            $data['studentName'] = $student->name;
+            $data['rollNo'] = $participant?->chest_no ?? $participant?->group?->chest_no ?? $participant?->level_registration_number ?? $student->reg_no ?? $student->admission_number;
+            $data['category'] = FestItemCategoryLabel::resolve($schedules->first()?->item ?? $participant?->registration?->item, $classGroupLabels, $artsCategoryLabels);
+            $data['items'] = $schedules->map(fn (FestSchedule $s) => [
+                'title' => $s->item?->title,
+                'stage' => $s->festStage?->name ?? $s->stage,
+                'time'  => $s->scheduled_at?->format('h:i A'),
+            ])->all();
+
+            while (count($data['items']) < 2) {
+                $data['items'][] = [];
+            }
         } else {
             $boxCount = max(2, min(6, (int) $request->query('items', 3)));
             $data['items'] = array_fill(0, $boxCount, []);
@@ -191,6 +257,10 @@ class FestClashRequestController extends SchoolAdminController
             'orgContact'  => trim(implode('   ', array_filter([$profile?->contact_email, $profile?->contact_phone]))),
             'year'        => now()->format('Y'),
         ])->render();
+
+        if ($request->boolean('raw_html')) {
+            return response($html)->header('Content-Type', 'text/html');
+        }
 
         return PdfGenerator::download($html, 'clash-form.pdf', $request->boolean('inline') || $request->boolean('preview') || ! $request->has('download'));
     }

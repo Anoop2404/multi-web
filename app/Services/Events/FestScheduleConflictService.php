@@ -118,6 +118,8 @@ class FestScheduleConflictService
                         'date'            => $start1->format('d M Y'),
                         'event1'          => $item1['title'],
                         'event2'          => $item2['title'],
+                        'schedule1_id'    => $s1->id,
+                        'schedule2_id'    => $s2->id,
                         'item1_id'        => $s1->item_id,
                         'item2_id'        => $s2->item_id,
                         'item1_category'  => $item1['category'],
