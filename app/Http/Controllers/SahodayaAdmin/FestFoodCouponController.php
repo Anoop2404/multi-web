@@ -77,6 +77,69 @@ class FestFoodCouponController extends SahodayaAdminController
                 ->all();
         }
 
+        // School-wise breakdown with individual meal type counts
+        $schoolBreakdown = [];
+        $couponsBySchool = $allEventCoupons->groupBy('school_id');
+
+        foreach ($couponsBySchool as $schoolId => $items) {
+            $schoolName = $schoolId ? ($schoolMap[$schoolId] ?? $schoolId) : 'General Buffer / Extra';
+            $schoolBreakdown[] = [
+                'school_id'   => $schoolId,
+                'school_name' => $schoolName,
+                'is_extra'    => empty($schoolId),
+                'total'       => $items->count(),
+                'issued'      => $items->where('status', 'issued')->count(),
+                'redeemed'    => $items->where('status', 'redeemed')->count(),
+                'breakfast'   => $items->where('meal_type', 'breakfast')->count(),
+                'lunch'       => $items->where('meal_type', 'lunch')->count(),
+                'dinner'      => $items->where('meal_type', 'dinner')->count(),
+                'snacks'      => $items->where('meal_type', 'snacks')->count(),
+                'tea'         => $items->where('meal_type', 'tea')->count(),
+                'other'       => $items->where('meal_type', 'other')->count(),
+                'date_counts' => $items->groupBy(fn ($c) => $c->valid_date?->format('Y-m-d'))->map->count()->all(),
+                'date_meals'  => $items->groupBy(fn ($c) => $c->valid_date?->format('Y-m-d'))
+                    ->map(fn ($dateGroup) => [
+                        'total'     => $dateGroup->count(),
+                        'issued'    => $dateGroup->where('status', 'issued')->count(),
+                        'redeemed'  => $dateGroup->where('status', 'redeemed')->count(),
+                        'breakfast' => $dateGroup->where('meal_type', 'breakfast')->count(),
+                        'lunch'     => $dateGroup->where('meal_type', 'lunch')->count(),
+                        'dinner'    => $dateGroup->where('meal_type', 'dinner')->count(),
+                        'snacks'    => $dateGroup->where('meal_type', 'snacks')->count(),
+                        'tea'       => $dateGroup->where('meal_type', 'tea')->count(),
+                        'other'     => $dateGroup->where('meal_type', 'other')->count(),
+                    ])->all(),
+            ];
+        }
+
+        // Sort by school name alphabetically, extra buffer at the bottom
+        usort($schoolBreakdown, function ($a, $b) {
+            if ($a['is_extra'] !== $b['is_extra']) {
+                return $a['is_extra'] ? 1 : -1;
+            }
+            return strcasecmp($a['school_name'], $b['school_name']);
+        });
+
+        // Day/Date breakdown
+        $dateBreakdown = [];
+        $couponsByDate = $allEventCoupons->groupBy(fn ($c) => $c->valid_date?->format('Y-m-d'));
+        foreach ($eventDates as $d) {
+            $items = $couponsByDate->get($d, collect());
+            $dateBreakdown[] = [
+                'date'        => $d,
+                'total'       => $items->count(),
+                'issued'      => $items->where('status', 'issued')->count(),
+                'redeemed'    => $items->where('status', 'redeemed')->count(),
+                'breakfast'   => $items->where('meal_type', 'breakfast')->count(),
+                'lunch'       => $items->where('meal_type', 'lunch')->count(),
+                'dinner'      => $items->where('meal_type', 'dinner')->count(),
+                'snacks'      => $items->where('meal_type', 'snacks')->count(),
+                'tea'         => $items->where('meal_type', 'tea')->count(),
+                'other'       => $items->where('meal_type', 'other')->count(),
+                'school_count'=> $items->pluck('school_id')->filter()->unique()->count(),
+            ];
+        }
+
         return $this->inertia('Sahodaya/Events/FoodCoupons', $this->withEventActivity($event, FestPageActivity::FOOD_COUPONS, [
             'event'   => [
                 ...$event->only('id', 'title', 'event_type', 'event_start', 'event_end', 'require_payment_for_coupons'),
@@ -109,6 +172,15 @@ class FestFoodCouponController extends SahodayaAdminController
             'eventDates' => $eventDates,
             'mealTypes' => FestFoodCoupon::MEAL_LABELS,
             'mealPrefixes' => FestFoodCoupon::MEAL_PREFIXES,
+            'schoolBreakdown' => $schoolBreakdown,
+            'dateBreakdown' => $dateBreakdown,
+            'couponMatrix' => $allEventCoupons->map(fn (FestFoodCoupon $c) => [
+                's' => $c->school_id,
+                'm' => $c->meal_type,
+                'd' => $c->valid_date?->format('Y-m-d'),
+                'e' => (bool) $c->is_extra,
+                'st' => $c->status,
+            ]),
             'summary' => [
                 'total'    => $allEventCoupons->count(),
                 'issued'   => $allEventCoupons->where('status', 'issued')->count(),
@@ -486,6 +558,21 @@ class FestFoodCouponController extends SahodayaAdminController
             ];
         }
 
+        $parts = ['food-coupons', 'event-' . $event->id];
+        if ($meal) {
+            $parts[] = $meal;
+        }
+        if ($schoolId) {
+            $school = Tenant::find($schoolId);
+            $parts[] = Str::slug($school?->name ?? 'school');
+        } elseif ($request->query('extra_only') === '1') {
+            $parts[] = 'extra-buffer';
+        }
+        if ($date) {
+            $parts[] = $date;
+        }
+        $filename = implode('-', $parts) . '.pdf';
+
         return Pdf::loadView('fest.catering.food-coupons', [
             'event'     => $event,
             'sahodaya'  => $this->sahodaya,
@@ -493,6 +580,6 @@ class FestFoodCouponController extends SahodayaAdminController
             'bgDataUri' => $bgDataUri,
             'coupons'   => $preparedCoupons,
         ])->setPaper('a4', 'portrait')
-          ->download('food-coupons-'.$event->id.'.pdf');
+          ->download($filename);
     }
 }

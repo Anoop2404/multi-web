@@ -103,137 +103,429 @@
                 </div>
             </div>
 
-            <!-- Filters Bar -->
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-4">
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-end">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">Meal Type</label>
-                        <select v-model="filterMeal" @change="applyFilters" class="w-full text-xs rounded-lg border-slate-300 py-1.5 px-2">
-                            <option value="">All Meals (BF, LN, DN, etc.)</option>
-                            <option v-for="(label, key) in mealTypes" :key="key" :value="key">
-                                {{ label }} ({{ mealPrefixes[key] || key }})
-                            </option>
-                        </select>
-                    </div>
+            <!-- Main View Navigation Tabs -->
+            <div class="flex items-center gap-2 border-b border-slate-200 mb-5 pb-1 overflow-x-auto">
+                <button
+                    type="button"
+                    @click="activeTab = 'schools'"
+                    class="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition shrink-0"
+                    :class="activeTab === 'schools' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    <span>School-wise Distribution & Download</span>
+                    <span
+                        class="px-2 py-0.5 text-xs rounded-full font-bold"
+                        :class="activeTab === 'schools' ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-700'"
+                    >
+                        {{ schoolBreakdown.length }}
+                    </span>
+                </button>
 
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">School / Recipient</label>
-                        <select v-model="filterSchool" @change="applyFilters" class="w-full text-xs rounded-lg border-slate-300 py-1.5 px-2">
-                            <option value="">All Schools & Extra</option>
-                            <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
-                        </select>
-                    </div>
+                <button
+                    type="button"
+                    @click="activeTab = 'dates'"
+                    class="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition shrink-0"
+                    :class="activeTab === 'dates' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span>Daily Downloads (Per Day)</span>
+                    <span
+                        class="px-2 py-0.5 text-xs rounded-full font-bold"
+                        :class="activeTab === 'dates' ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-700'"
+                    >
+                        {{ dateBreakdown.length }}
+                    </span>
+                </button>
 
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">Valid Date</label>
-                        <select v-model="filterDate" @change="applyFilters" class="w-full text-xs rounded-lg border-slate-300 py-1.5 px-2">
-                            <option value="">All Dates</option>
-                            <option v-for="d in eventDates" :key="d" :value="d">{{ formatCalendarDate(d) }}</option>
-                        </select>
-                    </div>
+                <button
+                    type="button"
+                    @click="activeTab = 'coupons'"
+                    class="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition shrink-0"
+                    :class="activeTab === 'coupons' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                    </svg>
+                    <span>All Individual Coupons & Verification</span>
+                    <span
+                        class="px-2 py-0.5 text-xs rounded-full font-bold"
+                        :class="activeTab === 'coupons' ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-700'"
+                    >
+                        {{ summary.total || coupons.length }}
+                    </span>
+                </button>
+            </div>
 
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">Status</label>
-                        <select v-model="filterStatus" @change="applyFilters" class="w-full text-xs rounded-lg border-slate-300 py-1.5 px-2">
-                            <option value="">All Statuses</option>
-                            <option value="issued">Issued / Ready</option>
-                            <option value="redeemed">Redeemed</option>
-                        </select>
-                    </div>
+            <!-- Tab 1: School-wise Distribution & Download -->
+            <div v-show="activeTab === 'schools'" class="space-y-4">
+                <!-- Sub-filter bar -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-3 flex-1 min-w-[280px]">
+                        <div class="relative flex-1 max-w-sm">
+                            <input
+                                v-model="schoolSearch"
+                                type="text"
+                                placeholder="Search school name..."
+                                class="w-full text-xs rounded-lg border-slate-300 pl-8 py-2 pr-3"
+                            >
+                            <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
 
-                    <div class="flex items-center gap-3">
-                        <label class="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
-                            <input type="checkbox" v-model="filterExtraOnly" @change="applyFilters" class="rounded text-indigo-600 focus:ring-indigo-500">
-                            <span>Extra Only</span>
-                        </label>
-                        <button v-if="hasActiveFilters" type="button" @click="resetFilters" class="text-xs text-rose-600 hover:text-rose-800 ml-auto font-medium">
-                            Reset Filters
-                        </button>
-                    </div>
-                </div>
-
-                <div class="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-                    <div class="relative flex-1 max-w-xs">
-                        <input v-model="searchQuery" type="text" placeholder="Search code, QR token, school..." class="w-full text-xs rounded-lg border-slate-300 pl-8 py-1.5 pr-3">
-                        <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        <div class="w-48">
+                            <select v-model="schoolDateFilter" class="w-full text-xs rounded-lg border-slate-300 py-2 px-2">
+                                <option value="">All Event Dates (Total)</option>
+                                <option v-for="d in eventDates" :key="d" :value="d">{{ formatCalendarDate(d) }}</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="text-xs text-slate-500">
-                        Showing <strong>{{ filteredCoupons.length }}</strong> of {{ coupons.length }} loaded coupons
-                        <span v-if="selectedIds.length" class="ml-2 font-semibold text-indigo-600">({{ selectedIds.length }} selected)</span>
+                        Showing <strong>{{ filteredSchoolBreakdown.length }}</strong> of {{ schoolBreakdown.length }} schools
+                    </div>
+                </div>
+
+                <!-- Schools Table -->
+                <div class="card card--flush bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                    <div class="overflow-x-auto">
+                        <table class="data-table w-full text-left">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600">
+                                    <th class="py-3 px-3 w-12 text-slate-400">#</th>
+                                    <th class="py-3 px-3">School / Recipient Name</th>
+                                    <th class="py-3 px-2 text-center text-amber-800 bg-amber-50/50">Breakfast (BF)</th>
+                                    <th class="py-3 px-2 text-center text-emerald-800 bg-emerald-50/50">Lunch (LN)</th>
+                                    <th class="py-3 px-2 text-center text-indigo-800 bg-indigo-50/50">Dinner (DN)</th>
+                                    <th class="py-3 px-2 text-center text-pink-800 bg-pink-50/50">Snacks (SN)</th>
+                                    <th class="py-3 px-2 text-center text-orange-800 bg-orange-50/50">Tea (TE)</th>
+                                    <th class="py-3 px-2 text-center font-bold text-slate-900 bg-slate-100/60">Total Coupons</th>
+                                    <th class="py-3 px-3 text-center">Dates Active</th>
+                                    <th class="py-3 px-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-xs">
+                                <tr v-for="(s, idx) in filteredSchoolBreakdown" :key="s.school_id || 'extra'" class="hover:bg-slate-50/70 transition">
+                                    <td class="py-3 px-3 text-slate-400">{{ idx + 1 }}</td>
+                                    <td class="py-3 px-3">
+                                        <div class="font-semibold text-slate-900 flex items-center gap-1.5">
+                                            <span>{{ s.school_name }}</span>
+                                            <span v-if="s.is_extra" class="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">Extra Buffer</span>
+                                        </div>
+                                        <div class="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2">
+                                            <span class="text-emerald-600 font-medium">{{ getSchoolIssuedCount(s) }} Ready</span>
+                                            <span v-if="getSchoolRedeemedCount(s)" class="text-slate-500">• {{ getSchoolRedeemedCount(s) }} Redeemed</span>
+                                        </div>
+                                    </td>
+
+                                    <td class="py-3 px-2 text-center">
+                                        <span v-if="getSchoolMealCount(s, 'breakfast')" class="inline-block px-2 py-0.5 rounded font-bold text-amber-800 bg-amber-100 border border-amber-200">
+                                            {{ getSchoolMealCount(s, 'breakfast') }}
+                                        </span>
+                                        <span v-else class="text-slate-300">-</span>
+                                    </td>
+
+                                    <td class="py-3 px-2 text-center">
+                                        <span v-if="getSchoolMealCount(s, 'lunch')" class="inline-block px-2 py-0.5 rounded font-bold text-emerald-800 bg-emerald-100 border border-emerald-200">
+                                            {{ getSchoolMealCount(s, 'lunch') }}
+                                        </span>
+                                        <span v-else class="text-slate-300">-</span>
+                                    </td>
+
+                                    <td class="py-3 px-2 text-center">
+                                        <span v-if="getSchoolMealCount(s, 'dinner')" class="inline-block px-2 py-0.5 rounded font-bold text-indigo-800 bg-indigo-100 border border-indigo-200">
+                                            {{ getSchoolMealCount(s, 'dinner') }}
+                                        </span>
+                                        <span v-else class="text-slate-300">-</span>
+                                    </td>
+
+                                    <td class="py-3 px-2 text-center">
+                                        <span v-if="getSchoolMealCount(s, 'snacks')" class="inline-block px-2 py-0.5 rounded font-bold text-pink-800 bg-pink-100 border border-pink-200">
+                                            {{ getSchoolMealCount(s, 'snacks') }}
+                                        </span>
+                                        <span v-else class="text-slate-300">-</span>
+                                    </td>
+
+                                    <td class="py-3 px-2 text-center">
+                                        <span v-if="getSchoolMealCount(s, 'tea')" class="inline-block px-2 py-0.5 rounded font-bold text-orange-800 bg-orange-100 border border-orange-200">
+                                            {{ getSchoolMealCount(s, 'tea') }}
+                                        </span>
+                                        <span v-else class="text-slate-300">-</span>
+                                    </td>
+
+                                    <td class="py-3 px-2 text-center bg-slate-50/50">
+                                        <span class="inline-block px-2.5 py-0.5 rounded-full font-bold text-sm text-slate-900 bg-slate-200">
+                                            {{ getSchoolTotalCount(s) }}
+                                        </span>
+                                    </td>
+
+                                    <td class="py-3 px-3 text-center">
+                                        <div class="flex flex-wrap justify-center gap-1">
+                                            <span
+                                                v-for="(count, d) in s.date_counts"
+                                                :key="d"
+                                                class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 cursor-pointer hover:bg-slate-200"
+                                                @click="schoolDateFilter = d"
+                                                :title="`Click to filter to ${formatCalendarDate(d)} (${count} coupons)`"
+                                            >
+                                                {{ formatCalendarDate(d).split(',')[0] || d }}: <strong>{{ count }}</strong>
+                                            </span>
+                                        </div>
+                                    </td>
+
+                                    <td class="py-3 px-3 text-right">
+                                        <div class="flex items-center justify-end gap-2">
+                                            <a
+                                                :href="schoolDownloadUrl(s.school_id, schoolDateFilter)"
+                                                target="_blank"
+                                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition"
+                                                :title="`Download Printable PDF for ${s.school_name}`"
+                                            >
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                </svg>
+                                                <span>Download PDF</span>
+                                            </a>
+
+                                            <button
+                                                type="button"
+                                                @click="filterBySchool(s.school_id)"
+                                                class="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline px-1.5 py-1"
+                                            >
+                                                View
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr v-if="!filteredSchoolBreakdown.length">
+                                    <td colspan="10" class="p-8 text-center text-slate-400">
+                                        No schools match the filter criteria.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
 
-            <!-- Coupons Data Table -->
-            <div class="card card--flush bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                <table class="data-table w-full text-left">
-                    <thead>
-                        <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600">
-                            <th class="w-10 text-center py-3">
-                                <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" class="rounded text-indigo-600 focus:ring-indigo-500">
-                            </th>
-                            <th class="py-3 px-2">Sl No</th>
-                            <th class="py-3 px-2">Serialized Code</th>
-                            <th class="py-3 px-2">QR Decoded Value</th>
-                            <th class="py-3 px-2">Meal Type</th>
-                            <th class="py-3 px-2">School / Recipient</th>
-                            <th class="py-3 px-2">Valid Date</th>
-                            <th class="py-3 px-2">Status</th>
-                            <th class="py-3 px-2 text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100 text-xs">
-                        <tr v-for="(c, idx) in paginatedCoupons" :key="c.id" class="hover:bg-slate-50/70 transition">
-                            <td class="text-center py-2.5">
-                                <input type="checkbox" :value="c.id" v-model="selectedIds" class="rounded text-indigo-600 focus:ring-indigo-500">
-                            </td>
-                            <td class="py-2.5 px-2 text-slate-400">{{ (currentPage - 1) * pageSize + idx + 1 }}</td>
-                            <td class="py-2.5 px-2">
-                                <span class="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                                    {{ c.coupon_code }}
+            <!-- Tab 2: Daily Downloads (Per Day) -->
+            <div v-show="activeTab === 'dates'" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div
+                        v-for="d in dateBreakdown"
+                        :key="d.date"
+                        class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col justify-between hover:border-indigo-300 transition"
+                    >
+                        <div>
+                            <div class="flex items-start justify-between gap-2 border-b border-slate-100 pb-3 mb-3">
+                                <div>
+                                    <h3 class="text-base font-bold text-slate-900">{{ formatCalendarDate(d.date) }}</h3>
+                                    <p class="text-xs text-slate-500 mt-0.5">{{ d.school_count }} schools participating</p>
+                                </div>
+                                <span class="px-3 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                    {{ d.total }} Meals
                                 </span>
-                            </td>
-                            <td class="py-2.5 px-2">
-                                <span class="font-mono text-slate-600 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
-                                    {{ c.qr_token }}
-                                </span>
-                            </td>
-                            <td class="py-2.5 px-2">
-                                <span class="px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide"
-                                      :class="mealPillClass(c.meal_type)">
-                                    {{ c.meal_type }}
-                                </span>
-                            </td>
-                            <td class="py-2.5 px-2">
-                                <span class="font-medium text-slate-800">{{ c.school_name }}</span>
-                                <span v-if="c.is_extra" class="ml-1 text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.2 rounded">Extra</span>
-                            </td>
-                            <td class="py-2.5 px-2 text-slate-600">{{ formatCalendarDate(c.valid_date) }}</td>
-                            <td class="py-2.5 px-2">
-                                <span class="status-pill text-[11px]" :class="couponStatusPillClass(c.status)">
-                                    {{ couponStatusLabel(c.status) }}
-                                </span>
-                            </td>
-                            <td class="py-2.5 px-2 text-right space-x-2">
-                                <a :href="`/food-coupons/verify/${c.qr_token}`" target="_blank" class="text-slate-500 hover:text-slate-800 font-medium">Verify</a>
-                                <button v-if="c.status === 'issued'" type="button" @click="redeem(c.id)" class="text-emerald-600 hover:text-emerald-800 font-semibold">Redeem</button>
-                            </td>
-                        </tr>
-                        <tr v-if="!filteredCoupons.length">
-                            <td colspan="9" class="p-10 text-center text-slate-400">
-                                No food coupons match your criteria. Click "Issue from Catering", "Issue from Food Bills", or "Generate Extra Coupons" above.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                            </div>
 
-                <!-- Pagination footer -->
-                <div v-if="totalPages > 1" class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
-                    <span class="text-slate-500">Page {{ currentPage }} of {{ totalPages }} ({{ filteredCoupons.length }} items)</span>
-                    <div class="space-x-1">
-                        <button type="button" :disabled="currentPage === 1" @click="currentPage--" class="px-2.5 py-1 border rounded bg-white disabled:opacity-40">Previous</button>
-                        <button type="button" :disabled="currentPage === totalPages" @click="currentPage++" class="px-2.5 py-1 border rounded bg-white disabled:opacity-40">Next</button>
+                            <!-- Meal type breakdown grid -->
+                            <div class="grid grid-cols-3 gap-2 text-center text-xs mb-4">
+                                <div class="p-2 rounded-lg bg-amber-50/70 border border-amber-200">
+                                    <p class="font-bold text-amber-900 text-sm">{{ d.breakfast }}</p>
+                                    <p class="text-[10px] text-amber-700 font-medium">Breakfast</p>
+                                </div>
+                                <div class="p-2 rounded-lg bg-emerald-50/70 border border-emerald-200">
+                                    <p class="font-bold text-emerald-900 text-sm">{{ d.lunch }}</p>
+                                    <p class="text-[10px] text-emerald-700 font-medium">Lunch</p>
+                                </div>
+                                <div class="p-2 rounded-lg bg-indigo-50/70 border border-indigo-200">
+                                    <p class="font-bold text-indigo-900 text-sm">{{ d.dinner }}</p>
+                                    <p class="text-[10px] text-indigo-700 font-medium">Dinner</p>
+                                </div>
+                                <div class="p-2 rounded-lg bg-pink-50/70 border border-pink-200">
+                                    <p class="font-bold text-pink-900 text-sm">{{ d.snacks }}</p>
+                                    <p class="text-[10px] text-pink-700 font-medium">Snacks</p>
+                                </div>
+                                <div class="p-2 rounded-lg bg-orange-50/70 border border-orange-200">
+                                    <p class="font-bold text-orange-900 text-sm">{{ d.tea }}</p>
+                                    <p class="text-[10px] text-orange-700 font-medium">Tea</p>
+                                </div>
+                                <div class="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                                    <p class="font-bold text-slate-700 text-sm">{{ d.issued }}</p>
+                                    <p class="text-[10px] text-slate-500 font-medium">Issued / Ready</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2 pt-2 border-t border-slate-100">
+                            <!-- Download All for Day -->
+                            <a
+                                :href="dateDownloadUrl(d.date)"
+                                target="_blank"
+                                class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                <span>Download All Coupons for {{ formatCalendarDate(d.date).split(',')[0] }} (PDF)</span>
+                            </a>
+
+                            <!-- Specific meal download links if meals exist -->
+                            <div class="flex flex-wrap items-center justify-center gap-1.5 pt-1 text-[11px]">
+                                <span class="text-slate-400">By Meal:</span>
+                                <a v-if="d.breakfast" :href="dateDownloadUrl(d.date, 'breakfast')" target="_blank" class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 hover:bg-amber-200 font-medium">BF</a>
+                                <a v-if="d.lunch" :href="dateDownloadUrl(d.date, 'lunch')" target="_blank" class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 hover:bg-emerald-200 font-medium">Lunch</a>
+                                <a v-if="d.dinner" :href="dateDownloadUrl(d.date, 'dinner')" target="_blank" class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 hover:bg-indigo-200 font-medium">Dinner</a>
+                                <a v-if="d.snacks" :href="dateDownloadUrl(d.date, 'snacks')" target="_blank" class="px-2 py-0.5 rounded bg-pink-100 text-pink-800 hover:bg-pink-200 font-medium">Snacks</a>
+                                <a v-if="d.tea" :href="dateDownloadUrl(d.date, 'tea')" target="_blank" class="px-2 py-0.5 rounded bg-orange-100 text-orange-800 hover:bg-orange-200 font-medium">Tea</a>
+                                <button type="button" @click="filterByDate(d.date)" class="ml-auto text-indigo-600 hover:underline">View in List →</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-if="!dateBreakdown.length" class="col-span-full p-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                        No event dates with coupons found.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: All Individual Coupons & Verification -->
+            <div v-show="activeTab === 'coupons'" class="space-y-4">
+                <!-- Filters Bar -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-end">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Meal Type</label>
+                            <select v-model="filterMeal" @change="applyFilters" class="w-full text-xs rounded-lg border-slate-300 py-1.5 px-2">
+                                <option value="">All Meals (BF, LN, DN, etc.)</option>
+                                <option v-for="(label, key) in mealTypes" :key="key" :value="key">
+                                    {{ label }} ({{ mealPrefixes[key] || key }})
+                                </option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">School / Recipient</label>
+                            <select v-model="filterSchool" @change="applyFilters" class="w-full text-xs rounded-lg border-slate-300 py-1.5 px-2">
+                                <option value="">All Schools & Extra</option>
+                                <option v-for="s in schools" :key="s.id" :value="s.id">{{ s.name }}</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Valid Date</label>
+                            <select v-model="filterDate" @change="applyFilters" class="w-full text-xs rounded-lg border-slate-300 py-1.5 px-2">
+                                <option value="">All Dates</option>
+                                <option v-for="d in eventDates" :key="d" :value="d">{{ formatCalendarDate(d) }}</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Status</label>
+                            <select v-model="filterStatus" @change="applyFilters" class="w-full text-xs rounded-lg border-slate-300 py-1.5 px-2">
+                                <option value="">All Statuses</option>
+                                <option value="issued">Issued / Ready</option>
+                                <option value="redeemed">Redeemed</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <label class="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
+                                <input type="checkbox" v-model="filterExtraOnly" @change="applyFilters" class="rounded text-indigo-600 focus:ring-indigo-500">
+                                <span>Extra Only</span>
+                            </label>
+                            <button v-if="hasActiveFilters" type="button" @click="resetFilters" class="text-xs text-rose-600 hover:text-rose-800 ml-auto font-medium">
+                                Reset Filters
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                        <div class="relative flex-1 max-w-xs">
+                            <input v-model="searchQuery" type="text" placeholder="Search code, QR token, school..." class="w-full text-xs rounded-lg border-slate-300 pl-8 py-1.5 pr-3">
+                            <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        </div>
+
+                        <div class="text-xs text-slate-500">
+                            Showing <strong>{{ filteredCoupons.length }}</strong> of {{ coupons.length }} loaded coupons
+                            <span v-if="selectedIds.length" class="ml-2 font-semibold text-indigo-600">({{ selectedIds.length }} selected)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Coupons Data Table -->
+                <div class="card card--flush bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                    <table class="data-table w-full text-left">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600">
+                                <th class="w-10 text-center py-3">
+                                    <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" class="rounded text-indigo-600 focus:ring-indigo-500">
+                                </th>
+                                <th class="py-3 px-2">Sl No</th>
+                                <th class="py-3 px-2">Serialized Code</th>
+                                <th class="py-3 px-2">QR Decoded Value</th>
+                                <th class="py-3 px-2">Meal Type</th>
+                                <th class="py-3 px-2">School / Recipient</th>
+                                <th class="py-3 px-2">Valid Date</th>
+                                <th class="py-3 px-2">Status</th>
+                                <th class="py-3 px-2 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 text-xs">
+                            <tr v-for="(c, idx) in paginatedCoupons" :key="c.id" class="hover:bg-slate-50/70 transition">
+                                <td class="text-center py-2.5">
+                                    <input type="checkbox" :value="c.id" v-model="selectedIds" class="rounded text-indigo-600 focus:ring-indigo-500">
+                                </td>
+                                <td class="py-2.5 px-2 text-slate-400">{{ (currentPage - 1) * pageSize + idx + 1 }}</td>
+                                <td class="py-2.5 px-2">
+                                    <span class="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                        {{ c.coupon_code }}
+                                    </span>
+                                </td>
+                                <td class="py-2.5 px-2">
+                                    <span class="font-mono text-slate-600 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
+                                        {{ c.qr_token }}
+                                    </span>
+                                </td>
+                                <td class="py-2.5 px-2">
+                                    <span class="px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide"
+                                          :class="mealPillClass(c.meal_type)">
+                                        {{ c.meal_type }}
+                                    </span>
+                                </td>
+                                <td class="py-2.5 px-2">
+                                    <span class="font-medium text-slate-800">{{ c.school_name }}</span>
+                                    <span v-if="c.is_extra" class="ml-1 text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.2 rounded">Extra</span>
+                                </td>
+                                <td class="py-2.5 px-2 text-slate-600">{{ formatCalendarDate(c.valid_date) }}</td>
+                                <td class="py-2.5 px-2">
+                                    <span class="status-pill text-[11px]" :class="couponStatusPillClass(c.status)">
+                                        {{ couponStatusLabel(c.status) }}
+                                    </span>
+                                </td>
+                                <td class="py-2.5 px-2 text-right space-x-2">
+                                    <a :href="`/food-coupons/verify/${c.qr_token}`" target="_blank" class="text-slate-500 hover:text-slate-800 font-medium">Verify</a>
+                                    <button v-if="c.status === 'issued'" type="button" @click="redeem(c.id)" class="text-emerald-600 hover:text-emerald-800 font-semibold">Redeem</button>
+                                </td>
+                            </tr>
+                            <tr v-if="!filteredCoupons.length">
+                                <td colspan="9" class="p-10 text-center text-slate-400">
+                                    No food coupons match your criteria. Click "Issue from Catering", "Issue from Food Bills", or "Generate Extra Coupons" above.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <!-- Pagination footer -->
+                    <div v-if="totalPages > 1" class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
+                        <span class="text-slate-500">Page {{ currentPage }} of {{ totalPages }} ({{ filteredCoupons.length }} items)</span>
+                        <div class="space-x-1">
+                            <button type="button" :disabled="currentPage === 1" @click="currentPage--" class="px-2.5 py-1 border rounded bg-white disabled:opacity-40">Previous</button>
+                            <button type="button" :disabled="currentPage === totalPages" @click="currentPage++" class="px-2.5 py-1 border rounded bg-white disabled:opacity-40">Next</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -436,16 +728,32 @@
                     </label>
                 </div>
 
-                <div class="p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-xs text-indigo-900">
+                <div class="p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-xs text-indigo-900 space-y-1">
                     <p>• 10 coupons per A4 sheet (2 columns × 5 rows).</p>
                     <p>• Includes unique QR code with decoded value underneath.</p>
                     <p>• Ready for guillotine cutting and distribution.</p>
                 </div>
 
+                <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs">
+                    <span class="text-slate-700 font-medium">Matching coupons ready to print:</span>
+                    <span
+                        class="font-bold px-2.5 py-0.5 rounded-full text-xs border"
+                        :class="matchedPrintCouponsCount > 0 ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-rose-100 text-rose-800 border-rose-300'"
+                    >
+                        {{ matchedPrintCouponsCount }} coupons ready
+                    </span>
+                </div>
+
                 <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
                     <button type="button" @click="showPrintModal = false" class="px-4 py-2 border rounded-lg text-sm font-medium">Cancel</button>
-                    <a :href="printUrl" target="_blank" @click="showPrintModal = false" class="btn-primary">
-                        Download PDF
+                    <a
+                        :href="matchedPrintCouponsCount > 0 ? printUrl : 'javascript:void(0)'"
+                        target="_blank"
+                        @click="handlePrintDownload"
+                        class="btn-primary"
+                        :class="{ 'opacity-50 pointer-events-none cursor-not-allowed': matchedPrintCouponsCount === 0 }"
+                    >
+                        Download PDF ({{ matchedPrintCouponsCount }})
                     </a>
                 </div>
             </div>
@@ -567,6 +875,10 @@ const props = defineProps({
     eventDates: { type: Array, default: () => [] },
     mealTypes: { type: Object, default: () => ({}) },
     mealPrefixes: { type: Object, default: () => ({}) },
+    schoolDates: { type: Array, default: () => [] },
+    schoolBreakdown: { type: Array, default: () => [] },
+    dateBreakdown: { type: Array, default: () => [] },
+    couponMatrix: { type: Array, default: () => [] },
     filters: { type: Object, default: () => ({}) },
 });
 
@@ -582,6 +894,78 @@ const generatingExtra = ref(false);
 const ungenerating = ref(false);
 const uploadingBg = ref(false);
 const removingBg = ref(false);
+
+// Active Tab ('schools' | 'dates' | 'coupons')
+const activeTab = ref('schools');
+const schoolSearch = ref('');
+const schoolDateFilter = ref('');
+
+const filteredSchoolBreakdown = computed(() => {
+    let list = props.schoolBreakdown || [];
+    if (schoolSearch.value) {
+        const q = schoolSearch.value.toLowerCase().trim();
+        list = list.filter(s => (s.school_name || '').toLowerCase().includes(q));
+    }
+    if (schoolDateFilter.value) {
+        list = list.filter(s => s.date_counts && s.date_counts[schoolDateFilter.value] > 0);
+    }
+    return list;
+});
+
+function getSchoolMealCount(s, mealKey) {
+    if (schoolDateFilter.value && s.date_meals && s.date_meals[schoolDateFilter.value]) {
+        return s.date_meals[schoolDateFilter.value][mealKey] || 0;
+    }
+    return s[mealKey] || 0;
+}
+
+function getSchoolTotalCount(s) {
+    if (schoolDateFilter.value && s.date_meals && s.date_meals[schoolDateFilter.value]) {
+        return s.date_meals[schoolDateFilter.value].total || 0;
+    }
+    return s.total || 0;
+}
+
+function getSchoolIssuedCount(s) {
+    if (schoolDateFilter.value && s.date_meals && s.date_meals[schoolDateFilter.value]) {
+        return s.date_meals[schoolDateFilter.value].issued || 0;
+    }
+    return s.issued || 0;
+}
+
+function getSchoolRedeemedCount(s) {
+    if (schoolDateFilter.value && s.date_meals && s.date_meals[schoolDateFilter.value]) {
+        return s.date_meals[schoolDateFilter.value].redeemed || 0;
+    }
+    return s.redeemed || 0;
+}
+
+function schoolDownloadUrl(schoolId, date = '') {
+    const params = new URLSearchParams();
+    if (schoolId) params.set('school_id', schoolId);
+    else params.set('extra_only', '1');
+    if (date) params.set('valid_date', date);
+    return `${base}/food-coupons/print?${params.toString()}`;
+}
+
+function dateDownloadUrl(date, mealType = '') {
+    const params = new URLSearchParams();
+    if (date) params.set('valid_date', date);
+    if (mealType) params.set('meal_type', mealType);
+    return `${base}/food-coupons/print?${params.toString()}`;
+}
+
+function filterBySchool(schoolId) {
+    filterSchool.value = schoolId || '';
+    activeTab.value = 'coupons';
+    applyFilters();
+}
+
+function filterByDate(date) {
+    filterDate.value = date || '';
+    activeTab.value = 'coupons';
+    applyFilters();
+}
 
 // Modals
 const showExtraModal = ref(false);
@@ -824,6 +1208,23 @@ function removeTemplateBg() {
     });
 }
 
+const matchedPrintCouponsCount = computed(() => {
+    let list = props.couponMatrix && props.couponMatrix.length ? props.couponMatrix : props.coupons || [];
+    if (printMeal.value) {
+        list = list.filter(c => (c.m || c.meal_type) === printMeal.value);
+    }
+    if (printSchool.value) {
+        list = list.filter(c => (c.s || c.school_id) === printSchool.value);
+    }
+    if (printDate.value) {
+        list = list.filter(c => (c.d || c.valid_date) === printDate.value);
+    }
+    if (printExtraOnly.value) {
+        list = list.filter(c => Boolean(c.e !== undefined ? c.e : c.is_extra));
+    }
+    return list.filter(c => (c.st || c.status) === 'issued').length;
+});
+
 const printUrl = computed(() => {
     const params = new URLSearchParams();
     if (printMeal.value) params.set('meal_type', printMeal.value);
@@ -834,4 +1235,10 @@ const printUrl = computed(() => {
     const qs = params.toString();
     return `${base}/food-coupons/print${qs ? '?' + qs : ''}`;
 });
+
+function handlePrintDownload() {
+    if (matchedPrintCouponsCount.value > 0) {
+        showPrintModal.value = false;
+    }
+}
 </script>
