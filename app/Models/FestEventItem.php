@@ -48,6 +48,7 @@ class FestEventItem extends Model
     protected $appends = [
         'squad_summary',
         'formatted_title',
+        'standbys',
     ];
 
     protected static function booted(): void
@@ -76,6 +77,11 @@ class FestEventItem extends Model
     public function getFormattedTitleAttribute(): string
     {
         return $this->formattedTitle();
+    }
+
+    public function getStandbysAttribute(): ?int
+    {
+        return isset($this->criteria_json['standbys']) ? (int) $this->criteria_json['standbys'] : null;
     }
 
     public function formattedTitle(?array $classGroupLabels = null, ?array $artsCategoryLabels = null): string

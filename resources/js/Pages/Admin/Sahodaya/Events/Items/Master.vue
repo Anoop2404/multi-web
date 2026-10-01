@@ -785,7 +785,7 @@ function startEditItem(item) {
     editForm.max_per_school = item.max_per_school ?? null;
     editForm.min_group_size = item.min_group_size ?? null;
     editForm.max_group_size = item.max_group_size ?? null;
-    editForm.standbys = item.standbys ?? null;
+    editForm.standbys = item.standbys ?? item.criteria_json?.standbys ?? null;
     editForm.qualify_count = item.qualify_count ?? null;
     editForm.duration_minutes = item.duration_minutes ?? null;
     editForm.total_marks = item.total_marks ?? null;

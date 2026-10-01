@@ -1203,49 +1203,55 @@ class FestEventController extends SahodayaAdminController
         $data['exclusive_group_key'] = filled($data['exclusive_group_key'] ?? null) ? trim($data['exclusive_group_key']) : null;
 
         if (FestTeamSquadRules::isMultiPerson($participantType)) {
-            $squadInput = $request->only([
-                'min_playing', 'max_playing', 'max_subs', 'max_squad', 'min_squad', 'standbys',
-            ]);
-            $hasSquadInput = collect($squadInput)->contains(fn ($v) => $v !== null && $v !== '');
+            $criteria = $item->criteria_json ?? [];
 
-            if ($hasSquadInput) {
-                $merged = FestTeamSquadRules::mergeIntoItem($squadInput);
-                if ($merged['criteria_json']) {
-                    $data['criteria_json'] = $merged['criteria_json'];
-                }
-                if ($merged['min_group_size']) {
-                    $data['min_group_size'] = $merged['min_group_size'];
-                }
-                if ($merged['max_group_size']) {
-                    $data['max_group_size'] = $merged['max_group_size'];
-                }
-            } elseif ($request->has('min_group_size') || $request->has('max_group_size')) {
-                $data['min_group_size'] = $request->input('min_group_size');
-                $data['max_group_size'] = $request->input('max_group_size');
-
-                // criteria_json['min_squad']/['max_squad'] take precedence over the
-                // min_group_size/max_group_size columns in FestTeamSquadRules::fromItem(),
-                // so an edit here has to keep both in sync or the squad-rules summary
-                // (and "register N–M students" text) silently keeps the stale values.
-                $criteria = $item->criteria_json ?? [];
+            if ($request->has('min_group_size') || $request->has('min_squad')) {
+                $min = $request->input('min_group_size', $request->input('min_squad'));
+                $data['min_group_size'] = ($min !== null && $min !== '') ? (int) $min : null;
                 if ($data['min_group_size'] !== null) {
-                    $criteria['min_squad'] = (int) $data['min_group_size'];
+                    $criteria['min_squad'] = $data['min_group_size'];
                 } else {
                     unset($criteria['min_squad']);
                 }
+            }
+
+            if ($request->has('max_group_size') || $request->has('max_squad')) {
+                $max = $request->input('max_group_size', $request->input('max_squad'));
+                $data['max_group_size'] = ($max !== null && $max !== '') ? (int) $max : null;
                 if ($data['max_group_size'] !== null) {
-                    $criteria['max_squad'] = (int) $data['max_group_size'];
+                    $criteria['max_squad'] = $data['max_group_size'];
                 } else {
                     unset($criteria['max_squad']);
                 }
-                $data['criteria_json'] = $criteria;
-            } else {
-                $fixed = FestTeamSquadRules::defaultSizeFor($participantType);
-                if ($fixed && empty($data['min_group_size']) && empty($item->min_group_size)) {
-                    $data['min_group_size'] = $fixed;
-                    $data['max_group_size'] = $fixed;
+            }
+
+            if ($request->has('standbys')) {
+                $st = $request->input('standbys');
+                if ($st !== null && $st !== '') {
+                    $criteria['standbys'] = (int) $st;
+                } else {
+                    unset($criteria['standbys']);
                 }
             }
+
+            foreach (['min_playing', 'max_playing', 'max_subs'] as $f) {
+                if ($request->has($f)) {
+                    $val = $request->input($f);
+                    if ($val !== null && $val !== '') {
+                        $criteria[$f] = (int) $val;
+                    } else {
+                        unset($criteria[$f]);
+                    }
+                }
+            }
+
+            $fixed = FestTeamSquadRules::defaultSizeFor($participantType);
+            if ($fixed && empty($data['min_group_size']) && empty($item->min_group_size)) {
+                $data['min_group_size'] = $fixed;
+                $data['max_group_size'] = $fixed;
+            }
+
+            $data['criteria_json'] = $criteria;
         }
 
         unset($data['min_playing'], $data['max_playing'], $data['max_subs'], $data['max_squad'], $data['min_squad'], $data['standbys']);

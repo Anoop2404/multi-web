@@ -173,13 +173,16 @@ class FestTeamSquadRules
      */
     public static function mergeIntoItem(array $input): array
     {
+        $minSquad = isset($input['min_squad']) && $input['min_squad'] !== '' ? (int) $input['min_squad'] : (isset($input['min_group_size']) && $input['min_group_size'] !== '' ? (int) $input['min_group_size'] : null);
+        $maxSquad = isset($input['max_squad']) && $input['max_squad'] !== '' ? (int) $input['max_squad'] : (isset($input['max_group_size']) && $input['max_group_size'] !== '' ? (int) $input['max_group_size'] : null);
+
         $rules = new self(
-            minPlaying: isset($input['min_playing']) ? (int) $input['min_playing'] : null,
-            maxPlaying: isset($input['max_playing']) ? (int) $input['max_playing'] : null,
-            maxSubs: isset($input['max_subs']) ? (int) $input['max_subs'] : null,
-            maxSquad: isset($input['max_squad']) ? (int) $input['max_squad'] : null,
-            minSquad: isset($input['min_squad']) ? (int) $input['min_squad'] : null,
-            standbys: isset($input['standbys']) ? (int) $input['standbys'] : null,
+            minPlaying: isset($input['min_playing']) && $input['min_playing'] !== '' ? (int) $input['min_playing'] : null,
+            maxPlaying: isset($input['max_playing']) && $input['max_playing'] !== '' ? (int) $input['max_playing'] : null,
+            maxSubs: isset($input['max_subs']) && $input['max_subs'] !== '' ? (int) $input['max_subs'] : null,
+            maxSquad: $maxSquad,
+            minSquad: $minSquad,
+            standbys: isset($input['standbys']) && $input['standbys'] !== '' ? (int) $input['standbys'] : null,
         );
 
         if ($rules->maxSquad && $rules->minPlaying && ! $rules->maxSubs && ! $rules->minSquad) {
