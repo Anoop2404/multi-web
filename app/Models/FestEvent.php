@@ -209,6 +209,23 @@ class FestEvent extends Model
         return $sahodayaProfile ? $sahodayaProfile->paymentQrCodeUrl() : null;
     }
 
+    /** Resolved custom food payment QR code image URL for schools, if customized for food. */
+    public function foodPaymentQrCodeUrl(): ?string
+    {
+        $customQr = $this->fee_settings['food_payment_qr_code'] ?? null;
+        if (filled($customQr)) {
+            $path = (string) $customQr;
+            if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://') || str_starts_with($path, '/')) {
+                return $path;
+            }
+            return \App\Support\TenantStorage::assetUrl(null, $path)
+                ?? \App\Support\TenantStorage::logoUrl(null, $path)
+                ?? ('/storage/' . ltrim($path, '/'));
+        }
+
+        return null;
+    }
+
     /** Resolved food coupon background template image URL */
     public function foodCouponBgImageUrl(?Tenant $sahodaya = null): ?string
     {

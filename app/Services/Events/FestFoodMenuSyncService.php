@@ -96,10 +96,18 @@ class FestFoodMenuSyncService
             return;
         }
 
-        $child->update([
+        $updates = [
             'food_payee_type'     => $hub->food_payee_type,
             'food_host_school_id' => $hub->food_host_school_id,
-        ]);
+        ];
+
+        if (isset($hub->fee_settings['food_payment_qr_code']) && ! isset($child->fee_settings['food_payment_qr_code'])) {
+            $childFee = $child->fee_settings ?? [];
+            $childFee['food_payment_qr_code'] = $hub->fee_settings['food_payment_qr_code'];
+            $updates['fee_settings'] = $childFee;
+        }
+
+        $child->update($updates);
     }
 
     /** Fill missing window edges without overwriting a region's own schedule. */

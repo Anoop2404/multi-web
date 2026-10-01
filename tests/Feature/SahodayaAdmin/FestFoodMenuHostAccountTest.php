@@ -280,4 +280,65 @@ class FestFoodMenuHostAccountTest extends TestCase
         $this->assertSame($f['host']->id, $child->fresh()->food_host_school_id);
         $this->assertSame('host_school', $childBill->fresh()->payee_type);
     }
+
+    public function test_admin_can_upload_and_remove_payment_qr_code_for_host_school(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        $f = $this->fixture();
+
+        $qrFile = \Illuminate\Http\UploadedFile::fake()->image('host_qr.png', 400, 400);
+
+        $this->actingAs($f['admin'])->put(route('sahodaya.events.food-menu.payee.update', [
+            'tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id,
+        ]), [
+            'food_payee_type' => 'host_school',
+            'food_host_school_id' => $f['host']->id,
+            'payment_bank_name' => 'State Bank of India',
+            'payment_qr_code' => $qrFile,
+        ])->assertSessionHasNoErrors();
+
+        $details = $f['host']->fresh()->paymentDetails();
+        $this->assertNotNull($details['qr_code']);
+        $this->assertNotNull($f['event']->fresh()->foodPaymentQrCodeUrl());
+
+        // Now remove the QR code
+        $this->actingAs($f['admin'])->put(route('sahodaya.events.food-menu.payee.update', [
+            'tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id,
+        ]), [
+            'food_payee_type' => 'host_school',
+            'food_host_school_id' => $f['host']->id,
+            'remove_payment_qr_code' => true,
+        ])->assertSessionHasNoErrors();
+
+        $details = $f['host']->fresh()->paymentDetails();
+        $this->assertNull($details['qr_code']);
+        $this->assertNull($f['event']->fresh()->foodPaymentQrCodeUrl());
+    }
+
+    public function test_admin_can_upload_and_remove_payment_qr_code_for_sahodaya(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        $f = $this->fixture();
+
+        $qrFile = \Illuminate\Http\UploadedFile::fake()->image('sahodaya_food_qr.png', 400, 400);
+
+        $this->actingAs($f['admin'])->put(route('sahodaya.events.food-menu.payee.update', [
+            'tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id,
+        ]), [
+            'food_payee_type' => 'sahodaya',
+            'payment_qr_code' => $qrFile,
+        ])->assertSessionHasNoErrors();
+
+        $this->assertNotNull($f['event']->fresh()->foodPaymentQrCodeUrl());
+
+        // Remove it
+        $this->actingAs($f['admin'])->put(route('sahodaya.events.food-menu.payee.update', [
+            'tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id,
+        ]), [
+            'food_payee_type' => 'sahodaya',
+            'remove_payment_qr_code' => true,
+        ])->assertSessionHasNoErrors();
+
+        $this->assertNull($f['event']->fresh()->foodPaymentQrCodeUrl());
+    }
 }

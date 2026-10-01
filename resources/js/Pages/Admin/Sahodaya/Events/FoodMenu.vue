@@ -423,6 +423,64 @@
                         </label>
                     </div>
 
+                    <!-- Sahodaya QR Code Settings -->
+                    <div v-if="payeeForm.food_payee_type === 'sahodaya'" class="pt-3 border-t border-slate-100 space-y-3">
+                        <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
+                            <div>
+                                <h4 class="font-bold text-xs uppercase tracking-wider text-slate-700">Sahodaya Food Payment QR Code</h4>
+                                <p class="text-xs text-slate-500 mt-0.5">
+                                    Optionally upload a dedicated QR code image for catering payments, or leave blank to use the default QR code configured in Sahodaya Settings.
+                                </p>
+                            </div>
+                            <FormField label="Food Payment QR Code Image (Optional)"
+                                       hint="Upload a UPI QR Code image (PNG/JPG/WEBP up to 3MB)."
+                                       :error="payeeForm.errors.payment_qr_code">
+                                <template #default="{ id }">
+                                    <div class="flex flex-wrap items-center gap-4 mt-1">
+                                        <!-- Newly chosen preview -->
+                                        <div v-if="qrPreviewUrl" class="shrink-0 p-2 bg-emerald-50 rounded-xl border border-emerald-200 shadow-xs flex items-center gap-3">
+                                            <img :src="qrPreviewUrl" alt="New QR Preview" class="w-16 h-16 object-contain rounded-lg border border-emerald-300 bg-white">
+                                            <div class="text-xs">
+                                                <span class="inline-flex items-center gap-1 font-bold text-emerald-800">
+                                                    <span>✓</span> New QR Selected
+                                                </span>
+                                                <p class="text-[11px] text-slate-500 mt-0.5">Click Save Settings below to apply</p>
+                                                <button type="button" @click="clearSelectedQr" class="mt-1 text-[11px] font-semibold text-rose-600 hover:underline">
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Existing QR -->
+                                        <div v-else-if="currentPayeeQrUrl && !payeeForm.remove_payment_qr_code"
+                                             class="shrink-0 p-2 bg-white rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
+                                            <img :src="currentPayeeQrUrl" alt="Current QR Code" class="w-16 h-16 object-contain rounded-lg border border-slate-100">
+                                            <div class="text-xs">
+                                                <p class="font-bold text-slate-800">
+                                                    {{ event.food_payment_qr_code_url ? 'Custom Food QR Code' : 'Sahodaya Default QR Code' }}
+                                                </p>
+                                                <label v-if="event.food_payment_qr_code_url"
+                                                       class="inline-flex items-center gap-1.5 mt-1 text-rose-600 cursor-pointer font-medium hover:underline text-[11px]">
+                                                    <input type="checkbox" v-model="payeeForm.remove_payment_qr_code" class="rounded text-rose-600">
+                                                    Remove custom QR (use default)
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <!-- Removal state -->
+                                        <div v-else-if="payeeForm.remove_payment_qr_code" class="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-xl p-2.5">
+                                            Custom QR code will be removed upon saving.
+                                            <button type="button" @click="payeeForm.remove_payment_qr_code = false" class="ml-2 font-semibold underline text-slate-700">Undo</button>
+                                        </div>
+
+                                        <input :id="id" type="file" accept="image/png,image/jpeg,image/webp" class="field text-xs max-w-xs"
+                                               @change="handleQrFileChange">
+                                    </div>
+                                </template>
+                            </FormField>
+                        </div>
+                    </div>
+
                     <!-- Host School Account Details -->
                     <div v-if="payeeForm.food_payee_type === 'host_school'" class="pt-3 border-t border-slate-100 space-y-3">
                         <FormField label="Select Host School" :error="payeeForm.errors.food_host_school_id" required>
@@ -451,6 +509,52 @@
                                 </FormField>
                                 <FormField label="UPI ID" :error="payeeForm.errors.payment_upi">
                                     <template #default="{ id }"><input :id="id" v-model="payeeForm.payment_upi" type="text" placeholder="e.g. schoolname@upi" class="field text-xs w-full font-mono"></template>
+                                </FormField>
+                            </div>
+
+                            <div class="border-t border-slate-200/60 pt-3">
+                                <FormField label="Host School Payment QR Code Image (Optional)"
+                                           hint="Upload a UPI QR code image (PNG, JPG, or WebP up to 3MB) for schools to scan on food checkout."
+                                           :error="payeeForm.errors.payment_qr_code">
+                                    <template #default="{ id }">
+                                        <div class="flex flex-wrap items-center gap-4 mt-1">
+                                            <!-- Newly chosen preview -->
+                                            <div v-if="qrPreviewUrl" class="shrink-0 p-2 bg-emerald-50 rounded-xl border border-emerald-200 shadow-xs flex items-center gap-3">
+                                                <img :src="qrPreviewUrl" alt="New QR Preview" class="w-16 h-16 object-contain rounded-lg border border-emerald-300 bg-white">
+                                                <div class="text-xs">
+                                                    <span class="inline-flex items-center gap-1 font-bold text-emerald-800">
+                                                        <span>✓</span> New QR Selected
+                                                    </span>
+                                                    <p class="text-[11px] text-slate-500 mt-0.5">Click Save Settings below to apply</p>
+                                                    <button type="button" @click="clearSelectedQr" class="mt-1 text-[11px] font-semibold text-rose-600 hover:underline">
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <!-- Existing QR -->
+                                            <div v-else-if="currentPayeeQrUrl && !payeeForm.remove_payment_qr_code"
+                                                 class="shrink-0 p-2 bg-white rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
+                                                <img :src="currentPayeeQrUrl" alt="Current QR Code" class="w-16 h-16 object-contain rounded-lg border border-slate-100">
+                                                <div class="text-xs">
+                                                    <p class="font-bold text-slate-800">Current QR Code</p>
+                                                    <label class="inline-flex items-center gap-1.5 mt-1 text-rose-600 cursor-pointer font-medium hover:underline text-[11px]">
+                                                        <input type="checkbox" v-model="payeeForm.remove_payment_qr_code" class="rounded text-rose-600">
+                                                        Remove QR code
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            <!-- Removal state -->
+                                            <div v-else-if="payeeForm.remove_payment_qr_code" class="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-xl p-2.5">
+                                                QR code will be removed upon saving.
+                                                <button type="button" @click="payeeForm.remove_payment_qr_code = false" class="ml-2 font-semibold underline text-slate-700">Undo</button>
+                                            </div>
+
+                                            <input :id="id" type="file" accept="image/png,image/jpeg,image/webp" class="field text-xs max-w-xs"
+                                                   @change="handleQrFileChange">
+                                        </div>
+                                    </template>
                                 </FormField>
                             </div>
                         </div>
@@ -594,7 +698,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
@@ -650,6 +754,8 @@ const payeeForm = useForm({
     food_order_closes_at: toDateTimeLocal(props.event.food_order_closes_at),
     food_order_day_windows: buildDayWindowRows(),
     payment_bank_name: '', payment_account_no: '', payment_ifsc: '', payment_upi: '',
+    payment_qr_code: null,
+    remove_payment_qr_code: false,
 });
 
 function buildDayWindowRows() {
@@ -784,6 +890,46 @@ function clearDayWindow(day) {
     savePayee();
 }
 
+const qrPreviewUrl = ref(null);
+
+const currentPayeeQrUrl = computed(() => {
+    if (payeeForm.food_payee_type === 'host_school') {
+        if (!payeeForm.food_host_school_id) return null;
+        const d = props.schoolPaymentDetails?.[payeeForm.food_host_school_id];
+        return d?.qr_code_url || (payeeForm.food_host_school_id === props.event.food_host_school_id ? props.event.food_payment_qr_code_url : null);
+    }
+    return props.event.food_payment_qr_code_url || props.event.sahodaya_payment_qr_code_url;
+});
+
+function handleQrFileChange(e) {
+    const file = e.target.files?.[0];
+    if (file) {
+        payeeForm.payment_qr_code = file;
+        payeeForm.remove_payment_qr_code = false;
+        if (qrPreviewUrl.value) {
+            URL.revokeObjectURL(qrPreviewUrl.value);
+        }
+        qrPreviewUrl.value = URL.createObjectURL(file);
+    }
+}
+
+function clearSelectedQr() {
+    payeeForm.payment_qr_code = null;
+    if (qrPreviewUrl.value) {
+        URL.revokeObjectURL(qrPreviewUrl.value);
+        qrPreviewUrl.value = null;
+    }
+}
+
+watch(() => [payeeForm.food_payee_type, payeeForm.food_host_school_id], () => {
+    payeeForm.remove_payment_qr_code = false;
+    clearSelectedQr();
+});
+
+onBeforeUnmount(() => {
+    clearSelectedQr();
+});
+
 function fillHostPayment(schoolId) {
     const d = props.schoolPaymentDetails?.[schoolId] ?? {};
     payeeForm.payment_bank_name = d.bank_name ?? '';
@@ -795,7 +941,18 @@ fillHostPayment(payeeForm.food_host_school_id);
 watch(() => payeeForm.food_host_school_id, fillHostPayment);
 
 function savePayee() {
-    payeeForm.put(`${base}/food-menu-payee`, { preserveScroll: true });
+    payeeForm.transform((data) => ({
+        ...data,
+        _method: 'put',
+    })).post(`${base}/food-menu-payee`, {
+        preserveScroll: true,
+        forceFormData: true,
+        onSuccess: () => {
+            payeeForm.payment_qr_code = null;
+            payeeForm.remove_payment_qr_code = false;
+            clearSelectedQr();
+        },
+    });
 }
 
 // --- Food Catalog ---

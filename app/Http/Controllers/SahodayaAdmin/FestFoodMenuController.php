@@ -70,10 +70,14 @@ class FestFoodMenuController extends SahodayaAdminController
                 ->all();
         }
 
+        $sahodayaProfile = \App\Models\SahodayaProfile::where('tenant_id', $this->sahodaya->id)->first();
+
         return $this->inertia('Sahodaya/Events/FoodMenu', $this->withEventActivity($event, FestPageActivity::FOOD_MENU, [
             'event' => [
                 ...$event->only('id', 'title', 'event_type', 'event_start', 'event_end', 'food_payee_type', 'food_host_school_id', 'conducting_school_id', 'require_payment_for_coupons', 'food_order_opens_at', 'food_order_closes_at', 'food_order_day_windows'),
                 'phase_food_cutoff_at' => $phaseFoodCutoffAt?->toIso8601String(),
+                'food_payment_qr_code_url' => $event->foodPaymentQrCodeUrl(),
+                'sahodaya_payment_qr_code_url' => $sahodayaProfile?->paymentQrCodeUrl(),
             ],
             'hierarchy' => $event->hierarchyContext(),
             'menuItems' => $items,
@@ -84,8 +88,11 @@ class FestFoodMenuController extends SahodayaAdminController
             // Keyed by school id so the payee form can prefill whichever host school gets
             // picked -- only schools that actually have something on file are included.
             'schoolPaymentDetails' => $schools
-                ->mapWithKeys(fn (Tenant $s) => [$s->id => $s->paymentDetails()])
-                ->filter(fn (array $d) => collect($d)->except('qr_code')->filter()->isNotEmpty()),
+                ->mapWithKeys(fn (Tenant $s) => [$s->id => [
+                    ...$s->paymentDetails(),
+                    'qr_code_url' => $s->paymentQrCodeUrl(),
+                ]])
+                ->filter(fn (array $d) => collect($d)->except(['qr_code', 'qr_code_url'])->filter()->isNotEmpty() || filled($d['qr_code'] ?? null)),
             'isPartitionedHub' => $isPartitionedHub,
             'foodRegionSummary' => $isPartitionedHub ? $partitions->foodRegionDrillDownSummary($event) : [],
         ]));
@@ -156,6 +163,8 @@ class FestFoodMenuController extends SahodayaAdminController
             'payment_account_no' => ['nullable', 'string', 'max:64'],
             'payment_ifsc' => ['nullable', 'string', 'max:32'],
             'payment_upi' => ['nullable', 'string', 'max:255'],
+            'payment_qr_code' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:3072'],
+            'remove_payment_qr_code' => ['nullable', 'boolean'],
         ]);
 
         $newOpensAt = $request->exists('food_order_opens_at')
@@ -201,18 +210,35 @@ class FestFoodMenuController extends SahodayaAdminController
             ]);
         }
 
+        $uploadedQr = null;
+        if ($request->hasFile('payment_qr_code')) {
+            $uploadedQr = \App\Support\TenantStorage::storeUploadedFile($request->file('payment_qr_code'), 'payment_qr_codes', 'public');
+        }
+
         if ($data['food_payee_type'] === 'host_school') {
             $host = Tenant::find($data['food_host_school_id']);
             $keys = ['payment_bank_name' => 'bank_name', 'payment_account_no' => 'account_no', 'payment_ifsc' => 'ifsc', 'payment_upi' => 'upi'];
-            if ($host && collect(array_keys($keys))->contains(fn (string $k) => $request->exists($k))) {
+            if ($host && (collect(array_keys($keys))->contains(fn (string $k) => $request->exists($k)) || $uploadedQr !== null || $request->boolean('remove_payment_qr_code'))) {
                 $payment = $host->paymentDetails();
                 foreach ($keys as $field => $key) {
                     if ($request->exists($field)) {
                         $payment[$key] = $data[$field] ?? null;
                     }
                 }
+                if ($uploadedQr !== null) {
+                    $payment['qr_code'] = $uploadedQr;
+                } elseif ($request->boolean('remove_payment_qr_code')) {
+                    $payment['qr_code'] = null;
+                }
                 $host->setSetting('payment', $payment);
             }
+        }
+
+        $feeSettings = $event->fee_settings ?? [];
+        if ($uploadedQr !== null) {
+            $feeSettings['food_payment_qr_code'] = $uploadedQr;
+        } elseif ($request->boolean('remove_payment_qr_code')) {
+            unset($feeSettings['food_payment_qr_code']);
         }
 
         $previousType = $event->food_payee_type;
@@ -223,14 +249,19 @@ class FestFoodMenuController extends SahodayaAdminController
         $newType = $data['food_payee_type'];
         $newHost = $newType === 'host_school' ? $data['food_host_school_id'] : null;
 
-        $event->update([
+        $eventUpdateData = [
             'food_payee_type' => $newType,
             'food_host_school_id' => $newHost,
             'require_payment_for_coupons' => $data['require_payment_for_coupons'] ?? $event->require_payment_for_coupons ?? false,
             'food_order_opens_at' => $newOpensAt,
             'food_order_closes_at' => $newClosesAt,
             'food_order_day_windows' => $newDayWindows ?: null,
-        ]);
+        ];
+        if ($uploadedQr !== null || $request->boolean('remove_payment_qr_code')) {
+            $eventUpdateData['fee_settings'] = $feeSettings;
+        }
+
+        $event->update($eventUpdateData);
 
         $this->applyPayeeToInheritedEventsAndUnpaidBills($event, $previousType, $previousHost, $newType, $newHost);
         $this->applyOrderingWindowToInheritedEvents($event, $previousOpensAt, $previousClosesAt, $previousDayWindows);
@@ -304,7 +335,13 @@ class FestFoodMenuController extends SahodayaAdminController
                 ->get();
 
             foreach ($children as $child) {
-                $child->update(['food_payee_type' => $newType, 'food_host_school_id' => $newHost]);
+                $childUpdate = ['food_payee_type' => $newType, 'food_host_school_id' => $newHost];
+                if (isset($event->fee_settings['food_payment_qr_code'])) {
+                    $childFee = $child->fee_settings ?? [];
+                    $childFee['food_payment_qr_code'] = $event->fee_settings['food_payment_qr_code'];
+                    $childUpdate['fee_settings'] = $childFee;
+                }
+                $child->update($childUpdate);
                 $eventIds[] = $child->id;
             }
         }

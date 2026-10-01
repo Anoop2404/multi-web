@@ -159,11 +159,12 @@ class FestFoodOrderController extends SchoolAdminController
             : null;
 
         $payeeDetails = null;
+        $foodCustomQr = $event->foodPaymentQrCodeUrl();
         if ($payeeType === 'host_school' && $hostSchool) {
             $payeeDetails = [
                 'name' => $hostSchool->name,
                 ...$hostSchool->paymentDetails(),
-                'qr_code_url' => $hostSchool->paymentQrCodeUrl(),
+                'qr_code_url' => $foodCustomQr ?? $hostSchool->paymentQrCodeUrl(),
             ];
         } elseif ($payeeType !== 'host_school') {
             $sahodayaProfile = \App\Models\SahodayaProfile::where('tenant_id', $event->tenant_id)->first();
@@ -174,7 +175,7 @@ class FestFoodOrderController extends SchoolAdminController
                     'account_no' => $sahodayaProfile->payment_account_no,
                     'ifsc' => $sahodayaProfile->payment_ifsc,
                     'upi' => $sahodayaProfile->payment_upi,
-                    'qr_code_url' => $sahodayaProfile->paymentQrCodeUrl(),
+                    'qr_code_url' => $foodCustomQr ?? $sahodayaProfile->paymentQrCodeUrl(),
                 ];
             }
         }

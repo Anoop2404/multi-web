@@ -168,4 +168,20 @@ class FestFoodHostPaymentDetailsTest extends TestCase
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page->where('payeeDetails', null));
     }
+
+    public function test_ordering_school_sees_custom_food_payment_qr_code(): void
+    {
+        $this->event->update([
+            'food_payee_type' => 'sahodaya',
+            'fee_settings' => ['food_payment_qr_code' => 'payment_qr_codes/custom_food_qr.png'],
+        ]);
+
+        $response = $this->actingAs($this->orderingSchoolAdmin)->get(route('school.food-order.show', [
+            'tenantId' => $this->orderingSchool->id, 'event' => $this->event->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->where('payeeDetails.qr_code_url', fn ($url) => str_contains($url, 'custom_food_qr.png')));
+    }
 }
