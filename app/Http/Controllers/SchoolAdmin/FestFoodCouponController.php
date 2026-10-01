@@ -74,23 +74,18 @@ class FestFoodCouponController extends SchoolAdminController
         $preparedCoupons = [];
         foreach ($coupons as $c) {
             $verifyUrl = $c->verificationUrl($baseUrl);
-            $qrData = $qrService->dataUri($verifyUrl);
-            $headCount = max(1, (int) $c->head_count);
-
-            for ($i = 0; $i < $headCount; $i++) {
-                $subCode = $headCount > 1 ? ($c->coupon_code . '-' . ($i + 1)) : $c->coupon_code;
-                $preparedCoupons[] = [
-                    'id' => $c->id,
-                    'coupon_code' => $subCode,
-                    'qr_token' => $c->qr_token,
-                    'meal_type' => $c->meal_type,
-                    'formatted_date' => $c->valid_date?->format('d M Y') ?? 'N/A',
-                    'head_count' => 1,
-                    'is_extra' => $c->is_extra,
-                    'school_name' => $this->school->name,
-                    'qr_src' => $qrData,
-                ];
-            }
+            $qrData = $qrService->dataUri($verifyUrl, 300);
+            $preparedCoupons[] = [
+                'id' => $c->id,
+                'coupon_code' => $c->coupon_code,
+                'qr_token' => $c->qr_token,
+                'meal_type' => $c->meal_type,
+                'formatted_date' => $c->valid_date?->format('d M Y') ?? 'N/A',
+                'head_count' => 1,
+                'is_extra' => $c->is_extra,
+                'school_name' => $this->school->name,
+                'qr_src' => $qrData,
+            ];
         }
 
         return Pdf::loadView('fest.catering.food-coupons', [

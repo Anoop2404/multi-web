@@ -355,5 +355,63 @@ class FestFoodCouponGeneratorTest extends TestCase
         $this->assertTrue($coupons->every(fn ($c) => $c->head_count === 1));
         $this->assertSame(20, $coupons->pluck('qr_token')->unique()->count());
     }
+
+    public function test_migration_expands_legacy_multi_head_coupons_and_resequences_continuously_across_schools(): void
+    {
+        $school2 = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'school',
+            'name' => 'Santa Maria School',
+            'parent_id' => $this->sahodaya->id,
+            'membership_status' => 'approved',
+            'is_active' => true,
+        ]);
+
+        // Create legacy batch coupons (like the old code did: 1 row with head_count 18 for School 1, 1 row with head_count 3 for School 2)
+        FestFoodCoupon::create([
+            'event_id' => $this->event->id,
+            'school_id' => $this->school->id,
+            'coupon_code' => 'TE-0001',
+            'sequence_no' => 1,
+            'qr_token' => 'TOKEN_SCH1',
+            'meal_type' => 'tea',
+            'valid_date' => now()->toDateString(),
+            'head_count' => 18,
+            'status' => 'issued',
+        ]);
+
+        FestFoodCoupon::create([
+            'event_id' => $this->event->id,
+            'school_id' => $school2->id,
+            'coupon_code' => 'TE-0002',
+            'sequence_no' => 2,
+            'qr_token' => 'TOKEN_SCH2',
+            'meal_type' => 'tea',
+            'valid_date' => now()->toDateString(),
+            'head_count' => 3,
+            'status' => 'issued',
+        ]);
+
+        // Run migration
+        $migration = require database_path('migrations/tenant/2026_11_17_000006_expand_and_resequence_food_coupons.php');
+        $migration->up();
+
+        // Must now be 21 individual coupons
+        $coupons = FestFoodCoupon::where('event_id', $this->event->id)
+            ->where('meal_type', 'tea')
+            ->orderBy('sequence_no')
+            ->get();
+
+        $this->assertCount(21, $coupons);
+        $this->assertTrue($coupons->every(fn ($c) => $c->head_count === 1));
+
+        // Codes must be continuous across both schools: TE-0001 to TE-0021
+        $codes = $coupons->pluck('coupon_code')->all();
+        $expectedCodes = array_map(fn ($i) => 'TE-' . str_pad((string) $i, 4, '0', STR_PAD_LEFT), range(1, 21));
+        $this->assertSame($expectedCodes, $codes);
+
+        // All QR tokens must be unique
+        $this->assertSame(21, $coupons->pluck('qr_token')->unique()->count());
+    }
 }
 

@@ -71,17 +71,17 @@
             z-index: 3;
             text-align: center;
             overflow: hidden;
-            padding: 0.6mm 0.5mm 0.4mm 0.5mm;
+            padding: 0.5mm 0.5mm 0.3mm 0.5mm;
         }
 
         .box-serial-no {
             font-family: 'DejaVu Sans Mono', monospace;
             font-weight: bold;
-            font-size: 6.8pt;
+            font-size: 7pt;
             color: #0f172a;
             letter-spacing: 0.4px;
             line-height: 1.1;
-            margin-bottom: 0.4mm;
+            margin-bottom: 0.3mm;
             text-align: center;
         }
 
@@ -91,17 +91,17 @@
         }
 
         .box-qr-img {
-            width: 14.5mm;
-            height: 14.5mm;
+            width: 14mm;
+            height: 14mm;
             display: inline-block;
         }
 
         .box-decoded-val {
             font-family: 'DejaVu Sans Mono', monospace;
             font-weight: bold;
-            font-size: 5.5pt;
+            font-size: 5.6pt;
             color: #0f172a;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.6px;
             line-height: 1.1;
             margin-top: 0.4mm;
             text-align: center;
@@ -128,23 +128,23 @@
         .left-details-container {
             position: absolute;
             left: 4.5%;
-            top: 47%;
+            top: 46.5%;
             width: 58%;
-            height: 24%;
+            height: 24.5%;
             z-index: 3;
             overflow: hidden;
         }
 
         .left-meta-row {
             line-height: 1;
-            margin-bottom: 0.7mm;
+            margin-bottom: 0.8mm;
             white-space: nowrap;
         }
 
         .meal-pill {
             display: inline-block;
             font-family: 'DejaVu Sans', sans-serif;
-            font-size: 5pt;
+            font-size: 5.2pt;
             font-weight: bold;
             text-transform: uppercase;
             padding: 0.5mm 1.8mm;
@@ -157,10 +157,11 @@
         .meal-pill--lunch     { background: #10b981; color: #ffffff; }
         .meal-pill--dinner    { background: #4f46e5; color: #ffffff; }
         .meal-pill--snacks    { background: #ec4899; color: #ffffff; }
+        .meal-pill--tea       { background: #ea580c; color: #ffffff; }
         .meal-pill--other     { background: #64748b; color: #ffffff; }
 
         .meta-text {
-            font-size: 5pt;
+            font-size: 5.2pt;
             color: #334155;
             margin-left: 1.5mm;
             vertical-align: middle;
@@ -170,7 +171,7 @@
         }
 
         .left-school-row {
-            font-size: 5.2pt;
+            font-size: 5.5pt;
             font-weight: bold;
             color: #1e293b;
             white-space: nowrap;
@@ -199,7 +200,7 @@
             top: 72.5%;
             font-family: 'DejaVu Sans Mono', monospace;
             font-weight: bold;
-            font-size: 7pt;
+            font-size: 7.2pt;
             color: #1e3a8a;
             background: #dbeafe;
             border: 0.5px solid #93c5fd;
