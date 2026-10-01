@@ -162,6 +162,10 @@ class NotificationService
                 'title' => 'Registration needs re-approval',
                 'body_template' => 'A roster change for {{event_title}} ({{item_title}}) requires re-approval.',
             ],
+            'fee.receipt.reversed' => [
+                'title' => 'Fee receipt reversed',
+                'body_template' => 'Fee receipt {{receipt_number}} for ₹{{amount}} has been reversed. Reason: {{reason}}',
+            ],
             default => null,
         };
     }

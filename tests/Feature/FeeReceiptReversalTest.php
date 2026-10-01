@@ -176,4 +176,67 @@ class FeeReceiptReversalTest extends TestCase
         $this->assertSame(FeeReceipt::STATUS_APPROVED, $restoredAgain->status);
         $this->assertSame(2, LedgerTransaction::where('reference_type', FeeReceipt::REVERSAL_RESTORE_REFERENCE)->count());
     }
+
+    public function test_reversal_notifies_school_admin_with_template(): void
+    {
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $this->seed(SahodayaMasterDataSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id'        => (string) Str::uuid(),
+            'type'      => 'sahodaya',
+            'name'      => 'Reversal Sahodaya',
+            'domain'    => 'rev-notif.test',
+            'is_active' => true,
+        ]);
+
+        $school = Tenant::create([
+            'id'                => (string) Str::uuid(),
+            'type'              => 'school',
+            'name'              => 'Reversal School',
+            'parent_id'         => $sahodaya->id,
+            'membership_status' => 'approved',
+            'is_active'         => true,
+        ]);
+
+        $adminUser = User::factory()->create([
+            'tenant_id' => $school->id,
+        ]);
+        $adminUser->assignRole('school_admin');
+
+        $registration = Registration::create([
+            'school_id'             => $school->id,
+            'academic_year'         => AcademicYear::current(),
+            'registration_status'   => 'approved',
+            'membership_fee_amount' => 500,
+        ]);
+
+        $payment = MembershipPayment::create([
+            'school_id'          => $school->id,
+            'academic_year'      => AcademicYear::current(),
+            'registration_id'    => $registration->id,
+            'amount'             => 500,
+            'payment_proof_path' => 'payments/test/proof.png',
+            'payment_method'     => 'bank_transfer',
+            'status'             => 'verified',
+            'verified_by_user_id'=> $adminUser->id,
+            'verified_at'        => now(),
+        ]);
+
+        $receipt = app(FeeReceiptService::class)->createForMembershipPayment($payment);
+        $receipt->update([
+            'status'      => FeeReceipt::STATUS_APPROVED,
+            'payment_date'=> now()->toDateString(),
+            'reviewed_by' => $adminUser->id,
+            'reviewed_at' => now(),
+        ]);
+
+        // Reversal should send notification using template without throwing or warning
+        app(FeeReceiptReversalService::class)->reverse($receipt->fresh(), $adminUser, 'Payment cancelled');
+
+        $this->assertDatabaseHas('in_app_notifications', [
+            'user_id' => $adminUser->id,
+            'title'   => 'Fee receipt reversed',
+        ]);
+    }
 }

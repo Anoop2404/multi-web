@@ -71,10 +71,28 @@ class SeoController extends Controller
             return $urls;
         });
 
-        return response()
-            ->view('public.sitemap', compact('urls'))
-            ->header('Content-Type', 'application/xml')
-            ->header('Cache-Control', 'public, max-age=21600'); // 6 hours
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n";
+        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
+        foreach ($urls as $url) {
+            $xml .= "    <url>\n";
+            $xml .= '        <loc>'.htmlspecialchars($url['loc'], ENT_XML1, 'UTF-8')."</loc>\n";
+            if (!empty($url['lastmod'])) {
+                $xml .= '        <lastmod>'.htmlspecialchars($url['lastmod'], ENT_XML1, 'UTF-8')."</lastmod>\n";
+            }
+            if (!empty($url['changefreq'])) {
+                $xml .= '        <changefreq>'.htmlspecialchars($url['changefreq'], ENT_XML1, 'UTF-8')."</changefreq>\n";
+            }
+            if (!empty($url['priority'])) {
+                $xml .= '        <priority>'.htmlspecialchars($url['priority'], ENT_XML1, 'UTF-8')."</priority>\n";
+            }
+            $xml .= "    </url>\n";
+        }
+        $xml .= '</urlset>'."\n";
+
+        return response($xml, 200, [
+            'Content-Type' => 'application/xml',
+            'Cache-Control' => 'public, max-age=21600',
+        ]);
     }
 
     public function robots()

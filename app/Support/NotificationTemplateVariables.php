@@ -86,6 +86,7 @@ class NotificationTemplateVariables
 
             'circular.published'           => ['circular_title'],
             'payment.proof.uploaded'       => ['school_name', 'context_label'],
+            'fee.receipt.reversed'         => ['receipt_number', 'amount', 'reason'],
             'membership.payment.submitted' => ['school_name', 'academic_year'],
             'membership.payment.approved'  => ['academic_year'],
             'membership.payment.rejected'  => ['academic_year', 'reason'],

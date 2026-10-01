@@ -211,6 +211,11 @@ class NotificationTemplatesSeeder extends Seeder
                 'body_template' => '{{school_name}} uploaded payment proof for {{context_label}}.',
             ],
             [
+                'slug'          => 'fee.receipt.reversed',
+                'title'         => 'Fee receipt reversed',
+                'body_template' => 'Fee receipt {{receipt_number}} for ₹{{amount}} has been reversed. Reason: {{reason}}',
+            ],
+            [
                 'slug'          => 'membership.payment.submitted',
                 'title'         => 'Membership payment submitted',
                 'body_template' => '{{school_name}} submitted membership payment for {{academic_year}}.',
