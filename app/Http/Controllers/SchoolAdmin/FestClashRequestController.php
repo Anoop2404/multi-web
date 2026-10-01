@@ -168,9 +168,10 @@ class FestClashRequestController extends SchoolAdminController
             $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
             $schedules = $clashRequest->schedules();
 
-            $data['date'] = $clashRequest->created_at?->format('d M Y');
+            $data['date'] = $schedules->first(fn ($s) => $s->scheduled_at !== null)?->scheduled_at?->format('d M Y')
+                ?? $clashRequest->created_at?->format('d M Y');
             $data['studentName'] = $clashRequest->participant?->student?->name;
-            $data['rollNo'] = $clashRequest->participant?->chest_no ?? $clashRequest->participant?->level_registration_number;
+            $data['rollNo'] = $clashRequest->participant?->level_registration_number ?? $clashRequest->participant?->chest_no;
             $data['category'] = FestItemCategoryLabel::resolve($schedules->first()?->item, $classGroupLabels, $artsCategoryLabels);
             $data['items'] = $schedules->map(fn (FestSchedule $s) => [
                 'title' => $s->item?->title,
@@ -229,9 +230,11 @@ class FestClashRequestController extends SchoolAdminController
                     ->get();
             }
 
-            $data['date'] = now()->format('d M Y');
+            $data['date'] = $schedules->first(fn ($s) => $s->scheduled_at !== null)?->scheduled_at?->format('d M Y')
+                ?? $event->event_start?->format('d M Y')
+                ?? now()->format('d M Y');
             $data['studentName'] = $student->name;
-            $data['rollNo'] = $participant?->chest_no ?? $participant?->group?->chest_no ?? $participant?->level_registration_number ?? $student->reg_no ?? $student->admission_number;
+            $data['rollNo'] = $participant?->level_registration_number ?? $participant?->chest_no ?? $student->reg_no ?? $participant?->group?->chest_no ?? $student->admission_number;
             $data['category'] = FestItemCategoryLabel::resolve($schedules->first()?->item ?? $participant?->registration?->item, $classGroupLabels, $artsCategoryLabels);
             $data['items'] = $schedules->map(fn (FestSchedule $s) => [
                 'title' => $s->item?->title,
@@ -248,13 +251,10 @@ class FestClashRequestController extends SchoolAdminController
         }
 
         $sahodaya = \App\Models\Tenant::find($this->school->parent_id);
-        $profile = \App\Models\SahodayaProfile::where('tenant_id', $this->school->parent_id)->first();
 
         $html = view('fest.reports.clash-form', $data + [
             'orgName'     => $sahodaya?->name ?? 'Sahodaya',
             'logoSrc'     => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
-            'orgSubtitle' => $profile?->address,
-            'orgContact'  => trim(implode('   ', array_filter([$profile?->contact_email, $profile?->contact_phone]))),
             'year'        => now()->format('Y'),
         ])->render();
 

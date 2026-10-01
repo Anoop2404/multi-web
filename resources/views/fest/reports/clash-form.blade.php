@@ -179,12 +179,6 @@
                             <div><img src="{{ $logoSrc }}" alt="Logo"></div>
                         @endif
                         <div class="org-name">{{ $orgName ?? 'Sahodaya' }}</div>
-                        @if(!empty($orgSubtitle))
-                            <div class="org-sub">{{ $orgSubtitle }}</div>
-                        @endif
-                        @if(!empty($orgContact))
-                            <div class="org-contact">{{ $orgContact }}</div>
-                        @endif
                     </div>
 
                     <div class="banner">
@@ -199,7 +193,7 @@
                                     <span class="value" style="min-width: 100px;">{{ $date ?? '' }}</span>
                                 </td>
                                 <td style="width: 48%;">
-                                    <span class="label">Roll / Chest No:</span>
+                                    <span class="label">Roll / Fest ID:</span>
                                     <span class="value" style="min-width: 70px;">{{ $rollNo ?? '' }}</span>
                                 </td>
                             </tr>
