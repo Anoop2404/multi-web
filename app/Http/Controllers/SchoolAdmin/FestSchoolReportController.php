@@ -1198,16 +1198,15 @@ class FestSchoolReportController extends SchoolAdminController
         $service->requireStudentItem('student', $filters);
 
         $cards = $service->cards($event, 'student', $filters);
-        $customTemplate = $this->resolveCustomIdCardTemplate($event, $filters['item_id'] ?? null, 'student');
 
-        return view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
+        return view($this->idCardSheetView($request, null), $this->idCardViewData(
             $event,
             $cluster,
             $cards,
             'student',
             true,
             null,
-            $customTemplate,
+            null,
         ));
     }
 
@@ -1242,24 +1241,22 @@ class FestSchoolReportController extends SchoolAdminController
             'head'  => 'head-pass',
             default => 'student',
         };
-        $customTemplate = $this->resolveCustomIdCardTemplate($event, $filters['item_id'] ?? null, 'student');
 
-        $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
+        $html = view($this->idCardSheetView($request, null), $this->idCardViewData(
             $event,
             $cluster,
             $cards,
             'student',
             false,
             null,
-            $customTemplate,
+            null,
             true,
         ))->render();
 
         return \App\Support\PdfGenerator::download(
             $html,
             "{$slug}-{$scopeSuffix}-id-cards.pdf",
-            pageWidthMm: $customTemplate?->page_width_mm,
-            pageHeightMm: $customTemplate?->page_height_mm,
+            isLandscape: true,
             requireBrowserRenderer: true,
         );
     }
@@ -1292,26 +1289,24 @@ class FestSchoolReportController extends SchoolAdminController
         abort_if($sections === [], 422, 'No participants found for any item head.');
 
         $slug = str($event->title)->slug('-');
-        $customTemplate = $this->resolveCustomIdCardTemplate($event, null, 'student');
 
         $cards = collect($sections)->flatMap(fn($section) => $section['cards'])->values()->all();
 
-        $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
+        $html = view($this->idCardSheetView($request, null), $this->idCardViewData(
             $event,
             $cluster,
             $cards,
             'student',
             false,
             null,
-            $customTemplate,
+            null,
             true,
         ))->render();
 
         return \App\Support\PdfGenerator::download(
             $html,
             "{$slug}-all-heads-id-cards.pdf",
-            pageWidthMm: $customTemplate?->page_width_mm,
-            pageHeightMm: $customTemplate?->page_height_mm,
+            isLandscape: true,
             requireBrowserRenderer: true,
         );
     }
@@ -1338,26 +1333,24 @@ class FestSchoolReportController extends SchoolAdminController
         abort_if($sections === [], 422, 'No approved participants found for any item.');
 
         $slug = str($event->title)->slug('-');
-        $customTemplate = $this->resolveCustomIdCardTemplate($event, null, 'student');
 
         $cards = collect($sections)->flatMap(fn($section) => $section['cards'])->values()->all();
 
-        $html = view($this->idCardSheetView($request, $customTemplate), $this->idCardViewData(
+        $html = view($this->idCardSheetView($request, null), $this->idCardViewData(
             $event,
             $cluster,
             $cards,
             'student',
             false,
             null,
-            $customTemplate,
+            null,
             true,
         ))->render();
 
         return \App\Support\PdfGenerator::download(
             $html,
             "{$slug}-all-items-id-cards.pdf",
-            pageWidthMm: $customTemplate?->page_width_mm,
-            pageHeightMm: $customTemplate?->page_height_mm,
+            isLandscape: true,
             requireBrowserRenderer: true,
         );
     }

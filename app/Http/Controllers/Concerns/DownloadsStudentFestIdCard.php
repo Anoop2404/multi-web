@@ -97,19 +97,16 @@ trait DownloadsStudentFestIdCard
         $slug = str($event->title)->slug('-');
         $regSlug = str($student->reg_no ?: 'student-'.$student->id)->slug('-');
         $filename = "{$slug}-{$regSlug}-id-card.pdf";
-        $customTemplate = $this->resolveCustomIdCardTemplate($event, $filters['item_id'] ?? null, 'student');
-
         $html = view(
-            $this->idCardSheetView($request, $customTemplate),
-            $this->idCardViewData($event, $cluster, $cards, 'student', false, null, $customTemplate, true),
+            $this->idCardSheetView($request, null),
+            $this->idCardViewData($event, $cluster, $cards, 'student', false, null, null, true),
         )->render();
 
         return PdfGenerator::download(
             $html,
             $filename,
             $request->boolean('inline'),
-            pageWidthMm: $customTemplate?->page_width_mm,
-            pageHeightMm: $customTemplate?->page_height_mm,
+            isLandscape: true,
             requireBrowserRenderer: true,
         );
     }

@@ -46,7 +46,7 @@ trait BuildsFestIdCardResponses
             return 'fest.id-cards.custom-sheet';
         }
 
-        return FestIdCardTemplates::sheetView($request->input('template'));
+        return FestIdCardTemplates::sheetView($request->input('template', FestIdCardTemplates::PASS));
     }
 
     /** @param  list<array<string, mixed>>  $cards */
