@@ -52,7 +52,7 @@ return new class extends Migration
             $table->foreign('event_id')->references('id')->on('fest_events')->cascadeOnDelete();
             $table->string('school_id');
             $table->date('meal_date');
-            $table->enum('meal_type', ['breakfast', 'lunch', 'dinner', 'snacks'])->default('lunch');
+            $table->string('meal_type', 32)->default('lunch');
             $table->unsignedSmallInteger('head_count')->default(0);
             $table->text('notes')->nullable();
             $table->enum('status', ['requested', 'confirmed', 'cancelled'])->default('requested');

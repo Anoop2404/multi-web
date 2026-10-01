@@ -75,7 +75,7 @@ class FestEventPortalController extends SchoolAdminController
 
         $data = $request->validate([
             'meal_date'  => 'required|date',
-            'meal_type'  => 'required|in:breakfast,lunch,dinner,snacks',
+            'meal_type'  => 'required|in:breakfast,lunch,dinner,snacks,tea,other',
             'head_count' => 'required|integer|min:1|max:5000',
             'notes'      => 'nullable|string|max:500',
         ]);

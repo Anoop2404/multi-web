@@ -116,6 +116,8 @@ class FestFoodCouponController extends SahodayaAdminController
                 'lunch'    => $allEventCoupons->where('meal_type', 'lunch')->count(),
                 'dinner'   => $allEventCoupons->where('meal_type', 'dinner')->count(),
                 'snacks'   => $allEventCoupons->where('meal_type', 'snacks')->count(),
+                'tea'      => $allEventCoupons->where('meal_type', 'tea')->count(),
+                'other'    => $allEventCoupons->where('meal_type', 'other')->count(),
             ],
             'filters' => [
                 'meal_type' => $request->query('meal_type', ''),

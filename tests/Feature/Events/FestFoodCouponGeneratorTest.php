@@ -3,7 +3,9 @@
 namespace Tests\Feature\Events;
 
 use App\Models\FestEvent;
+use App\Models\FestFoodBill;
 use App\Models\FestFoodCoupon;
+use App\Models\FestFoodOrderItem;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
 use App\Models\User;
@@ -269,4 +271,85 @@ class FestFoodCouponGeneratorTest extends TestCase
         $printResp->assertStatus(200);
         $this->assertSame('application/pdf', $printResp->headers->get('content-type'));
     }
+
+    public function test_tea_and_other_meal_types_can_be_issued_and_serialized(): void
+    {
+        // 1. Tea serialization (TE-0001)
+        $te1 = FestFoodCoupon::generateSerializedCode($this->event, 'tea');
+        $this->assertSame('TE-0001', $te1['code']);
+
+        $teaCoupon = FestFoodCoupon::create([
+            'event_id' => $this->event->id,
+            'coupon_code' => $te1['code'],
+            'sequence_no' => $te1['sequence_no'],
+            'qr_token' => FestFoodCoupon::generateQrToken(),
+            'meal_type' => 'tea',
+            'valid_date' => now()->toDateString(),
+            'head_count' => 10,
+            'status' => 'issued',
+            'school_id' => $this->school->id,
+        ]);
+
+        $this->assertSame('tea', $teaCoupon->meal_type);
+        $this->assertSame('TE-0001', $teaCoupon->coupon_code);
+
+        // 2. Extra coupon generation endpoint with tea
+        $resp = $this->actingAs($this->sahodayaAdmin)->post(route('sahodaya.events.food-coupons.generate-extra', [
+            'tenantId' => $this->sahodaya->id,
+            'event' => $this->event->id,
+        ]), [
+            'meal_type' => 'tea',
+            'valid_date' => now()->toDateString(),
+            'quantity' => 2,
+        ]);
+
+        $resp->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('fest_food_coupons', [
+            'event_id' => $this->event->id,
+            'meal_type' => 'tea',
+            'coupon_code' => 'TE-0002',
+        ]);
+        $this->assertDatabaseHas('fest_food_coupons', [
+            'event_id' => $this->event->id,
+            'meal_type' => 'tea',
+            'coupon_code' => 'TE-0003',
+        ]);
+    }
+
+    public function test_issue_from_bill_supports_tea_meal_type(): void
+    {
+        $bill = FestFoodBill::create([
+            'tenant_id' => $this->sahodaya->id,
+            'event_id' => $this->event->id,
+            'school_id' => $this->school->id,
+            'status' => FestFoodBill::STATUS_OPEN,
+            'amount_total' => 500,
+            'amount_paid' => 500,
+        ]);
+
+        FestFoodOrderItem::create([
+            'bill_id' => $bill->id,
+            'menu_date' => now()->toDateString(),
+            'meal_type' => 'tea',
+            'item_name' => 'Evening Tea & Snacks',
+            'unit_price' => 25,
+            'quantity' => 20,
+            'line_total' => 500,
+        ]);
+
+        $resp = $this->actingAs($this->sahodayaAdmin)->post(route('sahodaya.events.food-coupons.issue-from-bill', [
+            'tenantId' => $this->sahodaya->id,
+            'event' => $this->event->id,
+        ]));
+
+        $resp->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('fest_food_coupons', [
+            'event_id' => $this->event->id,
+            'school_id' => $this->school->id,
+            'meal_type' => 'tea',
+            'coupon_code' => 'TE-0001',
+            'head_count' => 20,
+        ]);
+    }
 }
+

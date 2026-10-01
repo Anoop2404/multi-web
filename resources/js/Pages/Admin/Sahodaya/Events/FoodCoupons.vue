@@ -60,14 +60,14 @@
             </div>
 
             <!-- Stat Tiles -->
-            <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2.5 mb-6">
                 <div class="stat-tile text-center p-3 bg-white rounded-xl border border-slate-200">
                     <p class="text-2xl font-bold text-slate-800">{{ summary.total || 0 }}</p>
-                    <p class="text-xs font-medium text-slate-500 mt-1">Total Generated</p>
+                    <p class="text-xs font-medium text-slate-500 mt-1">Total</p>
                 </div>
                 <div class="stat-tile text-center p-3 bg-white rounded-xl border border-slate-200">
                     <p class="text-2xl font-bold text-blue-600">{{ summary.issued || 0 }}</p>
-                    <p class="text-xs font-medium text-slate-500 mt-1">Ready (Issued)</p>
+                    <p class="text-xs font-medium text-slate-500 mt-1">Ready</p>
                 </div>
                 <div class="stat-tile text-center p-3 bg-white rounded-xl border border-slate-200">
                     <p class="text-2xl font-bold text-emerald-600">{{ summary.redeemed || 0 }}</p>
@@ -75,19 +75,27 @@
                 </div>
                 <div class="stat-tile text-center p-3 bg-white rounded-xl border border-slate-200">
                     <p class="text-2xl font-bold text-amber-600">{{ summary.extra || 0 }}</p>
-                    <p class="text-xs font-medium text-slate-500 mt-1">Extra Buffer</p>
+                    <p class="text-xs font-medium text-slate-500 mt-1">Extra</p>
                 </div>
                 <div class="stat-tile text-center p-3 bg-amber-50/60 rounded-xl border border-amber-200">
                     <p class="text-2xl font-bold text-amber-800">{{ summary.breakfast || 0 }}</p>
-                    <p class="text-xs font-medium text-amber-700 mt-1">Breakfast (BF)</p>
+                    <p class="text-xs font-medium text-amber-700 mt-1">Breakfast</p>
                 </div>
                 <div class="stat-tile text-center p-3 bg-emerald-50/60 rounded-xl border border-emerald-200">
                     <p class="text-2xl font-bold text-emerald-800">{{ summary.lunch || 0 }}</p>
-                    <p class="text-xs font-medium text-emerald-700 mt-1">Lunch (LN)</p>
+                    <p class="text-xs font-medium text-emerald-700 mt-1">Lunch</p>
                 </div>
                 <div class="stat-tile text-center p-3 bg-indigo-50/60 rounded-xl border border-indigo-200">
                     <p class="text-2xl font-bold text-indigo-800">{{ summary.dinner || 0 }}</p>
-                    <p class="text-xs font-medium text-indigo-700 mt-1">Dinner (DN)</p>
+                    <p class="text-xs font-medium text-indigo-700 mt-1">Dinner</p>
+                </div>
+                <div class="stat-tile text-center p-3 bg-pink-50/60 rounded-xl border border-pink-200">
+                    <p class="text-2xl font-bold text-pink-800">{{ summary.snacks || 0 }}</p>
+                    <p class="text-xs font-medium text-pink-700 mt-1">Snacks</p>
+                </div>
+                <div class="stat-tile text-center p-3 bg-orange-50/60 rounded-xl border border-orange-200">
+                    <p class="text-2xl font-bold text-orange-800">{{ summary.tea || 0 }}</p>
+                    <p class="text-xs font-medium text-orange-700 mt-1">Tea</p>
                 </div>
             </div>
 

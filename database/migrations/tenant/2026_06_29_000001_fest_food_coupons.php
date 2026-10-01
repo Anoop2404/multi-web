@@ -13,7 +13,7 @@ return new class extends Migration
             $table->unsignedBigInteger('event_id');
             $table->string('school_id');
             $table->string('coupon_code', 20)->unique();
-            $table->enum('meal_type', ['breakfast', 'lunch', 'dinner', 'snacks'])->default('lunch');
+            $table->string('meal_type', 32)->default('lunch');
             $table->date('valid_date');
             $table->unsignedSmallInteger('head_count')->default(1);
             $table->enum('status', ['issued', 'redeemed', 'void'])->default('issued');
