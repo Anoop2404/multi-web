@@ -2,7 +2,10 @@
     <SahodayaEventsLayout :title="`${event.title} — Certificates`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Certificates`" eyebrow="Operations"
-                    description="Generate and manage participant certificates." />
+                    description="Generate, manage, and print participant and merit certificates." />
+
+        <SportsSetupSubNav v-if="event.event_type === 'sports'" :sahodaya-id="sahodaya.id" :event-id="event.id" :event="event" active="certificates" class="mb-4" />
+        <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="certificates" class="mb-4" />
 
         <div class="mb-4 flex flex-wrap items-center gap-3 text-xs">
             <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/merit`" class="font-semibold text-amber-700 hover:text-amber-900">
@@ -827,6 +830,8 @@ import { router, Link, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import EventSignatoriesCard from '@/Components/certificates/EventSignatoriesCard.vue';
+import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
+import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({

@@ -38,8 +38,8 @@ class FestIndividualChampionshipService
         $stored = $root->aggregation_config['individual_championship_config'] ?? [];
 
         return [
-            'male_title' => $stored['male_title'] ?? 'Kalaprathibha',
-            'female_title' => $stored['female_title'] ?? 'Kalathilakam',
+            'male_title' => $stored['male_title'] ?? ($event->event_type === 'sports' ? 'Individual Champion (Boys)' : 'Kalaprathibha'),
+            'female_title' => $stored['female_title'] ?? ($event->event_type === 'sports' ? 'Individual Champion (Girls)' : 'Kalathilakam'),
             'runner_up_title' => $stored['runner_up_title'] ?? 'Runner Up',
             'max_counting_items' => (int) ($stored['max_counting_items'] ?? 0), // 0 = unlimited / all items
             'multi_person_mode' => $stored['multi_person_mode'] ?? 'tie_break_only', // 'tie_break_only', 'include_weighted', 'exclude'

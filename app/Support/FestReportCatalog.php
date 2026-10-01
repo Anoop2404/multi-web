@@ -66,6 +66,8 @@ class FestReportCatalog
         // Event-wide comparative/schedule data — the same for every viewer, not any one
         // school's private information.
         'overall-ranking',
+        'overall-ranking-secondary',
+        'overall-ranking-senior-secondary',
         'house-wise',
         'item-list',
         'item-wise',

@@ -2,7 +2,11 @@
     <SahodayaEventsLayout :title="`${event.title} — Individual Championship`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
                           :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Individual Championship`" eyebrow="Scoring &amp; Honours"
-                    description="Individual championship points, crowned Kalaprathibha &amp; Kalathilakam honours, and builder rules." />
+                    :description="event.event_type === 'sports'
+                        ? 'Individual championship points, Best Athlete honours, and builder rules.'
+                        : 'Individual championship points, crowned honours (Kalaprathibha &amp; Kalathilakam), and builder rules.'" />
+        <SportsSetupSubNav v-if="event.event_type === 'sports'" :sahodaya-id="sahodaya.id" :event-id="event.id" :event="event" active="championship" class="mb-4" />
+        <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="championship" class="mb-4" />
         <FestEventWorkflowStepper :sahodaya-id="sahodaya.id" :event-id="event.id"
                                   :event-type="event.event_type" :current-step="'operations'" />
 
@@ -14,7 +18,7 @@
                 </div>
                 <div>
                     <h3 class="text-sm font-bold text-slate-800">
-                        Kalotsav Championship Honours
+                        {{ event.event_type === 'sports' ? 'Sports Individual Championship & Honours' : 'Individual Championship Honours' }}
                     </h3>
                     <p class="text-xs text-slate-500 mt-0.5">
                         Title honours ({{ championshipConfig.male_title }} / {{ championshipConfig.female_title }}) auto-calculated from published marks.
@@ -486,6 +490,8 @@ import { router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import FestEventWorkflowStepper from '@/Components/sahodaya/FestEventWorkflowStepper.vue';
+import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
+import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({

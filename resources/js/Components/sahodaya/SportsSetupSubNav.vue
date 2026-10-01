@@ -57,6 +57,9 @@ const tabs = computed(() => {
         { key: 'mark-settings', label: 'Mark Settings', icon: '🎚️', href: `${base.value}/mark-settings` },
         { key: 'rank-points', label: 'Rank Points', icon: '🏅', href: `${base.value}/rank-points` },
         { key: 'results', label: 'Results', icon: '🥇', href: `${base.value}/results` },
+        { key: 'championship', label: 'Individual Championship', icon: '👑', href: `${base.value}/championship` },
+        { key: 'certificates', label: 'Certificates', icon: '📜', href: `${base.value}/certificates` },
+        { key: 'reports', label: 'Reports Hub', icon: '📊', href: `${base.value}/reports` },
         { key: 'schedule', label: 'Schedule', icon: '📅', href: `${base.value}/schedule` },
         { key: 'activity', label: 'Activity log', icon: '🕒', href: `${base.value}/activity` },
     ];

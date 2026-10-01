@@ -5,6 +5,9 @@
             <PageHeader :title="`${event.title} — Downloads`" eyebrow="Reports"
                         :description="phaseMeta?.hint ?? 'Preview on-screen when available, or download filtered exports.'" />
 
+            <SportsSetupSubNav v-if="event.event_type === 'sports'" :sahodaya-id="sahodaya.id" :event-id="event.id" :event="event" active="reports" class="mb-4" />
+            <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="reports" class="mb-4" />
+
             <ReportsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" :active="phase" />
 
             <div v-if="competitionPhases.length" class="card mb-4 !py-4">
@@ -197,6 +200,8 @@ import { computed, reactive, ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import ReportsSubNav from '@/Components/sahodaya/ReportsSubNav.vue';
+import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
+import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import ReportExportCard from '@/Components/reports/ReportExportCard.vue';
 import ReportToolbar from '@/Components/reports/ReportToolbar.vue';
