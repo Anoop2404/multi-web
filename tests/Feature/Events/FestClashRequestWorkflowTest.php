@@ -335,4 +335,31 @@ class FestClashRequestWorkflowTest extends TestCase
         $response->assertStatus(403);
         $this->assertSame('pending', $clashRequest->fresh()->status);
     }
+
+    public function test_school_can_render_blank_and_prefilled_clash_form_pdf(): void
+    {
+        ['event' => $event, 'school' => $school, 'schoolAdmin' => $schoolAdmin, 'participant' => $participant, 'scheduleA' => $scheduleA, 'scheduleB' => $scheduleB] = $this->fixture();
+
+        // 1. Blank form
+        $blankResponse = $this->actingAs($schoolAdmin)->get(
+            "/school-admin/{$school->id}/kalotsav/events/{$event->id}/clash-requests/print-form?preview=1"
+        );
+        $blankResponse->assertOk();
+
+        // 2. Pre-filled form
+        $clashRequest = FestClashRequest::create([
+            'event_id'             => $event->id,
+            'school_id'            => $school->id,
+            'participant_id'       => $participant->id,
+            'schedule_ids'         => [$scheduleA->id, $scheduleB->id],
+            'description'          => 'Overlapping stages.',
+            'status'               => 'pending',
+            'requested_by_user_id' => $schoolAdmin->id,
+        ]);
+
+        $prefilledResponse = $this->actingAs($schoolAdmin)->get(
+            "/school-admin/{$school->id}/kalotsav/events/{$event->id}/clash-requests/print-form?clash_request={$clashRequest->id}&preview=1"
+        );
+        $prefilledResponse->assertOk();
+    }
 }

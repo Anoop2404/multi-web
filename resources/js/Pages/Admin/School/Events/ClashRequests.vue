@@ -128,14 +128,14 @@ function statusClass(status) {
 }
 
 function submit() {
-    form.post(`${programBase}/events/${props.event.id}/clash-requests`, { preserveScroll: true, onSuccess: () => form.reset() });
+    form.post(`${programBase.value}/events/${props.event.id}/clash-requests`, { preserveScroll: true, onSuccess: () => form.reset() });
 }
 
 // Printable "Off Stage/Stage Events — Clash Form", branded with this Sahodaya's own
 // header — blank (for filling in by hand) with no id, or pre-filled from an already
 // filed report when given one.
 function printFormUrl(clashRequestId = null) {
-    const base = `${programBase}/events/${props.event.id}/clash-requests/print-form`;
+    const base = `${programBase.value}/events/${props.event.id}/clash-requests/print-form`;
     return clashRequestId ? `${base}?clash_request=${clashRequestId}` : `${base}?preview=1`;
 }
 </script>
