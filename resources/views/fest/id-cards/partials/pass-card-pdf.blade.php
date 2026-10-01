@@ -27,7 +27,7 @@
     // regardless of DomPDF's CSS quirks. white-space:nowrap + overflow:hidden on
     // .pass-card-pdf__meta-value is then just a safety net for this box's real
     // one-line capacity (~20 characters at this font size/box width).
-    $venueDisplay = str($card['venue'] ?? '—')->limit(12)->toString();
+    $venueDisplay = str($card['venue'] ?? '—')->limit(24)->toString();
     $categoryDisplay = str($category)->limit(12)->toString();
     $idLabel = $card['id_label'] ?? 'Reg ID';
     $idNumber = $card['id_number'] ?? '—';

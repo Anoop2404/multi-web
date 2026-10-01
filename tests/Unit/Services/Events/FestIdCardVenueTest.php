@@ -143,4 +143,80 @@ class FestIdCardVenueTest extends TestCase
         $this->assertStringContainsString('ROLL NO: 10203', $cards[0]['student_info_inline']);
         $this->assertStringContainsString('GENDER: MALE', $cards[0]['student_info_inline']);
     }
+
+    public function test_id_card_uses_event_venue_instead_of_item_or_classroom_venues(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'Kochi Metro Sahodaya',
+            'domain' => 'sahodaya-'.Str::random(8).'.test',
+            'is_active' => true,
+        ]);
+
+        $event = FestEvent::create([
+            'tenant_id' => $sahodaya->id,
+            'title' => 'Kalotsav 2026-27',
+            'event_type' => 'kalotsavam',
+            'status' => 'published',
+            'venue' => 'Kochi Metro Central Campus',
+            'academic_year' => '2026-27',
+        ]);
+
+        // Competition classroom/stage venue added under event for item scheduling
+        FestVenue::create([
+            'tenant_id' => $sahodaya->id,
+            'event_id' => $event->id,
+            'name' => 'CLASS 1 A',
+            'is_active' => true,
+        ]);
+
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'school',
+            'name' => 'Alameen International Public School',
+            'sahodaya_id' => $sahodaya->id,
+        ]);
+
+        $class = SchoolClass::create([
+            'tenant_id' => $school->id,
+            'name' => 'Class 1',
+        ]);
+
+        $student = Student::create([
+            'tenant_id' => $school->id,
+            'school_class_id' => $class->id,
+            'name' => 'Muhammad Zayan',
+            'gender' => 'male',
+            'reg_no' => '907',
+        ]);
+
+        $item = FestEventItem::create([
+            'event_id' => $event->id,
+            'title' => 'Recitation-Malayalam',
+            'is_enabled' => true,
+        ]);
+
+        $reg = FestRegistration::create([
+            'event_id' => $event->id,
+            'school_id' => $school->id,
+            'item_id' => $item->id,
+            'status' => 'approved',
+        ]);
+
+        FestParticipant::create([
+            'registration_id' => $reg->id,
+            'student_id' => $student->id,
+            'participant_role' => 'performer',
+        ]);
+
+        $service = app(FestIdCardService::class);
+        $cards = $service->cards($event, 'student', ['school_id' => $school->id]);
+
+        $this->assertNotEmpty($cards);
+        $this->assertSame('Kochi Metro Central Campus', $cards[0]['venue']);
+        $this->assertNotSame('CLASS 1 A', $cards[0]['venue']);
+    }
 }

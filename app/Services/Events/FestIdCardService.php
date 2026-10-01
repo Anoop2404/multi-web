@@ -1164,39 +1164,20 @@ class FestIdCardService
             }
         }
 
-        // 2. Check FestVenue table for any active venue WITH NO region restriction or matching targetRegionId if set
-        $eventVenue = \App\Models\FestVenue::whereIn('event_id', $eventIds)
-            ->where('is_active', true)
-            ->where(function ($q) use ($targetRegionId) {
-                $q->whereNull('region_id');
-                if ($targetRegionId) {
-                    $q->orWhere('region_id', $targetRegionId);
-                }
-            })
-            ->first();
-
-        if ($eventVenue && !empty($eventVenue->name)) {
-            return $eventVenue->name;
-        }
-
-        // 2.5. This leaf's own phase-level venue — only ever set for a non-regional phase
-        // (see FestEventPhase::venue's migration comment; a regional phase's venue lives
-        // on FestPhaseRegion instead, already checked in step 1 above).
-        if ($phaseId) {
-            $phaseVenue = \App\Models\FestEventPhase::where('id', $phaseId)->value('venue');
-            if (! empty($phaseVenue)) {
-                return $phaseVenue;
-            }
-        }
-
-        // 3. Fallback to event model columns (venue, venue_name, location_name, conductingSchool)
+        // 2. Check event model configured venue (resolvedVenueName, venue, location_name, conductingSchool).
+        // ID cards must reflect the event-level host venue, NOT internal item-level stages or classrooms (e.g. "CLASS 1 A").
         $eventsToCheck = array_filter([
             $event,
-            $event->parent_event_id ? FestEvent::find($event->parent_event_id) : null,
             $regEvent,
+            $event->parent_event_id ? FestEvent::find($event->parent_event_id) : null,
+            $rootEvent,
         ]);
 
         foreach ($eventsToCheck as $ev) {
+            $resolved = $ev->resolvedVenueName();
+            if (!empty($resolved) && $resolved !== '—') {
+                return $resolved;
+            }
             if (!empty($ev->venue)) {
                 return $ev->venue;
             }
@@ -1205,6 +1186,19 @@ class FestIdCardService
             }
             if (!empty($ev->location_name)) {
                 return $ev->location_name;
+            }
+            if ($ev->conductingSchool?->name) {
+                return $ev->conductingSchool->name;
+            }
+        }
+
+        // 3. This leaf's own phase-level venue — only ever set for a non-regional phase
+        // (see FestEventPhase::venue's migration comment; a regional phase's venue lives
+        // on FestPhaseRegion instead, already checked in step 1 above).
+        if ($phaseId) {
+            $phaseVenue = \App\Models\FestEventPhase::where('id', $phaseId)->value('venue');
+            if (! empty($phaseVenue)) {
+                return $phaseVenue;
             }
         }
 
