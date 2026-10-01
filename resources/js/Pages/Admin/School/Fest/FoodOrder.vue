@@ -409,18 +409,18 @@
                         </div>
 
                         <!-- QR Code with preview modal -->
-                        <div v-if="payeeDetails.qr_code_url && !qrImageFailed" class="flex items-center gap-4 pt-2 border-t border-slate-100">
+                        <div v-if="payeeDetails.qr_code_url && !qrImageFailed" class="flex items-center gap-4 pt-3 border-t border-slate-100">
                             <div class="relative shrink-0 group cursor-pointer" @click="showQrModal = true">
                                 <img :src="payeeDetails.qr_code_url" alt="Payment QR Code"
-                                     class="w-24 h-24 sm:w-28 sm:h-28 object-contain rounded-xl border-2 border-slate-200 bg-white p-1.5 group-hover:ring-2 group-hover:ring-indigo-500 transition shadow-xs"
+                                     class="w-28 h-28 sm:w-36 sm:h-36 object-contain rounded-2xl border-2 border-slate-200 bg-white p-2 group-hover:ring-2 group-hover:ring-indigo-500 transition shadow-xs"
                                      @error="qrImageFailed = true">
-                                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-xl transition flex items-center justify-center">
-                                    <span class="opacity-0 group-hover:opacity-100 transition bg-slate-900/80 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">🔍 Zoom</span>
+                                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-2xl transition flex items-center justify-center">
+                                    <span class="opacity-0 group-hover:opacity-100 transition bg-slate-900/80 text-white text-[11px] font-bold px-2 py-0.5 rounded-md">🔍 Zoom</span>
                                 </div>
                             </div>
-                            <div class="min-w-0 space-y-1">
-                                <p class="text-sm sm:text-base font-extrabold text-slate-900">Scan & Pay via UPI</p>
-                                <p class="text-xs text-slate-500 leading-snug">Google Pay, PhonePe, Paytm, BHIM</p>
+                            <div class="min-w-0 space-y-1.5">
+                                <p class="text-base sm:text-lg font-extrabold text-slate-900 leading-snug">Scan & Pay via UPI</p>
+                                <p class="text-xs sm:text-sm text-slate-500 leading-snug">Google Pay, PhonePe, Paytm, BHIM</p>
                                 <div class="flex flex-wrap items-center gap-2 pt-1">
                                     <button type="button" @click="showQrModal = true"
                                             class="text-xs sm:text-sm text-indigo-600 font-bold hover:underline inline-flex items-center gap-1">
@@ -693,44 +693,58 @@
         </Modal>
 
         <!-- QR Code Zoom Modal -->
-        <Modal :show="showQrModal" title="UPI Payment QR Code" size="sm" @close="showQrModal = false">
-            <div class="text-center p-4 space-y-3.5">
-                <div v-if="payeeDetails?.qr_code_url && !qrImageFailed" class="inline-block p-3 rounded-2xl border-2 border-indigo-100 bg-white shadow-sm">
-                    <img :src="payeeDetails.qr_code_url" alt="UPI QR Code" class="w-64 h-64 object-contain mx-auto" @error="qrImageFailed = true">
+        <Modal :show="showQrModal" title="UPI Payment QR Code" size="lg" @close="showQrModal = false">
+            <div class="text-center p-4 sm:p-6 space-y-4">
+                <div v-if="payeeDetails?.qr_code_url && !qrImageFailed" class="inline-block p-4 sm:p-5 rounded-3xl border-2 border-indigo-200 bg-white shadow-lg max-w-full">
+                    <img :src="payeeDetails.qr_code_url" alt="UPI QR Code"
+                         class="w-80 sm:w-[26rem] h-80 sm:h-[26rem] md:h-[30rem] object-contain mx-auto rounded-xl"
+                         @error="qrImageFailed = true">
                 </div>
-                <div class="space-y-1">
-                    <p class="font-bold text-slate-900 text-sm">{{ payeeDetails?.name || 'Payment Payee' }}</p>
-                    <div v-if="displayUpi" class="inline-flex items-center gap-1.5 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100 mt-1 max-w-full">
-                        <span class="font-mono text-xs text-indigo-700 font-bold break-all select-all">{{ displayUpi }}</span>
+                <div class="space-y-1.5 max-w-lg mx-auto">
+                    <p class="font-black text-slate-900 text-base sm:text-xl tracking-tight">{{ payeeDetails?.name || 'Payment Payee' }}</p>
+                    <div v-if="displayUpi" class="inline-flex items-center gap-2 bg-indigo-50 px-4 py-2 rounded-2xl border-2 border-indigo-200 mt-1 max-w-full shadow-2xs">
+                        <span class="font-mono text-xs sm:text-base text-indigo-950 font-black break-all select-all tracking-wide">{{ displayUpi }}</span>
                         <button type="button" @click="copyText(displayUpi, 'UPI ID')"
-                                class="shrink-0 text-indigo-600 hover:text-indigo-800 text-[11px] font-semibold underline">
-                            {{ copiedField === 'UPI ID' ? 'Copied!' : 'Copy' }}
+                                class="shrink-0 px-3 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-700 hover:bg-indigo-100 text-xs font-bold shadow-2xs transition">
+                            {{ copiedField === 'UPI ID' ? '✓ Copied' : 'Copy' }}
                         </button>
                     </div>
                 </div>
 
-                <div v-if="payeeDetails?.account_no || payeeDetails?.ifsc" class="text-left bg-slate-50 rounded-xl p-3 border border-slate-200 text-xs space-y-1">
-                    <div v-if="payeeDetails.bank_name" class="flex justify-between gap-2">
-                        <span class="text-slate-500">Bank:</span>
-                        <span class="font-medium text-slate-800 text-right">{{ payeeDetails.bank_name }}</span>
+                <div v-if="payeeDetails?.account_no || payeeDetails?.ifsc" class="max-w-lg mx-auto text-left bg-slate-50/90 rounded-2xl p-4 sm:p-5 border-2 border-slate-200 text-xs sm:text-sm space-y-2.5 shadow-2xs">
+                    <div v-if="payeeDetails.bank_name" class="flex items-center justify-between gap-3">
+                        <span class="text-slate-500 font-bold uppercase text-[11px] sm:text-xs tracking-wider shrink-0">Bank</span>
+                        <span class="font-extrabold text-slate-900 text-sm sm:text-base text-right">{{ payeeDetails.bank_name }}</span>
                     </div>
-                    <div v-if="payeeDetails.account_no" class="flex justify-between gap-2">
-                        <span class="text-slate-500">A/C No:</span>
-                        <span class="font-mono font-bold text-slate-800">{{ payeeDetails.account_no }}</span>
+                    <div v-if="payeeDetails.account_no" class="flex items-center justify-between gap-3 pt-2 border-t border-slate-200">
+                        <span class="text-slate-500 font-bold uppercase text-[11px] sm:text-xs tracking-wider shrink-0">A/C No</span>
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="font-mono font-black text-base sm:text-lg text-slate-900 text-right tracking-wider select-all break-all">{{ payeeDetails.account_no }}</span>
+                            <button type="button" @click="copyText(payeeDetails.account_no, 'A/C No')"
+                                    class="shrink-0 px-2.5 py-1 rounded-lg bg-white border border-slate-300 text-indigo-700 hover:bg-indigo-50 text-xs font-bold shadow-2xs transition">
+                                {{ copiedField === 'A/C No' ? '✓ Copied' : 'Copy' }}
+                            </button>
+                        </div>
                     </div>
-                    <div v-if="payeeDetails.ifsc" class="flex justify-between gap-2">
-                        <span class="text-slate-500">IFSC:</span>
-                        <span class="font-mono font-bold text-slate-800">{{ payeeDetails.ifsc }}</span>
+                    <div v-if="payeeDetails.ifsc" class="flex items-center justify-between gap-3 pt-2 border-t border-slate-200">
+                        <span class="text-slate-500 font-bold uppercase text-[11px] sm:text-xs tracking-wider shrink-0">IFSC</span>
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="font-mono font-black text-base sm:text-lg text-slate-900 text-right tracking-wider select-all">{{ payeeDetails.ifsc }}</span>
+                            <button type="button" @click="copyText(payeeDetails.ifsc, 'IFSC')"
+                                    class="shrink-0 px-2.5 py-1 rounded-lg bg-white border border-slate-300 text-indigo-700 hover:bg-indigo-50 text-xs font-bold shadow-2xs transition">
+                                {{ copiedField === 'IFSC' ? '✓ Copied' : 'Copy' }}
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <div v-if="upiDeepLink" class="pt-1 sm:hidden">
-                    <a :href="upiDeepLink" class="btn-primary w-full text-xs font-bold py-2 justify-center shadow-xs">
+                <div v-if="upiDeepLink" class="pt-1 max-w-lg mx-auto sm:hidden">
+                    <a :href="upiDeepLink" class="btn-primary w-full text-xs font-bold py-2.5 justify-center shadow-xs">
                         Open in UPI App ↗
                     </a>
                 </div>
 
-                <p class="text-[11px] text-slate-500">Scan with Google Pay, PhonePe, Paytm, BHIM, or any UPI app to transfer.</p>
+                <p class="text-xs sm:text-sm text-slate-500 font-medium">Scan with Google Pay, PhonePe, Paytm, BHIM, or any UPI app to transfer.</p>
             </div>
         </Modal>
 
