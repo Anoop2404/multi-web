@@ -201,7 +201,7 @@ class FestClashRequestWorkflowTest extends TestCase
         $this->actingAs($schoolAdmin)->get(route('school.kalotsav.clash-requests.print-form', [
             'tenantId' => $school->id, 'event' => $event->id,
         ]).'?preview=1')->assertOk();
-        \Illuminate\Support\Facades\Http::assertSent(fn ($r) => str_contains((string) $r->data()['html'], $sahodaya->name));
+        \Illuminate\Support\Facades\Http::assertSent(fn ($r) => str_contains((string) $r->data()['html'], $sahodaya->name) && ($r->data()['landscape'] ?? false) === true);
 
         // Pre-filled from the request — every one of the 3 clashing items, not just 2.
         $this->actingAs($schoolAdmin)->get(route('school.kalotsav.clash-requests.print-form', [
@@ -210,7 +210,7 @@ class FestClashRequestWorkflowTest extends TestCase
         \Illuminate\Support\Facades\Http::assertSent(function ($r) {
             $html = (string) $r->data()['html'];
 
-            return str_contains($html, 'Recitation') && str_contains($html, 'Elocution') && str_contains($html, 'Group Song');
+            return str_contains($html, 'Recitation') && str_contains($html, 'Elocution') && str_contains($html, 'Group Song') && ($r->data()['landscape'] ?? false) === true;
         });
     }
 

@@ -262,6 +262,11 @@ class FestClashRequestController extends SchoolAdminController
             return response($html)->header('Content-Type', 'text/html');
         }
 
-        return PdfGenerator::download($html, 'clash-form.pdf', $request->boolean('inline') || $request->boolean('preview') || ! $request->has('download'));
+        return PdfGenerator::download(
+            $html,
+            'clash-form.pdf',
+            $request->boolean('inline') || $request->boolean('preview') || ! $request->has('download'),
+            true
+        );
     }
 }
