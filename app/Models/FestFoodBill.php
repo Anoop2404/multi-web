@@ -138,6 +138,39 @@ class FestFoodBill extends Model
     }
 
     /**
+     * Add a menu item to the bill, or increment quantity and line total if the item is already on the bill.
+     */
+    public function addOrIncrementItem(FestFoodMenuItem $menuItem, int $quantity, ?int $userId = null): FestFoodOrderItem
+    {
+        return DB::transaction(function () use ($menuItem, $quantity, $userId) {
+            $locked = static::whereKey($this->id)->lockForUpdate()->firstOrFail();
+            abort_if($locked->status !== self::STATUS_OPEN, 422, 'This bill is settled/cancelled and no longer editable.');
+
+            $existing = $locked->orderItems()
+                ->where('menu_item_id', $menuItem->id)
+                ->first();
+
+            if ($existing) {
+                $newQty = (int) $existing->quantity + $quantity;
+                $existing->update([
+                    'quantity'   => $newQty,
+                    'line_total' => round((float) $existing->unit_price * $newQty, 2),
+                ]);
+                $item = $existing;
+            } else {
+                $item = $locked->orderItems()->create(
+                    FestFoodOrderItem::fromMenuItem($menuItem, $quantity, $userId)
+                );
+            }
+
+            $locked->recalculate();
+            $this->setRawAttributes($locked->getAttributes());
+
+            return $item;
+        });
+    }
+
+    /**
      * Mark this bill settled under a row lock, re-checking the balance at lock time
      * rather than against a possibly-stale in-memory value (Finding 3: a concurrent
      * addItem() between this action's read and write could otherwise settle a bill with

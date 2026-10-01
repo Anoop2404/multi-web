@@ -343,13 +343,17 @@ class FestFoodCouponGeneratorTest extends TestCase
         ]));
 
         $resp->assertSessionHasNoErrors();
-        $this->assertDatabaseHas('fest_food_coupons', [
-            'event_id' => $this->event->id,
-            'school_id' => $this->school->id,
-            'meal_type' => 'tea',
-            'coupon_code' => 'TE-0001',
-            'head_count' => 20,
-        ]);
+        $coupons = FestFoodCoupon::where('event_id', $this->event->id)
+            ->where('school_id', $this->school->id)
+            ->where('meal_type', 'tea')
+            ->orderBy('sequence_no')
+            ->get();
+
+        $this->assertCount(20, $coupons);
+        $this->assertSame('TE-0001', $coupons->first()->coupon_code);
+        $this->assertSame('TE-0020', $coupons->last()->coupon_code);
+        $this->assertTrue($coupons->every(fn ($c) => $c->head_count === 1));
+        $this->assertSame(20, $coupons->pluck('qr_token')->unique()->count());
     }
 }
 

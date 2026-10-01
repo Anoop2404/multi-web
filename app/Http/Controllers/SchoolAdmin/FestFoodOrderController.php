@@ -266,8 +266,7 @@ class FestFoodOrderController extends SchoolAdminController
             abort_if($existingQty + $data['quantity'] > $menuItem->max_per_school, 422, "Only {$menuItem->max_per_school} of '{$menuItem->name}' allowed per school.");
         }
 
-        $bill->orderItems()->create(FestFoodOrderItem::fromMenuItem($menuItem, $data['quantity'], $request->user()->id));
-        $bill->recalculate();
+        $bill->addOrIncrementItem($menuItem, $data['quantity'], $request->user()->id);
 
         return back()->with('success', 'Added to your order.');
     }

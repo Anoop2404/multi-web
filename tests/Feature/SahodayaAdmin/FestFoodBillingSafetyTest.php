@@ -264,7 +264,8 @@ class FestFoodBillingSafetyTest extends TestCase
         ]));
 
         $response->assertRedirect();
-        $this->assertSame(1, FestFoodCoupon::where('event_id', $event->id)->count());
+        $this->assertSame(200, FestFoodCoupon::where('event_id', $event->id)->count());
+        $this->assertSame(200, (int) FestFoodCoupon::where('event_id', $event->id)->sum('head_count'));
     }
 
     public function test_catering_order_submission_is_blocked_when_event_requires_payment(): void
@@ -324,5 +325,50 @@ class FestFoodBillingSafetyTest extends TestCase
 
         $response->assertRedirect();
         $this->assertSame($school->id, $event->fresh()->food_host_school_id);
+    }
+
+    public function test_adding_same_menu_item_multiple_times_consolidates_quantity_and_line_total(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school, 'sahodayaAdmin' => $admin] = $this->makeSahodayaAndSchool();
+        $event = $this->makeEvent($sahodaya->id);
+
+        $menuItem = \App\Models\FestFoodMenuItem::create([
+            'tenant_id' => $sahodaya->id,
+            'event_id' => $event->id,
+            'name' => 'Idiyappam + Curry + Tea',
+            'meal_type' => 'breakfast',
+            'menu_date' => now()->toDateString(),
+            'price' => 50,
+            'is_available' => true,
+        ]);
+
+        $bill = FestFoodBill::firstOrCreateForSchool($event, $school->id);
+
+        // Add 10 items
+        $this->actingAs($admin)->post(route('sahodaya.events.food-billing.items.store', [
+            'tenantId' => $sahodaya->id,
+            'event' => $event->id,
+            'bill' => $bill->id,
+        ]), [
+            'menu_item_id' => $menuItem->id,
+            'quantity' => 10,
+        ])->assertRedirect();
+
+        // Add 37 more items of the same dish
+        $this->actingAs($admin)->post(route('sahodaya.events.food-billing.items.store', [
+            'tenantId' => $sahodaya->id,
+            'event' => $event->id,
+            'bill' => $bill->id,
+        ]), [
+            'menu_item_id' => $menuItem->id,
+            'quantity' => 37,
+        ])->assertRedirect();
+
+        // Must consolidate to 1 order item with quantity 47 and line_total 2350
+        $items = $bill->fresh()->orderItems;
+        $this->assertCount(1, $items);
+        $this->assertSame(47, (int) $items->first()->quantity);
+        $this->assertEquals(2350, (float) $items->first()->line_total);
+        $this->assertEquals(2350, (float) $bill->fresh()->amount_total);
     }
 }

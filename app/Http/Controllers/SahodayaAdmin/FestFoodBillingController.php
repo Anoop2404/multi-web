@@ -204,8 +204,7 @@ class FestFoodBillingController extends SahodayaAdminController
             abort_if($existingQty + $data['quantity'] > $menuItem->max_per_school, 422, "Only {$menuItem->max_per_school} of '{$menuItem->name}' allowed per school.");
         }
 
-        $bill->orderItems()->create(FestFoodOrderItem::fromMenuItem($menuItem, $data['quantity'], $request->user()->id));
-        $bill->recalculate();
+        $bill->addOrIncrementItem($menuItem, $data['quantity'], $request->user()->id);
 
         $audit->festEvent($event, FestPageActivity::FOOD_BILLING, 'fest.food_billing.item_added', "{$data['quantity']} x {$menuItem->name} added to bill", [
             'bill_id' => $bill->id,

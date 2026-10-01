@@ -150,35 +150,40 @@ class FestFoodCouponController extends SahodayaAdminController
 
         DB::transaction(function () use ($event, $orders, $batchId, &$created) {
             foreach ($orders as $order) {
-                $exists = FestFoodCoupon::where('event_id', $event->id)
+                $headCount = (int) $order->head_count;
+                if ($headCount <= 0) {
+                    continue;
+                }
+
+                $alreadyIssued = (int) FestFoodCoupon::where('event_id', $event->id)
                     ->where('school_id', $order->school_id)
                     ->where('valid_date', $order->meal_date)
                     ->where('meal_type', $order->meal_type)
                     ->where('is_extra', false)
-                    ->exists();
+                    ->sum('head_count');
 
-                if ($exists) {
-                    continue;
+                $toCreate = max(0, $headCount - $alreadyIssued);
+
+                for ($i = 0; $i < $toCreate; $i++) {
+                    $codeData = FestFoodCoupon::generateSerializedCode($event, $order->meal_type);
+
+                    FestFoodCoupon::create([
+                        'event_id'    => $event->id,
+                        'school_id'   => $order->school_id,
+                        'coupon_code' => $codeData['code'],
+                        'sequence_no' => $codeData['sequence_no'],
+                        'qr_token'    => FestFoodCoupon::generateQrToken(),
+                        'meal_type'   => $order->meal_type,
+                        'valid_date'  => $order->meal_date,
+                        'head_count'  => 1,
+                        'is_extra'    => false,
+                        'batch_id'    => $batchId,
+                        'status'      => 'issued',
+                        'issued_at'   => now(),
+                        'notes'       => $order->notes ?: "Catering order #{$order->id}",
+                    ]);
+                    $created++;
                 }
-
-                $codeData = FestFoodCoupon::generateSerializedCode($event, $order->meal_type);
-
-                FestFoodCoupon::create([
-                    'event_id'    => $event->id,
-                    'school_id'   => $order->school_id,
-                    'coupon_code' => $codeData['code'],
-                    'sequence_no' => $codeData['sequence_no'],
-                    'qr_token'    => FestFoodCoupon::generateQrToken(),
-                    'meal_type'   => $order->meal_type,
-                    'valid_date'  => $order->meal_date,
-                    'head_count'  => $order->head_count,
-                    'is_extra'    => false,
-                    'batch_id'    => $batchId,
-                    'status'      => 'issued',
-                    'issued_at'   => now(),
-                    'notes'       => $order->notes ?: "Catering order #{$order->id}",
-                ]);
-                $created++;
             }
         });
 
@@ -223,35 +228,35 @@ class FestFoodCouponController extends SahodayaAdminController
                         continue;
                     }
 
-                    $exists = FestFoodCoupon::where('event_id', $event->id)
+                    $alreadyIssued = (int) FestFoodCoupon::where('event_id', $event->id)
                         ->where('school_id', $bill->school_id)
                         ->where('valid_date', $menuDate)
                         ->where('meal_type', $mealType)
                         ->where('is_extra', false)
-                        ->exists();
+                        ->sum('head_count');
 
-                    if ($exists) {
-                        continue;
+                    $toCreate = max(0, $headCount - $alreadyIssued);
+
+                    for ($i = 0; $i < $toCreate; $i++) {
+                        $codeData = FestFoodCoupon::generateSerializedCode($event, $mealType);
+
+                        FestFoodCoupon::create([
+                            'event_id'    => $event->id,
+                            'school_id'   => $bill->school_id,
+                            'coupon_code' => $codeData['code'],
+                            'sequence_no' => $codeData['sequence_no'],
+                            'qr_token'    => FestFoodCoupon::generateQrToken(),
+                            'meal_type'   => $mealType,
+                            'valid_date'  => $menuDate,
+                            'head_count'  => 1,
+                            'is_extra'    => false,
+                            'batch_id'    => $batchId,
+                            'status'      => 'issued',
+                            'issued_at'   => now(),
+                            'notes'       => "Issued from priced food-menu order (bill #{$bill->id})",
+                        ]);
+                        $created++;
                     }
-
-                    $codeData = FestFoodCoupon::generateSerializedCode($event, $mealType);
-
-                    FestFoodCoupon::create([
-                        'event_id'    => $event->id,
-                        'school_id'   => $bill->school_id,
-                        'coupon_code' => $codeData['code'],
-                        'sequence_no' => $codeData['sequence_no'],
-                        'qr_token'    => FestFoodCoupon::generateQrToken(),
-                        'meal_type'   => $mealType,
-                        'valid_date'  => $menuDate,
-                        'head_count'  => $headCount,
-                        'is_extra'    => false,
-                        'batch_id'    => $batchId,
-                        'status'      => 'issued',
-                        'issued_at'   => now(),
-                        'notes'       => "Issued from priced food-menu order (bill #{$bill->id})",
-                    ]);
-                    $created++;
                 }
             }
         });
