@@ -49,8 +49,22 @@ class PdfGenerator
         ?string $headerTemplate = null,
         ?string $footerTemplate = null,
         ?array $margin = null,
+        ?float $pageWidthMm = null,
+        ?float $pageHeightMm = null,
+        bool $requireBrowserRenderer = false,
     ) {
-        return self::download(view($view, $data)->render(), $filename, $inline, $isLandscape, $headerTemplate, $footerTemplate, $margin);
+        return self::download(
+            view($view, $data)->render(),
+            $filename,
+            $inline,
+            $isLandscape,
+            $headerTemplate,
+            $footerTemplate,
+            $margin,
+            $pageWidthMm,
+            $pageHeightMm,
+            $requireBrowserRenderer
+        );
     }
 
     public static function download(

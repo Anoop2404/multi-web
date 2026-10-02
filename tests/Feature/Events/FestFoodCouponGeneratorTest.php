@@ -480,6 +480,28 @@ class FestFoodCouponGeneratorTest extends TestCase
         $downloadResponse->assertStatus(200);
         $this->assertStringContainsString('application/pdf', $downloadResponse->headers->get('content-type'));
         $this->assertStringContainsString('attachment', $downloadResponse->headers->get('content-disposition', ''));
+
+        // 3. Third-party PDF converter verification (Chromium / Puppeteer service)
+        config(['services.pdf_converter.url' => 'http://pdf-converter.test/pdf']);
+        \Illuminate\Support\Facades\Http::fake([
+            'http://pdf-converter.test/pdf' => \Illuminate\Support\Facades\Http::response('%PDF-1.4 Mocked Chromium PDF', 200, [
+                'Content-Type' => 'application/pdf',
+            ]),
+        ]);
+
+        $browserResponse = $this->actingAs($this->sahodayaAdmin)
+            ->get("/sahodaya-admin/{$this->sahodaya->id}/events/{$this->event->id}/food-coupons/print?preview=1");
+
+        $browserResponse->assertStatus(200);
+        $this->assertStringContainsString('application/pdf', $browserResponse->headers->get('content-type'));
+        $this->assertStringContainsString('inline', $browserResponse->headers->get('content-disposition', ''));
+
+        \Illuminate\Support\Facades\Http::assertSent(function ($request) {
+            return $request->url() === 'http://pdf-converter.test/pdf'
+                && $request['printBackground'] === true
+                && $request['format'] === 'A4'
+                && str_contains($request['html'], 'meal-meta-table');
+        });
     }
 }
 

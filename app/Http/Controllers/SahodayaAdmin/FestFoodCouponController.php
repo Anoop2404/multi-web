@@ -590,6 +590,7 @@ class FestFoodCouponController extends SahodayaAdminController
             filename: $filename,
             inline: $isPreview,
             isLandscape: false,
+            requireBrowserRenderer: !empty(config('services.pdf_converter.url')),
         );
     }
 
