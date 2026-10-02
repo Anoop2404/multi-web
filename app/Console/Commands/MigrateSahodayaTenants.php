@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Tenant;
 use Illuminate\Console\Command;
+use Illuminate\Console\ConfirmableTrait;
 use Illuminate\Support\Facades\Artisan;
 
 /**
@@ -23,12 +24,18 @@ use Illuminate\Support\Facades\Artisan;
  */
 class MigrateSahodayaTenants extends Command
 {
+    use ConfirmableTrait;
+
     protected $signature = 'tenants:migrate-sahodayas {--force : Force the operation to run when in production}';
 
     protected $description = 'Run tenant migrations for Sahodaya-type tenants only (schools share their parent Sahodaya\'s database)';
 
     public function handle(): int
     {
+        if (! $this->confirmToProceed()) {
+            return self::FAILURE;
+        }
+
         $sahodayaIds = Tenant::where('type', 'sahodaya')->pluck('id')->all();
 
         if ($sahodayaIds === []) {
@@ -41,7 +48,7 @@ class MigrateSahodayaTenants extends Command
 
         return Artisan::call('tenants:migrate', [
             '--tenants' => $sahodayaIds,
-            '--force' => (bool) $this->option('force'),
+            '--force' => true,
         ], $this->output);
     }
 }
