@@ -450,5 +450,37 @@ class FestFoodCouponGeneratorTest extends TestCase
         $this->event->refresh();
         $this->assertNull($this->event->food_coupon_layout);
     }
+
+    public function test_can_preview_and_download_food_coupons_pdf(): void
+    {
+        FestFoodCoupon::create([
+            'event_id' => $this->event->id,
+            'school_id' => $this->school->id,
+            'coupon_code' => 'LN-0001',
+            'sequence_no' => 1,
+            'qr_token' => 'TESTQRTOKEN1',
+            'meal_type' => 'lunch',
+            'valid_date' => now()->toDateString(),
+            'head_count' => 1,
+            'status' => 'issued',
+        ]);
+
+        // 1. Preview mode (inline disposition)
+        $previewResponse = $this->actingAs($this->sahodayaAdmin)
+            ->get("/sahodaya-admin/{$this->sahodaya->id}/events/{$this->event->id}/food-coupons/print?preview=1");
+
+        $previewResponse->assertStatus(200);
+        $this->assertStringContainsString('application/pdf', $previewResponse->headers->get('content-type'));
+        $this->assertStringContainsString('inline', $previewResponse->headers->get('content-disposition', ''));
+
+        // 2. Download mode (attachment disposition)
+        $downloadResponse = $this->actingAs($this->sahodayaAdmin)
+            ->get("/sahodaya-admin/{$this->sahodaya->id}/events/{$this->event->id}/food-coupons/print");
+
+        $downloadResponse->assertStatus(200);
+        $this->assertStringContainsString('application/pdf', $downloadResponse->headers->get('content-type'));
+        $this->assertStringContainsString('attachment', $downloadResponse->headers->get('content-disposition', ''));
+    }
 }
+
 

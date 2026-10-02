@@ -16,15 +16,19 @@
             background: #ffffff;
             margin: 0;
             padding: 0;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
         .page {
             width: 100%;
             page-break-inside: avoid;
+            break-inside: avoid;
             margin: 0 auto;
             padding: 0;
         }
         .page-break {
             page-break-after: always;
+            break-after: page;
         }
         .coupon-grid {
             width: 194mm;
@@ -60,6 +64,7 @@
             width: 100%;
             height: 100%;
             z-index: 1;
+            object-fit: cover;
         }
 
         /* ------------------------------------------------------------------ */
@@ -81,16 +86,20 @@
             z-index: 3;
             text-align: center;
             overflow: hidden;
-            padding: 0.8mm;
+            padding: 0.5mm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .stub-qr-img {
-            width: 20mm;
-            height: 20mm;
+            width: 100%;
+            height: 100%;
             max-width: 100%;
             max-height: 100%;
-            display: inline-block;
-            vertical-align: middle;
+            display: block;
+            margin: 0 auto;
+            object-fit: contain;
         }
 
         .stub-decoded-outside {

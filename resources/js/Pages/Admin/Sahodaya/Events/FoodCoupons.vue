@@ -51,6 +51,15 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                         Preview Card
                     </button>
+                    <a
+                        :href="`${base}/food-coupons/print?preview=1`"
+                        target="_blank"
+                        class="px-3 py-2 border border-sky-200 bg-sky-50 text-sky-700 rounded-lg text-sm font-semibold hover:bg-sky-100 transition flex items-center gap-1.5"
+                        title="Preview generated PDF sheets via high-fidelity converter"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        Preview PDF Sheets
+                    </a>
                     <button type="button" @click="showBgModal = true" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium hover:bg-slate-50 transition flex items-center gap-1.5">
                         <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                         Template Background
@@ -297,7 +306,17 @@
                                     </td>
 
                                     <td class="py-3 px-3 text-right">
-                                        <div class="flex items-center justify-end gap-2">
+                                        <div class="flex items-center justify-end gap-1.5">
+                                            <a
+                                                :href="schoolPreviewUrl(s.school_id, schoolDateFilter)"
+                                                target="_blank"
+                                                class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition"
+                                                :title="`Preview Printable PDF for ${s.school_name}`"
+                                            >
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                                <span>Preview</span>
+                                            </a>
+
                                             <a
                                                 :href="schoolDownloadUrl(s.school_id, schoolDateFilter)"
                                                 target="_blank"
@@ -380,17 +399,30 @@
                         </div>
 
                         <div class="space-y-2 pt-2 border-t border-slate-100">
-                            <!-- Download All for Day -->
-                            <a
-                                :href="dateDownloadUrl(d.date)"
-                                target="_blank"
-                                class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition"
-                            >
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                </svg>
-                                <span>Download All Coupons for {{ formatCalendarDate(d.date).split(',')[0] }} (PDF)</span>
-                            </a>
+                            <!-- Preview & Download for Day -->
+                            <div class="grid grid-cols-2 gap-2">
+                                <a
+                                    :href="datePreviewUrl(d.date)"
+                                    target="_blank"
+                                    class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition"
+                                    title="Preview Printable PDF Sheet"
+                                >
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                    <span>Preview Sheet</span>
+                                </a>
+
+                                <a
+                                    :href="dateDownloadUrl(d.date)"
+                                    target="_blank"
+                                    class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition"
+                                    title="Download All Coupons for this date"
+                                >
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    <span>Download PDF</span>
+                                </a>
+                            </div>
 
                             <!-- Specific meal download links if meals exist -->
                             <div class="flex flex-wrap items-center justify-center gap-1.5 pt-1 text-[11px]">
@@ -590,13 +622,22 @@
                             Reset Defaults
                         </button>
                         <a
+                            :href="`${base}/food-coupons/print?extra_only=1&preview=1`"
+                            target="_blank"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-700 transition"
+                            title="Preview sample PDF sheet in browser using third-party PDF converter"
+                        >
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            <span>Preview Sample PDF</span>
+                        </a>
+                        <a
                             :href="`${base}/food-coupons/print?extra_only=1`"
                             target="_blank"
                             class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition"
-                            title="Print sample PDF to test physical printer alignment"
+                            title="Download sample PDF to test physical printer alignment"
                         >
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                            <span>Test Print Sample PDF</span>
+                            <span>Download Sample PDF</span>
                         </a>
                         <button
                             type="button"
@@ -1288,17 +1329,31 @@
                     </span>
                 </div>
 
-                <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
                     <button type="button" @click="showPrintModal = false" class="px-4 py-2 border rounded-lg text-sm font-medium">Cancel</button>
-                    <a
-                        :href="matchedPrintCouponsCount > 0 ? printUrl : 'javascript:void(0)'"
-                        target="_blank"
-                        @click="handlePrintDownload"
-                        class="btn-primary"
-                        :class="{ 'opacity-50 pointer-events-none cursor-not-allowed': matchedPrintCouponsCount === 0 }"
-                    >
-                        Download PDF ({{ matchedPrintCouponsCount }})
-                    </a>
+                    <div class="flex items-center gap-2">
+                        <a
+                            :href="matchedPrintCouponsCount > 0 ? printPreviewUrl : 'javascript:void(0)'"
+                            target="_blank"
+                            class="px-3.5 py-2 rounded-lg text-sm font-semibold border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition flex items-center gap-1.5"
+                            :class="{ 'opacity-50 pointer-events-none cursor-not-allowed': matchedPrintCouponsCount === 0 }"
+                            title="Preview PDF in browser tab before printing"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            <span>Preview in Browser</span>
+                        </a>
+
+                        <a
+                            :href="matchedPrintCouponsCount > 0 ? printUrl : 'javascript:void(0)'"
+                            target="_blank"
+                            @click="handlePrintDownload"
+                            class="btn-primary flex items-center gap-1.5"
+                            :class="{ 'opacity-50 pointer-events-none cursor-not-allowed': matchedPrintCouponsCount === 0 }"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                            <span>Download PDF ({{ matchedPrintCouponsCount }})</span>
+                        </a>
+                    </div>
                 </div>
             </div>
         </Modal>
@@ -1378,11 +1433,22 @@
                     <p>• <strong>Continuous Serialization:</strong> Sequential numbers continue across schools.</p>
                 </div>
 
-                <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
                     <button type="button" @click="showPreviewModal = false" class="px-4 py-2 border rounded-lg text-sm font-medium">Close</button>
-                    <button type="button" @click="showPreviewModal = false; showPrintModal = true" class="btn-primary">
-                        Proceed to Print PDF
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <a
+                            :href="`${base}/food-coupons/print?preview=1`"
+                            target="_blank"
+                            class="px-3.5 py-2 rounded-lg text-sm font-semibold border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition flex items-center gap-1.5"
+                            title="Preview full 10-per-sheet PDF in browser using third-party converter"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            <span>Preview Full A4 Sheet (PDF)</span>
+                        </a>
+                        <button type="button" @click="showPreviewModal = false; showPrintModal = true" class="btn-primary">
+                            Proceed to Print Options
+                        </button>
+                    </div>
                 </div>
             </div>
         </Modal>
@@ -1494,10 +1560,27 @@ function schoolDownloadUrl(schoolId, date = '') {
     return `${base}/food-coupons/print?${params.toString()}`;
 }
 
+function schoolPreviewUrl(schoolId, date = '') {
+    const params = new URLSearchParams();
+    if (schoolId) params.set('school_id', schoolId);
+    else params.set('extra_only', '1');
+    if (date) params.set('valid_date', date);
+    params.set('preview', '1');
+    return `${base}/food-coupons/print?${params.toString()}`;
+}
+
 function dateDownloadUrl(date, mealType = '') {
     const params = new URLSearchParams();
     if (date) params.set('valid_date', date);
     if (mealType) params.set('meal_type', mealType);
+    return `${base}/food-coupons/print?${params.toString()}`;
+}
+
+function datePreviewUrl(date, mealType = '') {
+    const params = new URLSearchParams();
+    if (date) params.set('valid_date', date);
+    if (mealType) params.set('meal_type', mealType);
+    params.set('preview', '1');
     return `${base}/food-coupons/print?${params.toString()}`;
 }
 
@@ -1777,6 +1860,18 @@ const printUrl = computed(() => {
     if (printSchool.value) params.set('school_id', printSchool.value);
     if (printDate.value) params.set('valid_date', printDate.value);
     if (printExtraOnly.value) params.set('extra_only', '1');
+
+    const qs = params.toString();
+    return `${base}/food-coupons/print${qs ? '?' + qs : ''}`;
+});
+
+const printPreviewUrl = computed(() => {
+    const params = new URLSearchParams();
+    if (printMeal.value) params.set('meal_type', printMeal.value);
+    if (printSchool.value) params.set('school_id', printSchool.value);
+    if (printDate.value) params.set('valid_date', printDate.value);
+    if (printExtraOnly.value) params.set('extra_only', '1');
+    params.set('preview', '1');
 
     const qs = params.toString();
     return `${base}/food-coupons/print${qs ? '?' + qs : ''}`;

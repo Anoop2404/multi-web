@@ -11,9 +11,9 @@ use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\FestIdCardQrService;
 use App\Services\Events\FestPartitionService;
 use App\Support\FestPageActivity;
+use App\Support\PdfGenerator;
 use App\Support\TenantBranding;
 use App\Support\TenantStorage;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -575,15 +575,22 @@ class FestFoodCouponController extends SahodayaAdminController
         }
         $filename = implode('-', $parts) . '.pdf';
 
-        return Pdf::loadView('fest.catering.food-coupons', [
-            'event'     => $event,
-            'sahodaya'  => $this->sahodaya,
-            'logoSrc'   => TenantBranding::logoEmbedSrc($this->sahodaya),
-            'bgDataUri' => $bgDataUri,
-            'layout'    => $event->foodCouponLayout($this->sahodaya),
-            'coupons'   => $preparedCoupons,
-        ])->setPaper('a4', 'portrait')
-          ->download($filename);
+        $isPreview = $request->boolean('preview') || $request->boolean('inline');
+
+        return PdfGenerator::fromView(
+            view: 'fest.catering.food-coupons',
+            data: [
+                'event'     => $event,
+                'sahodaya'  => $this->sahodaya,
+                'logoSrc'   => TenantBranding::logoEmbedSrc($this->sahodaya),
+                'bgDataUri' => $bgDataUri,
+                'layout'    => $event->foodCouponLayout($this->sahodaya),
+                'coupons'   => $preparedCoupons,
+            ],
+            filename: $filename,
+            inline: $isPreview,
+            isLandscape: false,
+        );
     }
 
     /**
