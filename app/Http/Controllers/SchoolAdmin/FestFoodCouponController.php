@@ -6,8 +6,8 @@ use App\Models\FestEvent;
 use App\Models\FestFoodCoupon;
 use App\Models\Tenant;
 use App\Services\Events\FestIdCardQrService;
+use App\Support\PdfGenerator;
 use App\Support\TenantBranding;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 
 class FestFoodCouponController extends SchoolAdminController
@@ -88,14 +88,30 @@ class FestFoodCouponController extends SchoolAdminController
             ];
         }
 
-        return Pdf::loadView('fest.catering.food-coupons', [
-            'event'     => $event,
-            'school'    => $this->school,
-            'sahodaya'  => $sahodaya,
-            'logoSrc'   => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
-            'bgDataUri' => $bgDataUri,
-            'coupons'   => $preparedCoupons,
-        ])->setPaper('a4', 'portrait')
-          ->download('food-coupons-'.$this->school->school_prefix.'-'.$event->id.'.pdf');
+        $perSheet = (int) $request->query('per_sheet', $request->query('per_page', 12));
+        if (! in_array($perSheet, [10, 12], true)) {
+            $perSheet = 12;
+        }
+
+        $isPreview = $request->boolean('preview') || $request->boolean('inline');
+        $filename = 'food-coupons-'.$this->school->school_prefix.'-'.$event->id."-{$perSheet}per-sheet.pdf";
+
+        return PdfGenerator::fromView(
+            view: 'fest.catering.food-coupons',
+            data: [
+                'event'     => $event,
+                'school'    => $this->school,
+                'sahodaya'  => $sahodaya,
+                'logoSrc'   => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
+                'bgDataUri' => $bgDataUri,
+                'layout'    => $event->foodCouponLayout($sahodaya),
+                'coupons'   => $preparedCoupons,
+                'perSheet'  => $perSheet,
+            ],
+            filename: $filename,
+            inline: $isPreview,
+            isLandscape: false,
+            requireBrowserRenderer: !empty(config('services.pdf_converter.url')),
+        );
     }
 }

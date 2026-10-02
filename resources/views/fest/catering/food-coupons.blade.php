@@ -2,12 +2,18 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>{{ $event->title ?? 'Food Coupons' }} — 10 per Sheet</title>
+    @php
+        $perSheet = (int) ($perSheet ?? 10);
+        if (! in_array($perSheet, [10, 12], true)) {
+            $perSheet = 10;
+        }
+    @endphp
+    <title>{{ $event->title ?? 'Food Coupons' }} — {{ $perSheet }} per Sheet</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         @page {
             size: A4 portrait;
-            margin: 4mm 5mm;
+            margin: {{ $perSheet === 12 ? '3.5mm 5mm' : '4mm 5mm' }};
         }
         body {
             font-family: 'DejaVu Sans', Arial, sans-serif;
@@ -34,13 +40,13 @@
             width: 196mm;
             margin: 0 auto;
             border-collapse: separate;
-            border-spacing: 4mm 2.2mm;
+            border-spacing: {{ $perSheet === 12 ? '4mm 1.5mm' : '4mm 2.2mm' }};
             table-layout: fixed;
         }
         .coupon-cell {
             width: 96mm;
-            height: 55mm;
-            max-height: 55mm;
+            height: {{ $perSheet === 12 ? '46.5mm' : '55mm' }};
+            max-height: {{ $perSheet === 12 ? '46.5mm' : '55mm' }};
             vertical-align: top;
             padding: 0;
             line-height: 1;
@@ -48,8 +54,8 @@
         .coupon-card {
             position: relative;
             width: 96mm;
-            height: 55mm;
-            max-height: 55mm;
+            height: {{ $perSheet === 12 ? '46.5mm' : '55mm' }};
+            max-height: {{ $perSheet === 12 ? '46.5mm' : '55mm' }};
             overflow: hidden;
             background: #ffffff;
             border-radius: 2mm;
@@ -252,7 +258,7 @@
 </head>
 <body>
     @php
-        $pages = array_chunk($coupons, 10);
+        $pages = array_chunk($coupons, $perSheet);
         $totalPages = count($pages);
         $l = $layout ?? ($event ? $event->foodCouponLayout($sahodaya) : \App\Models\FestEvent::defaultFoodCouponLayout());
         $qb = $l['qr_box'] ?? [];
@@ -277,11 +283,11 @@
                             <img src="{{ $bgDataUri }}" class="coupon-bg" alt="" />
                         @else
                             <div class="fallback-header">
-                                <div class="fallback-event-title">{{ $event->title ?? 'Sahodaya Event' }}</div>
-                                <div class="fallback-sahodaya">{{ $sahodaya->name ?? 'Sahodaya' }}</div>
+                                <div class="fallback-event-title" style="font-size: {{ $perSheet == 12 ? '6pt' : '7pt' }};">{{ $event->title ?? 'Sahodaya Event' }}</div>
+                                <div class="fallback-sahodaya" style="font-size: {{ $perSheet == 12 ? '4.8pt' : '5.5pt' }};">{{ $sahodaya->name ?? 'Sahodaya' }}</div>
                             </div>
                             @if(!empty($ft['show'] ?? true))
-                            <div class="fallback-title" style="top: {{ $ft['top'] ?? 72.0 }}%; left: {{ $ft['left'] ?? 4.5 }}%;">FOOD COUPON</div>
+                            <div class="fallback-title" style="top: {{ $ft['top'] ?? 72.0 }}%; left: {{ $ft['left'] ?? 4.5 }}%; font-size: {{ $ft['font_size'] ?? ($perSheet == 12 ? 9.5 : 11.0) }}pt;">FOOD COUPON</div>
                             @endif
                             <div class="fallback-stub-border"></div>
                             <div class="fallback-box-border"></div>
@@ -293,14 +299,14 @@
                                 @if(!empty($mb['show'] ?? true))
                                 <td style="padding-right: 2mm; vertical-align: middle;">
                                     <span class="meal-pill meal-pill--{{ $c['meal_type'] }}"
-                                          style="font-size: {{ $mb['font_size'] ?? 6.0 }}pt;">
+                                          style="font-size: {{ $mb['font_size'] ?? ($perSheet == 12 ? 5.2 : 6.0) }}pt;">
                                         {{ ucfirst($c['meal_type']) }}
                                     </span>
                                 </td>
                                 @endif
                                 @if(!empty($dm['show'] ?? true))
                                 <td class="meta-text"
-                                    style="vertical-align: middle; font-size: {{ $dm['font_size'] ?? 6.2 }}pt; color: {{ $dm['color'] ?? '#334155' }};">
+                                    style="vertical-align: middle; font-size: {{ $dm['font_size'] ?? ($perSheet == 12 ? 5.5 : 6.2) }}pt; color: {{ $dm['color'] ?? '#334155' }};">
                                     <strong>Date:</strong> {{ $c['formatted_date'] }} &nbsp;&nbsp; <strong>Qty:</strong> {{ $c['head_count'] ?? 1 }}
                                 </td>
                                 @endif
@@ -310,7 +316,7 @@
                         {{-- Left Side: School Name --}}
                         @if(!empty($sn['show'] ?? true))
                         <div class="left-school-row"
-                             style="top: {{ $sn['top'] ?? 59.5 }}%; left: {{ $sn['left'] ?? 4.5 }}%; max-width: {{ $sn['max_width'] ?? 61.0 }}%; font-size: {{ $sn['font_size'] ?? 6.5 }}pt; color: {{ $sn['color'] ?? '#0f172a' }};">
+                             style="top: {{ $sn['top'] ?? 59.5 }}%; left: {{ $sn['left'] ?? 4.5 }}%; max-width: {{ $sn['max_width'] ?? 61.0 }}%; font-size: {{ $sn['font_size'] ?? ($perSheet == 12 ? 5.8 : 6.5) }}pt; color: {{ $sn['color'] ?? '#0f172a' }};">
                             <span>{{ $c['school_name'] }}</span>
                             @if(!empty($c['is_extra']))
                                 <span class="left-extra-pill">EXTRA BUFFER</span>
@@ -321,7 +327,7 @@
                         {{-- Voucher Serial Code Badge beside "FOOD COUPON" --}}
                         @if(!empty($vs['show'] ?? true))
                         <div class="coupon-serial-badge {{ ($vs['style'] ?? 'pill') === 'pill' ? 'coupon-serial-badge--pill' : '' }}"
-                             style="top: {{ $vs['top'] ?? 73.0 }}%; left: {{ $vs['left'] ?? 50.5 }}%; font-size: {{ $vs['font_size'] ?? 8.0 }}pt; color: {{ $vs['color'] ?? '#1e3a8a' }};">
+                             style="top: {{ $vs['top'] ?? 73.0 }}%; left: {{ $vs['left'] ?? 50.5 }}%; font-size: {{ $vs['font_size'] ?? ($perSheet == 12 ? 7.2 : 8.0) }}pt; color: {{ $vs['color'] ?? '#1e3a8a' }};">
                             {{ $c['coupon_code'] }}
                         </div>
                         @endif
@@ -329,7 +335,7 @@
                         {{-- Stub Area: Serial Code OUTSIDE above box --}}
                         @if(!empty($ss['show'] ?? true))
                         <div class="stub-serial-outside"
-                             style="top: {{ $ss['top'] ?? 8.5 }}%; left: {{ $ss['left'] ?? 70.0 }}%; width: {{ $ss['width'] ?? 24.5 }}%; font-size: {{ $ss['font_size'] ?? 8.5 }}pt; color: {{ $ss['color'] ?? '#0f172a' }};">
+                             style="top: {{ $ss['top'] ?? 8.5 }}%; left: {{ $ss['left'] ?? 70.0 }}%; width: {{ $ss['width'] ?? 24.5 }}%; font-size: {{ $ss['font_size'] ?? ($perSheet == 12 ? 7.5 : 8.5) }}pt; color: {{ $ss['color'] ?? '#0f172a' }};">
                             {{ $c['coupon_code'] }}
                         </div>
                         @endif
@@ -345,7 +351,7 @@
                         {{-- Stub Area: Decoded Token OUTSIDE below box --}}
                         @if(!empty($st['show'] ?? true))
                         <div class="stub-decoded-outside"
-                             style="top: {{ $st['top'] ?? 84.0 }}%; left: {{ $st['left'] ?? 70.0 }}%; width: {{ $st['width'] ?? 24.5 }}%; font-size: {{ $st['font_size'] ?? 7.2 }}pt; color: {{ $st['color'] ?? '#0f172a' }};">
+                             style="top: {{ $st['top'] ?? 84.0 }}%; left: {{ $st['left'] ?? 70.0 }}%; width: {{ $st['width'] ?? 24.5 }}%; font-size: {{ $st['font_size'] ?? ($perSheet == 12 ? 6.5 : 7.2) }}pt; color: {{ $st['color'] ?? '#0f172a' }};">
                             {{ $c['qr_token'] }}
                         </div>
                         @endif

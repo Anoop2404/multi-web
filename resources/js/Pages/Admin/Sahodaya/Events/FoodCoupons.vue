@@ -4,7 +4,7 @@
         <PageHeader :title="`${event.title} — Food Coupon Generator`" eyebrow="Operations"
                     :description="isPartitionedHub
                         ? 'Coupons are issued per region — pick a region below.'
-                        : 'Generate, ungenerate, manage extra buffer coupons, and print 10 coupons per A4 sheet with QR codes.'" />
+                        : 'Generate, ungenerate, manage extra buffer coupons, and print 12 or 10 coupons per A4 sheet with QR codes.'" />
 
         <EventHierarchyBadge :hierarchy="hierarchy" :hub-href="hubHref" />
 
@@ -67,7 +67,7 @@
                     </button>
                     <button type="button" @click="showPrintModal = true" class="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 transition flex items-center gap-1.5 shadow-sm">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                        Print 10-per-Sheet PDF
+                        Print PDF Sheets
                     </button>
                 </div>
             </div>
@@ -1280,8 +1280,37 @@
         </Modal>
 
         <!-- Modal 4: Print Options -->
-        <Modal :show="showPrintModal" title="Print Food Coupons (10 per A4 Sheet)" subtitle="Generate high-resolution printable PDF sheets with QR codes." @close="showPrintModal = false">
+        <Modal :show="showPrintModal" title="Print Food Coupons (A4 Sheet)" subtitle="Generate high-resolution printable PDF sheets with QR codes (12 or 10 per sheet)." @close="showPrintModal = false">
             <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">Coupons per A4 Sheet</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label
+                            class="flex items-start gap-2.5 p-3 border rounded-xl cursor-pointer transition"
+                            :class="printPerSheet === 12 ? 'border-indigo-500 bg-indigo-50/60 ring-2 ring-indigo-500/20' : 'border-slate-200 hover:bg-slate-50'"
+                        >
+                            <input type="radio" v-model="printPerSheet" :value="12" class="mt-0.5 text-indigo-600 focus:ring-indigo-500">
+                            <div>
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="text-xs font-bold text-slate-900">12 per Sheet</span>
+                                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">Recommended</span>
+                                </div>
+                                <p class="text-[11px] text-slate-500 mt-0.5">2 × 6 grid • Saves 20% paper</p>
+                            </div>
+                        </label>
+                        <label
+                            class="flex items-start gap-2.5 p-3 border rounded-xl cursor-pointer transition"
+                            :class="printPerSheet === 10 ? 'border-indigo-500 bg-indigo-50/60 ring-2 ring-indigo-500/20' : 'border-slate-200 hover:bg-slate-50'"
+                        >
+                            <input type="radio" v-model="printPerSheet" :value="10" class="mt-0.5 text-indigo-600 focus:ring-indigo-500">
+                            <div>
+                                <span class="text-xs font-bold text-slate-900">10 per Sheet</span>
+                                <p class="text-[11px] text-slate-500 mt-0.5">2 × 5 grid • Card height 55mm</p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 mb-1">Filter by Meal Type</label>
                     <select v-model="printMeal" class="w-full rounded-lg border-slate-300 text-sm">
@@ -1314,7 +1343,7 @@
                 </div>
 
                 <div class="p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-xs text-indigo-900 space-y-1">
-                    <p>• 10 coupons per A4 sheet (2 columns × 5 rows).</p>
+                    <p>• <strong>{{ printPerSheet }} coupons per A4 sheet</strong> ({{ printPerSheet === 12 ? '2 columns × 6 rows' : '2 columns × 5 rows' }}).</p>
                     <p>• Includes unique QR code with decoded value underneath.</p>
                     <p>• Ready for guillotine cutting and distribution.</p>
                 </div>
@@ -1648,6 +1677,7 @@ const filterExtraOnly = ref(Boolean(props.filters?.extra_only));
 const searchQuery = ref('');
 
 // Print filters
+const printPerSheet = ref(12);
 const printMeal = ref('');
 const printSchool = ref('');
 const printDate = ref('');
@@ -1856,6 +1886,7 @@ const matchedPrintCouponsCount = computed(() => {
 
 const printUrl = computed(() => {
     const params = new URLSearchParams();
+    if (printPerSheet.value) params.set('per_sheet', String(printPerSheet.value));
     if (printMeal.value) params.set('meal_type', printMeal.value);
     if (printSchool.value) params.set('school_id', printSchool.value);
     if (printDate.value) params.set('valid_date', printDate.value);
@@ -1867,6 +1898,7 @@ const printUrl = computed(() => {
 
 const printPreviewUrl = computed(() => {
     const params = new URLSearchParams();
+    if (printPerSheet.value) params.set('per_sheet', String(printPerSheet.value));
     if (printMeal.value) params.set('meal_type', printMeal.value);
     if (printSchool.value) params.set('school_id', printSchool.value);
     if (printDate.value) params.set('valid_date', printDate.value);

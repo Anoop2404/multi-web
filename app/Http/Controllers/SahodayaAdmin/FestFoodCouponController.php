@@ -560,6 +560,11 @@ class FestFoodCouponController extends SahodayaAdminController
             ];
         }
 
+        $perSheet = (int) $request->query('per_sheet', $request->query('per_page', 12));
+        if (! in_array($perSheet, [10, 12], true)) {
+            $perSheet = 12;
+        }
+
         $parts = ['food-coupons', 'event-' . $event->id];
         if ($meal) {
             $parts[] = $meal;
@@ -573,6 +578,7 @@ class FestFoodCouponController extends SahodayaAdminController
         if ($date) {
             $parts[] = $date;
         }
+        $parts[] = $perSheet . 'per-sheet';
         $filename = implode('-', $parts) . '.pdf';
 
         $isPreview = $request->boolean('preview') || $request->boolean('inline');
@@ -586,6 +592,7 @@ class FestFoodCouponController extends SahodayaAdminController
                 'bgDataUri' => $bgDataUri,
                 'layout'    => $event->foodCouponLayout($this->sahodaya),
                 'coupons'   => $preparedCoupons,
+                'perSheet'  => $perSheet,
             ],
             filename: $filename,
             inline: $isPreview,
