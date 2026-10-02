@@ -715,10 +715,10 @@
                                     class="absolute text-center font-mono font-bold leading-tight cursor-pointer transition"
                                     :class="activeElement === 'stub_serial' ? 'ring-2 ring-indigo-500 rounded bg-indigo-50/70' : 'hover:outline hover:outline-1 hover:outline-indigo-300'"
                                     :style="{
-                                        top: (layoutForm.stub_serial?.top ?? 6) + '%',
-                                        left: (layoutForm.stub_serial?.left ?? 69.5) + '%',
-                                        width: (layoutForm.stub_serial?.width ?? 26) + '%',
-                                        fontSize: (layoutForm.stub_serial?.font_size ? layoutForm.stub_serial.font_size * 1.5 : 11) + 'px',
+                                        top: (layoutForm.stub_serial?.top ?? 8.5) + '%',
+                                        left: (layoutForm.stub_serial?.left ?? 70.0) + '%',
+                                        width: (layoutForm.stub_serial?.width ?? 24.5) + '%',
+                                        fontSize: (layoutForm.stub_serial?.font_size ? layoutForm.stub_serial.font_size * 1.5 : 10) + 'px',
                                         color: layoutForm.stub_serial?.color || '#0f172a',
                                     }"
                                 >
@@ -734,10 +734,10 @@
                                         layoutForm.qr_box?.show_border ? 'border border-slate-800 rounded' : ''
                                     ]"
                                     :style="{
-                                        top: (layoutForm.qr_box?.top ?? 20.5) + '%',
-                                        left: (layoutForm.qr_box?.left ?? 71) + '%',
-                                        width: (layoutForm.qr_box?.width ?? 23) + '%',
-                                        height: (layoutForm.qr_box?.height ?? 56.5) + '%',
+                                        top: (layoutForm.qr_box?.top ?? 24.5) + '%',
+                                        left: (layoutForm.qr_box?.left ?? 72.0) + '%',
+                                        width: (layoutForm.qr_box?.width ?? 20.5) + '%',
+                                        height: (layoutForm.qr_box?.height ?? 51.5) + '%',
                                     }"
                                 >
                                     <img
@@ -754,9 +754,9 @@
                                     class="absolute text-center font-mono font-bold leading-tight cursor-pointer transition"
                                     :class="activeElement === 'stub_token' ? 'ring-2 ring-indigo-500 rounded bg-indigo-50/70' : 'hover:outline hover:outline-1 hover:outline-indigo-300'"
                                     :style="{
-                                        top: (layoutForm.stub_token?.top ?? 81.5) + '%',
-                                        left: (layoutForm.stub_token?.left ?? 69.5) + '%',
-                                        width: (layoutForm.stub_token?.width ?? 26) + '%',
+                                        top: (layoutForm.stub_token?.top ?? 84.0) + '%',
+                                        left: (layoutForm.stub_token?.left ?? 70.0) + '%',
+                                        width: (layoutForm.stub_token?.width ?? 24.5) + '%',
                                         fontSize: (layoutForm.stub_token?.font_size ? layoutForm.stub_token.font_size * 1.4 : 9) + 'px',
                                         color: layoutForm.stub_token?.color || '#0f172a',
                                     }"
@@ -774,7 +774,7 @@
                                         activeElement === 'meal_badge' ? 'ring-2 ring-indigo-500' : 'hover:outline hover:outline-1 hover:outline-indigo-300'
                                     ]"
                                     :style="{
-                                        top: (layoutForm.meal_badge?.top ?? 47.5) + '%',
+                                        top: (layoutForm.meal_badge?.top ?? 48.5) + '%',
                                         left: (layoutForm.meal_badge?.left ?? 4.5) + '%',
                                         fontSize: (layoutForm.meal_badge?.font_size ? layoutForm.meal_badge.font_size * 1.5 : 8) + 'px',
                                         padding: '2px 6px',
@@ -790,8 +790,8 @@
                                     class="absolute whitespace-nowrap cursor-pointer transition"
                                     :class="activeElement === 'date_meta' ? 'ring-2 ring-indigo-500 rounded bg-indigo-50/70' : 'hover:outline hover:outline-1 hover:outline-indigo-300'"
                                     :style="{
-                                        top: (layoutForm.date_meta?.top ?? 47.5) + '%',
-                                        left: (layoutForm.date_meta?.left ?? 21) + '%',
+                                        top: (layoutForm.date_meta?.top ?? 48.5) + '%',
+                                        left: (layoutForm.date_meta?.left ?? 21.0) + '%',
                                         fontSize: (layoutForm.date_meta?.font_size ? layoutForm.date_meta.font_size * 1.4 : 8) + 'px',
                                         color: layoutForm.date_meta?.color || '#334155',
                                     }"
@@ -806,9 +806,9 @@
                                     class="absolute font-bold truncate cursor-pointer transition"
                                     :class="activeElement === 'school_name' ? 'ring-2 ring-indigo-500 rounded bg-indigo-50/70' : 'hover:outline hover:outline-1 hover:outline-indigo-300'"
                                     :style="{
-                                        top: (layoutForm.school_name?.top ?? 56.5) + '%',
+                                        top: (layoutForm.school_name?.top ?? 59.5) + '%',
                                         left: (layoutForm.school_name?.left ?? 4.5) + '%',
-                                        maxWidth: (layoutForm.school_name?.max_width ?? 62) + '%',
+                                        maxWidth: (layoutForm.school_name?.max_width ?? 61.0) + '%',
                                         fontSize: (layoutForm.school_name?.font_size ? layoutForm.school_name.font_size * 1.5 : 9) + 'px',
                                         color: layoutForm.school_name?.color || '#0f172a',
                                     }"
@@ -826,8 +826,8 @@
                                         activeElement === 'voucher_serial' ? 'ring-2 ring-indigo-500' : 'hover:outline hover:outline-1 hover:outline-indigo-300'
                                     ]"
                                     :style="{
-                                        top: (layoutForm.voucher_serial?.top ?? 72) + '%',
-                                        left: (layoutForm.voucher_serial?.left ?? 51.5) + '%',
+                                        top: (layoutForm.voucher_serial?.top ?? 73.0) + '%',
+                                        left: (layoutForm.voucher_serial?.left ?? 50.5) + '%',
                                         fontSize: (layoutForm.voucher_serial?.font_size ? layoutForm.voucher_serial.font_size * 1.5 : 10) + 'px',
                                         color: layoutForm.voucher_serial?.color || '#1e3a8a',
                                     }"
@@ -1387,8 +1387,8 @@
                         </div>
 
                         <!-- Left Details Overlay -->
-                        <div class="absolute left-[4.5%] top-[45.5%] w-[58%] h-[25%] z-10 flex flex-col justify-center overflow-hidden">
-                            <div class="flex items-center gap-1.5 text-[9px] leading-none mb-1 whitespace-nowrap">
+                        <div class="absolute left-[4.5%] top-[48.5%] w-[58%] z-10">
+                            <div class="flex items-center gap-1.5 text-[9px] leading-none mb-1.5 whitespace-nowrap">
                                 <span class="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider text-white" :class="previewPillClass">
                                     {{ previewCoupon.meal_type || 'breakfast' }}
                                 </span>
@@ -1402,23 +1402,23 @@
                         </div>
 
                         <!-- Main Serial Badge beside FOOD COUPON -->
-                        <div class="absolute left-[50.5%] top-[71.5%] z-10 font-mono font-bold text-[10px] text-sky-800 bg-sky-100 border border-sky-300 px-1.5 py-0.5 rounded leading-none whitespace-nowrap shadow-xs">
+                        <div class="absolute left-[50.5%] top-[73.0%] z-10 font-mono font-bold text-[10px] text-sky-800 bg-sky-100 border border-sky-300 px-1.5 py-0.5 rounded leading-none whitespace-nowrap shadow-xs">
                             {{ previewCoupon.coupon_code || 'BF-0001' }}
                         </div>
 
                         <!-- Stub Area: Serial Code OUTSIDE above box -->
-                        <div class="absolute left-[68%] top-[6%] w-[28%] text-center z-10 font-mono font-bold text-[10.5px] text-slate-900 tracking-wide whitespace-nowrap leading-none">
+                        <div class="absolute left-[70.0%] top-[8.5%] w-[24.5%] text-center z-10 font-mono font-bold text-[10.5px] text-slate-900 tracking-wide whitespace-nowrap leading-none">
                             {{ previewCoupon.coupon_code || 'BF-0001' }}
                         </div>
 
                         <!-- Stub Area: QR Code Box: Fits QR FULLY inside the box -->
-                        <div class="absolute left-[70.41%] top-[22.60%] w-[23.54%] h-[55.48%] z-10 flex items-center justify-center p-1 overflow-hidden">
+                        <div class="absolute left-[72.0%] top-[24.5%] w-[20.5%] h-[51.5%] z-10 flex items-center justify-center p-0.5 overflow-hidden">
                             <img v-if="sampleQrSrc" :src="sampleQrSrc" class="w-full h-full object-contain" alt="QR" />
                             <div v-else class="w-full h-full bg-slate-900 flex items-center justify-center text-white text-[7px] font-mono">QR CODE</div>
                         </div>
 
                         <!-- Stub Area: Decoded Token OUTSIDE below box -->
-                        <div class="absolute left-[68%] top-[79.5%] w-[28%] text-center z-10 font-mono font-bold text-[8.5px] text-slate-800 tracking-wider whitespace-nowrap leading-none">
+                        <div class="absolute left-[70.0%] top-[84.0%] w-[24.5%] text-center z-10 font-mono font-bold text-[8.5px] text-slate-800 tracking-wider whitespace-nowrap leading-none">
                             {{ previewCoupon.qr_token || 'J4GJLO5GQW' }}
                         </div>
                     </div>
@@ -1889,14 +1889,14 @@ const savingLayout = ref(false);
 const saveAsSahodayaDefault = ref(false);
 
 const defaultCoordinates = {
-    qr_box: { top: 23.0, left: 72.5, width: 20.0, height: 52.0, show_border: false },
-    stub_serial: { top: 6.0, left: 69.5, width: 26.0, font_size: 7.2, color: '#0f172a', show: true },
-    stub_token: { top: 81.0, left: 69.5, width: 26.0, font_size: 6.0, color: '#0f172a', show: true },
-    meal_badge: { top: 41.5, left: 4.5, font_size: 5.0, show: true },
-    date_meta: { top: 41.5, left: 20.0, font_size: 5.0, color: '#334155', show: true },
-    school_name: { top: 50.5, left: 4.5, max_width: 61.0, font_size: 5.4, color: '#0f172a', show: true },
-    voucher_serial: { top: 69.0, left: 49.5, font_size: 7.0, color: '#1e3a8a', style: 'pill', show: true },
-    fallback_title: { top: 69.0, left: 4.5, show: true },
+    qr_box: { top: 24.5, left: 72.0, width: 20.5, height: 51.5, show_border: false },
+    stub_serial: { top: 8.5, left: 70.0, width: 24.5, font_size: 7.2, color: '#0f172a', show: true },
+    stub_token: { top: 84.0, left: 70.0, width: 24.5, font_size: 6.2, color: '#0f172a', show: true },
+    meal_badge: { top: 48.5, left: 4.5, font_size: 5.2, show: true },
+    date_meta: { top: 48.5, left: 21.0, font_size: 5.2, color: '#334155', show: true },
+    school_name: { top: 59.5, left: 4.5, max_width: 61.0, font_size: 5.6, color: '#0f172a', show: true },
+    voucher_serial: { top: 73.0, left: 50.5, font_size: 7.0, color: '#1e3a8a', style: 'pill', show: true },
+    fallback_title: { top: 73.0, left: 4.5, font_size: 12.0, color: '#1e3a8a', show: true },
 };
 
 const getInitialLayout = () => {
@@ -1913,14 +1913,14 @@ const layoutForm = reactive(getInitialLayout());
 
 function applyKochiMetroPreset() {
     const preset = {
-        qr_box: { top: 23.0, left: 72.5, width: 20.0, height: 52.0, show_border: false },
-        stub_serial: { top: 6.0, left: 69.5, width: 26.0, font_size: 7.2, color: '#0f172a', show: true },
-        stub_token: { top: 81.0, left: 69.5, width: 26.0, font_size: 6.0, color: '#0f172a', show: true },
-        meal_badge: { top: 41.5, left: 4.5, font_size: 5.0, show: true },
-        date_meta: { top: 41.5, left: 20.0, font_size: 5.0, color: '#334155', show: true },
-        school_name: { top: 50.5, left: 4.5, max_width: 61.0, font_size: 5.4, color: '#0f172a', show: true },
-        voucher_serial: { top: 69.0, left: 49.5, font_size: 7.0, color: '#1e3a8a', style: 'pill', show: true },
-        fallback_title: { top: 69.0, left: 4.5, show: true },
+        qr_box: { top: 24.5, left: 72.0, width: 20.5, height: 51.5, show_border: false },
+        stub_serial: { top: 8.5, left: 70.0, width: 24.5, font_size: 7.2, color: '#0f172a', show: true },
+        stub_token: { top: 84.0, left: 70.0, width: 24.5, font_size: 6.2, color: '#0f172a', show: true },
+        meal_badge: { top: 48.5, left: 4.5, font_size: 5.2, show: true },
+        date_meta: { top: 48.5, left: 21.0, font_size: 5.2, color: '#334155', show: true },
+        school_name: { top: 59.5, left: 4.5, max_width: 61.0, font_size: 5.6, color: '#0f172a', show: true },
+        voucher_serial: { top: 73.0, left: 50.5, font_size: 7.0, color: '#1e3a8a', style: 'pill', show: true },
+        fallback_title: { top: 73.0, left: 4.5, font_size: 12.0, color: '#1e3a8a', show: true },
     };
     Object.assign(layoutForm, JSON.parse(JSON.stringify(preset)));
 }

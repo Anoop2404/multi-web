@@ -119,19 +119,31 @@
         /* ------------------------------------------------------------------ */
         /* MAIN VOUCHER DETAILS (Left Section)                                */
         /* ------------------------------------------------------------------ */
-        .meal-pill {
+        .meal-meta-table {
             position: absolute;
+            z-index: 3;
+            border-collapse: collapse;
+            border: none;
+            padding: 0;
+            margin: 0;
+            width: 62mm;
+            white-space: nowrap;
+        }
+        .meal-meta-table td {
+            padding: 0;
+            vertical-align: middle;
+        }
+
+        .meal-pill {
             display: inline-block;
             font-family: 'DejaVu Sans', sans-serif;
             font-weight: bold;
             text-transform: uppercase;
-            padding: 0.5mm 1.8mm;
+            padding: 0.5mm 1.6mm;
             border-radius: 0.8mm;
             letter-spacing: 0.3px;
             line-height: 1;
             vertical-align: middle;
-            z-index: 3;
-            white-space: nowrap;
         }
         .meal-pill--breakfast { background: #f59e0b; color: #ffffff; }
         .meal-pill--lunch     { background: #10b981; color: #ffffff; }
@@ -141,10 +153,10 @@
         .meal-pill--other     { background: #64748b; color: #ffffff; }
 
         .meta-text {
-            position: absolute;
-            z-index: 3;
+            font-size: 5.2pt;
+            color: #334155;
             white-space: nowrap;
-            line-height: 1.2;
+            line-height: 1;
         }
         .meta-text strong {
             color: #0f172a;
@@ -275,26 +287,30 @@
                             <div class="fallback-box-border"></div>
                         @endif
 
-                        {{-- Left Side: Meal Badge --}}
-                        @if(!empty($mb['show'] ?? true))
-                        <span class="meal-pill meal-pill--{{ $c['meal_type'] }}"
-                              style="top: {{ $mb['top'] ?? 41.5 }}%; left: {{ $mb['left'] ?? 4.5 }}%; font-size: {{ $mb['font_size'] ?? 5.0 }}pt;">
-                            {{ ucfirst($c['meal_type']) }}
-                        </span>
-                        @endif
-
-                        {{-- Left Side: Date & Quantity --}}
-                        @if(!empty($dm['show'] ?? true))
-                        <div class="meta-text"
-                             style="top: {{ $dm['top'] ?? 41.5 }}%; left: {{ $dm['left'] ?? 20.0 }}%; font-size: {{ $dm['font_size'] ?? 5.0 }}pt; color: {{ $dm['color'] ?? '#334155' }};">
-                            <strong>Date:</strong> {{ $c['formatted_date'] }} &nbsp; <strong>Qty:</strong> {{ $c['head_count'] ?? 1 }}
-                        </div>
-                        @endif
+                        {{-- Left Side: Meal Badge & Date/Qty --}}
+                        <table class="meal-meta-table" style="top: {{ $mb['top'] ?? 48.5 }}%; left: {{ $mb['left'] ?? 4.5 }}%;">
+                            <tr>
+                                @if(!empty($mb['show'] ?? true))
+                                <td style="padding-right: 2mm; vertical-align: middle;">
+                                    <span class="meal-pill meal-pill--{{ $c['meal_type'] }}"
+                                          style="font-size: {{ $mb['font_size'] ?? 5.2 }}pt;">
+                                        {{ ucfirst($c['meal_type']) }}
+                                    </span>
+                                </td>
+                                @endif
+                                @if(!empty($dm['show'] ?? true))
+                                <td class="meta-text"
+                                    style="vertical-align: middle; font-size: {{ $dm['font_size'] ?? 5.2 }}pt; color: {{ $dm['color'] ?? '#334155' }};">
+                                    <strong>Date:</strong> {{ $c['formatted_date'] }} &nbsp;&nbsp; <strong>Qty:</strong> {{ $c['head_count'] ?? 1 }}
+                                </td>
+                                @endif
+                            </tr>
+                        </table>
 
                         {{-- Left Side: School Name --}}
                         @if(!empty($sn['show'] ?? true))
                         <div class="left-school-row"
-                             style="top: {{ $sn['top'] ?? 50.5 }}%; left: {{ $sn['left'] ?? 4.5 }}%; max-width: {{ $sn['max_width'] ?? 61.0 }}%; font-size: {{ $sn['font_size'] ?? 5.4 }}pt; color: {{ $sn['color'] ?? '#0f172a' }};">
+                             style="top: {{ $sn['top'] ?? 59.5 }}%; left: {{ $sn['left'] ?? 4.5 }}%; max-width: {{ $sn['max_width'] ?? 61.0 }}%; font-size: {{ $sn['font_size'] ?? 5.6 }}pt; color: {{ $sn['color'] ?? '#0f172a' }};">
                             <span>{{ $c['school_name'] }}</span>
                             @if(!empty($c['is_extra']))
                                 <span class="left-extra-pill">EXTRA BUFFER</span>
@@ -305,7 +321,7 @@
                         {{-- Voucher Serial Code Badge beside "FOOD COUPON" --}}
                         @if(!empty($vs['show'] ?? true))
                         <div class="coupon-serial-badge {{ ($vs['style'] ?? 'pill') === 'pill' ? 'coupon-serial-badge--pill' : '' }}"
-                             style="top: {{ $vs['top'] ?? 69.0 }}%; left: {{ $vs['left'] ?? 49.5 }}%; font-size: {{ $vs['font_size'] ?? 7.0 }}pt; color: {{ $vs['color'] ?? '#1e3a8a' }};">
+                             style="top: {{ $vs['top'] ?? 73.0 }}%; left: {{ $vs['left'] ?? 50.5 }}%; font-size: {{ $vs['font_size'] ?? 7.0 }}pt; color: {{ $vs['color'] ?? '#1e3a8a' }};">
                             {{ $c['coupon_code'] }}
                         </div>
                         @endif
@@ -313,14 +329,14 @@
                         {{-- Stub Area: Serial Code OUTSIDE above box --}}
                         @if(!empty($ss['show'] ?? true))
                         <div class="stub-serial-outside"
-                             style="top: {{ $ss['top'] ?? 6.0 }}%; left: {{ $ss['left'] ?? 69.5 }}%; width: {{ $ss['width'] ?? 26.0 }}%; font-size: {{ $ss['font_size'] ?? 7.2 }}pt; color: {{ $ss['color'] ?? '#0f172a' }};">
+                             style="top: {{ $ss['top'] ?? 8.5 }}%; left: {{ $ss['left'] ?? 70.0 }}%; width: {{ $ss['width'] ?? 24.5 }}%; font-size: {{ $ss['font_size'] ?? 7.2 }}pt; color: {{ $ss['color'] ?? '#0f172a' }};">
                             {{ $c['coupon_code'] }}
                         </div>
                         @endif
 
                         {{-- Stub Area: QR Code FULLY INSIDE box --}}
                         <div class="stub-qr-box"
-                             style="top: {{ $qb['top'] ?? 23.0 }}%; left: {{ $qb['left'] ?? 72.5 }}%; width: {{ $qb['width'] ?? 20.0 }}%; height: {{ $qb['height'] ?? 52.0 }}%; {{ !empty($qb['show_border']) ? 'border: 1px solid #0f172a; border-radius: 1mm;' : '' }}">
+                             style="top: {{ $qb['top'] ?? 24.5 }}%; left: {{ $qb['left'] ?? 72.0 }}%; width: {{ $qb['width'] ?? 20.5 }}%; height: {{ $qb['height'] ?? 51.5 }}%; {{ !empty($qb['show_border']) ? 'border: 1px solid #0f172a; border-radius: 1mm;' : '' }}">
                             @if(!empty($c['qr_src']))
                                 <img src="{{ $c['qr_src'] }}" class="stub-qr-img" alt="QR" />
                             @endif
@@ -329,7 +345,7 @@
                         {{-- Stub Area: Decoded Token OUTSIDE below box --}}
                         @if(!empty($st['show'] ?? true))
                         <div class="stub-decoded-outside"
-                             style="top: {{ $st['top'] ?? 81.0 }}%; left: {{ $st['left'] ?? 69.5 }}%; width: {{ $st['width'] ?? 26.0 }}%; font-size: {{ $st['font_size'] ?? 6.0 }}pt; color: {{ $st['color'] ?? '#0f172a' }};">
+                             style="top: {{ $st['top'] ?? 84.0 }}%; left: {{ $st['left'] ?? 70.0 }}%; width: {{ $st['width'] ?? 24.5 }}%; font-size: {{ $st['font_size'] ?? 6.2 }}pt; color: {{ $st['color'] ?? '#0f172a' }};">
                             {{ $c['qr_token'] }}
                         </div>
                         @endif
