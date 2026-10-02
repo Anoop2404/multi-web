@@ -589,7 +589,7 @@
                         <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
                             <span>🎨 Food Coupon Visual Template Builder</span>
                             <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                                95mm × 40.63mm (10 per A4 Sheet)
+                                96mm × 55mm (10 per A4 Sheet — Full Height)
                             </span>
                         </h2>
                         <p class="text-xs text-slate-500 mt-1">
@@ -679,7 +679,7 @@
                         <div class="p-4 bg-slate-100 rounded-xl flex items-center justify-center overflow-hidden border border-slate-200">
                             <div
                                 class="relative bg-white shadow-md rounded overflow-hidden select-none"
-                                style="width: 100%; max-width: 540px; aspect-ratio: 95 / 40.63;"
+                                style="width: 100%; max-width: 540px; aspect-ratio: 96 / 55;"
                             >
                                 <!-- Background Image -->
                                 <img
@@ -840,7 +840,7 @@
                         <!-- Canvas Helper info -->
                         <div class="text-xs text-slate-500 flex items-center justify-between">
                             <span>Selected Element: <strong class="text-indigo-600 uppercase">{{ activeElement.replace('_', ' ') }}</strong></span>
-                            <span class="text-slate-400">Dimensions: 95mm × 40.63mm (300 DPI)</span>
+                            <span class="text-slate-400">Dimensions: 96mm × 55mm (300 DPI)</span>
                         </div>
                     </div>
 
@@ -1359,7 +1359,7 @@
         </Modal>
 
         <!-- Modal 5: Live Coupon Card Preview -->
-        <Modal :show="showPreviewModal" title="Food Coupon Card Preview" subtitle="Accurate preview of how individual coupons will print on A4 sheets (95mm × 40.63mm)." @close="showPreviewModal = false">
+        <Modal :show="showPreviewModal" title="Food Coupon Card Preview" subtitle="Accurate preview of how individual coupons will print on A4 sheets (96mm × 55mm)." @close="showPreviewModal = false">
             <div class="space-y-4">
                 <div class="flex items-center justify-between gap-3 p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
                     <span class="text-xs font-semibold text-slate-700">Preview Meal:</span>
@@ -1375,7 +1375,7 @@
 
                 <!-- The Live Card -->
                 <div class="p-4 bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-center">
-                    <div class="relative w-full max-w-[480px] aspect-[95/40.63] rounded-lg overflow-hidden border border-slate-300 shadow-lg bg-white select-none">
+                    <div class="relative w-full max-w-[480px] aspect-[96/55] rounded-lg overflow-hidden border border-slate-300 shadow-lg bg-white select-none">
                         <!-- Background Image or Fallback -->
                         <img v-if="event.food_coupon_bg_image_url && !bgImgError" :src="event.food_coupon_bg_image_url" class="absolute inset-0 w-full h-full object-fill z-0" alt="Background" />
                         <div v-else class="absolute inset-0 bg-gradient-to-r from-slate-50 to-slate-100 p-3 z-0">
@@ -1890,12 +1890,12 @@ const saveAsSahodayaDefault = ref(false);
 
 const defaultCoordinates = {
     qr_box: { top: 24.5, left: 72.0, width: 20.5, height: 51.5, show_border: false },
-    stub_serial: { top: 8.5, left: 70.0, width: 24.5, font_size: 7.2, color: '#0f172a', show: true },
-    stub_token: { top: 84.0, left: 70.0, width: 24.5, font_size: 6.2, color: '#0f172a', show: true },
-    meal_badge: { top: 48.5, left: 4.5, font_size: 5.2, show: true },
-    date_meta: { top: 48.5, left: 21.0, font_size: 5.2, color: '#334155', show: true },
-    school_name: { top: 59.5, left: 4.5, max_width: 61.0, font_size: 5.6, color: '#0f172a', show: true },
-    voucher_serial: { top: 73.0, left: 50.5, font_size: 7.0, color: '#1e3a8a', style: 'pill', show: true },
+    stub_serial: { top: 8.5, left: 70.0, width: 24.5, font_size: 8.5, color: '#0f172a', show: true },
+    stub_token: { top: 84.0, left: 70.0, width: 24.5, font_size: 7.2, color: '#0f172a', show: true },
+    meal_badge: { top: 48.5, left: 4.5, font_size: 6.0, show: true },
+    date_meta: { top: 48.5, left: 21.0, font_size: 6.2, color: '#334155', show: true },
+    school_name: { top: 59.5, left: 4.5, max_width: 61.0, font_size: 6.5, color: '#0f172a', show: true },
+    voucher_serial: { top: 73.0, left: 50.5, font_size: 8.0, color: '#1e3a8a', style: 'pill', show: true },
     fallback_title: { top: 73.0, left: 4.5, font_size: 12.0, color: '#1e3a8a', show: true },
 };
 
@@ -1914,12 +1914,12 @@ const layoutForm = reactive(getInitialLayout());
 function applyKochiMetroPreset() {
     const preset = {
         qr_box: { top: 24.5, left: 72.0, width: 20.5, height: 51.5, show_border: false },
-        stub_serial: { top: 8.5, left: 70.0, width: 24.5, font_size: 7.2, color: '#0f172a', show: true },
-        stub_token: { top: 84.0, left: 70.0, width: 24.5, font_size: 6.2, color: '#0f172a', show: true },
-        meal_badge: { top: 48.5, left: 4.5, font_size: 5.2, show: true },
-        date_meta: { top: 48.5, left: 21.0, font_size: 5.2, color: '#334155', show: true },
-        school_name: { top: 59.5, left: 4.5, max_width: 61.0, font_size: 5.6, color: '#0f172a', show: true },
-        voucher_serial: { top: 73.0, left: 50.5, font_size: 7.0, color: '#1e3a8a', style: 'pill', show: true },
+        stub_serial: { top: 8.5, left: 70.0, width: 24.5, font_size: 8.5, color: '#0f172a', show: true },
+        stub_token: { top: 84.0, left: 70.0, width: 24.5, font_size: 7.2, color: '#0f172a', show: true },
+        meal_badge: { top: 48.5, left: 4.5, font_size: 6.0, show: true },
+        date_meta: { top: 48.5, left: 21.0, font_size: 6.2, color: '#334155', show: true },
+        school_name: { top: 59.5, left: 4.5, max_width: 61.0, font_size: 6.5, color: '#0f172a', show: true },
+        voucher_serial: { top: 73.0, left: 50.5, font_size: 8.0, color: '#1e3a8a', style: 'pill', show: true },
         fallback_title: { top: 73.0, left: 4.5, font_size: 12.0, color: '#1e3a8a', show: true },
     };
     Object.assign(layoutForm, JSON.parse(JSON.stringify(preset)));

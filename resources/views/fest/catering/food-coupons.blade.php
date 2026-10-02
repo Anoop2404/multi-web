@@ -7,12 +7,12 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         @page {
             size: A4 portrait;
-            margin: 4mm 6mm;
+            margin: 4mm 5mm;
         }
         body {
             font-family: 'DejaVu Sans', Arial, sans-serif;
             color: #0f172a;
-            font-size: 7px;
+            font-size: 8px;
             background: #ffffff;
             margin: 0;
             padding: 0;
@@ -31,25 +31,25 @@
             break-after: page;
         }
         .coupon-grid {
-            width: 194mm;
+            width: 196mm;
             margin: 0 auto;
             border-collapse: separate;
-            border-spacing: 4mm 1.8mm;
+            border-spacing: 4mm 2.2mm;
             table-layout: fixed;
         }
         .coupon-cell {
-            width: 95mm;
-            height: 40mm;
-            max-height: 40mm;
+            width: 96mm;
+            height: 55mm;
+            max-height: 55mm;
             vertical-align: top;
             padding: 0;
             line-height: 1;
         }
         .coupon-card {
             position: relative;
-            width: 95mm;
-            height: 40mm;
-            max-height: 40mm;
+            width: 96mm;
+            height: 55mm;
+            max-height: 55mm;
             overflow: hidden;
             background: #ffffff;
             border-radius: 2mm;
@@ -139,8 +139,8 @@
             font-family: 'DejaVu Sans', sans-serif;
             font-weight: bold;
             text-transform: uppercase;
-            padding: 0.5mm 1.6mm;
-            border-radius: 0.8mm;
+            padding: 0.7mm 2mm;
+            border-radius: 1mm;
             letter-spacing: 0.3px;
             line-height: 1;
             vertical-align: middle;
@@ -153,7 +153,7 @@
         .meal-pill--other     { background: #64748b; color: #ffffff; }
 
         .meta-text {
-            font-size: 5.2pt;
+            font-size: 6.2pt;
             color: #334155;
             white-space: nowrap;
             line-height: 1;
@@ -177,10 +177,10 @@
             background: #fffbeb;
             color: #b45309;
             border: 0.5px solid #fde68a;
-            font-size: 4.8pt;
+            font-size: 5.5pt;
             font-weight: bold;
-            padding: 0.3mm 1.5mm;
-            border-radius: 0.8mm;
+            padding: 0.4mm 1.8mm;
+            border-radius: 1mm;
             text-transform: uppercase;
             margin-left: 1.5mm;
             vertical-align: middle;
@@ -197,9 +197,9 @@
         }
         .coupon-serial-badge--pill {
             background: #dbeafe;
-            border: 0.5px solid #93c5fd;
-            padding: 0.4mm 1.6mm;
-            border-radius: 0.8mm;
+            border: 0.8px solid #93c5fd;
+            padding: 0.6mm 2.2mm;
+            border-radius: 1.5mm;
         }
 
         /* Fallback elements when NO template background exists */
@@ -293,14 +293,14 @@
                                 @if(!empty($mb['show'] ?? true))
                                 <td style="padding-right: 2mm; vertical-align: middle;">
                                     <span class="meal-pill meal-pill--{{ $c['meal_type'] }}"
-                                          style="font-size: {{ $mb['font_size'] ?? 5.2 }}pt;">
+                                          style="font-size: {{ $mb['font_size'] ?? 6.0 }}pt;">
                                         {{ ucfirst($c['meal_type']) }}
                                     </span>
                                 </td>
                                 @endif
                                 @if(!empty($dm['show'] ?? true))
                                 <td class="meta-text"
-                                    style="vertical-align: middle; font-size: {{ $dm['font_size'] ?? 5.2 }}pt; color: {{ $dm['color'] ?? '#334155' }};">
+                                    style="vertical-align: middle; font-size: {{ $dm['font_size'] ?? 6.2 }}pt; color: {{ $dm['color'] ?? '#334155' }};">
                                     <strong>Date:</strong> {{ $c['formatted_date'] }} &nbsp;&nbsp; <strong>Qty:</strong> {{ $c['head_count'] ?? 1 }}
                                 </td>
                                 @endif
@@ -310,7 +310,7 @@
                         {{-- Left Side: School Name --}}
                         @if(!empty($sn['show'] ?? true))
                         <div class="left-school-row"
-                             style="top: {{ $sn['top'] ?? 59.5 }}%; left: {{ $sn['left'] ?? 4.5 }}%; max-width: {{ $sn['max_width'] ?? 61.0 }}%; font-size: {{ $sn['font_size'] ?? 5.6 }}pt; color: {{ $sn['color'] ?? '#0f172a' }};">
+                             style="top: {{ $sn['top'] ?? 59.5 }}%; left: {{ $sn['left'] ?? 4.5 }}%; max-width: {{ $sn['max_width'] ?? 61.0 }}%; font-size: {{ $sn['font_size'] ?? 6.5 }}pt; color: {{ $sn['color'] ?? '#0f172a' }};">
                             <span>{{ $c['school_name'] }}</span>
                             @if(!empty($c['is_extra']))
                                 <span class="left-extra-pill">EXTRA BUFFER</span>
@@ -321,7 +321,7 @@
                         {{-- Voucher Serial Code Badge beside "FOOD COUPON" --}}
                         @if(!empty($vs['show'] ?? true))
                         <div class="coupon-serial-badge {{ ($vs['style'] ?? 'pill') === 'pill' ? 'coupon-serial-badge--pill' : '' }}"
-                             style="top: {{ $vs['top'] ?? 73.0 }}%; left: {{ $vs['left'] ?? 50.5 }}%; font-size: {{ $vs['font_size'] ?? 7.0 }}pt; color: {{ $vs['color'] ?? '#1e3a8a' }};">
+                             style="top: {{ $vs['top'] ?? 73.0 }}%; left: {{ $vs['left'] ?? 50.5 }}%; font-size: {{ $vs['font_size'] ?? 8.0 }}pt; color: {{ $vs['color'] ?? '#1e3a8a' }};">
                             {{ $c['coupon_code'] }}
                         </div>
                         @endif
@@ -329,7 +329,7 @@
                         {{-- Stub Area: Serial Code OUTSIDE above box --}}
                         @if(!empty($ss['show'] ?? true))
                         <div class="stub-serial-outside"
-                             style="top: {{ $ss['top'] ?? 8.5 }}%; left: {{ $ss['left'] ?? 70.0 }}%; width: {{ $ss['width'] ?? 24.5 }}%; font-size: {{ $ss['font_size'] ?? 7.2 }}pt; color: {{ $ss['color'] ?? '#0f172a' }};">
+                             style="top: {{ $ss['top'] ?? 8.5 }}%; left: {{ $ss['left'] ?? 70.0 }}%; width: {{ $ss['width'] ?? 24.5 }}%; font-size: {{ $ss['font_size'] ?? 8.5 }}pt; color: {{ $ss['color'] ?? '#0f172a' }};">
                             {{ $c['coupon_code'] }}
                         </div>
                         @endif
@@ -345,7 +345,7 @@
                         {{-- Stub Area: Decoded Token OUTSIDE below box --}}
                         @if(!empty($st['show'] ?? true))
                         <div class="stub-decoded-outside"
-                             style="top: {{ $st['top'] ?? 84.0 }}%; left: {{ $st['left'] ?? 70.0 }}%; width: {{ $st['width'] ?? 24.5 }}%; font-size: {{ $st['font_size'] ?? 6.2 }}pt; color: {{ $st['color'] ?? '#0f172a' }};">
+                             style="top: {{ $st['top'] ?? 84.0 }}%; left: {{ $st['left'] ?? 70.0 }}%; width: {{ $st['width'] ?? 24.5 }}%; font-size: {{ $st['font_size'] ?? 7.2 }}pt; color: {{ $st['color'] ?? '#0f172a' }};">
                             {{ $c['qr_token'] }}
                         </div>
                         @endif

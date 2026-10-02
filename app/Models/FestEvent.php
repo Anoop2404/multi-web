@@ -259,7 +259,7 @@ class FestEvent extends Model
         return \App\Support\TenantStorage::backgroundDataUri($sahodaya, $this->food_coupon_bg_image);
     }
 
-    /** Default food coupon visual element coordinates (percentages of 95mm × 40.63mm coupon card) */
+    /** Default food coupon visual element coordinates (percentages of 96mm × 55mm coupon card) */
     public static function defaultFoodCouponLayout(): array
     {
         return [
@@ -274,7 +274,7 @@ class FestEvent extends Model
                 'top' => 8.5,
                 'left' => 70.0,
                 'width' => 24.5,
-                'font_size' => 7.2,
+                'font_size' => 8.5,
                 'color' => '#0f172a',
                 'show' => true,
             ],
@@ -282,20 +282,20 @@ class FestEvent extends Model
                 'top' => 84.0,
                 'left' => 70.0,
                 'width' => 24.5,
-                'font_size' => 6.2,
+                'font_size' => 7.2,
                 'color' => '#0f172a',
                 'show' => true,
             ],
             'meal_badge' => [
                 'top' => 48.5,
                 'left' => 4.5,
-                'font_size' => 5.2,
+                'font_size' => 6.0,
                 'show' => true,
             ],
             'date_meta' => [
                 'top' => 48.5,
                 'left' => 21.0,
-                'font_size' => 5.2,
+                'font_size' => 6.2,
                 'color' => '#334155',
                 'show' => true,
             ],
@@ -303,14 +303,14 @@ class FestEvent extends Model
                 'top' => 59.5,
                 'left' => 4.5,
                 'max_width' => 61.0,
-                'font_size' => 5.6,
+                'font_size' => 6.5,
                 'color' => '#0f172a',
                 'show' => true,
             ],
             'voucher_serial' => [
                 'top' => 73.0,
                 'left' => 50.5,
-                'font_size' => 7.0,
+                'font_size' => 8.0,
                 'color' => '#1e3a8a',
                 'style' => 'pill',
                 'show' => true,
