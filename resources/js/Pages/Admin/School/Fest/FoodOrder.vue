@@ -1,5 +1,5 @@
 <template>
-    <SchoolAdminLayout :title="`${event.title} — Food Order`" :school="school" :show-header-title="false">
+    <SchoolAdminLayout :title="`${event.title} — Food Menu & Order`" :school="school" :show-header-title="false">
         <!-- Hero Header -->
         <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 sm:p-8 text-white shadow-xl mb-6">
             <div class="absolute -right-8 -bottom-8 w-44 h-44 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none" />
@@ -7,7 +7,7 @@
                 <div>
                     <div class="flex flex-wrap items-center gap-2 mb-2">
                         <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-400/20 px-3 py-1 text-xs font-semibold text-amber-300 border border-amber-400/30">
-                            <span>🍱</span> Food & Catering
+                            <span>🍱</span> Food Menu &amp; Catering
                         </span>
                         <span v-if="bill" class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
                               :class="bill.status === 'settled' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'">

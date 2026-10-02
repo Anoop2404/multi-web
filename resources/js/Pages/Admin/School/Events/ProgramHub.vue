@@ -240,7 +240,10 @@
                             <td class="font-medium">{{ ev.title }}</td>
                             <td class="text-xs">{{ ev.level_label }}</td>
                             <td>{{ ev.registrations_count }}</td>
-                            <td class="text-right">
+                            <td class="text-right whitespace-nowrap">
+                                <Link :href="`/school-admin/${school.id}/fest/${ev.id}/food-order`" class="text-xs text-amber-700 hover:text-amber-800 font-semibold mr-3">
+                                    🍱 Food menu →
+                                </Link>
                                 <Link :href="`${programBase}/events/${ev.id}/registration`" class="link-brand text-xs">Open event →</Link>
                             </td>
                         </tr>

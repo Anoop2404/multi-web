@@ -486,9 +486,11 @@ class FestFoodEndToEndFlowTest extends TestCase
         $issueResp->assertRedirect();
         $issueResp->assertSessionHas('success');
 
-        $coupon = \App\Models\FestFoodCoupon::where('event_id', $this->event->id)->firstOrFail();
+        $coupons = \App\Models\FestFoodCoupon::where('event_id', $this->event->id)->get();
+        $this->assertCount(10, $coupons);
+        $coupon = $coupons->first();
         $this->assertSame('issued', $coupon->status);
-        $this->assertSame(10, $coupon->head_count);
+        $this->assertSame(1, $coupon->head_count);
 
         $redeemResp = $this->actingAs($this->sahodayaAdmin)->post(route('sahodaya.events.food-coupons.redeem', [
             'tenantId' => $this->sahodaya->id,

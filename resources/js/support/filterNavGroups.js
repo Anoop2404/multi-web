@@ -14,7 +14,7 @@ export function filterNavGroups(groups, query = '') {
             // With search: show any item whose label matches, including hidden
             items: group.items.filter((item) =>
                 q
-                    ? item.label.toLowerCase().includes(q)
+                    ? item.label.toLowerCase().includes(q) || (Array.isArray(item.keywords) && item.keywords.some((k) => k.toLowerCase().includes(q)))
                     : !item.hidden,
             ),
         }))

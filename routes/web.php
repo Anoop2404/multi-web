@@ -690,6 +690,9 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/fest/{event}/food-order', [\App\Http\Controllers\SchoolAdmin\FestFoodOrderController::class, 'show'])
         ->middleware('cache.headers:no_store;no_cache;must_revalidate;private;max_age=0')
         ->name('food-order.show');
+    Route::get('/fest/{event}/food-menu', [\App\Http\Controllers\SchoolAdmin\FestFoodOrderController::class, 'show'])
+        ->middleware('cache.headers:no_store;no_cache;must_revalidate;private;max_age=0')
+        ->name('food-menu.show');
     Route::post('/fest/{event}/food-order/items', [\App\Http\Controllers\SchoolAdmin\FestFoodOrderController::class, 'addItem'])->name('food-order.items.store');
     Route::delete('/fest/{event}/food-order/items/{orderItem}', [\App\Http\Controllers\SchoolAdmin\FestFoodOrderController::class, 'removeItem'])->name('food-order.items.destroy');
     Route::post('/fest/{event}/food-order/payments', [\App\Http\Controllers\SchoolAdmin\FestFoodOrderController::class, 'submitPayment'])->name('food-order.payments.store');

@@ -260,6 +260,12 @@
                                class="text-xs font-semibold text-indigo-600 px-2 py-1 rounded-full bg-indigo-50 hover:bg-indigo-100">
                                 Fest day →
                             </a>
+                            <a :href="`/school-admin/${school.id}/fest/${event.id}/food-order`"
+                               class="text-xs font-semibold text-amber-800 px-2.5 py-1 rounded-full bg-amber-50 hover:bg-amber-100 border border-amber-200/80 inline-flex items-center gap-1 shadow-2xs transition"
+                               title="Browse food menu and place contingent meal orders">
+                                <span>🍱</span>
+                                <span>Food Menu &amp; Order →</span>
+                            </a>
                             <a :href="`${programBase}/events/${event.id}/substitution-requests`"
                                class="text-xs font-semibold text-slate-600 px-2 py-1 rounded-full bg-slate-100 hover:bg-slate-200">
                                 Substitutions
@@ -307,7 +313,7 @@
                 </div>
 
                 <!-- In-card navigation tabs (Option 2) -->
-                <div class="border-b border-slate-200 bg-slate-50/70 px-5 py-2.5 flex flex-wrap gap-2 text-xs font-semibold">
+                <div class="border-b border-slate-200 bg-slate-50/70 px-5 py-2.5 flex flex-wrap items-center gap-2 text-xs font-semibold">
                     <button type="button" @click="setTab(event.id, 'athletes')"
                             class="px-3.5 py-1.5 rounded-lg transition"
                             :class="getTab(event.id) === 'athletes' ? 'bg-[#0f3d7a] text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'">
@@ -327,6 +333,13 @@
                             {{ event.school_fee.status }}
                         </span>
                     </button>
+                    <a :href="`/school-admin/${school.id}/fest/${event.id}/food-order`"
+                       class="ml-auto px-3.5 py-1.5 rounded-lg transition inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/80 shadow-2xs font-semibold"
+                       title="Browse food menu and place meal orders for students & teachers">
+                        <span>🍱</span>
+                        <span>Food Menu &amp; Order</span>
+                        <span class="text-amber-600 font-bold">→</span>
+                    </a>
                 </div>
 
                 <div class="p-5">

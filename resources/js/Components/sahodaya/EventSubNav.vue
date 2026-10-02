@@ -72,6 +72,7 @@ const tabs = computed(() => {
         { key: 'phase-regions', label: 'Region Matrix', icon: '🗺️', href: `${base.value}/phases/regions-matrix`, permissions: FEST_SETTINGS },
         { key: 'registrations', label: 'Registrations', icon: '📝', href: `${base.value}/registrations`, permissions: FEST_REGISTRATIONS },
         { key: 'fees', label: 'Event Fees', icon: '💳', href: `${base.value}/fees`, permissions: FEST_FINANCE },
+        { key: 'food-menu', label: 'Food Menu', icon: '🍱', href: `${base.value}/food-menu`, permissions: FEST_CATERING },
         { key: 'chest-numbers', label: 'Chest Numbers', icon: '🔢', href: `${base.value}/chest-numbers`, permissions: FEST_MANAGE },
         { key: 'reporting-batches', label: 'Reporting Batches', icon: '⏱️', href: `${base.value}/reporting-batches`, permissions: FEST_MANAGE },
         { key: 'attendance', label: 'Attendance', icon: '📋', href: `${base.value}/attendance`, permissions: FEST_REGISTRATIONS },

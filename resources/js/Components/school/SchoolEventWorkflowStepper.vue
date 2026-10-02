@@ -16,6 +16,12 @@
             </span>
             <span>{{ step.label }}</span>
         </component>
+        <a :href="`/school-admin/${schoolId}/fest/${eventId}/food-order`"
+           class="ml-auto inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 transition whitespace-nowrap shadow-2xs"
+           title="Browse food menu and place meal orders">
+            <span>🍱</span>
+            <span>Food Menu &amp; Order →</span>
+        </a>
     </nav>
 </template>
 

@@ -53,6 +53,9 @@
                         <Link :href="ev.registration_url" class="btn-primary text-xs flex-1 text-center justify-center font-bold py-2">
                             Open Registration →
                         </Link>
+                        <Link :href="`/school-admin/${school.id}/fest/${ev.id}/food-order`" class="btn-secondary text-xs px-2.5 py-2 shrink-0 font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border-amber-200" title="Food menu and meal ordering">
+                            🍱 Food Menu
+                        </Link>
                         <Link :href="`/school-admin/${school.id}/fest/hub?event_id=${ev.id}`" class="btn-secondary text-xs px-3 py-2 shrink-0 font-semibold">
                             Tools
                         </Link>
@@ -86,6 +89,12 @@
                 current-step="overview" />
 
             <div class="hub-grid mb-6">
+                <HubCard
+                    :href="`/school-admin/${school.id}/fest/${event.id}/food-order`"
+                    icon="🍱"
+                    label="Food Menu & Orders"
+                    hint="Browse menu & pre-order contingent meals"
+                />
                 <HubCard
                     :href="`/school-admin/${school.id}/fest/${event.id}/house`"
                     icon="🏠"

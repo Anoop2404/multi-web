@@ -172,12 +172,27 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
 
     // Food & catering navigation: dedicated event-scoped section
     const foodItems = [
-        { label: 'Food order', href: `/school-admin/${schoolId}/fest/${eventId}/food-order`, icon: 'clipboard' },
-        { label: 'Food coupons', href: `/school-admin/${schoolId}/food-coupons?event_id=${eventId}`, icon: 'hash' },
+        {
+            label: 'Food menu & order',
+            href: `/school-admin/${schoolId}/fest/${eventId}/food-order`,
+            icon: 'clipboard',
+            keywords: ['food menu', 'food order', 'canteen', 'meals', 'catering', 'menu', 'lunch', 'breakfast', 'dinner', 'snacks', 'food'],
+        },
+        {
+            label: 'Food coupons',
+            href: `/school-admin/${schoolId}/food-coupons?event_id=${eventId}`,
+            icon: 'hash',
+            keywords: ['coupons', 'qr', 'food vouchers', 'meal pass', 'food'],
+        },
     ];
 
     if (event?.food_payee_type === 'host_school' && String(event?.food_host_school_id) === String(schoolId)) {
-        foodItems.push({ label: 'Food billing (host)', href: `/school-admin/${schoolId}/fest/${eventId}/food-host-billing`, icon: 'credit-card' });
+        foodItems.push({
+            label: 'Food billing (host)',
+            href: `/school-admin/${schoolId}/fest/${eventId}/food-host-billing`,
+            icon: 'credit-card',
+            keywords: ['food billing', 'canteen billing', 'host food'],
+        });
     }
 
     const groups = [

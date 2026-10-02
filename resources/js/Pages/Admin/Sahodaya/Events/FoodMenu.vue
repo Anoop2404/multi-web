@@ -6,6 +6,9 @@
                         ? 'Build the food item catalog here, then apply it to every region below. Schools order and pay against their own region\'s event, not this hub.'
                         : 'Manage dishes in your catalog, schedule meals across event dates, and configure where schools pay for their contingent food orders.'" />
 
+        <EventSubNav v-if="event.event_type !== 'sports'"
+                     :sahodaya-id="sahodaya.id" :event-id="event.id" active="food-menu" />
+
         <EventHierarchyBadge :hierarchy="hierarchy" :hub-href="hubHref" />
 
         <!-- Top Navigation & Quick Links -->
@@ -743,6 +746,7 @@
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import EventHierarchyBadge from '@/Components/fest/EventHierarchyBadge.vue';
 import FoodRegionDrillDown from '@/Components/sahodaya/FoodRegionDrillDown.vue';
