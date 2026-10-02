@@ -34,19 +34,22 @@
             width: 194mm;
             margin: 0 auto;
             border-collapse: separate;
-            border-spacing: 4mm 2.2mm;
+            border-spacing: 4mm 1.8mm;
+            table-layout: fixed;
         }
         .coupon-cell {
             width: 95mm;
-            height: 40.63mm;
+            height: 40mm;
+            max-height: 40mm;
             vertical-align: top;
             padding: 0;
+            line-height: 1;
         }
         .coupon-card {
             position: relative;
             width: 95mm;
-            height: 40.63mm;
-            max-height: 40.63mm;
+            height: 40mm;
+            max-height: 40mm;
             overflow: hidden;
             background: #ffffff;
             border-radius: 2mm;
@@ -275,7 +278,7 @@
                         {{-- Left Side: Meal Badge --}}
                         @if(!empty($mb['show'] ?? true))
                         <span class="meal-pill meal-pill--{{ $c['meal_type'] }}"
-                              style="top: {{ $mb['top'] ?? 47.5 }}%; left: {{ $mb['left'] ?? 4.5 }}%; font-size: {{ $mb['font_size'] ?? 5.2 }}pt;">
+                              style="top: {{ $mb['top'] ?? 41.5 }}%; left: {{ $mb['left'] ?? 4.5 }}%; font-size: {{ $mb['font_size'] ?? 5.0 }}pt;">
                             {{ ucfirst($c['meal_type']) }}
                         </span>
                         @endif
@@ -283,7 +286,7 @@
                         {{-- Left Side: Date & Quantity --}}
                         @if(!empty($dm['show'] ?? true))
                         <div class="meta-text"
-                             style="top: {{ $dm['top'] ?? 47.5 }}%; left: {{ $dm['left'] ?? 21.0 }}%; font-size: {{ $dm['font_size'] ?? 5.2 }}pt; color: {{ $dm['color'] ?? '#334155' }};">
+                             style="top: {{ $dm['top'] ?? 41.5 }}%; left: {{ $dm['left'] ?? 20.0 }}%; font-size: {{ $dm['font_size'] ?? 5.0 }}pt; color: {{ $dm['color'] ?? '#334155' }};">
                             <strong>Date:</strong> {{ $c['formatted_date'] }} &nbsp; <strong>Qty:</strong> {{ $c['head_count'] ?? 1 }}
                         </div>
                         @endif
@@ -291,7 +294,7 @@
                         {{-- Left Side: School Name --}}
                         @if(!empty($sn['show'] ?? true))
                         <div class="left-school-row"
-                             style="top: {{ $sn['top'] ?? 56.5 }}%; left: {{ $sn['left'] ?? 4.5 }}%; max-width: {{ $sn['max_width'] ?? 62.0 }}%; font-size: {{ $sn['font_size'] ?? 5.5 }}pt; color: {{ $sn['color'] ?? '#0f172a' }};">
+                             style="top: {{ $sn['top'] ?? 50.5 }}%; left: {{ $sn['left'] ?? 4.5 }}%; max-width: {{ $sn['max_width'] ?? 61.0 }}%; font-size: {{ $sn['font_size'] ?? 5.4 }}pt; color: {{ $sn['color'] ?? '#0f172a' }};">
                             <span>{{ $c['school_name'] }}</span>
                             @if(!empty($c['is_extra']))
                                 <span class="left-extra-pill">EXTRA BUFFER</span>
@@ -302,7 +305,7 @@
                         {{-- Voucher Serial Code Badge beside "FOOD COUPON" --}}
                         @if(!empty($vs['show'] ?? true))
                         <div class="coupon-serial-badge {{ ($vs['style'] ?? 'pill') === 'pill' ? 'coupon-serial-badge--pill' : '' }}"
-                             style="top: {{ $vs['top'] ?? 72.0 }}%; left: {{ $vs['left'] ?? 51.5 }}%; font-size: {{ $vs['font_size'] ?? 7.2 }}pt; color: {{ $vs['color'] ?? '#1e3a8a' }};">
+                             style="top: {{ $vs['top'] ?? 69.0 }}%; left: {{ $vs['left'] ?? 49.5 }}%; font-size: {{ $vs['font_size'] ?? 7.0 }}pt; color: {{ $vs['color'] ?? '#1e3a8a' }};">
                             {{ $c['coupon_code'] }}
                         </div>
                         @endif
@@ -310,14 +313,14 @@
                         {{-- Stub Area: Serial Code OUTSIDE above box --}}
                         @if(!empty($ss['show'] ?? true))
                         <div class="stub-serial-outside"
-                             style="top: {{ $ss['top'] ?? 6.0 }}%; left: {{ $ss['left'] ?? 69.5 }}%; width: {{ $ss['width'] ?? 26.0 }}%; font-size: {{ $ss['font_size'] ?? 7.5 }}pt; color: {{ $ss['color'] ?? '#0f172a' }};">
+                             style="top: {{ $ss['top'] ?? 6.0 }}%; left: {{ $ss['left'] ?? 69.5 }}%; width: {{ $ss['width'] ?? 26.0 }}%; font-size: {{ $ss['font_size'] ?? 7.2 }}pt; color: {{ $ss['color'] ?? '#0f172a' }};">
                             {{ $c['coupon_code'] }}
                         </div>
                         @endif
 
                         {{-- Stub Area: QR Code FULLY INSIDE box --}}
                         <div class="stub-qr-box"
-                             style="top: {{ $qb['top'] ?? 20.5 }}%; left: {{ $qb['left'] ?? 71.0 }}%; width: {{ $qb['width'] ?? 23.0 }}%; height: {{ $qb['height'] ?? 56.5 }}%; {{ !empty($qb['show_border']) ? 'border: 1px solid #0f172a; border-radius: 1mm;' : '' }}">
+                             style="top: {{ $qb['top'] ?? 23.0 }}%; left: {{ $qb['left'] ?? 72.5 }}%; width: {{ $qb['width'] ?? 20.0 }}%; height: {{ $qb['height'] ?? 52.0 }}%; {{ !empty($qb['show_border']) ? 'border: 1px solid #0f172a; border-radius: 1mm;' : '' }}">
                             @if(!empty($c['qr_src']))
                                 <img src="{{ $c['qr_src'] }}" class="stub-qr-img" alt="QR" />
                             @endif
@@ -326,7 +329,7 @@
                         {{-- Stub Area: Decoded Token OUTSIDE below box --}}
                         @if(!empty($st['show'] ?? true))
                         <div class="stub-decoded-outside"
-                             style="top: {{ $st['top'] ?? 81.5 }}%; left: {{ $st['left'] ?? 69.5 }}%; width: {{ $st['width'] ?? 26.0 }}%; font-size: {{ $st['font_size'] ?? 6.2 }}pt; color: {{ $st['color'] ?? '#0f172a' }};">
+                             style="top: {{ $st['top'] ?? 81.0 }}%; left: {{ $st['left'] ?? 69.5 }}%; width: {{ $st['width'] ?? 26.0 }}%; font-size: {{ $st['font_size'] ?? 6.0 }}pt; color: {{ $st['color'] ?? '#0f172a' }};">
                             {{ $c['qr_token'] }}
                         </div>
                         @endif

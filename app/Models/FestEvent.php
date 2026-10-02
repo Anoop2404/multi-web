@@ -264,59 +264,59 @@ class FestEvent extends Model
     {
         return [
             'qr_box' => [
-                'top' => 20.5,
-                'left' => 71.0,
-                'width' => 23.0,
-                'height' => 56.5,
+                'top' => 23.0,
+                'left' => 72.5,
+                'width' => 20.0,
+                'height' => 52.0,
                 'show_border' => false,
             ],
             'stub_serial' => [
                 'top' => 6.0,
                 'left' => 69.5,
                 'width' => 26.0,
-                'font_size' => 7.5,
+                'font_size' => 7.2,
                 'color' => '#0f172a',
                 'show' => true,
             ],
             'stub_token' => [
-                'top' => 81.5,
+                'top' => 81.0,
                 'left' => 69.5,
                 'width' => 26.0,
-                'font_size' => 6.2,
+                'font_size' => 6.0,
                 'color' => '#0f172a',
                 'show' => true,
             ],
             'meal_badge' => [
-                'top' => 47.5,
+                'top' => 41.5,
                 'left' => 4.5,
-                'font_size' => 5.2,
+                'font_size' => 5.0,
                 'show' => true,
             ],
             'date_meta' => [
-                'top' => 47.5,
-                'left' => 21.0,
-                'font_size' => 5.2,
+                'top' => 41.5,
+                'left' => 20.0,
+                'font_size' => 5.0,
                 'color' => '#334155',
                 'show' => true,
             ],
             'school_name' => [
-                'top' => 56.5,
+                'top' => 50.5,
                 'left' => 4.5,
-                'max_width' => 62.0,
-                'font_size' => 5.5,
+                'max_width' => 61.0,
+                'font_size' => 5.4,
                 'color' => '#0f172a',
                 'show' => true,
             ],
             'voucher_serial' => [
-                'top' => 72.0,
-                'left' => 51.5,
-                'font_size' => 7.2,
+                'top' => 69.0,
+                'left' => 49.5,
+                'font_size' => 7.0,
                 'color' => '#1e3a8a',
                 'style' => 'pill',
                 'show' => true,
             ],
             'fallback_title' => [
-                'top' => 72.0,
+                'top' => 69.0,
                 'left' => 4.5,
                 'show' => true,
             ],
@@ -329,8 +329,8 @@ class FestEvent extends Model
         $defaults = self::defaultFoodCouponLayout();
         $custom = $this->food_coupon_layout;
 
-        if (empty($custom) && $sahodaya && ! empty($sahodaya->data['food_coupon_layout'])) {
-            $custom = $sahodaya->data['food_coupon_layout'];
+        if (empty($custom) && $sahodaya) {
+            $custom = $sahodaya->food_coupon_layout ?? $sahodaya->data['food_coupon_layout'] ?? null;
         }
 
         if (empty($custom)) {

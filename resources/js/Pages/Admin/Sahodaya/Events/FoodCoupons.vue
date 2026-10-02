@@ -1889,14 +1889,14 @@ const savingLayout = ref(false);
 const saveAsSahodayaDefault = ref(false);
 
 const defaultCoordinates = {
-    qr_box: { top: 20.5, left: 71.0, width: 23.0, height: 56.5, show_border: false },
-    stub_serial: { top: 6.0, left: 69.5, width: 26.0, font_size: 7.5, color: '#0f172a', show: true },
-    stub_token: { top: 81.5, left: 69.5, width: 26.0, font_size: 6.2, color: '#0f172a', show: true },
-    meal_badge: { top: 47.5, left: 4.5, font_size: 5.2, show: true },
-    date_meta: { top: 47.5, left: 21.0, font_size: 5.2, color: '#334155', show: true },
-    school_name: { top: 56.5, left: 4.5, max_width: 62.0, font_size: 5.5, color: '#0f172a', show: true },
-    voucher_serial: { top: 72.0, left: 51.5, font_size: 7.2, color: '#1e3a8a', style: 'pill', show: true },
-    fallback_title: { top: 72.0, left: 4.5, show: true },
+    qr_box: { top: 23.0, left: 72.5, width: 20.0, height: 52.0, show_border: false },
+    stub_serial: { top: 6.0, left: 69.5, width: 26.0, font_size: 7.2, color: '#0f172a', show: true },
+    stub_token: { top: 81.0, left: 69.5, width: 26.0, font_size: 6.0, color: '#0f172a', show: true },
+    meal_badge: { top: 41.5, left: 4.5, font_size: 5.0, show: true },
+    date_meta: { top: 41.5, left: 20.0, font_size: 5.0, color: '#334155', show: true },
+    school_name: { top: 50.5, left: 4.5, max_width: 61.0, font_size: 5.4, color: '#0f172a', show: true },
+    voucher_serial: { top: 69.0, left: 49.5, font_size: 7.0, color: '#1e3a8a', style: 'pill', show: true },
+    fallback_title: { top: 69.0, left: 4.5, show: true },
 };
 
 const getInitialLayout = () => {
@@ -1913,14 +1913,14 @@ const layoutForm = reactive(getInitialLayout());
 
 function applyKochiMetroPreset() {
     const preset = {
-        qr_box: { top: 20.5, left: 71.0, width: 23.0, height: 56.5, show_border: false },
-        stub_serial: { top: 6.0, left: 69.5, width: 26.0, font_size: 7.5, color: '#0f172a', show: true },
-        stub_token: { top: 81.5, left: 69.5, width: 26.0, font_size: 6.2, color: '#0f172a', show: true },
-        meal_badge: { top: 47.5, left: 4.5, font_size: 5.2, show: true },
-        date_meta: { top: 47.5, left: 21.0, font_size: 5.2, color: '#334155', show: true },
-        school_name: { top: 56.5, left: 4.5, max_width: 62.0, font_size: 5.5, color: '#0f172a', show: true },
-        voucher_serial: { top: 72.0, left: 51.5, font_size: 7.2, color: '#1e3a8a', style: 'pill', show: true },
-        fallback_title: { top: 72.0, left: 4.5, show: true },
+        qr_box: { top: 23.0, left: 72.5, width: 20.0, height: 52.0, show_border: false },
+        stub_serial: { top: 6.0, left: 69.5, width: 26.0, font_size: 7.2, color: '#0f172a', show: true },
+        stub_token: { top: 81.0, left: 69.5, width: 26.0, font_size: 6.0, color: '#0f172a', show: true },
+        meal_badge: { top: 41.5, left: 4.5, font_size: 5.0, show: true },
+        date_meta: { top: 41.5, left: 20.0, font_size: 5.0, color: '#334155', show: true },
+        school_name: { top: 50.5, left: 4.5, max_width: 61.0, font_size: 5.4, color: '#0f172a', show: true },
+        voucher_serial: { top: 69.0, left: 49.5, font_size: 7.0, color: '#1e3a8a', style: 'pill', show: true },
+        fallback_title: { top: 69.0, left: 4.5, show: true },
     };
     Object.assign(layoutForm, JSON.parse(JSON.stringify(preset)));
 }
