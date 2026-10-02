@@ -3,9 +3,9 @@
 <head>
     <meta charset="utf-8">
     @php
-        $perSheet = (int) ($perSheet ?? 10);
+        $perSheet = (int) ($perSheet ?? 12);
         if (! in_array($perSheet, [10, 12], true)) {
-            $perSheet = 10;
+            $perSheet = 12;
         }
     @endphp
     <title>{{ $event->title ?? 'Food Coupons' }} — {{ $perSheet }} per Sheet</title>

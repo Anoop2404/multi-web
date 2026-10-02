@@ -1388,7 +1388,7 @@
         </Modal>
 
         <!-- Modal 5: Live Coupon Card Preview -->
-        <Modal :show="showPreviewModal" title="Food Coupon Card Preview" subtitle="Accurate preview of how individual coupons will print on A4 sheets (96mm × 55mm)." @close="showPreviewModal = false">
+        <Modal :show="showPreviewModal" title="Food Coupon Card Preview" :subtitle="`Accurate preview of how individual coupons will print on A4 sheets (${printPerSheet === 12 ? '96mm × 46.5mm' : '96mm × 55mm'}).`" @close="showPreviewModal = false">
             <div class="space-y-4">
                 <div class="flex items-center justify-between gap-3 p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
                     <span class="text-xs font-semibold text-slate-700">Preview Meal:</span>
@@ -1404,7 +1404,8 @@
 
                 <!-- The Live Card -->
                 <div class="p-4 bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-center">
-                    <div class="relative w-full max-w-[480px] aspect-[96/55] rounded-lg overflow-hidden border border-slate-300 shadow-lg bg-white select-none">
+                    <div class="relative w-full max-w-[480px] rounded-lg overflow-hidden border border-slate-300 shadow-lg bg-white select-none transition-all duration-200"
+                         :style="{ aspectRatio: printPerSheet === 12 ? '96 / 46.5' : '96 / 55' }">
                         <!-- Background Image or Fallback -->
                         <img v-if="event.food_coupon_bg_image_url && !bgImgError" :src="event.food_coupon_bg_image_url" class="absolute inset-0 w-full h-full object-fill z-0" alt="Background" />
                         <div v-else class="absolute inset-0 bg-gradient-to-r from-slate-50 to-slate-100 p-3 z-0">
@@ -1466,10 +1467,10 @@
                     <button type="button" @click="showPreviewModal = false" class="px-4 py-2 border rounded-lg text-sm font-medium">Close</button>
                     <div class="flex items-center gap-2">
                         <a
-                            :href="`${base}/food-coupons/print?preview=1`"
+                            :href="`${base}/food-coupons/print?preview=1&per_sheet=${printPerSheet}`"
                             target="_blank"
                             class="px-3.5 py-2 rounded-lg text-sm font-semibold border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition flex items-center gap-1.5"
-                            title="Preview full 10-per-sheet PDF in browser using third-party converter"
+                            :title="`Preview full ${printPerSheet}-per-sheet PDF in browser using high-fidelity converter`"
                         >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                             <span>Preview Full A4 Sheet (PDF)</span>
