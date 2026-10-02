@@ -1141,6 +1141,23 @@ class FestCertificateController extends SahodayaAdminController
         $service = app(FestCertificateService::class);
         [$certificates, $payloads] = $service->exportScope($event, $publishedOnly, $itemId, $schoolId, $certType, $certIds);
 
+        if (! $schoolId && ($request->boolean('exclude_downloaded') || ($groupBy === 'school' && empty($certIds)))) {
+            $downloadedMarks = $this->downloadMarks($event);
+            $downloadedSchoolIds = $downloadedMarks
+                ->when($certType, fn ($c) => $c->filter(fn ($m) => $m->cert_type === $certType))
+                ->pluck('school_id')
+                ->flip();
+
+            if ($downloadedSchoolIds->isNotEmpty()) {
+                $certificates = $certificates->reject(function ($cert) use ($payloads, $downloadedSchoolIds) {
+                    $p = $payloads->get($cert->id);
+                    $sId = (string) ($p['registration']?->school_id ?? $p['participant']?->registration?->school_id ?? '');
+
+                    return $downloadedSchoolIds->has($sId);
+                })->values();
+            }
+        }
+
         abort_if($certificates->isEmpty(), 404, $publishedOnly ? 'No published winner certificates to download.' : 'No certificates to download.');
 
         $zipPath = storage_path('app/tmp/fest-certs-'.$event->id.'-'.time().'.zip');
@@ -1239,6 +1256,24 @@ class FestCertificateController extends SahodayaAdminController
         if ($publishedOnly) {
             $payloads = $service->payloadsFor($certificates);
             $certificates = $service->publishedOnlyWinners($certificates, $payloads);
+        }
+
+        if (! $schoolId && ($request->boolean('exclude_downloaded') || ($groupBy === 'school' && empty($certIds)))) {
+            $downloadedMarks = $this->downloadMarks($event);
+            $downloadedSchoolIds = $downloadedMarks
+                ->when($certType, fn ($c) => $c->filter(fn ($m) => $m->cert_type === $certType))
+                ->pluck('school_id')
+                ->flip();
+
+            if ($downloadedSchoolIds->isNotEmpty()) {
+                $payloads ??= $service->payloadsFor($certificates);
+                $certificates = $certificates->reject(function ($cert) use ($payloads, $downloadedSchoolIds) {
+                    $p = $payloads->get($cert->id);
+                    $sId = (string) ($p['registration']?->school_id ?? $p['participant']?->registration?->school_id ?? '');
+
+                    return $downloadedSchoolIds->has($sId);
+                })->values();
+            }
         }
 
         abort_if($certificates->isEmpty(), 404, $publishedOnly ? 'No published winner certificates to download.' : 'No certificates to download.');

@@ -117,11 +117,11 @@
                                         class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                                     📦 Participation only — no background (ZIP)
                                 </button>
-                                <button v-if="participationBySchool.length" @click="queueZipDownload({ cert_type: 'participation', group_by: 'school' }, $event)" :disabled="isBatchRunning"
+                                <button v-if="participationBySchool.length" @click="queueZipDownload({ cert_type: 'participation', group_by: 'school', exclude_downloaded: '1' }, $event)" :disabled="isBatchRunning"
                                         class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                                     📦 Participation — grouped by school (ZIP)
                                 </button>
-                                <button v-if="participationBySchool.length" @click="queueZipDownload({ cert_type: 'participation', group_by: 'school', plain: '1' }, $event)" :disabled="isBatchRunning"
+                                <button v-if="participationBySchool.length" @click="queueZipDownload({ cert_type: 'participation', group_by: 'school', plain: '1', exclude_downloaded: '1' }, $event)" :disabled="isBatchRunning"
                                         class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                                     📦 Participation — grouped by school — no background (ZIP)
                                 </button>
@@ -290,15 +290,15 @@
                 </span>
                 <details v-if="readyCertificateIds(filteredWinnersBySchool).length" class="relative ml-auto">
                     <summary class="btn-secondary py-1.5 px-3 text-xs inline-flex list-none cursor-pointer [&::-webkit-details-marker]:hidden">
-                        📦 Results-complete schools shown ({{ filteredWinnersBySchool.filter(isSchoolReady).length }}) ▾
+                        📦 Results-complete schools shown ({{ filteredWinnersBySchool.filter(isSchoolReadyForExport).length }}) ▾
                     </summary>
                     <div class="absolute z-20 right-0 mt-1 w-72 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
-                        <p class="px-3 pt-2 pb-1 text-[11px] text-gray-500">One folder per school — only schools whose every registered item has published results.</p>
-                        <button @click="queueZipDownload({ certificate_ids: readyCertificateIds(filteredWinnersBySchool).join(','), group_by: 'school' }, $event)" :disabled="isBatchRunning"
+                        <p class="px-3 pt-2 pb-1 text-[11px] text-gray-500">One folder per school — only schools whose every registered item has published results<template v-if="schoolDownloaded !== 'yes'"> (excluding downloaded schools)</template>.</p>
+                        <button @click="queueZipDownload({ certificate_ids: readyCertificateIds(filteredWinnersBySchool).join(','), group_by: 'school', exclude_downloaded: '1' }, $event)" :disabled="isBatchRunning"
                                 class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                             📦 ZIP (with background)
                         </button>
-                        <button @click="queueZipDownload({ certificate_ids: readyCertificateIds(filteredWinnersBySchool).join(','), group_by: 'school', plain: '1' }, $event)" :disabled="isBatchRunning"
+                        <button @click="queueZipDownload({ certificate_ids: readyCertificateIds(filteredWinnersBySchool).join(','), group_by: 'school', plain: '1', exclude_downloaded: '1' }, $event)" :disabled="isBatchRunning"
                                 class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                             📦 ZIP — no background
                         </button>
@@ -436,11 +436,12 @@
                         📦 All schools — folder per school ▾
                     </summary>
                     <div class="absolute z-20 right-0 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
-                        <button @click="queueZipDownload({ cert_type: 'participation', group_by: 'school' }, $event)" :disabled="isBatchRunning"
+                        <p class="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">Excluding downloaded schools</p>
+                        <button @click="queueZipDownload({ certificate_ids: allNonDownloadedCertificateIds().join(','), cert_type: 'participation', group_by: 'school', exclude_downloaded: '1' }, $event)" :disabled="isBatchRunning"
                                 class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                             📦 ZIP (with background)
                         </button>
-                        <button @click="queueZipDownload({ cert_type: 'participation', group_by: 'school', plain: '1' }, $event)" :disabled="isBatchRunning"
+                        <button @click="queueZipDownload({ certificate_ids: allNonDownloadedCertificateIds().join(','), cert_type: 'participation', group_by: 'school', plain: '1', exclude_downloaded: '1' }, $event)" :disabled="isBatchRunning"
                                 class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                             📦 ZIP — no background
                         </button>
@@ -479,9 +480,9 @@
                     </summary>
                     <div class="absolute z-20 left-0 mt-1 w-72 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left text-xs">
                         <p class="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">Not printed yet — excluding downloaded schools</p>
-                        <button @click="queueZipDownload({ certificate_ids: leftToPrintCertificateIds().join(','), cert_type: 'participation', group_by: 'school' }, $event)" :disabled="isBatchRunning"
+                        <button @click="queueZipDownload({ certificate_ids: leftToPrintCertificateIds().join(','), cert_type: 'participation', group_by: 'school', exclude_downloaded: '1' }, $event)" :disabled="isBatchRunning"
                                 class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">📦 With background</button>
-                        <button @click="queueZipDownload({ certificate_ids: leftToPrintCertificateIds().join(','), cert_type: 'participation', group_by: 'school', plain: '1' }, $event)" :disabled="isBatchRunning"
+                        <button @click="queueZipDownload({ certificate_ids: leftToPrintCertificateIds().join(','), cert_type: 'participation', group_by: 'school', plain: '1', exclude_downloaded: '1' }, $event)" :disabled="isBatchRunning"
                                 class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">📦 Without background (plain)</button>
                         <div class="my-1 border-t border-gray-100"></div>
                         <a :href="statusUrl('pdf', { preview: 1, status: 'unprinted' })" target="_blank" rel="noopener" class="block px-3 py-2 rounded hover:bg-gray-50">👁️ List of who's left ↗</a>
@@ -518,15 +519,15 @@
                 </span>
                 <details v-if="readyCertificateIds(filteredParticipationBySchool).length" class="relative ml-auto">
                     <summary class="btn-secondary py-1.5 px-3 text-xs inline-flex list-none cursor-pointer [&::-webkit-details-marker]:hidden">
-                        📦 Results-complete schools shown ({{ filteredParticipationBySchool.filter(isSchoolReady).length }}) ▾
+                        📦 Results-complete schools shown ({{ filteredParticipationBySchool.filter(isSchoolReadyForExport).length }}) ▾
                     </summary>
                     <div class="absolute z-20 right-0 mt-1 w-72 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
-                        <p class="px-3 pt-2 pb-1 text-[11px] text-gray-500">One folder per school — only schools whose every registered item has published results.</p>
-                        <button @click="queueZipDownload({ certificate_ids: readyCertificateIds(filteredParticipationBySchool).join(','), group_by: 'school' }, $event)" :disabled="isBatchRunning"
+                        <p class="px-3 pt-2 pb-1 text-[11px] text-gray-500">One folder per school — only schools whose every registered item has published results<template v-if="schoolDownloaded !== 'yes'"> (excluding downloaded schools)</template>.</p>
+                        <button @click="queueZipDownload({ certificate_ids: readyCertificateIds(filteredParticipationBySchool).join(','), group_by: 'school', exclude_downloaded: '1' }, $event)" :disabled="isBatchRunning"
                                 class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                             📦 ZIP (with background)
                         </button>
-                        <button @click="queueZipDownload({ certificate_ids: readyCertificateIds(filteredParticipationBySchool).join(','), group_by: 'school', plain: '1' }, $event)" :disabled="isBatchRunning"
+                        <button @click="queueZipDownload({ certificate_ids: readyCertificateIds(filteredParticipationBySchool).join(','), group_by: 'school', plain: '1', exclude_downloaded: '1' }, $event)" :disabled="isBatchRunning"
                                 class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                             📦 ZIP — no background
                         </button>
@@ -1004,6 +1005,8 @@ async function printComplete(schoolId, plain = false, clickEvent = null, include
 
 // Manual checklist: tick a school once its certificates have been downloaded / handed over.
 function markDownloaded(group, certType, downloaded) {
+    group.downloaded = downloaded;
+    group.downloaded_at = downloaded ? new Date().toISOString() : null;
     router.post(`${base}/school-downloaded`, {
         school_id: group.school_id,
         cert_type: certType,
@@ -1015,6 +1018,12 @@ function markDownloaded(group, certType, downloaded) {
 // FestCertificateController::schoolResultsStatus()) — no merit result or grade still to come.
 function isSchoolReady(group) {
     return (group.results?.total ?? 0) > 0 && (group.results?.pending?.length ?? 0) === 0;
+}
+
+function isSchoolReadyForExport(group) {
+    if (!isSchoolReady(group)) return false;
+    if (schoolDownloaded.value !== 'yes' && group.downloaded) return false;
+    return true;
 }
 
 function matchesSchoolSearch(group) {
@@ -1029,7 +1038,13 @@ function matchesSchoolSearch(group) {
 }
 
 function readyCertificateIds(groups) {
-    return groups.filter(isSchoolReady).flatMap(group => group.winners.map(w => w.id));
+    return groups.filter(isSchoolReadyForExport).flatMap(group => (group.winners ?? []).map(w => w.id));
+}
+
+function allNonDownloadedCertificateIds() {
+    return props.participationBySchool
+        .filter((g) => !g.downloaded)
+        .flatMap((g) => (g.winners ?? []).map((w) => w.id));
 }
 const filteredParticipationBySchool = computed(() => props.participationBySchool.filter(matchesSchoolSearch));
 const filteredWinnersBySchool = computed(() => props.winnersBySchool.filter(matchesSchoolSearch));

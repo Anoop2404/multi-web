@@ -477,5 +477,17 @@ class FestParticipationCertificateParentTest extends TestCase
         // Unprinted status export should exclude downloaded schools
         $unprinted = $this->actingAs($admin)->get("{$base}/print-status/xls?status=unprinted")->streamedContent();
         $this->assertStringNotContainsString('Two Leg Student', $unprinted);
+
+        // Bulk queueZipExport grouped by school should exclude downloaded schools (returns 404 if none left)
+        $this->actingAs($admin)->post("{$base}/download-zip/queue", [
+            'group_by' => 'school',
+            'cert_type' => 'participation',
+        ])->assertStatus(404);
+
+        // But targeting the school directly in queueZipExport works
+        $this->actingAs($admin)->post("{$base}/download-zip/queue", [
+            'school_id' => $school->id,
+            'cert_type' => 'participation',
+        ])->assertRedirect()->assertSessionHas('certificate_batch_id');
     }
 }
