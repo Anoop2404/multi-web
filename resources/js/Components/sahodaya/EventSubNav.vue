@@ -16,6 +16,7 @@
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import {
+    FEST_CATERING,
     FEST_CERTIFICATES,
     FEST_FINANCE,
     FEST_MANAGE,
