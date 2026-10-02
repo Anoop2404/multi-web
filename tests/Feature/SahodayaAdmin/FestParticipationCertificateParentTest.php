@@ -448,4 +448,34 @@ class FestParticipationCertificateParentTest extends TestCase
         $this->actingAs($admin)->post("{$base}/print-status/clear")->assertRedirect();
         $this->assertSame(0, \App\Models\FestCertificatePrint::count());
     }
+
+    public function test_downloaded_marked_schools_are_excluded_from_bulk_print_complete_and_unprinted_status(): void
+    {
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $f = $this->fixture();
+        $school = \App\Models\Tenant::find($f['student']->tenant_id);
+        app(FestCertificateService::class)->generateParticipationForEvent($f['root']);
+        FestEventItem::whereIn('title', ['Pencil Drawing', 'Solo Song'])->update(['results_published_at' => now()]);
+
+        $admin = \App\Models\User::factory()->create(['tenant_id' => $f['root']->tenant_id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+        $base = "/sahodaya-admin/{$f['root']->tenant_id}/events/{$f['root']->id}/certificates";
+
+        // Mark this school as downloaded
+        $this->actingAs($admin)->post("{$base}/school-downloaded", [
+            'school_id' => $school->id,
+            'cert_type' => 'participation',
+            'downloaded' => true,
+        ])->assertRedirect();
+
+        // Bulk print complete should exclude downloaded schools and return 422 (nothing left)
+        $this->actingAs($admin)->postJson("{$base}/print-complete", [])->assertStatus(422);
+
+        // But explicitly targeting this school directly still allows printing it
+        $this->actingAs($admin)->postJson("{$base}/print-complete", ['school_id' => $school->id])->assertOk()->assertJsonPath('count', 1);
+
+        // Unprinted status export should exclude downloaded schools
+        $unprinted = $this->actingAs($admin)->get("{$base}/print-status/xls?status=unprinted")->streamedContent();
+        $this->assertStringNotContainsString('Two Leg Student', $unprinted);
+    }
 }

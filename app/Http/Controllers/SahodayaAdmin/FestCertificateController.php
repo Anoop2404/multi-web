@@ -379,12 +379,13 @@ class FestCertificateController extends SahodayaAdminController
         });
     }
 
-    /** All participation rows for the event, by school, with print state (and the school's own results status). */
+    /** All participation rows for the event, by school, with print state and downloaded marks (and the school's own results status). */
     private function participationPrintGroups(FestEvent $event): Collection
     {
         $certificates = $this->withParticipationItems($this->certificatesForEvent($event, 'participation'), $event);
+        $marks = $this->downloadMarks($event);
 
-        return $this->withPrintState($this->participationBySchool($certificates, $event));
+        return $this->withDownloadMarks($this->withPrintState($this->participationBySchool($certificates, $event)), $marks, 'participation');
     }
 
     /**
@@ -405,7 +406,10 @@ class FestCertificateController extends SahodayaAdminController
         $includePrinted = (bool) ($validated['include_printed'] ?? false);
 
         $groups = $this->participationPrintGroups($event)
-            ->when($schoolId, fn ($c) => $c->filter(fn (array $g) => (string) $g['school_id'] === $schoolId));
+            ->when($schoolId,
+                fn ($c) => $c->filter(fn (array $g) => (string) $g['school_id'] === $schoolId),
+                fn ($c) => $c->filter(fn (array $g) => ! ($g['downloaded'] ?? false))
+            );
 
         $toPrint = $groups->flatMap(fn (array $g) => collect($g['winners'])
             ->filter(fn (array $w) => $w['complete'] && ! $w['printed'])
@@ -561,6 +565,7 @@ class FestCertificateController extends SahodayaAdminController
     {
         $groups = $this->participationPrintGroups($event)
             ->when($schoolId, fn ($c) => $c->filter(fn (array $g) => (string) $g['school_id'] === $schoolId))
+            ->when($status === 'unprinted' && ! $schoolId, fn ($c) => $c->filter(fn (array $g) => ! ($g['downloaded'] ?? false)))
             ->values();
 
         $studentIds = $groups->flatMap(fn (array $g) => collect($g['winners'])->pluck('student_id'))->filter()->unique()->values();
@@ -668,6 +673,13 @@ class FestCertificateController extends SahodayaAdminController
         $cleared = FestCertificatePrint::whereIn('event_id', $event->rootEvent()->reportableEventIds())
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->delete();
+
+        if ($cleared) {
+            FestCertificateSchoolMark::whereIn('event_id', $event->rootEvent()->reportableEventIds())
+                ->where('cert_type', 'participation')
+                ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+                ->delete();
+        }
 
         app(\App\Services\Audit\PlatformAuditLogger::class)->festEvent($event, FestPageActivity::CERTIFICATES, 'fest.certificates.print-status-cleared', "{$cleared} printed record(s) cleared", [
             'school_id' => $schoolId,
@@ -1321,7 +1333,10 @@ class FestCertificateController extends SahodayaAdminController
         if ($request->boolean('complete')) {
             $schoolFilter = $request->query('school_id') ? (string) $request->query('school_id') : null;
             $completeIds = $this->participationPrintGroups($event)
-                ->when($schoolFilter, fn ($c) => $c->filter(fn (array $g) => (string) $g['school_id'] === $schoolFilter))
+                ->when($schoolFilter,
+                    fn ($c) => $c->filter(fn (array $g) => (string) $g['school_id'] === $schoolFilter),
+                    fn ($c) => $c->filter(fn (array $g) => ! ($g['downloaded'] ?? false))
+                )
                 ->flatMap(fn (array $g) => collect($g['winners'])->filter(fn (array $w) => $w['complete'])->pluck('id'))
                 ->map(fn ($id) => (int) $id)
                 ->all();

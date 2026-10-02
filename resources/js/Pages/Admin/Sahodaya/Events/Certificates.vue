@@ -411,14 +411,14 @@
                         </summary>
                         <div class="absolute z-20 right-0 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left text-xs">
                             <template v-if="totalReadyToPrint">
-                                <p class="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">Print complete ({{ totalReadyToPrint }}) — marks them printed</p>
+                                <p class="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">Print complete ({{ totalReadyToPrint }}) — excluding downloaded schools</p>
                                 <button @click="printComplete(null, false, $event)" :disabled="printingComplete"
                                         class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🖨️ With background</button>
                                 <button @click="printComplete(null, true, $event)" :disabled="printingComplete"
                                         class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🖨️ Without background (plain)</button>
                             </template>
                             <template v-if="totalComplete">
-                                <p class="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">Reprint all complete ({{ totalComplete }}) — printed + ready</p>
+                                <p class="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">Reprint all complete ({{ totalComplete }}) — excluding downloaded schools</p>
                                 <button @click="printComplete(null, false, $event, true)" :disabled="printingComplete"
                                         class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">🔁 With background</button>
                                 <button @click="printComplete(null, true, $event, true)" :disabled="printingComplete"
@@ -478,7 +478,7 @@
                         📦 Left to print — ZIP ({{ totalLeftToPrint }}) ▾
                     </summary>
                     <div class="absolute z-20 left-0 mt-1 w-72 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left text-xs">
-                        <p class="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">Not printed yet — includes students still awaiting results</p>
+                        <p class="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">Not printed yet — excluding downloaded schools</p>
                         <button @click="queueZipDownload({ certificate_ids: leftToPrintCertificateIds().join(','), cert_type: 'participation', group_by: 'school' }, $event)" :disabled="isBatchRunning"
                                 class="block w-full text-left px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-40">📦 With background</button>
                         <button @click="queueZipDownload({ certificate_ids: leftToPrintCertificateIds().join(','), cert_type: 'participation', group_by: 'school', plain: '1' }, $event)" :disabled="isBatchRunning"
@@ -923,6 +923,7 @@ const printRun = ref(null);
 const printError = ref('');
 
 function readyToPrint(group) {
+    if (group.downloaded) return 0;
     return (group.winners ?? []).filter((w) => w.complete && !w.printed).length;
 }
 function printedCount(group) {
@@ -940,14 +941,20 @@ function printedCertificateIds() {
     return props.participationBySchool.flatMap((g) => (g.winners ?? []).filter((w) => w.printed).map((w) => w.id));
 }
 function leftToPrintCertificateIds() {
-    return props.participationBySchool.flatMap((g) => (g.winners ?? []).filter((w) => !w.printed).map((w) => w.id));
+    return props.participationBySchool
+        .filter((g) => !g.downloaded)
+        .flatMap((g) => (g.winners ?? []).filter((w) => !w.printed).map((w) => w.id));
 }
-const totalLeftToPrint = computed(() => props.participationBySchool.reduce((n, g) => n + (g.winners ?? []).filter((w) => !w.printed).length, 0));
+const totalLeftToPrint = computed(() => props.participationBySchool
+    .filter((g) => !g.downloaded)
+    .reduce((n, g) => n + (g.winners ?? []).filter((w) => !w.printed).length, 0));
 
 function completeCount(group) {
     return (group.winners ?? []).filter((w) => w.complete).length;
 }
-const totalComplete = computed(() => props.participationBySchool.reduce((n, g) => n + completeCount(g), 0));
+const totalComplete = computed(() => props.participationBySchool
+    .filter((g) => !g.downloaded)
+    .reduce((n, g) => n + completeCount(g), 0));
 function reprintUrl(schoolId, plain) {
     const params = new URLSearchParams({ reprint: '1' });
     if (schoolId) params.set('school_id', schoolId);
