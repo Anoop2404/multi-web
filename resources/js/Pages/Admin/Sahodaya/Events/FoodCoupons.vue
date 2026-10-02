@@ -158,6 +158,25 @@
                         {{ summary.total || coupons.length }}
                     </span>
                 </button>
+
+                <button
+                    type="button"
+                    @click="activeTab = 'builder'"
+                    class="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition shrink-0"
+                    :class="activeTab === 'builder' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    <span>Coupon Template Builder</span>
+                    <span
+                        v-if="event.has_template_bg"
+                        class="px-2 py-0.5 text-[10px] rounded-full font-bold uppercase tracking-wide"
+                        :class="activeTab === 'builder' ? 'bg-emerald-500 text-white' : 'bg-emerald-100 text-emerald-800'"
+                    >
+                        Custom BG
+                    </span>
+                </button>
             </div>
 
             <!-- Tab 1: School-wise Distribution & Download -->
@@ -529,6 +548,531 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Tab 4: Coupon Template Builder -->
+            <div v-show="activeTab === 'builder'" class="space-y-6">
+                <!-- Builder Header Card -->
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                            <span>🎨 Food Coupon Visual Template Builder</span>
+                            <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                95mm × 40.63mm (10 per A4 Sheet)
+                            </span>
+                        </h2>
+                        <p class="text-xs text-slate-500 mt-1">
+                            Customize the position of QR codes, serial numbers, meal pills, and school text to match your Sahodaya's graphic background.
+                        </p>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            @click="applyKochiMetroPreset"
+                            class="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition"
+                            title="Load preset aligned for Kochi Metro Sahodaya right-stub template"
+                        >
+                            Preset: Kochi Metro
+                        </button>
+                        <button
+                            type="button"
+                            @click="applyPlainPaperPreset"
+                            class="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition"
+                            title="Load preset with outer borders for plain A4 paper"
+                        >
+                            Preset: Plain Paper
+                        </button>
+                        <button
+                            type="button"
+                            @click="resetToDefaultLayout"
+                            class="px-3 py-1.5 rounded-lg text-xs font-semibold border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 transition"
+                        >
+                            Reset Defaults
+                        </button>
+                        <a
+                            :href="`${base}/food-coupons/print?extra_only=1`"
+                            target="_blank"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition"
+                            title="Print sample PDF to test physical printer alignment"
+                        >
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                            <span>Test Print Sample PDF</span>
+                        </a>
+                        <button
+                            type="button"
+                            @click="submitSaveLayout"
+                            class="btn-primary flex items-center gap-1.5"
+                            :disabled="savingLayout"
+                        >
+                            <span v-if="savingLayout">Saving...</span>
+                            <span v-else>Save Template Layout</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2-Column Canvas + Settings Workspace -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    <!-- Left: Interactive Visual Canvas (7 cols on lg) -->
+                    <div class="lg:col-span-7 bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-800">Live WYSIWYG Preview</h3>
+                                <p class="text-[11px] text-slate-400">Click any element on the card to configure its position.</p>
+                            </div>
+                            <!-- Sample Meal Selector -->
+                            <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+                                <button
+                                    v-for="(label, key) in mealTypes"
+                                    :key="key"
+                                    type="button"
+                                    @click="previewMeal = key"
+                                    class="px-2 py-0.5 text-[11px] font-semibold rounded"
+                                    :class="previewMeal === key ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'"
+                                >
+                                    {{ mealPrefixes[key] || key }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Card Canvas Frame -->
+                        <div class="p-4 bg-slate-100 rounded-xl flex items-center justify-center overflow-hidden border border-slate-200">
+                            <div
+                                class="relative bg-white shadow-md rounded overflow-hidden select-none"
+                                style="width: 100%; max-width: 540px; aspect-ratio: 95 / 40.63;"
+                            >
+                                <!-- Background Image -->
+                                <img
+                                    v-if="event.food_coupon_bg_image_url"
+                                    :src="event.food_coupon_bg_image_url"
+                                    class="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                                    alt="Coupon Background"
+                                />
+
+                                <!-- Fallback elements when NO background image -->
+                                <template v-if="!event.food_coupon_bg_image_url">
+                                    <div class="absolute left-[4.5%] top-[4%] w-[59%] pointer-events-none">
+                                        <div class="text-[10px] font-bold text-slate-900 uppercase leading-tight">{{ event.title || 'Sahodaya Festival' }}</div>
+                                        <div class="text-[8px] text-slate-500">{{ sahodayaName || 'Sahodaya Complex' }}</div>
+                                    </div>
+                                    <div
+                                        v-if="layoutForm.fallback_title?.show ?? true"
+                                        class="absolute text-[13px] font-extrabold text-slate-900 tracking-wider pointer-events-none"
+                                        :style="{
+                                            top: (layoutForm.fallback_title?.top ?? 72) + '%',
+                                            left: (layoutForm.fallback_title?.left ?? 4.5) + '%',
+                                        }"
+                                    >
+                                        FOOD COUPON
+                                    </div>
+                                    <div class="absolute left-[67%] top-0 bottom-0 border-l border-dashed border-slate-300 pointer-events-none"></div>
+                                </template>
+
+                                <!-- 1. Stub Serial Number -->
+                                <div
+                                    v-if="layoutForm.stub_serial?.show ?? true"
+                                    @click="activeElement = 'stub_serial'"
+                                    class="absolute text-center font-mono font-bold leading-tight cursor-pointer transition"
+                                    :class="activeElement === 'stub_serial' ? 'ring-2 ring-indigo-500 rounded bg-indigo-50/70' : 'hover:outline hover:outline-1 hover:outline-indigo-300'"
+                                    :style="{
+                                        top: (layoutForm.stub_serial?.top ?? 6) + '%',
+                                        left: (layoutForm.stub_serial?.left ?? 69.5) + '%',
+                                        width: (layoutForm.stub_serial?.width ?? 26) + '%',
+                                        fontSize: (layoutForm.stub_serial?.font_size ? layoutForm.stub_serial.font_size * 1.5 : 11) + 'px',
+                                        color: layoutForm.stub_serial?.color || '#0f172a',
+                                    }"
+                                >
+                                    {{ previewCoupon.coupon_code }}
+                                </div>
+
+                                <!-- 2. Stub QR Box & Code -->
+                                <div
+                                    @click="activeElement = 'qr_box'"
+                                    class="absolute flex items-center justify-center cursor-pointer transition p-0.5"
+                                    :class="[
+                                        activeElement === 'qr_box' ? 'ring-2 ring-indigo-500 bg-indigo-50/50' : 'hover:outline hover:outline-1 hover:outline-indigo-300',
+                                        layoutForm.qr_box?.show_border ? 'border border-slate-800 rounded' : ''
+                                    ]"
+                                    :style="{
+                                        top: (layoutForm.qr_box?.top ?? 20.5) + '%',
+                                        left: (layoutForm.qr_box?.left ?? 71) + '%',
+                                        width: (layoutForm.qr_box?.width ?? 23) + '%',
+                                        height: (layoutForm.qr_box?.height ?? 56.5) + '%',
+                                    }"
+                                >
+                                    <img
+                                        :src="sampleQrSrc"
+                                        class="w-full h-full object-contain pointer-events-none"
+                                        alt="QR"
+                                    />
+                                </div>
+
+                                <!-- 3. Stub Decoded Token -->
+                                <div
+                                    v-if="layoutForm.stub_token?.show ?? true"
+                                    @click="activeElement = 'stub_token'"
+                                    class="absolute text-center font-mono font-bold leading-tight cursor-pointer transition"
+                                    :class="activeElement === 'stub_token' ? 'ring-2 ring-indigo-500 rounded bg-indigo-50/70' : 'hover:outline hover:outline-1 hover:outline-indigo-300'"
+                                    :style="{
+                                        top: (layoutForm.stub_token?.top ?? 81.5) + '%',
+                                        left: (layoutForm.stub_token?.left ?? 69.5) + '%',
+                                        width: (layoutForm.stub_token?.width ?? 26) + '%',
+                                        fontSize: (layoutForm.stub_token?.font_size ? layoutForm.stub_token.font_size * 1.4 : 9) + 'px',
+                                        color: layoutForm.stub_token?.color || '#0f172a',
+                                    }"
+                                >
+                                    {{ previewCoupon.qr_token }}
+                                </div>
+
+                                <!-- 4. Left Meal Pill -->
+                                <span
+                                    v-if="layoutForm.meal_badge?.show ?? true"
+                                    @click="activeElement = 'meal_badge'"
+                                    class="absolute inline-block text-white font-bold uppercase rounded cursor-pointer leading-none transition"
+                                    :class="[
+                                        previewPillClass,
+                                        activeElement === 'meal_badge' ? 'ring-2 ring-indigo-500' : 'hover:outline hover:outline-1 hover:outline-indigo-300'
+                                    ]"
+                                    :style="{
+                                        top: (layoutForm.meal_badge?.top ?? 47.5) + '%',
+                                        left: (layoutForm.meal_badge?.left ?? 4.5) + '%',
+                                        fontSize: (layoutForm.meal_badge?.font_size ? layoutForm.meal_badge.font_size * 1.5 : 8) + 'px',
+                                        padding: '2px 6px',
+                                    }"
+                                >
+                                    {{ previewCoupon.meal_type }}
+                                </span>
+
+                                <!-- 5. Left Date & Quantity -->
+                                <div
+                                    v-if="layoutForm.date_meta?.show ?? true"
+                                    @click="activeElement = 'date_meta'"
+                                    class="absolute whitespace-nowrap cursor-pointer transition"
+                                    :class="activeElement === 'date_meta' ? 'ring-2 ring-indigo-500 rounded bg-indigo-50/70' : 'hover:outline hover:outline-1 hover:outline-indigo-300'"
+                                    :style="{
+                                        top: (layoutForm.date_meta?.top ?? 47.5) + '%',
+                                        left: (layoutForm.date_meta?.left ?? 21) + '%',
+                                        fontSize: (layoutForm.date_meta?.font_size ? layoutForm.date_meta.font_size * 1.4 : 8) + 'px',
+                                        color: layoutForm.date_meta?.color || '#334155',
+                                    }"
+                                >
+                                    <strong>Date:</strong> {{ previewCoupon.formatted_date }} &nbsp; <strong>Qty:</strong> 1
+                                </div>
+
+                                <!-- 6. Left School Name -->
+                                <div
+                                    v-if="layoutForm.school_name?.show ?? true"
+                                    @click="activeElement = 'school_name'"
+                                    class="absolute font-bold truncate cursor-pointer transition"
+                                    :class="activeElement === 'school_name' ? 'ring-2 ring-indigo-500 rounded bg-indigo-50/70' : 'hover:outline hover:outline-1 hover:outline-indigo-300'"
+                                    :style="{
+                                        top: (layoutForm.school_name?.top ?? 56.5) + '%',
+                                        left: (layoutForm.school_name?.left ?? 4.5) + '%',
+                                        maxWidth: (layoutForm.school_name?.max_width ?? 62) + '%',
+                                        fontSize: (layoutForm.school_name?.font_size ? layoutForm.school_name.font_size * 1.5 : 9) + 'px',
+                                        color: layoutForm.school_name?.color || '#0f172a',
+                                    }"
+                                >
+                                    {{ previewCoupon.school_name }}
+                                </div>
+
+                                <!-- 7. Main Voucher Serial Badge -->
+                                <div
+                                    v-if="layoutForm.voucher_serial?.show ?? true"
+                                    @click="activeElement = 'voucher_serial'"
+                                    class="absolute font-mono font-bold leading-none cursor-pointer transition"
+                                    :class="[
+                                        (layoutForm.voucher_serial?.style ?? 'pill') === 'pill' ? 'bg-blue-100 text-blue-900 border border-blue-300 rounded px-1.5 py-0.5' : '',
+                                        activeElement === 'voucher_serial' ? 'ring-2 ring-indigo-500' : 'hover:outline hover:outline-1 hover:outline-indigo-300'
+                                    ]"
+                                    :style="{
+                                        top: (layoutForm.voucher_serial?.top ?? 72) + '%',
+                                        left: (layoutForm.voucher_serial?.left ?? 51.5) + '%',
+                                        fontSize: (layoutForm.voucher_serial?.font_size ? layoutForm.voucher_serial.font_size * 1.5 : 10) + 'px',
+                                        color: layoutForm.voucher_serial?.color || '#1e3a8a',
+                                    }"
+                                >
+                                    {{ previewCoupon.coupon_code }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Canvas Helper info -->
+                        <div class="text-xs text-slate-500 flex items-center justify-between">
+                            <span>Selected Element: <strong class="text-indigo-600 uppercase">{{ activeElement.replace('_', ' ') }}</strong></span>
+                            <span class="text-slate-400">Dimensions: 95mm × 40.63mm (300 DPI)</span>
+                        </div>
+                    </div>
+
+                    <!-- Right: Positioning & Styling Controls (5 cols on lg) -->
+                    <div class="lg:col-span-5 space-y-4">
+                        <!-- Background Image Card -->
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                            <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center justify-between">
+                                <span>1. Template Background Graphic</span>
+                                <span v-if="event.has_template_bg" class="text-[10px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded font-bold">Active</span>
+                            </h4>
+                            <p class="text-xs text-slate-500">
+                                Upload your Sahodaya's designed coupon graphic (PNG, JPG, WebP). Recommended resolution: <strong>1122 × 480 px</strong>.
+                            </p>
+                            <div class="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    @click="showBgModal = true"
+                                    class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition"
+                                >
+                                    {{ event.has_template_bg ? 'Replace Background' : 'Upload Background Image' }}
+                                </button>
+                                <button
+                                    v-if="event.has_template_bg"
+                                    type="button"
+                                    @click="removeTemplateBg"
+                                    class="px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition"
+                                    :disabled="removingBg"
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Element Settings Tabs -->
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                                <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                                    2. Position & Font Settings
+                                </h4>
+                                <select v-model="activeElement" class="text-xs rounded border-slate-300 py-1 px-2 font-medium">
+                                    <option value="qr_box">QR Code & Box (Stub)</option>
+                                    <option value="stub_serial">Serial Code (Above QR)</option>
+                                    <option value="stub_token">Decoded Token (Below QR)</option>
+                                    <option value="meal_badge">Meal Type Pill</option>
+                                    <option value="date_meta">Date & Qty Meta</option>
+                                    <option value="school_name">School Name</option>
+                                    <option value="voucher_serial">Voucher Serial Code</option>
+                                </select>
+                            </div>
+
+                            <!-- Panel 1: QR Box -->
+                            <div v-show="activeElement === 'qr_box'" class="space-y-3">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">X Position (Left %)</label>
+                                        <input type="number" step="0.5" min="0" max="100" v-model.number="layoutForm.qr_box.left" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Y Position (Top %)</label>
+                                        <input type="number" step="0.5" min="0" max="100" v-model.number="layoutForm.qr_box.top" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Width (%)</label>
+                                        <input type="number" step="0.5" min="5" max="50" v-model.number="layoutForm.qr_box.width" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Height (%)</label>
+                                        <input type="number" step="0.5" min="5" max="80" v-model.number="layoutForm.qr_box.height" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                </div>
+                                <label class="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer pt-1">
+                                    <input type="checkbox" v-model="layoutForm.qr_box.show_border" class="rounded text-indigo-600">
+                                    <span>Draw Outline Border Box (useful when background has no box)</span>
+                                </label>
+                            </div>
+
+                            <!-- Panel 2: Stub Serial -->
+                            <div v-show="activeElement === 'stub_serial'" class="space-y-3">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">X Position (Left %)</label>
+                                        <input type="number" step="0.5" min="0" max="100" v-model.number="layoutForm.stub_serial.left" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Y Position (Top %)</label>
+                                        <input type="number" step="0.5" min="0" max="100" v-model.number="layoutForm.stub_serial.top" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Width (%)</label>
+                                        <input type="number" step="0.5" min="5" max="50" v-model.number="layoutForm.stub_serial.width" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Font Size (pt)</label>
+                                        <input type="number" step="0.1" min="4" max="16" v-model.number="layoutForm.stub_serial.font_size" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between pt-1">
+                                    <label class="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                                        <input type="checkbox" v-model="layoutForm.stub_serial.show" class="rounded text-indigo-600">
+                                        <span>Show Serial Number</span>
+                                    </label>
+                                    <input type="color" v-model="layoutForm.stub_serial.color" class="h-6 w-8 rounded cursor-pointer border border-slate-300">
+                                </div>
+                            </div>
+
+                            <!-- Panel 3: Stub Token -->
+                            <div v-show="activeElement === 'stub_token'" class="space-y-3">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">X Position (Left %)</label>
+                                        <input type="number" step="0.5" min="0" max="100" v-model.number="layoutForm.stub_token.left" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Y Position (Top %)</label>
+                                        <input type="number" step="0.5" min="0" max="100" v-model.number="layoutForm.stub_token.top" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Width (%)</label>
+                                        <input type="number" step="0.5" min="5" max="50" v-model.number="layoutForm.stub_token.width" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Font Size (pt)</label>
+                                        <input type="number" step="0.1" min="4" max="14" v-model.number="layoutForm.stub_token.font_size" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between pt-1">
+                                    <label class="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                                        <input type="checkbox" v-model="layoutForm.stub_token.show" class="rounded text-indigo-600">
+                                        <span>Show Decoded QR Token</span>
+                                    </label>
+                                    <input type="color" v-model="layoutForm.stub_token.color" class="h-6 w-8 rounded cursor-pointer border border-slate-300">
+                                </div>
+                            </div>
+
+                            <!-- Panel 4: Meal Badge -->
+                            <div v-show="activeElement === 'meal_badge'" class="space-y-3">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">X Position (Left %)</label>
+                                        <input type="number" step="0.5" min="0" max="100" v-model.number="layoutForm.meal_badge.left" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Y Position (Top %)</label>
+                                        <input type="number" step="0.5" min="0" max="100" v-model.number="layoutForm.meal_badge.top" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Font Size (pt)</label>
+                                        <input type="number" step="0.1" min="3" max="12" v-model.number="layoutForm.meal_badge.font_size" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                </div>
+                                <label class="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer pt-1">
+                                    <input type="checkbox" v-model="layoutForm.meal_badge.show" class="rounded text-indigo-600">
+                                    <span>Show Meal Type Pill</span>
+                                </label>
+                            </div>
+
+                            <!-- Panel 5: Date Meta -->
+                            <div v-show="activeElement === 'date_meta'" class="space-y-3">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">X Position (Left %)</label>
+                                        <input type="number" step="0.5" min="0" max="100" v-model.number="layoutForm.date_meta.left" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Y Position (Top %)</label>
+                                        <input type="number" step="0.5" min="0" max="100" v-model.number="layoutForm.date_meta.top" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Font Size (pt)</label>
+                                        <input type="number" step="0.1" min="3" max="12" v-model.number="layoutForm.date_meta.font_size" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Text Color</label>
+                                        <input type="color" v-model="layoutForm.date_meta.color" class="h-8 w-full rounded cursor-pointer border border-slate-300">
+                                    </div>
+                                </div>
+                                <label class="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer pt-1">
+                                    <input type="checkbox" v-model="layoutForm.date_meta.show" class="rounded text-indigo-600">
+                                    <span>Show Date and Quantity</span>
+                                </label>
+                            </div>
+
+                            <!-- Panel 6: School Name -->
+                            <div v-show="activeElement === 'school_name'" class="space-y-3">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">X Position (Left %)</label>
+                                        <input type="number" step="0.5" min="0" max="100" v-model.number="layoutForm.school_name.left" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Y Position (Top %)</label>
+                                        <input type="number" step="0.5" min="0" max="100" v-model.number="layoutForm.school_name.top" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Max Width (%)</label>
+                                        <input type="number" step="1" min="20" max="90" v-model.number="layoutForm.school_name.max_width" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Font Size (pt)</label>
+                                        <input type="number" step="0.1" min="3" max="14" v-model.number="layoutForm.school_name.font_size" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between pt-1">
+                                    <label class="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                                        <input type="checkbox" v-model="layoutForm.school_name.show" class="rounded text-indigo-600">
+                                        <span>Show School / Recipient Name</span>
+                                    </label>
+                                    <input type="color" v-model="layoutForm.school_name.color" class="h-6 w-8 rounded cursor-pointer border border-slate-300">
+                                </div>
+                            </div>
+
+                            <!-- Panel 7: Voucher Serial -->
+                            <div v-show="activeElement === 'voucher_serial'" class="space-y-3">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">X Position (Left %)</label>
+                                        <input type="number" step="0.5" min="0" max="100" v-model.number="layoutForm.voucher_serial.left" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Y Position (Top %)</label>
+                                        <input type="number" step="0.5" min="0" max="100" v-model.number="layoutForm.voucher_serial.top" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Font Size (pt)</label>
+                                        <input type="number" step="0.1" min="4" max="16" v-model.number="layoutForm.voucher_serial.font_size" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Style</label>
+                                        <select v-model="layoutForm.voucher_serial.style" class="w-full text-xs rounded border-slate-300 py-1.5">
+                                            <option value="pill">Pill Box (Light Blue)</option>
+                                            <option value="plain">Clean Text Only (Transparent)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between pt-1">
+                                    <label class="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                                        <input type="checkbox" v-model="layoutForm.voucher_serial.show" class="rounded text-indigo-600">
+                                        <span>Show Serial Beside Food Coupon</span>
+                                    </label>
+                                    <input type="color" v-model="layoutForm.voucher_serial.color" class="h-6 w-8 rounded cursor-pointer border border-slate-300">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Save & Sahodaya Default Card -->
+                        <div class="bg-indigo-50/70 p-4 rounded-xl border border-indigo-200 shadow-sm space-y-3">
+                            <label class="flex items-start gap-2.5 text-xs font-medium text-indigo-950 cursor-pointer">
+                                <input type="checkbox" v-model="saveAsSahodayaDefault" class="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500">
+                                <div>
+                                    <span class="font-bold">Save as default template for this Sahodaya</span>
+                                    <p class="text-[11px] text-indigo-700 mt-0.5">
+                                        New events created in this Sahodaya will automatically inherit these coordinates.
+                                    </p>
+                                </div>
+                            </label>
+
+                            <div class="pt-2 border-t border-indigo-200/60 flex items-center justify-between">
+                                <span class="text-xs text-indigo-800">Ready to apply changes?</span>
+                                <button
+                                    type="button"
+                                    @click="submitSaveLayout"
+                                    class="btn-primary"
+                                    :disabled="savingLayout"
+                                >
+                                    <span v-if="savingLayout">Saving Layout...</span>
+                                    <span v-else>Save Template Layout</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </template>
 
         <!-- Modal 1: Generate Extra Coupons -->
@@ -880,6 +1424,8 @@ const props = defineProps({
     dateBreakdown: { type: Array, default: () => [] },
     couponMatrix: { type: Array, default: () => [] },
     filters: { type: Object, default: () => ({}) },
+    foodCouponLayout: { type: Object, default: () => ({}) },
+    defaultLayout: { type: Object, default: () => ({}) },
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
@@ -1240,5 +1786,88 @@ function handlePrintDownload() {
     if (matchedPrintCouponsCount.value > 0) {
         showPrintModal.value = false;
     }
+}
+
+// Layout Builder State & Handlers
+const activeElement = ref('qr_box');
+const savingLayout = ref(false);
+const saveAsSahodayaDefault = ref(false);
+
+const defaultCoordinates = {
+    qr_box: { top: 20.5, left: 71.0, width: 23.0, height: 56.5, show_border: false },
+    stub_serial: { top: 6.0, left: 69.5, width: 26.0, font_size: 7.5, color: '#0f172a', show: true },
+    stub_token: { top: 81.5, left: 69.5, width: 26.0, font_size: 6.2, color: '#0f172a', show: true },
+    meal_badge: { top: 47.5, left: 4.5, font_size: 5.2, show: true },
+    date_meta: { top: 47.5, left: 21.0, font_size: 5.2, color: '#334155', show: true },
+    school_name: { top: 56.5, left: 4.5, max_width: 62.0, font_size: 5.5, color: '#0f172a', show: true },
+    voucher_serial: { top: 72.0, left: 51.5, font_size: 7.2, color: '#1e3a8a', style: 'pill', show: true },
+    fallback_title: { top: 72.0, left: 4.5, show: true },
+};
+
+const getInitialLayout = () => {
+    const incoming = (props.foodCouponLayout && Object.keys(props.foodCouponLayout).length > 0)
+        ? props.foodCouponLayout
+        : (props.defaultLayout && Object.keys(props.defaultLayout).length > 0 ? props.defaultLayout : {});
+    return {
+        ...JSON.parse(JSON.stringify(defaultCoordinates)),
+        ...JSON.parse(JSON.stringify(incoming)),
+    };
+};
+
+const layoutForm = reactive(getInitialLayout());
+
+function applyKochiMetroPreset() {
+    const preset = {
+        qr_box: { top: 20.5, left: 71.0, width: 23.0, height: 56.5, show_border: false },
+        stub_serial: { top: 6.0, left: 69.5, width: 26.0, font_size: 7.5, color: '#0f172a', show: true },
+        stub_token: { top: 81.5, left: 69.5, width: 26.0, font_size: 6.2, color: '#0f172a', show: true },
+        meal_badge: { top: 47.5, left: 4.5, font_size: 5.2, show: true },
+        date_meta: { top: 47.5, left: 21.0, font_size: 5.2, color: '#334155', show: true },
+        school_name: { top: 56.5, left: 4.5, max_width: 62.0, font_size: 5.5, color: '#0f172a', show: true },
+        voucher_serial: { top: 72.0, left: 51.5, font_size: 7.2, color: '#1e3a8a', style: 'pill', show: true },
+        fallback_title: { top: 72.0, left: 4.5, show: true },
+    };
+    Object.assign(layoutForm, JSON.parse(JSON.stringify(preset)));
+}
+
+function applyPlainPaperPreset() {
+    const preset = {
+        qr_box: { top: 18.0, left: 70.0, width: 25.0, height: 58.0, show_border: true },
+        stub_serial: { top: 6.0, left: 68.0, width: 28.0, font_size: 8.0, color: '#0f172a', show: true },
+        stub_token: { top: 80.0, left: 68.0, width: 28.0, font_size: 6.5, color: '#0f172a', show: true },
+        meal_badge: { top: 28.0, left: 4.5, font_size: 6.5, show: true },
+        date_meta: { top: 28.0, left: 22.0, font_size: 6.0, color: '#334155', show: true },
+        school_name: { top: 42.0, left: 4.5, max_width: 62.0, font_size: 6.5, color: '#0f172a', show: true },
+        voucher_serial: { top: 70.0, left: 50.0, font_size: 7.5, color: '#1e3a8a', style: 'pill', show: true },
+        fallback_title: { top: 70.0, left: 4.5, show: true },
+    };
+    Object.assign(layoutForm, JSON.parse(JSON.stringify(preset)));
+}
+
+function resetToDefaultLayout() {
+    if (!confirm('Reset template layout coordinates to default settings?')) return;
+    router.post(`${base}/food-coupons/reset-layout`, {}, {
+        preserveScroll: true,
+        onSuccess: () => {
+            if (props.defaultLayout && Object.keys(props.defaultLayout).length > 0) {
+                Object.assign(layoutForm, JSON.parse(JSON.stringify(props.defaultLayout)));
+            } else {
+                applyKochiMetroPreset();
+            }
+        },
+    });
+}
+
+function submitSaveLayout() {
+    savingLayout.value = true;
+    router.post(`${base}/food-coupons/layout`, {
+        layout: layoutForm,
+        save_as_sahodaya_default: saveAsSahodayaDefault.value,
+    }, {
+        preserveScroll: true,
+        onFinish: () => {
+            savingLayout.value = false;
+        },
+    });
 }
 </script>

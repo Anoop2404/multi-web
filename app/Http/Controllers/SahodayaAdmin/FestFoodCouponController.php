@@ -174,6 +174,8 @@ class FestFoodCouponController extends SahodayaAdminController
             'mealPrefixes' => FestFoodCoupon::MEAL_PREFIXES,
             'schoolBreakdown' => $schoolBreakdown,
             'dateBreakdown' => $dateBreakdown,
+            'foodCouponLayout' => $event->foodCouponLayout($this->sahodaya),
+            'defaultLayout' => FestEvent::defaultFoodCouponLayout(),
             'couponMatrix' => $allEventCoupons->map(fn (FestFoodCoupon $c) => [
                 's' => $c->school_id,
                 'm' => $c->meal_type,
@@ -578,8 +580,49 @@ class FestFoodCouponController extends SahodayaAdminController
             'sahodaya'  => $this->sahodaya,
             'logoSrc'   => TenantBranding::logoEmbedSrc($this->sahodaya),
             'bgDataUri' => $bgDataUri,
+            'layout'    => $event->foodCouponLayout($this->sahodaya),
             'coupons'   => $preparedCoupons,
         ])->setPaper('a4', 'portrait')
           ->download($filename);
+    }
+
+    /**
+     * Save customized food coupon template layout coordinates from the builder.
+     */
+    public function saveLayout(string $tenantId, FestEvent $event, Request $request, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'layout' => 'required|array',
+            'save_as_sahodaya_default' => 'nullable|boolean',
+        ]);
+
+        $event->update(['food_coupon_layout' => $data['layout']]);
+
+        if (! empty($data['save_as_sahodaya_default'])) {
+            $this->sahodaya->food_coupon_layout = $data['layout'];
+            $this->sahodaya->save();
+        }
+
+        $audit->festEvent($event, FestPageActivity::FOOD_COUPONS, 'fest.food_coupons.layout_updated', 'Food coupon template layout updated via builder', [
+            'save_as_sahodaya_default' => (bool) ($data['save_as_sahodaya_default'] ?? false),
+        ]);
+
+        return back()->with('success', 'Food coupon template layout saved successfully.');
+    }
+
+    /**
+     * Reset food coupon layout to factory default coordinates.
+     */
+    public function resetLayout(string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $event->update(['food_coupon_layout' => null]);
+
+        $audit->festEvent($event, FestPageActivity::FOOD_COUPONS, 'fest.food_coupons.layout_reset', 'Food coupon template layout reset to default', []);
+
+        return back()->with('success', 'Food coupon template layout reset to default.');
     }
 }

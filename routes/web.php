@@ -1598,6 +1598,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/food-coupons/template-background', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'uploadTemplateBackground'])->name('food-coupons.template-background');
             Route::delete('/{event}/food-coupons/template-background', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'removeTemplateBackground'])->name('food-coupons.template-background.remove');
             Route::post('/{event}/food-coupons/{coupon}/redeem', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'redeem'])->name('food-coupons.redeem');
+            Route::post('/{event}/food-coupons/layout', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'saveLayout'])->name('food-coupons.layout');
+            Route::post('/{event}/food-coupons/reset-layout', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'resetLayout'])->name('food-coupons.reset-layout');
             Route::get('/{event}/food-coupons/print', [\App\Http\Controllers\SahodayaAdmin\FestFoodCouponController::class, 'print'])->name('food-coupons.print');
             Route::get('/{event}/food-menu', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'index'])->name('food-menu.index');
             Route::post('/{event}/food-menu', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'store'])->name('food-menu.store');

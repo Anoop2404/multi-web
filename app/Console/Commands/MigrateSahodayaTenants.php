@@ -36,7 +36,17 @@ class MigrateSahodayaTenants extends Command
             return self::FAILURE;
         }
 
-        $sahodayaIds = Tenant::where('type', 'sahodaya')->pluck('id')->all();
+        $sahodayas = Tenant::where('type', 'sahodaya')->get();
+        $sahodayaIds = [];
+
+        foreach ($sahodayas as $t) {
+            $dbName = $t->database()->getName();
+            if ($t->database()->manager()->databaseExists($dbName)) {
+                $sahodayaIds[] = (string) $t->id;
+            } else {
+                $this->warn("Skipping tenant {$t->id} ({$t->name}) — database {$dbName} does not exist.");
+            }
+        }
 
         if ($sahodayaIds === []) {
             $this->warn('No Sahodaya tenants found — nothing to migrate.');

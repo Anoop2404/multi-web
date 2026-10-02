@@ -64,7 +64,7 @@ class FestEvent extends Model
         'schedule_mode', 'competition_time',
         'notification_settings',
         'strict_item_payment_gating',
-        'food_payee_type', 'food_host_school_id', 'food_coupon_bg_image', 'require_payment_for_coupons', 'food_order_opens_at', 'food_order_closes_at', 'food_order_day_windows',
+        'food_payee_type', 'food_host_school_id', 'food_coupon_bg_image', 'food_coupon_layout', 'require_payment_for_coupons', 'food_order_opens_at', 'food_order_closes_at', 'food_order_day_windows',
         'phase_mode_enabled', 'workflow_mode', 'source_phase_id', 'registration_batch_id', 'workflow_leaf_key',
         'reporting_batch_min_registrations', 'reporting_batch_size',
         'certificate_signatories',
@@ -105,6 +105,7 @@ class FestEvent extends Model
         'strict_item_payment_gating' => 'boolean',
         'combine_regions_at_finale' => 'boolean',
         'require_payment_for_coupons' => 'boolean',
+        'food_coupon_layout' => 'array',
         'food_order_opens_at' => 'datetime',
         'food_order_closes_at' => 'datetime',
         'food_order_day_windows' => 'array',
@@ -256,6 +257,87 @@ class FestEvent extends Model
         }
 
         return \App\Support\TenantStorage::backgroundDataUri($sahodaya, $this->food_coupon_bg_image);
+    }
+
+    /** Default food coupon visual element coordinates (percentages of 95mm × 40.63mm coupon card) */
+    public static function defaultFoodCouponLayout(): array
+    {
+        return [
+            'qr_box' => [
+                'top' => 20.5,
+                'left' => 71.0,
+                'width' => 23.0,
+                'height' => 56.5,
+                'show_border' => false,
+            ],
+            'stub_serial' => [
+                'top' => 6.0,
+                'left' => 69.5,
+                'width' => 26.0,
+                'font_size' => 7.5,
+                'color' => '#0f172a',
+                'show' => true,
+            ],
+            'stub_token' => [
+                'top' => 81.5,
+                'left' => 69.5,
+                'width' => 26.0,
+                'font_size' => 6.2,
+                'color' => '#0f172a',
+                'show' => true,
+            ],
+            'meal_badge' => [
+                'top' => 47.5,
+                'left' => 4.5,
+                'font_size' => 5.2,
+                'show' => true,
+            ],
+            'date_meta' => [
+                'top' => 47.5,
+                'left' => 21.0,
+                'font_size' => 5.2,
+                'color' => '#334155',
+                'show' => true,
+            ],
+            'school_name' => [
+                'top' => 56.5,
+                'left' => 4.5,
+                'max_width' => 62.0,
+                'font_size' => 5.5,
+                'color' => '#0f172a',
+                'show' => true,
+            ],
+            'voucher_serial' => [
+                'top' => 72.0,
+                'left' => 51.5,
+                'font_size' => 7.2,
+                'color' => '#1e3a8a',
+                'style' => 'pill',
+                'show' => true,
+            ],
+            'fallback_title' => [
+                'top' => 72.0,
+                'left' => 4.5,
+                'show' => true,
+            ],
+        ];
+    }
+
+    /** Resolved food coupon layout config */
+    public function foodCouponLayout(?Tenant $sahodaya = null): array
+    {
+        $defaults = self::defaultFoodCouponLayout();
+        $custom = $this->food_coupon_layout;
+
+        if (empty($custom) && $sahodaya && ! empty($sahodaya->data['food_coupon_layout'])) {
+            $custom = $sahodaya->data['food_coupon_layout'];
+        }
+
+        if (empty($custom)) {
+            return $defaults;
+        }
+
+        return array_replace_recursive($defaults, $custom);
     }
 
     public function requiresManualApproval(): bool

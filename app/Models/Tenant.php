@@ -34,7 +34,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         'id', 'type', 'state_id', 'name', 'domain', 'subdomain',
         'parent_id', 'plan', 'is_active', 'fest_registration_closed',
         'school_prefix', 'school_no', 'membership_status', 'is_non_affiliated', 'is_appeal_pool', 'renewal_status', 'application_payload', 'prefixes_locked',
-        'school_setup_wizard_dismissed', 'nav_overrides',
+        'school_setup_wizard_dismissed', 'nav_overrides', 'data',
     ];
 
     protected $casts = [

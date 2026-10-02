@@ -32,6 +32,9 @@ class FestFoodCouponGeneratorTest extends TestCase
         Storage::fake('local');
         $this->seed(RolesAndPermissionsSeeder::class);
 
+        $layoutMigration = require database_path('migrations/tenant/2026_11_17_000007_add_food_coupon_layout_to_fest_events.php');
+        $layoutMigration->up();
+
         $this->sahodaya = Tenant::create([
             'id' => (string) Str::uuid(),
             'type' => 'sahodaya',
@@ -412,6 +415,40 @@ class FestFoodCouponGeneratorTest extends TestCase
 
         // All QR tokens must be unique
         $this->assertSame(21, $coupons->pluck('qr_token')->unique()->count());
+    }
+
+    public function test_can_save_and_reset_custom_coupon_layout(): void
+    {
+        $customLayout = [
+            'qr_box' => ['top' => 22.0, 'left' => 70.0, 'width' => 24.0, 'height' => 55.0, 'show_border' => true],
+            'stub_serial' => ['top' => 5.0, 'left' => 68.0, 'width' => 28.0, 'font_size' => 8.0, 'color' => '#1e293b', 'show' => true],
+        ];
+
+        // 1. Save layout to event and Sahodaya default
+        $response = $this->actingAs($this->sahodayaAdmin)
+            ->post("/sahodaya-admin/{$this->sahodaya->id}/events/{$this->event->id}/food-coupons/layout", [
+                'layout' => $customLayout,
+                'save_as_sahodaya_default' => true,
+            ]);
+
+        $response->assertRedirect();
+        $this->event->refresh();
+        $this->sahodaya->refresh();
+
+        $this->assertNotNull($this->event->food_coupon_layout, 'Event layout should not be null');
+        $this->assertEquals(22.0, $this->event->food_coupon_layout['qr_box']['top']);
+
+        $sahodayaLayout = $this->sahodaya->food_coupon_layout ?? $this->sahodaya->data['food_coupon_layout'] ?? null;
+        $this->assertNotNull($sahodayaLayout, 'Sahodaya layout should not be null');
+        $this->assertEquals(22.0, $sahodayaLayout['qr_box']['top']);
+
+        // 2. Reset layout
+        $resetResponse = $this->actingAs($this->sahodayaAdmin)
+            ->post("/sahodaya-admin/{$this->sahodaya->id}/events/{$this->event->id}/food-coupons/reset-layout");
+
+        $resetResponse->assertRedirect();
+        $this->event->refresh();
+        $this->assertNull($this->event->food_coupon_layout);
     }
 }
 
