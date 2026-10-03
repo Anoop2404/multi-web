@@ -1922,14 +1922,14 @@ const savingLayout = ref(false);
 const saveAsSahodayaDefault = ref(false);
 
 const defaultCoordinates = {
-    qr_box: { top: 24.5, left: 72.0, width: 20.5, height: 51.5, show_border: false },
-    stub_serial: { top: 8.5, left: 70.0, width: 24.5, font_size: 8.5, color: '#0f172a', show: true },
-    stub_token: { top: 84.0, left: 70.0, width: 24.5, font_size: 7.2, color: '#0f172a', show: true },
-    meal_badge: { top: 48.5, left: 4.5, font_size: 6.0, show: true },
-    date_meta: { top: 48.5, left: 21.0, font_size: 6.2, color: '#334155', show: true },
-    school_name: { top: 59.5, left: 4.5, max_width: 61.0, font_size: 6.5, color: '#0f172a', show: true },
-    voucher_serial: { top: 73.0, left: 50.5, font_size: 8.0, color: '#1e3a8a', style: 'pill', show: true },
-    fallback_title: { top: 73.0, left: 4.5, font_size: 12.0, color: '#1e3a8a', show: true },
+    qr_box: { top: 24.0, left: 76.0, width: 21.0, height: 54.0, show_border: false },
+    stub_serial: { top: 6.5, left: 75.0, width: 23.0, font_size: 8.0, color: '#0f172a', show: true },
+    stub_token: { top: 85.0, left: 75.0, width: 23.0, font_size: 6.8, color: '#0f172a', show: true },
+    meal_badge: { top: 47.0, left: 4.5, font_size: 5.5, show: true },
+    date_meta: { top: 47.0, left: 20.0, font_size: 5.8, color: '#334155', show: true },
+    school_name: { top: 59.0, left: 4.5, max_width: 61.0, font_size: 6.2, color: '#0f172a', show: true },
+    voucher_serial: { top: 73.0, left: 48.0, font_size: 7.5, color: '#1e3a8a', style: 'pill', show: true },
+    fallback_title: { top: 73.0, left: 4.5, font_size: 10.5, color: '#1e3a8a', show: true },
 };
 
 const getInitialLayout = () => {

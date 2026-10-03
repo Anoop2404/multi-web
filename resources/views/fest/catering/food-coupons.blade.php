@@ -13,7 +13,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         @page {
             size: A4 portrait;
-            margin: {{ $perSheet === 12 ? '3.5mm 5mm' : '4mm 5mm' }};
+            margin: {{ $perSheet === 12 ? '2.5mm 5mm' : '4mm 5mm' }};
         }
         body {
             font-family: 'DejaVu Sans', Arial, sans-serif;
@@ -40,13 +40,13 @@
             width: 196mm;
             margin: 0 auto;
             border-collapse: separate;
-            border-spacing: {{ $perSheet === 12 ? '4mm 1.5mm' : '4mm 2.2mm' }};
+            border-spacing: {{ $perSheet === 12 ? '4mm 1.0mm' : '4mm 2.2mm' }};
             table-layout: fixed;
         }
         .coupon-cell {
             width: 96mm;
-            height: {{ $perSheet === 12 ? '46.5mm' : '55mm' }};
-            max-height: {{ $perSheet === 12 ? '46.5mm' : '55mm' }};
+            height: {{ $perSheet === 12 ? '46.0mm' : '55mm' }};
+            max-height: {{ $perSheet === 12 ? '46.0mm' : '55mm' }};
             vertical-align: top;
             padding: 0;
             line-height: 1;
@@ -54,8 +54,8 @@
         .coupon-card {
             position: relative;
             width: 96mm;
-            height: {{ $perSheet === 12 ? '46.5mm' : '55mm' }};
-            max-height: {{ $perSheet === 12 ? '46.5mm' : '55mm' }};
+            height: {{ $perSheet === 12 ? '46.0mm' : '55mm' }};
+            max-height: {{ $perSheet === 12 ? '46.0mm' : '55mm' }};
             overflow: hidden;
             background: #ffffff;
             border-radius: 2mm;
@@ -246,10 +246,10 @@
         }
         .fallback-box-border {
             position: absolute;
-            left: 71.0%;
-            top: 20.5%;
-            width: 23.0%;
-            height: 56.5%;
+            left: {{ ($perSheet === 12) ? '74.5%' : '71.0%' }};
+            top: {{ ($perSheet === 12) ? '21.0%' : '20.5%' }};
+            width: {{ ($perSheet === 12) ? '24.0%' : '23.0%' }};
+            height: {{ ($perSheet === 12) ? '60.0%' : '56.5%' }};
             border: 1px solid #0f172a;
             border-radius: 1mm;
             z-index: 2;
@@ -261,6 +261,8 @@
         $pages = array_chunk($coupons, $perSheet);
         $totalPages = count($pages);
         $l = $layout ?? ($event ? $event->foodCouponLayout($sahodaya) : \App\Models\FestEvent::defaultFoodCouponLayout());
+        $is12 = ($perSheet === 12);
+
         $qb = $l['qr_box'] ?? [];
         $ss = $l['stub_serial'] ?? [];
         $st = $l['stub_token'] ?? [];
@@ -269,6 +271,28 @@
         $sn = $l['school_name'] ?? [];
         $vs = $l['voucher_serial'] ?? [];
         $ft = $l['fallback_title'] ?? [];
+
+        if ($is12) {
+            if (empty($qb['left']) || abs((float)$qb['left'] - 72.0) < 0.5) {
+                $qb['left'] = 76.0;
+                $qb['width'] = 21.0;
+                $qb['top'] = 24.0;
+                $qb['height'] = 54.0;
+            }
+            if (empty($ss['left']) || abs((float)$ss['left'] - 70.0) < 0.5) {
+                $ss['left'] = 75.0;
+                $ss['width'] = 23.0;
+                $ss['top'] = 6.5;
+            }
+            if (empty($st['left']) || abs((float)$st['left'] - 70.0) < 0.5) {
+                $st['left'] = 75.0;
+                $st['width'] = 23.0;
+                $st['top'] = 85.0;
+            }
+            if (empty($vs['left']) || abs((float)$vs['left'] - 50.5) < 0.5) {
+                $vs['left'] = 48.0;
+            }
+        }
     @endphp
 
     @foreach($pages as $pageIndex => $pageCoupons)
