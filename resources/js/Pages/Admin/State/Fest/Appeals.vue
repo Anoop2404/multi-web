@@ -47,7 +47,7 @@
                                 {{ a.participant || 'Unnamed' }}
                                 <span v-if="a.item_code" class="ml-1 font-mono text-xs text-slate-400">{{ a.item_code }}</span>
                             </p>
-                            <p class="text-xs text-slate-500">{{ a.school }} · submitted {{ a.submitted_at }}</p>
+                            <p class="text-xs text-slate-500">{{ a.sahodaya }} · {{ a.school }} · submitted {{ a.submitted_at }}</p>
                             <p class="mt-1 text-xs italic text-slate-600">“{{ a.grounds }}”</p>
                             <p v-if="a.review_notes" class="mt-1 text-xs text-slate-700">Decision: {{ a.review_notes }}</p>
                             <p class="mt-0.5 text-[11px] text-slate-400">

@@ -122,7 +122,7 @@
                                     <span class="font-bold text-slate-700">{{ row.rank }}</span>
                                     <span v-if="row.is_tied" class="ml-0.5 text-[10px] font-semibold text-amber-600" title="Joint">=</span>
                                     <span class="ml-1 font-medium text-slate-800">{{ row.name }}</span>
-                                    <span v-if="row.school" class="block text-slate-400">{{ row.school }}</span>
+                                    <span v-if="row.school" class="block text-slate-400">{{ row.sahodaya }} · {{ row.school }}</span>
                                     <span v-else-if="row.sahodaya" class="block text-slate-400">{{ row.sahodaya }}</span>
                                 </span>
                                 <span class="shrink-0 text-right">

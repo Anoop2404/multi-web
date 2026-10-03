@@ -8,6 +8,7 @@ use App\Models\State\StateConductAudit;
 use App\Models\State\StateFestEvent;
 use App\Models\State\StateFestMark;
 use App\Models\State\StateItemResult;
+use App\Models\State\StateSahodaya;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -174,6 +175,7 @@ class StateAppealService
     public function listFor(StateFestEvent $event)
     {
         $items = FestStateProgramItem::where('state_program_id', $event->state_program_id)->pluck('title', 'id');
+        $sahodayas = StateSahodaya::query()->get()->keyBy('id');
 
         return StateAppeal::where('state_event_id', $event->id)->orderByDesc('created_at')->get()
             ->map(fn (StateAppeal $a) => [
@@ -181,6 +183,7 @@ class StateAppealService
                 'item_code' => $a->item_code,
                 'item_name' => $items[$a->item_id] ?? null,
                 'participant' => $a->participant_name,
+                'sahodaya' => $sahodayas[$a->sahodaya_id]?->name ?? null,
                 'school' => $a->school_name,
                 'grounds' => $a->grounds,
                 'fee_amount' => $a->fee_amount,

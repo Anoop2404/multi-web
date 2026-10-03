@@ -100,7 +100,7 @@
                                 {{ row.item_code }} {{ row.item }}
                                 <span class="font-normal text-slate-500">· {{ row.sahodaya }}</span>
                             </p>
-                            <p class="text-xs text-slate-500">{{ row.school }}</p>
+                            <p class="text-xs text-slate-500">{{ row.sahodaya }} · {{ row.school }}</p>
                         </div>
                         <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
                               :class="row.status === 'unknown_class' ? 'bg-slate-200 text-slate-600' : 'bg-amber-200 text-amber-900'">
