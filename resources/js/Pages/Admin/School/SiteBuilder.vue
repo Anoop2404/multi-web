@@ -535,7 +535,7 @@
                             :config="editConfigs[currentEditingSection.id] || currentEditingSection.config || {}"
                             :upload-media="uploadSiteMedia"
                             :media-preview="mediaPreviewUrl"
-                            @update="val => editConfigs[currentEditingSection.id] = val" />
+                            @update="val => { editConfigs[currentEditingSection.id] = val; dirtySections[currentEditingSection.id] = true; }" />
                     </div>
                     <div v-else class="rounded-xl border border-sky-100 bg-sky-50/70 p-5 text-sm text-sky-900 space-y-1">
                         <p class="font-bold">Automated Database Content</p>
@@ -569,8 +569,12 @@
                         <button type="button"
                                 @click="saveSection(currentEditingSection)"
                                 :disabled="saving[currentEditingSection.id]"
-                                class="px-6 py-2.5 bg-[#041525] hover:bg-[#0c4a6e] text-white text-sm font-bold rounded-xl transition shadow-sm disabled:opacity-50 flex items-center gap-2">
-                            <span>{{ saving[currentEditingSection.id] ? 'Saving…' : 'Save Section' }}</span>
+                                class="px-6 py-2.5 rounded-xl text-sm font-bold transition shadow-sm disabled:opacity-50 flex items-center gap-2"
+                                :class="dirtySections[currentEditingSection.id]
+                                    ? 'bg-amber-600 hover:bg-amber-700 text-white ring-2 ring-amber-300'
+                                    : 'bg-[#041525] hover:bg-[#0c4a6e] text-white'">
+                            <span v-if="dirtySections[currentEditingSection.id]" class="w-2 h-2 rounded-full bg-amber-200 shrink-0"></span>
+                            <span>{{ saving[currentEditingSection.id] ? 'Saving…' : (dirtySections[currentEditingSection.id] ? 'Save Changes' : 'Save Section') }}</span>
                         </button>
                     </div>
                 </div>
@@ -672,6 +676,9 @@
                                     </span>
                                     <span v-else class="text-[11px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">
                                         Live
+                                    </span>
+                                    <span v-if="dirtySections[section.id]" class="text-[11px] font-semibold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">
+                                        Unsaved
                                     </span>
                                 </div>
                                 <p class="text-xs text-gray-400 truncate">
@@ -855,6 +862,9 @@ const missingSectionType = ref(null);
 
 function editSection(section) {
     if (!section) return;
+    if (dirtySections[selectedSectionId.value]) {
+        if (!confirm('You have unsaved changes. Leave without saving?')) return;
+    }
     missingSectionType.value = null;
     selectedSectionId.value = section.id;
     activeTab.value = 'sections';
@@ -871,6 +881,9 @@ function editSection(section) {
 }
 
 function closeSectionEditor() {
+    if (dirtySections[selectedSectionId.value]) {
+        if (!confirm('You have unsaved changes. Leave without saving?')) return;
+    }
     selectedSectionId.value = null;
     missingSectionType.value = null;
     if (typeof window !== 'undefined') {
@@ -959,6 +972,7 @@ const editConfigs = reactive({});
 const saving      = reactive({});
 const sectionErrors = reactive({});
 const requestError = ref('');
+const dirtySections = reactive({});   // sectionId -> true when unsaved edits exist
 const mediaUrls = reactive({ ...(props.mediaUrls ?? {}) });
 
 const navConfig = reactive({
@@ -1214,6 +1228,13 @@ onMounted(() => {
     syncTabFromUrl();
     if (typeof window !== 'undefined') {
         window.addEventListener('popstate', handlePopstate);
+        window.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                const sec = sections.value.find(s => s.id === selectedSectionId.value);
+                if (sec) saveSection(sec);
+            }
+        });
     }
     if (currentSiteData.id) loadVersions();
 });
@@ -1249,7 +1270,9 @@ const colorMap = {
 function sectionIcon(type)  { return iconMap[type] ?? '⚡'; }
 function sectionColor(type) { return colorMap[type] ?? '#f9fafb'; }
 function sectionTypeLabel(type) {
-    return (type ?? '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    if (!type) return '';
+    const withSpaces = type.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
+    return withSpaces.replace(/\b\w/g, c => c.toUpperCase());
 }
 function variantsFor(type) { return props.sectionTypes[type] ?? []; }
 function fieldsFor(type, variant) { return props.fieldDefs?.[type]?.[variant]?.fields ?? []; }
@@ -1499,6 +1522,7 @@ async function saveSection(section) {
         const idx = sections.value.findIndex(s => s.id === section.id);
         if (idx !== -1) Object.assign(sections.value[idx], updated);
         sectionSaved[section.id] = true;
+        dirtySections[section.id] = false;
         setTimeout(() => { sectionSaved[section.id] = false; }, 3000);
     } catch (error) {
         sectionErrors[section.id] = error?.message || 'This section could not be saved.';

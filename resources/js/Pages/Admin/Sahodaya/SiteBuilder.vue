@@ -131,6 +131,7 @@
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center gap-1.5">
                                         <span class="truncate font-semibold capitalize">{{ sectionTypeLabel(sec.section_type) }}</span>
+                                        <span v-if="dirtySections[sec.id]" class="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" title="Unsaved changes"></span>
                                         <span v-if="!sec.is_active" class="text-[9px] bg-gray-100 text-gray-400 px-1 py-0.2 rounded shrink-0">Hidden</span>
                                     </div>
                                     <p class="text-[10px] text-gray-400 truncate">{{ sec.variant }}</p>
@@ -291,7 +292,7 @@
                                         :config="editConfigs[currentEditingSection.id] || currentEditingSection.config || {}"
                                         :upload-media="uploadSiteMedia"
                                         :media-preview="mediaPreviewUrl"
-                                        @update="val => editConfigs[currentEditingSection.id] = val" />
+                                        @update="val => { editConfigs[currentEditingSection.id] = val; dirtySections[currentEditingSection.id] = true; }" />
                                 </div>
                                 <div v-else class="bg-sky-50 border border-sky-100 rounded-xl p-5 text-center space-y-2">
                                     <div class="text-3xl">🗄️</div>
@@ -335,8 +336,12 @@
                                 <template v-if="isSuperAdmin">
                                     <button @click="saveSection(currentEditingSection)"
                                             :disabled="saving[currentEditingSection.id]"
-                                            class="px-5 py-2.5 bg-[#1e1b4b] hover:bg-[#312e81] text-white text-xs font-bold rounded-xl transition disabled:opacity-50 shadow-xs">
-                                        {{ saving[currentEditingSection.id] ? 'Saving…' : 'Save Section Draft' }}
+                                            class="px-5 py-2.5 rounded-xl text-xs font-bold transition disabled:opacity-50 shadow-xs flex items-center gap-2"
+                                            :class="dirtySections[currentEditingSection.id]
+                                                ? 'bg-amber-600 hover:bg-amber-700 text-white ring-2 ring-amber-300'
+                                                : 'bg-[#1e1b4b] hover:bg-[#312e81] text-white'">
+                                        <span v-if="dirtySections[currentEditingSection.id]" class="w-1.5 h-1.5 rounded-full bg-amber-200 shrink-0"></span>
+                                        <span>{{ saving[currentEditingSection.id] ? 'Saving…' : (dirtySections[currentEditingSection.id] ? 'Save Changes' : 'Save Section Draft') }}</span>
                                     </button>
                                     <button @click="publishSection(currentEditingSection)"
                                             :disabled="saving[currentEditingSection.id]"
@@ -1082,6 +1087,7 @@ const editLayouts = reactive({});
 const saving      = reactive({});
 const sectionVersions = reactive({});
 const dragIndex = ref(null);
+const dirtySections = reactive({});   // sectionId -> true when unsaved edits exist
 
 const navConfig = reactive({
     layout_variant: props.navConfig?.layout_variant ?? 'sahodaya-modern',
@@ -1177,6 +1183,9 @@ const addModal = reactive({
 // ── Tab & Section Selection with URL synchronization ─────────────────────────
 
 function selectTab(tabId) {
+    if (dirtySections[selectedSectionId.value]) {
+        if (!confirm('You have unsaved changes. Leave without saving?')) return;
+    }
     activeTab.value = tabId;
     selectedSectionId.value = null;
     syncUrl();
@@ -1184,6 +1193,9 @@ function selectTab(tabId) {
 
 function selectSection(section) {
     if (!section) return;
+    if (dirtySections[selectedSectionId.value]) {
+        if (!confirm('You have unsaved changes. Leave without saving?')) return;
+    }
     selectedSectionId.value = section.id;
     activeTab.value = 'section-edit';
     if (!editConfigs[section.id]) {
@@ -1262,6 +1274,13 @@ function syncFromUrl(targetUrl = window.location.href) {
 onMounted(() => {
     syncFromUrl();
     window.addEventListener('popstate', () => syncFromUrl());
+    window.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            const sec = sections.value.find(s => s.id === selectedSectionId.value);
+            if (sec) saveSection(sec);
+        }
+    });
     if (props.isSuperAdmin) {
         loadVersions();
     }
@@ -1291,7 +1310,9 @@ const colorMap = {
 function sectionIcon(type)  { return iconMap[type] ?? '⚡'; }
 function sectionColor(type) { return colorMap[type] ?? '#f9fafb'; }
 function sectionTypeLabel(type) {
-    return (type ?? '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    if (!type) return '';
+    const withSpaces = type.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
+    return withSpaces.replace(/\b\w/g, c => c.toUpperCase());
 }
 function variantsFor(type) { return props.sectionTypes[type] ?? []; }
 function fieldsFor(type, variant) { return props.fieldDefs?.[type]?.[variant]?.fields ?? []; }
@@ -1608,6 +1629,7 @@ async function saveSection(section) {
         const updated = await apiPatch(`/sections/${section.id}`, { config, layout_json: editLayouts[section.id] ?? section.layout_json ?? {}, status: 'draft' });
         const idx = sections.value.findIndex(s => s.id === section.id);
         if (idx !== -1) Object.assign(sections.value[idx], updated);
+        dirtySections[section.id] = false;
     } finally {
         saving[section.id] = false;
     }
