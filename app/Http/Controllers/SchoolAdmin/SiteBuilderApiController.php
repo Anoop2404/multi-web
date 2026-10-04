@@ -15,6 +15,7 @@ use App\Support\TenantPublicSite;
 use App\Support\TenantStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class SiteBuilderApiController extends SchoolAdminController
@@ -228,6 +229,78 @@ class SiteBuilderApiController extends SchoolAdminController
         return response()->json($config);
     }
 
+    public function getMenu(): JsonResponse
+    {
+        $site = WebsiteSite::ensurePrimary($this->school->id);
+        $sections = $site->sectionQuery()
+            ->orderBy('display_order')
+            ->get(['id', 'section_type', 'variant', 'is_active', 'show_in_menu', 'display_order']);
+
+        $items = $sections->map(fn ($s) => [
+            'id' => $s->id,
+            'section_type' => $s->section_type,
+            'label' => NavConfigDefaults::sectionLabel($s->section_type),
+            'variant' => $s->variant,
+            'is_active' => $s->is_active,
+            'show_in_menu' => (bool) $s->show_in_menu,
+            'display_order' => $s->display_order,
+        ])->values()->all();
+
+        return response()->json(['items' => $items]);
+    }
+
+    public function saveMenu(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'items' => 'required|array',
+            'items.*.id' => 'required|integer|distinct',
+            'items.*.show_in_menu' => 'required|boolean',
+            'items.*.display_order' => 'required|integer|min:0',
+        ]);
+
+        $ids = collect($data['items'])->pluck('id')->all();
+        $site = WebsiteSite::ensurePrimary($this->school->id);
+        $allowedIds = $site->sectionQuery()
+            ->whereIn('id', $ids)
+            ->pluck('id')
+            ->all();
+
+        abort_unless(count($allowedIds) === count($ids), 422, 'All menu items must belong to the primary website.');
+
+        DB::transaction(function () use ($data, $site) {
+            foreach ($data['items'] as $item) {
+                $site->sectionQuery()->whereKey($item['id'])->update([
+                    'show_in_menu' => $item['show_in_menu'],
+                    'display_order' => $item['display_order'],
+                ]);
+            }
+        });
+
+        $this->school->invalidateCache();
+
+        return response()->json(['saved' => true]);
+    }
+
+    public function syncMenu(): JsonResponse
+    {
+        $site = WebsiteSite::ensurePrimary($this->school->id);
+        $sections = $site->sectionQuery()
+            ->orderBy('display_order')
+            ->get(['id', 'section_type', 'variant', 'is_active', 'show_in_menu', 'display_order']);
+
+        $items = $sections->map(fn ($s) => [
+            'id' => $s->id,
+            'section_type' => $s->section_type,
+            'label' => NavConfigDefaults::sectionLabel($s->section_type),
+            'variant' => $s->variant,
+            'is_active' => $s->is_active,
+            'show_in_menu' => (bool) $s->show_in_menu,
+            'display_order' => $s->display_order,
+        ])->values()->all();
+
+        return response()->json(['items' => $items]);
+    }
+
     public function saveNav(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -321,6 +394,97 @@ class SiteBuilderApiController extends SchoolAdminController
         ]);
     }
 
+    /**
+     * Return every public page with its editable text, sections, and nav links.
+     *
+     * @return array<string, mixed>
+     */
+    public function getPages(): JsonResponse
+    {
+        $site = WebsiteSite::ensurePrimary($this->school->id);
+        $sections = $site->sectionQuery()
+            ->orderBy('display_order')
+            ->get(['id', 'section_type', 'variant', 'is_active', 'show_in_menu', 'display_order', 'config']);
+
+        $navConfig = NavConfigDefaults::resolve($this->school, $this->school->getSetting('nav_config', []));
+        $siteContent = SchoolPublicPageContent::resolve($this->school);
+        $publicUrl = TenantPublicSite::url($this->school);
+
+        $pages = [];
+        foreach ($this->pageDefinitions() as $page) {
+            $pageSections = $this->resolvePageSections($page['slug'], $sections);
+            $navLinks = $this->resolveNavLinksForPage($page['slug'], $navConfig);
+
+            $pages[] = [
+                'slug' => $page['slug'],
+                'label' => $page['label'],
+                'icon' => $page['icon'],
+                'url' => $page['url'],
+                'is_home' => $page['slug'] === 'home',
+                'enabled' => $page['slug'] === 'home'
+                    ? true
+                    : $pageSections->isNotEmpty(),
+                'content' => $siteContent['pages'][$page['slug']] ?? [],
+                'sections' => $pageSections->map(fn ($s) => [
+                    'id' => $s->id,
+                    'section_type' => $s->section_type,
+                    'label' => NavConfigDefaults::sectionLabel($s->section_type),
+                    'variant' => $s->variant,
+                    'is_active' => $s->is_active,
+                    'show_in_menu' => $s->show_in_menu,
+                    'preview' => $s->config['heading'] ?? $s->config['title'] ?? $s->config['tagline'] ?? null,
+                ])->values()->all(),
+                'nav_links' => $navLinks,
+            ];
+        }
+
+        return response()->json([
+            'pages' => $pages,
+            'hero_section_id' => $sections->firstWhere('section_type', 'hero')?->id,
+            'navbar_style' => $navConfig['layout_variant'] ?? $navConfig['style'] ?? 'logo-left',
+        ]);
+    }
+
+    /**
+     * Update the editable text for a single public page.
+     */
+    public function savePageText(Request $request): JsonResponse
+    {
+        $request->validate([
+            'slug' => 'required|string',
+            'title' => 'nullable|string|max:200',
+            'eyebrow' => 'nullable|string|max:200',
+            'subheading' => 'nullable|string|max:2000',
+            'seo_title' => 'nullable|string|max:200',
+            'seo_description' => 'nullable|string|max:500',
+        ]);
+
+        $slug = $request->input('slug');
+        $allowed = collect($this->pageDefinitions())->pluck('slug')->all();
+        abort_unless(in_array($slug, $allowed, true), 404);
+
+        $content = SchoolPublicPageContent::resolve($this->school);
+        $pages = $content['pages'] ?? [];
+        if (!isset($pages[$slug])) {
+            $pages[$slug] = [];
+        }
+
+        foreach (['title', 'eyebrow', 'subheading', 'seo_title', 'seo_description'] as $field) {
+            if ($request->has($field)) {
+                $pages[$slug][$field] = $request->input($field);
+            }
+        }
+
+        $content['pages'] = $pages;
+        $this->school->setSetting('site_content', $content);
+        $this->school->invalidateCache();
+
+        return response()->json([
+            'saved' => true,
+            'content' => $content,
+        ]);
+    }
+
     public function ensurePortalLinks(): JsonResponse
     {
         $nav = SchoolPortalNavLinks::mergePortalCta($this->school->getSetting('nav_config', []));
@@ -407,5 +571,118 @@ class SiteBuilderApiController extends SchoolAdminController
     private function assertSuperAdmin(): void
     {
         abort_unless(request()->user()?->isSuperAdmin(), 403, 'Template architecture and structural site changes are restricted to Platform Super Admins only.');
+    }
+
+    /**
+     * @return list<array{slug: string, label: string, icon: string, url: string}>
+     */
+    private function pageDefinitions(): array
+    {
+        $baseUrl = TenantPublicSite::url($this->school);
+        $baseUrl = rtrim($baseUrl ?? '/', '/');
+
+        return [
+            ['slug' => 'home', 'label' => 'Homepage', 'icon' => '🏠', 'url' => $baseUrl],
+            ['slug' => 'about', 'label' => 'About Us', 'icon' => '📖', 'url' => "{$baseUrl}/about"],
+            ['slug' => 'academics', 'label' => 'Academics', 'icon' => '📚', 'url' => "{$baseUrl}/academics"],
+            ['slug' => 'facilities', 'label' => 'Facilities', 'icon' => '🏫', 'url' => "{$baseUrl}/facilities"],
+            ['slug' => 'house-system', 'label' => 'House System', 'icon' => '🏠', 'url' => "{$baseUrl}/house-system"],
+            ['slug' => 'clubs', 'label' => 'Clubs', 'icon' => '🎯', 'url' => "{$baseUrl}/clubs"],
+            ['slug' => 'career-guidance', 'label' => 'Career Guidance', 'icon' => '🧭', 'url' => "{$baseUrl}/career-guidance"],
+            ['slug' => 'publications', 'label' => 'Publications', 'icon' => '📄', 'url' => "{$baseUrl}/publications"],
+            ['slug' => 'atl', 'label' => 'ATAL Lab', 'icon' => '🔬', 'url' => "{$baseUrl}/atl"],
+            ['slug' => 'admissions', 'label' => 'Admissions', 'icon' => '📝', 'url' => "{$baseUrl}/admissions"],
+            ['slug' => 'faculty', 'label' => 'Faculty', 'icon' => '👥', 'url' => "{$baseUrl}/faculty"],
+            ['slug' => 'achievements', 'label' => 'Achievements', 'icon' => '⭐', 'url' => "{$baseUrl}/achievements"],
+            ['slug' => 'contact', 'label' => 'Contact Us', 'icon' => '📞', 'url' => "{$baseUrl}/contact"],
+            ['slug' => 'news', 'label' => 'News', 'icon' => '📰', 'url' => "{$baseUrl}/news"],
+            ['slug' => 'events', 'label' => 'Events', 'icon' => '📅', 'url' => "{$baseUrl}/events"],
+            ['slug' => 'gallery', 'label' => 'Gallery', 'icon' => '🖼️', 'url' => "{$baseUrl}/gallery"],
+            ['slug' => 'video-gallery', 'label' => 'Video Gallery', 'icon' => '🎬', 'url' => "{$baseUrl}/video-gallery"],
+            ['slug' => 'downloads', 'label' => 'Downloads', 'icon' => '📥', 'url' => "{$baseUrl}/downloads"],
+            ['slug' => 'careers', 'label' => 'Careers', 'icon' => '💼', 'url' => "{$baseUrl}/careers"],
+            ['slug' => 'alumni', 'label' => 'Alumni', 'icon' => '🎓', 'url' => "{$baseUrl}/alumni"],
+            ['slug' => 'testimonials', 'label' => 'Testimonials', 'icon' => '💬', 'url' => "{$baseUrl}/testimonials"],
+            ['slug' => 'newsletter', 'label' => 'Newsletter', 'icon' => '📧', 'url' => "{$baseUrl}/newsletter"],
+            ['slug' => 'portals', 'label' => 'Quick Links', 'icon' => '🔗', 'url' => "{$baseUrl}/portals"],
+            ['slug' => 'disclosure', 'label' => 'CBSE Disclosure', 'icon' => '📋', 'url' => "{$baseUrl}/disclosure"],
+            ['slug' => 'results', 'label' => 'Board Results', 'icon' => '🏆', 'url' => "{$baseUrl}/results"],
+            ['slug' => 'admission-enquiry', 'label' => 'Admission Enquiry', 'icon' => '📝', 'url' => "{$baseUrl}/admission-enquiry"],
+        ];
+    }
+
+    /** @param  \Illuminate\Database\Eloquent\Collection<int, \App\Models\SiteSection>  $allSections */
+    private function resolvePageSections(string $pageSlug, $allSections): \Illuminate\Support\Collection
+    {
+        if ($pageSlug === 'home') {
+            return $allSections->where('is_active', true)->sortBy('display_order');
+        }
+
+        $sectionTypeMap = [
+            'about' => ['about', 'principal_message', 'management', 'about_sahodaya'],
+            'facilities' => ['facilities', 'statistics'],
+            'house-system' => ['house_system'],
+            'clubs' => ['clubs'],
+            'career-guidance' => ['career_guidance'],
+            'publications' => ['publications'],
+            'atl' => ['atl'],
+            'admissions' => ['admissions', 'admission_enquiry'],
+            'faculty' => ['staff'],
+            'achievements' => ['achievements'],
+            'contact' => ['contact'],
+            'news' => ['news'],
+            'events' => ['events'],
+            'gallery' => ['gallery'],
+            'video-gallery' => ['video_gallery'],
+            'downloads' => ['downloads'],
+            'careers' => ['job_vacancies'],
+            'alumni' => ['alumni'],
+            'testimonials' => ['testimonials'],
+            'newsletter' => ['newsletter'],
+            'portals' => ['portals'],
+            'disclosure' => ['mandatory_disclosure'],
+            'results' => ['board_results'],
+            'academics' => ['academic_programmes'],
+        ];
+
+        $types = $sectionTypeMap[$pageSlug] ?? [];
+        if ($types) {
+            return $allSections
+                ->whereIn('section_type', $types)
+                ->where('is_active', true)
+                ->sortBy('display_order');
+        }
+
+        return collect();
+    }
+
+    /** @return array{label: string, url: string}[] */
+    private function resolveNavLinksForPage(string $pageSlug, array $navConfig): array
+    {
+        $targetUrl = null;
+        foreach ($this->pageDefinitions() as $def) {
+            if ($def['slug'] === $pageSlug) {
+                $targetUrl = $def['url'];
+                break;
+            }
+        }
+
+        if (! $targetUrl) {
+            return [];
+        }
+
+        $found = [];
+        foreach ($navConfig['items'] ?? [] as $item) {
+            if (($item['url'] ?? '') === $targetUrl) {
+                $found[] = ['label' => $item['label'], 'url' => $item['url']];
+            }
+            foreach ($item['children'] ?? [] as $child) {
+                if (($child['url'] ?? '') === $targetUrl) {
+                    $found[] = ['label' => $child['label'], 'url' => $child['url']];
+                }
+            }
+        }
+
+        return $found;
     }
 }

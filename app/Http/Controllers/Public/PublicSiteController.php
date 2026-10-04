@@ -157,6 +157,97 @@ class PublicSiteController extends Controller
                     'section_types' => ['achievements'],
                 ];
                 break;
+
+            case 'facilities':
+                $pageConfig = [
+                    'title' => 'Facilities',
+                    'eyebrow' => 'Infrastructure',
+                    'subheading' => 'Modern facilities and infrastructure for holistic student development.',
+                    'section_types' => ['facilities', 'statistics', 'house_system', 'clubs', 'atl'],
+                ];
+                break;
+
+            case 'house-system':
+                $pageConfig = [
+                    'title' => 'House System',
+                    'eyebrow' => 'Our Houses',
+                    'subheading' => 'Four houses fostering competition, leadership, and teamwork.',
+                    'section_types' => ['house_system'],
+                ];
+                break;
+
+            case 'clubs':
+                $pageConfig = [
+                    'title' => 'Clubs & Activities',
+                    'eyebrow' => 'Beyond Academics',
+                    'subheading' => 'Clubs, societies, and extracurricular programmes.',
+                    'section_types' => ['clubs'],
+                ];
+                break;
+
+            case 'career-guidance':
+                $pageConfig = [
+                    'title' => 'Career Guidance',
+                    'eyebrow' => 'Future Pathways',
+                    'subheading' => 'Career counselling, aptitude testing, and higher-education guidance.',
+                    'section_types' => ['career_guidance'],
+                ];
+                break;
+
+            case 'publications':
+                $pageConfig = [
+                    'title' => 'Publications',
+                    'eyebrow' => 'School Publications',
+                    'subheading' => 'School magazine, newsletters, and literary publications.',
+                    'section_types' => ['publications'],
+                ];
+                break;
+
+            case 'atl':
+                $pageConfig = [
+                    'title' => 'ATAL Laboratory',
+                    'eyebrow' => 'Innovation & Technology',
+                    'subheading' => 'Atal Tinkering Lab for innovation, STEM learning, and hands-on projects.',
+                    'section_types' => ['atl'],
+                ];
+                break;
+
+            case 'portals':
+                $pageConfig = [
+                    'title' => 'Quick Links',
+                    'eyebrow' => 'Portals',
+                    'subheading' => 'Quick access to student, parent, and staff portals.',
+                    'section_types' => ['portals'],
+                ];
+                break;
+
+            case 'testimonials':
+                $pageConfig = [
+                    'title' => 'Testimonials',
+                    'eyebrow' => 'What Parents Say',
+                    'subheading' => 'Feedback and experiences from our school community.',
+                    'section_types' => ['testimonials'],
+                ];
+                break;
+
+            case 'newsletter':
+                $pageConfig = [
+                    'title' => 'Newsletter',
+                    'eyebrow' => 'Stay Updated',
+                    'subheading' => 'Subscribe to our newsletter for the latest school news and events.',
+                    'section_types' => ['newsletter'],
+                ];
+                break;
+
+            case 'video-gallery':
+                $pageConfig = [
+                    'title' => 'Video Gallery',
+                    'eyebrow' => 'Moments in Motion',
+                    'subheading' => 'School events, performances, and celebrations on video.',
+                    'section_types' => ['video_gallery'],
+                ];
+                break;
+
             default:
                 $pageConfig = [
                     'title' => ucfirst(str_replace('-', ' ', $page)),
@@ -178,6 +269,16 @@ class PublicSiteController extends Controller
             'careers', 'jobs', 'job-vacancies' => 'careers',
             'alumni' => 'alumni',
             'achievements' => 'achievements',
+            'facilities' => 'facilities',
+            'house-system' => 'house_system',
+            'clubs' => 'clubs',
+            'career-guidance' => 'career_guidance',
+            'publications' => 'publications',
+            'atl' => 'atl',
+            'portals' => 'portals',
+            'testimonials' => 'testimonials',
+            'newsletter' => 'newsletter',
+            'video-gallery' => 'video_gallery',
             default => null,
         };
 

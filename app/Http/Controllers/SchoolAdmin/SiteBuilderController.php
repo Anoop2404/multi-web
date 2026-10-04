@@ -44,6 +44,19 @@ class SiteBuilderController extends SchoolAdminController
             );
         }
 
+        $navMenuItems = $sections
+            ->where('show_in_menu', true)
+            ->values()
+            ->map(fn ($s) => [
+                'id' => $s->id,
+                'section_type' => $s->section_type,
+                'variant' => $s->variant,
+                'anchor' => '/#' . $s->section_type,
+                'is_active' => $s->is_active,
+                'display_order' => $s->display_order,
+            ])
+            ->all();
+
         return $this->inertia('School/SiteBuilder', [
             'sections' => $sections,
             'currentSite' => [
@@ -67,6 +80,7 @@ class SiteBuilderController extends SchoolAdminController
             'navNeedsSetup' => empty($navConfig['items']),
             'mediaUrls' => $mediaUrls,
             'isSuperAdmin' => (bool) request()->user()?->isSuperAdmin(),
+            'navMenu' => $navMenuItems,
         ]);
     }
 }

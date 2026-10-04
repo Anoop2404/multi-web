@@ -918,6 +918,9 @@ Route::prefix('school-admin/{tenantId}')
         Route::post('/sections/{sectionId}/versions/{versionId}/restore', [SiteBuilderApiController::class, 'restoreSectionVersion'])->name('sections.versions.restore');
         Route::get('/nav', [SiteBuilderApiController::class, 'getNav'])->name('nav.get');
         Route::post('/nav', [SiteBuilderApiController::class, 'saveNav'])->name('nav.save');
+        Route::get('/menu', [SiteBuilderApiController::class, 'getMenu'])->name('menu.get');
+        Route::post('/menu', [SiteBuilderApiController::class, 'saveMenu'])->name('menu.save');
+        Route::post('/menu/sync', [SiteBuilderApiController::class, 'syncMenu'])->name('menu.sync');
         Route::get('/footer', [SiteBuilderApiController::class, 'getFooter'])->name('footer.get');
         Route::post('/footer', [SiteBuilderApiController::class, 'saveFooter'])->name('footer.save');
         Route::post('/portal-links', [SiteBuilderApiController::class, 'ensurePortalLinks'])->name('portal-links.ensure');
@@ -932,6 +935,8 @@ Route::prefix('school-admin/{tenantId}')
         Route::post('/experience/versions/{versionId}/restore', [SiteBuilderApiController::class, 'restoreExperienceVersion'])->name('experience.versions.restore');
         Route::post('/design', [SiteBuilderApiController::class, 'saveDesign'])->name('design.save');
         Route::post('/site-content', [SiteBuilderApiController::class, 'saveSiteContent'])->name('site-content.save');
+        Route::get('/pages', [SiteBuilderApiController::class, 'getPages'])->name('pages.index');
+        Route::post('/pages/text', [SiteBuilderApiController::class, 'savePageText'])->name('pages.text.save');
         Route::post('/media', [SiteBuilderApiController::class, 'uploadMedia'])->name('media.upload');
     });
     }); // public.website.admin.cms

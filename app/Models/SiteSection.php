@@ -22,6 +22,7 @@ class SiteSection extends Model
         'variant',
         'display_order',
         'is_active',
+        'show_in_menu',
         'status',
         'config',
         'published_config',
@@ -34,6 +35,7 @@ class SiteSection extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'show_in_menu' => 'boolean',
         'config' => 'array',
         'published_config' => 'array',
         'archived_configs' => 'array',

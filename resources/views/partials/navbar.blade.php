@@ -7,6 +7,7 @@
     $navConfig = NavConfigDefaults::resolve($tenant, $navConfig ?? []);
     if (isset($sections)) {
         $navConfig = NavConfigDefaults::pruneDeadAnchors($navConfig, $sections);
+        $navConfig = NavConfigDefaults::mergeSectionItems($navConfig, $sections);
     }
     $navVariant = SectionVariantResolver::resolveNavVariant($navConfig);
     $logo = $logo ?? TenantBranding::logoUrl($tenant);

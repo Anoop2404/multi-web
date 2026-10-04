@@ -37,6 +37,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class FestPortalController extends Controller
 {
@@ -310,9 +311,18 @@ class FestPortalController extends Controller
         $publishedAt = FestResult::whereIn('event_id', $selectedScope['event_ids'])
             ->whereNull('item_id')
             ->max('published_at');
+        // resultsVersion must track every signal that changes what's publicly
+        // visible: event-level publish (FestResult.published_at), individual
+        // item publish (results_published_at), item explicit unpublish/hide
+        // (results_hidden — no dedicated timestamp, but toggling it updates the
+        // row's updated_at), and live mark changes (FestMark.updated_at).
+        // Previously the hash skipped results_hidden, so hiding an item after
+        // event-level publish left the cached tab HTML serving the now-hidden
+        // results until a mark was touched.
         $resultsVersion = sha1(implode('|', [
             (string) $publishedAt,
             (string) FestEventItem::whereIn('event_id', $selectedScope['event_ids'])->max('results_published_at'),
+            (string) FestEventItem::whereIn('event_id', $selectedScope['event_ids'])->max('updated_at'),
             (string) FestMark::whereIn('event_id', $selectedScope['event_ids'])->max('updated_at'),
         ]));
 
@@ -1121,15 +1131,18 @@ public function tv(Request $request, int $eventId)
     // graceful "nothing published yet" fallback (the schools-only roster further
     // below) instead of needing to be blocked off, so it never 403s here.
     $categories = $this->scoreboards->categories($event, $selectedScope);
-
-    // When this event's hub has other phases visible too, the boards below show each
-    // school's CROSS-PHASE combined total_points (see crossPhaseScoreboard()) — the
-    // medal tally must be scoped to those same combined events, or a medal earned in a
-    // different phase silently drops out of gold/silver/bronze and gets swept into the
-    // catch-all "Grade" column instead (grade_points = total - gold - silver - bronze),
-    // even though the total itself correctly includes it. Falls back to just this
-    // event's own scope when there's no phase combining to do.
     $crossPhaseEventIds = $this->crossPhaseVisibleEventIds($event, $request);
+
+    // Cached for 30 s for anonymous traffic — the TV auto-rotates, so a brief
+    // staleness window is invisible to venue attendees, and this cuts the heavy
+    // cross-phase + medal-tally computation on every page load. Admin-preview
+    // requests (e.g. checking what the TV will show before publishing) bypass
+    // the cache so the admin sees the current state immediately.
+    $bypassCache = auth()->check() || request()->user();
+    $cacheKey = 'fest-tv:'.$tenant->id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id)
+        .':'.($isPublished ? '1' : '0')
+        .':'.implode(',', $selectedScope['event_ids'])
+        .':'.implode(',', $crossPhaseEventIds ?? []);
 
     $marks = FestMark::whereIn('event_id', $crossPhaseEventIds ?? $selectedScope['event_ids'])
         ->whereIn('position', [1, 2, 3])
@@ -1371,7 +1384,7 @@ public function tv(Request $request, int $eventId)
             $sections[] = ['type' => 'waiting'];
         }
 
-        return $this->renderPublic('public.fest.tv', $tenant, [
+        $render = fn () => $this->renderPublic('public.fest.tv', $tenant, [
             'event' => $event,
             'selectedScope' => $selectedScope,
             'isPublished' => $isPublished,
@@ -1379,6 +1392,12 @@ public function tv(Request $request, int $eventId)
             'sections' => $sections,
             'pageSeo' => ['title' => $event->title.' — Results Display'],
         ]);
+
+        if ($bypassCache) {
+            return $render();
+        }
+
+        return \Illuminate\Support\Facades\Cache::remember($cacheKey, 30, $render);
     }
 
     public function manual(int $eventId)
@@ -1529,8 +1548,20 @@ public function tv(Request $request, int $eventId)
     private function crossPhaseScoreboard(FestEvent $event, ?string $category, Request $request): ?array
     {
         $hub = $event->rootEvent();
+        // Memoized within-request: tv() calls this once for "Overall" + once per
+        // category, and scoreboardDynamicData()/schoolResults() call it too. All
+        // callers in the same request see the same hub + category, so the inner
+        // computation runs once and subsequent calls return the cached value.
+        $cacheKey = $hub->id.':'.($category ?? 'overall');
+
+        if (isset(self::$crossPhaseBoards[$cacheKey])) {
+            return self::$crossPhaseBoards[$cacheKey];
+        }
+
         $phases = FestEventPhase::where('event_id', $hub->id)->get();
         if ($phases->isEmpty()) {
+            self::$crossPhaseBoards[$cacheKey] = null;
+
             return null;
         }
 
@@ -1553,6 +1584,8 @@ public function tv(Request $request, int $eventId)
         }
 
         if (! $anyVisible) {
+            self::$crossPhaseBoards[$cacheKey] = null;
+
             return null;
         }
 
@@ -1572,8 +1605,13 @@ public function tv(Request $request, int $eventId)
             ];
         }
 
+        self::$crossPhaseBoards[$cacheKey] = $rows;
+
         return $rows;
     }
+
+    /** @var array<string, array|null> memoized within a single request */
+    private static array $crossPhaseBoards = [];
 
     /**
      * The event_ids of every leaf across every VISIBLE phase of $event's hub — the same
@@ -1584,13 +1622,23 @@ public function tv(Request $request, int $eventId)
      * the same conditions crossPhaseScoreboard() would return null (no phases, or none
      * visible) — callers should fall back to their own single-event scope in that case.
      *
+     * Memoized within-request: called alongside crossPhaseScoreboard() from the same
+     * request paths (tv, scoreboardDynamicData, schoolResults), so it runs once.
+     *
      * @return list<int>|null
      */
     private function crossPhaseVisibleEventIds(FestEvent $event, Request $request): ?array
     {
         $hub = $event->rootEvent();
+        $cacheKey = $hub->id.':'.$event->id;
+        if (isset(self::$crossPhaseEventIds[$cacheKey])) {
+            return self::$crossPhaseEventIds[$cacheKey];
+        }
+
         $phases = FestEventPhase::where('event_id', $hub->id)->get();
         if ($phases->isEmpty()) {
+            self::$crossPhaseEventIds[$cacheKey] = null;
+
             return null;
         }
 
@@ -1605,8 +1653,15 @@ public function tv(Request $request, int $eventId)
             }
         }
 
+        $eventIds = array_unique($eventIds);
+
+        self::$crossPhaseEventIds[$cacheKey] = $eventIds ?: null;
+
         return $eventIds ?: null;
     }
+
+    /** @var array<string, array<int>|null> memoized within a single request */
+    private static array $crossPhaseEventIds = [];
 
     /**
      * Cache::remember() wraps computeScoreboardDynamicData() below — this is the hot
@@ -1624,13 +1679,21 @@ public function tv(Request $request, int $eventId)
     {
         $bypassCache = (bool) ($request?->user() ?? auth()->user());
 
+        $versionInputs = [
+            (string) FestResult::whereIn('event_id', $selectedScope['event_ids'])->whereNull('item_id')->max('published_at'),
+            (string) FestEventItem::whereIn('event_id', $selectedScope['event_ids'])->max('results_published_at'),
+            (string) FestEventItem::whereIn('event_id', $selectedScope['event_ids'])->max('updated_at'),
+            (string) FestMark::whereIn('event_id', $selectedScope['event_ids'])->max('updated_at'),
+        ];
+        $version = sha1(implode('|', $versionInputs));
+
         $compute = fn () => $this->computeScoreboardDynamicData($event, $selectedScope, $category, $isPublished, $isAdminPreview, $request);
 
         if ($bypassCache) {
             return $compute();
         }
 
-        $cacheKey = 'fest-scoreboard-dynamic:v2:'.$event->tenant_id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.($category ?? 'all').':'.($isPublished ? '1' : '0');
+        $cacheKey = 'fest-scoreboard-dynamic:v2:'.$event->tenant_id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.($category ?? 'all').':'.($isPublished ? '1' : '0').':'.$version;
 
         return $this->rememberPublicHotPath($cacheKey, 10, $compute, waitSeconds: 15);
     }
@@ -1646,18 +1709,24 @@ public function tv(Request $request, int $eventId)
         // under this method's short TTLs, returning null instead of falling through
         // to recompute — check the value itself, not existence.
         if (($cached = Cache::get($key)) !== null) {
+            Log::channel('tall')->info('fest.public_hotpath.cache_hit', ['key' => $key, 'ttl' => $ttlSeconds]);
+
             return $cached;
         }
 
         $remember = fn () => Cache::remember($key, now()->addSeconds($ttlSeconds), $compute);
 
         try {
-            return Cache::lock('lock:'.$key, max(30, $waitSeconds + 5))->block($waitSeconds, $remember);
+            $result = Cache::lock('lock:'.$key, max(30, $waitSeconds + 5))->block($waitSeconds, $remember);
         } catch (\Throwable) {
             // A request may have filled the key just before our lock timed out. Recheck
             // before falling back so an unavailable lock driver never breaks the page.
-            return Cache::get($key) ?? $remember();
+            $result = Cache::get($key) ?? $remember();
         }
+
+        Log::channel('tall')->info('fest.public_hotpath.cache_set', ['key' => $key, 'ttl' => $ttlSeconds]);
+
+        return $result;
     }
 
     private function computeScoreboardDynamicData(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished, bool $isAdminPreview = false, ?Request $request = null): array

@@ -382,11 +382,14 @@ class PublicFestScoreboardService
      * results (item.results_published_at set) — for use before the whole-event
      * official publish action has run. scoreboard()'s overall branch reads a
      * FestResult snapshot that's only written AT that publish action, so there's
-     * nothing to read yet; this recomputes from FestMark every call instead,
-     * deliberately not cached, since which items are published keeps changing
-     * during a live event. Category and overall share one implementation here
-     * (scoreboard() needs two, since the official overall path is snapshot-based
-     * but its category path already computes live).
+     * nothing to read yet; this recomputes from FestMark every call instead.
+     *
+     * Cached for 5 seconds — short enough that provisional data feels live during
+     * a scoring event, but long enough to avoid a full FestMark scan on every
+     * poll (the scoreboard page refreshes every 30 s). The cache key includes the
+     * scope's event_ids so a newly-published phase or partition busts the old
+     * value. Bypassed for authenticated requests, which may see a newly-published
+     * item the instant an admin clicks Publish.
      *
      * @return list<array{school_id: string, school_name: string, total_points: int, rank: int}>
      */
@@ -400,33 +403,45 @@ class PublicFestScoreboardService
         // tab still works, only the combined total leaves it out.
         $excludedCategories = $category ? [] : FestOverallCategoryExclusion::excluded($root);
 
-        $marks = FestMark::whereIn('event_id', $scope['event_ids'])
-            ->whereHas('item', function ($query) use ($sourceCategoryKeys, $categoryColumn, $excludedCategories) {
-                $query->whereNotNull('results_published_at');
-                if ($sourceCategoryKeys) {
-                    $query->whereIn($categoryColumn, $sourceCategoryKeys);
-                }
-                if ($excludedCategories) {
-                    $query->whereNotIn($categoryColumn, $excludedCategories);
-                }
-            })
-            ->with(['participant.registration.item', 'item'])
-            ->get()
-            ->unique(fn (FestMark $m) => $m->deduplicationKey());
+        $bypass = auth()->check() || request()->user();
 
-        $totals = [];
-        foreach ($marks as $mark) {
-            $participant = $mark->participant;
-            $schoolId = $participant?->registration?->school_id;
+        $compute = function () use ($root, $scope, $categoryColumn, $sourceCategoryKeys, $excludedCategories, $event) {
+            $marks = FestMark::whereIn('event_id', $scope['event_ids'])
+                ->whereHas('item', function ($query) use ($sourceCategoryKeys, $categoryColumn, $excludedCategories) {
+                    $query->whereNotNull('results_published_at');
+                    if ($sourceCategoryKeys) {
+                        $query->whereIn($categoryColumn, $sourceCategoryKeys);
+                    }
+                    if ($excludedCategories) {
+                        $query->whereNotIn($categoryColumn, $excludedCategories);
+                    }
+                })
+                ->with(['participant.registration.item', 'item'])
+                ->get()
+                ->unique(fn (FestMark $m) => $m->deduplicationKey());
 
-            if (! $schoolId || $participant->disqualified_at) {
-                continue;
+            $totals = [];
+            foreach ($marks as $mark) {
+                $participant = $mark->participant;
+                $schoolId = $participant?->registration?->school_id;
+
+                if (! $schoolId || $participant->disqualified_at) {
+                    continue;
+                }
+
+                $totals[$schoolId] = ($totals[$schoolId] ?? 0) + $this->gradePoints->pointsForMark($event, $mark);
             }
 
-            $totals[$schoolId] = ($totals[$schoolId] ?? 0) + $this->gradePoints->pointsForMark($event, $mark);
+            return $this->rankTotals($totals);
+        };
+
+        if ($bypass) {
+            return $compute();
         }
 
-        return $this->rankTotals($totals);
+        $key = 'fest-provisional-scoreboard:'.$root->tenant_id.':'.$root->id.':'.($category ?? 'all').':'.implode(',', $scope['event_ids']);
+
+        return \Illuminate\Support\Facades\Cache::remember($key, 5, $compute);
     }
 
     /**

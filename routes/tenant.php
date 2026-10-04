@@ -159,6 +159,18 @@ Route::middleware([
         Route::get('/careers', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'careers'))->name('tenant.site.careers');
         Route::get('/alumni', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'alumni'))->name('tenant.site.alumni');
         Route::get('/achievements', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'achievements'))->name('tenant.site.achievements');
+
+        Route::get('/facilities', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'facilities'))->name('tenant.site.facilities');
+        Route::get('/house-system', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'house-system'))->name('tenant.site.house-system');
+        Route::get('/clubs', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'clubs'))->name('tenant.site.clubs');
+        Route::get('/career-guidance', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'career-guidance'))->name('tenant.site.career-guidance');
+        Route::get('/publications', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'publications'))->name('tenant.site.publications');
+        Route::get('/atl', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'atl'))->name('tenant.site.atl');
+        Route::get('/portals', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'portals'))->name('tenant.site.portals');
+        Route::get('/testimonials', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'testimonials'))->name('tenant.site.testimonials');
+        Route::get('/newsletter', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'newsletter'))->name('tenant.site.newsletter');
+        Route::get('/video-gallery', fn (\Illuminate\Http\Request $request) => app(\App\Http\Controllers\Public\PublicSiteController::class)->page($request, 'video-gallery'))->name('tenant.site.video-gallery');
+
         Route::get('/gallery/function', fn () => app(SahodayaCmsPageController::class)->show('gallery/function'))->name('tenant.sahodaya.gallery.function');
         Route::get('/gallery/programme', fn () => app(SahodayaCmsPageController::class)->show('gallery/programme'))->name('tenant.sahodaya.gallery.programme');
         Route::get('/gallery/sahodya', fn () => app(SahodayaCmsPageController::class)->show('gallery/sahodya'))->name('tenant.sahodaya.gallery.sahodya');
