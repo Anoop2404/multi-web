@@ -13,8 +13,8 @@
         .meta { font-size: 8px; color: #64748b; margin-top: 2px; }
         table.data { width: 100%; border-collapse: collapse; }
         table.data thead { display: table-header-group; }
-        table.data th { background: #f1f5f9; color: #334155; font-size: 8px; text-transform: uppercase; text-align: left; padding: 5px 6px; border: 1px solid #cbd5e1; }
-        table.data td { border: 1px solid #cbd5e1; padding: 5px 6px; vertical-align: top; }
+        table.data th { background: #f1f5f9; color: #334155; font-size: 8px; text-transform: uppercase; text-align: left; padding: 5px 6px; border: 1px solid #000; }
+        table.data td { border: 1px solid #000; padding: 5px 6px; vertical-align: top; }
         table.data tr { page-break-inside: avoid; }
         table.data tr:nth-child(even) td { background: #f8fafc; }
         .sub { color: #64748b; font-size: 7.5px; }

@@ -37,7 +37,7 @@
         th {
             background-color: #f1f5f9;
             color: #334155;
-            border: 1px solid #cbd5e1;
+            border: 1px solid #000;
             padding: 6px 8px;
             font-size: 10.5px;
             font-weight: bold;
@@ -45,7 +45,7 @@
             text-align: left;
         }
         td {
-            border: 1px solid #e2e8f0;
+            border: 1px solid #000;
             padding: 10px 8px;
             font-size: 11px;
             color: #334155;

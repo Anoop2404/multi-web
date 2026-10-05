@@ -9,10 +9,10 @@
         h1 { font-size: 14px; font-weight: 800; color: #0f172a; margin: 4px 0 12px; text-align: center; }
         table.data { width: 100%; border-collapse: collapse; }
         table.data th { background: #1d3557; color: #ffffff; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; text-align: left; padding: 6px 8px; border: 1px solid #1d3557; }
-        table.data td { border: 1px solid #cbd5e1; padding: 7px 8px; font-size: 10.5px; vertical-align: middle; }
+        table.data td { border: 1px solid #000; padding: 7px 8px; font-size: 10.5px; vertical-align: middle; }
         table.data tr:nth-child(even) td { background: #f8fafc; }
         .rank { font-weight: 800; font-size: 12px; color: #0f172a; }
-        .footer { margin-top: 14px; padding-top: 6px; border-top: 1px solid #cbd5e1; font-size: 8.5px; color: #64748b; }
+        .footer { margin-top: 14px; padding-top: 6px; border-top: 1px solid #000; font-size: 8.5px; color: #64748b; }
         .published-at { margin-top: 14px; font-size: 13px; font-weight: bold; color: #0f172a; }
     </style>
 </head>

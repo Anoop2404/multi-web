@@ -29,7 +29,7 @@
         .school-heading { font-size: 16px; font-weight: bold; color: #0f3d7a; border-bottom: 2px solid #0f3d7a; padding-bottom: 4px; }
         .school-heading-sub { font-size: 11px; color: #64748b; margin: 3px 0 12px; }
         .student-card {
-            border: 1px solid #cbd5e1;
+            border: 1px solid #000;
             border-radius: 6px;
             margin-bottom: 16px;
             page-break-inside: avoid;
@@ -38,7 +38,7 @@
         }
         .card-header {
             background-color: #f8fafc;
-            border-b: 1px solid #e2e8f0;
+            border-b: 1px solid #000;
             padding: 8px 12px;
         }
         .student-info {
@@ -55,7 +55,7 @@
             height: 42px;
             border-radius: 50%;
             object-fit: cover;
-            border: 1px solid #cbd5e1;
+            border: 1px solid #000;
         }
         .avatar-placeholder {
             width: 40px;
@@ -90,8 +90,8 @@
         .items-table th {
             background-color: #f1f5f9;
             color: #334155;
-            border-top: 1px solid #e2e8f0;
-            border-bottom: 1px solid #cbd5e1;
+            border-top: 1px solid #000;
+            border-bottom: 1px solid #000;
             padding: 5px 10px;
             font-size: 10.5px;
             text-transform: uppercase;

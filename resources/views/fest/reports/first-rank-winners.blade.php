@@ -14,7 +14,7 @@
         table.data tr:nth-child(even) td { background: #fffbeb; }
         .name { font-weight: 700; }
         .head-cell { font-size: 9px; color: #92400e; text-transform: uppercase; }
-        .footer { margin-top: 14px; padding-top: 6px; border-top: 1px solid #cbd5e1; font-size: 8.5px; color: #64748b; }
+        .footer { margin-top: 14px; padding-top: 6px; border-top: 1px solid #000; font-size: 8.5px; color: #64748b; }
         .empty { text-align: center; padding: 20px; color: #64748b; }
     </style>
 </head>

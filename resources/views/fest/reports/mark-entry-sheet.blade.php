@@ -20,10 +20,10 @@
         .meta { margin-top: 6px; font-size: 11px; color: #475569; }
         .table { width: 100%; border-collapse: collapse; margin-top: 4px; table-layout: fixed; }
         .table th { background: #0f172a; color: #ffffff; font-weight: bold; text-transform: uppercase; text-align: left; border: 1px solid #0f172a; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; vertical-align: bottom; line-height: 1.25; }
-        .table td { border: 1px solid #cbd5e1; height: 26px; word-wrap: break-word; overflow-wrap: break-word; }
+        .table td { border: 1px solid #000; height: 26px; word-wrap: break-word; overflow-wrap: break-word; }
         .table tr:nth-child(even) { background-color: #f8fafc; }
         .center { text-align: center; }
-        .sign-box { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 12px; }
+        .sign-box { margin-top: 24px; border-top: 1px solid #000; padding-top: 12px; }
         .sign-col { float: left; width: 33%; font-size: 11px; font-weight: bold; color: #475569; }
         .clear { clear: both; }
         {{-- Only the ORG branding (logo/name/doc-title) is document-wide constant, so it's
@@ -60,7 +60,7 @@
 
                 $isSum = !empty($sheet['is_sum_sheet']);
                 $critCount = (!$isSum && !empty($sheet['criteria']) && $sheet['criteria']->isNotEmpty()) ? $sheet['criteria']->count() : 0;
-                $colCount = $isSum ? (($sheet['judge_count'] ?? 1) + 3) : ($critCount > 0 ? ($critCount + 3) : 3);
+                $colCount = $isSum ? (($sheet['judge_count'] ?? 1) + 4) : ($critCount > 0 ? ($critCount + 3) : 3);
 
                 // Auto-scale fonts, paddings, and column widths based on the column count
                 if ($colCount <= 4) {
@@ -71,6 +71,7 @@
                     $slWidth = '38px';
                     $chestWidth = '85px';
                     $totalWidth = '90px';
+                    $remarksWidth = '110px';
                 } elseif ($colCount <= 6) {
                     $thFont = '10px';
                     $tdFont = '11px';
@@ -79,6 +80,7 @@
                     $slWidth = '34px';
                     $chestWidth = '70px';
                     $totalWidth = '75px';
+                    $remarksWidth = '95px';
                 } elseif ($colCount <= 8) {
                     $thFont = '9px';
                     $tdFont = '10.5px';
@@ -87,6 +89,7 @@
                     $slWidth = '30px';
                     $chestWidth = '62px';
                     $totalWidth = '68px';
+                    $remarksWidth = '80px';
                 } else { // 9+ columns (e.g. 6+ criteria or 6+ judges)
                     $thFont = '8.5px';
                     $tdFont = '10px';
@@ -95,11 +98,12 @@
                     $slWidth = '28px';
                     $chestWidth = '54px';
                     $totalWidth = '58px';
+                    $remarksWidth = '70px';
                 }
             @endphp
 
             @if(!empty($sheet['is_sum_sheet']))
-                {{-- Consolidated sheet: one column per judge (their paper subtotal) + Grand Total --}}
+                {{-- Consolidated sheet: one column per judge (their paper subtotal) + Grand Total + Remarks --}}
                 <table class="table">
                     <colgroup>
                         <col style="width: {{ $slWidth }};">
@@ -108,11 +112,12 @@
                             <col>
                         @endfor
                         <col style="width: {{ $totalWidth }};">
+                        <col style="width: {{ $remarksWidth }};">
                     </colgroup>
                     <thead>
                         @if(!empty($itemInfoParts))
                         <tr class="item-context-row">
-                            <th colspan="{{ $sheet['judge_count'] + 3 }}">
+                            <th colspan="{{ $sheet['judge_count'] + 4 }}">
                                 @if(!empty($sheet['sheet_label']))
                                     <span style="font-weight: bold; margin-right: 6px;">{{ $sheet['sheet_label'] }} —</span>
                                 @endif
@@ -127,6 +132,7 @@
                                 <th style="font-size: {{ $thFont }}; padding: {{ $thPadding }};">JUDGE {{ $j }}</th>
                             @endfor
                             <th style="font-size: {{ $thFont }}; padding: {{ $thPadding }};">GRAND TOTAL</th>
+                            <th style="font-size: {{ $thFont }}; padding: {{ $thPadding }};">REMARKS</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -140,10 +146,11 @@
                                     <td style="font-size: {{ $tdFont }}; padding: {{ $tdPadding }};"></td>
                                 @endfor
                                 <td style="font-size: {{ $tdFont }}; padding: {{ $tdPadding }};"></td>
+                                <td style="font-size: {{ $tdFont }}; padding: {{ $tdPadding }};"></td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ 3 + $sheet['judge_count'] }}" class="center" style="padding: 16px; color: #64748b;">
+                                <td colspan="{{ 4 + $sheet['judge_count'] }}" class="center" style="padding: 16px; color: #64748b;">
                                     No approved registrations for this item.
                                 </td>
                             </tr>

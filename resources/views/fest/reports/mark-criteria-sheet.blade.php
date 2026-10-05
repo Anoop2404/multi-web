@@ -11,7 +11,7 @@
         .header { border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 12px; }
         .table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
         .table th { background: #0f3d7a; color: #ffffff; font-weight: bold; text-transform: uppercase; text-align: left; border: 1px solid #0f3d7a; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; vertical-align: bottom; }
-        .table td { border: 1px solid #cbd5e1; word-wrap: break-word; overflow-wrap: break-word; }
+        .table td { border: 1px solid #000; word-wrap: break-word; overflow-wrap: break-word; }
         .table tr:nth-child(even) { background-color: #f8fafc; }
         .num { text-align: right; }
         .center { text-align: center; }
@@ -47,7 +47,7 @@
 
                 <div style="border-bottom: 2px solid #0f172a; margin-bottom: 8px;"></div>
 
-                <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; padding: 6px 10px;">
+                <div style="background: #f8fafc; border: 1px solid #000; border-radius: 4px; padding: 6px 10px;">
                     <table style="width: 100%; border-collapse: collapse; font-size: 10px; color: #1e293b;">
                         <tr>
                             <td style="padding: 2px 0;"><strong>EVENT:</strong> {{ strtoupper($event->title) }}</td>
@@ -71,7 +71,7 @@
 
             @php
                 $jCount = max(1, (int) ($sheet['judge_count'] ?? 1));
-                $colCount = $jCount > 1 ? ($jCount + 3) : 3;
+                $colCount = $jCount > 1 ? ($jCount + 4) : 4;
 
                 if ($colCount <= 4) {
                     $thFont = '10.5px';
@@ -81,6 +81,7 @@
                     $slWidth = '38px';
                     $chestWidth = '85px';
                     $totalWidth = '90px';
+                    $remarksWidth = '110px';
                 } elseif ($colCount <= 6) {
                     $thFont = '10px';
                     $tdFont = '10.5px';
@@ -89,6 +90,7 @@
                     $slWidth = '34px';
                     $chestWidth = '70px';
                     $totalWidth = '75px';
+                    $remarksWidth = '95px';
                 } else {
                     $thFont = '9px';
                     $tdFont = '10px';
@@ -97,6 +99,7 @@
                     $slWidth = '30px';
                     $chestWidth = '58px';
                     $totalWidth = '62px';
+                    $remarksWidth = '75px';
                 }
             @endphp
 
@@ -112,6 +115,7 @@
                     @else
                         <col>
                     @endif
+                    <col style="width: {{ $remarksWidth }};">
                 </colgroup>
                 <thead>
                     <tr>
@@ -125,6 +129,7 @@
                         @else
                             <th style="font-size: {{ $thFont }}; padding: {{ $thPadding }};">Score</th>
                         @endif
+                        <th style="font-size: {{ $thFont }}; padding: {{ $thPadding }};">Remarks</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -140,9 +145,10 @@
                             @else
                                 <td class="num" style="font-size: {{ $tdFont }}; padding: {{ $tdPadding }};">{{ $row['scores'][0] === null ? '' : rtrim(rtrim(number_format($row['scores'][0], 2), '0'), '.') }}</td>
                             @endif
+                            <td style="font-size: {{ $tdFont }}; padding: {{ $tdPadding }};"></td>
                         </tr>
                     @empty
-                        <tr><td colspan="{{ $sheet['judge_count'] > 1 ? 2 + $sheet['judge_count'] + 1 : 3 }}" class="center" style="padding: 16px; color: #64748b;">No participants for this item.</td></tr>
+                        <tr><td colspan="{{ $sheet['judge_count'] > 1 ? 2 + $sheet['judge_count'] + 2 : 4 }}" class="center" style="padding: 16px; color: #64748b;">No participants for this item.</td></tr>
                     @endforelse
                 </tbody>
             </table>

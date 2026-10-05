@@ -3,7 +3,7 @@
 <style>
 body{font-family:DejaVu Sans,sans-serif;font-size:9px}
 table{width:100%;border-collapse:collapse;margin-top:10px}
-th,td{border:1px solid #ccc;padding:3px 4px;text-align:center}
+th,td{border:1px solid #000;padding:3px 4px;text-align:center}
 th{background:#1d3557;color:#fff;font-size:8px;font-weight:bold;white-space:nowrap}
 .school-col{text-align:left;min-width:120px}
 .rank-col{width:28px}

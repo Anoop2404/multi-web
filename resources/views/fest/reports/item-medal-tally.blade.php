@@ -10,7 +10,7 @@
         .subtitle { text-align: center; font-size: 9.5px; color: #64748b; margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
         table.data { width: 100%; border-collapse: collapse; }
         table.data th { background: #1d3557; color: #fff; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; padding: 6px 5px; border: 1px solid #1d3557; text-align: center; }
-        table.data td { border: 1px solid #cbd5e1; padding: 5px; text-align: center; }
+        table.data td { border: 1px solid #000; padding: 5px; text-align: center; }
         table.data th.left, table.data td.left { text-align: left; }
         table.data tr:nth-child(even) td { background: #f7f9fc; }
         table.data td.item { font-weight: 700; }

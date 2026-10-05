@@ -13,7 +13,7 @@
         thead { display: table-header-group; }
         tr { page-break-inside: avoid; }
         th { background: #1d3557; color: #fff; font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em; text-align: left; padding: 0 8px; height: 30px; border: 1px solid #1d3557; }
-        td { border: 1px solid #94a3b8; padding: 0 8px; height: 30px; font-size: 11.5px; vertical-align: middle; }
+        td { border: 1px solid #000; padding: 0 8px; height: 30px; font-size: 11.5px; vertical-align: middle; }
         td.num, th.num { width: 34px; text-align: center; padding: 0 2px; }
         td.id, th.id { width: 62px; text-align: center; }
         td.cat, th.cat { width: 56px; text-align: center; }

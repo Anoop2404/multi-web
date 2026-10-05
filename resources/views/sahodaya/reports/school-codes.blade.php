@@ -52,7 +52,7 @@
             margin-bottom: 14px;
         }
         .summary-card {
-            border: 1px solid #cbd5e1;
+            border: 1px solid #000;
             background-color: #f8fafc;
             border-radius: 4px;
             padding: 6px 10px;
@@ -88,7 +88,7 @@
         }
         .table td {
             padding: 5.5px 7px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid #000;
             vertical-align: middle;
         }
         .table tr:nth-child(even) td {
@@ -114,7 +114,7 @@
             right: 0;
             font-size: 8px;
             color: #94a3b8;
-            border-top: 1px solid #e2e8f0;
+            border-top: 1px solid #000;
             padding-top: 4px;
         }
     </style>

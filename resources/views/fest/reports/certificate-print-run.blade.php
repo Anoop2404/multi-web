@@ -16,7 +16,7 @@
         thead { display: table-header-group; }
         tr { page-break-inside: avoid; }
         th { background: #1d3557; color: #fff; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.03em; text-align: left; padding: 0 8px; height: 26px; border: 1px solid #1d3557; }
-        td { border: 1px solid #cbd5e1; padding: 5px 8px; font-size: 10.5px; vertical-align: top; }
+        td { border: 1px solid #000; padding: 5px 8px; font-size: 10.5px; vertical-align: top; }
         td.num, th.num { width: 28px; text-align: center; padding: 5px 2px; }
         td.cls, th.cls { width: 46px; text-align: center; }
         .pending-table th { background: #92400e; border-color: #92400e; }

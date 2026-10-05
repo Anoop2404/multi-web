@@ -35,7 +35,7 @@
         }
         .summary-box {
             background-color: #f8fafc;
-            border: 1px solid #cbd5e1;
+            border: 1px solid #000;
             padding: 6px 10px;
             text-align: center;
             vertical-align: middle;
@@ -70,7 +70,7 @@
             text-align: left;
         }
         td {
-            border: 1px solid #e2e8f0;
+            border: 1px solid #000;
             padding: 5px 8px;
             font-size: 11px;
             color: #334155;
@@ -86,7 +86,7 @@
             background-color: #e2e8f0;
             color: #0f172a;
             font-weight: bold;
-            border-top: 2px solid #94a3b8;
+            border-top: 2px solid #000;
         }
     </style>
 </head>

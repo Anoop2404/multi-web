@@ -12,7 +12,7 @@
         .subtitle { font-size: 12px; color: #475569; margin: 0; font-weight: bold; }
         .meta { font-size: 10.5px; color: #64748b; margin-top: 4px; }
         .summary { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
-        .summary td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: center; }
+        .summary td { border: 1px solid #000; padding: 6px 8px; text-align: center; }
         .summary .lbl { font-size: 9px; text-transform: uppercase; color: #64748b; display: block; margin-bottom: 2px; }
         .summary .val { font-size: 13px; font-weight: bold; color: #0f172a; }
         .class-section { page-break-after: always; break-after: page; margin-bottom: 14px; }
@@ -22,7 +22,7 @@
         table.roster { width: 100%; border-collapse: collapse; }
         table.roster thead { display: table-header-group; }
         table.roster tr { page-break-inside: avoid; break-inside: avoid; }
-        table.roster th, table.roster td { border: 1px solid #cbd5e1; padding: 4px 7px; }
+        table.roster th, table.roster td { border: 1px solid #000; padding: 4px 7px; }
         table.roster th { background-color: #eef2f7; font-size: 9.5px; text-transform: uppercase; text-align: left; color: #334155; }
         table.roster td { font-size: 10.5px; }
         .text-center { text-align: center; }
@@ -32,7 +32,7 @@
         .status-unpaid { color: #b91c1c; font-weight: bold; }
         .class-subtotal td { background-color: #f1f5f9; font-weight: bold; }
         .grand-total { width: 100%; border-collapse: collapse; margin-top: 14px; page-break-inside: avoid; break-inside: avoid; }
-        .grand-total td { border: 1px solid #cbd5e1; padding: 7px 8px; font-size: 11.5px; }
+        .grand-total td { border: 1px solid #000; padding: 7px 8px; font-size: 11.5px; }
         .grand-total .lbl { text-align: right; font-weight: bold; width: 70%; }
         .grand-total .val { text-align: right; font-weight: bold; width: 30%; }
     </style>

@@ -16,14 +16,14 @@
         .school-heading { background-color: #0f172a; color: #ffffff; padding: 8px 12px; border-radius: 4px; margin: 0 0 8px; }
         .school-name { font-size: 14px; font-weight: bold; }
         .school-sub { font-size: 10px; color: #cbd5e1; margin-top: 2px; }
-        tr.item-row td { background-color: #e2e8f0; padding: 4px 8px; border-color: #cbd5e1; page-break-after: avoid; break-after: avoid; }
+        tr.item-row td { background-color: #e2e8f0; padding: 4px 8px; border-color: #000; page-break-after: avoid; break-after: avoid; }
         .item-title { font-size: 10.5px; font-weight: bold; color: #0f172a; }
         .item-meta { font-weight: normal; color: #475569; font-size: 9.5px; }
         table { width: 100%; border-collapse: collapse; }
         thead { display: table-header-group; }
         tr { page-break-inside: avoid; }
-        th { background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 4px 6px; font-size: 9px; text-transform: uppercase; }
-        td { border: 1px solid #e2e8f0; padding: 4px 6px; font-size: 10px; vertical-align: middle; }
+        th { background-color: #f1f5f9; color: #334155; border: 1px solid #000; padding: 4px 6px; font-size: 9px; text-transform: uppercase; }
+        td { border: 1px solid #000; padding: 4px 6px; font-size: 10px; vertical-align: middle; }
         .c { text-align: center; }
         .idx { color: #94a3b8; }
         .mono { font-family: monospace; }

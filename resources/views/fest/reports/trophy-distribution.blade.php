@@ -13,7 +13,7 @@
         
         table { width: 100%; border-collapse: collapse; margin-top: 8px; }
         th { background: #1d3557; color: #ffffff; padding: 6px 8px; font-size: 9px; font-weight: bold; text-align: left; border: 1px solid #1d3557; }
-        td { border: 1px solid #cbd5e1; padding: 5px 8px; font-size: 9.5px; vertical-align: middle; }
+        td { border: 1px solid #000; padding: 5px 8px; font-size: 9.5px; vertical-align: middle; }
         tbody tr:nth-child(even) { background: #f8fafc; }
         
         .col-no { width: 32px; text-align: center; font-weight: bold; color: #1e293b; }
@@ -23,15 +23,15 @@
         .col-winner { font-weight: bold; color: #0f172a; }
         .col-details { font-size: 8.5px; color: #475569; }
         .col-sign { width: 60px; text-align: center; }
-        .checkbox-box { display: inline-block; width: 14px; height: 14px; border: 1px solid #94a3b8; }
+        .checkbox-box { display: inline-block; width: 14px; height: 14px; border: 1px solid #000; }
         
         .empty-winner { color: #94a3b8; font-style: italic; font-weight: normal; }
         
-        .stats-box { margin-top: 14px; padding: 8px 12px; background: #f1f5f9; border-radius: 4px; border: 1px solid #e2e8f0; font-size: 9px; }
+        .stats-box { margin-top: 14px; padding: 8px 12px; background: #f1f5f9; border-radius: 4px; border: 1px solid #000; font-size: 9px; }
         
         .signatures { margin-top: 40px; width: 100%; page-break-inside: avoid; }
         .sig-col { width: 33.33%; text-align: center; font-size: 9px; font-weight: bold; color: #334155; }
-        .sig-line { width: 120px; border-top: 1px solid #64748b; margin: 0 auto 4px; }
+        .sig-line { width: 120px; border-top: 1px solid #000; margin: 0 auto 4px; }
     </style>
 </head>
 <body>

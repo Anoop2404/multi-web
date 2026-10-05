@@ -1265,7 +1265,7 @@ class FestMarkEntryController extends SahodayaAdminController
         }
         $fileName = \Illuminate\Support\Str::slug(implode(' ', $nameParts)).'.pdf';
 
-        $maxColumns = collect($sheets)->map(fn ($sheet) => ($sheet['judge_count'] ?? 1) > 1 ? (($sheet['judge_count'] ?? 1) + 3) : 3)->max() ?? 3;
+        $maxColumns = collect($sheets)->map(fn ($sheet) => ($sheet['judge_count'] ?? 1) > 1 ? (($sheet['judge_count'] ?? 1) + 4) : 4)->max() ?? 4;
         $orientation = $request->input('orientation');
         if (!in_array($orientation, ['portrait', 'landscape'], true)) {
             $orientation = $maxColumns > 4 ? 'landscape' : 'portrait';
@@ -1418,7 +1418,7 @@ class FestMarkEntryController extends SahodayaAdminController
 
         $maxColumns = collect($sheets)->map(function ($sheet) {
             if (!empty($sheet['is_sum_sheet'])) {
-                return (int) ($sheet['judge_count'] ?? 1) + 3;
+                return (int) ($sheet['judge_count'] ?? 1) + 4;
             }
             $critCount = !empty($sheet['criteria']) && $sheet['criteria']->isNotEmpty() ? $sheet['criteria']->count() : 0;
             return $critCount > 0 ? ($critCount + 3) : 3;
@@ -1555,7 +1555,7 @@ class FestMarkEntryController extends SahodayaAdminController
 
         abort_if($sheets === [], 404, 'No multi-judge items found for this selection -- a Sum Sheet only applies to items scored by more than one judge.');
 
-        $maxColumns = collect($sheets)->map(fn ($sheet) => (int) ($sheet['judge_count'] ?? 1) + 3)->max() ?? 3;
+        $maxColumns = collect($sheets)->map(fn ($sheet) => (int) ($sheet['judge_count'] ?? 1) + 4)->max() ?? 4;
         $orientation = $request->input('orientation');
         if (!in_array($orientation, ['portrait', 'landscape'], true)) {
             $orientation = $maxColumns > 4 ? 'landscape' : 'portrait';

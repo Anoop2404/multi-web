@@ -36,14 +36,14 @@
             margin-bottom: 12px;
             padding: 5px 8px;
             background: #f8fafc;
-            border: 1px solid #e2e8f0;
+            border: 1px solid #000;
             border-radius: 4px;
             font-size: 9px;
             color: #475569;
         }
         .item-card {
             margin-bottom: 11px;
-            border: 1px solid #cbd5e1;
+            border: 1px solid #000;
             page-break-inside: avoid;
             background: #ffffff;
         }
@@ -91,12 +91,12 @@
             text-transform: uppercase;
             letter-spacing: 0.04em;
             padding: 5px 8px;
-            border-bottom: 1px solid #cbd5e1;
+            border-bottom: 1px solid #000;
             text-align: left;
         }
         table.winners-table td {
             padding: 5px 8px;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid #000;
             font-size: 9.5px;
             vertical-align: middle;
         }
@@ -125,7 +125,7 @@
         .rank-2 {
             background: #f1f5f9;
             color: #334155;
-            border: 1px solid #94a3b8;
+            border: 1px solid #000;
         }
         .rank-3 {
             background: #ffedd5;
@@ -175,7 +175,7 @@
             padding: 30px 15px;
             color: #64748b;
             background: #f8fafc;
-            border: 1px dashed #cbd5e1;
+            border: 1px dashed #000;
             border-radius: 4px;
             font-size: 11px;
             margin-top: 20px;
@@ -183,7 +183,7 @@
         .footer-note {
             margin-top: 14px;
             padding-top: 6px;
-            border-top: 1px solid #cbd5e1;
+            border-top: 1px solid #000;
             font-size: 8px;
             color: #64748b;
         }

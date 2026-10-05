@@ -104,7 +104,7 @@
             display: inline-block;
             font-weight: 700;
             color: #0f172a;
-            border-bottom: 1px solid #64748b;
+            border-bottom: 1px solid #000;
             min-height: 18px;
             padding: 1px 6px;
             font-size: 11.5px;
@@ -116,11 +116,11 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin: 10px 0 6px;
-            border-bottom: 1.5px solid #cbd5e1;
+            border-bottom: 1.5px solid #000;
             padding-bottom: 3px;
         }
         .item-box {
-            border: 1.5px solid #cbd5e1;
+            border: 1.5px solid #000;
             border-radius: 4px;
             padding: 8px 10px;
             margin-bottom: 7px;
@@ -149,7 +149,7 @@
             min-height: 16px;
         }
         .remarks-box {
-            border: 1.5px dashed #94a3b8;
+            border: 1.5px dashed #000;
             border-radius: 4px;
             background: #ffffff;
             min-height: 55px;
@@ -159,7 +159,7 @@
         .copy-footer {
             margin-top: 10px;
             padding-top: 5px;
-            border-top: 1px dashed #cbd5e1;
+            border-top: 1px dashed #000;
             text-align: right;
             font-size: 9px;
             font-weight: 800;

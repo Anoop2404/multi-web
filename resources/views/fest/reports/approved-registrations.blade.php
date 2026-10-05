@@ -9,14 +9,14 @@
         .header { margin-bottom: 12px; }
         .table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         .table th { background: #0f172a; color: #ffffff; font-size: 10.5px; font-weight: bold; text-transform: uppercase; text-align: left; padding: 6px 8px; border: 1px solid #0f172a; }
-        .table td { border: 1px solid #cbd5e1; padding: 6px 8px; font-size: 11px; }
+        .table td { border: 1px solid #000; padding: 6px 8px; font-size: 11px; }
         .table tr:nth-child(even) { background-color: #f8fafc; }
         .center { text-align: center; }
         .badge-approved { background-color: #dcfce7; color: #15803d; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 10px; text-transform: uppercase; }
-        .meta-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; padding: 8px 12px; margin-top: 8px; }
+        .meta-box { background: #f8fafc; border: 1px solid #000; border-radius: 4px; padding: 8px 12px; margin-top: 8px; }
         .meta-table { width: 100%; border-collapse: collapse; font-size: 11px; }
         .meta-table td { padding: 2px 0; }
-        .footer-sign { margin-top: 24px; border-top: 1px solid #cbd5e1; padding-top: 10px; }
+        .footer-sign { margin-top: 24px; border-top: 1px solid #000; padding-top: 10px; }
         .sign-col { float: left; width: 50%; font-size: 11px; font-weight: bold; color: #475569; }
         .clear { clear: both; }
     </style>

@@ -55,7 +55,7 @@
         th {
             background-color: #f1f5f9;
             color: #334155;
-            border: 1px solid #cbd5e1;
+            border: 1px solid #000;
             padding: 5px 6px;
             font-size: 9.5px;
             font-weight: bold;
@@ -63,7 +63,7 @@
             letter-spacing: 0.2px;
         }
         td {
-            border: 1px solid #e2e8f0;
+            border: 1px solid #000;
             padding: 5px 6px;
             font-size: 10px;
             color: #334155;

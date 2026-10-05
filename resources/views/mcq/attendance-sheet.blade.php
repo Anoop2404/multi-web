@@ -15,10 +15,10 @@
         .tag { font-size: 9.5px; color: #64748b; text-transform: uppercase; letter-spacing: 0.55px; margin-top: 2px; }
         .title { font-size: 16px; font-weight: 700; margin: 8px 0 3px; }
         .meta { font-size: 10.5px; color: #64748b; margin-bottom: 12px; }
-        .note { font-size: 10.5px; color: #334155; margin-bottom: 12px; padding: 6px 8px; background: #f8fafc; border: 1px solid #e2e8f0; }
+        .note { font-size: 10.5px; color: #334155; margin-bottom: 12px; padding: 6px 8px; background: #f8fafc; border: 1px solid #000; }
         table.sheet { width: 100%; border-collapse: collapse; }
         table.sheet th { background: #0f2744; color: #fff; text-align: left; padding: 8px 6px; font-size: 10px; text-transform: uppercase; }
-        table.sheet td { padding: 8px 6px; border: 1px solid #cbd5e1; vertical-align: middle; font-size: 11px; }
+        table.sheet td { padding: 8px 6px; border: 1px solid #000; vertical-align: middle; font-size: 11px; }
         table.sheet tr:nth-child(even) td { background: #f8fafc; }
         .photo-cell { width: 30px; text-align: center; }
         .photo-cell img { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; }

@@ -57,7 +57,7 @@
             margin-bottom: 12px;
             padding: 6px 8px;
             background: #f8fafc;
-            border: 1px solid #e2e8f0;
+            border: 1px solid #000;
         }
         table.sheet {
             width: 100%;
@@ -88,7 +88,7 @@
         }
         table.sheet td {
             padding: 8px 6px;
-            border: 1px solid #cbd5e1;
+            border: 1px solid #000;
             vertical-align: middle;
         }
         table.sheet tr:nth-child(even) td {
@@ -111,7 +111,7 @@
             margin-top: 14px;
             font-size: 8px;
             color: #94a3b8;
-            border-top: 1px solid #e2e8f0;
+            border-top: 1px solid #000;
             padding-top: 6px;
         }
         .sign-line {
@@ -123,7 +123,7 @@
             padding-top: 36px;
             font-size: 9px;
             color: #475569;
-            border-top: 1px solid #94a3b8;
+            border-top: 1px solid #000;
             text-align: center;
         }
     </style>

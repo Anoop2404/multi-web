@@ -9,7 +9,7 @@ $innerLeft = max(1, (int) round($itemColWidth / 8));
 <style>
 body{font-family:DejaVu Sans,sans-serif;font-size:{{ $fontSize }}px}
 table{width:100%;border-collapse:collapse;margin-top:10px}
-th,td{border:1px solid #ccc;padding:2px 3px;text-align:center}
+th,td{border:1px solid #000;padding:2px 3px;text-align:center}
 th{background:#1d3557;color:#fff;font-size:{{ max(6, $fontSize - 1) }}px;font-weight:bold;white-space:nowrap}
 .school-col{text-align:left;width:62px;max-width:62px}
 .rank-col{width:16px}

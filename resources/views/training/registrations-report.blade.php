@@ -63,7 +63,7 @@
         }
         table.report td {
             padding: 7px 8px;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid #000;
             vertical-align: top;
         }
         table.report tr:nth-child(even) td {
@@ -79,7 +79,7 @@
             margin-top: 18px;
             font-size: 9px;
             color: #94a3b8;
-            border-top: 1px solid #e2e8f0;
+            border-top: 1px solid #000;
             padding-top: 8px;
         }
     </style>

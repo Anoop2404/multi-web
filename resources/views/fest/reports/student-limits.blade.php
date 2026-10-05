@@ -34,7 +34,7 @@
         .summary-cell {
             display: table-cell;
             text-align: center;
-            border: 1px solid #e2e8f0;
+            border: 1px solid #000;
             padding: 6px 4px;
         }
         .summary-cell .num {
@@ -48,7 +48,7 @@
             text-transform: uppercase;
         }
         .student-card {
-            border: 1px solid #cbd5e1;
+            border: 1px solid #000;
             border-radius: 6px;
             margin-bottom: 16px;
             page-break-inside: avoid;
@@ -57,7 +57,7 @@
         }
         .card-header {
             background-color: #f8fafc;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid #000;
             padding: 8px 12px;
         }
         .student-info {
@@ -74,7 +74,7 @@
             height: 34px;
             border-radius: 50%;
             object-fit: cover;
-            border: 1px solid #cbd5e1;
+            border: 1px solid #000;
         }
         .avatar-placeholder {
             width: 32px;
@@ -119,8 +119,8 @@
         .items-table th {
             background-color: #f1f5f9;
             color: #334155;
-            border-top: 1px solid #e2e8f0;
-            border-bottom: 1px solid #cbd5e1;
+            border-top: 1px solid #000;
+            border-bottom: 1px solid #000;
             padding: 5px 10px;
             font-size: 10.5px;
             text-transform: uppercase;

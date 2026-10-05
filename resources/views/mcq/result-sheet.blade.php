@@ -20,12 +20,12 @@
         .badge-draft { background: #fef3c7; color: #92400e; }
         table.sheet { width: 100%; border-collapse: collapse; }
         table.sheet th { background: #0f2744; color: #fff; text-align: left; padding: 8px 6px; font-size: 10px; text-transform: uppercase; }
-        table.sheet td { padding: 7px 6px; border: 1px solid #cbd5e1; font-size: 11px; }
+        table.sheet td { padding: 7px 6px; border: 1px solid #000; font-size: 11px; }
         table.sheet tr:nth-child(even) td { background: #f8fafc; }
         .sl { width: 36px; text-align: center; }
         .num { text-align: right; width: 64px; }
         .empty { text-align: center; color: #94a3b8; padding: 24px 0; }
-        .footer { margin-top: 14px; font-size: 9.5px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 6px; }
+        .footer { margin-top: 14px; font-size: 9.5px; color: #94a3b8; border-top: 1px solid #000; padding-top: 6px; }
     </style>
 </head>
 <body>

@@ -73,6 +73,11 @@
                         <div class="flex flex-wrap gap-2">
                             <button type="button" class="btn-primary text-sm" @click="generate">Assign missing chest</button>
                             <button type="button" class="btn-secondary text-sm" @click="assignItemReg">Assign missing item reg</button>
+                            <button v-if="selectedItemId && participants.length" type="button"
+                                    :class="isBulkEditing ? 'btn-primary !bg-indigo-600' : 'btn-secondary'"
+                                    class="text-sm font-semibold" @click="toggleBulkEdit">
+                                {{ isBulkEditing ? '✕ Exit Bulk Edit' : '✏️ Bulk Edit' }}
+                            </button>
                             <button v-if="selectedItemId" type="button" class="btn-secondary text-sm" @click="openItemNumberingModal(item)">
                                 🔢 Set starting no (this item)
                             </button>
@@ -126,6 +131,60 @@
                         </div>
                     </div>
 
+                    <!-- Bulk Editing Toolbar -->
+                    <div v-if="isBulkEditing" class="bg-indigo-50/90 border border-indigo-200 rounded-xl p-4 space-y-3 shadow-sm">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <h4 class="font-bold text-sm text-indigo-950 flex items-center gap-2">
+                                    <span>✏️ Bulk Edit Mode</span>
+                                    <span class="text-xs font-semibold text-indigo-700 bg-indigo-100 px-2.5 py-0.5 rounded-full">
+                                        {{ participants.length }} participants
+                                    </span>
+                                </h4>
+                                <p class="text-xs text-indigo-700 mt-0.5">
+                                    Type directly in the Chest and Order boxes below. Use <kbd class="px-1 py-0.5 bg-white border rounded text-[11px] font-mono">Tab</kbd> to move across fields quickly.
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" class="btn-secondary text-xs !bg-white" @click="cancelBulkEdit" :disabled="isSavingBulk">
+                                    Cancel
+                                </button>
+                                <button type="button" class="btn-primary text-xs !bg-indigo-600 hover:!bg-indigo-700" @click="saveBulkChanges" :disabled="isSavingBulk">
+                                    {{ isSavingBulk ? 'Saving...' : '💾 Save All Changes' }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Quick sequence helpers -->
+                        <div class="flex flex-wrap items-center gap-3 pt-2.5 border-t border-indigo-200/70 text-xs">
+                            <div class="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-indigo-200">
+                                <span class="text-slate-600 font-medium">Chest start:</span>
+                                <input v-model.number="autoChestStart" type="number" min="1" class="w-16 px-1.5 py-0.5 border border-slate-300 rounded font-mono text-center text-xs" />
+                                <button type="button" class="text-indigo-600 font-bold hover:underline" @click="autoFillChests">
+                                    Auto-fill Chests ↓
+                                </button>
+                                <button type="button" class="text-slate-400 hover:text-rose-600 ml-1 text-xs" title="Clear draft chests" @click="clearDraftChests">
+                                    ✕
+                                </button>
+                            </div>
+
+                            <div class="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-indigo-200">
+                                <span class="text-slate-600 font-medium">Order start:</span>
+                                <input v-model.number="autoOrderStart" type="number" min="1" class="w-14 px-1.5 py-0.5 border border-slate-300 rounded font-mono text-center text-xs" />
+                                <button type="button" class="text-indigo-600 font-bold hover:underline" @click="autoFillOrders">
+                                    Auto-fill Orders ↓
+                                </button>
+                                <button type="button" class="text-slate-400 hover:text-rose-600 ml-1 text-xs" title="Clear draft orders" @click="clearDraftOrders">
+                                    ✕
+                                </button>
+                            </div>
+
+                            <div v-if="bulkError" class="text-rose-700 font-semibold bg-rose-50 px-2.5 py-1 rounded border border-rose-200">
+                                ⚠️ {{ bulkError }}
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="card card--flush overflow-x-auto">
                         <table class="w-full text-sm">
                             <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
@@ -140,7 +199,13 @@
                                     :class="p.chest_no ? 'hover:bg-slate-50' : 'bg-amber-50/60 hover:bg-amber-50'">
                                     <td class="p-3 text-gray-500">{{ idx + 1 }}</td>
                                     <td class="p-3 font-mono font-bold">
-                                        <div v-if="editingChestId === p.id" class="relative flex items-center gap-1">
+                                        <div v-if="isBulkEditing">
+                                            <input type="number" min="1"
+                                                   v-model.number="bulkDrafts[p.id].chest_no"
+                                                   class="w-20 rounded border-2 border-indigo-400 px-2 py-1 text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-white"
+                                                   placeholder="—" />
+                                        </div>
+                                        <div v-else-if="editingChestId === p.id" class="relative flex items-center gap-1">
                                             <input ref="chestEditInput" type="number" min="1"
                                                    v-model="chestDraft"
                                                    @keydown.enter="confirmSetChest(p)"
@@ -158,7 +223,13 @@
                                         </div>
                                     </td>
                                     <td class="p-3">
-                                        <SearchableSelect :model-value="p.order_no ?? ''"
+                                        <div v-if="isBulkEditing">
+                                            <input type="number" min="1"
+                                                   v-model.number="bulkDrafts[p.id].order_no"
+                                                   class="w-16 rounded border-2 border-indigo-400 px-2 py-1 text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-white"
+                                                   placeholder="—" />
+                                        </div>
+                                        <SearchableSelect v-else :model-value="p.order_no ?? ''"
                                                 :options="orderOptionsFor(p.id).map((n) => ({ value: n, label: String(n) }))"
                                                 :all-option="true" all-label="— No order —"
                                                 @update:model-value="(value) => saveOrderNo(p.id, value)" />
@@ -192,6 +263,12 @@
                                 </tr>
                             </tbody>
                         </table>
+                        <div v-if="isBulkEditing && participants.length > 8" class="flex justify-end gap-2 p-3 bg-indigo-50/70 border-t border-indigo-100">
+                            <button type="button" class="btn-secondary text-xs !bg-white" @click="cancelBulkEdit" :disabled="isSavingBulk">Cancel</button>
+                            <button type="button" class="btn-primary text-xs !bg-indigo-600 hover:!bg-indigo-700" @click="saveBulkChanges" :disabled="isSavingBulk">
+                                {{ isSavingBulk ? 'Saving...' : '💾 Save All Changes' }}
+                            </button>
+                        </div>
                         <p v-if="hasTeamRows" class="px-3 py-2 text-xs text-slate-500 border-t">
                             This is a team item — one chest number is shared by the whole squad. Clearing or revealing applies to every member.
                         </p>
@@ -471,6 +548,138 @@ function confirmSetChest(participant) {
             chestError.value = errors.chest_no || 'Could not set chest number.';
         },
     });
+}
+
+// Bulk Edit Mode
+const isBulkEditing = ref(false);
+const isSavingBulk = ref(false);
+const bulkError = ref('');
+const bulkDrafts = reactive({});
+const autoChestStart = ref(100);
+const autoOrderStart = ref(1);
+
+function toggleBulkEdit() {
+    if (isBulkEditing.value) {
+        cancelBulkEdit();
+    } else {
+        startBulkEdit();
+    }
+}
+
+function startBulkEdit() {
+    cancelChestEdit();
+    isBulkEditing.value = true;
+    bulkError.value = '';
+
+    const existingChests = props.participants
+        .map((p) => Number(p.chest_no))
+        .filter((n) => Number.isInteger(n) && n > 0);
+    if (existingChests.length) {
+        autoChestStart.value = Math.min(...existingChests);
+    } else {
+        autoChestStart.value = 100;
+    }
+    autoOrderStart.value = 1;
+
+    for (const p of props.participants) {
+        bulkDrafts[p.id] = {
+            chest_no: p.chest_no ?? null,
+            order_no: p.order_no ?? null,
+        };
+    }
+}
+
+function cancelBulkEdit() {
+    isBulkEditing.value = false;
+    bulkError.value = '';
+    for (const key of Object.keys(bulkDrafts)) {
+        delete bulkDrafts[key];
+    }
+}
+
+function autoFillChests() {
+    let current = Number(autoChestStart.value) || 100;
+    for (const p of props.participants) {
+        if (!bulkDrafts[p.id]) bulkDrafts[p.id] = {};
+        bulkDrafts[p.id].chest_no = current++;
+    }
+}
+
+function autoFillOrders() {
+    let current = Number(autoOrderStart.value) || 1;
+    for (const p of props.participants) {
+        if (!bulkDrafts[p.id]) bulkDrafts[p.id] = {};
+        bulkDrafts[p.id].order_no = current++;
+    }
+}
+
+function clearDraftChests() {
+    for (const p of props.participants) {
+        if (bulkDrafts[p.id]) bulkDrafts[p.id].chest_no = null;
+    }
+}
+
+function clearDraftOrders() {
+    for (const p of props.participants) {
+        if (bulkDrafts[p.id]) bulkDrafts[p.id].order_no = null;
+    }
+}
+
+function saveBulkChanges() {
+    bulkError.value = '';
+
+    // Check for duplicate chest numbers in drafts
+    const chests = Object.values(bulkDrafts)
+        .map((d) => d.chest_no)
+        .filter((c) => c !== null && c !== undefined && c !== '');
+    const chestCounts = {};
+    for (const c of chests) {
+        chestCounts[c] = (chestCounts[c] || 0) + 1;
+        if (chestCounts[c] > 1) {
+            bulkError.value = `Duplicate chest number #${c} detected in your changes.`;
+            return;
+        }
+    }
+
+    // Check for duplicate order numbers in drafts
+    const orders = Object.values(bulkDrafts)
+        .map((d) => d.order_no)
+        .filter((o) => o !== null && o !== undefined && o !== '');
+    const orderCounts = {};
+    for (const o of orders) {
+        orderCounts[o] = (orderCounts[o] || 0) + 1;
+        if (orderCounts[o] > 1) {
+            bulkError.value = `Duplicate order number ${o} detected in your changes.`;
+            return;
+        }
+    }
+
+    const updates = props.participants.map((p) => ({
+        id: p.id,
+        chest_no: bulkDrafts[p.id]?.chest_no ? Number(bulkDrafts[p.id].chest_no) : null,
+        order_no: bulkDrafts[p.id]?.order_no ? Number(bulkDrafts[p.id].order_no) : null,
+    }));
+
+    isSavingBulk.value = true;
+    router.post(
+        `${base.value}/bulk-update`,
+        {
+            item_id: props.selectedItemId,
+            updates,
+        },
+        {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                isBulkEditing.value = false;
+                isSavingBulk.value = false;
+            },
+            onError: (errors) => {
+                isSavingBulk.value = false;
+                bulkError.value = errors.bulk || Object.values(errors)[0] || 'Could not save bulk changes.';
+            },
+        }
+    );
 }
 
 // Per-item / bulk "starting number" popups — a quicker alternative to the full table

@@ -16,9 +16,9 @@
         .medal-cell img { width: 32px; height: 32px; }
         .rank { font-weight: 800; font-size: 12px; color: #92400e; }
         .name { font-weight: 700; }
-        .footer { margin-top: 14px; padding-top: 6px; border-top: 1px solid #cbd5e1; font-size: 8.5px; color: #64748b; }
+        .footer { margin-top: 14px; padding-top: 6px; border-top: 1px solid #000; font-size: 8.5px; color: #64748b; }
         .empty { text-align: center; padding: 20px; color: #64748b; }
-        .blank-line { display: inline-block; width: 100%; border-bottom: 1px solid #cbd5e1; height: 16px; }
+        .blank-line { display: inline-block; width: 100%; border-bottom: 1px solid #000; height: 16px; }
     </style>
 </head>
 <body>

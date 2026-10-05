@@ -37,7 +37,7 @@
         .footer-container {
             display: table;
             width: 100%;
-            border-top: 1px solid #cbd5e1;
+            border-top: 1px solid #000;
             padding-top: 4px;
             margin-top: 16px;
             font-size: 9.5px;
@@ -70,12 +70,12 @@
             text-transform: uppercase;
             letter-spacing: 0.04em;
             padding: 5px 6px;
-            border: 1px solid #cbd5e1;
+            border: 1px solid #000;
             text-align: left;
         }
         td {
             padding: 10px 7px;
-            border: 1px solid #cbd5e1;
+            border: 1px solid #000;
             font-size: 10.5px;
             color: #1e293b;
             vertical-align: middle;
@@ -97,8 +97,8 @@
             font-weight: bold;
             font-size: 10.5px;
             padding: 4px 6px;
-            border-top: 2px solid #cbd5e1;
-            border-bottom: 1px solid #cbd5e1;
+            border-top: 2px solid #000;
+            border-bottom: 1px solid #000;
             text-transform: uppercase;
             letter-spacing: 0.03em;
         }
@@ -148,7 +148,7 @@
     ])
     {{-- Plain text, no dark box -- see the matching comment in fest.reports.attendance-sheet
          for the single-item vs. multi-item split this follows. --}}
-    <div class="event-context-bar" style="margin-top: 4px; padding-top: 4px; border-top: 1px solid #e2e8f0; display: block;">
+    <div class="event-context-bar" style="margin-top: 4px; padding-top: 4px; border-top: 1px solid #000; display: block;">
         <div style="font-size: 9px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px;">
             {{ $event->title }}
         </div>

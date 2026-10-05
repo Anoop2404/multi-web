@@ -26,7 +26,7 @@ body{font-family:DejaVu Sans,sans-serif;font-size:{{ $tdFont }}}
 h1{font-size:16px;text-align:center}
 table{width:100%;border-collapse:collapse;margin-top:8px;table-layout:fixed}
 th{background:#023e8a;color:#fff;padding:{{ $padding }};font-size:{{ $thFont }};word-wrap:break-word;overflow-wrap:break-word;word-break:break-word;vertical-align:bottom}
-td{border:1px solid #aaa;padding:{{ $padding }};font-size:{{ $tdFont }};min-height:30px;word-wrap:break-word;overflow-wrap:break-word}
+td{border:1px solid #000;padding:{{ $padding }};font-size:{{ $tdFont }};min-height:30px;word-wrap:break-word;overflow-wrap:break-word}
 .score-cell{min-height:30px}
 </style>
 </head><body>

@@ -13,13 +13,13 @@
         table.data tr { page-break-inside: avoid; }
         table.data th { background: #1d3557; color: #ffffff; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; text-align: center; padding: 7px 8px; border: 1px solid #1d3557; }
         table.data th.school-col { text-align: left; }
-        table.data td { border: 1px solid #cbd5e1; padding: 0 8px; height: 28px; font-size: 10.5px; text-align: center; }
+        table.data td { border: 1px solid #000; padding: 0 8px; height: 28px; font-size: 10.5px; text-align: center; }
         table.data td.school-col { text-align: left; font-weight: 700; }
         table.data tr:nth-child(even) td { background: #f7f9fc; }
         table.data td.overall-col { font-weight: bold; }
         table.data td.rank-col, table.data th.rank-col { font-weight: 800; }
         table.data tr.top3 td { font-weight: bold; background: #fef9e7; }
-        .footer { margin-top: 14px; padding-top: 6px; border-top: 1px solid #cbd5e1; font-size: 8.5px; color: #64748b; }
+        .footer { margin-top: 14px; padding-top: 6px; border-top: 1px solid #000; font-size: 8.5px; color: #64748b; }
         .empty { text-align: center; padding: 20px; color: #64748b; }
     </style>
 </head>

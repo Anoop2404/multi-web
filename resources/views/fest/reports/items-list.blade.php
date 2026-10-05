@@ -10,7 +10,7 @@
         .meta { text-align: center; font-size: 10px; color: #64748b; margin: 0 0 12px; }
         table { width: 100%; border-collapse: collapse; }
         th { background: #0f172a; color: #ffffff; font-size: 10.5px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.03em; text-align: left; padding: 6px 8px; border: 1px solid #0f172a; }
-        td { border: 1px solid #cbd5e1; padding: 6px 8px; font-size: 11px; vertical-align: middle; }
+        td { border: 1px solid #000; padding: 6px 8px; font-size: 11px; vertical-align: middle; }
         tr:nth-child(even) td { background: #f8fafc; }
         .center { text-align: center; }
     </style>

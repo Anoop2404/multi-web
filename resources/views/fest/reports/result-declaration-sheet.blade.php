@@ -14,10 +14,10 @@
         .sheet:last-child { page-break-after: avoid; }
         .table { width: 100%; border-collapse: collapse; margin-top: 4px; }
         .table th { background: #0f172a; color: #ffffff; font-size: 11px; font-weight: bold; text-transform: uppercase; text-align: left; padding: 6px 8px; border: 1px solid #0f172a; }
-        .table td { border: 1px solid #cbd5e1; padding: 9px 8px; font-size: 11.5px; height: 30px; }
+        .table td { border: 1px solid #000; padding: 9px 8px; font-size: 11.5px; height: 30px; }
         .table tr:nth-child(even) { background-color: #f8fafc; }
         .center { text-align: center; }
-        .sign-box { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 12px; }
+        .sign-box { margin-top: 24px; border-top: 1px solid #000; padding-top: 12px; }
         .sign-col { float: left; width: 50%; font-size: 11px; font-weight: bold; color: #475569; }
         .clear { clear: both; }
         .published-at { margin-top: 18px; font-size: 13px; font-weight: bold; color: #0f172a; }

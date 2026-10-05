@@ -21,7 +21,7 @@
             background: #0f2744; color: #fff; text-align: left;
             padding: 6px 5px; font-size: 8px; text-transform: uppercase; letter-spacing: 0.3px;
         }
-        table.report td { padding: 5px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+        table.report td { padding: 5px; border-bottom: 1px solid #000; vertical-align: middle; }
         table.report tr:nth-child(even) td { background: #f8fafc; }
         .sl { width: 32px; text-align: center; }
         .mark { text-align: center; width: 52px; font-weight: 700; }
@@ -29,7 +29,7 @@
         .a { color: #b91c1c; }
         .u { color: #94a3b8; font-weight: 500; }
         .empty { text-align: center; color: #94a3b8; padding: 24px 0; }
-        .footer { margin-top: 14px; font-size: 8px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 6px; }
+        .footer { margin-top: 14px; font-size: 8px; color: #94a3b8; border-top: 1px solid #000; padding-top: 6px; }
     </style>
 </head>
 <body>

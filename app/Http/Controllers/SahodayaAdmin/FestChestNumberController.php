@@ -228,6 +228,93 @@ class FestChestNumberController extends SahodayaAdminController
         return back()->with('success', "Cleared {$cleared} chest number(s) {$scopeLabel}.");
     }
 
+    public function bulkUpdate(
+        Request $request,
+        string $tenantId,
+        FestEvent $event,
+        FestChestNumberService $service,
+        FestNumberingService $numbering,
+        PlatformAuditLogger $audit
+    ) {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'item_id' => 'required|exists:fest_event_items,id',
+            'updates' => 'required|array',
+            'updates.*.id' => 'required|integer',
+            'updates.*.chest_no' => 'nullable|integer|min:1',
+            'updates.*.order_no' => 'nullable|integer|min:1|max:65535',
+        ]);
+
+        $item = FestEventItem::where('event_id', $event->id)->findOrFail($data['item_id']);
+        $isGroup = $numbering->isGroupItem($item);
+
+        // Check for client-submitted duplicate chest numbers
+        $chestValues = array_filter(array_map(fn ($u) => !empty($u['chest_no']) ? (int) $u['chest_no'] : null, $data['updates']));
+        $chestCounts = array_count_values($chestValues);
+        foreach ($chestCounts as $num => $count) {
+            if ($count > 1) {
+                return back()->withErrors(['bulk' => "Duplicate chest number #{$num} in submitted changes."]);
+            }
+        }
+
+        // Check for client-submitted duplicate order numbers
+        $orderValues = array_filter(array_map(fn ($u) => !empty($u['order_no']) ? (int) $u['order_no'] : null, $data['updates']));
+        $orderCounts = array_count_values($orderValues);
+        foreach ($orderCounts as $num => $count) {
+            if ($count > 1) {
+                return back()->withErrors(['bulk' => "Duplicate order number {$num} in submitted changes."]);
+            }
+        }
+
+        $participants = FestParticipant::whereHas('registration', fn ($q) => $q->where('event_id', $event->id)->where('item_id', $item->id))
+            ->whereIn('id', array_column($data['updates'], 'id'))
+            ->with(['registration', 'group'])
+            ->get()
+            ->keyBy('id');
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($data, $participants, $service, $isGroup) {
+            // First pass: clear any rows whose chest number is changed or emptied to prevent self-collision
+            foreach ($data['updates'] as $u) {
+                $p = $participants->get($u['id']);
+                if (! $p) continue;
+                $newChest = !empty($u['chest_no']) ? (int) $u['chest_no'] : null;
+                $currentChest = $isGroup && $p->group ? $p->group->chest_no : $p->chest_no;
+                if ($currentChest !== null && ($newChest === null || $newChest !== $currentChest)) {
+                    $service->clearChest($p);
+                }
+            }
+
+            // Second pass: apply new chest numbers and order numbers
+            foreach ($data['updates'] as $u) {
+                $p = $participants->get($u['id']);
+                if (! $p) continue;
+
+                $newChest = !empty($u['chest_no']) ? (int) $u['chest_no'] : null;
+                if ($newChest !== null) {
+                    $service->setChest($p, $newChest);
+                }
+
+                $newOrder = !empty($u['order_no']) ? (int) $u['order_no'] : null;
+                if ($isGroup && $p->group) {
+                    $p->group->update(['order_no' => $newOrder]);
+                } else {
+                    $p->update(['order_no' => $newOrder]);
+                }
+            }
+        });
+
+        $count = count($data['updates']);
+        $audit->festEvent(
+            $event,
+            FestPageActivity::CHEST_NUMBERS,
+            'fest.chest_number.bulk_update',
+            "Bulk updated chest/order numbers for {$item->title} ({$count} participants)"
+        );
+
+        return back()->with('success', "Updated numbers for {$count} participants successfully.");
+    }
+
     public function revealChest(string $tenantId, FestEvent $event, FestParticipant $participant, FestChestNumberService $service, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

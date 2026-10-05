@@ -86,4 +86,55 @@ class FestBlankSumSheetTest extends TestCase
 
         $response->assertOk();
     }
+
+    public function test_blank_sum_sheet_view_renders_remarks_column(): void
+    {
+        [$sahodaya, $event, , $multiJudgeItem] = $this->fixture();
+
+        $view = view('fest.reports.mark-entry-sheet', [
+            'sahodaya' => $sahodaya,
+            'event' => $event,
+            'sheets' => [[
+                'item' => $multiJudgeItem,
+                'criteria' => collect(),
+                'rows' => [['chest_no' => '101']],
+                'sheet_label' => 'SUM SHEET',
+                'is_sum_sheet' => true,
+                'judge_count' => 3,
+                'category_label' => null,
+            ]],
+            'logoSrc' => null,
+            'blankChest' => false,
+            'orientation' => 'landscape',
+        ])->render();
+
+        $this->assertStringContainsString('REMARKS', $view);
+        $this->assertStringContainsString('GRAND TOTAL', $view);
+        $this->assertStringContainsString('JUDGE 1', $view);
+        $this->assertStringContainsString('JUDGE 3', $view);
+    }
+
+    public function test_digital_sum_sheet_view_renders_remarks_column(): void
+    {
+        [$sahodaya, $event, , $multiJudgeItem] = $this->fixture();
+
+        $view = view('fest.reports.mark-criteria-sheet', [
+            'sahodaya' => $sahodaya,
+            'event' => $event,
+            'sheets' => [[
+                'item' => $multiJudgeItem,
+                'criteria' => collect(),
+                'rows' => [['chest_no' => '101', 'scores' => [10, 20, 30], 'total' => 60]],
+                'judge_count' => 3,
+                'category_label' => null,
+            ]],
+            'sheetTitle' => 'DIGITAL SUM SHEET',
+            'logoSrc' => null,
+            'blankChest' => false,
+            'orientation' => 'landscape',
+        ])->render();
+
+        $this->assertStringContainsString('Remarks', $view);
+        $this->assertStringContainsString('Grand Total', $view);
+    }
 }

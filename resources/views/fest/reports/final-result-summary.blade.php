@@ -16,12 +16,12 @@
         table.data tr { page-break-inside: avoid; }
         table.data th { background: #1d3557; color: #ffffff; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.04em; text-align: center; padding: 0 14px; height: 40px; border: 1px solid #1d3557; }
         table.data th.school-col { text-align: left; }
-        table.data td { border: 1px solid #cbd5e1; padding: 0 14px; height: 46px; font-size: 15px; text-align: center; }
+        table.data td { border: 1px solid #000; padding: 0 14px; height: 46px; font-size: 15px; text-align: center; }
         table.data td.school-col { text-align: left; font-weight: bold; }
         table.data td.total-col { font-weight: bold; font-size: 16px; }
         table.data td.rank-col { font-weight: bold; font-size: 16px; }
         table.data tr.rank-1 td { background: #fef3c7; }
-        .footer { margin-top: 14px; padding-top: 6px; border-top: 1px solid #cbd5e1; font-size: 8.5px; color: #64748b; }
+        .footer { margin-top: 14px; padding-top: 6px; border-top: 1px solid #000; font-size: 8.5px; color: #64748b; }
         .empty { text-align: center; padding: 18px; color: #64748b; font-size: 13px; }
     </style>
 </head>

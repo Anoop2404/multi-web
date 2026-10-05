@@ -14,7 +14,7 @@ tbody tr:nth-child(even){background:#f7f9fc}
 .rank-1{color:#b45309}
 .rank-2{color:#475569}
 .rank-3{color:#92400e}
-.photo{width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:8px;border:1px solid #cbd5e1}
+.photo{width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:8px;border:1px solid #000}
 .photo-fallback{display:inline-block;width:28px;height:28px;border-radius:50%;background:#e2e8f0;color:#475569;text-align:center;line-height:28px;font-size:11px;font-weight:bold;vertical-align:middle;margin-right:8px}
 .empty{text-align:center;color:#64748b;margin-top:40px;font-size:12px}
 </style>

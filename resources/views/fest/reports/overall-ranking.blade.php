@@ -9,7 +9,7 @@
     thead { display: table-header-group; }
     tr { page-break-inside: avoid; }
     th { background: #1d3557; color: #fff; padding: 0 8px; height: 28px; font-size: 11px; text-transform: uppercase; }
-    td { border-bottom: 1px solid #cbd5e1; padding: 0 8px; height: 28px; font-size: 11.5px; text-align: center; }
+    td { border-bottom: 1px solid #000; padding: 0 8px; height: 28px; font-size: 11.5px; text-align: center; }
     td.school { text-align: left; font-weight: bold; }
     th.school { text-align: left; }
     td.pts { font-weight: bold; }
