@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Http\Controllers\Admin\BuilderApiController;
+use App\Http\Controllers\Traits\HandlesRepeaterItems;
+use App\Models\SiteSection;
 use App\Models\WebsiteSite;
 use App\Models\WebsiteSiteVersion;
 use App\Services\Website\SahodayaTemplateApplier;
@@ -20,6 +22,7 @@ use Illuminate\Validation\ValidationException;
 
 class SiteBuilderApiController extends SchoolAdminController
 {
+    use HandlesRepeaterItems;
     public function experiences(): JsonResponse
     {
         return response()->json(['experiences' => SchoolWebsiteTemplateCatalog::summaries()]);
@@ -684,5 +687,24 @@ class SiteBuilderApiController extends SchoolAdminController
         }
 
         return $found;
+    }
+
+    // ── HandlesRepeaterItems trait requirements ───────────────────────────────
+
+    private function resolveSite(Request $request, string $tenantId): WebsiteSite
+    {
+        $siteId = $request->filled('site_id') ? (int) $request->integer('site_id') : null;
+
+        return WebsiteSite::resolveForTenant($tenantId, $siteId);
+    }
+
+    private function sectionForSite(WebsiteSite $site, int $sectionId): SiteSection
+    {
+        return $site->sectionQuery()->findOrFail($sectionId);
+    }
+
+    private function bustCache(string $tenantId): void
+    {
+        // School site builder does not use the same cache layer as Sahodaya.
     }
 }

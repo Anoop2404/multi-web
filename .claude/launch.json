@@ -5,7 +5,7 @@
       "name": "multi-web-dev",
       "runtimeExecutable": "composer",
       "runtimeArgs": ["run", "dev"],
-      "port": 8000
+      "autoPort": true
     },
     {
       "name": "vite",
@@ -16,26 +16,26 @@
     {
       "name": "multi-web-serve-built",
       "runtimeExecutable": "php",
-      "runtimeArgs": ["artisan", "serve", "--port=8000"],
-      "port": 8000
+      "runtimeArgs": ["artisan", "serve", "--host=0.0.0.0", "--port=$PORT"],
+      "autoPort": true
     },
     {
       "name": "multi-web-serve-8010",
       "runtimeExecutable": "php",
-      "runtimeArgs": ["artisan", "serve", "--port=8010"],
-      "port": 8010
+      "runtimeArgs": ["artisan", "serve", "--host=0.0.0.0", "--port=$PORT"],
+      "autoPort": true
     },
     {
       "name": "multi-web-serve-8020",
       "runtimeExecutable": "php",
-      "runtimeArgs": ["artisan", "serve", "--port=8020"],
-      "port": 8020
+      "runtimeArgs": ["artisan", "serve", "--host=0.0.0.0", "--port=$PORT"],
+      "autoPort": true
     },
     {
       "name": "multi-web-serve-8033",
       "runtimeExecutable": "php",
-      "runtimeArgs": ["artisan", "serve", "--port=8033"],
-      "port": 8033
+      "runtimeArgs": ["artisan", "serve", "--host=0.0.0.0", "--port=$PORT"],
+      "autoPort": true
     }
   ]
 }

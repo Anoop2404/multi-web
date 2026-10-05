@@ -111,6 +111,49 @@ class FestStateSlotCollectionController extends SahodayaAdminController
         );
     }
 
+    public function updateSlotQuotas(string $tenantId, FestEvent $event, FestStateSlotCollectionService $collection, Request $request)
+    {
+        $program = $this->context($event);
+        abort_if($event->state_slot_collection_approved_at, 422, 'Cannot change slots after the list has been approved.');
+
+        $data = $request->validate([
+            'default_quota' => 'nullable|integer|min:1|max:10',
+            'slots' => 'nullable|array',
+            'slots.*' => 'nullable|integer|min:1|max:10',
+            'sync_now' => 'nullable|boolean',
+        ]);
+
+        $nominations = app(\App\Services\State\FestStateNominationService::class);
+        $sourceEvents = $nominations->sourceEvents($event, app(\App\Services\Events\FestPartitionService::class));
+        $sourceEventIds = collect($sourceEvents)->pluck('id');
+
+        if (! empty($data['default_quota'])) {
+            \App\Models\FestEventItem::whereIn('event_id', $sourceEventIds)
+                ->whereNotNull('state_program_item_id')
+                ->update(['qualify_count' => (int) $data['default_quota']]);
+        }
+
+        if (! empty($data['slots'])) {
+            foreach ($data['slots'] as $stateItemId => $quota) {
+                if ($quota !== null) {
+                    \App\Models\FestEventItem::whereIn('event_id', $sourceEventIds)
+                        ->where('state_program_item_id', $stateItemId)
+                        ->update(['qualify_count' => (int) $quota]);
+                }
+            }
+        }
+
+        $syncMsg = '';
+        if ($event->state_slot_collection_open && ! empty($data['sync_now'])) {
+            $result = $collection->syncAdditionalSlots($program, $event, $request->user());
+            if ($result['filled'] > 0) {
+                $syncMsg = " and {$result['filled']} newly added slot(s) sent to schools for confirmation";
+            }
+        }
+
+        return back()->with('success', "Slot quotas updated successfully{$syncMsg}.");
+    }
+
     private function context(FestEvent $event): FestStateProgram
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
@@ -128,6 +171,7 @@ class FestStateSlotCollectionController extends SahodayaAdminController
         return [
             'open' => "{$base}/open",
             'approve' => "{$base}/approve",
+            'updateSlots' => "{$base}/update-slots",
             'overview' => "/sahodaya-admin/{$tenantId}/state-slot-collection",
         ];
     }

@@ -70,6 +70,28 @@ class FestStateSlotCollectionService
     }
 
     /**
+     * Re-run autoFill for newly increased item slot quotas while collection is open,
+     * marking any newly added selections as 'pending' school response.
+     */
+    public function syncAdditionalSlots(FestStateProgram $program, FestEvent $hubEvent, User $by): array
+    {
+        return DB::transaction(function () use ($program, $hubEvent, $by) {
+            $batch = $this->nominations->openBatch($program, $hubEvent);
+            abort_if($batch->isCertified(), 422, 'This event is already registered with State.');
+
+            $result = $this->sheets->autoFill($program, $hubEvent, $by);
+
+            $batch->selections()
+                ->where('nomination_type', 'primary')
+                ->where('status', 'selected')
+                ->whereNull('school_response')
+                ->update(['school_response' => 'pending']);
+
+            return $result;
+        });
+    }
+
+    /**
      * A school's answer to one offered slot. Accepting just records who answered; opting out also
      * frees the slot and, same as a Sahodaya-recorded decline, re-runs "fill from the top" for that
      * item so the next rank is offered in turn — a chain that only stops once someone accepts or the

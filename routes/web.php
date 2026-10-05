@@ -843,13 +843,13 @@ Route::prefix('school-admin/{tenantId}')
             Route::post('/public-website', [SiteBuilderApiController::class, 'savePublicWebsite'])->name('public-website.save');
 
             // Phase 7 — per-item CRUD for repeater items in site_section_items table
-            Route::get('/sections/{sectionId}/items', [SiteBuilderApiController::class, 'listRepeaterItems'])->name('items.index');
-            Route::post('/sections/{sectionId}/items', [SiteBuilderApiController::class, 'createRepeaterItem'])->name('items.store');
+            Route::get('/sections/{sectionId}/items/{itemKey}', [SiteBuilderApiController::class, 'listRepeaterItems'])->name('items.index');
+            Route::post('/sections/{sectionId}/items/{itemKey}', [SiteBuilderApiController::class, 'createRepeaterItem'])->name('items.store');
             Route::patch('/sections/{sectionId}/items/{itemId}', [SiteBuilderApiController::class, 'updateRepeaterItem'])->name('items.update');
             Route::delete('/sections/{sectionId}/items/{itemId}', [SiteBuilderApiController::class, 'deleteRepeaterItem'])->name('items.delete');
             Route::post('/sections/{sectionId}/items/{itemId}/toggle', [SiteBuilderApiController::class, 'toggleRepeaterItem'])->name('items.toggle');
             Route::post('/sections/{sectionId}/items/{itemId}/feature', [SiteBuilderApiController::class, 'featureRepeaterItem'])->name('items.feature');
-            Route::post('/sections/{sectionId}/items/reorder', [SiteBuilderApiController::class, 'reorderRepeaterItems'])->name('items.reorder');
+            Route::post('/sections/{sectionId}/items/{itemKey}/reorder', [SiteBuilderApiController::class, 'reorderRepeaterItems'])->name('items.reorder');
         }); // site-builder.api — feature:module.website enforced here
 
     // News
@@ -1525,6 +1525,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
                 Route::get('/', [$slots, 'index'])->name('index');
                 Route::post('/open', [$slots, 'open'])->name('open');
                 Route::post('/approve', [$slots, 'approve'])->name('approve');
+                Route::post('/update-slots', [$slots, 'updateSlotQuotas'])->name('update-slots');
             });
             Route::post('/{event}/spawn-school-rounds', [FestEventController::class, 'spawnSchoolRounds'])->name('spawn-school-rounds');
             Route::post('/{event}/link-school-round', [FestEventController::class, 'linkSchoolRound'])->name('link-school-round');

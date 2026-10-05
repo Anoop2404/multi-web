@@ -8,8 +8,8 @@
                         <Link :href="actionUrls.overview" class="text-xs text-gray-500 hover:text-gray-800">← All State events</Link>
                         <h3 class="font-semibold mt-1">Get a confirmed list before State registration</h3>
                         <p class="text-xs text-gray-500 mt-0.5 max-w-2xl">
-                            Opening this auto-fills each item's top ranks, same as "Fill from the top" on
-                            the winner sheet, and asks each winning school to accept or opt out of their
+                            Configure how many winning positions (slots) are offered to schools per item.
+                            Opening this auto-fills each item's top ranks and asks each winning school to accept or opt out of their
                             slot. If a school opts out, the next rank is offered the freed slot in their
                             place. Once every offer is answered, approve the list — after that you
                             register with State from the winner sheet exactly as before.
@@ -20,14 +20,45 @@
                     </span>
                 </div>
 
+                <!-- Slot Quota Configuration Toolbar -->
+                <div v-if="!event.state_slot_collection_approved_at" class="mt-4 pt-4 border-t border-slate-100">
+                    <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                        <div>
+                            <p class="text-xs font-bold text-slate-800">Configure Slot Count per Item</p>
+                            <p class="text-[11px] text-slate-500">
+                                How many top ranks qualify? (e.g. 1 = 1st Place only, 2 = 1st &amp; 2nd, 3 = 1st, 2nd &amp; 3rd)
+                            </p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="text-[11px] text-slate-500 font-medium">Quick set all:</span>
+                            <button type="button" @click="applyBatch(1)" class="px-2.5 py-1 text-xs font-medium rounded-lg border border-slate-300 bg-white hover:bg-slate-100 transition shadow-xs">
+                                🥇 Top 1 Only
+                            </button>
+                            <button type="button" @click="applyBatch(2)" class="px-2.5 py-1 text-xs font-medium rounded-lg border border-slate-300 bg-white hover:bg-slate-100 transition shadow-xs">
+                                🥈 Top 2
+                            </button>
+                            <button type="button" @click="applyBatch(3)" class="px-2.5 py-1 text-xs font-medium rounded-lg border border-slate-300 bg-white hover:bg-slate-100 transition shadow-xs">
+                                🥉 Top 3
+                            </button>
+                            <button type="button" :disabled="savingSlots" @click="saveSlotQuotas(false)" class="btn-secondary text-xs !py-1 ml-1">
+                                {{ savingSlots ? 'Saving...' : '💾 Save Slot Counts' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="mt-3 flex flex-wrap items-center gap-2">
-                    <button v-if="!event.state_slot_collection_open" type="button" class="btn-primary text-xs" @click="open">
+                    <button v-if="!event.state_slot_collection_open" type="button" class="btn-primary text-xs" :disabled="savingSlots" @click="open">
                         Open slot collection
                     </button>
                     <template v-else-if="!event.state_slot_collection_approved_at">
                         <span class="text-xs text-gray-500">
                             {{ totals.accepted }} accepted · {{ totals.pending }} awaiting response · {{ totals.optedOut }} opted out
                         </span>
+                        <button v-if="event.state_slot_collection_open" type="button" :disabled="savingSlots" @click="saveSlotQuotas(true)"
+                                class="px-2.5 py-1 text-xs font-medium rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition ml-2">
+                            🔄 Re-sync new slots with schools
+                        </button>
                         <button type="button" class="btn-primary text-xs ml-auto" :disabled="totals.pending > 0" @click="approve">
                             Approve list
                         </button>
@@ -55,17 +86,32 @@
             <section v-for="row in summary" :key="row.item_id" class="card">
                 <div class="flex flex-wrap items-start justify-between gap-2">
                     <div class="min-w-0">
-                        <h4 class="font-semibold text-sm text-gray-800">
-                            <span class="font-mono text-xs text-gray-400">{{ row.item_code }}</span>
-                            {{ row.title }}
-                        </h4>
+                        <div class="flex items-center gap-2">
+                            <h4 class="font-semibold text-sm text-gray-800">
+                                <span class="font-mono text-xs text-gray-400">{{ row.item_code }}</span>
+                                {{ row.title }}
+                            </h4>
+                            <span v-if="row.quota" class="rounded-md px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                Quota: Top {{ row.quota }}
+                            </span>
+                        </div>
                         <p class="text-[11px] text-gray-500">
                             <span v-if="row.category">{{ row.category }} · </span>
                             <span v-if="row.class_group">{{ row.class_group }} · </span>
                             {{ row.participant_type || 'individual' }}
                         </p>
                     </div>
-                    <div class="flex flex-wrap items-center gap-1.5 shrink-0">
+
+                    <div class="flex flex-wrap items-center gap-2 shrink-0">
+                        <!-- Per-item slot count control -->
+                        <div v-if="!event.state_slot_collection_approved_at" class="flex items-center gap-1.5 mr-2">
+                            <label class="text-[11px] text-slate-500 font-medium">Slots:</label>
+                            <input type="number" min="1" max="10"
+                                   v-model.number="slotQuotas[row.item_id]"
+                                   @change="hasChanges = true"
+                                   class="w-14 rounded-lg border border-slate-300 px-2 py-1 text-xs text-center font-bold text-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
+                        </div>
+
                         <span class="rounded-full px-2.5 py-1 text-[11px] font-semibold bg-emerald-100 text-emerald-700">
                             {{ row.school_responses.accepted }} accepted
                         </span>
@@ -103,7 +149,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { ref, reactive, computed, watch } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 
@@ -111,6 +157,39 @@ const props = defineProps({
     sahodaya: Object, publicUrl: { type: String, default: '' },
     event: Object, program: Object, summary: Array, actionUrls: Object,
 });
+
+const slotQuotas = reactive({});
+const savingSlots = ref(false);
+const hasChanges = ref(false);
+
+function initQuotas() {
+    (props.summary || []).forEach(row => {
+        slotQuotas[row.item_id] = Number(row.quota) || 2;
+    });
+}
+initQuotas();
+watch(() => props.summary, () => initQuotas(), { deep: true });
+
+function applyBatch(val) {
+    (props.summary || []).forEach(row => {
+        slotQuotas[row.item_id] = val;
+    });
+    hasChanges.value = true;
+}
+
+function saveSlotQuotas(syncNow = false) {
+    savingSlots.value = true;
+    router.post(props.actionUrls.updateSlots, {
+        slots: { ...slotQuotas },
+        sync_now: syncNow,
+    }, {
+        preserveScroll: true,
+        onFinish: () => {
+            savingSlots.value = false;
+            hasChanges.value = false;
+        },
+    });
+}
 
 const totals = computed(() => props.summary.reduce((acc, row) => ({
     accepted: acc.accepted + row.school_responses.accepted,
@@ -145,11 +224,26 @@ function formatDate(v) {
 }
 
 function open() {
-    if (!confirm('Open slot collection? This fills each item\'s top ranks and sends the offer to schools.')) return;
-    router.post(props.actionUrls.open, {}, { preserveScroll: true });
+    if (!confirm('Open slot collection? This fills each item\'s top ranks matching the configured slot counts and sends the offers to schools.')) return;
+    if (hasChanges.value) {
+        // Save first then open
+        savingSlots.value = true;
+        router.post(props.actionUrls.updateSlots, { slots: { ...slotQuotas } }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                router.post(props.actionUrls.open, {}, { preserveScroll: true });
+            },
+            onFinish: () => {
+                savingSlots.value = false;
+            },
+        });
+    } else {
+        router.post(props.actionUrls.open, {}, { preserveScroll: true });
+    }
 }
 function approve() {
     if (!confirm('Approve this list? You can then register with State from the winner sheet.')) return;
     router.post(props.actionUrls.approve, {}, { preserveScroll: true });
 }
 </script>
+

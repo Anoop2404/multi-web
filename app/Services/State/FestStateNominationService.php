@@ -128,7 +128,7 @@ class FestStateNominationService
             $itemId = $candidate['item_id'] ?? null;
 
             if ($nominationType === 'primary' && $itemId) {
-                $quota = $this->itemQuota($itemId, $candidate['item_code'] ?? null);
+                $quota = $this->itemQuota($itemId, $candidate['item_code'] ?? null, $batch->hub_event_id);
                 $existingPrimaries = $batch->selections()
                     ->where('item_id', $itemId)
                     ->where('nomination_type', 'primary')
@@ -187,8 +187,23 @@ class FestStateNominationService
         $selection->update(['status' => 'withdrawn']);
     }
 
-    private function itemQuota(?string $itemId, ?string $itemCode): ?int
+    public function itemQuota(?string $itemId, ?string $itemCode, ?string $hubEventId = null): ?int
     {
+        if ($hubEventId && $itemId) {
+            $hubEvent = FestEvent::find($hubEventId);
+            if ($hubEvent) {
+                $sourceEvents = $this->sourceEvents($hubEvent, app(FestPartitionService::class));
+                $sourceEventIds = collect($sourceEvents)->pluck('id');
+                $custom = FestEventItem::whereIn('event_id', $sourceEventIds)
+                    ->where('state_program_item_id', $itemId)
+                    ->whereNotNull('qualify_count')
+                    ->value('qualify_count');
+                if ($custom !== null) {
+                    return (int) $custom;
+                }
+            }
+        }
+
         if (! $itemId && ! $itemCode) {
             return null;
         }

@@ -3,11 +3,13 @@
 namespace App\Services\State;
 
 use App\Models\FestEvent;
+use App\Models\FestEventItem;
 use App\Models\FestStateNominationBatch;
 use App\Models\FestStateNominationSelection;
 use App\Models\FestStateProgram;
 use App\Models\FestStateProgramItem;
 use App\Models\User;
+use App\Services\Events\FestPartitionService;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -57,6 +59,13 @@ class FestStateWinnerSheetService
             ->when($filters['class_group'] ?? null, fn ($q, $v) => $q->where('class_group', $v))
             ->orderBy('item_code')->get();
 
+        $sourceEvents = $this->nominations->sourceEvents($hubEvent, app(FestPartitionService::class));
+        $sourceEventIds = collect($sourceEvents)->pluck('id');
+        $eventItemQuotas = FestEventItem::whereIn('event_id', $sourceEventIds)
+            ->whereNotNull('state_program_item_id')
+            ->whereNotNull('qualify_count')
+            ->pluck('qualify_count', 'state_program_item_id');
+
         $byItem = $candidates->groupBy('item_id');
         $selectionsByItem = $selections->groupBy('item_id');
 
@@ -65,6 +74,7 @@ class FestStateWinnerSheetService
                 $item,
                 $byItem->get($item->id, collect()),
                 $selectionsByItem->get($item->id, collect()),
+                isset($eventItemQuotas[$item->id]) ? (int) $eventItemQuotas[$item->id] : null,
             ))
             // An item this Sahodaya has no results for is not a decision to make. Kept out rather than
             // listed empty, so the page is the work remaining.
@@ -78,9 +88,9 @@ class FestStateWinnerSheetService
      * @param  Collection<int, FestStateNominationSelection>  $selections
      * @return array<string, mixed>
      */
-    private function itemSheet(FestStateProgramItem $item, Collection $candidates, Collection $selections): array
+    private function itemSheet(FestStateProgramItem $item, Collection $candidates, Collection $selections, ?int $quotaOverride = null): array
     {
-        $quota = (int) ($item->qualify_count ?: 0);
+        $quota = $quotaOverride !== null ? $quotaOverride : (int) ($item->qualify_count ?: 0);
 
         $chosen = $selections->where('status', 'selected')->where('nomination_type', 'primary');
         $reserves = $selections->where('status', 'selected')->where('nomination_type', 'reserve');
