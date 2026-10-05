@@ -217,7 +217,7 @@
                 </div>
 
                 <form @submit.prevent="submitForm" class="p-6 space-y-5 text-xs">
-                    {{-- ── Section 1: Basics ── }}
+                    <!-- ── Section 1: Basics ── -->
                     <fieldset class="space-y-3">
                         <legend class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Basics</legend>
                         <div class="grid grid-cols-3 gap-3">
@@ -249,7 +249,7 @@
                         </div>
                     </fieldset>
 
-                    {{-- ── Section 2: Trophy Type ── }}
+                    <!-- ── Section 2: Trophy Type ── -->
                     <fieldset class="space-y-3">
                         <legend class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Trophy Type</legend>
                         <div>
@@ -263,54 +263,47 @@
                             </select>
                         </div>
 
-                        {{-- Category / Individual Championship: pick a category --}}
+                        <!-- Category / Individual Championship: pick a category -->
                         <div v-if="form.trophy_type === 'category' || form.trophy_type === 'individual_championship'">
                             <label class="lbl">Target Category</label>
                             <SearchableSelect v-model="form.category_key" class="w-full" :options="categoryOptions" :all-option="false" placeholder="Select category" />
                         </div>
 
-                        {{-- Single Item: pick one item + optional name pattern --}}
+                        <!-- Single Item: pick one item + optional name pattern -->
                         <div v-if="form.trophy_type === 'item'">
                             <label class="lbl">Match Item</label>
-                            <select v-model="form.item_id" class="fld">
-                                <option :value="null">— Use name pattern instead —</option>
-                                <option v-for="it in items" :key="it.id" :value="it.id">
-                                    {{ it.item_code ? it.item_code + ' — ' : '' }}{{ it.title }} ({{ it.class_group || it.category }})
-                                </option>
-                            </select>
+                            <SearchableSelect v-model="form.item_id" class="w-full" :options="itemsWithNull" :all-option="false" placeholder="— Use name pattern instead —" />
                             <div class="mt-2">
                                 <label class="lbl">Name Pattern <span class="text-slate-400 font-normal normal-case tracking-normal">(matches items across events)</span></label>
                                 <input v-model="form.item_name_pattern" type="text" class="fld" placeholder="e.g. One Act Play, Oppana, Margamkali">
                             </div>
                         </div>
 
-                        {{-- Item Group: group name + optional explicit item list --}}
+                        <!-- Item Group: group name + optional explicit item list -->
                         <div v-if="form.trophy_type === 'item_group'">
                             <label class="lbl">Group / Cluster Name</label>
                             <input v-model="form.item_group_name" type="text" class="fld" placeholder="e.g. Music items, Art items">
                             <div class="mt-3">
-                                <label class="lbl">Or pick specific items <span class="text-slate-400 font-normal normal-case tracking-normal">(optional)</span></label>
-                                <div class="max-h-32 overflow-y-auto border rounded-lg p-2 bg-slate-50 space-y-1">
-                                    <label v-for="it in items" :key="it.id" class="flex items-center gap-2 text-slate-700 cursor-pointer hover:bg-white rounded px-1">
+                                <label class="lbl">Select specific items <span class="text-slate-400 font-normal normal-case tracking-normal">(optional)</span></label>
+                                <input v-model="itemGroupFilter" type="text" class="fld mb-2" placeholder="Type to filter items…">
+                                <div class="max-h-40 overflow-y-auto border rounded-lg p-2 bg-slate-50 space-y-1">
+                                    <label v-for="it in filteredGroupItems" :key="it.id" class="flex items-center gap-2 text-slate-700 cursor-pointer hover:bg-white rounded px-1">
                                         <input type="checkbox" :value="it.id" v-model="form.item_ids" class="rounded">
                                         <span>{{ it.item_code }} — {{ it.title }}</span>
                                     </label>
+                                    <p v-if="!filteredGroupItems.length" class="text-xs text-slate-400 px-1 py-1">No items match your filter.</p>
                                 </div>
                             </div>
                         </div>
 
-                        {{-- Individual Championship: gender --}}
+                        <!-- Individual Championship: gender -->
                         <div v-if="form.trophy_type === 'individual_championship'">
                             <label class="lbl">Eligibility</label>
-                            <select v-model="form.gender" class="fld">
-                                <option :value="null">Any Gender / Open</option>
-                                <option value="male">Boys (Kalaprathibha)</option>
-                                <option value="female">Girls (Kalathilakam)</option>
-                            </select>
+                            <SearchableSelect v-model="form.gender" class="w-full" :options="genderOptions" :all-option="false" placeholder="Select eligibility…" />
                         </div>
                     </fieldset>
 
-                    {{-- ── Section 3: Details ── }}
+                    <!-- ── Section 3: Details ── -->
                     <fieldset class="space-y-3">
                         <legend class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Details</legend>
                         <div class="grid grid-cols-2 gap-3">
@@ -380,6 +373,29 @@ const statusOptions = [
     { value: 'ready', label: 'Ready (Winner Found)' },
     { value: 'pending', label: 'Pending Results' },
 ];
+
+const itemsWithNull = computed(() => [{ value: null, label: '— Use name pattern instead —' }, ...props.items.map(it => ({
+    value: it.id,
+    label: `${it.item_code ? it.item_code + ' — ' : ''}${it.title} (${it.class_group || it.category})`,
+}))]);
+
+const genderOptions = [
+    { value: null, label: 'Any Gender / Open' },
+    { value: 'male', label: 'Boys (Kalaprathibha)' },
+    { value: 'female', label: 'Girls (Kalathilakam)' },
+];
+
+const itemGroupFilter = ref('');
+
+const filteredGroupItems = computed(() => {
+    if (!itemGroupFilter.value.trim()) return props.items;
+    const q = itemGroupFilter.value.toLowerCase().trim();
+    return props.items.filter(it =>
+        it.title.toLowerCase().includes(q) ||
+        (it.item_code && it.item_code.toLowerCase().includes(q)) ||
+        (it.class_group && it.class_group.toLowerCase().includes(q))
+    );
+});
 
 const filteredRows = computed(() => {
     let list = props.trophyRows;

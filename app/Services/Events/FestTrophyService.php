@@ -492,6 +492,42 @@ class FestTrophyService
                     $matchedItemId = $matched?->id;
                 }
 
+                // Resolve item_ids for item_group trophies: persist the matched items so the
+                // modal shows them as already-selected and resolvers don't depend on a fragile
+                // name-based re-derivation every time. Falls back to a transient resolve if the
+                // trophy is missing a group name (shouldn't happen with this preset).
+                $resolvedItemIds = null;
+                if (($def['trophy_type'] ?? null) === 'item_group' && ! empty($def['item_group_name'])) {
+                    $groupName = strtolower($def['item_group_name']);
+                    $resolvedItemIds = $items->filter(function (FestEventItem $it) use ($groupName) {
+                        if (str_contains($groupName, 'music')) {
+                            if (strtolower((string) $it->category) === 'music') {
+                                return true;
+                            }
+                            $title = strtolower($it->title);
+                            foreach (['classical music', 'light music', 'mappilappattu', 'violin', 'guitar', 'flute', 'mrudangam', 'tabala', 'vocal'] as $kw) {
+                                if (str_contains($title, $kw)) {
+                                    return true;
+                                }
+                            }
+                            return false;
+                        }
+                        if (str_contains($groupName, 'art') || str_contains($groupName, 'drawing')) {
+                            if (strtolower((string) $it->category) === 'art') {
+                                return true;
+                            }
+                            $title = strtolower($it->title);
+                            foreach (['pencil drawing', 'painting', 'crayon', 'water colour', 'water color', 'oil colour', 'oil color', 'cartoon', 'clay'] as $kw) {
+                                if (str_contains($title, $kw)) {
+                                    return true;
+                                }
+                            }
+                            return false;
+                        }
+                        return false;
+                    })->pluck('id')->all();
+                }
+
                 FestTrophy::create([
                     'event_id' => $event->id,
                     'template_id' => $template->id,
@@ -503,6 +539,7 @@ class FestTrophyService
                     'category_key' => $def['category_key'] ?? null,
                     'item_id' => $matchedItemId,
                     'item_name_pattern' => $def['item_name_pattern'] ?? null,
+                    'item_ids' => $resolvedItemIds,
                     'item_group_name' => $def['item_group_name'] ?? null,
                     'notes' => $def['notes'] ?? null,
                     'is_rolling' => $def['is_rolling'] ?? false,
