@@ -812,6 +812,8 @@ const props = defineProps({
     sections:                { type: Array,  default: () => [] },
     currentSite:             { type: Object, default: () => ({}) },
     experiences:             { type: Array,  default: () => [] },
+    staffPermissions:        { type: Array,  default: () => [] },
+    isStaff:                 { type: Boolean, default: false },
     sectionTypes:            { type: Object, default: () => ({}) },
     fieldDefs:               { type: Object, default: () => ({}) },
     navConfig:               { type: Object, default: () => ({}) },
@@ -832,6 +834,10 @@ const isSuperAdmin = computed(() => Boolean(
     || page.props.auth?.user?.roles?.includes('superadmin')
     || page.props.auth?.user?.is_super_admin
 ));
+
+const canEdit = computed(() => isSuperAdmin.value || props.isStaff || props.staffPermissions.includes('website.edit'));
+
+const canPublish = computed(() => isSuperAdmin.value || props.isStaff || props.staffPermissions.includes('website.publish'));
 
 const tabs = computed(() => [
     ...(isSuperAdmin.value ? [
