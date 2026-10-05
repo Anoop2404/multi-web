@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\SiteSection;
 use App\Models\WebsiteSite;
+use App\Support\Licensing\FeatureGate;
 use App\Support\NavConfigDefaults;
 use App\Support\SchoolPortalNavLinks;
 use App\Support\SchoolPublicPageContent;
@@ -12,12 +13,21 @@ use App\Support\SchoolWebsiteTemplateCatalog;
 use App\Support\SectionFieldRegistry;
 use App\Support\SiteSectionMedia;
 use App\Support\TenantPublicSite;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Redirect;
 use Inertia\Response;
 
 class SiteBuilderController extends SchoolAdminController
 {
-    public function index(): Response
+    public function index(): Response|RedirectResponse
     {
+        if (! app(FeatureGate::class)->allows($this->school, 'module.website')) {
+            return Redirect::back()->with(
+                'error',
+                'Your subscription does not include the public website module. Contact your Sahodaya administrator to enable it.',
+            );
+        }
+
         $site = WebsiteSite::ensurePrimary($this->school->id);
 
         $sections = SiteSection::where('tenant_id', $this->school->id)

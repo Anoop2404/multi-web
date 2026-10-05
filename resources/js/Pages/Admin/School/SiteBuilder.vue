@@ -457,9 +457,15 @@
                                     </h2>
                                     <span class="text-xs font-bold px-2.5 py-0.5 rounded-full border"
                                           :class="currentEditingSection.is_active
-                                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                              ? (currentEditingSection.has_unpublished_changes || dirtySections[currentEditingSection.id]
+                                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200')
                                               : 'bg-gray-100 text-gray-500 border-gray-200'">
-                                        {{ currentEditingSection.is_active ? '● Live on Website' : '○ Hidden from Website' }}
+                                        {{ currentEditingSection.is_active
+                                            ? (currentEditingSection.has_unpublished_changes || dirtySections[currentEditingSection.id]
+                                                ? '● Unpublished changes'
+                                                : '● Published')
+                                            : '○ Hidden from Website' }}
                                     </span>
                                 </div>
                                 <p class="text-xs text-gray-400 mt-1">
@@ -576,7 +582,7 @@
                             <span v-if="dirtySections[currentEditingSection.id]" class="w-2 h-2 rounded-full bg-amber-200 shrink-0"></span>
                             <span>{{ saving[currentEditingSection.id] ? 'Saving…' : (dirtySections[currentEditingSection.id] ? 'Save Changes' : 'Save Draft') }}</span>
                         </button>
-                        <button v-if="canEdit && (dirtySections[currentEditingSection.id] || currentEditingSection.status !== 'published')"
+                        <button v-if="canPublish && (dirtySections[currentEditingSection.id] || currentEditingSection.status !== 'published')"
                                 type="button"
                                 @click="publishSection(currentEditingSection)"
                                 :disabled="saving[currentEditingSection.id]"
@@ -699,7 +705,7 @@
 
                             <!-- Action buttons -->
                             <div class="flex w-full items-center justify-end gap-2 sm:w-auto shrink-0">
-                                <button v-if="canEdit && (section.has_unpublished_changes || dirtySections[section.id])"
+                                <button v-if="canPublish && (section.has_unpublished_changes || dirtySections[section.id])"
                                         type="button"
                                         @click="publishSection(section)"
                                         :disabled="saving[section.id]"

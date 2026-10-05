@@ -3,13 +3,24 @@
 namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\WebsiteSite;
+use App\Support\Licensing\FeatureGate;
 use App\Support\TenantPublicSite;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Redirect;
 use Inertia\Response;
 
 class WebsiteHubController extends SchoolAdminController
 {
-    public function index(): Response
+    public function index(): Response|RedirectResponse
     {
+        if (! app(FeatureGate::class)->allows($this->school, 'module.website')) {
+            return Redirect::route('school-admin.dashboard', ['tenantId' => $this->school->id])
+                ->with(
+                    'error',
+                    'Your subscription does not include the public website module. Contact your Sahodaya administrator to enable it.',
+                );
+        }
+
         $base = "/school-admin/{$this->school->id}";
         $site = WebsiteSite::ensurePrimary($this->school->id);
 
