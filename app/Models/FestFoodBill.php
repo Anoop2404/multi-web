@@ -121,7 +121,7 @@ class FestFoodBill extends Model
         DB::transaction(function () use ($item) {
             $locked = static::whereKey($this->id)->lockForUpdate()->firstOrFail();
 
-            abort_if($locked->status !== self::STATUS_OPEN, 422, 'This bill is settled/cancelled and no longer editable.');
+            abort_if($locked->status === self::STATUS_CANCELLED, 422, 'This bill is cancelled and no longer editable.');
 
             $newTotal = round((float) $locked->orderItems()->sum('line_total') - (float) $item->line_total, 2);
             $alreadyPaid = round((float) $locked->amount_paid, 2);
@@ -144,7 +144,13 @@ class FestFoodBill extends Model
     {
         return DB::transaction(function () use ($menuItem, $quantity, $userId) {
             $locked = static::whereKey($this->id)->lockForUpdate()->firstOrFail();
-            abort_if($locked->status !== self::STATUS_OPEN, 422, 'This bill is settled/cancelled and no longer editable.');
+            abort_if($locked->status === self::STATUS_CANCELLED, 422, 'This bill is cancelled and no longer editable.');
+
+            if ($locked->status === self::STATUS_SETTLED) {
+                $locked->status = self::STATUS_OPEN;
+                $locked->settled_at = null;
+                $locked->settled_by_user_id = null;
+            }
 
             $existing = $locked->orderItems()
                 ->where('menu_item_id', $menuItem->id)

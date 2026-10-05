@@ -1612,6 +1612,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/food-menu', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'index'])->name('food-menu.index');
             Route::post('/{event}/food-menu', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'store'])->name('food-menu.store');
             Route::post('/{event}/food-menu/assign-catalog-items', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'assignCatalogItems'])->name('food-menu.assign-catalog-items');
+            Route::post('/{event}/food-menu/move-date', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'moveDate'])->name('food-menu.move-date');
             Route::put('/{event}/food-menu/{menuItem}', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'update'])->name('food-menu.update');
             Route::delete('/{event}/food-menu/{menuItem}', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'destroy'])->name('food-menu.destroy');
             Route::put('/{event}/food-menu-payee', [\App\Http\Controllers\SahodayaAdmin\FestFoodMenuController::class, 'updatePayee'])->name('food-menu.payee.update');

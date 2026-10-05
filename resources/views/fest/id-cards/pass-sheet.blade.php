@@ -135,6 +135,10 @@
         }
 
         .meta-grid { margin-top: 2.1mm; display: grid; grid-template-columns: 1fr 1fr; gap: 1.1mm 1.6mm; }
+        .meta-grid--3col { grid-template-columns: repeat(6, 1fr); }
+        .meta-grid--3col .meta-box--venue,
+        .meta-grid--3col .meta-box--date { grid-column: span 3; }
+        .meta-grid--3col .meta-box:not(.meta-box--venue):not(.meta-box--date) { grid-column: span 2; }
         .meta-box { min-width: 0; padding: 1.1mm 1.6mm; background: #f2f7fc; border-radius: 1.6mm; }
         .meta-label { display: block; font-size: 5pt; font-weight: 700; text-transform: uppercase; color: #8391a4; margin-bottom: .5mm; }
         .meta-value {

@@ -89,12 +89,12 @@
                     </div>
                 </div>
             @else
-                <div class="meta-grid">
-                    <div class="meta-box">
+                <div class="meta-grid {{ !empty($card['dob']) ? 'meta-grid--3col' : '' }}">
+                    <div class="meta-box meta-box--venue">
                         <span class="meta-label">Venue</span>
                         <span class="meta-value">{{ $card['venue'] ?? '—' }}</span>
                     </div>
-                    <div class="meta-box">
+                    <div class="meta-box meta-box--date">
                         <span class="meta-label">Event Date</span>
                         <span class="meta-value">{{ $card['event_date'] ?? '—' }}</span>
                     </div>
@@ -102,6 +102,12 @@
                         <span class="meta-label">Category</span>
                         <span class="meta-value category-value">{{ $category }}</span>
                     </div>
+                    @if(!empty($card['dob']))
+                    <div class="meta-box">
+                        <span class="meta-label">DOB</span>
+                        <span class="meta-value">{{ $card['dob'] }}</span>
+                    </div>
+                    @endif
                     <div class="meta-box">
                         <span class="meta-label">{{ $idLabel }}</span>
                         <span class="meta-value">{{ $idNumber }}</span>

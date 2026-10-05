@@ -72,8 +72,8 @@
         <!-- TAB 1: ORDERED DISHES                          -->
         <!-- ============================================== -->
         <div v-if="activeTab === 'items'" class="space-y-6">
-            <!-- Add Item Form (When bill is open) -->
-            <div v-if="bill.status === 'open'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+            <!-- Add Item Form (When bill is not cancelled) -->
+            <div v-if="bill.status !== 'cancelled'" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
                 <h4 class="font-bold text-xs uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                     <span>➕</span> Add Item to this School's Order
                 </h4>

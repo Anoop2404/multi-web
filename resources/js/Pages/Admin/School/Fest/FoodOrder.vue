@@ -61,10 +61,17 @@
             </div>
         </div>
 
-        <div v-if="bill && bill.status !== 'open'" class="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/90 p-4 text-amber-800 text-sm mb-6 shadow-xs">
-            <span class="text-xl shrink-0" aria-hidden="true">🔒</span>
+        <div v-if="bill && bill.status === 'cancelled'" class="flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50/90 p-4 text-rose-800 text-sm mb-6 shadow-xs">
+            <span class="text-xl shrink-0" aria-hidden="true">🚫</span>
             <div>
-                <strong class="font-semibold">This bill is settled.</strong> Ordering is locked. Please contact the Sahodaya administration if you need to modify your contingent's food requirements.
+                <strong class="font-semibold">This bill is cancelled.</strong> Food ordering is no longer available.
+            </div>
+        </div>
+
+        <div v-else-if="bill && bill.status === 'settled' && orderingOpen" class="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/90 p-4 text-emerald-800 text-sm mb-6 shadow-xs">
+            <span class="text-xl shrink-0" aria-hidden="true">✓</span>
+            <div>
+                <strong class="font-semibold">Previous order settled.</strong> You can continue to add more food items below while ordering remains open. Any new items will automatically update your bill.
             </div>
         </div>
 
@@ -819,7 +826,7 @@ const props = defineProps({
 const school = computed(() => usePage().props.school);
 const base = computed(() => `/school-admin/${school.value?.id}/fest/${props.event.id}/food-order`);
 
-const canOrder = computed(() => props.orderingOpen && (!props.bill || props.bill.status === 'open'));
+const canOrder = computed(() => props.orderingOpen && (!props.bill || props.bill.status !== 'cancelled'));
 
 function dayWindowFor(date) {
     return props.foodOrderDayWindows?.[date] ?? null;
@@ -850,7 +857,7 @@ function dayWindowClass(date) {
 function orderUnavailableLabel(item) {
     if (props.orderingStatus === 'upcoming') return 'Ordering not open';
     if (!props.orderingOpen) return 'Ordering closed';
-    if (props.bill && props.bill.status !== 'open') return 'Bill settled';
+    if (props.bill && props.bill.status === 'cancelled') return 'Bill cancelled';
     const dayStatus = dayWindowFor(item.menu_date)?.status;
     if (dayStatus === 'upcoming') return 'This day is not open';
     if (dayStatus === 'closed') return 'This day is closed';

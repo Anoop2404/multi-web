@@ -259,7 +259,7 @@ class FestFoodOrderController extends SchoolAdminController
         $this->assertOrderingOpen($event, $menuItem->menu_date->format('Y-m-d'));
 
         $bill = FestFoodBill::firstOrCreateForSchool($event, $this->school->id);
-        abort_if($bill->status !== FestFoodBill::STATUS_OPEN, 422, 'Your food bill for this event is already settled — contact the Sahodaya to reopen it.');
+        abort_if($bill->status === FestFoodBill::STATUS_CANCELLED, 422, 'Your food bill for this event is cancelled.');
 
         if ($menuItem->max_per_school) {
             $existingQty = $bill->orderItems()->where('menu_item_id', $menuItem->id)->sum('quantity');
@@ -304,7 +304,7 @@ class FestFoodOrderController extends SchoolAdminController
         ]);
 
         $bill = FestFoodBill::firstOrCreateForSchool($event, $this->school->id);
-        abort_if($bill->status !== FestFoodBill::STATUS_OPEN, 422, 'Your food bill for this event is already settled — contact the Sahodaya to reopen it.');
+        abort_if($bill->status === FestFoodBill::STATUS_CANCELLED, 422, 'Your food bill for this event is cancelled.');
 
         $proofPath = TenantStorage::storeUploadedFile($request->file('proof'), "food-payments/{$this->school->id}");
 

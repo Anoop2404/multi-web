@@ -555,4 +555,40 @@ class FestFoodOrderControllerTest extends TestCase
         $this->assertSame(0.0, (float) $bill->fresh()->amount_total);
         $this->assertSame(0, $bill->orderItems()->count());
     }
+
+    public function test_school_can_place_new_order_after_bill_is_settled_without_manual_reopen(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school, 'schoolAdmin' => $schoolAdmin] = $this->makeSahodayaAndSchool();
+        $event = $this->makeStandaloneEvent($sahodaya);
+        $lunch = $this->addMenuItem($sahodaya->id, $event->id, ['name' => 'Meals', 'price' => 50]);
+        $dinner = $this->addMenuItem($sahodaya->id, $event->id, ['name' => 'Dinner', 'price' => 40]);
+
+        // 1. Initial order: 2 lunches = 100
+        $this->actingAs($schoolAdmin)->post(route('school.food-order.items.store', [
+            'tenantId' => $school->id, 'event' => $event->id,
+        ]), ['menu_item_id' => $lunch->id, 'quantity' => 2])->assertRedirect();
+
+        $bill = FestFoodBill::where('event_id', $event->id)->where('school_id', $school->id)->firstOrFail();
+        $this->assertSame(100.0, (float) $bill->amount_total);
+
+        // 2. Paid and settled
+        \App\Models\FestFoodPayment::recordForBill($bill, 100.0, 'cash', null, 1);
+        $bill->refresh();
+        $bill->settle(1);
+        $this->assertSame(FestFoodBill::STATUS_SETTLED, $bill->fresh()->status);
+        $this->assertSame(0.0, (float) $bill->fresh()->balanceDue());
+
+        // 3. School places a new order without anyone manually reopening the bill
+        $this->actingAs($schoolAdmin)->post(route('school.food-order.items.store', [
+            'tenantId' => $school->id, 'event' => $event->id,
+        ]), ['menu_item_id' => $dinner->id, 'quantity' => 3])->assertRedirect();
+
+        $bill->refresh();
+        // Bill is automatically open, total is 100 + 120 = 220, balance due is 120
+        $this->assertSame(FestFoodBill::STATUS_OPEN, $bill->status);
+        $this->assertNull($bill->settled_at);
+        $this->assertSame(220.0, (float) $bill->amount_total);
+        $this->assertSame(100.0, (float) $bill->amount_paid);
+        $this->assertSame(120.0, (float) $bill->balanceDue());
+    }
 }

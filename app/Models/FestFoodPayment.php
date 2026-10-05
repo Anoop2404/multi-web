@@ -79,9 +79,9 @@ class FestFoodPayment extends Model
             $locked = FestFoodBill::whereKey($bill->id)->lockForUpdate()->firstOrFail();
 
             abort_if(
-                $locked->status !== FestFoodBill::STATUS_OPEN,
+                $locked->status === FestFoodBill::STATUS_CANCELLED,
                 422,
-                'This bill is settled/cancelled — no further payments can be recorded.'
+                'This bill is cancelled — no further payments can be recorded.'
             );
 
             $balance = $locked->balanceDue();
@@ -142,9 +142,9 @@ class FestFoodPayment extends Model
             $locked = FestFoodBill::whereKey($bill->id)->lockForUpdate()->firstOrFail();
 
             abort_if(
-                $locked->status !== FestFoodBill::STATUS_OPEN,
+                $locked->status === FestFoodBill::STATUS_CANCELLED,
                 422,
-                'This bill is settled/cancelled — no further payments can be submitted.'
+                'This bill is cancelled — no further payments can be submitted.'
             );
 
             return static::create([

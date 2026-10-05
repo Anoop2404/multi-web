@@ -105,13 +105,51 @@
 
             <!-- Grouped Scheduled Items -->
             <div v-for="group in filteredGroupedItems" :key="group.date" class="space-y-6">
-                <div class="flex items-center gap-3 border-b-2 border-slate-200 pb-2">
-                    <div class="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm">
-                        📅
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b-2 border-slate-200 pb-2">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm">
+                            📅
+                        </div>
+                        <div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h2 class="text-lg font-extrabold text-slate-900">{{ formatCalendarDate(group.date) }}</h2>
+                                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-bold"
+                                      :class="dayWindowStatus(getDayWindow(group.date)).classes">
+                                    {{ dayWindowStatus(getDayWindow(group.date)).label }}
+                                </span>
+                            </div>
+                            <p class="text-xs text-slate-500">
+                                {{ group.meals.reduce((acc, m) => acc + m.items.length, 0) }} item(s) scheduled
+                                <span v-if="getDayWindow(group.date).opens_at || getDayWindow(group.date).closes_at" class="text-slate-400">
+                                    · {{ dayWindowDescription(getDayWindow(group.date)) }}
+                                </span>
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <h2 class="text-lg font-extrabold text-slate-900">{{ formatCalendarDate(group.date) }}</h2>
-                        <p class="text-xs text-slate-500">{{ group.meals.reduce((acc, m) => acc + m.items.length, 0) }} item(s) scheduled</p>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <!-- Quick Open / Close buttons directly against date of menus -->
+                        <button v-if="dayWindowStatus(getDayWindow(group.date)).label === 'Closed'"
+                                type="button"
+                                @click="openDayNow(getDayWindow(group.date))"
+                                :disabled="payeeForm.processing"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 text-xs font-bold text-emerald-800 hover:bg-emerald-100 shadow-xs transition">
+                            <span>🔓</span> Open orders
+                        </button>
+                        <button v-else
+                                type="button"
+                                @click="closeDayNow(getDayWindow(group.date))"
+                                :disabled="payeeForm.processing"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-300 bg-rose-50 text-xs font-bold text-rose-800 hover:bg-rose-100 shadow-xs transition">
+                            <span>🔒</span> Close orders
+                        </button>
+                        <button type="button" @click="openSetWindowModal(group.date)"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-xs transition">
+                            <span>🕒</span> Window times
+                        </button>
+                        <button type="button" @click="openMoveDateModal(group.date)"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-xs transition">
+                            <span>📅</span> Move dishes
+                        </button>
                     </div>
                 </div>
 
@@ -642,10 +680,15 @@
                 <div class="grid grid-cols-2 gap-3">
                     <FormField label="Date" :error="assignForm.errors.menu_date" required>
                         <template #default="{ id }">
-                            <SearchableSelect v-if="eventDates.length" :id="id" v-model="assignForm.menu_date" :options="eventDateOptions"
-                                              :all-option="true" all-label="— Select Date —" />
-                            <input v-else :id="id" v-model="assignForm.menu_date" type="date" class="field text-xs w-full"
-                                   :min="event.event_start" :max="event.event_end">
+                            <input :id="id" v-model="assignForm.menu_date" type="date" class="field text-xs w-full" required>
+                            <div v-if="eventDates.length" class="mt-1 flex flex-wrap gap-1">
+                                <button v-for="d in eventDates" :key="d" type="button"
+                                        class="px-2 py-0.5 rounded text-[10px] font-semibold border transition"
+                                        :class="assignForm.menu_date === d ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'"
+                                        @click="assignForm.menu_date = d">
+                                    {{ formatCalendarDate(d) }}
+                                </button>
+                            </div>
                         </template>
                     </FormField>
                     <FormField label="Meal Slot" :error="assignForm.errors.meal_type" required>
@@ -712,18 +755,31 @@
                     <template #default="{ id }"><input :id="id" v-model="editForm.name" type="text" class="field text-xs w-full" required></template>
                 </FormField>
                 <div class="grid grid-cols-2 gap-3">
-                    <FormField label="Meal Slot">
+                    <FormField label="Date" required>
+                        <template #default="{ id }">
+                            <input :id="id" v-model="editForm.menu_date" type="date" class="field text-xs w-full" required>
+                            <div v-if="eventDates.length" class="mt-1 flex flex-wrap gap-1">
+                                <button v-for="d in eventDates" :key="d" type="button"
+                                        class="px-2 py-0.5 rounded text-[10px] font-semibold border transition"
+                                        :class="editForm.menu_date === d ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'"
+                                        @click="editForm.menu_date = d">
+                                    {{ formatCalendarDate(d) }}
+                                </button>
+                            </div>
+                        </template>
+                    </FormField>
+                    <FormField label="Meal Slot" required>
                         <template #default="{ id }">
                             <SearchableSelect :id="id" v-model="editForm.meal_type" :options="mealTypeOptions" :all-option="false" placeholder="Select meal" />
                         </template>
                     </FormField>
-                    <FormField label="Sort Order">
-                        <template #default="{ id }"><input :id="id" v-model="editForm.sort_order" type="number" min="0" class="field text-xs w-full"></template>
-                    </FormField>
                     <FormField label="Price (₹)">
                         <template #default="{ id }"><input :id="id" v-model="editForm.price" type="number" min="0" step="0.01" class="field text-xs w-full" required></template>
                     </FormField>
-                    <FormField label="Max Per School" hint="Leave blank for no limit">
+                    <FormField label="Sort Order">
+                        <template #default="{ id }"><input :id="id" v-model="editForm.sort_order" type="number" min="0" class="field text-xs w-full"></template>
+                    </FormField>
+                    <FormField label="Max Per School" hint="Leave blank for no limit" class="col-span-2">
                         <template #default="{ id }"><input :id="id" v-model="editForm.max_per_school" type="number" min="1" class="field text-xs w-full"></template>
                     </FormField>
                 </div>
@@ -735,6 +791,86 @@
             <template #footer>
                 <button type="button" class="btn-secondary text-xs" @click="cancelEdit">Cancel</button>
                 <button type="submit" form="edit-menu-item-form" class="btn-primary text-xs font-bold">Save Changes</button>
+            </template>
+        </Modal>
+
+        <!-- ========================================== -->
+        <!-- MODAL: MOVE DISHES TO ANOTHER DATE         -->
+        <!-- ========================================== -->
+        <Modal :show="showMoveDateModal" title="Move Scheduled Dishes to Another Date" size="md" @close="showMoveDateModal = false">
+            <form id="move-date-form" @submit.prevent="executeMoveDate" class="space-y-4">
+                <p class="text-xs text-slate-600">
+                    Move all dishes currently scheduled for <strong class="text-slate-900">{{ formatCalendarDate(moveDateFrom) }}</strong> to a new date:
+                </p>
+                <FormField label="Target Date" required>
+                    <template #default="{ id }">
+                        <input :id="id" v-model="moveDateTo" type="date" class="field text-xs w-full" required>
+                        <div v-if="eventDates.length" class="mt-1.5 flex flex-wrap gap-1">
+                            <button v-for="d in eventDates" :key="d" type="button"
+                                    class="px-2 py-0.5 rounded text-[10px] font-semibold border transition"
+                                    :class="moveDateTo === d ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'"
+                                    @click="moveDateTo = d">
+                                {{ formatCalendarDate(d) }}
+                            </button>
+                        </div>
+                    </template>
+                </FormField>
+            </form>
+            <template #footer>
+                <button type="button" class="btn-secondary text-xs" @click="showMoveDateModal = false">Cancel</button>
+                <button type="submit" form="move-date-form" :disabled="!moveDateTo || moveDateTo === moveDateFrom || isMovingDate"
+                        class="btn-primary text-xs font-bold">
+                    {{ isMovingDate ? 'Moving…' : 'Move Dishes' }}
+                </button>
+            </template>
+        </Modal>
+
+        <!-- ========================================== -->
+        <!-- MODAL: SET ORDERING WINDOW FOR DATE        -->
+        <!-- ========================================== -->
+        <Modal :show="showWindowModal" :title="`Ordering Window for ${formatCalendarDate(activeWindowDate)}`" size="md" @close="showWindowModal = false">
+            <div v-if="activeWindowDay" class="space-y-4">
+                <div class="flex items-center justify-between p-3 rounded-xl border bg-slate-50" :class="dayWindowStatus(activeWindowDay).classes">
+                    <div>
+                        <span class="text-xs font-bold">Current Status:</span>
+                        <span class="ml-1.5 font-extrabold text-xs uppercase">{{ dayWindowStatus(activeWindowDay).label }}</span>
+                    </div>
+                    <span class="text-[11px] text-slate-600 font-medium">{{ dayWindowDescription(activeWindowDay) || 'Following overall event window' }}</span>
+                </div>
+
+                <div class="grid sm:grid-cols-2 gap-3">
+                    <FormField label="Orders open at" hint="Leave blank to follow overall window">
+                        <template #default="{ id }">
+                            <input :id="id" v-model="activeWindowDay.opens_at" type="datetime-local" class="field text-xs w-full">
+                        </template>
+                    </FormField>
+                    <FormField label="Orders close at" hint="Leave blank to follow overall window">
+                        <template #default="{ id }">
+                            <input :id="id" v-model="activeWindowDay.closes_at" type="datetime-local" class="field text-xs w-full">
+                        </template>
+                    </FormField>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200">
+                    <button type="button" class="btn-secondary text-xs" :disabled="payeeForm.processing" @click="openDayNow(activeWindowDay)">
+                        <span>🔓</span> Open orders now
+                    </button>
+                    <button type="button" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50 text-xs font-bold text-rose-700 hover:bg-rose-100"
+                            :disabled="payeeForm.processing" @click="closeDayNow(activeWindowDay)">
+                        <span>🔒</span> Close orders now
+                    </button>
+                    <button v-if="activeWindowDay.opens_at || activeWindowDay.closes_at" type="button"
+                            class="text-xs text-slate-500 hover:text-slate-800 underline ml-auto"
+                            :disabled="payeeForm.processing" @click="clearDayWindow(activeWindowDay)">
+                        Use overall event window
+                    </button>
+                </div>
+            </div>
+            <template #footer>
+                <button type="button" class="btn-secondary text-xs" @click="showWindowModal = false">Cancel</button>
+                <button type="button" class="btn-primary text-xs font-bold" :disabled="payeeForm.processing" @click="saveWindowModal">
+                    {{ payeeForm.processing ? 'Saving…' : 'Save Window' }}
+                </button>
             </template>
         </Modal>
 
@@ -937,6 +1073,37 @@ function clearDayWindow(day) {
     savePayee();
 }
 
+function getDayWindow(date) {
+    let day = payeeForm.food_order_day_windows.find((d) => d.date === date);
+    if (!day) {
+        day = { date, opens_at: '', closes_at: '' };
+        payeeForm.food_order_day_windows.push(day);
+    }
+    return day;
+}
+
+function dayWindowDescription(day) {
+    if (!day || (!day.opens_at && !day.closes_at)) return '';
+    if (day.opens_at && day.closes_at) return `Opens ${formatDateTime(day.opens_at)}, closes ${formatDateTime(day.closes_at)}`;
+    if (day.opens_at) return `Opens ${formatDateTime(day.opens_at)}`;
+    if (day.closes_at) return `Closes ${formatDateTime(day.closes_at)}`;
+    return '';
+}
+
+const showWindowModal = ref(false);
+const activeWindowDate = ref('');
+const activeWindowDay = computed(() => activeWindowDate.value ? getDayWindow(activeWindowDate.value) : null);
+
+function openSetWindowModal(date) {
+    activeWindowDate.value = date;
+    showWindowModal.value = true;
+}
+
+function saveWindowModal() {
+    savePayee();
+    showWindowModal.value = false;
+}
+
 const qrPreviewUrl = ref(null);
 
 const currentPayeeQrUrl = computed(() => {
@@ -1079,9 +1246,38 @@ function executeAssign() {
     });
 }
 
+// --- Move Date Modal ---
+const showMoveDateModal = ref(false);
+const moveDateFrom = ref('');
+const moveDateTo = ref('');
+const isMovingDate = ref(false);
+
+function openMoveDateModal(date) {
+    moveDateFrom.value = date;
+    moveDateTo.value = props.eventDates.find((d) => d !== date) || '';
+    showMoveDateModal.value = true;
+}
+
+function executeMoveDate() {
+    if (!moveDateTo.value || moveDateTo.value === moveDateFrom.value) return;
+    isMovingDate.value = true;
+    router.post(`${base}/food-menu/move-date`, {
+        from_date: moveDateFrom.value,
+        to_date: moveDateTo.value,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showMoveDateModal.value = false;
+        },
+        onFinish: () => {
+            isMovingDate.value = false;
+        },
+    });
+}
+
 // --- Scheduled Menu Item Editing ---
 const editingId = ref(null);
-const editForm = reactive({ meal_type: '', name: '', price: '', max_per_school: '', is_available: true, sort_order: 0 });
+const editForm = reactive({ menu_date: '', meal_type: '', name: '', price: '', max_per_school: '', is_available: true, sort_order: 0 });
 const editingItem = computed(() => props.menuItems.find((i) => i.id === editingId.value) ?? null);
 
 function menuItemBadges(item) {
@@ -1093,6 +1289,7 @@ function menuItemBadges(item) {
 
 function startEdit(item) {
     editingId.value = item.id;
+    editForm.menu_date = (item.menu_date || '').toString().slice(0, 10);
     editForm.meal_type = item.meal_type;
     editForm.name = item.name;
     editForm.price = item.price;
@@ -1105,7 +1302,7 @@ function cancelEdit() {
 }
 function saveEdit(item) {
     router.put(`${base}/food-menu/${item.id}`, {
-        menu_date: item.menu_date,
+        menu_date: editForm.menu_date,
         meal_type: editForm.meal_type,
         name: editForm.name,
         description: item.description,

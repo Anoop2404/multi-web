@@ -28,7 +28,8 @@
     // .pass-card-pdf__meta-value is then just a safety net for this box's real
     // one-line capacity (~20 characters at this font size/box width).
     $venueDisplay = str($card['venue'] ?? '—')->limit(24)->toString();
-    $categoryDisplay = str($category)->limit(12)->toString();
+    $categoryDisplay = str($category)->limit(24)->toString();
+    $dobDisplay = !empty($card['dob']) ? str($card['dob'])->limit(16)->toString() : null;
     $idLabel = $card['id_label'] ?? 'Reg ID';
     $idNumber = $card['id_number'] ?? '—';
     // A phase (Zonal, Sub District, ...) is the specific competition round the
@@ -107,21 +108,27 @@
             @else
                 <table class="pass-card-pdf__meta">
                     <tr>
-                        <td class="pass-card-pdf__meta-box">
+                        <td class="pass-card-pdf__meta-box" colspan="{{ !empty($card['dob']) ? '3' : '1' }}" style="width: 50%;">
                             <span class="pass-card-pdf__meta-label">Venue</span>
                             <span class="pass-card-pdf__meta-value">{{ $venueDisplay }}</span>
                         </td>
-                        <td class="pass-card-pdf__meta-box">
+                        <td class="pass-card-pdf__meta-box" colspan="{{ !empty($card['dob']) ? '3' : '1' }}" style="width: 50%;">
                             <span class="pass-card-pdf__meta-label">Event Date</span>
                             <span class="pass-card-pdf__meta-value">{{ $card['event_date'] ?? '—' }}</span>
                         </td>
                     </tr>
                     <tr>
-                        <td class="pass-card-pdf__meta-box">
+                        <td class="pass-card-pdf__meta-box" colspan="{{ !empty($card['dob']) ? '2' : '1' }}" style="width: {{ !empty($card['dob']) ? '34%' : '50%' }};">
                             <span class="pass-card-pdf__meta-label">Category</span>
                             <span class="pass-card-pdf__meta-value pass-card-pdf__meta-value--accent">{{ $categoryDisplay }}</span>
                         </td>
-                        <td class="pass-card-pdf__meta-box">
+                        @if(!empty($card['dob']))
+                        <td class="pass-card-pdf__meta-box" colspan="2" style="width: 33%;">
+                            <span class="pass-card-pdf__meta-label">DOB</span>
+                            <span class="pass-card-pdf__meta-value">{{ $dobDisplay }}</span>
+                        </td>
+                        @endif
+                        <td class="pass-card-pdf__meta-box" colspan="{{ !empty($card['dob']) ? '2' : '1' }}" style="width: {{ !empty($card['dob']) ? '33%' : '50%' }};">
                             <span class="pass-card-pdf__meta-label">{{ $idLabel }}</span>
                             <span class="pass-card-pdf__meta-value">{{ $idNumber }}</span>
                         </td>

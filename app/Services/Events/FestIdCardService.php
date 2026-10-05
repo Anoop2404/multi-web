@@ -831,6 +831,13 @@ class FestIdCardService
             }
         }
 
+        if ($isSports && ! $ageGroupLabel && $p->student) {
+            $studentAgeKey = FestSportsAgeGroup::assignedAgeGroupForStudent($p->student, $event);
+            if ($studentAgeKey) {
+                $ageGroupLabel = FestSportsAgeGroup::labels($event->tenant_id)[$studentAgeKey] ?? strtoupper($studentAgeKey);
+            }
+        }
+
         $itemLabel = $item !== '—' ? $item : null;
         if ($ageGroupLabel) {
             $itemLabel = $itemLabel ? "{$itemLabel} · {$ageGroupLabel}" : $ageGroupLabel;
@@ -864,16 +871,26 @@ class FestIdCardService
         $pureCategory = $ageGroupLabel ?: ($classCategory ?: $studentClassLabel);
         $itemTitleClean = ($item !== '—' && $item) ? str_replace('_', ' ', $item) : null;
         $categoryDisplay = $pureCategory ? str_replace('_', ' ', $pureCategory) : ($itemTitleClean ?: '—');
-        // The ID card's Category column is narrow — it shows just the short roman
-        // code ("III"), not the full descriptive label FestClassGroupScheme returns
-        // ("Category 3 — Classes 8, 9 & 10"). Strip the "Category "/"Cat. " prefix
-        // and everything from a dash onward first, matching
-        // FestCertificateService's own category_short/category_roman split, then
-        // roman-numeralize what's left; a non-numeric remainder ("Sub Junior")
-        // passes through unchanged.
-        $categoryShort = preg_replace('/^(category|cat\.?)\s*/i', '', $categoryDisplay);
-        $categoryShort = trim((string) preg_replace('/\s*[—-].*$/', '', $categoryShort));
-        $categoryDisplay = $this->numeralizeCategoryNumber($categoryShort !== '' ? $categoryShort : $categoryDisplay);
+
+        if ($isSports) {
+            // For sports, the category is an age group (e.g. "Under 8", "Under 14", "Under 17").
+            // Do NOT roman-numeralize numbers (sports uses Under 8, Under 14 — never Under VIII, Under XIV).
+            // Strip any parenthetical descriptor like "(LP Mini)" or "(Kiddies)" if present
+            // so it cleanly displays the age band.
+            $cleanAge = trim((string) preg_replace('/\s*\(.*?\)/', '', $categoryDisplay));
+            $categoryDisplay = $cleanAge !== '' ? $cleanAge : $categoryDisplay;
+        } else {
+            // The ID card's Category column is narrow — it shows just the short roman
+            // code ("III"), not the full descriptive label FestClassGroupScheme returns
+            // ("Category 3 — Classes 8, 9 & 10"). Strip the "Category "/"Cat. " prefix
+            // and everything from a dash onward first, matching
+            // FestCertificateService's own category_short/category_roman split, then
+            // roman-numeralize what's left; a non-numeric remainder ("Sub Junior")
+            // passes through unchanged.
+            $categoryShort = preg_replace('/^(category|cat\.?)\s*/i', '', $categoryDisplay);
+            $categoryShort = trim((string) preg_replace('/\s*[—-].*$/', '', $categoryShort));
+            $categoryDisplay = $this->numeralizeCategoryNumber($categoryShort !== '' ? $categoryShort : $categoryDisplay);
+        }
 
         $rawGender = strtolower((string) ($p->student?->gender ?? $p->teacher?->gender ?? ''));
         $gender = match (true) {

@@ -219,4 +219,77 @@ class FestIdCardVenueTest extends TestCase
         $this->assertSame('Kochi Metro Central Campus', $cards[0]['venue']);
         $this->assertNotSame('CLASS 1 A', $cards[0]['venue']);
     }
+
+    public function test_id_card_sports_event_retains_arabic_numerals_and_dob(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'sahodaya',
+            'name' => 'Malappuram Central Sahodaya',
+            'domain' => 'sahodaya-'.Str::random(8).'.test',
+            'is_active' => true,
+        ]);
+
+        $sportsEvent = FestEvent::create([
+            'tenant_id' => $sahodaya->id,
+            'title' => 'Sports Meet 2026-27',
+            'event_type' => 'sports',
+            'status' => 'published',
+            'academic_year' => '2026-27',
+        ]);
+
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'school',
+            'name' => 'Sacred Heart CMI Public School',
+            'domain' => 'shcmi-'.Str::random(8).'.test',
+            'parent_id' => $sahodaya->id,
+            'is_active' => true,
+        ]);
+
+        $class = SchoolClass::create([
+            'tenant_id' => $school->id,
+            'name' => 'Class 3',
+        ]);
+
+        $student = Student::create([
+            'tenant_id' => $school->id,
+            'school_class_id' => $class->id,
+            'name' => 'Aaradhya V Menon',
+            'gender' => 'female',
+            'dob' => '2018-08-15',
+            'reg_no' => 'STU/27/122',
+        ]);
+
+        $item = FestEventItem::create([
+            'event_id' => $sportsEvent->id,
+            'title' => 'Rink Race 4 One Lap (Quads)',
+            'age_group' => 'u8',
+            'is_enabled' => true,
+        ]);
+
+        $reg = FestRegistration::create([
+            'event_id' => $sportsEvent->id,
+            'school_id' => $school->id,
+            'item_id' => $item->id,
+            'status' => 'approved',
+        ]);
+
+        FestParticipant::create([
+            'registration_id' => $reg->id,
+            'student_id' => $student->id,
+            'participant_role' => 'performer',
+        ]);
+
+        $service = app(FestIdCardService::class);
+        $cards = $service->cards($sportsEvent, 'student', ['school_id' => $school->id]);
+
+        $this->assertNotEmpty($cards);
+        $card = $cards[0];
+        $this->assertSame('15 Aug 2018', $card['dob']);
+        $this->assertSame('Under 8', $card['category']);
+        $this->assertNotSame('Under VIII', $card['category']);
+    }
 }

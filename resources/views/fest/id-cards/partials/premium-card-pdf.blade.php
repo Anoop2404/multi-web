@@ -77,7 +77,7 @@
                                 <td class="pcard-pdf__meta-sep">:</td>
                                 <td class="pcard-pdf__meta-val">{{ $card['venue'] ?? '—' }}</td>
                             </tr>
-                            @if(!empty($card['dob']) && !empty($card['is_sports']))
+                            @if(!empty($card['dob']))
                             <tr>
                                 <td class="pcard-pdf__meta-label">DOB</td>
                                 <td class="pcard-pdf__meta-sep">:</td>

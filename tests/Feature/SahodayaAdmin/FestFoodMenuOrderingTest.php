@@ -227,4 +227,50 @@ class FestFoodMenuOrderingTest extends TestCase
 
         $this->assertSame(1, $created);
     }
+
+    public function test_update_can_change_menu_item_date(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event] = $this->makeSahodayaAndEvent('2026-09-01', '2026-09-05');
+
+        $item = FestFoodMenuItem::create([
+            'tenant_id' => $sahodaya->id,
+            'event_id' => $event->id,
+            'menu_date' => '2026-09-01',
+            'meal_type' => 'breakfast',
+            'name' => 'Idli Sambar',
+            'price' => 80,
+            'is_available' => true,
+            'sort_order' => 0,
+        ]);
+
+        $response = $this->actingAs($admin)->put("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/food-menu/{$item->id}", [
+            'menu_date' => '2026-09-02',
+            'meal_type' => 'breakfast',
+            'name' => 'Idli Sambar',
+            'price' => 80,
+            'is_available' => true,
+        ]);
+
+        $response->assertRedirect();
+        $this->assertSame('2026-09-02', $item->fresh()->menu_date->format('Y-m-d'));
+    }
+
+    public function test_move_date_moves_all_items_on_a_date_to_a_new_date(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event] = $this->makeSahodayaAndEvent('2026-09-01', '2026-09-05');
+
+        FestFoodMenuItem::create(['tenant_id' => $sahodaya->id, 'event_id' => $event->id, 'menu_date' => '2026-09-01', 'meal_type' => 'breakfast', 'name' => 'Breakfast 1', 'price' => 50, 'is_available' => true, 'sort_order' => 0]);
+        FestFoodMenuItem::create(['tenant_id' => $sahodaya->id, 'event_id' => $event->id, 'menu_date' => '2026-09-01', 'meal_type' => 'lunch', 'name' => 'Lunch 1', 'price' => 80, 'is_available' => true, 'sort_order' => 1]);
+        FestFoodMenuItem::create(['tenant_id' => $sahodaya->id, 'event_id' => $event->id, 'menu_date' => '2026-09-03', 'meal_type' => 'dinner', 'name' => 'Dinner 3', 'price' => 60, 'is_available' => true, 'sort_order' => 0]);
+
+        $response = $this->actingAs($admin)->post("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/food-menu/move-date", [
+            'from_date' => '2026-09-01',
+            'to_date' => '2026-09-02',
+        ]);
+
+        $response->assertRedirect();
+        $this->assertSame(0, FestFoodMenuItem::where('event_id', $event->id)->whereDate('menu_date', '2026-09-01')->count());
+        $this->assertSame(2, FestFoodMenuItem::where('event_id', $event->id)->whereDate('menu_date', '2026-09-02')->count());
+        $this->assertSame(1, FestFoodMenuItem::where('event_id', $event->id)->whereDate('menu_date', '2026-09-03')->count());
+    }
 }

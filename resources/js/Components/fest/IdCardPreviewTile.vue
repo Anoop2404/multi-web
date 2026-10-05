@@ -46,18 +46,22 @@
                 </div>
 
                 <template v-else>
-                    <div class="pass-tile__meta">
-                        <div class="pass-tile__meta-box">
+                    <div class="pass-tile__meta" :class="{ 'pass-tile__meta--3col': card.dob }">
+                        <div class="pass-tile__meta-box pass-tile__meta-box--venue">
                             <span class="pass-tile__meta-label">Venue</span>
                             <span class="pass-tile__meta-value">{{ card.venue || '—' }}</span>
                         </div>
-                        <div class="pass-tile__meta-box">
+                        <div class="pass-tile__meta-box pass-tile__meta-box--date">
                             <span class="pass-tile__meta-label">Event Date</span>
                             <span class="pass-tile__meta-value">{{ card.event_date || '—' }}</span>
                         </div>
                         <div class="pass-tile__meta-box">
                             <span class="pass-tile__meta-label">Category</span>
                             <span class="pass-tile__meta-value pass-tile__meta-value--accent">{{ card.category || card.class_category || '—' }}</span>
+                        </div>
+                        <div v-if="card.dob" class="pass-tile__meta-box">
+                            <span class="pass-tile__meta-label">DOB</span>
+                            <span class="pass-tile__meta-value">{{ card.dob }}</span>
                         </div>
                         <div class="pass-tile__meta-box">
                             <span class="pass-tile__meta-label">{{ card.id_label || 'ID' }}</span>
@@ -328,6 +332,10 @@ const items = computed(() => {
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pass-tile__meta { margin-top: 0.2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.12rem 0.18rem; }
+.pass-tile__meta--3col { grid-template-columns: repeat(6, 1fr); }
+.pass-tile__meta--3col .pass-tile__meta-box--venue,
+.pass-tile__meta--3col .pass-tile__meta-box--date { grid-column: span 3; }
+.pass-tile__meta--3col .pass-tile__meta-box:not(.pass-tile__meta-box--venue):not(.pass-tile__meta-box--date) { grid-column: span 2; }
 .pass-tile__meta-box { min-width: 0; padding: 0.12rem 0.2rem; background: #f2f7fc; border-radius: 0.2rem; }
 .pass-tile__meta-label { display: block; font-size: 0.4rem; font-weight: 700; text-transform: uppercase; color: #8391a4; }
 .pass-tile__meta-value {

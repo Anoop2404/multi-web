@@ -190,7 +190,7 @@ class FestFoodBillingController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($bill->event_id !== $event->id, 404);
-        abort_if($bill->status !== FestFoodBill::STATUS_OPEN, 422, 'This bill is settled/cancelled and no longer editable.');
+        abort_if($bill->status === FestFoodBill::STATUS_CANCELLED, 422, 'This bill is cancelled and no longer editable.');
 
         $data = $request->validate([
             'menu_item_id' => 'required|integer|exists:fest_food_menu_items,id',

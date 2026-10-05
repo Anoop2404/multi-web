@@ -61,14 +61,14 @@ class FestFoodMenuController extends SahodayaAdminController
         $phaseFoodCutoffAt = $this->phaseFoodCutoffAt($event);
 
         $eventDates = $this->eventDateOptions($event);
-        if ($eventDates === []) {
-            $eventDates = $items->pluck('menu_date')
-                ->map(fn ($date) => $date->format('Y-m-d'))
-                ->unique()
-                ->sort()
-                ->values()
-                ->all();
-        }
+        $itemDates = $items->pluck('menu_date')
+            ->map(fn ($date) => $date->format('Y-m-d'))
+            ->unique()
+            ->values()
+            ->all();
+
+        $eventDates = array_values(array_unique([...$eventDates, ...$itemDates]));
+        sort($eventDates);
 
         $sahodayaProfile = \App\Models\SahodayaProfile::where('tenant_id', $this->sahodaya->id)->first();
 
@@ -570,6 +570,28 @@ class FestFoodMenuController extends SahodayaAdminController
         $audit->festEvent($event, FestPageActivity::FOOD_MENU, 'fest.food_menu.deleted', "Menu item '{$name}' removed", []);
 
         return back()->with('success', 'Menu item removed.');
+    }
+
+    public function moveDate(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'from_date' => 'required|date',
+            'to_date' => $this->menuDateRules($event),
+        ]);
+
+        $count = FestFoodMenuItem::forEvent($event->id)
+            ->whereDate('menu_date', $data['from_date'])
+            ->update(['menu_date' => $data['to_date']]);
+
+        $audit->festEvent($event, FestPageActivity::FOOD_MENU, 'fest.food_menu.date_moved', "{$count} items moved from {$data['from_date']} to {$data['to_date']}", [
+            'from_date' => $data['from_date'],
+            'to_date' => $data['to_date'],
+            'count' => $count,
+        ]);
+
+        return back()->with('success', "Moved {$count} item(s) to ".\Illuminate\Support\Carbon::parse($data['to_date'])->format('d M Y').'.');
     }
 
     private function mealTypeOptions(): array
