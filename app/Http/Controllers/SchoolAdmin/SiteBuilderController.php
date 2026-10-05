@@ -81,6 +81,9 @@ class SiteBuilderController extends SchoolAdminController
             'mediaUrls' => $mediaUrls,
             'isSuperAdmin' => (bool) request()->user()?->isSuperAdmin(),
             'navMenu' => $navMenuItems,
+            'hubLinks' => [
+                'hub' => "/school-admin/{$this->school->id}/website",
+            ],
         ]);
     }
 }
