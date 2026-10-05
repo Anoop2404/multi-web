@@ -103,12 +103,12 @@ class StaffViewPermissionScopeTest extends TestCase
             ->assertOk();
     }
 
-    public function test_region_admins_default_permission_set_can_view_registrations_but_not_schedule_or_settings(): void
+    public function test_region_admins_default_permission_set_can_view_registrations_and_schedule_but_not_settings(): void
     {
         // Region/phase admin's own event+region scope matching (ResolvesSahodayaAdminScope)
         // is a separate, pre-existing mechanism this test isn't exercising — assigned via
         // event_admin duty instead so only the permission gate under test is in play, using
-        // region_admin's exact default permission set (fest.manage but no fest.schedule).
+        // region_admin's exact default permission set (includes fest.schedule, no fest.settings).
         $staff = User::factory()->create(['tenant_id' => $this->sahodaya->id, 'email_verified_at' => now()]);
         $staff->assignRole('event_admin');
         $staff->givePermissionTo(\App\Support\TenantUserCatalog::defaultPermissionsForRole('region_admin'));
@@ -120,12 +120,13 @@ class StaffViewPermissionScopeTest extends TestCase
             ->get(route('sahodaya.events.registrations.index', ['tenantId' => $this->sahodaya->id, 'event' => $this->event->id]))
             ->assertOk();
 
-        // region_admin holds fest.manage by default (for unrelated reasons — id-cards/
-        // food-menu/food-billing have no dedicated permission), but is deliberately
-        // excluded from Schedule/Settings — matching the nav's FEST_SCHEDULE/FEST_SETTINGS
-        // groups, which don't accept fest.manage as a fallback.
         $this->actingAs($staff)
             ->get(route('sahodaya.events.schedule.index', ['tenantId' => $this->sahodaya->id, 'event' => $this->event->id]))
+            ->assertOk();
+
+        // region_admin does not hold fest.settings by default, so settings remains forbidden.
+        $this->actingAs($staff)
+            ->get(route('sahodaya.events.phases.index', ['tenantId' => $this->sahodaya->id, 'event' => $this->event->id]))
             ->assertForbidden();
     }
 }

@@ -106,6 +106,7 @@
                             <th class="p-3.5 w-12 text-center">Sl No</th>
                             <th class="p-3.5 w-12"></th>
                             <th class="p-3.5 w-20 text-center">Chest #</th>
+                            <th class="p-3.5 w-24 text-center">Fest ID</th>
                             <th class="p-3.5">Participant / Team</th>
                             <th v-if="usesAgeEligibility" class="p-3.5">DOB</th>
                             <th v-else-if="usesClassEligibility" class="p-3.5">Class</th>
@@ -127,6 +128,9 @@
                             </td>
                             <td class="p-3.5 font-mono text-center font-bold text-slate-700">
                                 {{ row.chest_no ?? '—' }}
+                            </td>
+                            <td class="p-3.5 font-mono text-center font-bold text-slate-600">
+                                {{ row.fest_id ?? '—' }}
                             </td>
                             <td class="p-3.5 font-bold text-slate-900">
                                 <div class="flex items-center gap-2">
@@ -178,7 +182,7 @@
                             </td>
                         </tr>
                         <tr v-if="!displayRows.length">
-                            <td colspan="7" class="p-0">
+                            <td :colspan="usesAgeEligibility || usesClassEligibility ? 9 : 8" class="p-0">
                                 <EmptyState v-if="!props.participants.length" title="No participants to mark yet"
                                     description="Approve registrations for this item first, then attendance can be taken." icon="✅" class="py-10" />
                                 <EmptyState v-else title="No participants match your filter or search"
@@ -374,6 +378,7 @@ const displayRows = computed(() => {
                 member_count: members.length,
                 name: p.group?.team_name || 'Team',
                 chest_no: p.group?.chest_no,
+                fest_id: p.group?.registration_number ?? p.level_registration_number ?? p.student?.reg_no ?? null,
                 school: p.registration?.school?.name ?? '—',
                 item_title: item?.title ?? '—',
                 item_category: formatItemCat(item),
@@ -390,6 +395,7 @@ const displayRows = computed(() => {
                 const match = (rowData.name ?? '').toLowerCase().includes(q)
                     || (rowData.school ?? '').toLowerCase().includes(q)
                     || (String(rowData.chest_no ?? '')).toLowerCase().includes(q)
+                    || (String(rowData.fest_id ?? '')).toLowerCase().includes(q)
                     || (rowData.item_title ?? '').toLowerCase().includes(q);
                 if (!match) continue;
             }
@@ -403,6 +409,7 @@ const displayRows = computed(() => {
             is_team: false,
             name: p.student?.name ?? p.teacher?.name ?? 'Participant',
             chest_no: p.chest_no,
+            fest_id: p.level_registration_number ?? p.student?.reg_no ?? null,
             school: p.registration?.school?.name ?? '—',
             item_title: item?.title ?? '—',
             item_category: formatItemCat(item),
@@ -419,6 +426,7 @@ const displayRows = computed(() => {
             const match = (rowData.name ?? '').toLowerCase().includes(q)
                 || (rowData.school ?? '').toLowerCase().includes(q)
                 || (String(rowData.chest_no ?? '')).toLowerCase().includes(q)
+                || (String(rowData.fest_id ?? '')).toLowerCase().includes(q)
                 || (rowData.item_title ?? '').toLowerCase().includes(q);
             if (!match) continue;
         }

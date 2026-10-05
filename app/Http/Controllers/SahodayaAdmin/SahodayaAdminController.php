@@ -34,7 +34,11 @@ abstract class SahodayaAdminController extends Controller
 
         if ($this->isStaff && ! in_array($request->method(), ['GET', 'HEAD', 'OPTIONS'], true)) {
             $permission = \App\Support\TenantUserCatalog::writePermissionForPath($request->path());
-            if ($permission === null || ! $request->user()?->can($permission)) {
+            $canWrite = $permission !== null && (
+                $request->user()?->can($permission)
+                || $request->user()?->can('fest.manage')
+            );
+            if (! $canWrite) {
                 abort(403, 'View-only access. Contact your Sahodaya administrator.');
             }
         }
@@ -168,10 +172,11 @@ abstract class SahodayaAdminController extends Controller
             return null;
         }
 
+        $eventAdminEventIds = collect($request->attributes->get('eventAdminEventIds', []));
         $regionScopes = $request->attributes->get('regionAdminScopes', []);
         $phaseScopes = $request->attributes->get('phaseAdminScopes', []);
 
-        $eventIds = collect($request->attributes->get('eventAdminEventIds', []))
+        $eventIds = $eventAdminEventIds
             ->merge(collect($regionScopes)->pluck('event_id'))
             ->merge(collect($phaseScopes)->pluck('event_id'))
             ->filter()
@@ -184,7 +189,9 @@ abstract class SahodayaAdminController extends Controller
 
         $childIds = FestEvent::whereIn('parent_event_id', $eventIds->all())
             ->get(['id', 'parent_event_id', 'region_id', 'source_phase_id'])
-            ->filter(fn (FestEvent $child) => \App\Support\EventRegionAdminScope::matchesRegionScope($child->id, $regionScopes)
+            ->filter(fn (FestEvent $child) =>
+                in_array((int) $child->parent_event_id, $eventAdminEventIds->all(), true)
+                || \App\Support\EventRegionAdminScope::matchesRegionScope($child->id, $regionScopes)
                 || \App\Support\EventRegionAdminScope::matchesPhaseScope($child->id, $phaseScopes))
             ->pluck('id');
 

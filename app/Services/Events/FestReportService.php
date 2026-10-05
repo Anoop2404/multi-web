@@ -951,7 +951,7 @@ class FestReportService
                     '_student_id' => $p->student_id,
                     '_uses_age'   => $ageGroup !== '',
                     '_uses_class' => $ageGroup === '' && $classGroup !== '' && $classGroup !== 'open',
-                    'fest_id'     => $p->level_registration_number,
+                    'fest_id'     => $p->level_registration_number ?? $p->student?->reg_no,
                     'dob'         => $p->student?->dob?->format('d M Y'),
                     'class'       => $p->student?->schoolClass?->name,
                     // Item's own Category/Type/Gender — read by the attendance sheet's
@@ -1866,7 +1866,7 @@ class FestReportService
             $studentRows[$id]['events'][] = [
                 'event_name'   => $p->registration?->item?->title ?? '',
                 'chest_number' => $p->group?->chest_no ?? $p->chest_no ?? '—',
-                'fest_id'      => $p->level_registration_number ?? '—',
+                'fest_id'      => $p->level_registration_number ?? $p->student?->reg_no ?? '—',
             ];
         }
 

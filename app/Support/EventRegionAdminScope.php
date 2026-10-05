@@ -31,7 +31,7 @@ class EventRegionAdminScope
         if ($hasEventAdmin) {
             $allowedEventIds = FestEventStaff::query()
                 ->where('user_id', $user->id)
-                ->where('duty', 'event_admin')
+                ->whereIn('duty', ['event_admin', 'coordinator'])
                 ->pluck('event_id')
                 ->map(fn ($id) => (int) $id)
                 ->values()
@@ -189,6 +189,35 @@ class EventRegionAdminScope
     }
 
     /**
+     * True when the requested event is either directly assigned to the event admin,
+     * or is a child partition event of an event the admin is assigned to (i.e. an event admin
+     * assigned on a hub event can manage any child event under that hub).
+     *
+     * @param  list<int>  $allowedEventIds
+     */
+    public static function matchesEventScope(int $requestedEventId, array $allowedEventIds): bool
+    {
+        if ($allowedEventIds === []) {
+            return false;
+        }
+
+        if (in_array($requestedEventId, $allowedEventIds, true)) {
+            return true;
+        }
+
+        $requestedEvent = FestEvent::query()
+            ->select(['id', 'parent_event_id'])
+            ->find($requestedEventId);
+
+        if (! $requestedEvent) {
+            return false;
+        }
+
+        return $requestedEvent->parent_event_id !== null
+            && in_array((int) $requestedEvent->parent_event_id, $allowedEventIds, true);
+    }
+
+    /**
      * For a hub/singleton program event (Kalotsav, English Fest, ...) that an event/region/
      * phase-scoped admin cannot directly open, finds the specific child event their scope
      * DOES cover — so "open my program" (the sidebar program link, which always resolves to
@@ -207,6 +236,7 @@ class EventRegionAdminScope
     public static function resolveScopedLandingEvent(FestEvent $hub, array $allowedEventIds, array $regionScopes, array $phaseScopes): ?FestEvent
     {
         if (in_array($hub->id, $allowedEventIds, true)
+            || self::matchesEventScope($hub->id, $allowedEventIds)
             || self::matchesRegionScope($hub->id, $regionScopes)
             || self::matchesPhaseScope($hub->id, $phaseScopes)) {
             return null;
@@ -216,6 +246,7 @@ class EventRegionAdminScope
 
         foreach ($children as $child) {
             if (in_array($child->id, $allowedEventIds, true)
+                || self::matchesEventScope($child->id, $allowedEventIds)
                 || self::matchesRegionScope($child->id, $regionScopes)
                 || self::matchesPhaseScope($child->id, $phaseScopes)) {
                 return $child;

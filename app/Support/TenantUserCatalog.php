@@ -157,7 +157,7 @@ class TenantUserCatalog
     /** @return list<string> */
     public static function festEventDuties(): array
     {
-        return ['coordinator', 'region_admin', 'phase_admin', 'stage', 'registration', 'attendance', 'food', 'appeals', 'certificates', 'marks', 'discipline', 'admit_cards'];
+        return ['coordinator', 'event_admin', 'region_admin', 'phase_admin', 'stage', 'registration', 'attendance', 'food', 'appeals', 'certificates', 'marks', 'discipline', 'admit_cards'];
     }
 
     /** @return array<string, string> */
@@ -214,8 +214,8 @@ class TenantUserCatalog
             'fest_ops'                 => 'One operational duty (registration desk, stage, food, etc.) for a single event you assign — narrow, task-based access.',
             'school_principal'         => 'Full school-admin access, can create/manage other school users.',
             'event_admin'              => 'Full sahodaya-admin control (items, fees, registrations, results, settings) but locked to only the events you tick below.',
-            'region_admin'             => 'Mark entry, ID cards, registrations, finance, and food billing — locked to one region within one event.',
-            'phase_admin'              => 'Mark entry, ID cards, registrations, finance, and food billing — locked to one phase, but across every region, within one event.',
+            'region_admin'             => 'Mark entry, ID cards, registrations, finance, food billing, and schedule — locked to one region within one event.',
+            'phase_admin'              => 'Mark entry, ID cards, registrations, finance, food billing, and schedule — locked to one phase, but across every region, within one event.',
         ];
     }
 
@@ -397,21 +397,21 @@ class TenantUserCatalog
                 'fest.results', 'fest.finance', 'fest.settings', 'fest.catering',
                 'fest.schedule', 'fest.certificates',
             ],
-            // Region admin is deliberately narrower than event_admin: mark entry, ID cards,
-            // registrations, finance, and food billing — no schedule/settings/certificates.
+            // Region admin: mark entry, ID cards, registrations, finance, food billing,
+            // and schedule — locked to one region within one event.
             // 'fest.manage' is required because id-cards/food-menu/food-billing paths don't
             // have a dedicated permission and fall through to it in writePermissionForPath().
             'region_admin'             => [
                 'fest.view', 'fest.manage', 'fest.marks', 'fest.registrations',
-                'fest.finance', 'fest.catering',
+                'fest.finance', 'fest.catering', 'fest.schedule',
             ],
             // Phase admin is region_admin's counterpart: same operational scope
-            // (mark entry, ID cards, registrations, finance, food billing), but
-            // spanning every region within one phase instead of being locked to
+            // (mark entry, ID cards, registrations, finance, food billing, schedule),
+            // but spanning every region within one phase instead of being locked to
             // a single region.
             'phase_admin'              => [
                 'fest.view', 'fest.manage', 'fest.marks', 'fest.registrations',
-                'fest.finance', 'fest.catering',
+                'fest.finance', 'fest.catering', 'fest.schedule',
             ],
             default                    => [],
         };
@@ -602,12 +602,8 @@ class TenantUserCatalog
         if (str_contains($path, '/finance') || str_contains($path, '/school-fees') || str_contains($path, '/fees') || str_contains($path, '/ledger')) {
             return ['fest.finance'];
         }
-        // Deliberately does NOT fall back to fest.manage — matches FEST_SCHEDULE in the
-        // JS nav filter (region_admin/phase_admin hold fest.manage by default for
-        // unrelated reasons — see defaultPermissionsForRole() — but are explicitly meant
-        // to be excluded from Schedule/Settings).
         if (str_contains($path, '/schedule')) {
-            return ['fest.schedule'];
+            return ['fest.schedule', 'fest.manage'];
         }
         if (str_contains($path, '/certificates')) {
             return ['fest.certificates', 'fest.manage'];

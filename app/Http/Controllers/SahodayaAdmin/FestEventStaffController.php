@@ -219,6 +219,11 @@ class FestEventStaffController extends SahodayaAdminController
         if ($user) {
             if ($data['duty'] === 'marks' && ! $user->hasRole('mark_entry_coordinator')) {
                 $user->assignRole('mark_entry_coordinator');
+            } elseif (in_array($data['duty'], ['coordinator', 'event_admin'], true)) {
+                if (! $user->hasRole('event_admin')) {
+                    $user->assignRole('event_admin');
+                }
+                $user->givePermissionTo(TenantUserCatalog::defaultPermissionsForRole('event_admin'));
             } elseif ($data['duty'] === 'region_admin') {
                 // Region coordinators must NOT receive the unscoped 'fest_ops' role — that grants
                 // full access to every event in the Sahodaya, defeating the point of "region" scoping.
@@ -229,7 +234,7 @@ class FestEventStaffController extends SahodayaAdminController
                 }
                 // Grant the write permissions this duty needs immediately, rather than waiting on
                 // the periodic `permissions:sync-staff` command — mark entry, ID cards, registrations,
-                // finance, food billing (see TenantUserCatalog::defaultPermissionsForRole()).
+                // finance, food billing, and schedule (see TenantUserCatalog::defaultPermissionsForRole()).
                 $user->givePermissionTo(TenantUserCatalog::defaultPermissionsForRole('region_admin'));
             } elseif ($data['duty'] === 'phase_admin') {
                 // Same reasoning as region_admin above: phase coordinators must not receive the

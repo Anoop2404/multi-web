@@ -61,6 +61,10 @@ trait ResolvesSahodayaAdminScope
         if ($requestedEventId !== null) {
             $allowed = in_array($requestedEventId, $allowedEventIds, true);
 
+            if (! $allowed && $allowedEventIds !== []) {
+                $allowed = EventRegionAdminScope::matchesEventScope($requestedEventId, $allowedEventIds);
+            }
+
             if (! $allowed && $allowedRegionScopes !== []) {
                 $allowed = EventRegionAdminScope::matchesRegionScope($requestedEventId, $allowedRegionScopes);
             }
