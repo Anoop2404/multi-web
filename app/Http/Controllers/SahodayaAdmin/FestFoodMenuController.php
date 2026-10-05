@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
+use App\Models\FestCateringOrder;
 use App\Models\FestEvent;
 use App\Models\FestEventPhase;
 use App\Models\FestFoodCatalogItem;
+use App\Models\FestFoodCoupon;
 use App\Models\FestFoodMenuItem;
+use App\Models\FestFoodOrderItem;
 use App\Models\Tenant;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\FestFoodMenuSyncService;
@@ -543,11 +546,55 @@ class FestFoodMenuController extends SahodayaAdminController
             'sort_order' => 'nullable|integer|min:0|max:9999',
         ]);
 
+        $oldDate = $menuItem->menu_date?->format('Y-m-d');
+        $oldMealType = $menuItem->meal_type;
+
         $menuItem->update([
             ...$data,
             'is_available' => $data['is_available'] ?? false,
             'sort_order' => $data['sort_order'] ?? 0,
         ]);
+
+        $newDate = Carbon::parse($data['menu_date'])->format('Y-m-d');
+        $newMealType = $data['meal_type'];
+
+        if ($oldDate !== $newDate || $oldMealType !== $newMealType) {
+            $orderItems = FestFoodOrderItem::where('menu_item_id', $menuItem->id)
+                ->with('bill')
+                ->get();
+
+            FestFoodOrderItem::where('menu_item_id', $menuItem->id)
+                ->update([
+                    'menu_date' => $newDate,
+                    'meal_type' => $newMealType,
+                ]);
+
+            // Shift corresponding issued food coupons for affected schools
+            $schoolQuantities = [];
+            foreach ($orderItems as $item) {
+                if ($item->bill && $item->bill->school_id) {
+                    $sid = (string) $item->bill->school_id;
+                    $schoolQuantities[$sid] = ($schoolQuantities[$sid] ?? 0) + (int) $item->quantity;
+                }
+            }
+
+            foreach ($schoolQuantities as $schoolId => $qty) {
+                $couponIds = FestFoodCoupon::where('event_id', $event->id)
+                    ->where('school_id', $schoolId)
+                    ->whereDate('valid_date', $oldDate)
+                    ->where('meal_type', $oldMealType)
+                    ->where('status', 'issued')
+                    ->limit($qty)
+                    ->pluck('id');
+
+                if ($couponIds->isNotEmpty()) {
+                    FestFoodCoupon::whereIn('id', $couponIds)->update([
+                        'valid_date' => $newDate,
+                        'meal_type' => $newMealType,
+                    ]);
+                }
+            }
+        }
 
         $audit->festEvent($event, FestPageActivity::FOOD_MENU, 'fest.food_menu.updated', "Menu item '{$menuItem->name}' updated", [
             'menu_item_id' => $menuItem->id,
@@ -581,9 +628,27 @@ class FestFoodMenuController extends SahodayaAdminController
             'to_date' => $this->menuDateRules($event),
         ]);
 
+        $fromDate = Carbon::parse($data['from_date'])->format('Y-m-d');
+        $toDate = Carbon::parse($data['to_date'])->format('Y-m-d');
+
         $count = FestFoodMenuItem::forEvent($event->id)
-            ->whereDate('menu_date', $data['from_date'])
-            ->update(['menu_date' => $data['to_date']]);
+            ->whereDate('menu_date', $fromDate)
+            ->update(['menu_date' => $toDate]);
+
+        // Cascade date move to existing school orders
+        FestFoodOrderItem::whereHas('bill', fn ($q) => $q->where('event_id', $event->id))
+            ->whereDate('menu_date', $fromDate)
+            ->update(['menu_date' => $toDate]);
+
+        // Cascade date move to issued food coupons
+        FestFoodCoupon::where('event_id', $event->id)
+            ->whereDate('valid_date', $fromDate)
+            ->update(['valid_date' => $toDate]);
+
+        // Cascade date move to catering orders
+        FestCateringOrder::where('event_id', $event->id)
+            ->whereDate('meal_date', $fromDate)
+            ->update(['meal_date' => $toDate]);
 
         $audit->festEvent($event, FestPageActivity::FOOD_MENU, 'fest.food_menu.date_moved', "{$count} items moved from {$data['from_date']} to {$data['to_date']}", [
             'from_date' => $data['from_date'],

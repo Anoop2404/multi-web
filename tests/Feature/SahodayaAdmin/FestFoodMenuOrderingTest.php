@@ -2,8 +2,12 @@
 
 namespace Tests\Feature\SahodayaAdmin;
 
+use App\Models\FestCateringOrder;
 use App\Models\FestEvent;
+use App\Models\FestFoodBill;
+use App\Models\FestFoodCoupon;
 use App\Models\FestFoodMenuItem;
+use App\Models\FestFoodOrderItem;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
 use App\Models\User;
@@ -272,5 +276,150 @@ class FestFoodMenuOrderingTest extends TestCase
         $this->assertSame(0, FestFoodMenuItem::where('event_id', $event->id)->whereDate('menu_date', '2026-09-01')->count());
         $this->assertSame(2, FestFoodMenuItem::where('event_id', $event->id)->whereDate('menu_date', '2026-09-02')->count());
         $this->assertSame(1, FestFoodMenuItem::where('event_id', $event->id)->whereDate('menu_date', '2026-09-03')->count());
+    }
+
+    public function test_update_cascades_date_and_meal_type_to_existing_school_orders_and_coupons(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event] = $this->makeSahodayaAndEvent('2026-09-01', '2026-09-05');
+
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'school',
+            'name' => 'Participating School',
+            'domain' => 'school-'.Str::random(8).'.test',
+            'is_active' => true,
+        ]);
+
+        $item = FestFoodMenuItem::create([
+            'tenant_id' => $sahodaya->id,
+            'event_id' => $event->id,
+            'menu_date' => '2026-09-01',
+            'meal_type' => 'breakfast',
+            'name' => 'Idli Sambar',
+            'price' => 80,
+            'is_available' => true,
+            'sort_order' => 0,
+        ]);
+
+        $bill = FestFoodBill::create([
+            'tenant_id' => $sahodaya->id,
+            'event_id' => $event->id,
+            'school_id' => $school->id,
+            'status' => FestFoodBill::STATUS_OPEN,
+            'amount_total' => 240,
+            'amount_paid' => 0,
+        ]);
+
+        $orderItem = FestFoodOrderItem::create([
+            'bill_id' => $bill->id,
+            'menu_item_id' => $item->id,
+            'menu_date' => '2026-09-01',
+            'meal_type' => 'breakfast',
+            'item_name' => 'Idli Sambar',
+            'unit_price' => 80,
+            'quantity' => 3,
+            'line_total' => 240,
+        ]);
+
+        $coupon = FestFoodCoupon::create([
+            'event_id' => $event->id,
+            'school_id' => $school->id,
+            'coupon_code' => 'BF-001',
+            'sequence_no' => 1,
+            'qr_token' => Str::random(16),
+            'meal_type' => 'breakfast',
+            'valid_date' => '2026-09-01',
+            'head_count' => 1,
+            'status' => 'issued',
+        ]);
+
+        $response = $this->actingAs($admin)->put("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/food-menu/{$item->id}", [
+            'menu_date' => '2026-09-03',
+            'meal_type' => 'lunch',
+            'name' => 'Idli Sambar Updated',
+            'price' => 80,
+            'is_available' => true,
+        ]);
+
+        $response->assertRedirect();
+        $this->assertSame('2026-09-03', $orderItem->fresh()->menu_date->format('Y-m-d'));
+        $this->assertSame('lunch', $orderItem->fresh()->meal_type);
+        $this->assertSame('2026-09-03', $coupon->fresh()->valid_date->format('Y-m-d'));
+        $this->assertSame('lunch', $coupon->fresh()->meal_type);
+    }
+
+    public function test_move_date_cascades_to_existing_school_orders_coupons_and_catering_orders(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event] = $this->makeSahodayaAndEvent('2026-09-01', '2026-09-05');
+
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'school',
+            'name' => 'Participating School',
+            'domain' => 'school-'.Str::random(8).'.test',
+            'is_active' => true,
+        ]);
+
+        $item = FestFoodMenuItem::create([
+            'tenant_id' => $sahodaya->id,
+            'event_id' => $event->id,
+            'menu_date' => '2026-09-01',
+            'meal_type' => 'lunch',
+            'name' => 'Fried Rice',
+            'price' => 100,
+            'is_available' => true,
+            'sort_order' => 0,
+        ]);
+
+        $bill = FestFoodBill::create([
+            'tenant_id' => $sahodaya->id,
+            'event_id' => $event->id,
+            'school_id' => $school->id,
+            'status' => FestFoodBill::STATUS_OPEN,
+            'amount_total' => 200,
+            'amount_paid' => 0,
+        ]);
+
+        $orderItem = FestFoodOrderItem::create([
+            'bill_id' => $bill->id,
+            'menu_item_id' => $item->id,
+            'menu_date' => '2026-09-01',
+            'meal_type' => 'lunch',
+            'item_name' => 'Fried Rice',
+            'unit_price' => 100,
+            'quantity' => 2,
+            'line_total' => 200,
+        ]);
+
+        $coupon = FestFoodCoupon::create([
+            'event_id' => $event->id,
+            'school_id' => $school->id,
+            'coupon_code' => 'LN-001',
+            'sequence_no' => 1,
+            'qr_token' => Str::random(16),
+            'meal_type' => 'lunch',
+            'valid_date' => '2026-09-01',
+            'head_count' => 1,
+            'status' => 'issued',
+        ]);
+
+        $cateringOrder = FestCateringOrder::create([
+            'event_id' => $event->id,
+            'school_id' => $school->id,
+            'meal_date' => '2026-09-01',
+            'meal_type' => 'lunch',
+            'head_count' => 15,
+            'status' => 'confirmed',
+        ]);
+
+        $response = $this->actingAs($admin)->post("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/food-menu/move-date", [
+            'from_date' => '2026-09-01',
+            'to_date' => '2026-09-04',
+        ]);
+
+        $response->assertRedirect();
+        $this->assertSame('2026-09-04', $orderItem->fresh()->menu_date->format('Y-m-d'));
+        $this->assertSame('2026-09-04', $coupon->fresh()->valid_date->format('Y-m-d'));
+        $this->assertSame('2026-09-04', $cateringOrder->fresh()->meal_date->format('Y-m-d'));
     }
 }
