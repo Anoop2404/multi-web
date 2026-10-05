@@ -817,7 +817,31 @@ Route::prefix('school-admin/{tenantId}')
     Route::post('/settings',  [SettingsController::class, 'update'])->name('settings.update');
 
     Route::middleware('public.website.admin.cms')->group(function () {
-    Route::get('/website/hub', [\App\Http\Controllers\SchoolAdmin\WebsiteHubController::class, 'index'])->name('website.hub');
+        Route::get('/website/hub', [\App\Http\Controllers\SchoolAdmin\WebsiteHubController::class, 'index'])->name('website.hub');
+        Route::get('/site-builder', [SiteBuilderController::class, 'index'])->name('site-builder');
+        Route::middleware('feature:module.website')->prefix('site-builder/api')->name('site-builder.api.')->group(function () {
+            Route::get('/sections', [SiteBuilderApiController::class, 'sections'])->name('sections.index');
+            Route::post('/sections', [SiteBuilderApiController::class, 'storeSection'])->name('sections.store');
+            Route::patch('/sections/{sectionId}', [SiteBuilderApiController::class, 'updateSection'])->name('sections.update');
+            Route::delete('/sections/{sectionId}', [SiteBuilderApiController::class, 'deleteSection'])->name('sections.delete');
+            Route::post('/sections/{sectionId}/toggle', [SiteBuilderApiController::class, 'toggleSection'])->name('sections.toggle');
+            Route::post('/sections/reorder', [SiteBuilderApiController::class, 'reorderSections'])->name('sections.reorder');
+            Route::post('/sections/{sectionId}/publish', [SiteBuilderApiController::class, 'publishSection'])->name('sections.publish');
+            Route::get('/sections/{sectionId}/versions', [SiteBuilderApiController::class, 'sectionVersions'])->name('sections.versions');
+            Route::post('/sections/{sectionId}/versions/{versionId}/restore', [SiteBuilderApiController::class, 'restoreSectionVersion'])->name('sections.versions.restore');
+            Route::get('/nav', [SiteBuilderApiController::class, 'getNav'])->name('nav.get');
+            Route::post('/nav', [SiteBuilderApiController::class, 'saveNav'])->name('nav.save');
+            Route::get('/footer', [SiteBuilderApiController::class, 'getFooter'])->name('footer.get');
+            Route::post('/footer', [SiteBuilderApiController::class, 'saveFooter'])->name('footer.save');
+            Route::get('/site-content', [SiteBuilderApiController::class, 'getSiteContent'])->name('site-content.get');
+            Route::post('/site-content', [SiteBuilderApiController::class, 'saveSiteContent'])->name('site-content.save');
+            Route::get('/design', [SiteBuilderApiController::class, 'getDesign'])->name('design.get');
+            Route::post('/design', [SiteBuilderApiController::class, 'saveDesign'])->name('design.save');
+            Route::get('/experiences', [SiteBuilderApiController::class, 'experiences'])->name('experiences.index');
+            Route::post('/experience/apply', [SiteBuilderApiController::class, 'applyExperienceDraft'])->name('experience.apply');
+            Route::post('/experience/cancel', [SiteBuilderApiController::class, 'cancelExperienceDraft'])->name('experience.cancel');
+            Route::post('/public-website', [SiteBuilderApiController::class, 'savePublicWebsite'])->name('public-website.save');
+        }); // site-builder.api — feature:module.website enforced here
 
     // News
     Route::get('/news',                  [NewsController::class, 'index'])->name('news.index');

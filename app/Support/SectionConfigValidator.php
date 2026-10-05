@@ -130,6 +130,10 @@ class SectionConfigValidator
                         $rules["{$field['key']}.*"] = ['array'];
                         $rules["{$field['key']}.*.{$subField['key']}"] = $subRules;
                     }
+                    $rules["{$field['key']}.*.\\_enabled"] = ['nullable', 'boolean'];
+                    $rules["{$field['key']}.*.\\_featured"] = ['nullable', 'boolean'];
+                    $rules["{$field['key']}.*.\\_start_date"] = ['nullable', 'date_format:Y-m-d'];
+                    $rules["{$field['key']}.*.\\_end_date"] = ['nullable', 'date_format:Y-m-d', 'after_or_equal:' . ($field['key'] ?? '') . '.*._start_date'];
                 }
                 break;
             case 'color':

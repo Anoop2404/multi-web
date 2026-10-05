@@ -655,14 +655,23 @@
                 </div>
 
                 <!-- Section cards list -->
-                <div class="space-y-3">
+                <div class="space-y-3" @dragover.prevent @drop.prevent="onContainerDrop">
                     <div v-for="(section, idx) in sections" :key="section.id"
-                         class="bg-white rounded-2xl border shadow-sm transition hover:shadow-md"
-                         :class="section.is_active ? 'border-gray-100' : 'border-gray-200 bg-gray-50/40 opacity-75'">
+                         :draggable="canEdit"
+                         @dragstart="onSectionDragStart($event, idx)"
+                         @dragover.prevent="onSectionDragOver($event, idx)"
+                         @drop.prevent="onSectionDrop($event, idx)"
+                         @dragend="onSectionDragEnd"
+                         :class="[
+                            'bg-white rounded-2xl border shadow-sm transition hover:shadow-md',
+                            section.is_active ? 'border-gray-100' : 'border-gray-200 bg-gray-50/40 opacity-75',
+                            dragOverIdx === idx ? 'ring-2 ring-sky-300' : '',
+                            draggingIdx === section.id ? 'opacity-40' : '',
+                         ]">
 
                         <div class="px-4 sm:px-5 py-4 flex flex-wrap items-center gap-3 sm:gap-4">
                             <!-- Reorder handles -->
-                            <div class="flex flex-col items-center gap-0.5 shrink-0">
+                            <div v-if="canEdit" class="flex flex-col items-center gap-0.5 shrink-0 cursor-grab" title="Drag to reorder or use arrows">
                                 <button type="button"
                                         @click="moveUp(idx)" :disabled="idx === 0"
                                         class="w-6 h-5 flex items-center justify-center text-gray-400 hover:text-gray-800 disabled:opacity-20 rounded transition text-xs font-bold"
@@ -1004,6 +1013,10 @@ const sectionErrors = reactive({});
 const requestError = ref('');
 const dirtySections = reactive({});   // sectionId -> true when unsaved edits exist
 const mediaUrls = reactive({ ...(props.mediaUrls ?? {}) });
+
+// Drag-and-drop state
+const dragIdx = ref(null);
+const dragOverIdx = ref(null);
 
 const navConfig = reactive({
     layout_variant: props.navConfig?.layout_variant ?? 'logo-left',
@@ -1622,6 +1635,42 @@ async function saveOrder() {
     await apiPost('/sections/reorder', { ids: sections.value.map(s => s.id) });
 }
 
+function onSectionDragStart(event, idx) {
+    dragIdx.value = idx;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.dropEffect = 'move';
+}
+
+function onSectionDragOver(event, idx) {
+    if (dragIdx.value === null || dragIdx.value === idx) return;
+    dragOverIdx.value = idx;
+}
+
+function onSectionDrop(event, idx) {
+    if (dragIdx.value === null || dragIdx.value === idx) return;
+    const from = dragIdx.value;
+    const to = idx;
+    const arr = [...sections.value];
+    const [moved] = arr.splice(from, 1);
+    arr.splice(to, 0, moved);
+    sections.value = arr;
+    dragIdx.value = null;
+    dragOverIdx.value = null;
+    saveOrder();
+}
+
+function onContainerDrop(event) {
+    if (dragIdx.value !== null) {
+        dragIdx.value = null;
+        dragOverIdx.value = null;
+    }
+}
+
+function onSectionDragEnd() {
+    dragIdx.value = null;
+    dragOverIdx.value = null;
+}
+
 function openAddModal() {
     if (!isSuperAdmin.value) return;
     addModal.open = true;
@@ -1674,12 +1723,25 @@ const SectionFieldEditor = defineComponent({
         function onRepeaterAdd(key, itemDef) {
             if (!Array.isArray(local[key])) local[key] = [];
             const blank = Object.fromEntries((itemDef ?? []).map(f => [f.key, '']));
+            blank._enabled = true;
+            blank._featured = false;
+            blank._start_date = '';
+            blank._end_date = '';
             local[key] = [...local[key], blank];
             emit('update', { ...local });
         }
 
         function onRepeaterRemove(key, idx) {
             local[key] = local[key].filter((_, i) => i !== idx);
+            emit('update', { ...local });
+        }
+
+        function onRepeaterDuplicate(key, idx) {
+            const arr = [...(local[key] ?? [])];
+            if (!arr[idx]) return;
+            const copy = { ...arr[idx], _featured: false };
+            arr.splice(idx + 1, 0, copy);
+            local[key] = arr;
             emit('update', { ...local });
         }
 
@@ -1699,6 +1761,10 @@ const SectionFieldEditor = defineComponent({
             emit('update', { ...local });
         }
 
+        function onRepeaterMeta(key, idx, fieldKey, val) {
+            onRepeaterField(key, idx, fieldKey, val);
+        }
+
         return () => h('div', { class: 'space-y-4' }, (props.fields ?? []).map(field => {
             if (field.type === 'repeater') {
                 return h('div', { key: field.key, class: 'space-y-3 rounded-xl border border-gray-200 bg-gray-50/60 p-3 sm:p-4' }, [
@@ -1714,29 +1780,79 @@ const SectionFieldEditor = defineComponent({
                         }, '+ Add item'),
                     ]),
                     ...(local[field.key] ?? []).map((item, idx) =>
-                        h('div', { key: idx, class: 'border border-gray-200 bg-white rounded-xl p-3 sm:p-4 space-y-3 shadow-sm' }, [
-                            h('div', { class: 'flex items-center justify-between gap-3' }, [
-                                h('span', { class: 'text-xs font-bold text-gray-500' }, `Item ${idx + 1}`),
-                                h('div', { class: 'flex items-center gap-3' }, [
+                        h('div', {
+                            key: idx,
+                            class: [
+                                'border border-gray-200 bg-white rounded-xl p-3 sm:p-4 space-y-3 shadow-sm',
+                                !item._enabled ? 'opacity-60' : null,
+                            ].filter(Boolean),
+                        }, [
+                            h('div', { class: 'flex items-center justify-between gap-3 flex-wrap' }, [
+                                h('div', { class: 'flex items-center gap-2' }, [
+                                    h('label', { class: 'flex items-center gap-1.5 cursor-pointer' }, [
+                                        h('input', {
+                                            type: 'checkbox',
+                                            checked: !!item._enabled,
+                                            onChange: e => onRepeaterMeta(field.key, idx, '_enabled', e.target.checked),
+                                            class: 'w-3.5 h-3.5 rounded text-sky-600',
+                                        }),
+                                        h('span', { class: 'text-xs font-bold text-gray-500' }, `Item ${idx + 1}`),
+                                    ]),
+                                    item._featured
+                                        ? h('span', { class: 'text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full font-bold' }, '★ Featured')
+                                        : null,
+                                ]),
+                                h('div', { class: 'flex items-center gap-2 flex-wrap' }, [
+                                h('label', { class: 'flex items-center gap-1 cursor-pointer', title: 'Featured item' }, [
+                                    h('input', {
+                                        type: 'checkbox',
+                                        checked: !!item._featured,
+                                        onChange: e => onRepeaterMeta(field.key, idx, '_featured', e.target.checked),
+                                        class: 'w-3.5 h-3.5 rounded text-amber-500',
+                                    }),
+                                    h('span', { class: 'text-[10px] text-amber-700 font-bold' }, '★'),
+                                ]),
+                                    h('label', { class: 'flex items-center gap-1 cursor-pointer' }, [
+                                        h('span', { class: 'text-[10px] text-gray-400 font-medium' }, 'Visible:'),
+                                        h('input', {
+                                            type: 'date',
+                                            value: item._start_date ?? '',
+                                            onChange: e => onRepeaterMeta(field.key, idx, '_start_date', e.target.value),
+                                            class: 'border border-gray-200 rounded-lg px-1.5 py-0.5 text-[10px] w-24',
+                                        }),
+                                        h('span', { class: 'text-[10px] text-gray-400' }, 'to'),
+                                        h('input', {
+                                            type: 'date',
+                                            value: item._end_date ?? '',
+                                            onChange: e => onRepeaterMeta(field.key, idx, '_end_date', e.target.value),
+                                            class: 'border border-gray-200 rounded-lg px-1.5 py-0.5 text-[10px] w-24',
+                                        }),
+                                    ]),
+                                    h('button', {
+                                        type: 'button',
+                                        onClick: () => onRepeaterDuplicate(field.key, idx),
+                                        class: 'text-[10px] font-bold text-sky-600 hover:text-sky-800',
+                                        title: 'Duplicate this item',
+                                    }, '⧉ Copy'),
                                     h('button', {
                                         type: 'button',
                                         disabled: idx === 0,
                                         onClick: () => onRepeaterMove(field.key, idx, -1),
                                         class: 'text-xs font-bold text-gray-500 disabled:cursor-not-allowed disabled:opacity-30',
                                         title: 'Move up',
-                                    }, '↑ Up'),
+                                    }, '↑'),
                                     h('button', {
                                         type: 'button',
                                         disabled: idx === (local[field.key] ?? []).length - 1,
                                         onClick: () => onRepeaterMove(field.key, idx, 1),
                                         class: 'text-xs font-bold text-gray-500 disabled:cursor-not-allowed disabled:opacity-30',
                                         title: 'Move down',
-                                    }, '↓ Down'),
+                                    }, '↓'),
                                     h('button', {
                                         type: 'button',
                                         onClick: () => onRepeaterRemove(field.key, idx),
                                         class: 'text-xs font-bold text-red-500 hover:text-red-700',
-                                    }, 'Remove'),
+                                    }, '✕'),
                                 ]),
                             ]),
                             h('div', { class: 'grid grid-cols-1 gap-3 sm:grid-cols-2' },

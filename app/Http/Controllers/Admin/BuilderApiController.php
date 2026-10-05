@@ -57,8 +57,13 @@ class BuilderApiController extends Controller
         $data['tenant_id'] = $tenantId;
         $data['site_id'] = $site->id;
         $data['display_order'] = ((int) $site->sectionQuery()->max('display_order')) + 1;
-        $data['config'] = HtmlSanitizer::sanitizeSectionConfig(
+        $data['config'] = SectionConfigValidator::validate(
+            $data['section_type'],
+            $data['variant'],
             $data['config'] ?? [],
+        );
+        $data['config'] = HtmlSanitizer::sanitizeSectionConfig(
+            $data['config'],
             $data['section_type'],
             $data['variant'],
         );
@@ -239,8 +244,31 @@ class BuilderApiController extends Controller
     /** @return array<string, mixed> */
     private function sectionPayload(SiteSection $section): array
     {
+        $config = $section->config ?? [];
+        $fields = SectionFieldRegistry::fields($section->section_type, $section->variant);
+
+        $repeaterStats = [];
+        foreach ($fields as $field) {
+            if (($field['type'] ?? null) !== 'repeater') continue;
+            $key = $field['key'];
+            $items = is_array($config[$key] ?? null) ? $config[$key] : [];
+            $enabled = 0;
+            $featured = 0;
+            foreach ($items as $item) {
+                if (! is_array($item)) continue;
+                if (($item['_enabled'] ?? true) === true || ! array_key_exists('_enabled', $item)) $enabled++;
+                if (! empty($item['_featured'])) $featured++;
+            }
+            $repeaterStats[$key] = [
+                'total' => count($items),
+                'enabled' => $enabled,
+                'featured' => $featured,
+            ];
+        }
+
         return array_merge($section->toArray(), [
             'has_unpublished_changes' => $section->hasUnpublishedChanges(),
+            'repeater_stats' => $repeaterStats,
         ]);
     }
 
