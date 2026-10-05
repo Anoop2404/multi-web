@@ -207,119 +207,135 @@
 
         <!-- Add / Edit Trophy Modal -->
         <div v-if="editingModal" class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-6 border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
-                <div class="flex items-start justify-between pb-3 border-b border-slate-100 mb-4">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+                <div class="flex items-start justify-between p-6 pb-4 border-b border-slate-100">
                     <div>
                         <h3 class="text-base font-bold text-slate-900">{{ form.id ? 'Edit Trophy #' + form.trophy_no : 'Add New Trophy' }}</h3>
-                        <p class="text-xs text-slate-500 mt-0.5">Configure trophy details, type, recipient placement, and items.</p>
+                        <p class="text-xs text-slate-500 mt-0.5">Configure the trophy — pick a type, then fill in the matching fields below.</p>
                     </div>
-                    <button type="button" class="text-slate-400 hover:text-slate-600 text-xl font-bold" @click="editingModal = false">×</button>
+                    <button type="button" class="text-slate-400 hover:text-slate-600 text-xl font-bold leading-none" @click="editingModal = false">&times;</button>
                 </div>
 
-                <form @submit.prevent="submitForm" class="space-y-4 text-xs">
-                    <div class="grid grid-cols-3 gap-3">
-                        <div>
-                            <label class="lbl">Trophy Number</label>
-                            <input v-model.number="form.trophy_no" type="number" min="1" max="999" class="fld font-bold" required>
+                <form @submit.prevent="submitForm" class="p-6 space-y-5 text-xs">
+                    {{-- ── Section 1: Basics ── }}
+                    <fieldset class="space-y-3">
+                        <legend class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Basics</legend>
+                        <div class="grid grid-cols-3 gap-3">
+                            <div>
+                                <label class="lbl">Trophy <span class="text-slate-400 font-normal normal-case tracking-normal">#</span></label>
+                                <input v-model.number="form.trophy_no" type="number" min="1" max="999" class="fld font-bold" required>
+                            </div>
+                            <div>
+                                <label class="lbl">Position</label>
+                                <select v-model.number="form.position" class="fld" required>
+                                    <option :value="1">1st Place</option>
+                                    <option :value="2">2nd Place</option>
+                                    <option :value="3">3rd Place</option>
+                                    <option :value="4">4th Place</option>
+                                    <option :value="5">5th Place</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="lbl">Award To</label>
+                                <select v-model="form.award_type" class="fld" required>
+                                    <option value="school">School</option>
+                                    <option value="individual">Individual Student</option>
+                                </select>
+                            </div>
                         </div>
                         <div>
-                            <label class="lbl">Position</label>
-                            <select v-model.number="form.position" class="fld" required>
-                                <option :value="1">1st Place</option>
-                                <option :value="2">2nd Place</option>
-                                <option :value="3">3rd Place</option>
-                                <option :value="4">4th Place</option>
-                                <option :value="5">5th Place</option>
+                            <label class="lbl">Trophy Title</label>
+                            <input v-model="form.title" type="text" class="fld" placeholder="e.g. First position in Folk Dance (Senior)" required>
+                        </div>
+                    </fieldset>
+
+                    {{-- ── Section 2: Trophy Type ── }}
+                    <fieldset class="space-y-3">
+                        <legend class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Trophy Type</legend>
+                        <div>
+                            <label class="lbl">Category</label>
+                            <select v-model="form.trophy_type" class="fld" required>
+                                <option value="overall">🏆 Overall Champion (school points)</option>
+                                <option value="category">📁 Category-wise (e.g. Arts, Sports)</option>
+                                <option value="item">🎯 Single Item (specific competition)</option>
+                                <option value="item_group">📦 Item Group / Cluster (e.g. all Art items)</option>
+                                <option value="individual_championship">👤 Individual Championship (Kalaprathibha / Kalathilakam)</option>
                             </select>
                         </div>
-                        <div>
-                            <label class="lbl">Award Recipient</label>
-                            <select v-model="form.award_type" class="fld" required>
-                                <option value="school">School</option>
-                                <option value="individual">Individual Student</option>
+
+                        {{-- Category / Individual Championship: pick a category --}}
+                        <div v-if="form.trophy_type === 'category' || form.trophy_type === 'individual_championship'">
+                            <label class="lbl">Target Category</label>
+                            <SearchableSelect v-model="form.category_key" class="w-full" :options="categoryOptions" :all-option="false" placeholder="Select category" />
+                        </div>
+
+                        {{-- Single Item: pick one item + optional name pattern --}}
+                        <div v-if="form.trophy_type === 'item'">
+                            <label class="lbl">Match Item</label>
+                            <select v-model="form.item_id" class="fld">
+                                <option :value="null">— Use name pattern instead —</option>
+                                <option v-for="it in items" :key="it.id" :value="it.id">
+                                    {{ it.item_code ? it.item_code + ' — ' : '' }}{{ it.title }} ({{ it.class_group || it.category }})
+                                </option>
+                            </select>
+                            <div class="mt-2">
+                                <label class="lbl">Name Pattern <span class="text-slate-400 font-normal normal-case tracking-normal">(matches items across events)</span></label>
+                                <input v-model="form.item_name_pattern" type="text" class="fld" placeholder="e.g. One Act Play, Oppana, Margamkali">
+                            </div>
+                        </div>
+
+                        {{-- Item Group: group name + optional explicit item list --}}
+                        <div v-if="form.trophy_type === 'item_group'">
+                            <label class="lbl">Group / Cluster Name</label>
+                            <input v-model="form.item_group_name" type="text" class="fld" placeholder="e.g. Music items, Art items">
+                            <div class="mt-3">
+                                <label class="lbl">Or pick specific items <span class="text-slate-400 font-normal normal-case tracking-normal">(optional)</span></label>
+                                <div class="max-h-32 overflow-y-auto border rounded-lg p-2 bg-slate-50 space-y-1">
+                                    <label v-for="it in items" :key="it.id" class="flex items-center gap-2 text-slate-700 cursor-pointer hover:bg-white rounded px-1">
+                                        <input type="checkbox" :value="it.id" v-model="form.item_ids" class="rounded">
+                                        <span>{{ it.item_code }} — {{ it.title }}</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Individual Championship: gender --}}
+                        <div v-if="form.trophy_type === 'individual_championship'">
+                            <label class="lbl">Eligibility</label>
+                            <select v-model="form.gender" class="fld">
+                                <option :value="null">Any Gender / Open</option>
+                                <option value="male">Boys (Kalaprathibha)</option>
+                                <option value="female">Girls (Kalathilakam)</option>
                             </select>
                         </div>
-                    </div>
+                    </fieldset>
 
-                    <div>
-                        <label class="lbl">Trophy Title / Description</label>
-                        <input v-model="form.title" type="text" class="fld" placeholder="e.g. Ever-rolling trophy for First position in overall points" required>
-                    </div>
-
-                    <div>
-                        <label class="lbl">Trophy Type</label>
-                        <select v-model="form.trophy_type" class="fld" required>
-                            <option v-for="(lbl, val) in trophyTypes" :key="val" :value="val">{{ lbl }}</option>
-                        </select>
-                    </div>
-
-                    <!-- Category-wise fields -->
-                    <div v-if="form.trophy_type === 'category' || form.trophy_type === 'individual_championship'">
-                        <label class="lbl">Target Category</label>
-                        <SearchableSelect v-model="form.category_key" class="w-full" :options="categoryOptions" :all-option="false" placeholder="Select category" />
-                    </div>
-
-                    <!-- Single Item fields -->
-                    <div v-if="form.trophy_type === 'item'">
-                        <label class="lbl">Specific Item</label>
-                        <select v-model="form.item_id" class="fld">
-                            <option :value="null">-- Match by Name Pattern instead --</option>
-                            <option v-for="it in items" :key="it.id" :value="it.id">
-                                {{ it.item_code ? it.item_code + ' - ' : '' }}{{ it.title }} ({{ it.class_group || it.category }})
-                            </option>
-                        </select>
-                        <div class="mt-2">
-                            <label class="lbl">Item Name Pattern (for templates across events)</label>
-                            <input v-model="form.item_name_pattern" type="text" class="fld" placeholder="e.g. One Act Play, Oppana, Margamkali">
+                    {{-- ── Section 3: Details ── }}
+                    <fieldset class="space-y-3">
+                        <legend class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Details</legend>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="lbl">Donor / Sponsor <span class="text-slate-400 font-normal normal-case tracking-normal">(optional)</span></label>
+                                <input v-model="form.donor_name" type="text" class="fld" placeholder="e.g. Late Shri ABC Memorial">
+                            </div>
+                            <div>
+                                <label class="lbl">Notes <span class="text-slate-400 font-normal normal-case tracking-normal">(optional)</span></label>
+                                <input v-model="form.notes" type="text" class="fld" placeholder="e.g. Includes classical music, violin…">
+                            </div>
                         </div>
-                    </div>
-
-                    <!-- Item Group / Cluster fields -->
-                    <div v-if="form.trophy_type === 'item_group'">
-                        <label class="lbl">Group / Cluster Name</label>
-                        <input v-model="form.item_group_name" type="text" class="fld" placeholder="e.g. Music items, Art items">
-                        <label class="lbl mt-2">Explicit Item Selection (Optional)</label>
-                        <div class="max-h-36 overflow-y-auto border rounded-lg p-2 bg-slate-50 space-y-1">
-                            <label v-for="it in items" :key="it.id" class="flex items-center gap-2 text-slate-700 cursor-pointer">
-                                <input type="checkbox" :value="it.id" v-model="form.item_ids" class="rounded">
-                                <span>{{ it.item_code }} — {{ it.title }}</span>
+                        <div class="flex items-center gap-6 pt-1">
+                            <label class="flex items-center gap-2 cursor-pointer font-medium text-slate-700">
+                                <input type="checkbox" v-model="form.is_rolling" class="rounded text-amber-600 focus:ring-amber-500">
+                                <span>Ever-rolling Trophy</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer font-medium text-slate-700">
+                                <input type="checkbox" v-model="form.is_active" class="rounded text-indigo-600 focus:ring-indigo-500">
+                                <span>Active</span>
                             </label>
                         </div>
-                    </div>
+                    </fieldset>
 
-                    <!-- Individual Championship fields -->
-                    <div v-if="form.trophy_type === 'individual_championship'">
-                        <label class="lbl">Gender</label>
-                        <select v-model="form.gender" class="fld">
-                            <option :value="null">Any Gender / Open</option>
-                            <option value="male">Boys (Kalaprathibha)</option>
-                            <option value="female">Girls (Kalathilakam)</option>
-                        </select>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="lbl">Donor / Sponsor Name</label>
-                            <input v-model="form.donor_name" type="text" class="fld" placeholder="e.g. Late Shri ABC Memorial">
-                        </div>
-                        <div>
-                            <label class="lbl">Notes</label>
-                            <input v-model="form.notes" type="text" class="fld" placeholder="e.g. Includes classical music, violin...">
-                        </div>
-                    </div>
-
-                    <div class="flex items-center gap-6 pt-2">
-                        <label class="flex items-center gap-2 cursor-pointer font-medium text-slate-700">
-                            <input type="checkbox" v-model="form.is_rolling" class="rounded text-amber-600 focus:ring-amber-500">
-                            <span>Ever-rolling Trophy</span>
-                        </label>
-                        <label class="flex items-center gap-2 cursor-pointer font-medium text-slate-700">
-                            <input type="checkbox" v-model="form.is_active" class="rounded text-indigo-600 focus:ring-indigo-500">
-                            <span>Active</span>
-                        </label>
-                    </div>
-
-                    <div class="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+                    <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                         <button type="button" class="btn-secondary" @click="editingModal = false">Cancel</button>
                         <button type="submit" class="btn-primary" :disabled="form.processing">
                             {{ form.id ? 'Save Changes' : 'Create Trophy' }}
