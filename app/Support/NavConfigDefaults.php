@@ -106,21 +106,76 @@ class NavConfigDefaults
             'layout_variant' => 'sahodaya-modern',
             'items' => [
                 ['label' => 'Home', 'url' => '/', 'external' => false, 'children' => []],
-                ['label' => 'About', 'url' => '/#about-sahodaya', 'external' => false, 'children' => []],
-                ['label' => 'Programmes', 'url' => '/#events-programs', 'external' => false, 'children' => []],
+
+                // ── About ────────────────────────────────────────────
                 [
-                    'label' => 'Events & Results', 'url' => '/fest', 'external' => false,
+                    'label' => 'About',
+                    'url' => '/#about-sahodaya',
+                    'external' => false,
+                    'children' => [
+                        ['label' => 'About Us', 'url' => '/#about-sahodaya', 'external' => false],
+                        ['label' => 'Management', 'url' => '/#management', 'external' => false],
+                        ['label' => "Principal's Message", 'url' => '/#principal-message', 'external' => false],
+                        ['label' => 'Faculty', 'url' => '/#staff', 'external' => false],
+                        ['label' => 'Facilities', 'url' => '/#facilities', 'external' => false],
+                        ['label' => 'Statistics', 'url' => '/#statistics', 'external' => false],
+                    ],
+                ],
+
+                // ── Programmes ──────────────────────────────────────
+                [
+                    'label' => 'Programmes',
+                    'url' => '/#academic-programmes',
+                    'external' => false,
+                    'children' => [
+                        ['label' => 'Academic Programmes', 'url' => '/#academic-programmes', 'external' => false],
+                        ['label' => 'Board Results', 'url' => '/#board-results', 'external' => false],
+                        ['label' => 'Admissions', 'url' => '/#admissions', 'external' => false],
+                        ['label' => 'CBSE Disclosure', 'url' => '/#mandatory-disclosure', 'external' => false],
+                        ['label' => 'House System', 'url' => '/#house-system', 'external' => false],
+                        ['label' => 'Clubs', 'url' => '/#clubs', 'external' => false],
+                        ['label' => 'Career Guidance', 'url' => '/#career-guidance', 'external' => false],
+                        ['label' => 'ATAL Lab', 'url' => '/#atl', 'external' => false],
+                    ],
+                ],
+
+                // ── Events & Results ────────────────────────────────
+                [
+                    'label' => 'Events & Results',
+                    'url' => '/fest',
+                    'external' => false,
                     'children' => [
                         ['label' => 'All Events & Schedule', 'url' => '/fest', 'external' => false],
                         ['label' => 'Live Scoreboards', 'url' => '/fest', 'external' => false],
-                        ['label' => 'MCQ Talent Search Papers', 'url' => '/mcq/papers', 'external' => false],
+                        ['label' => 'MCQ Talent Search', 'url' => '/mcq/papers', 'external' => false],
+                        ['label' => 'News', 'url' => '/#news', 'external' => false],
+                        ['label' => 'Gallery', 'url' => '/gallery', 'external' => false],
+                        ['label' => 'Video Gallery', 'url' => '/#video-gallery', 'external' => false],
+                        ['label' => 'Achievements', 'url' => '/#achievements', 'external' => false],
                     ],
                 ],
-                ['label' => 'Office Bearers', 'url' => '/office-bearers', 'external' => false, 'children' => []],
-                ['label' => 'Member Schools', 'url' => '/member-schools', 'external' => false, 'children' => []],
-                ['label' => 'Gallery', 'url' => '/gallery', 'external' => false, 'children' => []],
-                ['label' => 'Circulars', 'url' => '/circulars', 'external' => false, 'children' => []],
+
+                // ── Community ───────────────────────────────────────
+                [
+                    'label' => 'Community',
+                    'url' => '/member-schools',
+                    'external' => false,
+                    'children' => [
+                        ['label' => 'Office Bearers', 'url' => '/office-bearers', 'external' => false],
+                        ['label' => 'Member Schools', 'url' => '/member-schools', 'external' => false],
+                        ['label' => 'Circulars', 'url' => '/circulars', 'external' => false],
+                        ['label' => 'Testimonials', 'url' => '/#testimonials', 'external' => false],
+                        ['label' => 'Awards', 'url' => '/#achievements', 'external' => false],
+                        ['label' => 'Alumni', 'url' => '/#alumni', 'external' => false],
+                        ['label' => 'Downloads', 'url' => '/#downloads', 'external' => false],
+                        ['label' => 'Publications', 'url' => '/#publications', 'external' => false],
+                        ['label' => 'Newsletter', 'url' => '/#newsletter', 'external' => false],
+                        ['label' => 'FAQ', 'url' => '/#faq', 'external' => false],
+                    ],
+                ],
+
                 ['label' => 'Membership Renewal', 'url' => '/school-register', 'external' => false, 'children' => []],
+
                 ['label' => 'Contact', 'url' => '/#contact', 'external' => false, 'children' => []],
             ],
             'portal_cta' => PortalNavLinks::portalCtaDefaults(),
