@@ -441,7 +441,9 @@
                                                 <h4 class="font-bold text-sm text-gray-900 capitalize">{{ sectionTypeLabel(sec.section_type) }}</h4>
                                                 <span class="text-[11px] font-mono bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full font-semibold">{{ sec.variant }}</span>
                                                 <span class="text-[11px] font-semibold bg-sky-50 text-sky-700 px-2 py-0.5 rounded-full">Data: {{ sourceBadge(sec.section_type) }}</span>
-                                                <span v-if="!sec.is_active" class="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Hidden from site</span>
+                                                <span v-if="!sec.is_active" class="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Hidden</span>
+                                                <span v-else-if="sec.has_unpublished_changes || dirtySections[sec.id]" class="text-[11px] font-semibold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">Draft changes</span>
+                                                <span v-else class="text-[11px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">Published</span>
                                             </div>
                                             <p class="text-xs text-gray-400 truncate max-w-lg mt-0.5">
                                                 {{ sectionPreview(sec) }}

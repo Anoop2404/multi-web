@@ -561,7 +561,7 @@
                             <span>✓</span> Section saved!
                         </span>
                     </div>
-                    <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-3 flex-wrap">
                         <a v-if="publicUrl" :href="publicUrl" target="_blank"
                            class="text-xs font-bold text-sky-700 hover:text-sky-900 px-3 py-2">
                             Preview on website ↗
@@ -569,13 +569,24 @@
                         <button type="button"
                                 @click="saveSection(currentEditingSection)"
                                 :disabled="saving[currentEditingSection.id]"
-                                class="px-6 py-2.5 rounded-xl text-sm font-bold transition shadow-sm disabled:opacity-50 flex items-center gap-2"
+                                class="px-5 py-2.5 rounded-xl text-sm font-bold transition shadow-sm disabled:opacity-50 flex items-center gap-2"
                                 :class="dirtySections[currentEditingSection.id]
                                     ? 'bg-amber-600 hover:bg-amber-700 text-white ring-2 ring-amber-300'
                                     : 'bg-[#041525] hover:bg-[#0c4a6e] text-white'">
                             <span v-if="dirtySections[currentEditingSection.id]" class="w-2 h-2 rounded-full bg-amber-200 shrink-0"></span>
-                            <span>{{ saving[currentEditingSection.id] ? 'Saving…' : (dirtySections[currentEditingSection.id] ? 'Save Changes' : 'Save Section') }}</span>
+                            <span>{{ saving[currentEditingSection.id] ? 'Saving…' : (dirtySections[currentEditingSection.id] ? 'Save Changes' : 'Save Draft') }}</span>
                         </button>
+                        <button v-if="canEdit && (dirtySections[currentEditingSection.id] || currentEditingSection.status !== 'published')"
+                                type="button"
+                                @click="publishSection(currentEditingSection)"
+                                :disabled="saving[currentEditingSection.id]"
+                                class="px-5 py-2.5 rounded-xl text-sm font-bold transition shadow-sm disabled:opacity-50 flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+                            <span>🚀</span>
+                            <span>{{ saving[currentEditingSection.id] ? 'Publishing…' : 'Publish Live' }}</span>
+                        </button>
+                        <span v-if="sectionSaved[currentEditingSection.id]" class="text-sm font-bold text-emerald-600 flex items-center gap-1.5">
+                            <span>✓</span> Saved!
+                        </span>
                     </div>
                 </div>
             </div>
@@ -674,11 +685,11 @@
                                     <span v-if="!section.is_active" class="text-[11px] font-semibold bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full">
                                         Hidden
                                     </span>
-                                    <span v-else class="text-[11px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">
-                                        Live
+                                    <span v-else-if="section.has_unpublished_changes || dirtySections[section.id]" class="text-[11px] font-semibold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">
+                                        Draft changes
                                     </span>
-                                    <span v-if="dirtySections[section.id]" class="text-[11px] font-semibold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">
-                                        Unsaved
+                                    <span v-else class="text-[11px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">
+                                        Published
                                     </span>
                                 </div>
                                 <p class="text-xs text-gray-400 truncate">
@@ -688,6 +699,13 @@
 
                             <!-- Action buttons -->
                             <div class="flex w-full items-center justify-end gap-2 sm:w-auto shrink-0">
+                                <button v-if="canEdit && (section.has_unpublished_changes || dirtySections[section.id])"
+                                        type="button"
+                                        @click="publishSection(section)"
+                                        :disabled="saving[section.id]"
+                                        class="text-xs font-bold px-3 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition disabled:opacity-50">
+                                    🚀 Publish
+                                </button>
                                 <button type="button"
                                         @click="toggleActive(section)"
                                         class="text-xs font-bold px-3 py-1.5 rounded-xl border transition"
@@ -1526,6 +1544,26 @@ async function saveSection(section) {
         setTimeout(() => { sectionSaved[section.id] = false; }, 3000);
     } catch (error) {
         sectionErrors[section.id] = error?.message || 'This section could not be saved.';
+    } finally {
+        saving[section.id] = false;
+    }
+}
+
+async function publishSection(section) {
+    saving[section.id] = true;
+    sectionErrors[section.id] = '';
+    try {
+        const config = editConfigs[section.id] ?? section.config ?? {};
+        await apiPatch(`/sections/${section.id}`, { config, status: 'draft' });
+        const updated = await apiPost(`/sections/${section.id}/publish`, {});
+        const idx = sections.value.findIndex(s => s.id === section.id);
+        if (idx !== -1) Object.assign(sections.value[idx], updated);
+        sectionSaved[section.id] = true;
+        dirtySections[section.id] = false;
+        editConfigs[section.id] = {};
+        setTimeout(() => { sectionSaved[section.id] = false; }, 3000);
+    } catch (error) {
+        sectionErrors[section.id] = error?.message || 'This section could not be published.';
     } finally {
         saving[section.id] = false;
     }
