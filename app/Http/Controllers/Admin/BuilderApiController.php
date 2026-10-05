@@ -9,6 +9,7 @@ use App\Models\Tenant;
 use App\Models\TenantSetting;
 use App\Models\WebsiteSite;
 use App\Support\HtmlSanitizer;
+use App\Support\SectionConfigValidator;
 use App\Support\SectionFieldRegistry;
 use App\Support\SectionVariantResolver;
 use Illuminate\Support\Facades\Cache;
@@ -103,6 +104,11 @@ class BuilderApiController extends Controller
         $newSectionType = $data['section_type'] ?? $section->section_type;
         $newVariant = $data['variant'] ?? $section->variant;
         if (array_key_exists('config', $data) && is_array($data['config'])) {
+            $data['config'] = SectionConfigValidator::validate(
+                $newSectionType,
+                $newVariant,
+                $data['config']
+            );
             $data['config'] = HtmlSanitizer::sanitizeSectionConfig($data['config'], $newSectionType, $newVariant);
         }
 

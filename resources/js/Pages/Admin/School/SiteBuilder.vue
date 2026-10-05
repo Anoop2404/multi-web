@@ -1890,6 +1890,100 @@ const SectionFieldEditor = defineComponent({
                 ]);
             }
 
+            if (field.type === 'date') {
+                return h('div', { key: field.key }, [
+                    h('label', { class: 'block text-xs font-bold text-gray-700 mb-1.5' }, [field.label, field.required ? h('span', { class: 'text-red-500 ml-0.5' }, '*') : null]),
+                    h('input', {
+                        type: 'date',
+                        value: local[field.key] ?? field.default ?? '',
+                        onInput: e => onInput(field.key, e.target.value),
+                        min: field.min ?? undefined,
+                        max: field.max ?? undefined,
+                        class: 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-sky-200 focus:outline-none',
+                    }),
+                ]);
+            }
+
+            if (field.type === 'time') {
+                return h('div', { key: field.key }, [
+                    h('label', { class: 'block text-xs font-bold text-gray-700 mb-1.5' }, [field.label, field.required ? h('span', { class: 'text-red-500 ml-0.5' }, '*') : null]),
+                    h('input', {
+                        type: 'time',
+                        value: local[field.key] ?? field.default ?? '',
+                        onInput: e => onInput(field.key, e.target.value),
+                        class: 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-sky-200 focus:outline-none',
+                    }),
+                ]);
+            }
+
+            if (field.type === 'date_range') {
+                const fromVal = local[field.key]?.['from'] ?? field.default?.from ?? '';
+                const toVal = local[field.key]?.['to'] ?? field.default?.to ?? '';
+                return h('div', { key: field.key }, [
+                    h('label', { class: 'block text-xs font-bold text-gray-700 mb-1.5' }, [field.label, field.required ? h('span', { class: 'text-red-500 ml-0.5' }, '*') : null]),
+                    h('div', { class: 'grid grid-cols-2 gap-3' }, [
+                        h('div', {}, [
+                            h('span', { class: 'text-[11px] text-gray-400 mb-1 block' }, 'Start date'),
+                            h('input', {
+                                type: 'date',
+                                value: fromVal,
+                                min: field.min ?? undefined,
+                                onInput: e => onInput(field.key, { ...(local[field.key] ?? {}), from: e.target.value }),
+                                class: 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-sky-200 focus:outline-none',
+                            }),
+                        ]),
+                        h('div', {}, [
+                            h('span', { class: 'text-[11px] text-gray-400 mb-1 block' }, 'End date'),
+                            h('input', {
+                                type: 'date',
+                                value: toVal,
+                                max: field.max ?? undefined,
+                                onInput: e => onInput(field.key, { ...(local[field.key] ?? {}), to: e.target.value }),
+                                class: 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-sky-200 focus:outline-none',
+                            }),
+                        ]),
+                    ]),
+                ]);
+            }
+
+            if (field.type === 'academic_years') {
+                const currentYear = new Date().getFullYear();
+                const years = Array.from({ length: 10 }, (_, i) => currentYear - 5 + i);
+                return h('div', { key: field.key }, [
+                    h('label', { class: 'block text-xs font-bold text-gray-700 mb-1.5' }, [field.label, field.required ? h('span', { class: 'text-red-500 ml-0.5' }, '*') : null]),
+                    h('select', {
+                        value: local[field.key] ?? field.default ?? '',
+                        onChange: e => onInput(field.key, e.target.value),
+                        class: 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-sky-200 focus:outline-none bg-white',
+                    }, [
+                        h('option', { value: '' }, 'Select academic year'),
+                        ...years.map(y => h('option', { value: `${y}-${y + 1}`, key: y }, `${y}–${y + 1}`)),
+                    ]),
+                ]);
+            }
+
+            if (field.type === 'number') {
+                return h('div', { key: field.key }, [
+                    h('label', { class: 'block text-xs font-bold text-gray-700 mb-1.5' }, [
+                        field.label,
+                        field.required ? h('span', { class: 'text-red-500 ml-0.5' }, '*') : null,
+                        field.min !== null && field.min !== undefined ? h('span', { class: 'text-gray-400 ml-1 text-[10px]' }, `(min: ${field.min})`) : null,
+                        field.max !== null && field.max !== undefined ? h('span', { class: 'text-gray-400 ml-1 text-[10px]' }, `(max: ${field.max})`) : null,
+                        field.step ? h('span', { class: 'text-gray-400 ml-1 text-[10px]' }, `(step: ${field.step})`) : null,
+                    ]),
+                    h('input', {
+                        type: 'number',
+                        value: local[field.key] ?? field.default ?? '',
+                        min: field.min ?? undefined,
+                        max: field.max ?? undefined,
+                        step: field.step ?? 'any',
+                        placeholder: field.placeholder ?? '',
+                        onInput: e => onInput(field.key, e.target.value),
+                        class: 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-sky-200 focus:outline-none',
+                    }),
+                ]);
+            }
+
             // Default: text / number / url / email / telephone
             return h('div', { key: field.key }, [
                 h('label', { class: 'block text-xs font-bold text-gray-700 mb-1.5' }, [
