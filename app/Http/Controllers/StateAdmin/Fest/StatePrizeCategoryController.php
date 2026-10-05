@@ -85,6 +85,15 @@ class StatePrizeCategoryController extends Controller
         return back()->with('success', 'Prize category removed.');
     }
 
+    public function fullStandings(Request $request, StateFestEvent $event, string $category, StatePrizeCategoryService $prizes)
+    {
+        StateScope::assertOwns($event->state_id);
+
+        $categoryModel = StatePrizeCategory::where('state_event_id', $event->id)->findOrFail($category);
+
+        return response()->json($prizes->fullStandings($event, $categoryModel));
+    }
+
     /** @return array<string, mixed> */
     private function shell(Request $request, StateFestEvent $event): array
     {

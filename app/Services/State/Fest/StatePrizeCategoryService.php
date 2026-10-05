@@ -194,6 +194,48 @@ class StatePrizeCategoryService
     }
 
     /**
+     * Full top-10 standings for a single category — used by the eye-icon popover.
+     * Unlike {@see standings()}, this ignores honour_count and returns up to 10 places.
+     *
+     * @return array{category: array<string,mixed>, individual: list<array<string,mixed>>|null, school: list<array<string,mixed>>|null, sahodaya: list<array<string,mixed>>|null}
+     */
+    public function fullStandings(StateFestEvent $event, StatePrizeCategory $category): array
+    {
+        $itemIds = $this->itemIdsFor($event, $category);
+
+        $countable = StateItemResult::where('state_event_id', $event->id)
+            ->whereIn('item_id', $itemIds)
+            ->whereIn('status', [StateItemResult::PUBLISHED, StateItemResult::LOCKED])
+            ->pluck('item_id');
+
+        $registrations = StateFestRegistration::where('state_event_id', $event->id)
+            ->whereIn('item_id', $countable)
+            ->with('participants')->get()->keyBy('id');
+
+        $marks = $registrations->isEmpty() ? collect() : StateFestMark::where('state_event_id', $event->id)
+            ->whereIn('registration_id', $registrations->keys())
+            ->whereNotNull('position')->get();
+
+        $directory = StateSahodaya::whereIn('id', $registrations->pluck('sahodaya_id')->filter()->unique())
+            ->get()->keyBy('id');
+
+        return [
+            'category' => [
+                'id' => $category->id, 'code' => $category->code, 'name' => $category->name,
+                'description' => $category->description, 'is_overall' => $category->is_overall,
+                'awards' => $category->awards, 'award_labels' => $category->awardLabels(),
+                'honour_count' => $category->honour_count,
+            ],
+            'individual' => $category->awards(StatePrizeCategory::AWARD_INDIVIDUAL)
+                ? $this->individualStanding($marks, $registrations, 10) : null,
+            'school' => $category->awards(StatePrizeCategory::AWARD_SCHOOL)
+                ? $this->schoolStanding($marks, $registrations, 10) : null,
+            'sahodaya' => $category->awards(StatePrizeCategory::AWARD_SAHODAYA)
+                ? $this->sahodayaStanding($marks, $registrations, $directory, 10) : null,
+        ];
+    }
+
+    /**
      * @param  Collection<int, StateFestMark>  $marks
      * @param  Collection<int, StateFestRegistration>  $registrations
      * @return list<array<string, mixed>>

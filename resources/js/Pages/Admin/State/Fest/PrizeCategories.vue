@@ -121,6 +121,9 @@
                                 <span class="min-w-0">
                                     <span class="font-bold text-slate-700">{{ row.rank }}</span>
                                     <span v-if="row.is_tied" class="ml-0.5 text-[10px] font-semibold text-amber-600" title="Joint">=</span>
+                                    <button type="button" class="ml-1 text-slate-300 hover:text-indigo-600 transition" @click="openPopover(s.category.id, kind, row.rank)" title="View full top 10">
+                                        <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                    </button>
                                     <span class="ml-1 font-medium text-slate-800">{{ row.name }}</span>
                                     <span v-if="row.school" class="block text-slate-400">{{ row.sahodaya }} · {{ row.school }}</span>
                                     <span v-else-if="row.sahodaya" class="block text-slate-400">{{ row.sahodaya }}</span>
@@ -131,6 +134,33 @@
                                 </span>
                             </li>
                         </ol>
+
+                        <!-- Eye icon popover: full top-10 for this award kind -->
+                        <div v-if="popover.categoryId === s.category.id && popover.kind === kind"
+                             class="mt-2 rounded-xl border border-indigo-200 bg-indigo-50/50 p-3 text-xs">
+                            <p class="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-indigo-500">
+                                Full top-10 — {{ awardTypes[kind] }}
+                            </p>
+                            <div v-if="popover.loading" class="text-slate-400">Loading…</div>
+                            <div v-else-if="!popover.rows.length" class="text-slate-400">No data.</div>
+                            <ol v-else class="space-y-1">
+                                <li v-for="r in popover.rows" :key="r.rank" class="flex items-start justify-between gap-2 rounded-lg px-2 py-1"
+                                    :class="r.rank === row.rank ? 'bg-white border border-indigo-200' : ''">
+                                    <span class="min-w-0">
+                                        <span class="font-bold text-slate-700">{{ r.rank }}</span>
+                                        <span v-if="r.is_tied" class="ml-0.5 text-[10px] font-semibold text-amber-600">=</span>
+                                        <span class="ml-1 font-medium text-slate-800">{{ r.name }}</span>
+                                        <span v-if="r.school" class="block text-slate-400">{{ r.sahodaya }} · {{ r.school }}</span>
+                                        <span v-else-if="r.sahodaya" class="block text-slate-400">{{ r.sahodaya }}</span>
+                                    </span>
+                                    <span class="shrink-0 text-right">
+                                        <span class="font-bold text-slate-800">{{ r.points }}</span>
+                                        <span class="block text-[10px] text-slate-400">{{ r.firsts }} × 1st</span>
+                                    </span>
+                                </li>
+                            </ol>
+                            <button type="button" class="mt-2 text-[10px] text-indigo-600 hover:underline" @click="closePopover">Close</button>
+                        </div>
                     </template>
                 </div>
             </div>
@@ -151,6 +181,8 @@ const props = defineProps({
 const editing = ref(false);
 const itemsFor = ref(null);
 const picked = ref([]);
+
+const popover = ref({ categoryId: null, kind: null, rows: [], loading: false });
 
 const form = useForm({
     id: null, code: '', name: '', description: '',
@@ -196,6 +228,24 @@ function saveItems(c) {
         preserveScroll: true,
         onSuccess: () => { itemsFor.value = null; },
     });
+}
+
+const kindLabel = { individual: 'individual', school: 'school', sahodaya: 'sahodaya' };
+
+function openPopover(categoryId, kind) {
+    popover.value = { categoryId, kind, rows: [], loading: true };
+    fetch(`/admin/state/fest/${props.event.id}/prizes/${categoryId}/full-standings`)
+        .then(r => r.json())
+        .then(data => {
+            popover.value = { categoryId, kind, rows: data[kind] || [], loading: false };
+        })
+        .catch(() => {
+            popover.value = { categoryId, kind, rows: [], loading: false };
+        });
+}
+
+function closePopover() {
+    popover.value = { categoryId: null, kind: null, rows: [], loading: false };
 }
 </script>
 

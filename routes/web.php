@@ -282,6 +282,7 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
                 // Prize categories decide what trophies exist, so they sit with the event's other
                 // rules rather than with results.
                 Route::get('/{event}/prizes', [$prizes, 'index'])->name('prizes');
+                Route::get('/{event}/prizes/{category}/full-standings', [$prizes, 'fullStandings'])->name('prizes.full-standings');
                 Route::post('/{event}/prizes', [$prizes, 'save'])->name('prizes.save');
                 Route::post('/{event}/prizes/{category}/items', [$prizes, 'assign'])->name('prizes.assign');
                 Route::delete('/{event}/prizes/{category}', [$prizes, 'destroy'])->name('prizes.destroy');
