@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\WebsiteSite;
-use App\Support\Licensing\FeatureGate;
+use App\Services\Licensing\FeatureGate;
 use App\Support\TenantPublicSite;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Redirect;

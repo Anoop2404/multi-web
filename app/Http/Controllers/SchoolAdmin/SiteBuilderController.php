@@ -4,7 +4,7 @@ namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Models\SiteSection;
 use App\Models\WebsiteSite;
-use App\Support\Licensing\FeatureGate;
+use App\Services\Licensing\FeatureGate;
 use App\Support\NavConfigDefaults;
 use App\Support\SchoolPortalNavLinks;
 use App\Support\SchoolPublicPageContent;
