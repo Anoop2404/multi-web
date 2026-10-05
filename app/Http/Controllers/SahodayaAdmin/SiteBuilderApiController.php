@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Http\Controllers\Admin\BuilderApiController;
+use App\Http\Controllers\Traits\HandlesRepeaterItems;
 use App\Support\CkscSiteTemplate;
 use App\Support\NavConfigDefaults;
 use App\Support\PortalNavLinks;
@@ -25,6 +26,7 @@ use Illuminate\Validation\ValidationException;
  */
 class SiteBuilderApiController extends SahodayaAdminController
 {
+    use HandlesRepeaterItems;
     public function experiences(): JsonResponse
     {
         $premiumAllowed = app(FeatureGate::class)->allows($this->sahodaya, 'module.website_premium');
@@ -182,6 +184,49 @@ class SiteBuilderApiController extends SahodayaAdminController
         }
 
         return app(BuilderApiController::class)->updateSection($request, $this->sahodaya->id, $sectionId);
+    }
+
+    // Phase 7 — delegate to BuilderApiController trait
+    public function listRepeaterItems(Request $request, string $tenantId, int $sectionId, string $itemKey): JsonResponse
+    {
+        $this->assertSuperAdmin();
+        return app(BuilderApiController::class)->listRepeaterItems($request, $this->sahodaya->id, $sectionId, $itemKey);
+    }
+
+    public function createRepeaterItem(Request $request, string $tenantId, int $sectionId, string $itemKey): JsonResponse
+    {
+        $this->assertSuperAdmin();
+        return app(BuilderApiController::class)->createRepeaterItem($request, $this->sahodaya->id, $sectionId, $itemKey);
+    }
+
+    public function updateRepeaterItem(Request $request, string $tenantId, int $sectionId, int $itemId): JsonResponse
+    {
+        $this->assertSuperAdmin();
+        return app(BuilderApiController::class)->updateRepeaterItem($request, $this->sahodaya->id, $sectionId, $itemId);
+    }
+
+    public function deleteRepeaterItem(Request $request, string $tenantId, int $sectionId, int $itemId): JsonResponse
+    {
+        $this->assertSuperAdmin();
+        return app(BuilderApiController::class)->deleteRepeaterItem($request, $this->sahodaya->id, $sectionId, $itemId);
+    }
+
+    public function toggleRepeaterItem(Request $request, string $tenantId, int $sectionId, int $itemId): JsonResponse
+    {
+        $this->assertSuperAdmin();
+        return app(BuilderApiController::class)->toggleRepeaterItem($request, $this->sahodaya->id, $sectionId, $itemId);
+    }
+
+    public function featureRepeaterItem(Request $request, string $tenantId, int $sectionId, int $itemId): JsonResponse
+    {
+        $this->assertSuperAdmin();
+        return app(BuilderApiController::class)->featureRepeaterItem($request, $this->sahodaya->id, $sectionId, $itemId);
+    }
+
+    public function reorderRepeaterItems(Request $request, string $tenantId, int $sectionId, string $itemKey): JsonResponse
+    {
+        $this->assertSuperAdmin();
+        return app(BuilderApiController::class)->reorderRepeaterItems($request, $this->sahodaya->id, $sectionId, $itemKey);
     }
 
     public function deleteSection(string $tenantId, int $sectionId): JsonResponse
@@ -525,5 +570,24 @@ class SiteBuilderApiController extends SahodayaAdminController
             'id', 'name', 'slug', 'is_primary', 'is_active', 'template_key',
             'template_version', 'experience_version', 'homepage_mode', 'homepage_mode_override_until', 'design_json', 'draft_template_json',
         ]);
+    }
+
+    // ── HandlesRepeaterItems trait requirements ───────────────────────────────
+
+    private function resolveSite(Request $request, string $tenantId): WebsiteSite
+    {
+        $siteId = $request->filled('site_id') ? (int) $request->integer('site_id') : null;
+
+        return WebsiteSite::resolveForTenant($tenantId, $siteId);
+    }
+
+    private function sectionForSite(WebsiteSite $site, int $sectionId): \App\Models\SiteSection
+    {
+        return $site->sectionQuery()->findOrFail($sectionId);
+    }
+
+    private function bustCache(string $tenantId): void
+    {
+        // Sahodaya controller already invalidates caches inline; no-op here.
     }
 }

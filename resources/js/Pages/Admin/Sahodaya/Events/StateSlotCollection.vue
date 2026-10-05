@@ -1,5 +1,6 @@
 <template>
-    <AdminLayout :title="`State slot collection — ${program.title}`">
+    <SahodayaEventsLayout :title="`State slot collection — ${program.title}`"
+                          :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl">
         <div class="max-w-6xl space-y-4">
             <div class="card">
                 <div class="flex flex-wrap items-start justify-between gap-3">
@@ -98,15 +99,16 @@
                 </div>
             </section>
         </div>
-    </AdminLayout>
+    </SahodayaEventsLayout>
 </template>
 
 <script setup>
 import { computed } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
+import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 
 const props = defineProps({
+    sahodaya: Object, publicUrl: { type: String, default: '' },
     event: Object, program: Object, summary: Array, actionUrls: Object,
 });
 

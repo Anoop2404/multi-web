@@ -1,5 +1,5 @@
 <template>
-    <AdminLayout title="State slot collection">
+    <SahodayaAdminLayout title="State slot collection" :sahodaya="sahodaya" :publicUrl="publicUrl">
         <div class="max-w-4xl space-y-4">
             <div class="card">
                 <h3 class="font-semibold">State slot collection</h3>
@@ -34,14 +34,18 @@
                 </div>
             </Link>
         </div>
-    </AdminLayout>
+    </SahodayaAdminLayout>
 </template>
 
 <script setup>
 import { Link } from '@inertiajs/vue3';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
+import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 
-defineProps({ events: { type: Array, default: () => [] } });
+defineProps({
+    events: { type: Array, default: () => [] },
+    sahodaya: { type: Object, required: true },
+    publicUrl: { type: String, default: '' },
+});
 
 function statusLabel(e) {
     if (e.collection_approved_at) return 'Approved';

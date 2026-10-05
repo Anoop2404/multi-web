@@ -841,6 +841,15 @@ Route::prefix('school-admin/{tenantId}')
             Route::post('/experience/apply', [SiteBuilderApiController::class, 'applyExperienceDraft'])->name('experience.apply');
             Route::post('/experience/cancel', [SiteBuilderApiController::class, 'cancelExperienceDraft'])->name('experience.cancel');
             Route::post('/public-website', [SiteBuilderApiController::class, 'savePublicWebsite'])->name('public-website.save');
+
+            // Phase 7 — per-item CRUD for repeater items in site_section_items table
+            Route::get('/sections/{sectionId}/items', [SiteBuilderApiController::class, 'listRepeaterItems'])->name('items.index');
+            Route::post('/sections/{sectionId}/items', [SiteBuilderApiController::class, 'createRepeaterItem'])->name('items.store');
+            Route::patch('/sections/{sectionId}/items/{itemId}', [SiteBuilderApiController::class, 'updateRepeaterItem'])->name('items.update');
+            Route::delete('/sections/{sectionId}/items/{itemId}', [SiteBuilderApiController::class, 'deleteRepeaterItem'])->name('items.delete');
+            Route::post('/sections/{sectionId}/items/{itemId}/toggle', [SiteBuilderApiController::class, 'toggleRepeaterItem'])->name('items.toggle');
+            Route::post('/sections/{sectionId}/items/{itemId}/feature', [SiteBuilderApiController::class, 'featureRepeaterItem'])->name('items.feature');
+            Route::post('/sections/{sectionId}/items/reorder', [SiteBuilderApiController::class, 'reorderRepeaterItems'])->name('items.reorder');
         }); // site-builder.api — feature:module.website enforced here
 
     // News
@@ -1079,7 +1088,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::delete('/website/forms/{form}', [\App\Http\Controllers\SahodayaAdmin\SiteFormController::class, 'destroy'])->name('website.forms.destroy');
         Route::get('/website/forms/{form}/submissions', [\App\Http\Controllers\SahodayaAdmin\SiteFormController::class, 'submissions'])->name('website.forms.submissions');
 
-        Route::prefix('site-builder/api')->name('site-builder.api.')->group(function () {
+        Route::prefix('site-builder/api')->middleware('feature:module.website')->name('site-builder.api.')->group(function () {
             Route::get('/sections', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'sections'])->name('sections.index');
             Route::post('/sections', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'storeSection'])->name('sections.store');
             Route::patch('/sections/{sectionId}', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'updateSection'])->name('sections.update');
@@ -1110,6 +1119,15 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/experience-version', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'setExperienceVersion'])->name('experience.version.set');
             Route::post('/theme', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'saveTheme'])->name('theme.save');
             Route::post('/media', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'uploadMedia'])->name('media.upload');
+
+            // Phase 7 — per-item CRUD for repeater fields (delegates to BuilderApiController trait)
+            Route::get('/sections/{sectionId}/items/{itemKey}', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'listRepeaterItems'])->name('items.index');
+            Route::post('/sections/{sectionId}/items/{itemKey}', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'createRepeaterItem'])->name('items.store');
+            Route::patch('/sections/{sectionId}/items/{itemId}', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'updateRepeaterItem'])->name('items.update');
+            Route::delete('/sections/{sectionId}/items/{itemId}', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'deleteRepeaterItem'])->name('items.delete');
+            Route::post('/sections/{sectionId}/items/{itemId}/toggle', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'toggleRepeaterItem'])->name('items.toggle');
+            Route::post('/sections/{sectionId}/items/{itemId}/feature', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'featureRepeaterItem'])->name('items.feature');
+            Route::post('/sections/{sectionId}/items/{itemKey}/reorder', [\App\Http\Controllers\SahodayaAdmin\SiteBuilderApiController::class, 'reorderRepeaterItems'])->name('items.reorder');
         });
 
         Route::get('/office-bearers',              [\App\Http\Controllers\SahodayaAdmin\OfficeBearersController::class, 'index'])->name('office-bearers.index');

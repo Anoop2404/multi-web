@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\HandlesRepeaterItems;
 use App\Models\SiteSection;
+use App\Models\SiteSectionItem;
 use App\Models\SiteSectionVersion;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
@@ -19,6 +21,7 @@ use Illuminate\Http\Request;
 
 class BuilderApiController extends Controller
 {
+    use HandlesRepeaterItems;
     // ── Sections ─────────────────────────────────────────────────────────────
 
     public function sections(Request $request, string $tenantId): JsonResponse
@@ -133,6 +136,12 @@ class BuilderApiController extends Controller
         $data['updated_by'] = auth()->id();
         $section->fill($data);
         $section->save();
+
+        // Sync repeater items to dedicated table when config is updated
+        if (isset($data['config']) && is_array($data['config'])) {
+            $this->syncRepeaterItems($section, $data['config']);
+        }
+
         $section->recordVersion('Updated');
 
         if (($data['status'] ?? null) === SiteSection::STATUS_PUBLISHED) {
@@ -270,6 +279,86 @@ class BuilderApiController extends Controller
             'has_unpublished_changes' => $section->hasUnpublishedChanges(),
             'repeater_stats' => $repeaterStats,
         ]);
+    }
+
+    /** Persist repeater items from config JSON into site_section_items table. */
+    private function syncRepeaterItems(SiteSection $section, array $config): void
+    {
+        $fields = SectionFieldRegistry::fields($section->section_type, $section->variant);
+        $repeaters = array_filter($fields, fn ($f) => ($f['type'] ?? null) === 'repeater');
+
+        $tenantId = $section->tenant_id;
+        $siteId = $section->site_id;
+        $sectionId = $section->id;
+
+        foreach ($repeaters as $repeater) {
+            $key = $repeater['key'];
+            $items = is_array($config[$key] ?? null) ? $config[$key] : [];
+            $seenIds = [];
+
+            foreach ($items as $idx => $item) {
+                if (! is_array($item)) continue;
+
+                $isEnabled = ($item['_enabled'] ?? true) === true || ! array_key_exists('_enabled', $item);
+                $isFeatured = ! empty($item['_featured']);
+
+                // Extract content fields (strip meta keys)
+                $data = array_filter($item, fn ($k) => ! str_starts_with($k, '_'), ARRAY_FILTER_USE_KEY);
+
+                $existing = SiteSectionItem::query()
+                    ->where('site_section_id', $sectionId)
+                    ->where('item_key', $key)
+                    ->where('sort_order', $idx)
+                    ->first();
+
+                if ($existing) {
+                    $existing->update([
+                        'data' => $data,
+                        'meta' => [
+                            '_enabled' => $isEnabled,
+                            '_featured' => $isFeatured,
+                            '_start_date' => $item['_start_date'] ?? null,
+                            '_end_date' => $item['_end_date'] ?? null,
+                        ],
+                        'is_enabled' => $isEnabled,
+                        'is_featured' => $isFeatured,
+                        'sort_order' => $idx,
+                        'visible_from' => $item['_start_date'] ?? null,
+                        'visible_until' => $item['_end_date'] ?? null,
+                    ]);
+                    $seenIds[] = $existing->id;
+                } else {
+                    $seenIds[] = SiteSectionItem::create([
+                        'tenant_id' => $tenantId,
+                        'site_id' => $siteId,
+                        'site_section_id' => $sectionId,
+                        'item_key' => $key,
+                        'sort_order' => $idx,
+                        'display_order' => $idx,
+                        'data' => $data,
+                        'meta' => [
+                            '_enabled' => $isEnabled,
+                            '_featured' => $isFeatured,
+                            '_start_date' => $item['_start_date'] ?? null,
+                            '_end_date' => $item['_end_date'] ?? null,
+                        ],
+                        'is_enabled' => $isEnabled,
+                        'is_featured' => $isFeatured,
+                        'visible_from' => $item['_start_date'] ? \Illuminate\Support\Carbon::parse($item['_start_date'])->startOfDay() : null,
+                        'visible_until' => $item['_end_date'] ? \Illuminate\Support\Carbon::parse($item['_end_date'])->endOfDay() : null,
+                    ])->id;
+                }
+            }
+
+            // Remove items that no longer exist in config
+            if (!empty($seenIds)) {
+                SiteSectionItem::query()
+                    ->where('site_section_id', $sectionId)
+                    ->where('item_key', $key)
+                    ->whereNotIn('id', $seenIds)
+                    ->delete();
+            }
+        }
     }
 
     private function resolveSite(Request $request, string $tenantId): WebsiteSite
