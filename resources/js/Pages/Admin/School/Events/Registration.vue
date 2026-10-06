@@ -1636,10 +1636,16 @@ const GROUP_ALIASES = {
     hs: ['hs', 'category3', 'categoryiii', 'cat3', 'catiii', 'category_3', 'cc3'],
     hss: ['hss', 'category4', 'categoryiv', 'cat4', 'cativ', 'category_4', 'cc4'],
 };
-const OPEN_GROUP_VALS = new Set(['open', 'category5', 'categoryv', 'cat5', 'catv', 'cc5']);
+const OPEN_GROUP_VALS = new Set(['open', 'category5', 'categoryv', 'cat5', 'catv', 'cc5', 'all', 'none', 'general', 'opencategory']);
 
 function normalizedClassGroup(value) {
     return String(value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function isItemOpenClass(item) {
+    if (!item || !item.class_group) return true;
+    const itemGrp = normalizedClassGroup(item.class_group);
+    return !itemGrp || OPEN_GROUP_VALS.has(itemGrp);
 }
 
 function matchesClassGroup(studentGrpRaw, itemGrpRaw) {
@@ -1666,14 +1672,18 @@ function studentMatchesItem(student, event, item, { skipVerification = false } =
         return false;
     }
     if (['kalolsavam', 'kalotsav', 'custom', 'english_fest', 'science_fest'].includes(props.eventType) || String(props.eventType ?? '').includes('kalotsav')) {
-        if (['kalolsavam', 'kalotsav'].includes(props.eventType) && student.eligible_kalolsav === false) return false;
-        if (item.class_group && item.class_group !== 'open') {
-            if (!matchesClassGroup(student.kalolsav_class_group, item.class_group)) return false;
+        if (!isItemOpenClass(item)) {
+            if (['kalolsavam', 'kalotsav'].includes(props.eventType) && student.eligible_kalolsav === false) return false;
+            if (item.class_group && item.class_group !== 'open') {
+                if (!matchesClassGroup(student.kalolsav_class_group, item.class_group)) return false;
+            }
         }
     }
     if (props.eventType === 'kids_fest') {
-        if (!student.eligible_kids_fest) return false;
-        if (item.kids_band && item.kids_band !== 'open' && student.kids_fest_band !== item.kids_band) return false;
+        if (!isItemOpenClass(item)) {
+            if (!student.eligible_kids_fest) return false;
+            if (item.kids_band && item.kids_band !== 'open' && student.kids_fest_band !== item.kids_band) return false;
+        }
     }
     if (props.eventType === 'sports') {
         if (event?.require_event_registration && !eventRegisteredStudentIds(event).has(student.id)) {
@@ -1744,24 +1754,31 @@ function studentIneligibilityReason(student, event, item) {
         }
     }
 
-    if (props.eventType === 'kalolsavam') {
-        if (!student.eligible_kalolsav) return 'Not eligible for Kalotsav (Classes 3–12)';
-        if (item.class_group && item.class_group !== 'open' && !matchesClassGroup(student.kalolsav_class_group, item.class_group)) {
-            return classGroupMismatchReason(student, item, event);
-        }
-    }
-
-    if (['custom', 'english_fest', 'science_fest'].includes(props.eventType)) {
-        if (item.class_group && item.class_group !== 'open') {
-            if (!student.kalolsav_class_group) return 'Class is not assigned to a membership category';
-            if (!matchesClassGroup(student.kalolsav_class_group, item.class_group)) {
+    const isKalolsavEvent = ['kalolsavam', 'kalotsav'].includes(props.eventType) || String(props.eventType ?? '').includes('kalotsav');
+    if (isKalolsavEvent) {
+        if (!isItemOpenClass(item)) {
+            if (!student.eligible_kalolsav) return 'Not eligible for Kalotsav (Classes 3–12)';
+            if (item.class_group && item.class_group !== 'open' && !matchesClassGroup(student.kalolsav_class_group, item.class_group)) {
                 return classGroupMismatchReason(student, item, event);
             }
         }
     }
 
+    if (['custom', 'english_fest', 'science_fest'].includes(props.eventType)) {
+        if (!isItemOpenClass(item)) {
+            if (item.class_group && item.class_group !== 'open') {
+                if (!student.kalolsav_class_group) return 'Class is not assigned to a membership category';
+                if (!matchesClassGroup(student.kalolsav_class_group, item.class_group)) {
+                    return classGroupMismatchReason(student, item, event);
+                }
+            }
+        }
+    }
+
     if (props.eventType === 'kids_fest') {
-        if (!student.eligible_kids_fest) return 'Not eligible for Kids Fest (Pre-KG to Class 2)';
+        if (!isItemOpenClass(item)) {
+            if (!student.eligible_kids_fest) return 'Not eligible for Kids Fest (Pre-KG to Class 2)';
+        }
     }
 
     return 'Not eligible for this item';

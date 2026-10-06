@@ -210,21 +210,34 @@ class FestRegistrationEligibilityService
         return null;
     }
 
+    public function isItemOpenClass(FestEventItem $item): bool
+    {
+        return FestClassGroupScheme::isOpen($item->class_group);
+    }
+
     private function validateCategory(Student $student, FestEvent $event, FestEventItem $item): ?string
     {
-        return match ($event->event_type) {
-            'kalolsavam' => $this->validateKalolsav($student, $item, $event),
+        if ($this->isItemOpenClass($item)) {
+            return null;
+        }
+
+        $eventType = strtolower((string) ($event->event_type ?? ''));
+
+        return match ($eventType) {
+            'kalolsavam', 'kalotsav', 'kalolsav' => $this->validateKalolsav($student, $item, $event),
             'kids_fest' => $this->validateKidsFest($student, $item),
             'sports' => $this->validateSports($student, $event, $item),
-            'custom' => $this->validateCustomClassGroup($student, $item, $event),
-            'english_fest' => $this->validateCustomClassGroup($student, $item, $event),
-            'science_fest' => $this->validateCustomClassGroup($student, $item, $event),
+            'custom', 'english_fest', 'science_fest' => $this->validateCustomClassGroup($student, $item, $event),
             default => null,
         };
     }
 
     private function validateKalolsav(Student $student, FestEventItem $item, FestEvent $event): ?string
     {
+        if ($this->isItemOpenClass($item)) {
+            return null;
+        }
+
         $classNum = FestStudentClassResolver::classNumberFromStudent($student);
 
         if ($classNum !== null && $classNum <= 2) {
@@ -241,8 +254,7 @@ class FestRegistrationEligibilityService
 
     private function validateCustomClassGroup(Student $student, FestEventItem $item, FestEvent $event): ?string
     {
-        $itemGroup = $item->class_group ?? 'open';
-        if ($itemGroup === 'open' || $itemGroup === '') {
+        if ($this->isItemOpenClass($item)) {
             return null;
         }
 

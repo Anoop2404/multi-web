@@ -32,9 +32,23 @@ class FestClassGroupScheme
             'up', 'category2', 'categoryii', 'cat2', 'catii', 'cc2' => 'up',
             'hs', 'category3', 'categoryiii', 'cat3', 'catiii', 'cc3' => 'hs',
             'hss', 'category4', 'categoryiv', 'cat4', 'cativ', 'cc4' => 'hss',
-            'open', 'category5', 'categoryv', 'cat5', 'catv', 'cc5' => 'open',
+            'open', 'category5', 'categoryv', 'cat5', 'catv', 'cc5', 'all', 'none', 'general', 'opencategory' => 'open',
             default => $trimmed,
         };
+    }
+
+    public static function isOpen(?string $key): bool
+    {
+        if ($key === null || trim($key) === '') {
+            return true;
+        }
+
+        $canonical = self::canonicalKey($key);
+
+        return $canonical === 'open'
+            || $canonical === null
+            || $canonical === ''
+            || in_array(strtolower(trim($key)), ['open', 'none', 'all', 'general', 'open_category', 'category_5', 'category5', 'cat5', 'cc5'], true);
     }
 
     /**
