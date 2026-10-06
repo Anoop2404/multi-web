@@ -29,12 +29,37 @@
 @endif
 
 @php
-    $schoolCta = $navConfig['portal_cta'] ?? [];
-    if (($tenant->type ?? null) === 'school' && ($schoolCta['contact_btn'] ?? true)) {
-        $contactUrl = $schoolCta['contact_url'] ?? '/contact';
+    $portalCta = $navConfig['portal_cta'] ?? [];
+    $isSchoolTenant = ($tenant->type ?? null) === 'school';
+    $isSahodayaTenant = ($tenant->type ?? null) === 'sahodaya';
+
+    if ($isSchoolTenant && ($portalCta['contact_btn'] ?? true)) {
+        $contactUrl = $portalCta['contact_url'] ?? '/contact';
         $items = collect($items)->reject(function ($item) use ($contactUrl) {
             $label = strtolower(trim($item['label'] ?? ''));
             return ($item['url'] ?? '') === $contactUrl || in_array($label, ['contact', 'contact us'], true);
+        })->values()->all();
+    }
+
+    $hasPortalCta = ($portalCta['show_in_navbar'] ?? false) || ($isSahodayaTenant && ($portalCta['show_register_btn'] ?? true));
+    if ($hasPortalCta) {
+        $ctaUrls = array_filter([
+            $portalCta['portal_url'] ?? null,
+            $portalCta['login_url'] ?? null,
+            $portalCta['register_url'] ?? null,
+            $portalCta['admin_login_url'] ?? null,
+            '/login',
+            '/portal',
+            '/school-login',
+            '/school-register',
+        ]);
+        $items = collect($items)->reject(function ($item) use ($ctaUrls) {
+            if (!empty($item['children'])) {
+                return false;
+            }
+            $label = strtolower(trim($item['label'] ?? ''));
+            $url = $item['url'] ?? '';
+            return in_array($url, $ctaUrls, true) || in_array($label, ['school registration', 'school login', 'register', 'login'], true);
         })->values()->all();
     }
 @endphp
@@ -60,18 +85,7 @@
         </a>
 
         <div class="site-desktop-navigation hidden xl:flex items-center gap-3 2xl:gap-4 min-w-0 ml-4">
-            {{-- No overflow-x here on purpose: any overflow-x value forces the browser to
-                 also clip overflow-y (a CSS overflow spec quirk), which was silently
-                 hiding every dropdown's flyout panel — hover/click worked, the menu was
-                 rendered, it was just invisible. flex-wrap is the safety net if items
-                 ever don't fit at the narrowest lg width instead.
-
-                 Spacing/text-size bumps below are deferred from xl (1280px, the same
-                 pixel `lg:flex` first has room to breathe) to 2xl (1536px) — bumping
-                 right at 1280 was self-defeating: it widened gaps and text at exactly
-                 the width with the least slack, which is what caused "Contact Us" to
-                 wrap onto its own row on a plain 1280px laptop screen. --}}
-            <div class="flex flex-wrap items-center gap-1 2xl:gap-2.5">
+            <div class="flex items-center gap-1 2xl:gap-2 whitespace-nowrap">
                 @foreach($items as $item)
                     @php
                         $label = $item['label'] ?? '';

@@ -5,15 +5,20 @@
     $url = $cta['portal_url'] ?? $cta['login_url'] ?? '/portal';
     $label = $cta['portal_label'] ?? $cta['login_label'] ?? 'Login';
     $isSchool = isset($tenant) && $tenant->type === 'school';
+    $isSahodaya = isset($tenant) && $tenant->type === 'sahodaya';
     $showCbse = $cta['cbse_btn'] ?? $isSchool;
     $cbseUrl = $cta['cbse_url'] ?? '/disclosure';
     $cbseLabel = $cta['cbse_label'] ?? 'CBSE';
     $showContact = $cta['contact_btn'] ?? $isSchool;
     $contactUrl = $cta['contact_url'] ?? '/contact';
     $contactLabel = $cta['contact_label'] ?? 'Contact Us';
+    $showRegister = $isSahodaya && ($cta['show_register_btn'] ?? true);
+    $registerUrl = $cta['register_url'] ?? '/school-register';
+    $registerLabel = $cta['register_label'] ?? 'School Registration';
 @endphp
-@if($show || $showCbse || $showContact)
+@if($show || $showCbse || $showContact || $showRegister)
 <div class="pt-3 mt-2 border-t border-gray-100 space-y-2 xl:hidden">
+    @if($showCbse || $showContact)
     <div class="grid grid-cols-2 gap-2">
         @if($showCbse)
         <a href="{{ $cbseUrl }}" class="block text-center px-3 py-2.5 rounded-xl text-sm font-bold text-white" style="background-color: var(--color-accent)">{{ $cbseLabel }}</a>
@@ -22,10 +27,17 @@
         <a href="{{ $contactUrl }}" class="block text-center px-3 py-2.5 rounded-xl text-sm font-bold text-white" style="background-color: var(--color-primary)">{{ $contactLabel }}</a>
         @endif
     </div>
+    @endif
+    @if($showRegister)
+    <a href="{{ $registerUrl }}"
+       class="block text-center px-4 py-2.5 rounded-xl text-sm font-bold text-slate-800 bg-slate-100 border border-slate-300">
+        {{ $registerLabel }}
+    </a>
+    @endif
     @if($show)
     <a href="{{ $url }}"
        class="block text-center px-4 py-2.5 rounded-xl text-sm font-bold text-white"
-       style="background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));">
+       style="background: linear-gradient(135deg, var(--color-primary, #4f46e5), var(--color-secondary, #7c3aed));">
         {{ $label }}
     </a>
     @endif

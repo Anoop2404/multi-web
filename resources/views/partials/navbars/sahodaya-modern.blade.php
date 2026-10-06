@@ -1,5 +1,29 @@
 <nav class="sticky top-0 z-50 border-b border-slate-200/70 bg-white/90 backdrop-blur-xl shadow-xs transition-all duration-200"
      x-data="{ open: false, activeSubmenu: null }">
+@php
+    $portalCta = $navConfig['portal_cta'] ?? [];
+    $hasPortalCta = ($portalCta['show_in_navbar'] ?? false) || ($portalCta['show_register_btn'] ?? true);
+    if ($hasPortalCta) {
+        $ctaUrls = array_filter([
+            $portalCta['portal_url'] ?? null,
+            $portalCta['login_url'] ?? null,
+            $portalCta['register_url'] ?? null,
+            $portalCta['admin_login_url'] ?? null,
+            '/login',
+            '/portal',
+            '/school-login',
+            '/school-register',
+        ]);
+        $items = collect($items)->reject(function ($item) use ($ctaUrls) {
+            if (!empty($item['children'])) {
+                return false;
+            }
+            $label = strtolower(trim($item['label'] ?? ''));
+            $url = $item['url'] ?? '';
+            return in_array($url, $ctaUrls, true) || in_array($label, ['school registration', 'school login', 'register', 'login'], true);
+        })->values()->all();
+    }
+@endphp
     <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
         {{-- Top Brand & Contact Row --}}
         <div class="flex items-center justify-between h-16 lg:h-18">

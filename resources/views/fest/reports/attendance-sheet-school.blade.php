@@ -13,7 +13,12 @@
 <tr>
 <td style="text-align: center;">{{ $loop->iteration }}</td>
 <td class="photo">@if(!empty($row['photo_url']))<img src="{{ $row['photo_url'] }}" alt="">@else<span class="initials">{{ strtoupper(substr($row['student']->name ?? '?', 0, 1)) }}</span>@endif</td>
-<td>{{ $row['student']->name }}</td>
+<td>
+    <strong>{{ $row['student']->name }}</strong>
+    @if(!empty($row['roll_no']) && ($row['roll_no'] !== '—'))
+        <div style="font-size: 8px; color: #64748b; font-family: monospace; font-weight: 600;">Roll No: {{ $row['roll_no'] }}</div>
+    @endif
+</td>
 @if($showDob ?? false)
 <td style="text-align: center;">{{ $row['dob'] ?? '—' }}</td>
 @elseif($showClass ?? false)

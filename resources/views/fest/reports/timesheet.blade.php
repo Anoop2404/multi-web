@@ -115,6 +115,14 @@
             border-radius: 3px;
             margin-top: 1px;
         }
+        .roll-no-sub {
+            font-size: 8px;
+            color: #475569;
+            font-family: monospace;
+            font-weight: 600;
+            margin-top: 1px;
+            letter-spacing: 0.2px;
+        }
         {{-- Plain text, no dark box -- a <thead> row (see the usage site's own comment
              for why) only needed at all when this document covers more than one item,
              since a single item is already named once, plainly, in the top header. --}}
@@ -296,6 +304,9 @@
                         <td class="text-center chest-no">{{ $row['fest_id'] ?? '—' }}</td>
                         <td>
                             <strong style="font-size: 9px;">{{ $row['name'] ?? '' }}</strong>
+                            @if(!empty($row['roll_no']) && ($row['roll_no'] !== '—'))
+                                <div class="roll-no-sub">Roll No: {{ $row['roll_no'] }}</div>
+                            @endif
                             @if(!empty($row['team_name']))
                                 <div><span class="team-tag">Team: {{ $row['team_name'] }}</span></div>
                             @endif

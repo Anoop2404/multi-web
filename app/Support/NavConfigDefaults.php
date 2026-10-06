@@ -72,6 +72,36 @@ class NavConfigDefaults
         return $navConfig;
     }
 
+    private const ANCHOR_ALIASES = [
+        'about' => ['about', 'about-sahodaya'],
+        'about-sahodaya' => ['about', 'about-sahodaya'],
+        'programmes' => ['programmes', 'events-programs', 'academic-programmes'],
+        'events' => ['events', 'events-programs'],
+        'events-programs' => ['events', 'programmes', 'events-programs'],
+        'academic' => ['academic', 'academic-programmes', 'events-programs', 'programmes'],
+        'news' => ['news', 'news-circulars', 'circulars'],
+        'circulars' => ['news', 'news-circulars', 'circulars'],
+        'testimonials' => ['testimonials', 'testimonials-sahodaya'],
+        'testimonials-sahodaya' => ['testimonials', 'testimonials-sahodaya'],
+        'office-bearers' => ['office-bearers', 'management', 'staff'],
+        'member-schools' => ['member-schools'],
+        'gallery' => ['gallery', 'video-gallery'],
+        'contact' => ['contact'],
+        'statistics' => ['statistics'],
+    ];
+
+    private const ROUTE_FALLBACKS = [
+        'about' => '/about',
+        'office-bearers' => '/office-bearers',
+        'member-schools' => '/member-schools',
+        'programmes' => '/fest',
+        'events' => '/fest',
+        'gallery' => '/gallery',
+        'circulars' => '/circulars',
+        'downloads' => '/downloads',
+        'contact' => '/contact',
+    ];
+
     /**
      * @param  array<int, array<string, mixed>>  $items
      * @param  Collection<int, string>  $liveAnchors
@@ -80,20 +110,42 @@ class NavConfigDefaults
     private static function filterDeadAnchorItems(array $items, Collection $liveAnchors): array
     {
         return collect($items)
-            ->filter(function (array $item) use ($liveAnchors) {
-                if (! preg_match('/^\/#(.+)$/', $item['url'] ?? '', $matches)) {
-                    return true;
-                }
-
-                return $liveAnchors->contains($matches[1]);
-            })
             ->map(function (array $item) use ($liveAnchors) {
                 if (! empty($item['children'])) {
                     $item['children'] = self::filterDeadAnchorItems($item['children'], $liveAnchors);
                 }
 
-                return $item;
+                if (! preg_match('/^\/#(.+)$/', $item['url'] ?? '', $matches)) {
+                    return $item;
+                }
+
+                $anchor = $matches[1];
+
+                if ($liveAnchors->contains($anchor)) {
+                    return $item;
+                }
+
+                foreach (self::ANCHOR_ALIASES[$anchor] ?? [] as $alias) {
+                    if ($liveAnchors->contains($alias)) {
+                        $item['url'] = '/#'.$alias;
+                        return $item;
+                    }
+                }
+
+                // Keep dropdown parent if it has non-empty children
+                if (! empty($item['children'])) {
+                    return $item;
+                }
+
+                // If anchor is not rendered inline, fall back to dedicated page route if available
+                if (isset(self::ROUTE_FALLBACKS[$anchor])) {
+                    $item['url'] = self::ROUTE_FALLBACKS[$anchor];
+                    return $item;
+                }
+
+                return null;
             })
+            ->filter()
             ->values()
             ->all();
     }
@@ -272,8 +324,10 @@ class NavConfigDefaults
      */
     public static function itemsFromSections(Collection $sections): array
     {
+        $excluded = ['hero', 'membership_cta', 'admission_banner'];
+
         return $sections
-            ->filter(fn ($s) => $s->is_active && $s->show_in_menu)
+            ->filter(fn ($s) => $s->is_active && $s->show_in_menu && ! in_array($s->section_type, $excluded, true))
             ->sortBy('display_order')
             ->values()
             ->map(function ($s) {

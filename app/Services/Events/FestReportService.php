@@ -952,6 +952,24 @@ class FestReportService
                     '_uses_age'   => $ageGroup !== '',
                     '_uses_class' => $ageGroup === '' && $classGroup !== '' && $classGroup !== 'open',
                     'fest_id'     => $p->level_registration_number ?? $p->student?->reg_no,
+                    'roll_no'     => (function () use ($p) {
+                        $s = $p->student;
+                        if (! $s) {
+                            return null;
+                        }
+                        if (! empty($s->roll_number)) {
+                            return $s->roll_number;
+                        }
+                        // Check student admission_number or reg_no (e.g. STU/26/7778, 18/7778, 27/10495)
+                        $candidate = $s->admission_number ?: ($s->reg_no ?: "STU/{$s->id}");
+                        if ($candidate && preg_match('/(?:STU\/)?(?:\d+\/)+(\d+)/i', $candidate, $m)) {
+                            return $m[1];
+                        }
+                        if ($candidate && preg_match('/(\d+)$/', $candidate, $m)) {
+                            return $m[1];
+                        }
+                        return $candidate;
+                    })(),
                     'dob'         => $p->student?->dob?->format('d M Y'),
                     'class'       => $p->student?->schoolClass?->name,
                     // Item's own Category/Type/Gender — read by the attendance sheet's
@@ -1882,6 +1900,19 @@ class FestReportService
         // memory. An edited photo busts its own cache key since updated_at changes.
         foreach ($studentRows as $id => $row) {
             $student = $row['student'];
+
+            if (! empty($student->roll_number)) {
+                $studentRows[$id]['roll_no'] = $student->roll_number;
+            } else {
+                $candidate = $student->admission_number ?: ($student->reg_no ?: "STU/{$student->id}");
+                if ($candidate && preg_match('/(?:STU\/)?(?:\d+\/)+(\d+)/i', $candidate, $m)) {
+                    $studentRows[$id]['roll_no'] = $m[1];
+                } elseif ($candidate && preg_match('/(\d+)$/', $candidate, $m)) {
+                    $studentRows[$id]['roll_no'] = $m[1];
+                } else {
+                    $studentRows[$id]['roll_no'] = $candidate;
+                }
+            }
 
             if (! $student->photo) {
                 $studentRows[$id]['photo_url'] = null;
