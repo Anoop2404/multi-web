@@ -292,7 +292,14 @@ class FestFoodOrderController extends SchoolAdminController
      */
     public function submitPayment(Request $request, string $tenantId, FestEvent $event)
     {
-        $this->assertAccess($event);
+        // Payment submission is allowed even after the ordering cutoff for existing orders
+        // with an outstanding balance, while menu item modifications remain strictly locked.
+        $this->assertAccess($event, false);
+
+        $bill = FestFoodBill::where('event_id', $event->id)->where('school_id', $this->school->id)->first();
+        abort_unless($bill && (float) $bill->amount_total > 0, 422, 'No food order found for this event.');
+        abort_if($bill->status === FestFoodBill::STATUS_CANCELLED, 422, 'Your food bill for this event is cancelled.');
+        abort_if($bill->balanceDue() <= 0, 422, 'This food bill is already fully paid.');
 
         $data = $request->validate([
             'amount' => 'required|numeric|min:0.01|max:9999999.99',
@@ -302,9 +309,6 @@ class FestFoodOrderController extends SchoolAdminController
             'proof' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
             'notes' => 'nullable|string|max:500',
         ]);
-
-        $bill = FestFoodBill::firstOrCreateForSchool($event, $this->school->id);
-        abort_if($bill->status === FestFoodBill::STATUS_CANCELLED, 422, 'Your food bill for this event is cancelled.');
 
         $proofPath = TenantStorage::storeUploadedFile($request->file('proof'), "food-payments/{$this->school->id}");
 

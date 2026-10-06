@@ -30,6 +30,9 @@
             \App\Support\FestTeamSquadRules::isMultiPerson($item->participant_type ?? null) ? 'Group' : 'Individual',
             \App\Support\FestSportsAgeGroup::genderLabel($item->gender ?? null),
         ]);
+        if (!empty($stageName)) {
+            $headingParts[] = 'Stage: '.$stageName;
+        }
         if (!empty($participantCount)) {
             $headingParts[] = $participantCount.' participant'.((int) $participantCount === 1 ? '' : 's');
         }

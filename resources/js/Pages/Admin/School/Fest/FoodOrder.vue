@@ -444,7 +444,7 @@
                     </div>
 
                     <!-- Focused Payment Submission Entry Point -->
-                    <div v-if="bill && Number(bill.balance_due) > 0 && canOrder" class="rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50/80 to-blue-50/40 p-5 shadow-sm space-y-3.5">
+                    <div v-if="canPay" class="rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50/80 to-blue-50/40 p-5 shadow-sm space-y-3.5">
                         <div class="flex items-start justify-between gap-3">
                             <div>
                                 <h4 class="font-extrabold text-base text-slate-900">Ready to record your payment?</h4>
@@ -612,7 +612,7 @@
                     </div>
                 </div>
 
-                <button v-if="bill && Number(bill.balance_due) > 0 && canOrder" type="button"
+                <button v-if="canPay" type="button"
                         class="btn-primary w-full justify-center text-sm py-2.5" @click="openPaymentFromMobileCart">
                     Upload Payment Proof
                 </button>
@@ -827,6 +827,7 @@ const school = computed(() => usePage().props.school);
 const base = computed(() => `/school-admin/${school.value?.id}/fest/${props.event.id}/food-order`);
 
 const canOrder = computed(() => props.orderingOpen && (!props.bill || props.bill.status !== 'cancelled'));
+const canPay = computed(() => Boolean(props.bill) && props.bill.status !== 'cancelled' && Number(props.bill.balance_due) > 0);
 
 function dayWindowFor(date) {
     return props.foodOrderDayWindows?.[date] ?? null;
@@ -939,7 +940,7 @@ const paymentForm = useForm({
 });
 
 function openPaymentModal() {
-    if (!canOrder.value || !props.bill || Number(props.bill.balance_due) <= 0) return;
+    if (!canPay.value) return;
     if (!paymentForm.amount) paymentForm.amount = Number(props.bill.balance_due).toFixed(2);
     showPaymentModal.value = true;
 }

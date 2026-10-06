@@ -30,12 +30,13 @@
             'eventTitle' => $event->title,
             'item' => $item,
             'categoryLabel' => $categoryLabel ?? null,
+            'stageName' => $stageName ?? null,
             'participantCount' => collect($sections)->sum(fn ($s) => count($s['rows'])),
         ])
     </div>
     @endif
 
-    @include('fest.partials.reporting-batches-sections', ['sections' => $sections, 'isGroup' => $isGroup])
+    @include('fest.partials.reporting-batches-sections', ['sections' => $sections, 'isGroup' => $isGroup, 'stageName' => $stageName ?? null])
 
     <div class="footer">{{ $orgName ?? 'Sahodaya' }} &bull; {{ $event->title }} &bull; Generated {{ now()->format('d M Y, h:i A') }}</div>
 </body>

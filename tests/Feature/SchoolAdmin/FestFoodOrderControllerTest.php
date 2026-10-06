@@ -18,7 +18,9 @@ use App\Services\Events\FestSchoolPartitionService;
 use App\Services\Events\FestSchoolPhaseRegionService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -590,5 +592,120 @@ class FestFoodOrderControllerTest extends TestCase
         $this->assertSame(220.0, (float) $bill->amount_total);
         $this->assertSame(100.0, (float) $bill->amount_paid);
         $this->assertSame(120.0, (float) $bill->balanceDue());
+    }
+
+    public function test_school_can_submit_payment_after_ordering_closes_for_existing_order_with_balance(): void
+    {
+        Storage::fake('public');
+        ['sahodaya' => $sahodaya, 'school' => $school, 'schoolAdmin' => $schoolAdmin] = $this->makeSahodayaAndSchool();
+        $event = $this->makeStandaloneEvent($sahodaya, [
+            'food_order_closes_at' => now()->subHour(),
+        ]);
+        $lunch = $this->addMenuItem($sahodaya->id, $event->id, ['name' => 'Meals', 'price' => 50]);
+
+        // Existing order placed prior to cutoff
+        $bill = FestFoodBill::create([
+            'tenant_id' => $sahodaya->id,
+            'event_id' => $event->id,
+            'school_id' => $school->id,
+            'status' => FestFoodBill::STATUS_OPEN,
+            'amount_total' => 100.0,
+            'amount_paid' => 0.0,
+        ]);
+
+        $file = UploadedFile::fake()->image('payment_receipt.jpg');
+
+        $response = $this->actingAs($schoolAdmin)->post(route('school.food-order.payments.store', [
+            'tenantId' => $school->id,
+            'event' => $event->id,
+        ]), [
+            'amount' => 100.0,
+            'payment_mode' => 'upi',
+            'transaction_ref' => 'UPI12345678',
+            'proof' => $file,
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseHas('fest_food_payments', [
+            'bill_id' => $bill->id,
+            'amount' => 100.0,
+            'payment_mode' => 'upi',
+            'transaction_ref' => 'UPI12345678',
+            'status' => 'pending',
+        ]);
+    }
+
+    public function test_school_cannot_add_items_after_ordering_closes(): void
+    {
+        ['sahodaya' => $sahodaya, 'school' => $school, 'schoolAdmin' => $schoolAdmin] = $this->makeSahodayaAndSchool();
+        $event = $this->makeStandaloneEvent($sahodaya, [
+            'food_order_closes_at' => now()->subHour(),
+        ]);
+        $lunch = $this->addMenuItem($sahodaya->id, $event->id, ['name' => 'Meals', 'price' => 50]);
+
+        $response = $this->actingAs($schoolAdmin)->post(route('school.food-order.items.store', [
+            'tenantId' => $school->id,
+            'event' => $event->id,
+        ]), [
+            'menu_item_id' => $lunch->id,
+            'quantity' => 1,
+        ]);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_school_cannot_submit_payment_if_no_order_exists(): void
+    {
+        Storage::fake('public');
+        ['sahodaya' => $sahodaya, 'school' => $school, 'schoolAdmin' => $schoolAdmin] = $this->makeSahodayaAndSchool();
+        $event = $this->makeStandaloneEvent($sahodaya, [
+            'food_order_closes_at' => now()->subHour(),
+        ]);
+
+        $file = UploadedFile::fake()->image('receipt.jpg');
+
+        $response = $this->actingAs($schoolAdmin)->post(route('school.food-order.payments.store', [
+            'tenantId' => $school->id,
+            'event' => $event->id,
+        ]), [
+            'amount' => 50.0,
+            'payment_mode' => 'upi',
+            'proof' => $file,
+        ]);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_school_cannot_submit_payment_if_balance_due_is_zero(): void
+    {
+        Storage::fake('public');
+        ['sahodaya' => $sahodaya, 'school' => $school, 'schoolAdmin' => $schoolAdmin] = $this->makeSahodayaAndSchool();
+        $event = $this->makeStandaloneEvent($sahodaya, [
+            'food_order_closes_at' => now()->subHour(),
+        ]);
+
+        $bill = FestFoodBill::create([
+            'tenant_id' => $sahodaya->id,
+            'event_id' => $event->id,
+            'school_id' => $school->id,
+            'status' => FestFoodBill::STATUS_SETTLED,
+            'amount_total' => 100.0,
+            'amount_paid' => 100.0,
+        ]);
+
+        $file = UploadedFile::fake()->image('receipt.jpg');
+
+        $response = $this->actingAs($schoolAdmin)->post(route('school.food-order.payments.store', [
+            'tenantId' => $school->id,
+            'event' => $event->id,
+        ]), [
+            'amount' => 50.0,
+            'payment_mode' => 'upi',
+            'proof' => $file,
+        ]);
+
+        $response->assertStatus(422);
     }
 }

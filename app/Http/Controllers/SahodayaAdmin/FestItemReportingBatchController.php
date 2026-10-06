@@ -5,7 +5,9 @@ namespace App\Http\Controllers\SahodayaAdmin;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestItemReportingBatch;
+use App\Models\FestItemReportingBatchTime;
 use App\Models\FestRegistration;
+use App\Models\FestSchedule;
 use App\Models\FestSchoolDistance;
 use App\Models\Tenant;
 use App\Services\Audit\PlatformAuditLogger;
@@ -70,10 +72,17 @@ class FestItemReportingBatchController extends SahodayaAdminController
         // drama) instead of the class category admins actually care about here.
         $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
 
+        $schedulesByItem = FestSchedule::where('event_id', $event->id)
+            ->with('festStage')
+            ->get()
+            ->groupBy('item_id');
+
         $items = $event->items()->orderBy('title')->get(['id', 'title', 'item_code', 'category', 'class_group', 'age_group', 'gender', 'stage_type'])
-            ->map(function (FestEventItem $item) use ($regCounts, $assignedCounts, $usedBatchCounts, $classGroupLabels) {
+            ->map(function (FestEventItem $item) use ($regCounts, $assignedCounts, $usedBatchCounts, $classGroupLabels, $schedulesByItem) {
                 $regCount = (int) ($regCounts[$item->id] ?? 0);
                 $assignedCount = (int) ($assignedCounts[$item->id] ?? 0);
+                $sched = $schedulesByItem->get($item->id)?->first();
+                $stageName = $sched?->festStage?->name ?? $sched?->stage;
 
                 return [
                     'id'                 => $item->id,
@@ -82,6 +91,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
                     'category'           => \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels),
                     'gender_label'       => \App\Support\FestSportsAgeGroup::genderLabel($item->gender),
                     'is_group'           => app(FestNumberingService::class)->isGroupItem($item),
+                    'stage_name'         => $stageName,
                     'registration_count' => $regCount,
                     'batch_count'        => (int) ($usedBatchCounts[$item->id] ?? 0),
                     'assigned_count'     => $assignedCount,
@@ -94,9 +104,6 @@ class FestItemReportingBatchController extends SahodayaAdminController
         $itemId = $request->integer('item_id') ?: null;
         $selectedItem = null;
         $registrations = [];
-        // Batches are a common roster for the whole event, so the list (and the Batch Master
-        // modal that manages it) doesn't need an item selected to be useful.
-        $batches = $this->batchesForEvent($event);
 
         if ($itemId) {
             $itemModel = FestEventItem::where('event_id', $event->id)->find($itemId);
@@ -105,6 +112,8 @@ class FestItemReportingBatchController extends SahodayaAdminController
             $selectedItem = $this->itemSummary($itemModel, $items, $regCounts);
             $registrations = $this->registrationRows($event, $itemModel);
         }
+
+        $batches = $this->batchesForEvent($event, $itemId);
 
         return $this->inertia('Sahodaya/Events/ReportingBatches', $this->withEventActivity($event, FestPageActivity::REPORTING_BATCHES, [
             'event'            => $event,
@@ -154,7 +163,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Events/ReportingBatchMaster', [
             'event'         => $event,
             'selectedItem'  => $this->itemSummary($itemModel),
-            'batches'       => $this->batchesForEvent($event),
+            'batches'       => $this->batchesForEvent($event, $itemId),
             'registrations' => $this->registrationRows($event, $itemModel),
             'batchSize'     => $event->reporting_batch_size ?? self::DEFAULT_BATCH_SIZE,
         ]);
@@ -170,7 +179,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
         $itemModel = FestEventItem::where('event_id', $event->id)->find($itemId);
         abort_unless($itemModel, 404);
 
-        $batches = $this->batchesForEvent($event);
+        $batches = $this->batchesForEvent($event, $itemId);
         $orgName = $this->sahodaya->name;
         $logoSrc = \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya);
 
@@ -200,7 +209,6 @@ class FestItemReportingBatchController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $minRegistrations = $event->reporting_batch_min_registrations ?? self::DEFAULT_MIN_REGISTRATIONS_FOR_BATCHING;
-        $batches = $this->batchesForEvent($event);
 
         $regCounts = FestRegistration::where('event_id', $event->id)
             ->whereNotIn('status', ['rejected', 'withdrawn'])
@@ -217,9 +225,34 @@ class FestItemReportingBatchController extends SahodayaAdminController
         $orgName = $this->sahodaya->name;
         $logoSrc = \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya);
 
-        $pdfBytesByItem = $items->mapWithKeys(fn (FestEventItem $item) => [
-            $item->id => $this->renderItemReportingBatchesPdf($event, $item, $batches, $orgName, $logoSrc),
-        ])->all();
+        $itemTimesByItem = FestItemReportingBatchTime::where('event_id', $event->id)
+            ->get()
+            ->groupBy('item_id');
+        $baseBatches = FestItemReportingBatch::where('event_id', $event->id)
+            ->withCount('registrations')
+            ->orderBy('sort_order')
+            ->get();
+
+        $schedulesByItem = FestSchedule::where('event_id', $event->id)
+            ->with('festStage')
+            ->get()
+            ->groupBy('item_id');
+
+        $pdfBytesByItem = $items->mapWithKeys(function (FestEventItem $item) use ($event, $baseBatches, $itemTimesByItem, $schedulesByItem, $orgName, $logoSrc) {
+            $times = $itemTimesByItem->get($item->id)?->pluck('report_at', 'batch_id') ?? collect();
+            $batches = $baseBatches->map(function (FestItemReportingBatch $batch) use ($times) {
+                $b = clone $batch;
+                $b->report_at = $times->get($b->id);
+                return $b;
+            });
+
+            $sched = $schedulesByItem->get($item->id)?->first();
+            $stageName = $sched?->festStage?->name ?? $sched?->stage;
+
+            return [
+                $item->id => $this->renderItemReportingBatchesPdf($event, $item, $batches, $orgName, $logoSrc, $stageName),
+            ];
+        })->all();
 
         [$merged, $included] = $this->mergePdfByteStrings($pdfBytesByItem, "{$orgName} — {$event->title} — Reporting Batches (All Items)");
 
@@ -235,8 +268,16 @@ class FestItemReportingBatchController extends SahodayaAdminController
     }
 
     /** Renders one item's reporting-batches sheet to raw PDF bytes, with its own repeating per-page header. */
-    private function renderItemReportingBatchesPdf(FestEvent $event, FestEventItem $item, \Illuminate\Support\Collection $batches, string $orgName, ?string $logoSrc): string
+    private function renderItemReportingBatchesPdf(FestEvent $event, FestEventItem $item, \Illuminate\Support\Collection $batches, string $orgName, ?string $logoSrc, ?string $stageName = null): string
     {
+        if ($stageName === null) {
+            $schedule = FestSchedule::where('event_id', $event->id)
+                ->where('item_id', $item->id)
+                ->with('festStage')
+                ->first();
+            $stageName = $schedule?->festStage?->name ?? $schedule?->stage;
+        }
+
         $sections = $this->sectionsForItem($event, $item, $batches);
         $categoryLabel = \App\Support\FestItemCategoryLabel::resolve($item, \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent()));
         // Chromium's own header/footer templates render in a reserved margin band, isolated
@@ -253,6 +294,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
             'categoryLabel' => $categoryLabel,
             'isGroup'       => app(FestNumberingService::class)->isGroupItem($item),
             'sections'      => $sections,
+            'stageName'     => $stageName,
             'orgName'       => $orgName,
             'logoSrc'       => $logoSrc,
             'isDomPdf'      => $isDomPdf,
@@ -265,6 +307,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
             'eventTitle'       => $event->title,
             'item'             => $item,
             'categoryLabel'    => $categoryLabel,
+            'stageName'        => $stageName,
             'participantCount' => $participantCount > 0 ? $participantCount : null,
         ]);
 
@@ -347,12 +390,32 @@ class FestItemReportingBatchController extends SahodayaAdminController
             'label'      => 'sometimes|required|string|max:255',
             'report_at'  => 'nullable|date',
             'sort_order' => 'nullable|integer',
+            'item_id'    => ['nullable', 'integer', Rule::exists('fest_event_items', 'id')->where('event_id', $event->id)],
         ]);
 
-        $batch->update($data);
+        if (! empty($data['item_id'])) {
+            FestItemReportingBatchTime::updateOrCreate(
+                [
+                    'item_id'  => $data['item_id'],
+                    'batch_id' => $batch->id,
+                ],
+                [
+                    'event_id'  => $event->id,
+                    'report_at' => $data['report_at'] ?? null,
+                ]
+            );
+
+            $batchUpdates = collect($data)->only(['label', 'sort_order'])->filter(fn ($v) => $v !== null)->all();
+            if (! empty($batchUpdates)) {
+                $batch->update($batchUpdates);
+            }
+        } else {
+            $batch->update(collect($data)->except(['item_id'])->all());
+        }
 
         $audit->festEvent($event, FestPageActivity::REPORTING_BATCHES, 'fest.reporting_batch.updated', "Updated reporting batch {$batch->label}", [
             'batch_id' => $batch->id,
+            'item_id'  => $data['item_id'] ?? null,
         ]);
 
         return back()->with('success', "Batch '{$batch->label}' updated.");
@@ -560,7 +623,11 @@ class FestItemReportingBatchController extends SahodayaAdminController
             ->distinct('reporting_batch_id')
             ->count('reporting_batch_id');
 
-        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $item->event->rootEvent());
+        $sched = FestSchedule::where('event_id', $item->event_id)
+            ->where('item_id', $item->id)
+            ->with('festStage')
+            ->first();
+        $stageName = $sched?->festStage?->name ?? $sched?->stage;
 
         return [
             'id'                 => $item->id,
@@ -569,6 +636,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
             'category'           => \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels),
             'gender_label'       => \App\Support\FestSportsAgeGroup::genderLabel($item->gender),
             'is_group'           => app(FestNumberingService::class)->isGroupItem($item),
+            'stage_name'         => $stageName,
             'registration_count' => $count,
             'batch_count'        => $usedBatchCount,
             'assigned_count'     => $assigned,
@@ -576,11 +644,24 @@ class FestItemReportingBatchController extends SahodayaAdminController
         ];
     }
 
-    private function batchesForEvent(FestEvent $event): \Illuminate\Support\Collection
+    private function batchesForEvent(FestEvent $event, ?int $itemId = null): \Illuminate\Support\Collection
     {
-        return FestItemReportingBatch::where('event_id', $event->id)
+        $batches = FestItemReportingBatch::where('event_id', $event->id)
             ->withCount('registrations')
             ->orderBy('sort_order')
             ->get();
+
+        if ($itemId) {
+            $itemTimes = FestItemReportingBatchTime::where('item_id', $itemId)
+                ->pluck('report_at', 'batch_id');
+
+            return $batches->map(function (FestItemReportingBatch $batch) use ($itemTimes) {
+                $b = clone $batch;
+                $b->report_at = $itemTimes->get($b->id);
+                return $b;
+            });
+        }
+
+        return $batches;
     }
 }

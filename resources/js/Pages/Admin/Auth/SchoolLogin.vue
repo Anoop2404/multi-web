@@ -55,7 +55,7 @@
                                 <p class="login-form-sub">{{ standalone ? loginContent.form_description : 'Use the credentials sent when your school membership was approved.' }}</p>
                             </div>
 
-                            <form @submit.prevent="submit" class="login-form">
+                            <form @submit.prevent="submit" action="/login" method="POST" class="login-form">
                                 <AuthLoginAlerts :session-expired="sessionExpired" :auth-error="authError" />
 
                                 <div>
@@ -63,6 +63,7 @@
                                     <input
                                         id="email"
                                         v-model="form.email"
+                                        name="email"
                                         type="text"
                                         required
                                         autocomplete="username"
@@ -78,6 +79,7 @@
                                     <input
                                         id="password"
                                         v-model="form.password"
+                                        name="password"
                                         type="password"
                                         required
                                         autocomplete="current-password"
@@ -90,7 +92,7 @@
 
                                 <div class="flex items-center justify-between gap-3 text-sm">
                                     <label class="flex items-center gap-2 text-slate-600 cursor-pointer">
-                                        <input v-model="form.remember" type="checkbox" class="rounded border-slate-300">
+                                        <input v-model="form.remember" name="remember" type="checkbox" class="rounded border-slate-300">
                                         Remember me
                                     </label>
                                     <a href="/portal/forgot-password" class="login-inline-link text-xs font-semibold">Forgot password?</a>

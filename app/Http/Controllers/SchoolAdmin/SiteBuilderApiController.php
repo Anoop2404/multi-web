@@ -14,6 +14,7 @@ use App\Support\SchoolPublicPageContent;
 use App\Support\SchoolSiteBuilderCatalog;
 use App\Support\SchoolWebsiteTemplateCatalog;
 use App\Support\TenantPublicSite;
+use App\Support\TenantDomainSync;
 use App\Support\TenantStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -94,6 +95,16 @@ class SiteBuilderApiController extends SchoolAdminController
             'restored' => true,
             'site' => $this->sitePayload($site),
             'sections' => $site->sectionQuery()->orderBy('display_order')->get(),
+        ]);
+    }
+
+    public function getDesign(): JsonResponse
+    {
+        $site = WebsiteSite::ensurePrimary($this->school->id);
+
+        return response()->json([
+            'site' => $this->sitePayload($site),
+            'design' => $site->design_config ?? [],
         ]);
     }
 
@@ -376,6 +387,13 @@ class SiteBuilderApiController extends SchoolAdminController
         return response()->json(['saved' => true, 'footer' => $data]);
     }
 
+    public function getSiteContent(): JsonResponse
+    {
+        return response()->json([
+            'content' => SchoolPublicPageContent::resolve($this->school),
+        ]);
+    }
+
     public function saveSiteContent(Request $request): JsonResponse
     {
         $this->requestSite($request);
@@ -411,7 +429,7 @@ class SiteBuilderApiController extends SchoolAdminController
 
         $navConfig = NavConfigDefaults::resolve($this->school, $this->school->getSetting('nav_config', []));
         $siteContent = SchoolPublicPageContent::resolve($this->school);
-        $publicUrl = TenantPublicSite::url($this->school);
+        $publicUrl = TenantDomainSync::publicUrl($this->school);
 
         $pages = [];
         foreach ($this->pageDefinitions() as $page) {
@@ -581,7 +599,7 @@ class SiteBuilderApiController extends SchoolAdminController
      */
     private function pageDefinitions(): array
     {
-        $baseUrl = TenantPublicSite::url($this->school);
+        $baseUrl = TenantDomainSync::publicUrl($this->school);
         $baseUrl = rtrim($baseUrl ?? '/', '/');
 
         return [

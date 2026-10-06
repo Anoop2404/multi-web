@@ -2,7 +2,7 @@
     <SahodayaEventsLayout :title="`${event.title} — Batch Master`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Batch Master`" eyebrow="Schedule"
-                    :description="`${selectedItem.title} — every registration grouped by reporting batch.`">
+                    :description="`${selectedItem.title}${selectedItem.stage_name ? ' · Stage: ' + selectedItem.stage_name : ''} — every registration grouped by reporting batch.`">
             <template #actions>
                 <Link :href="`${base}/reporting-batches?item_id=${selectedItem.id}`" class="btn-secondary text-sm">&larr; Back to Reporting Batches</Link>
                 <label class="text-xs text-slate-500 flex items-center gap-1">

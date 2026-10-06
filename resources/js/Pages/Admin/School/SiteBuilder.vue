@@ -850,9 +850,9 @@ const isSuperAdmin = computed(() => Boolean(
     || page.props.auth?.user?.is_super_admin
 ));
 
-const canEdit = computed(() => isSuperAdmin.value || props.isStaff || props.staffPermissions.includes('website.edit'));
+const canEdit = computed(() => isSuperAdmin.value || props.isStaff || props.staffPermissions?.includes('website.edit'));
 
-const canPublish = computed(() => isSuperAdmin.value || props.isStaff || props.staffPermissions.includes('website.publish'));
+const canPublish = computed(() => isSuperAdmin.value || props.isStaff || props.staffPermissions?.includes('website.publish'));
 
 const tabs = computed(() => [
     ...(isSuperAdmin.value ? [

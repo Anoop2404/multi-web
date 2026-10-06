@@ -12,6 +12,9 @@
             <div class="batch-title">{{ $section['label'] }}</div>
             <div class="batch-meta">
                 {{ count($section['rows']) }} registration(s)
+                @if(!empty($stageName))
+                    &bull; Stage: {{ $stageName }}
+                @endif
                 @if($section['report_at'])
                     &bull; Reports: {{ \Illuminate\Support\Carbon::parse($section['report_at'])->format('d M Y, h:i A') }}
                 @endif

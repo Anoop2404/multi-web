@@ -58,8 +58,13 @@
             <div v-else class="card space-y-4">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <h4 class="section-title">{{ selectedItem.title }}</h4>
-                        <p class="section-desc">Listed in report order — Batch 1 reports/performs first.</p>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h4 class="section-title !mb-0">{{ selectedItem.title }}</h4>
+                            <span v-if="selectedItem.stage_name" class="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-800">
+                                📍 Stage: {{ selectedItem.stage_name }}
+                            </span>
+                        </div>
+                        <p class="section-desc mt-1">Listed in report order — Batch 1 reports/performs first.</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
                         <Link :href="`${base}/batch-master?item_id=${selectedItem.id}`" class="btn-secondary text-sm" target="_blank">Open full page ↗</Link>
@@ -188,6 +193,7 @@ function itemSubtitle(item) {
         item.category,
         item.gender_label,
         item.is_group ? 'Group' : 'Individual',
+        item.stage_name ? `Stage: ${item.stage_name}` : null,
     ].filter(Boolean);
 
     return parts.join(' · ');

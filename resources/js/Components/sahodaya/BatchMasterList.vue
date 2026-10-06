@@ -202,13 +202,26 @@ function moveRow(row, value) {
 
 function startEditTime(batch) {
     editingTimeFor.value = batch.id;
-    timeForm.report_at = batch.report_at ? batch.report_at.slice(0, 16) : '';
+    if (!batch.report_at) {
+        timeForm.report_at = '';
+        return;
+    }
+    const d = new Date(batch.report_at);
+    if (!Number.isNaN(d.getTime())) {
+        const pad = (n) => String(n).padStart(2, '0');
+        timeForm.report_at = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } else {
+        timeForm.report_at = String(batch.report_at).slice(0, 16).replace(' ', 'T');
+    }
 }
 
 function saveTime(batch) {
     if (!props.batchBaseUrl) return;
 
-    router.put(`${props.batchBaseUrl}/${batch.id}`, { report_at: timeForm.report_at || null }, {
+    router.put(`${props.batchBaseUrl}/${batch.id}`, {
+        report_at: timeForm.report_at || null,
+        item_id: props.selectedItem ? props.selectedItem.id : null,
+    }, {
         preserveScroll: true,
         preserveState: true,
         onSuccess: () => { editingTimeFor.value = null; },

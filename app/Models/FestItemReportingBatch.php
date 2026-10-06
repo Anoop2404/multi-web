@@ -25,4 +25,9 @@ class FestItemReportingBatch extends Model
     {
         return $this->hasMany(FestRegistration::class, 'reporting_batch_id');
     }
+
+    public function itemTimes(): HasMany
+    {
+        return $this->hasMany(FestItemReportingBatchTime::class, 'batch_id');
+    }
 }
