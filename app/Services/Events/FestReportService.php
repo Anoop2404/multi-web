@@ -960,15 +960,24 @@ class FestReportService
                         if (! empty($s->roll_number)) {
                             return $s->roll_number;
                         }
-                        // Check student admission_number or reg_no (e.g. STU/26/7778, 18/7778, 27/10495)
-                        $candidate = $s->admission_number ?: ($s->reg_no ?: "STU/{$s->id}");
-                        if ($candidate && preg_match('/(?:STU\/)?(?:\d+\/)+(\d+)/i', $candidate, $m)) {
+                        // Match ID card roll number: use student's system registration sequence ID (e.g. 16042 from STU/27/16042 or 7778 from 18/7778)
+                        $studentRegNo = $s->reg_no ?: ($s->id ? "STU/{$s->id}" : null);
+                        if ($studentRegNo && preg_match('/(?:STU\/\d{2}\/)?(\d+)$/i', $studentRegNo, $m)) {
                             return $m[1];
                         }
-                        if ($candidate && preg_match('/(\d+)$/', $candidate, $m)) {
+                        if ($studentRegNo && preg_match('/(\d+)$/', $studentRegNo, $m)) {
                             return $m[1];
                         }
-                        return $candidate;
+                        if ($studentRegNo) {
+                            return $studentRegNo;
+                        }
+                        if (! empty($s->admission_number)) {
+                            if (preg_match('/(\d+)$/', $s->admission_number, $m)) {
+                                return $m[1];
+                            }
+                            return $s->admission_number;
+                        }
+                        return null;
                     })(),
                     'dob'         => $p->student?->dob?->format('d M Y'),
                     'class'       => $p->student?->schoolClass?->name,
@@ -1904,13 +1913,21 @@ class FestReportService
             if (! empty($student->roll_number)) {
                 $studentRows[$id]['roll_no'] = $student->roll_number;
             } else {
-                $candidate = $student->admission_number ?: ($student->reg_no ?: "STU/{$student->id}");
-                if ($candidate && preg_match('/(?:STU\/)?(?:\d+\/)+(\d+)/i', $candidate, $m)) {
+                $studentRegNo = $student->reg_no ?: ($student->id ? "STU/{$student->id}" : null);
+                if ($studentRegNo && preg_match('/(?:STU\/\d{2}\/)?(\d+)$/i', $studentRegNo, $m)) {
                     $studentRows[$id]['roll_no'] = $m[1];
-                } elseif ($candidate && preg_match('/(\d+)$/', $candidate, $m)) {
+                } elseif ($studentRegNo && preg_match('/(\d+)$/', $studentRegNo, $m)) {
                     $studentRows[$id]['roll_no'] = $m[1];
+                } elseif ($studentRegNo) {
+                    $studentRows[$id]['roll_no'] = $studentRegNo;
+                } elseif (! empty($student->admission_number)) {
+                    if (preg_match('/(\d+)$/', $student->admission_number, $m)) {
+                        $studentRows[$id]['roll_no'] = $m[1];
+                    } else {
+                        $studentRows[$id]['roll_no'] = $student->admission_number;
+                    }
                 } else {
-                    $studentRows[$id]['roll_no'] = $candidate;
+                    $studentRows[$id]['roll_no'] = null;
                 }
             }
 

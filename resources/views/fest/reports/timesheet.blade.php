@@ -122,6 +122,7 @@
             font-weight: 600;
             margin-top: 1px;
             letter-spacing: 0.2px;
+            white-space: nowrap;
         }
         {{-- Plain text, no dark box -- a <thead> row (see the usage site's own comment
              for why) only needed at all when this document covers more than one item,

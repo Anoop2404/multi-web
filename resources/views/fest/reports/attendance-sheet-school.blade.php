@@ -16,7 +16,7 @@
 <td>
     <strong>{{ $row['student']->name }}</strong>
     @if(!empty($row['roll_no']) && ($row['roll_no'] !== '—'))
-        <div style="font-size: 8px; color: #64748b; font-family: monospace; font-weight: 600;">Roll No: {{ $row['roll_no'] }}</div>
+        <div style="font-size: 8px; color: #64748b; font-family: monospace; font-weight: 600; white-space: nowrap;">Roll No: {{ $row['roll_no'] }}</div>
     @endif
 </td>
 @if($showDob ?? false)

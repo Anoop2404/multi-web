@@ -932,9 +932,11 @@ class FestIdCardService
         $studentRegNo = $p->student?->reg_no ?: ($p->student ? "STU/{$p->student->id}" : null);
         $studentRegNo = $studentRegNo ?? $p->teacher?->reg_no ?? ($festId !== '—' ? $festId : null);
 
-        // Sequence number e.g. 10495 from STU/27/10495
+        // Sequence number e.g. 10495 from STU/27/10495 or 7778 from 18/7778
         $studentSeqId = null;
-        if ($studentRegNo && preg_match('/(?:STU\/\d{2}\/)?(\d+)/i', $studentRegNo, $m)) {
+        if ($studentRegNo && preg_match('/(?:STU\/\d{2}\/)?(\d+)$/i', $studentRegNo, $m)) {
+            $studentSeqId = $m[1];
+        } elseif ($studentRegNo && preg_match('/(\d+)$/', $studentRegNo, $m)) {
             $studentSeqId = $m[1];
         }
         $rollNo = $p->student?->roll_number ?: ($studentSeqId ?: $studentRegNo);

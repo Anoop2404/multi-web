@@ -159,6 +159,7 @@
             font-weight: 600;
             margin-top: 1px;
             letter-spacing: 0.2px;
+            white-space: nowrap;
         }
         .photo-cell {
             width: 40px;
