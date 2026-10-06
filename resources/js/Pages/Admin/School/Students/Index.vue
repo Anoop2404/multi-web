@@ -201,6 +201,9 @@
                                 Pending
                             </span>
                         </div>
+                        <div v-if="student.effective_roll_no || student.roll_number" class="text-[11px] font-mono text-slate-600 font-medium mt-0.5">
+                            Roll No: {{ student.effective_roll_no || student.roll_number }}
+                        </div>
                         <div v-if="student.reg_no" class="text-[11px] font-mono text-gray-500 mt-0.5">
                             ID: {{ student.reg_no }}
                         </div>

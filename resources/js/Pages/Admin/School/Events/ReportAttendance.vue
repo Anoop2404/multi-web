@@ -40,6 +40,7 @@
                             <td class="pl-5">
                                 <ReportStudentCell :name="row.student"
                                                    :reg-no="row.reg_no"
+                                                   :roll-no="row.roll_no"
                                                    :class-label="row.class"
                                                    :photo-url="row.photo_url" />
                             </td>

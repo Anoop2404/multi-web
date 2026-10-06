@@ -110,6 +110,9 @@
                                           class="text-[#0f3d7a] hover:underline">
                                         {{ s.name }}
                                     </Link>
+                                    <div v-if="s.effective_roll_no || s.roll_number" class="text-[11px] font-mono text-slate-500 font-medium">
+                                        Roll No: {{ s.effective_roll_no || s.roll_number }}
+                                    </div>
                                     <div v-if="s.reg_no" class="text-[11px] font-mono text-gray-400 font-normal">
                                         ID: {{ s.reg_no }}
                                     </div>

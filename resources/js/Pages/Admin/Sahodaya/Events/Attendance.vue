@@ -139,6 +139,9 @@
                                         Team · {{ row.member_count }} members
                                     </span>
                                 </div>
+                                <div v-if="row.roll_no" class="text-[10px] font-mono text-slate-500 font-semibold mt-0.5">
+                                    Roll No: {{ row.roll_no }}
+                                </div>
                             </td>
                             <td v-if="usesAgeEligibility" class="p-3.5 text-slate-600 whitespace-nowrap">
                                 {{ formatDate(row.dob) }}
@@ -410,6 +413,20 @@ const displayRows = computed(() => {
             name: p.student?.name ?? p.teacher?.name ?? 'Participant',
             chest_no: p.chest_no,
             fest_id: p.level_registration_number ?? p.student?.reg_no ?? null,
+            roll_no: p.roll_no || p.student?.effective_roll_no || p.student?.roll_number || (function () {
+                const s = p.student;
+                if (!s) return null;
+                const reg = s.reg_no || (s.id ? `STU/${s.id}` : null);
+                if (reg) {
+                    const m = reg.match(/(\d+)$/);
+                    if (m) return m[1];
+                }
+                if (s.admission_number) {
+                    const m = String(s.admission_number).match(/(\d+)$/);
+                    if (m) return m[1];
+                }
+                return null;
+            })(),
             school: p.registration?.school?.name ?? '—',
             item_title: item?.title ?? '—',
             item_category: formatItemCat(item),
@@ -427,6 +444,7 @@ const displayRows = computed(() => {
                 || (rowData.school ?? '').toLowerCase().includes(q)
                 || (String(rowData.chest_no ?? '')).toLowerCase().includes(q)
                 || (String(rowData.fest_id ?? '')).toLowerCase().includes(q)
+                || (String(rowData.roll_no ?? '')).toLowerCase().includes(q)
                 || (rowData.item_title ?? '').toLowerCase().includes(q);
             if (!match) continue;
         }

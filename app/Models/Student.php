@@ -27,6 +27,10 @@ class Student extends Model
         'resubmitted_at' => 'datetime',
     ];
 
+    protected $appends = [
+        'effective_roll_no',
+    ];
+
     protected static function booted(): void
     {
         static::updating(function (self $student) {
@@ -151,5 +155,42 @@ class Student extends Model
         $tenant = $this->relationLoaded('tenant') ? $this->tenant : Tenant::find($this->tenant_id);
 
         return TenantStorage::rememberPhotoDataUri($cacheKey, $tenant, $this->photo);
+    }
+
+    /**
+     * Effective roll number matching ID cards and attendance sheets.
+     * Takes roll_number if explicitly set, otherwise extracts sequence number
+     * from reg_no (e.g. 16042 from STU/27/16042 or 7778 from 18/7778),
+     * falling back to reg_no or admission_number.
+     */
+    public function effectiveRollNo(): ?string
+    {
+        if (! empty($this->roll_number)) {
+            return (string) $this->roll_number;
+        }
+
+        $candidate = $this->reg_no ?: ($this->id ? "STU/{$this->id}" : null);
+        if ($candidate && preg_match('/(?:STU\/\d{2}\/)?(\d+)$/i', $candidate, $m)) {
+            return $m[1];
+        }
+        if ($candidate && preg_match('/(\d+)$/', $candidate, $m)) {
+            return $m[1];
+        }
+        if ($candidate) {
+            return $candidate;
+        }
+        if (! empty($this->admission_number)) {
+            if (preg_match('/(\d+)$/', $this->admission_number, $m)) {
+                return $m[1];
+            }
+            return (string) $this->admission_number;
+        }
+
+        return null;
+    }
+
+    public function getEffectiveRollNoAttribute(): ?string
+    {
+        return $this->effectiveRollNo();
     }
 }

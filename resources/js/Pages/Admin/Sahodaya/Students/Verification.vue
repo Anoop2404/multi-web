@@ -177,7 +177,7 @@
                                 <p class="font-semibold text-gray-900">{{ row.name }}</p>
                                 <p v-if="row.reg_no" class="text-xs font-mono text-slate-500 mt-0.5">{{ row.reg_no }}</p>
                                 <p v-if="row.admission_number" class="text-xs text-slate-500 mt-0.5">Adm. {{ row.admission_number }}</p>
-                                <p v-if="row.roll_number" class="text-xs text-slate-500">Roll {{ row.roll_number }}</p>
+                                <p v-if="row.roll_no || row.roll_number" class="text-xs text-slate-500">Roll {{ row.roll_no || row.roll_number }}</p>
                                 <p v-if="row.rejection_reason" class="text-xs text-red-600 mt-0.5">Rejected: {{ row.rejection_reason }}</p>
                             </td>
                             <td class="py-3 text-sm">

@@ -10,7 +10,8 @@
         </div>
         <div class="min-w-0">
             <p class="font-medium text-slate-900 truncate">{{ name || '—' }}</p>
-            <p v-if="regNo || classLabel" class="text-xs text-slate-500 truncate">
+            <p v-if="rollNo || regNo || classLabel" class="text-xs text-slate-500 truncate">
+                <span v-if="rollNo" class="font-mono font-medium text-slate-700">Roll: {{ rollNo }} · </span>
                 <span v-if="regNo">{{ regNo }}</span>
                 <span v-if="regNo && classLabel"> · </span>
                 <span v-if="classLabel">{{ classLabel }}</span>
@@ -25,6 +26,7 @@ import { computed } from 'vue';
 const props = defineProps({
     name: { type: String, default: '' },
     regNo: { type: String, default: '' },
+    rollNo: { type: [String, Number], default: '' },
     classLabel: { type: String, default: '' },
     photoUrl: { type: String, default: null },
 });

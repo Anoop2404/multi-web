@@ -112,6 +112,7 @@ class StudentVerificationController extends SahodayaAdminController
                     $q->where(fn ($inner) => $inner
                         ->whereRaw('LOWER(name) LIKE ?', [$term])
                         ->orWhereRaw('LOWER(reg_no) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(roll_number) LIKE ?', [$term])
                         ->orWhereRaw('LOWER(admission_number) LIKE ?', [$term]));
                 })
                 ->orderBy('name')
@@ -315,6 +316,7 @@ class StudentVerificationController extends SahodayaAdminController
             'reg_no'            => $student->reg_no,
             'admission_number'  => $student->admission_number,
             'roll_number'       => $student->roll_number,
+            'roll_no'           => $student->effectiveRollNo(),
             'gender'            => $student->gender,
             'dob'               => $student->dob?->format('Y-m-d'),
             'dob_display'       => $student->dob?->format('j M Y'),

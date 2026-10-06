@@ -196,7 +196,8 @@
                         <td class="p-3 text-xs space-y-1">
                                     <div v-for="p in reg.participants" :key="p.id" class="flex flex-wrap items-center gap-1.5">
                                         <span class="font-medium text-slate-800">{{ p.student?.name ?? p.teacher?.name ?? '—' }}</span>
-                                        <span v-if="p.student?.reg_no" class="text-gray-400">· {{ p.student.reg_no }}</span>
+                                        <span v-if="p.roll_no || p.student?.effective_roll_no || p.student?.roll_number" class="text-slate-500 font-mono text-[11px] font-medium">· Roll: {{ p.roll_no || p.student?.effective_roll_no || p.student?.roll_number }}</span>
+                                        <span v-if="p.student?.reg_no" class="text-gray-400">({{ p.student.reg_no }})</span>
                                         <span class="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider"
                                               :class="p.participant_role === 'standby' ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-indigo-50 text-indigo-800 border border-indigo-200'">
                                             {{ p.participant_role || 'performer' }}

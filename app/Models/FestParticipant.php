@@ -21,6 +21,10 @@ class FestParticipant extends Model
         'chest_revealed_at' => 'datetime',
     ];
 
+    protected $appends = [
+        'roll_no',
+    ];
+
     public function registration(): BelongsTo
     {
         return $this->belongsTo(FestRegistration::class, 'registration_id');
@@ -51,5 +55,10 @@ class FestParticipant extends Model
         return Attribute::make(
             get: fn (?int $value) => $value ?? app(FestNumberingService::class)->effectiveChestNumber($this),
         );
+    }
+
+    public function getRollNoAttribute(): ?string
+    {
+        return $this->student?->effectiveRollNo();
     }
 }

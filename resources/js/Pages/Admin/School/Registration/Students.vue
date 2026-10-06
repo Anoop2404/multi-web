@@ -46,7 +46,12 @@
                     </thead>
                     <tbody>
                         <tr v-for="s in students.data" :key="s.id" class="border-t">
-                            <td class="p-3 font-medium">{{ s.name }}</td>
+                            <td class="p-3 font-medium">
+                                {{ s.name }}
+                                <div v-if="s.effective_roll_no || s.roll_number" class="text-[11px] font-mono text-slate-500 font-normal">
+                                    Roll No: {{ s.effective_roll_no || s.roll_number }}
+                                </div>
+                            </td>
                             <td class="p-3 font-mono text-xs text-slate-500">{{ s.reg_no || '—' }}</td>
                             <td class="p-3 text-xs text-slate-500">{{ s.school_class?.class_category?.label || '—' }}</td>
                             <td class="p-3">{{ s.school_class?.name || '—' }}</td>
