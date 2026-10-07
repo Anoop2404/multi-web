@@ -7,6 +7,7 @@ use App\Http\Controllers\SahodayaAdmin\Concerns\BuildsItemHeadReportContext;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestParticipant;
+use App\Models\FestSchoolChestRange;
 use App\Models\Tenant;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\FestChestNumberService;
@@ -64,6 +65,16 @@ class FestChestNumberController extends SahodayaAdminController
 
         $childEvents = $this->scopedChildEventOptions($event);
 
+        $schools = Tenant::where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->where('membership_status', 'approved')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $schoolChestRanges = FestSchoolChestRange::where('event_id', $event->id)
+            ->get(['school_id', 'chest_no_start', 'chest_no_end'])
+            ->keyBy('school_id');
+
         return $this->inertia('Sahodaya/Events/ChestNumbers', $this->withEventActivity($event, FestPageActivity::CHEST_NUMBERS, array_merge($nav, [
             'event'          => $event->only('id', 'title', 'status', 'event_type', 'chest_reveal_mode', 'results_published'),
             'selectedHeadId' => $selectedHeadId,
@@ -74,6 +85,8 @@ class FestChestNumberController extends SahodayaAdminController
             'includePending' => $includePending,
             'view'           => $request->query('view') === 'green-room' ? 'green-room' : null,
             'childEvents'    => $childEvents,
+            'schools'        => $schools,
+            'schoolChestRanges' => $schoolChestRanges,
             'itemHasMarksOrAttendance'  => $itemHasMarksOrAttendance,
             'eventHasMarksOrAttendance' => $eventHasMarksOrAttendance,
         ])));

@@ -1734,6 +1734,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::put('/{event}/registration-settings', [FestEventSettingsController::class, 'updateRegistrationSettings'])->name('registration-settings.update');
             Route::put('/{event}/numbering-settings', [FestEventSettingsController::class, 'updateNumberingSettings'])->name('numbering-settings.update');
             Route::put('/{event}/item-numbering', [FestEventSettingsController::class, 'updateItemNumbering'])->name('item-numbering.update');
+            Route::put('/{event}/school-chest-ranges', [FestEventSettingsController::class, 'updateSchoolChestRanges'])->name('school-chest-ranges.update');
             Route::patch('/{event}/items/{item}/windows', [FestEventSettingsController::class, 'updateItemWindows'])->name('items.windows.update');
             Route::patch('/{event}/items/windows/bulk', [FestEventSettingsController::class, 'bulkUpdateItemWindows'])->name('items.windows.bulk-update');
             Route::post('/{event}/items/{item}/publish-results', [FestEventSettingsController::class, 'publishItemResults'])->name('items.publish-results');

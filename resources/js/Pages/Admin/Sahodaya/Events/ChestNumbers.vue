@@ -84,6 +84,9 @@
                             <button type="button" class="btn-secondary text-sm" @click="openBulkNumberingModal">
                                 🔢 Set common starting no (all items)
                             </button>
+                            <button v-if="event.event_type === 'sports'" type="button" class="btn-secondary text-sm font-semibold !text-indigo-700 !bg-indigo-50 border-indigo-200 hover:!bg-indigo-100" @click="openSchoolRangesModal">
+                                🏫 Set starting no per school
+                            </button>
                             <a :href="`${printUrl}${printUrl.includes('?') ? '&' : '?'}inline=1`" target="_blank" class="btn-secondary text-sm">Preview list</a>
                             <a :href="`${printUrl}${printUrl.includes('?') ? '&' : '?'}download=1`" target="_blank" class="btn-secondary text-sm">Download list (PDF)</a>
                             <a :href="csvUrl" class="btn-secondary text-sm">CSV</a>
@@ -315,6 +318,65 @@
             </template>
         </Modal>
 
+        <!-- Per-School Chest Number Starting Ranges Modal -->
+        <Modal :show="showSchoolRangesModal" title="Set Starting Chest Number Per School"
+               subtitle="When assigning chest numbers, students from each school get continuous numbers starting from their school's allocated start number." size="lg"
+               @close="showSchoolRangesModal = false">
+            <div class="space-y-4">
+                <div class="flex flex-wrap items-center gap-2 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                    <span class="font-semibold text-slate-700">Auto-fill sequence:</span>
+                    <span>Start at</span>
+                    <input v-model.number="quickDistributeStart" type="number" min="1" class="field text-xs w-20 !py-1" placeholder="100">
+                    <span>Block size</span>
+                    <input v-model.number="quickDistributeBlock" type="number" min="1" class="field text-xs w-20 !py-1" placeholder="50">
+                    <button type="button" class="btn-secondary text-xs !py-1 !px-2.5 ml-auto" @click="applyQuickDistribute">
+                        Auto-fill Blocks
+                    </button>
+                    <button type="button" class="btn-secondary text-xs !py-1 !px-2.5 text-rose-600 hover:text-rose-700" @click="clearSchoolRanges">
+                        Clear All
+                    </button>
+                </div>
+
+                <div v-if="!schoolRangeRows.length" class="text-center py-6 text-xs text-slate-400">
+                    No approved schools found for this Sahodaya.
+                </div>
+
+                <div v-else class="max-h-80 overflow-y-auto border border-slate-200 rounded-lg">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-slate-50 text-slate-500 border-b uppercase tracking-wider text-[10px] font-bold sticky top-0 bg-white z-10">
+                            <tr>
+                                <th class="p-2.5">School</th>
+                                <th class="p-2.5 w-32">Chest Start #</th>
+                                <th class="p-2.5 w-32">Chest End # (opt)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr v-for="(row, idx) in schoolRangeRows" :key="row.school_id" class="hover:bg-slate-50">
+                                <td class="p-2.5 font-medium text-slate-800">{{ row.school_name }}</td>
+                                <td class="p-2.5">
+                                    <input v-model.number="schoolRangeRows[idx].chest_no_start" type="number" min="1" class="field text-xs w-full !py-1" placeholder="e.g. 101">
+                                </td>
+                                <td class="p-2.5">
+                                    <input v-model.number="schoolRangeRows[idx].chest_no_end" type="number" min="1" class="field text-xs w-full !py-1" placeholder="e.g. 150">
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-xs text-slate-400">
+                    Leave empty for any school that should use the default continuous pool.
+                </p>
+            </div>
+            <template #footer>
+                <div class="flex justify-end gap-2">
+                    <button type="button" class="btn-secondary text-sm" @click="showSchoolRangesModal = false" :disabled="isSavingSchoolRanges">Cancel</button>
+                    <button type="button" class="btn-primary text-sm" @click="saveSchoolRanges" :disabled="isSavingSchoolRanges">
+                        {{ isSavingSchoolRanges ? 'Saving…' : 'Save School Ranges' }}
+                    </button>
+                </div>
+            </template>
+        </Modal>
+
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />
     </SahodayaEventsLayout>
 </template>
@@ -346,6 +408,8 @@ const props = defineProps({
     view: String,
     activityLogs: { type: Array, default: () => [] },
     childEvents: { type: Array, default: () => [] },
+    schools: { type: Array, default: () => [] },
+    schoolChestRanges: { type: Object, default: () => ({}) },
     itemHasMarksOrAttendance: { type: Boolean, default: false },
     eventHasMarksOrAttendance: { type: Boolean, default: false },
 });
@@ -750,5 +814,61 @@ function togglePending(e) {
     const params = { item_id: props.selectedItemId, include_pending: e.target.checked ? 1 : undefined };
     if (props.selectedHeadId != null) params.head_id = props.selectedHeadId;
     router.get(base.value, params, { preserveState: true, preserveScroll: true });
+}
+
+// Per-School Chest Number Starting Ranges Modal
+const showSchoolRangesModal = ref(false);
+const isSavingSchoolRanges = ref(false);
+const schoolRangeRows = ref([]);
+const quickDistributeStart = ref(100);
+const quickDistributeBlock = ref(50);
+
+function openSchoolRangesModal() {
+    schoolRangeRows.value = (props.schools ?? []).map((s) => {
+        const existing = props.schoolChestRanges?.[s.id] ?? {};
+        return {
+            school_id: s.id,
+            school_name: s.name,
+            chest_no_start: existing.chest_no_start ?? '',
+            chest_no_end: existing.chest_no_end ?? '',
+        };
+    });
+    showSchoolRangesModal.value = true;
+}
+
+function applyQuickDistribute() {
+    let current = Number(quickDistributeStart.value) || 100;
+    const block = Number(quickDistributeBlock.value) || 50;
+    for (const row of schoolRangeRows.value) {
+        row.chest_no_start = current;
+        row.chest_no_end = current + block - 1;
+        current += block;
+    }
+}
+
+function clearSchoolRanges() {
+    for (const row of schoolRangeRows.value) {
+        row.chest_no_start = '';
+        row.chest_no_end = '';
+    }
+}
+
+function saveSchoolRanges() {
+    isSavingSchoolRanges.value = true;
+    router.put(
+        `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/school-chest-ranges`,
+        { schools: schoolRangeRows.value },
+        {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                showSchoolRangesModal.value = false;
+                isSavingSchoolRanges.value = false;
+            },
+            onFinish: () => {
+                isSavingSchoolRanges.value = false;
+            },
+        }
+    );
 }
 </script>

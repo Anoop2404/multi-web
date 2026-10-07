@@ -13,6 +13,7 @@ use App\Models\FestStage;
 use App\Models\FestVenue;
 use App\Models\FestVolunteer;
 use App\Models\FestSchoolVerification;
+use App\Models\FestSchoolChestRange;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
 use App\Support\Fest\FestEventSettingsPayload;
@@ -96,6 +97,9 @@ class FestEventSettingsController extends SahodayaAdminController
             ],
             'feeSchedule'  => $schedule,
             'numberingSettings' => app(\App\Services\Events\FestNumberingService::class)->settings($event),
+            'schoolChestRanges' => FestSchoolChestRange::where('event_id', $event->id)
+                ->get(['school_id', 'chest_no_start', 'chest_no_end'])
+                ->keyBy('school_id'),
             'feeModels'    => config('fest_fees.fee_models'),
             'feePresets'   => config('fest_fees.presets'),
             'classGroupScheme' => $classGroupScheme,
@@ -1873,6 +1877,48 @@ class FestEventSettingsController extends SahodayaAdminController
         );
 
         return back()->with('success', 'Per-item numbering saved.');
+    }
+
+    public function updateSchoolChestRanges(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($event->event_type !== 'sports', 404, 'Per-school chest number ranges are only supported for sports events.');
+
+        $data = $request->validate([
+            'schools' => 'required|array',
+            'schools.*.school_id' => 'required|string',
+            'schools.*.chest_no_start' => 'nullable|integer|min:1',
+            'schools.*.chest_no_end' => 'nullable|integer|min:1',
+        ]);
+
+        $count = 0;
+        foreach ($data['schools'] as $row) {
+            $schoolId = (string) $row['school_id'];
+            $start = !empty($row['chest_no_start']) ? (int) $row['chest_no_start'] : null;
+            $end = !empty($row['chest_no_end']) ? (int) $row['chest_no_end'] : null;
+
+            if ($start !== null) {
+                FestSchoolChestRange::updateOrCreate(
+                    ['event_id' => $event->id, 'school_id' => $schoolId],
+                    ['chest_no_start' => $start, 'chest_no_end' => $end]
+                );
+                $count++;
+            } else {
+                FestSchoolChestRange::where('event_id', $event->id)
+                    ->where('school_id', $schoolId)
+                    ->delete();
+            }
+        }
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            FestPageActivity::settingsTab('numbering'),
+            'fest.settings.school_chest_ranges_updated',
+            'Per-school starting chest numbers updated',
+            ['configured_count' => $count],
+        );
+
+        return back()->with('success', 'Per-school chest number ranges saved.');
     }
 
     public function updateItemWindows(Request $request, string $tenantId, FestEvent $event, FestEventItem $item)

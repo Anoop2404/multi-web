@@ -8,8 +8,10 @@ use App\Models\FestGroup;
 use App\Models\FestLevelRegistration;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
+use App\Models\FestSchoolChestRange;
 use App\Support\FestTeamSquadRules;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class FestNumberingService
 {
@@ -77,16 +79,26 @@ class FestNumberingService
         return (int) $item->id;
     }
 
-    public function nextChestNumber(FestEvent $event, FestEventItem $item): int
+    /**
+     * Pick the next free chest number for a participant.
+     *
+     * When $schoolId is given the service first looks for a per-school range
+     * configured in fest_school_chest_ranges and restricts the search to
+     * [chest_no_start, chest_no_end] for that school. If the school's block
+     * is fully exhausted (or no range is configured) it falls back to the
+     * event-wide pool starting from the item/event default start.
+     *
+     * @param  string|null  $schoolId  The school whose range should be preferred.
+     */
+    public function nextChestNumber(FestEvent $event, FestEventItem $item, ?string $schoolId = null): int
     {
-        return DB::transaction(function () use ($event, $item) {
+        return DB::transaction(function () use ($event, $item, $schoolId) {
             FestEvent::where('id', $event->id)->lockForUpdate()->first();
 
-            $settings = $this->settings($event);
-            $start = (int) ($item->chest_no_start ?? $settings['chest_no_start'] ?? 100);
+            $settings  = $this->settings($event);
             $headScope = $this->chestHeadScope($event, $item);
-            $eventIds = $event->reportableEventIds();
-            $itemIds = $event->reportableItemIds([$item->id]);
+            $eventIds  = $event->reportableEventIds();
+            $itemIds   = $event->reportableItemIds([$item->id]);
 
             // Every item sharing a head shares one identity space (a student keeps the same
             // chest number across sibling items — see resolveChestAssignment()), so a new
@@ -114,6 +126,41 @@ class FestNumberingService
                 ->map(fn ($n) => (int) $n)
                 ->flip();
 
+            // --- Per-school chest range (Sports events only) ---
+            // If the school has a configured range, try to find a free slot within it first.
+            if ($event->event_type === 'sports' && $schoolId) {
+                $range = FestSchoolChestRange::where('event_id', $event->id)
+                    ->where('school_id', $schoolId)
+                    ->first();
+
+                if ($range) {
+                    $candidate = $range->chest_no_start;
+                    $ceiling   = $range->chest_no_end; // null means open-ended
+
+                    while ($used->has($candidate)) {
+                        $candidate++;
+                        // If we have a hard ceiling and we've exceeded it, fall through to
+                        // the event-wide pool below and warn the admin.
+                        if ($ceiling !== null && $candidate > $ceiling) {
+                            Log::warning('FestNumberingService: school chest range exhausted', [
+                                'event_id'       => $event->id,
+                                'school_id'      => $schoolId,
+                                'chest_no_start' => $range->chest_no_start,
+                                'chest_no_end'   => $range->chest_no_end,
+                            ]);
+                            $candidate = null;
+                            break;
+                        }
+                    }
+
+                    if ($candidate !== null) {
+                        return $candidate;
+                    }
+                }
+            }
+
+            // --- Event-wide fallback (or no school range configured) ---
+            $start     = (int) ($item->chest_no_start ?? $settings['chest_no_start'] ?? 100);
             $candidate = $start;
             while ($used->has($candidate)) {
                 $candidate++;
@@ -133,13 +180,14 @@ class FestNumberingService
      * Resolve/assign the shared chest number for a team/group registration.
      * Returns the newly-assigned number, or null if the group already had one.
      */
-    public function resolveGroupChestNumber(FestEvent $event, FestEventItem $item, FestGroup $group): ?int
+    public function resolveGroupChestNumber(FestEvent $event, FestEventItem $item, FestGroup $group, ?string $schoolId = null): ?int
     {
         if ($group->chest_no !== null) {
             return null;
         }
 
-        $chest = $this->nextChestNumber($event, $item);
+        $schoolId = $schoolId ?? $group->registration?->school_id;
+        $chest = $this->nextChestNumber($event, $item, $schoolId);
         $group->update(['event_id' => $event->id, 'chest_no' => $chest]);
 
         return $chest;
@@ -216,21 +264,22 @@ class FestNumberingService
      * Resolve chest for assignment. Same student/teacher keeps one chest per item head (sports)
      * or per event (other fest types).
      *
+     * @param  string|null  $schoolId  When provided, the per-school chest range is preferred.
      * @return array{chest: int, persist: bool, chest_head_id: int}
      */
-    public function resolveChestAssignment(FestEvent $event, FestEventItem $item, FestParticipant $participant): array
+    public function resolveChestAssignment(FestEvent $event, FestEventItem $item, FestParticipant $participant, ?string $schoolId = null): array
     {
         $headScope = $this->chestHeadScope($event, $item);
-        $existing = $this->existingChestNumber($event, $item, $participant);
+        $existing  = $this->existingChestNumber($event, $item, $participant);
 
         if ($existing !== null) {
             return ['chest' => $existing, 'persist' => false, 'chest_head_id' => $headScope];
         }
 
         return [
-            'chest'          => $this->nextChestNumber($event, $item),
-            'persist'        => true,
-            'chest_head_id'  => $headScope,
+            'chest'         => $this->nextChestNumber($event, $item, $schoolId),
+            'persist'       => true,
+            'chest_head_id' => $headScope,
         ];
     }
 
@@ -275,12 +324,13 @@ class FestNumberingService
         $participant->loadMissing('registration.event', 'registration.item', 'student', 'group');
         $registration = $participant->registration;
         $event = $registration?->event;
-        $item = $registration?->item;
+        $item  = $registration?->item;
 
         if (! $event || ! $item) {
             return;
         }
 
+        $schoolId  = $registration->school_id ?? null;
         $headScope = $this->chestHeadScope($event, $item);
         $updates = [
             'event_id'      => $event->id,
@@ -304,12 +354,12 @@ class FestNumberingService
         if ($this->isGroupItem($item) && $participant->group_id && $participant->group) {
             // Team/group items: the number lives on the squad (FestGroup),
             // never on the individual participant row.
-            $this->resolveGroupChestNumber($event, $item, $participant->group);
+            $this->resolveGroupChestNumber($event, $item, $participant->group, $schoolId);
         } elseif (! $this->persistedChestNumber($participant) && $this->shouldAutoAssignChestOnCreate($event, $item)) {
-            ['chest' => $chest, 'persist' => $persist, 'chest_head_id' => $chestHeadId] = $this->resolveChestAssignment($event, $item, $participant);
+            ['chest' => $chest, 'persist' => $persist, 'chest_head_id' => $chestHeadId] = $this->resolveChestAssignment($event, $item, $participant, $schoolId);
             if ($persist) {
-                $updates['chest_no'] = $chest;
-                $updates['chest_head_id'] = $chestHeadId;
+                $updates['chest_no']       = $chest;
+                $updates['chest_head_id']  = $chestHeadId;
             }
         }
 
@@ -372,9 +422,10 @@ class FestNumberingService
                     return;
                 }
 
-                $item = $p->registration->item;
+                $item      = $p->registration->item;
+                $schoolId  = $p->registration->school_id ?? null;
                 $headScope = $this->chestHeadScope($event, $item);
-                $existing = $this->existingChestNumber($event, $item, $p);
+                $existing  = $this->existingChestNumber($event, $item, $p);
 
                 if ($existing !== null) {
                     $p->update([
@@ -390,7 +441,8 @@ class FestNumberingService
                 ['chest' => $chest, 'persist' => $persist, 'chest_head_id' => $chestHeadId] = $this->resolveChestAssignment(
                     $event,
                     $item,
-                    $p
+                    $p,
+                    $schoolId,
                 );
 
                 if (! $persist) {

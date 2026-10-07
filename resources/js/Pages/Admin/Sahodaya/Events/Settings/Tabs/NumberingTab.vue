@@ -120,7 +120,73 @@
             </div>
         </form>
 
-        <!-- Section 3: Open Chest Numbers Link Card -->
+        <!-- Section 3: Per-School Chest Number Starting Ranges (Sports Only) -->
+        <form v-if="event.event_type === 'sports'" @submit.prevent="saveSchoolChestRanges" class="card !p-5 space-y-4 border border-slate-200">
+            <div class="border-b border-slate-100 pb-3 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h3 class="section-title !mb-0 flex items-center gap-2 text-base">
+                        <span>🏫</span> Per-School Starting Chest Numbers
+                    </h3>
+                    <p class="section-desc mt-0.5">
+                        Assign fixed chest number starting ranges per school (e.g., School A starting at 101, School B at 201). When chest numbers are generated, each student from that school receives continuous numbers within their school's allocated block.
+                    </p>
+                </div>
+            </div>
+
+            <div v-if="!schoolChestRangesForm.schools.length" class="rounded-xl border border-dashed border-slate-200 p-8 text-center text-slate-400 text-xs">
+                No approved schools found for this Sahodaya.
+            </div>
+
+            <div v-else class="space-y-3">
+                <div class="flex flex-wrap items-center gap-2 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                    <span class="font-semibold text-slate-700">Quick Auto-Distribute:</span>
+                    <span>Start at</span>
+                    <input v-model.number="quickDistributeStart" type="number" min="1" class="field text-xs w-20 !py-1" placeholder="100">
+                    <span>with block size of</span>
+                    <input v-model.number="quickDistributeBlock" type="number" min="1" class="field text-xs w-20 !py-1" placeholder="100">
+                    <span>numbers per school</span>
+                    <button type="button" class="btn-secondary text-xs !py-1 !px-2.5 ml-auto" @click="applyQuickDistribute">
+                        Auto-fill Blocks
+                    </button>
+                    <button type="button" class="btn-secondary text-xs !py-1 !px-2.5 text-rose-600 hover:text-rose-700" @click="clearSchoolRanges">
+                        Clear All
+                    </button>
+                </div>
+
+                <div class="rounded-xl border border-slate-200 overflow-hidden bg-white max-h-96 overflow-y-auto">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[10px] font-bold sticky top-0 z-10 shadow-sm">
+                            <tr>
+                                <th class="p-3.5">School Name</th>
+                                <th class="p-3.5 w-36">Chest Start #</th>
+                                <th class="p-3.5 w-36">Chest End # (optional)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr v-for="(row, idx) in schoolChestRangesForm.schools" :key="row.school_id" class="hover:bg-slate-50/70 transition">
+                                <td class="p-3.5 font-bold text-slate-900">{{ row.school_name }}</td>
+                                <td class="p-3.5">
+                                    <input v-model.number="schoolChestRangesForm.schools[idx].chest_no_start"
+                                           type="number" min="1" class="field text-xs w-full" placeholder="e.g. 101">
+                                </td>
+                                <td class="p-3.5">
+                                    <input v-model.number="schoolChestRangesForm.schools[idx].chest_no_end"
+                                           type="number" min="1" class="field text-xs w-full" placeholder="e.g. 150">
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-2 border-t border-slate-100">
+                <button type="submit" class="btn-primary text-xs !py-1.5 !px-4" :disabled="schoolChestRangesForm.processing">
+                    Save School Chest Ranges
+                </button>
+            </div>
+        </form>
+
+        <!-- Section 4: Open Chest Numbers Link Card -->
         <section class="card !p-5 space-y-3 border border-slate-200 bg-gradient-to-r from-indigo-50/50 to-white">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -136,8 +202,38 @@
 </template>
 
 <script setup>
-import { inject } from 'vue';
+import { inject, ref } from 'vue';
 import { Link } from '@inertiajs/vue3';
 
-const { numberingSettingsForm, itemNumberingForm, chestUrl, saveNumberingSettings, saveItemNumbering, backfillRegs } = inject('eventSettings');
+const {
+    event,
+    numberingSettingsForm,
+    itemNumberingForm,
+    schoolChestRangesForm,
+    chestUrl,
+    saveNumberingSettings,
+    saveItemNumbering,
+    saveSchoolChestRanges,
+    backfillRegs
+} = inject('eventSettings');
+
+const quickDistributeStart = ref(100);
+const quickDistributeBlock = ref(50);
+
+function applyQuickDistribute() {
+    let current = Number(quickDistributeStart.value) || 100;
+    const block = Number(quickDistributeBlock.value) || 50;
+    for (const row of schoolChestRangesForm.schools) {
+        row.chest_no_start = current;
+        row.chest_no_end = current + block - 1;
+        current += block;
+    }
+}
+
+function clearSchoolRanges() {
+    for (const row of schoolChestRangesForm.schools) {
+        row.chest_no_start = '';
+        row.chest_no_end = '';
+    }
+}
 </script>

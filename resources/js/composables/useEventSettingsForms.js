@@ -174,6 +174,19 @@ export function useEventSettingsForms(props) {
             })),
     });
 
+    const schoolChestRangesForm = useForm({
+        schools: (props.schools ?? [])
+            .map((s) => {
+                const range = props.schoolChestRanges?.[s.id] ?? {};
+                return {
+                    school_id: s.id,
+                    school_name: s.name,
+                    chest_no_start: range.chest_no_start ?? '',
+                    chest_no_end: range.chest_no_end ?? '',
+                };
+            }),
+    });
+
     const existingFeeSettings = props.event.fee_settings ?? {};
     const schedule = props.feeSchedule ?? {};
 
@@ -407,6 +420,10 @@ export function useEventSettingsForms(props) {
         itemNumberingForm.put(`${base}/item-numbering`, { preserveScroll: true });
     }
 
+    function saveSchoolChestRanges() {
+        schoolChestRangesForm.put(`${base}/school-chest-ranges`, { preserveScroll: true });
+    }
+
     function backfillRegs() {
         router.post(`${base}/backfill-level-registrations`, {}, { preserveScroll: true });
     }
@@ -559,6 +576,7 @@ export function useEventSettingsForms(props) {
         registrationSettingsForm,
         numberingSettingsForm,
         itemNumberingForm,
+        schoolChestRangesForm,
         feeSettingsForm,
         effectiveClassGroupLabels,
         ageRuleSummary: computed(() => props.ageRuleSummary ?? ''),
@@ -578,6 +596,7 @@ export function useEventSettingsForms(props) {
         saveHeadWindow,
         saveNumberingSettings,
         saveItemNumbering,
+        saveSchoolChestRanges,
         backfillRegs,
         classGroupForm,
         addClassGroup,

@@ -158,6 +158,7 @@ const props = defineProps({
     ageGroupLabels: Object,
     defaultAgeGroupFees: Object,
     numberingSettings: { type: Object, default: () => ({}) },
+    schoolChestRanges: { type: Object, default: () => ({}) },
     initialTab: { type: String, default: 'lifecycle' },
     participationPolicy: Object,
     participationPresets: Object,
