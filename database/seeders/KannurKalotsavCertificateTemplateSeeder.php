@@ -31,12 +31,36 @@ class KannurKalotsavCertificateTemplateSeeder extends Seeder
                 }
             }
             $preset = require resource_path('certificate-templates/kannur/merit.php');
-            $template = CertificateTemplate::firstOrCreate([
+
+            // 1. Merit (Winner) Template
+            $meritTemplate = CertificateTemplate::firstOrCreate([
                 'tenant_id' => $tenant->id, 'event_type' => $preset['event_type'],
                 'event_id' => $event?->id, 'item_id' => null,
-                'certificate_type' => $preset['certificate_type'], 'title' => $preset['title'],
+                'certificate_type' => 'winner', 'title' => $preset['title'],
             ], $preset + ['background_path' => "{$base}.png", 'template_file_path' => "{$base}.pdf"]);
-            $this->command?->info("Kannur merit template #{$template->id} ready for {$tenant->name}.");
+            $this->command?->info("Kannur merit template #{$meritTemplate->id} ready for {$tenant->name}.");
+
+            // 2. Participation Template
+            $participationLayout = $preset['layout_json'] ?? [];
+            $participationBody = '<div style="color:#222;line-height:1.4;">This is to certify that {salutation} {recipient_name_upper} of {school_name_upper} has participated in {item_title}, {category_name}, at the KANNUR SAHODAYA DISTRICT KALOTSAV 2026-27 held at {venue} on {event_dates}.</div>';
+            $participationTemplate = CertificateTemplate::firstOrCreate([
+                'tenant_id' => $tenant->id, 'event_type' => $preset['event_type'],
+                'event_id' => $event?->id, 'item_id' => null,
+                'certificate_type' => 'participation',
+                'title' => 'Kannur Sahodaya District Kalotsav 2026-27 — Certificate of Participation',
+            ], [
+                'event_type' => $preset['event_type'],
+                'certificate_type' => 'participation',
+                'title' => 'Kannur Sahodaya District Kalotsav 2026-27 — Certificate of Participation',
+                'body' => $participationBody,
+                'dynamic_fields_json' => [],
+                'signatories' => [],
+                'layout_json' => $participationLayout,
+                'is_active' => true,
+                'background_path' => "{$base}.png",
+                'template_file_path' => "{$base}.pdf",
+            ]);
+            $this->command?->info("Kannur participation template #{$participationTemplate->id} ready for {$tenant->name}.");
         };
 
         if (tenant('id')) {
