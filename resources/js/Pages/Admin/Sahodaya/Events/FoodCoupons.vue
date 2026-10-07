@@ -24,7 +24,7 @@
                     <template v-if="event.require_payment_for_coupons">
                         <button type="button" @click="issueFromBill" class="btn-primary flex items-center gap-1.5 shadow-sm" :disabled="issuingBill">
                             <span v-if="issuingBill">Issuing...</span>
-                            <span v-else>🍽️ Issue from Food Bills (Settled Orders)</span>
+                            <span v-else>🍽️ Issue from Food Bills (Fully Paid Orders)</span>
                         </button>
                     </template>
                     <template v-else>

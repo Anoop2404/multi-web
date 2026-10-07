@@ -272,7 +272,7 @@ class FestFoodCouponController extends SahodayaAdminController
     }
 
     /**
-     * Issue food coupons from settled food bills.
+     * Issue food coupons from bills covered by approved payments.
      */
     public function issueFromBill(string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
     {
@@ -283,7 +283,7 @@ class FestFoodCouponController extends SahodayaAdminController
         $bills = FestFoodBill::forTenant($this->sahodaya->id)
             ->where('event_id', $event->id)
             ->where('status', '!=', FestFoodBill::STATUS_CANCELLED)
-            ->when($requirePayment, fn ($q) => $q->where('status', FestFoodBill::STATUS_SETTLED))
+            ->when($requirePayment, fn ($q) => $q->fullyPaid())
             ->with('orderItems')
             ->get();
 
@@ -345,12 +345,12 @@ class FestFoodCouponController extends SahodayaAdminController
 
         if ($created === 0) {
             if ($requirePayment && $bills->isEmpty()) {
-                return back()->with('error', 'No settled food orders found for this event to issue coupons from. Ensure participating schools have placed orders and payments are approved.');
+                return back()->with('error', 'No fully paid food orders found for this event. Approve payments covering the full bill amount before issuing coupons.');
             }
-            return back()->with('info', 'All food coupons for settled orders have already been issued.');
+            return back()->with('info', 'No new coupons to issue from eligible food orders.');
         }
 
-        return back()->with('success', "{$created} food coupon(s) issued from ".($requirePayment ? 'settled' : 'open').' food bills.');
+        return back()->with('success', "{$created} food coupon(s) issued from ".($requirePayment ? 'fully paid' : 'open').' food bills.');
     }
 
     /**

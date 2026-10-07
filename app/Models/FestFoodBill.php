@@ -73,6 +73,14 @@ class FestFoodBill extends Model
         return round((float) $this->amount_total - (float) $this->amount_paid, 2);
     }
 
+    /** Approved payments, rather than a manually assigned status, determine eligibility. */
+    public function scopeFullyPaid(Builder $query): Builder
+    {
+        return $query->where('status', '!=', self::STATUS_CANCELLED)
+            ->where('amount_total', '>', 0)
+            ->whereColumn('amount_paid', '>=', 'amount_total');
+    }
+
     /**
      * Re-derive amount_total from order items and amount_paid from payments. Call after
      * any mutation. Only 'approved' payments count toward amount_paid — a school-submitted

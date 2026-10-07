@@ -321,6 +321,7 @@ class FestFoodCouponGeneratorTest extends TestCase
 
     public function test_issue_from_bill_supports_tea_meal_type(): void
     {
+        $this->event->update(['require_payment_for_coupons' => true]);
         $bill = FestFoodBill::create([
             'tenant_id' => $this->sahodaya->id,
             'event_id' => $this->event->id,
@@ -357,6 +358,28 @@ class FestFoodCouponGeneratorTest extends TestCase
         $this->assertSame('TE-0020', $coupons->last()->coupon_code);
         $this->assertTrue($coupons->every(fn ($c) => $c->head_count === 1));
         $this->assertSame(20, $coupons->pluck('qr_token')->unique()->count());
+
+        $this->actingAs($this->sahodayaAdmin)->post(route('sahodaya.events.food-coupons.issue-from-bill', [
+            'tenantId' => $this->sahodaya->id, 'event' => $this->event->id,
+        ]))->assertSessionHasNoErrors();
+        $this->assertSame(20, FestFoodCoupon::where('event_id', $this->event->id)->count());
+    }
+
+    public function test_paid_bill_eligibility_uses_amounts_and_excludes_cancelled_or_partial_orders(): void
+    {
+        $bill = FestFoodBill::create([
+            'tenant_id' => $this->sahodaya->id, 'event_id' => $this->event->id,
+            'school_id' => $this->school->id, 'status' => FestFoodBill::STATUS_OPEN,
+            'amount_total' => 500, 'amount_paid' => 500,
+        ]);
+        foreach ([
+            ['open', 500, 500, true], ['open', 500, 550, true],
+            ['open', 500, 499.99, false], ['settled', 500, 0, false],
+            ['cancelled', 500, 500, false], ['open', 0, 0, false],
+        ] as [$status, $total, $paid, $eligible]) {
+            $bill->update(['status' => $status, 'amount_total' => $total, 'amount_paid' => $paid]);
+            $this->assertSame($eligible, FestFoodBill::whereKey($bill->id)->fullyPaid()->exists());
+        }
     }
 
     public function test_migration_expands_legacy_multi_head_coupons_and_resequences_continuously_across_schools(): void
@@ -504,5 +527,4 @@ class FestFoodCouponGeneratorTest extends TestCase
         });
     }
 }
-
 
