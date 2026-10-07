@@ -42,12 +42,21 @@ class KannurKalotsavCertificateTemplateSeeder extends Seeder
 
             // 2. Participation Template
             $participationLayout = $preset['layout_json'] ?? [];
+            // Cover "Merit" on the artwork background and cleanly display "Participation"
+            $participationLayout['custom_fields'] = [[
+                'text' => '<div style="background:#f6f5f1;color:#1a365d;font-weight:bold;letter-spacing:1px;padding:2px 10px;border-radius:4px;">Participation</div>',
+                'top' => 24.8,
+                'left' => 56.5,
+                'width' => 18,
+                'font_size' => 28,
+                'font_family' => 'Times New Roman',
+                'align' => 'left',
+            ]];
             $participationBody = '<div style="color:#222;line-height:1.4;">This is to certify that {salutation} {recipient_name_upper} of {school_name_upper} has participated in {item_title}, {category_name}, at the KANNUR SAHODAYA DISTRICT KALOTSAV 2026-27 held at {venue} on {event_dates}.</div>';
-            $participationTemplate = CertificateTemplate::firstOrCreate([
+            $participationTemplate = CertificateTemplate::updateOrCreate([
                 'tenant_id' => $tenant->id, 'event_type' => $preset['event_type'],
                 'event_id' => $event?->id, 'item_id' => null,
                 'certificate_type' => 'participation',
-                'title' => 'Kannur Sahodaya District Kalotsav 2026-27 — Certificate of Participation',
             ], [
                 'event_type' => $preset['event_type'],
                 'certificate_type' => 'participation',
