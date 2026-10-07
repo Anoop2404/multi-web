@@ -17,7 +17,20 @@ class CertificateTemplateController extends SahodayaAdminController
 {
     public function index()
     {
+        return $this->templatePage();
+    }
+
+    public function edit(string $tenantId, CertificateTemplate $template)
+    {
+        abort_if($template->tenant_id !== $this->sahodaya->id, 403);
+
+        return $this->templatePage($template);
+    }
+
+    private function templatePage(?CertificateTemplate $editingTemplate = null)
+    {
         $templates = CertificateTemplate::where('tenant_id', $this->sahodaya->id)
+            ->when($editingTemplate, fn ($query) => $query->whereKey($editingTemplate->id))
             ->orderBy('event_type')
             ->get()
             ->map(function (CertificateTemplate $t) {
@@ -69,6 +82,7 @@ class CertificateTemplateController extends SahodayaAdminController
 
         return $this->inertia('Sahodaya/Certificates/Templates', [
             'templates'          => $templates,
+            'editTemplateId'     => $editingTemplate?->id,
             'festEvents'         => $festEvents,
             'defaultBody'        => CertificateTemplate::defaultTrainingBody(),
             'defaultTopperBody'  => CertificateTemplate::defaultTopperBody(),
@@ -291,6 +305,7 @@ class CertificateTemplateController extends SahodayaAdminController
             'layout_json.body.top' => 'nullable|numeric|min:0|max:100',
             'layout_json.body.left' => 'nullable|numeric|min:0|max:100',
             'layout_json.body.width' => 'nullable|numeric|min:0|max:100',
+            'layout_json.body.bottom' => 'nullable|numeric|min:0|max:100',
             'layout_json.body.font_size' => 'nullable|numeric|min:6|max:96',
             'layout_json.body.font_family' => ['nullable', 'string', Rule::in(CertificateTemplate::fontFamilyOptions())],
             'layout_json.body.font_weight' => 'nullable|in:normal,bold',
@@ -550,6 +565,7 @@ class CertificateTemplateController extends SahodayaAdminController
             'layout_json.body.top' => 'nullable|numeric|min:0|max:100',
             'layout_json.body.left' => 'nullable|numeric|min:0|max:100',
             'layout_json.body.width' => 'nullable|numeric|min:0|max:100',
+            'layout_json.body.bottom' => 'nullable|numeric|min:0|max:100',
             'layout_json.body.font_size' => 'nullable|numeric|min:6|max:96',
             'layout_json.body.font_family' => ['nullable', 'string', Rule::in(CertificateTemplate::fontFamilyOptions())],
             'layout_json.body.font_weight' => 'nullable|in:normal,bold',
@@ -909,6 +925,7 @@ class CertificateTemplateController extends SahodayaAdminController
                 'participation_label_cover' => ['top', 'left', 'width', 'height'],
                 'photo' => ['top', 'left', 'size'],
                 'page' => ['width_mm', 'height_mm'],
+                'body' => array_merge($textKeys, ['bottom']),
                 default => $textKeys,
             };
             $layout[$key] = array_merge($layout[$key] ?? [], array_intersect_key(

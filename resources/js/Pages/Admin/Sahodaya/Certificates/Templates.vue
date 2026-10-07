@@ -1,8 +1,11 @@
 <template>
     <SahodayaEventsLayout title="Certificate Templates" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader title="Certificate templates" eyebrow="Tools"
-                    description="Create training templates with a PDF/image background, then choose one on each training program." />
+        <PageHeader :title="editTemplateId ? 'Edit certificate template' : 'Certificate templates'" eyebrow="Tools"
+                    :description="editTemplateId ? 'Update this template’s content and layout, then save your changes.' : 'Create certificate templates with a PDF/image background for events, training, and topper awards.'" />
+        <Link v-if="editTemplateId" :href="`/sahodaya-admin/${sahodaya.id}/certificate-templates`" class="btn-secondary mb-4 inline-flex">
+            ← Back to certificate templates
+        </Link>
 
         <!-- 2-Column Certificate Creation Layout (Form on Left, Live Canvas on Right) -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8 items-start">
@@ -545,7 +548,7 @@
         </div>
 
         <!-- Saved Templates Register Table -->
-        <div class="card overflow-hidden !p-0 border border-slate-200 shadow-xs rounded-xl">
+        <div v-if="!editTemplateId" class="card overflow-hidden !p-0 border border-slate-200 shadow-xs rounded-xl">
             <div class="p-4 border-b border-slate-200 bg-slate-50/80 flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h3 class="text-base font-bold text-slate-900">Saved Certificate Templates</h3>
@@ -619,11 +622,11 @@
                                 </span>
                             </td>
                             <td class="px-4 py-3 text-right space-x-2">
-                                <button type="button"
+                                <Link
                                         class="btn-secondary text-xs !py-1 !px-2.5"
-                                        @click="editTemplate(t)">
+                                        :href="`/sahodaya-admin/${sahodaya.id}/certificate-templates/${t.id}/edit`">
                                     Edit
-                                </button>
+                                </Link>
                                 <a :href="`/sahodaya-admin/${sahodaya.id}/certificate-templates/${t.id}/preview`"
                                    target="_blank" rel="noopener"
                                    class="btn-secondary text-xs !py-1 !px-2.5 font-semibold text-indigo-700 border-indigo-200 hover:bg-indigo-50">
@@ -647,7 +650,7 @@
 </template>
 
 <script setup>
-import { useForm, router } from '@inertiajs/vue3';
+import { Link, useForm, router } from '@inertiajs/vue3';
 import { ref, watch, computed } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import CertificateLiveCanvas from '@/Components/certificates/CertificateLiveCanvas.vue';
@@ -661,6 +664,7 @@ const props = defineProps({
     publicUrl: String,
     pendingPaymentsCount: Number,
     templates: { type: Array, default: () => [] },
+    editTemplateId: { type: Number, default: null },
     festEvents: { type: Array, default: () => [] },
     defaultBody: { type: String, default: '' },
     defaultTopperBody: { type: String, default: '' },
@@ -903,6 +907,8 @@ function removeSignatureBlock(index) {
 
 
 function textFieldDefaults(src = {}, def = {}, fallback = {}) {
+    src = src ?? {};
+    def = def ?? {};
     return {
         top: src.top ?? def.top ?? fallback.top ?? 0,
         left: src.left ?? def.left ?? fallback.left ?? 10,
@@ -940,9 +946,12 @@ function layoutDefaults(from = null) {
         recipient_name: textFieldDefaults(src.recipient_name, d.recipient_name, {
             top: 38, left: 10, width: 80, font_size: 24, font_family: 'Montserrat', font_weight: 'bold', align: 'center',
         }),
-        body: textFieldDefaults(src.body, d.body, {
-            top: 48, left: 12, width: 76, font_size: 12.5, font_family: 'Montserrat', align: 'center',
-        }),
+        body: {
+            ...textFieldDefaults(src.body, d.body, {
+                top: 48, left: 12, width: 76, font_size: 12.5, font_family: 'Montserrat', align: 'center',
+            }),
+            bottom: src.body?.bottom ?? d.body?.bottom ?? null,
+        },
         certificate_date: textFieldDefaults(src.certificate_date, d.certificate_date, {
             top: 72, left: 8, width: 42, font_size: 12, font_family: 'Montserrat', align: 'left',
         }),
@@ -1082,6 +1091,10 @@ function editTemplate(template) {
 }
 
 function cancelEdit() {
+    if (props.editTemplateId) {
+        router.get(`/sahodaya-admin/${props.sahodaya.id}/certificate-templates`);
+        return;
+    }
     editingId.value = null;
     editingTemplate.value = null;
     localFilePreviewUrl.value = null;
@@ -1108,16 +1121,26 @@ function cancelEdit() {
     form.clearErrors();
 }
 
+watch(() => props.editTemplateId, (id) => {
+    if (id) {
+        const template = props.templates.find(t => t.id === id);
+        if (template) editTemplate(template);
+    } else if (editingId.value) {
+        cancelEdit();
+    }
+}, { immediate: true });
+
 function upload() {
     const options = {
         forceFormData: true,
         preserveScroll: true,
-        onSuccess: () => {
+        onSuccess: (page) => {
             form.reset('template_file', 'converted_background_png', 'logo', 'seal');
             form.signatories.forEach(s => { s.signature = null; });
             form.layout_json.signature_blocks.forEach(b => { b.signature_file = null; b.remove_signature = false; });
             if (editingId.value) {
-                cancelEdit();
+                const savedTemplate = page.props.templates?.find(t => t.id === editingId.value);
+                if (savedTemplate) editTemplate(savedTemplate);
             }
         },
         // The error banner renders at the top of a form that can run to 10+ custom
@@ -1134,7 +1157,7 @@ function upload() {
         return;
     }
 
-    form.post(`/sahodaya-admin/${props.sahodaya.id}/certificate-templates`, options);
+    form.transform(data => data).post(`/sahodaya-admin/${props.sahodaya.id}/certificate-templates`, options);
 }
 
 async function remove(template) {
