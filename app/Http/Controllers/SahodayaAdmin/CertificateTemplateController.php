@@ -244,6 +244,8 @@ class CertificateTemplateController extends SahodayaAdminController
 
     public function store(Request $request)
     {
+        $this->normalizeRequestBooleans($request);
+
         $data = $request->validate([
             'event_type'          => ['required', 'string', Rule::in(['fest', 'training', 'topper'])],
             'event_id'            => 'nullable|integer|exists:fest_events,id',
@@ -265,6 +267,9 @@ class CertificateTemplateController extends SahodayaAdminController
             'dynamic_fields_json' => 'nullable|array',
             'layout_json'         => 'nullable|array',
             'layout_json.orientation' => 'nullable|in:landscape,portrait',
+            'layout_json.page'        => 'nullable|array',
+            'layout_json.page.width_mm' => 'nullable|numeric|min:1|max:2000',
+            'layout_json.page.height_mm' => 'nullable|numeric|min:1|max:2000',
             'layout_json.show_recipient_name' => 'nullable|boolean',
             'layout_json.show_participation_label' => 'nullable|boolean',
             'layout_json.bold_variables' => 'nullable|boolean',
@@ -482,6 +487,8 @@ class CertificateTemplateController extends SahodayaAdminController
     {
         abort_if($template->tenant_id !== $this->sahodaya->id, 403);
 
+        $this->normalizeRequestBooleans($request);
+
         $data = $request->validate([
             'title'               => 'nullable|string|max:255',
             'body'                => 'nullable|string',
@@ -519,6 +526,9 @@ class CertificateTemplateController extends SahodayaAdminController
             // sahodaya-admin reference another tenant's file path on the shared public disk.
             'layout_json'         => 'nullable|array',
             'layout_json.orientation' => 'nullable|in:landscape,portrait',
+            'layout_json.page'        => 'nullable|array',
+            'layout_json.page.width_mm' => 'nullable|numeric|min:1|max:2000',
+            'layout_json.page.height_mm' => 'nullable|numeric|min:1|max:2000',
             'layout_json.show_recipient_name' => 'nullable|boolean',
             'layout_json.show_participation_label' => 'nullable|boolean',
             'layout_json.bold_variables' => 'nullable|boolean',
@@ -890,7 +900,7 @@ class CertificateTemplateController extends SahodayaAdminController
             $layout['orientation'] = $input['orientation'];
         }
 
-        foreach (['recipient_name', 'body', 'certificate_date', 'uuid', 'participation_label_cover', 'photo'] as $key) {
+        foreach (['recipient_name', 'body', 'certificate_date', 'uuid', 'participation_label_cover', 'photo', 'page'] as $key) {
             if (! isset($input[$key]) || ! is_array($input[$key])) {
                 continue;
             }
@@ -898,6 +908,7 @@ class CertificateTemplateController extends SahodayaAdminController
             $allowed = match ($key) {
                 'participation_label_cover' => ['top', 'left', 'width', 'height'],
                 'photo' => ['top', 'left', 'size'],
+                'page' => ['width_mm', 'height_mm'],
                 default => $textKeys,
             };
             $layout[$key] = array_merge($layout[$key] ?? [], array_intersect_key(
@@ -921,6 +932,36 @@ class CertificateTemplateController extends SahodayaAdminController
         }
 
         return $layout;
+    }
+
+    /**
+     * Normalizes boolean values in the request (converting strings like 'false', '0', 'true', '1')
+     * so that Laravel's boolean validator accepts them reliably across multipart/form-data.
+     */
+    private function normalizeRequestBooleans(Request $request): void
+    {
+        if ($request->has('is_active')) {
+            $request->merge(['is_active' => filter_var($request->input('is_active'), FILTER_VALIDATE_BOOLEAN)]);
+        }
+
+        if ($request->has('layout_json') && is_array($request->input('layout_json'))) {
+            $layout = $request->input('layout_json');
+            $flags = [
+                'show_recipient_name',
+                'show_participation_label',
+                'bold_variables',
+                'show_certificate_date',
+                'show_logo_overlay',
+                'show_qr',
+                'show_photo',
+            ];
+            foreach ($flags as $flag) {
+                if (array_key_exists($flag, $layout)) {
+                    $layout[$flag] = filter_var($layout[$flag], FILTER_VALIDATE_BOOLEAN);
+                }
+            }
+            $request->merge(['layout_json' => $layout]);
+        }
     }
 
     /** @return list<array{key: string, source: string, label: string}> */
