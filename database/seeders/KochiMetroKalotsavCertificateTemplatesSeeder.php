@@ -56,11 +56,12 @@ class KochiMetroKalotsavCertificateTemplatesSeeder extends Seeder
                         .'of {school_name_upper} '.$achievement.' in {item_title} {category_name} in the '
                         .'KOCHI METRO SAHODAYA DISTRICT KALOTSAV 2026-27 held at '
                         ."St. Mary’s Public School, Thamarachal on {event_dates}.</div>";
-                    $template = CertificateTemplate::firstOrCreate([
-                        'tenant_id' => $tenant->id, 'event_type' => 'fest', 'event_id' => $event?->id,
+                    $template = CertificateTemplate::updateOrCreate([
+                        'tenant_id' => $tenant->id, 'event_type' => 'fest',
                         'item_id' => null, 'certificate_type' => $type,
-                        'title' => "Kochi Metro Sahodaya Kalotsav 2026-27 — Certificate of {$label}",
                     ], [
+                        'event_id' => $event?->id,
+                        'title' => "Kochi Metro Sahodaya Kalotsav 2026-27 — Certificate of {$label}",
                         'body' => $body, 'background_path' => $path, 'layout_json' => $layout,
                         'dynamic_fields_json' => [], 'signatories' => [], 'is_active' => true,
                     ]);
