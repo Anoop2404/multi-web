@@ -1067,7 +1067,8 @@ function editTemplate(template) {
     form.clearErrors();
     backgroundPreviewError.value = '';
     localFilePreviewUrl.value = null;
-    form.layout_json = layoutDefaults(template.layout_json || {});
+    const clonedLayout = template.layout_json ? JSON.parse(JSON.stringify(template.layout_json)) : {};
+    form.layout_json = layoutDefaults(clonedLayout);
     const sigs = Array.isArray(template.signatories) && template.signatories.length
         ? template.signatories
         : props.defaultSignatories;
