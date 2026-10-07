@@ -316,11 +316,25 @@ const sampleData = computed(() => {
 // closely enough to preview layout — this is authoring-preview only, never used for a
 // real certificate (the server always regenerates the real box from real registrations).
 const participationItemsBoxSample = '<div style="border:1px solid #d6a95c;border-radius:6px;padding:6px 10px;margin:5px auto 0;max-width:98%;background:rgba(180,83,9,0.04);">'
-    + '<div style="text-align:center;font-size:0.85em;font-weight:700;letter-spacing:1.5px;color:#b45309;text-transform:uppercase;margin-bottom:5px;">&bull;&nbsp;Participated Items&nbsp;&bull;</div>'
-    + '<table style="width:100%;border-collapse:collapse;"><tr>'
-    + '<td style="width:50%;vertical-align:top;padding:2px 6px 2px 0;"><span style="display:block;font-size:0.95em;line-height:1.35;color:#172033;">&bull;&nbsp;<strong>100m Sprint</strong> <span style="font-size:0.86em;font-weight:400;color:#64748b;">(Category I &bull; Individual)</span></span></td>'
-    + '<td style="width:50%;vertical-align:top;padding:2px 6px 2px 0;"><span style="display:block;font-size:0.95em;line-height:1.35;color:#172033;">&bull;&nbsp;<strong>Long Jump</strong> <span style="font-size:0.86em;font-weight:400;color:#64748b;">(Category I &bull; Individual)</span></span></td>'
-    + '</tr></table></div>';
+    + '<div style="text-align:center;font-size:0.85em;font-weight:700;letter-spacing:1.5px;color:#b45309;text-transform:uppercase;margin-bottom:5px;">&bull;&nbsp;Participated Items (7)&nbsp;&bull;</div>'
+    + '<table style="width:100%;border-collapse:collapse;">'
+    + '<tr>'
+    + '<td style="width:50%;vertical-align:top;padding:2px 6px 2px 0;"><span style="display:block;font-size:0.95em;line-height:1.35;color:#172033;">&bull;&nbsp;<strong>Classical Music (Solo)</strong> <span style="font-size:0.86em;font-weight:400;color:#64748b;">(Category I &bull; Individual)</span> <span style="font-size:0.86em;font-weight:700;color:#b45309;">— Grade A</span></span></td>'
+    + '<td style="width:50%;vertical-align:top;padding:2px 6px 2px 0;"><span style="display:block;font-size:0.95em;line-height:1.35;color:#172033;">&bull;&nbsp;<strong>Bharatanatyam</strong> <span style="font-size:0.86em;font-weight:400;color:#64748b;">(Category I &bull; Individual)</span> <span style="font-size:0.86em;font-weight:700;color:#b45309;">— Grade A</span></span></td>'
+    + '</tr>'
+    + '<tr>'
+    + '<td style="width:50%;vertical-align:top;padding:2px 6px 2px 0;"><span style="display:block;font-size:0.95em;line-height:1.35;color:#172033;">&bull;&nbsp;<strong>Folk Dance (Group)</strong> <span style="font-size:0.86em;font-weight:400;color:#64748b;">(Category I &bull; Group)</span></span></td>'
+    + '<td style="width:50%;vertical-align:top;padding:2px 6px 2px 0;"><span style="display:block;font-size:0.95em;line-height:1.35;color:#172033;">&bull;&nbsp;<strong>Elocution (English)</strong> <span style="font-size:0.86em;font-weight:400;color:#64748b;">(Category I &bull; Individual)</span> <span style="font-size:0.86em;font-weight:700;color:#b45309;">— Grade B</span></span></td>'
+    + '</tr>'
+    + '<tr>'
+    + '<td style="width:50%;vertical-align:top;padding:2px 6px 2px 0;"><span style="display:block;font-size:0.95em;line-height:1.35;color:#172033;">&bull;&nbsp;<strong>Light Music (Vocal)</strong> <span style="font-size:0.86em;font-weight:400;color:#64748b;">(Category I &bull; Individual)</span> <span style="font-size:0.86em;font-weight:700;color:#b45309;">— Grade A</span></span></td>'
+    + '<td style="width:50%;vertical-align:top;padding:2px 6px 2px 0;"><span style="display:block;font-size:0.95em;line-height:1.35;color:#172033;">&bull;&nbsp;<strong>Pencil Drawing</strong> <span style="font-size:0.86em;font-weight:400;color:#64748b;">(Category I &bull; Individual)</span></span></td>'
+    + '</tr>'
+    + '<tr>'
+    + '<td style="width:50%;vertical-align:top;padding:2px 6px 2px 0;"><span style="display:block;font-size:0.95em;line-height:1.35;color:#172033;">&bull;&nbsp;<strong>Patriotic Song (Group)</strong> <span style="font-size:0.86em;font-weight:400;color:#64748b;">(Category I &bull; Group)</span> <span style="font-size:0.86em;font-weight:700;color:#b45309;">— Grade A</span></span></td>'
+    + '<td style="width:50%;"></td>'
+    + '</tr>'
+    + '</table></div>';
 
 // Shared by the single `body` paragraph and each independently-positioned custom
 // field below — mirrors CertificateTemplate::substituteTokens() server-side so the

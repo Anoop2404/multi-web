@@ -42,12 +42,12 @@ class KannurKalotsavCertificateTemplateSeeder extends Seeder
 
             // 2. Participation Template
             $participationLayout = $preset['layout_json'] ?? [];
-            // Cover "Merit" on the artwork background and cleanly display "Participation"
+            // Cover "Merit" and the red flourish underneath cleanly with the certificate's cream background
             $participationLayout['custom_fields'] = [[
-                'text' => '<div style="background:#f6f5f1;color:#1a365d;font-weight:bold;letter-spacing:1px;padding:2px 10px;border-radius:4px;">Participation</div>',
-                'top' => 24.8,
-                'left' => 56.5,
-                'width' => 18,
+                'text' => '<div style="background:#f6f5f1;color:#1a365d;font-weight:bold;letter-spacing:1px;padding:6px 14px 10px;border-radius:4px;display:inline-block;box-shadow:0 0 1px #f6f5f1;">Participation</div>',
+                'top' => 24.2,
+                'left' => 56.2,
+                'width' => 19,
                 'font_size' => 28,
                 'font_family' => 'Times New Roman',
                 'align' => 'left',
