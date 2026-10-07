@@ -153,7 +153,7 @@
             margin-top: 1px;
         }
         .roll-no-sub {
-            font-size: 8px;
+            font-size: 10px;
             color: #475569;
             font-family: monospace;
             font-weight: 600;
@@ -401,7 +401,7 @@
                             @endif
                         </td>
                         <td>
-                            <strong style="font-size: 9px;">{{ $row['name'] ?? '' }}</strong>
+                            <strong style="font-size: 12px;">{{ $row['name'] ?? '' }}</strong>
                             @if(!empty($row['roll_no']) && ($row['roll_no'] !== '—'))
                                 <div class="roll-no-sub">Roll No: {{ $row['roll_no'] }}</div>
                             @endif

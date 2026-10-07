@@ -139,7 +139,7 @@
                                         Team · {{ row.member_count }} members
                                     </span>
                                 </div>
-                                <div v-if="row.roll_no" class="text-[10px] font-mono text-slate-500 font-semibold mt-0.5">
+                                <div v-if="row.roll_no" class="text-xs font-mono text-slate-600 font-semibold mt-0.5">
                                     Roll No: {{ row.roll_no }}
                                 </div>
                             </td>
