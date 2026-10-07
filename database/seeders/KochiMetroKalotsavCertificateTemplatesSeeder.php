@@ -19,10 +19,14 @@ class KochiMetroKalotsavCertificateTemplatesSeeder extends Seeder
             ->firstOrFail();
 
         $seed = function (Tenant $tenant) {
-            $event = $tenant->subdomain === 'kochimetro'
-                ? FestEvent::where('tenant_id', $tenant->id)
-                    ->whereNull('parent_event_id')->where('title', 'Kochi Metro Kalotsav 2026-27')->firstOrFail()
-                : null;
+            $event = FestEvent::where('tenant_id', $tenant->id)
+                ->whereNull('parent_event_id')
+                ->where(function ($q) {
+                    $q->where('title', 'Kochi Metro Kalotsav 2026-27')
+                      ->orWhereRaw('LOWER(title) LIKE ?', ['%kochi%kalots%'])
+                      ->orWhereRaw('LOWER(title) LIKE ?', ['%kalots%2026%']);
+                })
+                ->first();
             $path = "tenants/{$tenant->id}/certificate-backgrounds/kochi-metro-kalotsav-2026-27.jpg";
             Storage::disk('shared')->put($path, file_get_contents(resource_path('certificate-templates/kochi-metro/kalotsav-2026-27.jpg')));
 
