@@ -12,16 +12,16 @@ class KannurKalotsavCertificateTemplateSeeder extends Seeder
 {
     public function run(): void
     {
-        $tenantId = env('SAHODAYA_UUID');
+        $tenantId = tenant('id') ?? env('SAHODAYA_UUID');
         $tenant = Tenant::where('type', 'sahodaya')
             ->when($tenantId, fn ($q) => $q->where('id', $tenantId), fn ($q) => $q->where('subdomain', 'kannur'))
             ->first();
 
         if (! $tenant) {
-            throw new \RuntimeException('Kannur Sahodaya was not found. Create the local account or set SAHODAYA_UUID to the intended Sahodaya UUID.');
+            throw new \RuntimeException("Sahodaya tenant was not found for ID [{$tenantId}]. Create the account or pass the intended tenant ID.");
         }
 
-        $tenant->run(function () use ($tenant) {
+        $seed = function (Tenant $tenant) {
             $event = FestEvent::where('tenant_id', $tenant->id)->whereNull('parent_event_id')
                 ->whereRaw('LOWER(title) LIKE ?', ['%kalots%'])->where('title', 'like', '%2026%')->first();
             $base = "tenants/{$tenant->id}/certificate-backgrounds/kannur-kalotsav-2026-27";
@@ -37,6 +37,12 @@ class KannurKalotsavCertificateTemplateSeeder extends Seeder
                 'certificate_type' => $preset['certificate_type'], 'title' => $preset['title'],
             ], $preset + ['background_path' => "{$base}.png", 'template_file_path' => "{$base}.pdf"]);
             $this->command?->info("Kannur merit template #{$template->id} ready for {$tenant->name}.");
-        });
+        };
+
+        if (tenant('id')) {
+            $seed($tenant);
+        } else {
+            $tenant->run(fn () => $seed($tenant));
+        }
     }
 }

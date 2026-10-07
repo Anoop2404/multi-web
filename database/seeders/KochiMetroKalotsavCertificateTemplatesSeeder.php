@@ -13,11 +13,12 @@ class KochiMetroKalotsavCertificateTemplatesSeeder extends Seeder
 {
     public function run(): void
     {
-        $tenantId = env('SAHODAYA_UUID');
+        $tenantId = tenant('id') ?? env('SAHODAYA_UUID');
         $tenant = Tenant::where('type', 'sahodaya')
             ->when($tenantId, fn ($q) => $q->where('id', $tenantId), fn ($q) => $q->where('subdomain', 'kochimetro'))
             ->firstOrFail();
-        $tenant->run(function () use ($tenant) {
+
+        $seed = function (Tenant $tenant) {
             $event = $tenant->subdomain === 'kochimetro'
                 ? FestEvent::where('tenant_id', $tenant->id)
                     ->whereNull('parent_event_id')->where('title', 'Kochi Metro Kalotsav 2026-27')->firstOrFail()
@@ -62,6 +63,12 @@ class KochiMetroKalotsavCertificateTemplatesSeeder extends Seeder
                     $this->command?->info("{$label} template #{$template->id} ready for {$tenant->name}.");
                 }
             });
-        });
+        };
+
+        if (tenant('id')) {
+            $seed($tenant);
+        } else {
+            $tenant->run(fn () => $seed($tenant));
+        }
     }
 }
