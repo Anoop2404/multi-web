@@ -1139,7 +1139,7 @@ public function tv(Request $request, int $eventId)
     // requests (e.g. checking what the TV will show before publishing) bypass
     // the cache so the admin sees the current state immediately.
     $bypassCache = auth()->check() || request()->user();
-    $cacheKey = 'fest-tv:'.$tenant->id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id)
+    $cacheKey = 'fest-tv:html-v2:'.$tenant->id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id)
         .':'.($isPublished ? '1' : '0')
         .':'.implode(',', $selectedScope['event_ids'])
         .':'.implode(',', $crossPhaseEventIds ?? []);
@@ -1397,7 +1397,11 @@ public function tv(Request $request, int $eventId)
             return $render();
         }
 
-        return \Illuminate\Support\Facades\Cache::remember($cacheKey, 30, $render);
+        // Response::original retains the View and its closure-bearing render context.
+        // Redis can serialize the rendered HTML, but cannot serialize that response.
+        $html = \Illuminate\Support\Facades\Cache::remember($cacheKey, 30, fn () => $render()->getContent());
+
+        return response($html);
     }
 
     public function manual(int $eventId)
