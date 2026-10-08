@@ -433,7 +433,9 @@ class FestNumberingService
                     $p->update([
                         'event_id'      => $event->id,
                         'chest_head_id' => $headScope,
-                        'chest_no'      => $existing,
+                        // The canonical row owns the number; sibling registrations
+                        // resolve it through FestParticipant's chest_no accessor.
+                        // Persisting it twice violates event/head/chest uniqueness.
                     ]);
                     $count++;
 

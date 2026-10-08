@@ -173,18 +173,6 @@ class FestChestNumberService
         // withdrawn one, the new active one), and without this exclusion a stray chest_no
         // left on the withdrawn row (e.g. from before FestRegistrationService::cancel()
         // reliably cleared it) blocked assignment for a number nobody currently holds.
-        $taken = FestParticipant::query()
-            ->where('event_id', $eventId)
-            ->where('chest_head_id', $headScope)
-            ->where('chest_no', $chestNo)
-            ->where('id', '!=', $participant->id)
-            ->whereHas('registration', fn ($q) => $q->whereNotIn('status', ['rejected', 'withdrawn']))
-            ->exists();
-
-        if ($taken) {
-            throw ValidationException::withMessages(['chest_no' => "Chest number {$chestNo} is already in use."]);
-        }
-
         // A participant who has never been auto-assigned still carries event_id = null
         // and chest_head_id = 0 (its un-backfilled defaults — see assignMissingChestNumbers()
         // above), so neither can be trusted to locate THIS row; scope through the reliable
@@ -215,8 +203,20 @@ class FestChestNumberService
             $query->where('id', $participant->id);
         }
 
+        // Update only the stored owner; sibling rows resolve its number for display.
+        $owner = (clone $query)->whereNotNull('chest_no')->orderBy('id')->first() ?? $participant;
+        $taken = FestParticipant::query()
+            ->where('event_id', $eventId)
+            ->where('chest_head_id', $headScope)
+            ->where('chest_no', $chestNo)
+            ->where('id', '!=', $owner->id)
+            ->exists();
+        if ($taken) {
+            throw ValidationException::withMessages(['chest_no' => "Chest number {$chestNo} is already in use."]);
+        }
+
         try {
-            $query->update(['event_id' => $eventId, 'chest_head_id' => $headScope, 'chest_no' => $chestNo]);
+            $owner->update(['event_id' => $eventId, 'chest_head_id' => $headScope, 'chest_no' => $chestNo]);
         } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
             // Same TOCTOU gap as the group branch above: the exists() check at line 162
             // and this write aren't atomic, so two near-simultaneous assignments of the

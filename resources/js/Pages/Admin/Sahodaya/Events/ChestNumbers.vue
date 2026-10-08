@@ -10,7 +10,7 @@
                             ? 'Pick an item — each student keeps a single chest number across the sports event.'
                             : 'Pick an item — view or assign chest numbers per competition item.')">
             <template #actions>
-                <button type="button" class="btn-primary text-sm" @click="assignAllMissingForEvent">
+                <button v-if="event.event_type !== 'sports'" type="button" class="btn-primary text-sm" @click="assignAllMissingForEvent">
                     Assign all missing chest numbers (this phase)
                 </button>
                 <Link :href="numberingUrl" class="btn-secondary text-sm">Numbering settings</Link>
@@ -23,6 +23,19 @@
                 </button>
             </template>
         </PageHeader>
+
+        <div v-if="event.event_type === 'sports'" class="card mb-5 space-y-3">
+            <h3 class="font-semibold">Generate chest numbers using school ranges</h3>
+            <p class="text-sm text-slate-600">School ranges take priority. Schools without a range use the custom fallback below. Existing numbers are preserved; only missing numbers are assigned for all items in this event/phase.</p>
+            <div class="flex flex-wrap items-end gap-3">
+                <button type="button" class="btn-secondary" @click="openSchoolRangesModal">Configure school ranges</button>
+                <label class="text-xs font-semibold">Custom fallback start
+                    <input v-model.number="sportsFallbackStart" type="number" min="1" class="field mt-1 w-36">
+                </label>
+                <button type="button" class="btn-primary" :disabled="sportsGenerating || !sportsFallbackStart || sportsFallbackStart < 1" @click="generateSportsChests">Generate all using school ranges</button>
+            </div>
+            <p class="text-xs text-slate-500">Fallback also applies when a school's range is full. To replace existing numbers, reset all chests first.</p>
+        </div>
 
         <SportsSetupSubNav v-if="event.event_type === 'sports'" :sahodaya-id="sahodaya.id" :event-id="event.id" active="chest-numbers" :event="event" />
         <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="chest-numbers" class="mb-4" />
@@ -74,7 +87,7 @@
                             <button v-if="totalCount > assignedCount" type="button" class="btn-primary text-sm" :disabled="isSavingBulk" @click="startBulkEdit(true)">
                                 Add missing chest numbers manually ({{ totalCount - assignedCount }})
                             </button>
-                            <button type="button" class="btn-secondary text-sm" @click="generate">Assign missing chest</button>
+                            <button v-if="event.event_type !== 'sports'" type="button" class="btn-secondary text-sm" @click="generate">Assign missing chest</button>
                             <button type="button" class="btn-secondary text-sm" @click="assignItemReg">Assign missing item reg</button>
                             <button v-if="selectedItemId && participants.length" type="button"
                                     :class="isBulkEditing ? 'btn-primary !bg-indigo-600' : 'btn-secondary'"
@@ -87,9 +100,7 @@
                             <button v-if="event.event_type !== 'sports'" type="button" class="btn-secondary text-sm" @click="openBulkNumberingModal">
                                 🔢 Set common starting no (all items)
                             </button>
-                            <button v-if="event.event_type === 'sports'" type="button" class="btn-secondary text-sm font-semibold !text-indigo-700 !bg-indigo-50 border-indigo-200 hover:!bg-indigo-100" @click="openSchoolRangesModal">
-                                🏫 Set starting no per school
-                            </button>
+
                             <a :href="`${printUrl}${printUrl.includes('?') ? '&' : '?'}inline=1`" target="_blank" class="btn-secondary text-sm">Preview list</a>
                             <a :href="`${printUrl}${printUrl.includes('?') ? '&' : '?'}download=1`" target="_blank" class="btn-secondary text-sm">Download list (PDF)</a>
                             <a :href="csvUrl" class="btn-secondary text-sm">CSV</a>
@@ -482,6 +493,16 @@ function assignItemReg() { postAction(`${base.value}/assign-item-ids`); }
 // assigns every item still missing chest numbers, not just whichever one is currently
 // open. Purely additive (never touches an already-assigned number), so no confirm
 // dialog, matching the same no-confirm per-item "Assign missing chest" button.
+const sportsFallbackStart = ref(props.event.numbering_settings?.chest_no_start ?? 100);
+const sportsGenerating = ref(false);
+function generateSportsChests() {
+    sportsGenerating.value = true;
+    router.post(`${base.value}/assign-missing-all`, { fallback_start: sportsFallbackStart.value }, {
+        preserveScroll: true, preserveState: true,
+        onFinish: () => { sportsGenerating.value = false; },
+    });
+}
+
 function assignAllMissingForEvent() {
     router.post(`${base.value}/assign-missing-all`, {}, { preserveScroll: true, preserveState: true });
 }

@@ -254,30 +254,30 @@ class FestNumberingServiceTest extends TestCase
      * start that isn't already used anywhere in the head, instead of always
      * jumping past the head-wide maximum.
      */
-    public function test_next_chest_number_honors_independent_per_item_start_within_shared_head(): void
+    public function test_sports_uses_event_fallback_instead_of_legacy_item_starts(): void
     {
         ['event' => $event, 'itemA' => $itemA, 'itemB' => $itemB, 'school' => $school] = $this->sportsContext();
         $itemA->update(['chest_no_start' => 100]);
         $itemB->update(['chest_no_start' => 500]);
-
         $service = app(FestNumberingService::class);
+        $this->assertSame(1, $service->nextChestNumber($event, $itemA));
+        $this->participant($event, $itemA, $school, $this->student($school), 1);
+        $this->assertSame(2, $service->nextChestNumber($event, $itemB));
+    }
 
-        // Item A's own range starts at 100, untouched by item B.
-        $this->assertSame(100, $service->nextChestNumber($event, $itemA->fresh()));
-        $this->participant($event, $itemA, $school, $this->student($school, 'Athlete A1'), 100);
-
-        // Item B has its own independent range starting at 500 -- previously this
-        // would have returned 101 (head-wide max of 100, plus one), silently
-        // ignoring item B's own configured start.
-        $this->assertSame(500, $service->nextChestNumber($event, $itemB->fresh()));
-        $this->participant($event, $itemB, $school, $this->student($school, 'Athlete B1'), 500);
-
-        // Item A keeps advancing within its own low range, unaffected by item B
-        // now holding a higher number under the same head.
-        $this->assertSame(101, $service->nextChestNumber($event, $itemA->fresh()));
-
-        // Item B keeps advancing within its own range too.
-        $this->assertSame(501, $service->nextChestNumber($event, $itemB->fresh()));
+    public function test_bulk_assignment_reuses_canonical_chest_without_persisting_duplicate(): void
+    {
+        ['event' => $event, 'itemA' => $itemA, 'itemB' => $itemB, 'school' => $school] = $this->sportsContext();
+        $student = $this->student($school);
+        $this->participant($event, $itemA, $school, $student, 3202);
+        $sibling = $this->participant($event, $itemB, $school, $student);
+        $service = app(FestNumberingService::class);
+        $service->assignMissingChestNumbers($event);
+        $sibling->refresh();
+        $this->assertNull($service->persistedChestNumber($sibling));
+        $this->assertSame(3202, $sibling->chest_no);
+        $service->assignMissingChestNumbers($event);
+        $this->assertSame(1, FestParticipant::where('event_id', $event->id)->where('chest_no', 3202)->count());
     }
 
     public function test_assigns_chest_on_create_for_first_sports_item_in_head(): void

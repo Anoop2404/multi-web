@@ -76,7 +76,7 @@ class FestChestNumberController extends SahodayaAdminController
             ->keyBy('school_id');
 
         return $this->inertia('Sahodaya/Events/ChestNumbers', $this->withEventActivity($event, FestPageActivity::CHEST_NUMBERS, array_merge($nav, [
-            'event'          => $event->only('id', 'title', 'status', 'event_type', 'chest_reveal_mode', 'results_published'),
+            'event'          => $event->only('id', 'title', 'status', 'event_type', 'chest_reveal_mode', 'results_published', 'numbering_settings'),
             'selectedHeadId' => $selectedHeadId,
             'selectedItemId' => $itemId,
             'selectedItem'   => $selectedItem,
@@ -173,6 +173,14 @@ class FestChestNumberController extends SahodayaAdminController
     public function assignMissingAll(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        if ($event->event_type === 'sports' && $request->has('fallback_start')) {
+            $data = $request->validate(['fallback_start' => 'required|integer|min:1']);
+            $event->update(['numbering_settings' => array_merge(
+                app(FestNumberingService::class)->settings($event),
+                ['chest_no_start' => $data['fallback_start']],
+            )]);
+        }
 
         $itemId = $request->integer('item_id') ?: null;
         $item = $itemId ? FestEventItem::where('event_id', $event->id)->find($itemId) : null;
