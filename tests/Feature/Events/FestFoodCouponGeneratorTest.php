@@ -382,6 +382,38 @@ class FestFoodCouponGeneratorTest extends TestCase
         }
     }
 
+    public function test_large_paid_order_uses_batch_queries_and_repeat_does_not_duplicate_coupons(): void
+    {
+        $this->event->update(['require_payment_for_coupons' => true]);
+        $bill = FestFoodBill::create([
+            'tenant_id' => $this->sahodaya->id, 'event_id' => $this->event->id,
+            'school_id' => $this->school->id, 'status' => FestFoodBill::STATUS_OPEN,
+            'amount_total' => 25000, 'amount_paid' => 25000,
+        ]);
+        FestFoodOrderItem::create([
+            'bill_id' => $bill->id, 'menu_date' => now()->toDateString(),
+            'meal_type' => 'lunch', 'item_name' => 'Lunch',
+            'unit_price' => 25, 'quantity' => 1000, 'line_total' => 25000,
+        ]);
+        $couponQueries = 0;
+        \Illuminate\Support\Facades\DB::listen(function ($query) use (&$couponQueries) {
+            if (str_contains($query->sql, 'fest_food_coupons')) {
+                $couponQueries++;
+            }
+        });
+        $url = route('sahodaya.events.food-coupons.issue-from-bill', [
+            'tenantId' => $this->sahodaya->id, 'event' => $this->event->id,
+        ]);
+        $this->actingAs($this->sahodayaAdmin)->post($url)->assertSessionHasNoErrors();
+        $this->assertLessThan(25, $couponQueries);
+        $coupons = FestFoodCoupon::where('event_id', $this->event->id)->get();
+        $this->assertCount(1000, $coupons);
+        $this->assertSame(1000, $coupons->pluck('qr_token')->unique()->count());
+        $this->assertSame(1000, $coupons->pluck('coupon_code')->unique()->count());
+        $this->actingAs($this->sahodayaAdmin)->post($url)->assertSessionHasNoErrors();
+        $this->assertSame(1000, FestFoodCoupon::where('event_id', $this->event->id)->count());
+    }
+
     public function test_migration_expands_legacy_multi_head_coupons_and_resequences_continuously_across_schools(): void
     {
         $school2 = Tenant::create([
@@ -527,4 +559,3 @@ class FestFoodCouponGeneratorTest extends TestCase
         });
     }
 }
-

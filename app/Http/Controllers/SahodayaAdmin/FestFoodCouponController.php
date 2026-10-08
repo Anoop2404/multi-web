@@ -280,60 +280,72 @@ class FestFoodCouponController extends SahodayaAdminController
 
         $requirePayment = (bool) ($event->require_payment_for_coupons ?? false);
 
-        $bills = FestFoodBill::forTenant($this->sahodaya->id)
-            ->where('event_id', $event->id)
-            ->where('status', '!=', FestFoodBill::STATUS_CANCELLED)
-            ->when($requirePayment, fn ($q) => $q->fullyPaid())
-            ->with('orderItems')
-            ->get();
-
         $batchId = 'bill_' . Str::random(8);
         $created = 0;
+        $eligibleBillCount = 0;
 
-        DB::transaction(function () use ($event, $bills, $batchId, &$created) {
+        DB::transaction(function () use ($event, $requirePayment, $batchId, &$created, &$eligibleBillCount) {
+            // Other generators also lock this event while allocating coupon numbers.
+            // Take it once, before reading existing coupons, so retries cannot duplicate orders.
+            FestEvent::whereKey($event->id)->lockForUpdate()->firstOrFail();
+            $bills = FestFoodBill::forTenant($this->sahodaya->id)
+                ->where('event_id', $event->id)
+                ->where('status', '!=', FestFoodBill::STATUS_CANCELLED)
+                ->when($requirePayment, fn ($q) => $q->fullyPaid())
+                ->orderBy('id')->lockForUpdate()->with('orderItems')->get();
+            $eligibleBillCount = $bills->count();
+
+            $issued = [];
+            $sequences = [];
+            $codes = [];
+            foreach (FestFoodCoupon::where('event_id', $event->id)
+                ->get(['school_id', 'valid_date', 'meal_type', 'is_extra', 'head_count', 'sequence_no', 'coupon_code']) as $coupon) {
+                $meal = $coupon->meal_type;
+                $sequences[$meal] = max($sequences[$meal] ?? 0, (int) $coupon->sequence_no);
+                $codes[$coupon->coupon_code] = true;
+                if (! $coupon->is_extra) {
+                    $key = $coupon->school_id.'|'.$coupon->valid_date->toDateString().'|'.$meal;
+                    $issued[$key] = ($issued[$key] ?? 0) + (int) $coupon->head_count;
+                }
+            }
+
+            $rows = [];
+            $timestamp = now()->toDateTimeString();
             foreach ($bills as $bill) {
-                $grouped = $bill->orderItems->groupBy(
-                    fn ($item) => $item->menu_date->toDateString().'|'.$item->meal_type
-                );
-
+                $grouped = $bill->orderItems->groupBy(fn ($item) => $item->menu_date->toDateString().'|'.$item->meal_type);
                 foreach ($grouped as $key => $items) {
                     [$menuDate, $mealType] = explode('|', $key, 2);
-                    $headCount = (int) $items->sum('quantity');
-
-                    if ($headCount <= 0) {
-                        continue;
-                    }
-
-                    $alreadyIssued = (int) FestFoodCoupon::where('event_id', $event->id)
-                        ->where('school_id', $bill->school_id)
-                        ->where('valid_date', $menuDate)
-                        ->where('meal_type', $mealType)
-                        ->where('is_extra', false)
-                        ->sum('head_count');
-
-                    $toCreate = max(0, $headCount - $alreadyIssued);
-
+                    $issuedKey = $bill->school_id.'|'.$key;
+                    $toCreate = max(0, (int) $items->sum('quantity') - ($issued[$issuedKey] ?? 0));
                     for ($i = 0; $i < $toCreate; $i++) {
-                        $codeData = FestFoodCoupon::generateSerializedCode($event, $mealType);
-
-                        FestFoodCoupon::create([
-                            'event_id'    => $event->id,
-                            'school_id'   => $bill->school_id,
-                            'coupon_code' => $codeData['code'],
-                            'sequence_no' => $codeData['sequence_no'],
-                            'qr_token'    => FestFoodCoupon::generateQrToken(),
-                            'meal_type'   => $mealType,
-                            'valid_date'  => $menuDate,
-                            'head_count'  => 1,
-                            'is_extra'    => false,
-                            'batch_id'    => $batchId,
-                            'status'      => 'issued',
-                            'issued_at'   => now(),
-                            'notes'       => "Issued from priced food-menu order (bill #{$bill->id})",
-                        ]);
+                        do {
+                            $sequence = ($sequences[$mealType] ?? 0) + 1;
+                            $sequences[$mealType] = $sequence;
+                            $code = FestFoodCoupon::prefixForMeal($mealType).'-'.str_pad((string) $sequence, 4, '0', STR_PAD_LEFT);
+                        } while (isset($codes[$code]));
+                        $codes[$code] = true;
+                        $rows[] = [
+                            'event_id' => $event->id, 'school_id' => $bill->school_id,
+                            'coupon_code' => $code, 'sequence_no' => $sequence,
+                            // 128-bit random token fits the existing 32-character unique column.
+                            'qr_token' => strtoupper(bin2hex(random_bytes(16))),
+                            'meal_type' => $mealType, 'valid_date' => $menuDate,
+                            'head_count' => 1, 'is_extra' => false, 'batch_id' => $batchId,
+                            'status' => 'issued', 'issued_at' => $timestamp,
+                            'created_at' => $timestamp, 'updated_at' => $timestamp,
+                            'notes' => "Issued from priced food-menu order (bill #{$bill->id})",
+                        ];
                         $created++;
+                        if (count($rows) === 100) {
+                            FestFoodCoupon::insert($rows);
+                            $rows = [];
+                        }
                     }
+                    $issued[$issuedKey] = ($issued[$issuedKey] ?? 0) + $toCreate;
                 }
+            }
+            if ($rows) {
+                FestFoodCoupon::insert($rows);
             }
         });
 
@@ -344,7 +356,7 @@ class FestFoodCouponController extends SahodayaAdminController
         ]);
 
         if ($created === 0) {
-            if ($requirePayment && $bills->isEmpty()) {
+            if ($requirePayment && $eligibleBillCount === 0) {
                 return back()->with('error', 'No fully paid food orders found for this event. Approve payments covering the full bill amount before issuing coupons.');
             }
             return back()->with('info', 'No new coupons to issue from eligible food orders.');
