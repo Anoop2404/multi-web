@@ -71,6 +71,12 @@ class FestChestNumberController extends SahodayaAdminController
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        $selectedSchoolId = $request->query('school_id');
+        if ($selectedSchoolId) {
+            abort_unless($schools->contains('id', $selectedSchoolId), 404);
+        }
+        $schoolStudents = $selectedSchoolId ? $this->schoolStudentRows($event, $selectedSchoolId) : [];
+
         $schoolChestRanges = FestSchoolChestRange::where('event_id', $event->id)
             ->get(['school_id', 'chest_no_start', 'chest_no_end'])
             ->keyBy('school_id');
@@ -87,6 +93,8 @@ class FestChestNumberController extends SahodayaAdminController
             'childEvents'    => $childEvents,
             'schools'        => $schools,
             'schoolChestRanges' => $schoolChestRanges,
+            'selectedSchoolId' => $selectedSchoolId,
+            'schoolStudents' => $schoolStudents,
             'itemHasMarksOrAttendance'  => $itemHasMarksOrAttendance,
             'eventHasMarksOrAttendance' => $eventHasMarksOrAttendance,
         ])));
@@ -182,12 +190,17 @@ class FestChestNumberController extends SahodayaAdminController
             )]);
         }
 
+        $schoolId = $request->input('school_id');
+        if ($schoolId) {
+            abort_unless(Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->whereKey($schoolId)->exists(), 404);
+        }
+
         $itemId = $request->integer('item_id') ?: null;
         $item = $itemId ? FestEventItem::where('event_id', $event->id)->find($itemId) : null;
 
-        $count = app(FestNumberingService::class)->assignMissingChestNumbers($event, $item);
+        $count = app(FestNumberingService::class)->assignMissingChestNumbers($event, $item, $schoolId);
 
-        $scopeLabel = $item ? "for item '{$item->title}'" : "for the entire event '{$event->title}'";
+        $scopeLabel = $schoolId ? "for the selected school" : ($item ? "for item '{$item->title}'" : "for the entire event '{$event->title}'");
 
         $audit->festEvent($event, FestPageActivity::CHEST_NUMBERS, 'fest.chest_numbers.assigned_missing_all', "Assigned {$count} missing chest number(s) {$scopeLabel}", [
             'count'   => $count,
@@ -383,7 +396,7 @@ class FestChestNumberController extends SahodayaAdminController
             $item = FestEventItem::where('event_id', $event->id)->find($bulkItemIds[0]);
         }
 
-        $rows = $this->chestNumberRows($event, $itemId, $bulkItemIds ?? []);
+        $rows = $this->chestNumberRows($event, $itemId, $bulkItemIds ?? [], $request->query('school_id'));
 
         $itemCategory = null;
         if ($item && $item->class_group && $item->class_group !== 'open') {
@@ -464,7 +477,7 @@ class FestChestNumberController extends SahodayaAdminController
         $bulkItemIds = $this->resolveBulkChestItemIds($event, $request);
         abort_if($bulkItemIds === [], 404, 'No competition items found.');
 
-        $rows = $this->chestNumberRows($event, $request->integer('item_id') ?: null, $bulkItemIds ?? []);
+        $rows = $this->chestNumberRows($event, $request->integer('item_id') ?: null, $bulkItemIds ?? [], $request->query('school_id'));
         $filename = str($event->title)->slug()->limit(40)->toString().'-chest-numbers.csv';
 
         return response()->streamDownload(function () use ($rows) {
@@ -643,13 +656,33 @@ class FestChestNumberController extends SahodayaAdminController
         return $query->pluck('id')->map(fn ($id) => (int) $id)->all();
     }
 
+    private function schoolStudentRows(FestEvent $event, string $schoolId): array
+    {
+        return FestParticipant::whereHas('registration', fn ($q) => $q
+            ->where('event_id', $event->id)->where('school_id', $schoolId)
+            ->whereNotIn('status', ['rejected', 'withdrawn']))
+            ->with(['registration.item', 'registration.event', 'student', 'teacher', 'group'])
+            ->get()->groupBy(fn ($p) => ($p->group_id ? 'group-'.$p->group_id : 'person-'.($p->student_id ? 's'.$p->student_id : ($p->teacher_id ? 't'.$p->teacher_id : 'p'.$p->id)))
+                .'-'.app(FestNumberingService::class)->chestHeadScope($event, $p->registration->item))
+            ->map(function ($rows) {
+                $p = $rows->first();
+                return [
+                    'id' => $p->id,
+                    'name' => $p->student?->name ?? $p->teacher?->name ?? 'Participant',
+                    'chest_no' => $p->group?->chest_no ?? $p->chest_no,
+                    'items' => $rows->pluck('registration.item.title')->unique()->implode(', '),
+                ];
+            })->sortBy('name')->values()->all();
+    }
+
     /** @param list<int> $explicitItemIds */
-    private function chestNumberRows(FestEvent $event, ?int $itemId = null, array $explicitItemIds = [])
+    private function chestNumberRows(FestEvent $event, ?int $itemId = null, array $explicitItemIds = [], ?string $schoolId = null)
     {
         $itemIds = $explicitItemIds !== [] ? $explicitItemIds : ($itemId ? $event->reportableItemIds([$itemId]) : null);
 
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
             ->whereIn('event_id', $event->reportableEventIds())
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->whereNotIn('status', ['rejected', 'withdrawn'])
             ->when($itemIds, fn ($q2) => $q2->whereIn('item_id', $itemIds)))
             ->where('participant_role', '!=', 'standby')

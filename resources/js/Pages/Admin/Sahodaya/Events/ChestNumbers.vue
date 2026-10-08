@@ -37,6 +37,33 @@
             <p class="text-xs text-slate-500">Fallback also applies when a school's range is full. To replace existing numbers, reset all chests first.</p>
         </div>
 
+        <div v-if="event.event_type === 'sports'" class="card mb-5 space-y-3">
+            <h3 class="font-semibold">School-wise student chest assignment</h3>
+            <select :value="selectedSchoolId || ''" @change="selectChestSchool($event.target.value)" class="field">
+                <option value="">Select school</option>
+                <option v-for="school in schools" :key="school.id" :value="school.id">{{ school.name }}</option>
+            </select>
+            <div v-if="selectedSchoolId" class="space-y-3">
+                <div class="flex flex-wrap gap-2">
+                    <button class="btn-primary" :disabled="sportsGenerating" @click="generateSportsChests(selectedSchoolId)">Assign missing for this school</button>
+                    <a :href="`${base}/print?school_id=${selectedSchoolId}&download=1`" class="btn-secondary">School chest report (PDF)</a>
+                    <a :href="`${base}/csv?school_id=${selectedSchoolId}`" class="btn-secondary">School chest report (CSV)</a>
+                </div>
+                <p class="text-xs text-slate-500">Uses the school's range, or the custom fallback above. Shared sports numbers are listed once per student and item head.</p>
+                <div class="overflow-x-auto">
+                    <table class="data-table">
+                        <thead><tr><th>Student</th><th>Items</th><th>Chest number</th><th></th></tr></thead>
+                        <tbody><tr v-for="student in schoolStudents" :key="student.id">
+                            <td>{{ student.name }}</td><td>{{ student.items }}</td>
+                            <td><input type="number" min="1" class="field w-28" :value="schoolChestDrafts[student.id] ?? student.chest_no" @input="schoolChestDrafts[student.id] = $event.target.value"></td>
+                            <td><button class="btn-secondary" @click="saveSchoolStudentChest(student)">Save</button></td>
+                        </tr></tbody>
+                    </table>
+                    <p v-if="!schoolStudents.length" class="text-sm text-slate-500 p-3">No active participants for this school.</p>
+                </div>
+            </div>
+        </div>
+
         <SportsSetupSubNav v-if="event.event_type === 'sports'" :sahodaya-id="sahodaya.id" :event-id="event.id" active="chest-numbers" :event="event" />
         <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="chest-numbers" class="mb-4" />
 
@@ -424,6 +451,8 @@ const props = defineProps({
     activityLogs: { type: Array, default: () => [] },
     childEvents: { type: Array, default: () => [] },
     schools: { type: Array, default: () => [] },
+    selectedSchoolId: { type: String, default: null },
+    schoolStudents: { type: Array, default: () => [] },
     schoolChestRanges: { type: Object, default: () => ({}) },
     itemHasMarksOrAttendance: { type: Boolean, default: false },
     eventHasMarksOrAttendance: { type: Boolean, default: false },
@@ -493,11 +522,22 @@ function assignItemReg() { postAction(`${base.value}/assign-item-ids`); }
 // assigns every item still missing chest numbers, not just whichever one is currently
 // open. Purely additive (never touches an already-assigned number), so no confirm
 // dialog, matching the same no-confirm per-item "Assign missing chest" button.
+const schoolChestDrafts = ref({});
+function selectChestSchool(schoolId) {
+    schoolChestDrafts.value = {};
+    router.get(base.value, schoolId ? { school_id: schoolId } : {}, { preserveScroll: true });
+}
+function saveSchoolStudentChest(student) {
+    const chest = Number(schoolChestDrafts.value[student.id] ?? student.chest_no);
+    if (!Number.isInteger(chest) || chest < 1) return;
+    router.post(`${base.value}/${student.id}/set`, { chest_no: chest }, { preserveScroll: true });
+}
+
 const sportsFallbackStart = ref(props.event.numbering_settings?.chest_no_start ?? 100);
 const sportsGenerating = ref(false);
-function generateSportsChests() {
+function generateSportsChests(schoolId = null) {
     sportsGenerating.value = true;
-    router.post(`${base.value}/assign-missing-all`, { fallback_start: sportsFallbackStart.value }, {
+    router.post(`${base.value}/assign-missing-all`, { fallback_start: sportsFallbackStart.value, school_id: typeof schoolId === 'string' ? schoolId : null }, {
         preserveScroll: true, preserveState: true,
         onFinish: () => { sportsGenerating.value = false; },
     });

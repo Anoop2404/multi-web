@@ -517,8 +517,23 @@ class FestHeadItemNavigationService
             ->where(fn ($q) => $q->whereNotNull('fest_participants.student_id')->orWhereNotNull('fest_participants.teacher_id'))
             ->when($schoolId, fn ($q) => $q->where('fest_registrations.school_id', $schoolId));
 
+        // Sports stores a shared chest once per person/head. Count a sibling row
+        // as assigned when the same owner lookup used by the display can resolve it.
+        $scopePlaceholders = implode(',', array_fill(0, count($eventIds), '?'));
+        $sharedChest = "exists (
+            select 1 from fest_participants chest_owner
+            where chest_owner.event_id in ({$scopePlaceholders})
+              and chest_owner.chest_head_id = coalesce(chest_item.head_id, 0)
+              and chest_owner.chest_no is not null
+              and ((fest_participants.student_id is not null and chest_owner.student_id = fest_participants.student_id)
+                or (fest_participants.student_id is null and fest_participants.teacher_id is not null and chest_owner.teacher_id = fest_participants.teacher_id))
+        )";
         $participantRows = $baseParticipantQuery()
-            ->selectRaw('fest_registrations.item_id as item_id, count(*) as indiv_count, sum(case when fest_participants.chest_no is not null or fest_groups.chest_no is not null then 1 else 0 end) as chest_assigned')
+            ->join('fest_event_items as chest_item', 'fest_registrations.item_id', '=', 'chest_item.id')
+            ->join('fest_events as chest_event', 'fest_registrations.event_id', '=', 'chest_event.id')
+            ->selectRaw("fest_registrations.item_id as item_id, count(*) as indiv_count,
+                sum(case when fest_participants.chest_no is not null or fest_groups.chest_no is not null
+                    or (chest_event.event_type = 'sports' and {$sharedChest}) then 1 else 0 end) as chest_assigned", $eventIds)
             ->groupBy('fest_registrations.item_id')
             ->get()
             ->keyBy('item_id');

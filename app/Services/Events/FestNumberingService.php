@@ -371,7 +371,7 @@ class FestNumberingService
     }
 
     /** Assign chest numbers to participants missing them. */
-    public function assignMissingChestNumbers(FestEvent $event, ?FestEventItem $item = null): int
+    public function assignMissingChestNumbers(FestEvent $event, ?FestEventItem $item = null, ?string $schoolId = null): int
     {
         $count = 0;
 
@@ -387,6 +387,7 @@ class FestNumberingService
         // final headcount yet) -- nothing here gets renumbered later, it's a one-time batch.
         FestGroup::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->whereNotIn('status', ['rejected', 'withdrawn'])
             ->when($item, fn ($q2) => $q2->where('item_id', $item->id))
             ->whereHas('item', fn ($qi) => $qi->whereIn('participant_type', FestTeamSquadRules::MULTI_PERSON_TYPES)))
@@ -411,6 +412,7 @@ class FestNumberingService
         // registration always won, every time this ran.
         FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->whereNotIn('status', ['rejected', 'withdrawn'])
             ->when($item, fn ($q2) => $q2->where('item_id', $item->id))
             ->whereDoesntHave('item', fn ($qi) => $qi->whereIn('participant_type', FestTeamSquadRules::MULTI_PERSON_TYPES)))
