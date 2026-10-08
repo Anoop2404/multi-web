@@ -280,6 +280,7 @@ class CertificateTemplateController extends SahodayaAdminController
             'signatories.*.signature' => 'nullable|image|max:1024',
             'dynamic_fields_json' => 'nullable|array',
             'layout_json'         => 'nullable|array',
+            'layout_json.achievement_verb' => 'nullable|string|max:80',
             'layout_json.orientation' => 'nullable|in:landscape,portrait',
             'layout_json.page'        => 'nullable|array',
             'layout_json.page.width_mm' => 'nullable|numeric|min:1|max:2000',
@@ -540,6 +541,7 @@ class CertificateTemplateController extends SahodayaAdminController
             // below) — it used to be read straight from this validated field, letting a
             // sahodaya-admin reference another tenant's file path on the shared public disk.
             'layout_json'         => 'nullable|array',
+            'layout_json.achievement_verb' => 'nullable|string|max:80',
             'layout_json.orientation' => 'nullable|in:landscape,portrait',
             'layout_json.page'        => 'nullable|array',
             'layout_json.page.width_mm' => 'nullable|numeric|min:1|max:2000',
@@ -904,6 +906,10 @@ class CertificateTemplateController extends SahodayaAdminController
 
         if (! is_array($input)) {
             return $layout;
+        }
+
+        if (array_key_exists('achievement_verb', $input)) {
+            $layout['achievement_verb'] = $input['achievement_verb'] ?: 'secured';
         }
 
         foreach (['show_recipient_name', 'show_participation_label', 'bold_variables', 'show_certificate_date', 'show_logo_overlay', 'show_qr', 'show_photo'] as $flag) {

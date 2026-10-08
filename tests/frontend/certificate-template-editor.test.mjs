@@ -74,3 +74,12 @@ test('cancel on the edit page navigates back to the template list', () => {
     ctx.cancelEdit();
     assert.equal(destination, '/sahodaya-admin/tenant/certificate-templates');
 });
+
+test('achievement wording defaults to lowercase and loads per-template overrides', () => {
+    const ctx = vm.createContext({ props: { defaultLayout: {} } });
+    vm.runInContext(layoutSource, ctx);
+    assert.equal(ctx.layoutDefaults().achievement_verb, 'secured');
+    const loaded = ctx.layoutDefaults({ achievement_verb: 'Secured', body: { top: 41 } });
+    assert.equal(loaded.achievement_verb, 'Secured');
+    assert.equal(loaded.body.top, 41);
+});

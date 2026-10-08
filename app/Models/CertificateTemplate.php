@@ -63,6 +63,7 @@ class CertificateTemplate extends Model
             'show_recipient_name' => false,
             'show_participation_label' => true,
             'bold_variables' => true,
+            'achievement_verb' => 'secured',
             'show_certificate_date' => true,
             'show_logo_overlay' => true,
             'show_qr' => true,
@@ -223,8 +224,15 @@ class CertificateTemplate extends Model
      *
      * @param  array<string, mixed>  $fieldValues
      */
-    public static function substituteTokens(string $text, array $fieldValues, bool $boldVariables): string
+    public static function substituteTokens(string $text, array $fieldValues, bool $boldVariables, array $layout = []): string
     {
+        if (isset($fieldValues['achievement_line']) && filled($layout['achievement_verb'] ?? null)) {
+            $fieldValues['achievement_line'] = preg_replace_callback(
+                '/^secured\b/i',
+                fn () => (string) $layout['achievement_verb'],
+                (string) $fieldValues['achievement_line'],
+            );
+        }
         $itemTitlesList = $fieldValues['item_titles'] ?? [];
 
         foreach ($fieldValues as $key => $value) {
@@ -259,6 +267,7 @@ class CertificateTemplate extends Model
     {
         $defaults = self::defaultBackgroundLayout();
         $custom = is_array($this->layout_json) ? $this->layout_json : [];
+        $defaults['achievement_verb'] = $custom['achievement_verb'] ?? 'secured';
 
         foreach (['show_recipient_name', 'show_participation_label', 'bold_variables', 'show_certificate_date', 'show_logo_overlay', 'show_qr', 'show_photo'] as $flag) {
             if (array_key_exists($flag, $custom)) {

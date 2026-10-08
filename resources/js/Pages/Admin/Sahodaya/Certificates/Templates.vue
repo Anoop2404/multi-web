@@ -497,6 +497,14 @@
                         </FormField>
                     </template>
 
+                    <FormField v-if="form.event_type === 'fest'" label="Achievement wording"
+                               hint="Replaces only ‘secured’ in {achievement_line}. Prize and grade stay dynamic. Use ‘Secured’ for a capital S."
+                               :error="form.errors['layout_json.achievement_verb']">
+                        <template #default="{ id }">
+                            <input :id="id" v-model="form.layout_json.achievement_verb" class="field" maxlength="80" placeholder="secured">
+                        </template>
+                    </FormField>
+
                     <div class="sm:col-span-2">
                         <label class="flex items-center gap-2 text-sm text-slate-700 font-semibold">
                             <input v-model="form.is_active" type="checkbox" class="rounded" :true-value="true" :false-value="false">
@@ -926,6 +934,7 @@ function layoutDefaults(from = null) {
     const src = from || {};
     return {
         orientation: src.orientation ?? d.orientation ?? 'landscape',
+        achievement_verb: src.achievement_verb ?? d.achievement_verb ?? 'secured',
         // Null (either) means true A4 — see CertificateTemplate::pageDimensionsMm().
         page: {
             width_mm: src.page?.width_mm ?? d.page?.width_mm ?? null,

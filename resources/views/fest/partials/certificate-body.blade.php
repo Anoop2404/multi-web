@@ -30,7 +30,7 @@
         if ($rawBody === null && $customFields === []) {
             $rawBody = \App\Models\CertificateTemplate::defaultFestBody();
         }
-        $body = \App\Models\CertificateTemplate::substituteTokens($rawBody ?? '', $fieldValues ?? [], $boldVariables);
+        $body = \App\Models\CertificateTemplate::substituteTokens($rawBody ?? '', $fieldValues ?? [], $boldVariables, $layout);
         $paragraphs = array_filter(array_map('trim', preg_split('/\n\s*\n/', $body)));
         $hasBackground = ! empty($backgroundUrl) || ! empty($template);
     @endphp
@@ -125,7 +125,7 @@
 
             @foreach($customFields as $cf)
                 <div class="overlay-field custom-field" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($cf, ['top' => 50, 'left' => 10, 'width' => 30, 'font_size' => 14, 'font_family' => 'Montserrat', 'align' => 'left']) }}">
-                    {!! \App\Models\CertificateTemplate::substituteTokens($cf['text'] ?? '', $fieldValues ?? [], $boldVariables) !!}
+                    {!! \App\Models\CertificateTemplate::substituteTokens($cf['text'] ?? '', $fieldValues ?? [], $boldVariables, $layout) !!}
                 </div>
             @endforeach
         </div>
