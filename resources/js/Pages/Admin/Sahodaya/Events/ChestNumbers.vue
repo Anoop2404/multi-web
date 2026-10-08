@@ -71,7 +71,10 @@
 
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div class="flex flex-wrap gap-2">
-                            <button type="button" class="btn-primary text-sm" @click="generate">Assign missing chest</button>
+                            <button v-if="totalCount > assignedCount" type="button" class="btn-primary text-sm" :disabled="isSavingBulk" @click="startBulkEdit(true)">
+                                Add missing chest numbers manually ({{ totalCount - assignedCount }})
+                            </button>
+                            <button type="button" class="btn-secondary text-sm" @click="generate">Assign missing chest</button>
                             <button type="button" class="btn-secondary text-sm" @click="assignItemReg">Assign missing item reg</button>
                             <button v-if="selectedItemId && participants.length" type="button"
                                     :class="isBulkEditing ? 'btn-primary !bg-indigo-600' : 'btn-secondary'"
@@ -139,13 +142,13 @@
                         <div class="flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <h4 class="font-bold text-sm text-indigo-950 flex items-center gap-2">
-                                    <span>✏️ Bulk Edit Mode</span>
+                                    <span>{{ missingOnly ? 'Add missing chest numbers' : '✏️ Bulk Edit Mode' }}</span>
                                     <span class="text-xs font-semibold text-indigo-700 bg-indigo-100 px-2.5 py-0.5 rounded-full">
-                                        {{ participants.length }} participants
+                                        {{ bulkParticipants.length }} participants
                                     </span>
                                 </h4>
                                 <p class="text-xs text-indigo-700 mt-0.5">
-                                    Type directly in the Chest and Order boxes below. Use <kbd class="px-1 py-0.5 bg-white border rounded text-[11px] font-mono">Tab</kbd> to move across fields quickly.
+                                    {{ missingOnly ? 'Enter chest numbers in the empty boxes below, then save all together. Blank boxes stay unassigned.' : 'Type directly in the Chest and Order boxes below.' }} Use <kbd class="px-1 py-0.5 bg-white border rounded text-[11px] font-mono">Tab</kbd> to move across fields quickly.
                                 </p>
                             </div>
                             <div class="flex items-center gap-2">
@@ -171,7 +174,7 @@
                                 </button>
                             </div>
 
-                            <div class="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-indigo-200">
+                            <div v-if="!missingOnly" class="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-indigo-200">
                                 <span class="text-slate-600 font-medium">Order start:</span>
                                 <input v-model.number="autoOrderStart" type="number" min="1" class="w-14 px-1.5 py-0.5 border border-slate-300 rounded font-mono text-center text-xs" />
                                 <button type="button" class="text-indigo-600 font-bold hover:underline" @click="autoFillOrders">
@@ -202,8 +205,8 @@
                                     :class="p.chest_no ? 'hover:bg-slate-50' : 'bg-amber-50/60 hover:bg-amber-50'">
                                     <td class="p-3 text-gray-500">{{ idx + 1 }}</td>
                                     <td class="p-3 font-mono font-bold">
-                                        <div v-if="isBulkEditing">
-                                            <input type="number" min="1"
+                                        <div v-if="isBulkEditing && (!missingOnly || !p.chest_no)">
+                                            <input type="number" min="1" :aria-label="`Chest number for ${p.name}`" :disabled="isSavingBulk"
                                                    v-model.number="bulkDrafts[p.id].chest_no"
                                                    class="w-20 rounded border-2 border-indigo-400 px-2 py-1 text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-white"
                                                    placeholder="—" />
@@ -221,17 +224,18 @@
                                         </div>
                                         <div v-else class="flex items-center gap-1.5">
                                             <span>{{ p.chest_no ?? '—' }}</span>
-                                            <button @click="startChestEdit(p)" title="Set chest number"
+                                            <button v-if="!isBulkEditing" @click="startChestEdit(p)" title="Set chest number"
                                                     class="text-slate-300 hover:text-indigo-600 font-normal text-xs leading-none">✎</button>
                                         </div>
                                     </td>
                                     <td class="p-3">
-                                        <div v-if="isBulkEditing">
-                                            <input type="number" min="1"
+                                        <div v-if="isBulkEditing && !missingOnly">
+                                            <input type="number" min="1" :disabled="isSavingBulk"
                                                    v-model.number="bulkDrafts[p.id].order_no"
                                                    class="w-16 rounded border-2 border-indigo-400 px-2 py-1 text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-white"
                                                    placeholder="—" />
                                         </div>
+                                        <span v-else-if="isBulkEditing && missingOnly" class="font-mono">{{ p.order_no ?? '—' }}</span>
                                         <SearchableSelect v-else :model-value="p.order_no ?? ''"
                                                 :options="orderOptionsFor(p.id).map((n) => ({ value: n, label: String(n) }))"
                                                 :all-option="true" all-label="— No order —"
@@ -382,7 +386,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, reactive, ref } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
@@ -616,11 +620,25 @@ function confirmSetChest(participant) {
 
 // Bulk Edit Mode
 const isBulkEditing = ref(false);
+const missingOnly = ref(false);
+const bulkParticipants = computed(() => missingOnly.value
+    ? props.participants.filter((p) => !p.chest_no)
+    : props.participants);
+watch(() => [props.selectedItemId, props.includePending], () => {
+    cancelBulkEdit();
+    if (props.selectedItemId && props.participants.some((p) => !p.chest_no)) startBulkEdit(true);
+});
 const isSavingBulk = ref(false);
 const bulkError = ref('');
 const bulkDrafts = reactive({});
 const autoChestStart = ref(100);
 const autoOrderStart = ref(1);
+
+onMounted(() => {
+    if (props.selectedItemId && props.participants.some((p) => !p.chest_no)) {
+        startBulkEdit(true);
+    }
+});
 
 function toggleBulkEdit() {
     if (isBulkEditing.value) {
@@ -630,7 +648,10 @@ function toggleBulkEdit() {
     }
 }
 
-function startBulkEdit() {
+function startBulkEdit(onlyMissing = false) {
+    if (isSavingBulk.value) return;
+    cancelBulkEdit();
+    missingOnly.value = onlyMissing;
     cancelChestEdit();
     isBulkEditing.value = true;
     bulkError.value = '';
@@ -654,6 +675,7 @@ function startBulkEdit() {
 }
 
 function cancelBulkEdit() {
+    if (isSavingBulk.value) return;
     isBulkEditing.value = false;
     bulkError.value = '';
     for (const key of Object.keys(bulkDrafts)) {
@@ -663,7 +685,9 @@ function cancelBulkEdit() {
 
 function autoFillChests() {
     let current = Number(autoChestStart.value) || 100;
-    for (const p of props.participants) {
+    const taken = new Set(missingOnly.value ? props.participants.filter((p) => p.chest_no).map((p) => Number(p.chest_no)) : []);
+    for (const p of bulkParticipants.value) {
+        while (taken.has(current)) current++;
         if (!bulkDrafts[p.id]) bulkDrafts[p.id] = {};
         bulkDrafts[p.id].chest_no = current++;
     }
@@ -678,7 +702,7 @@ function autoFillOrders() {
 }
 
 function clearDraftChests() {
-    for (const p of props.participants) {
+    for (const p of bulkParticipants.value) {
         if (bulkDrafts[p.id]) bulkDrafts[p.id].chest_no = null;
     }
 }
@@ -691,6 +715,15 @@ function clearDraftOrders() {
 
 function saveBulkChanges() {
     bulkError.value = '';
+
+    if (isSavingBulk.value) return;
+    for (const p of bulkParticipants.value) {
+        const value = bulkDrafts[p.id]?.chest_no;
+        if (value !== null && value !== undefined && value !== '' && (!Number.isInteger(Number(value)) || Number(value) < 1)) {
+            bulkError.value = `Enter a valid chest number for ${p.name}.`;
+            return;
+        }
+    }
 
     // Check for duplicate chest numbers in drafts
     const chests = Object.values(bulkDrafts)
@@ -706,7 +739,7 @@ function saveBulkChanges() {
     }
 
     // Check for duplicate order numbers in drafts
-    const orders = Object.values(bulkDrafts)
+    const orders = (missingOnly.value ? [] : Object.values(bulkDrafts))
         .map((d) => d.order_no)
         .filter((o) => o !== null && o !== undefined && o !== '');
     const orderCounts = {};
@@ -718,12 +751,16 @@ function saveBulkChanges() {
         }
     }
 
-    const updates = props.participants.map((p) => ({
+    const updates = bulkParticipants.value.filter((p) => !missingOnly.value || bulkDrafts[p.id]?.chest_no).map((p) => ({
         id: p.id,
         chest_no: bulkDrafts[p.id]?.chest_no ? Number(bulkDrafts[p.id].chest_no) : null,
         order_no: bulkDrafts[p.id]?.order_no ? Number(bulkDrafts[p.id].order_no) : null,
     }));
 
+    if (!updates.length) {
+        bulkError.value = 'Enter at least one chest number before saving.';
+        return;
+    }
     isSavingBulk.value = true;
     router.post(
         `${base.value}/bulk-update`,
@@ -738,6 +775,7 @@ function saveBulkChanges() {
                 isBulkEditing.value = false;
                 isSavingBulk.value = false;
             },
+            onFinish: () => { isSavingBulk.value = false; },
             onError: (errors) => {
                 isSavingBulk.value = false;
                 bulkError.value = errors.bulk || Object.values(errors)[0] || 'Could not save bulk changes.';

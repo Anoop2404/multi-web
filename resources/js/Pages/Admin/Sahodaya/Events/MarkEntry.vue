@@ -47,7 +47,7 @@
             <p class="text-xs text-amber-900">
                 <strong>{{ props.missingChestCount }}</strong> participant(s) in this item {{ props.missingChestCount === 1 ? "doesn't" : "don't" }} have a chest number yet — the printed sheet will show a blank for them.
             </p>
-            <Link :href="chestNumbersUrl" class="btn-secondary text-xs !bg-white shrink-0">Generate chest numbers</Link>
+            <Link :href="chestNumbersUrl" class="btn-secondary text-xs !bg-white shrink-0">Add chest numbers manually</Link>
         </div>
 
         <!-- Item locked: results already published, marks are frozen -->
@@ -392,7 +392,7 @@ const importUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${
 const markEntryReportUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/reports/item-wise`);
 const marksAuditLogUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/audit-logs?action=fest.mark.saved`);
 const registrationsUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/registrations`);
-const chestNumbersUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/chest-numbers?item_id=${props.selectedItemId}`);
+const chestNumbersUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/chest-numbers?item_id=${props.selectedItemId}&entry=missing`);
 const isSports = computed(() => props.event?.event_type === 'sports');
 
 // Maps childEvents (sport-event/region children) to the {value, label} shape
