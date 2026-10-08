@@ -45,6 +45,7 @@ class FestCertificateController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Events/Certificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
             'event' => $event,
             'certificates' => $this->slimCertificates($certificates),
+            'stageItems' => FestEventItem::whereIn('event_id', $event->reportableEventIds())->orderBy('title')->get(['id', 'title', 'category', 'stage_type', 'results_published_at']),
             'publishedItems' => $this->publishedItemsForEvent($event),
             'schools' => $this->schoolsFromCertificates($certificates),
             'winnersByItem' => $this->winnersByItem($certificates, $event),
@@ -1120,6 +1121,68 @@ class FestCertificateController extends SahodayaAdminController
             ->unique()
             ->values()
             ->all();
+    }
+
+    public function updateItemStages(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        $data = $request->validate([
+            'stage_type' => 'required|in:on_stage,off_stage',
+            'scope' => 'required|in:published,item',
+            'item_id' => 'required_if:scope,item|nullable|integer',
+        ]);
+        $items = FestEventItem::whereIn('event_id', $event->reportableEventIds());
+        if ($data['scope'] === 'published') {
+            $items->whereNotNull('results_published_at')->where('results_hidden', false);
+        } else {
+            $items->whereKey($data['item_id']);
+            abort_unless((clone $items)->exists(), 404);
+        }
+        $count = $items->update(['stage_type' => $data['stage_type']]);
+
+        return back()->with('success', "Updated stage label for {$count} items.");
+    }
+
+    public function downloadMergedMerit(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        $data = $request->validate(['stage_type' => 'nullable|in:on_stage,off_stage']);
+        $service = app(FestCertificateService::class);
+        $itemIds = FestEventItem::whereIn('event_id', $event->reportableEventIds())
+            ->when($data['stage_type'] ?? null, fn ($q, $stage) => $q->where('stage_type', $stage))
+            ->pluck('id')->flip();
+        [$certificates, $payloads] = $service->exportScope($event, true, null, null, 'winner');
+        $certificates = $certificates->filter(fn ($cert) => $itemIds->has($payloads->get($cert->id)['item']?->id))
+            ->sortBy(fn ($cert) => sprintf('%010d-%010d', $payloads->get($cert->id)['item']?->id, $cert->id));
+        if ($certificates->isEmpty()) {
+            return back()->with('error', 'No published merit certificates match this stage. Generate Merit certificates first.');
+        }
+        $plain = $request->boolean('plain');
+        // Preflight before merging: a large download must never render PDFs in the web request.
+        foreach ($certificates as $certificate) {
+            if ($service->cachedPdf($certificate, $plain) === null) {
+                return back()->with('error', 'Some certificates need rendering. Run Render & cache files, then download the merged PDF.');
+            }
+        }
+        @ini_set('memory_limit', '1024M');
+        $pdf = new \setasign\Fpdi\Fpdi();
+        foreach ($certificates as $certificate) {
+            $bytes = $service->cachedPdf($certificate, $plain);
+            $pages = $pdf->setSourceFile(\setasign\Fpdi\PdfParser\StreamReader::createByString($bytes));
+            if ($pages !== 1) {
+                return back()->with('error', 'A certificate has more than one page. Adjust its template and render again before merging.');
+            }
+            $page = $pdf->importPage(1);
+            $size = $pdf->getTemplateSize($page);
+            $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
+            $pdf->useTemplate($page);
+        }
+        $filename = str($event->title)->slug().'-'.($data['stage_type'] ?? 'all-stages').'-merit.pdf';
+
+        return response($pdf->Output('S'), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
     }
 
     public function downloadZip(Request $request, string $tenantId, FestEvent $event)

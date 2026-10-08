@@ -19,6 +19,27 @@
             </Link>
         </div>
 
+        <div class="card !p-4 mb-6">
+            <p class="font-semibold mb-3">Onstage / Offstage merit certificates</p>
+            <div class="flex flex-wrap gap-3 items-center">
+                <select v-model="stageItemId" class="field">
+                    <option value="">All currently published items</option>
+                    <option v-for="item in stageItems" :key="item.id" :value="item.id">{{ item.title }} · {{ item.category || '—' }} · {{ item.stage_type === 'off_stage' ? 'Offstage' : item.stage_type === 'on_stage' ? 'Onstage' : 'Unassigned' }}</option>
+                </select>
+                <select v-model="stageLabel" class="field">
+                    <option value="off_stage">Offstage</option><option value="on_stage">Onstage</option>
+                </select>
+                <button class="btn-secondary" :disabled="stageSaving" @click="saveItemStage">Save item stage</button>
+            </div>
+            <div class="flex flex-wrap gap-3 items-center mt-3">
+                <select v-model="meritStage" class="field">
+                    <option value="off_stage">Offstage winners</option><option value="on_stage">Onstage winners</option><option value="">All stage winners</option>
+                </select>
+                <a :href="`${base}/merged-merit?stage_type=${meritStage}&plain=${plainMode ? 1 : 0}`" class="btn-primary">Download merged merit PDF</a>
+                <span class="text-xs text-gray-500">Published winners only. One certificate per page. Generate and render certificates first.</span>
+            </div>
+        </div>
+
         <!-- Certificate date -->
         <div class="card !p-3 mb-6 flex flex-wrap items-center gap-3 text-xs">
             <span class="font-semibold text-gray-700">📅 Certificate date:</span>
@@ -840,6 +861,7 @@ const props = defineProps({
     event: Object, certificates: Array,
     participationHeld: { type: Boolean, default: false },
     participationParentUrl: { type: String, default: null },
+    stageItems: { type: Array, default: () => [] },
     publishedItems: { type: Array, default: () => [] },
     schools: { type: Array, default: () => [] },
     winnersByItem: { type: Array, default: () => [] },
@@ -855,6 +877,18 @@ const props = defineProps({
 const page = usePage();
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/certificates`;
 
+const stageItemId = ref('');
+const stageLabel = ref('off_stage');
+const meritStage = ref('off_stage');
+const stageSaving = ref(false);
+function saveItemStage() {
+    stageSaving.value = true;
+    router.post(`${base}/item-stages`, {
+        scope: stageItemId.value ? 'item' : 'published',
+        item_id: stageItemId.value || null,
+        stage_type: stageLabel.value,
+    }, { preserveScroll: true, onFinish: () => { stageSaving.value = false; } });
+}
 const activeTab = ref('winners_item');
 const plainMode = ref(false);
 const selectedItemId = ref(null);

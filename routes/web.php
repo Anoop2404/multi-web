@@ -1827,6 +1827,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/certificates/school-downloaded', [FestCertificateController::class, 'markSchoolDownloaded'])->name('certificates.school-downloaded');
             Route::post('/{event}/certificates/certificate-date', [FestCertificateController::class, 'updateCertificateDate'])->name('certificates.certificate-date');
             Route::post('/{event}/certificates/signatories', [FestCertificateController::class, 'updateSignatories'])->name('certificates.signatories');
+            Route::post('/{event}/certificates/item-stages', [FestCertificateController::class, 'updateItemStages'])->name('certificates.item-stages');
+            Route::get('/{event}/certificates/merged-merit', [FestCertificateController::class, 'downloadMergedMerit'])->name('certificates.merged-merit');
             Route::get('/{event}/certificates/download-zip', [FestCertificateController::class, 'downloadZip'])->name('certificates.download-zip');
             Route::post('/{event}/certificates/download-zip/queue', [FestCertificateController::class, 'queueZipExport'])->name('certificates.download-zip.queue');
             Route::post('/{event}/certificates/print-complete', [FestCertificateController::class, 'printComplete'])->name('certificates.print-complete');
