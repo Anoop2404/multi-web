@@ -885,7 +885,7 @@
 </template>
 
 <script setup>
-import { sortByPublication } from '@/Support/certificatePublicationSort.js';
+import { sortByPublication } from '@/support/certificatePublicationSort.js';
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
