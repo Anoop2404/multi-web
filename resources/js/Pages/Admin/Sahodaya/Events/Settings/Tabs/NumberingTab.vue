@@ -71,6 +71,10 @@
                 </p>
             </div>
 
+            <p v-if="event.event_type === 'sports'" class="rounded-lg bg-indigo-50 p-3 text-xs text-indigo-800">
+                Sports uses shared student chest numbers and optional school ranges. Per-item chest starts are disabled. Set the event fallback below or configure school ranges. Item Reg IDs remain per item.
+            </p>
+
             <div v-if="!itemNumberingForm.items.length" class="rounded-xl border border-dashed border-slate-200 p-8 text-center text-slate-400 text-xs">
                 No enabled competition items found. Add items from the event items page first.
             </div>
@@ -91,7 +95,8 @@
                             <td class="p-3.5 font-mono text-slate-500 text-[11px]">{{ row.item_code || '—' }}</td>
                             <td class="p-3.5">
                                 <input v-model.number="itemNumberingForm.items[idx].chest_no_start"
-                                       type="number" min="1" class="field text-xs w-full" placeholder="100">
+                                       :disabled="event.event_type === 'sports'" :title="event.event_type === 'sports' ? 'Sports uses student chest numbers and school ranges; item chest starts are inactive.' : ''"
+                                       type="number" min="1" class="field text-xs w-full disabled:bg-slate-100 disabled:text-slate-400" placeholder="100">
                             </td>
                             <td class="p-3.5">
                                 <input v-model.number="itemNumberingForm.items[idx].item_reg_id_start"

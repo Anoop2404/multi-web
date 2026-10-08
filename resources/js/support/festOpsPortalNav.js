@@ -23,7 +23,7 @@ const dutyNav = {
 };
 
 /** Event-scoped fest-ops nav — pass assigned `duties` to limit links. */
-export function festOpsEventNav(sahodayaId, eventId, duties = null) {
+export function festOpsEventNav(sahodayaId, eventId, duties = null, canManageEvent = false) {
     const opsBase = `/portal/fest-ops/${sahodayaId}`;
     const eventBase = `${opsBase}/events/${eventId}`;
 
@@ -31,6 +31,18 @@ export function festOpsEventNav(sahodayaId, eventId, duties = null) {
         ...festOpsDashboardNav(sahodayaId),
         { href: eventBase, label: 'Event' },
     ];
+
+    if (canManageEvent) {
+        const adminBase = `/sahodaya-admin/${sahodayaId}/events/${eventId}`;
+        items.push(
+            { href: adminBase, label: 'Manage event' },
+            { href: `${adminBase}/reporting-batches`, label: 'Reporting batches' },
+            { href: `${adminBase}/settings/venues`, label: 'Venues & stages' },
+            { href: `${adminBase}/areas`, label: 'Competition areas' },
+            { href: `${adminBase}/schedule`, label: 'Scheduling' },
+            { href: `${adminBase}/items`, label: 'Items & catalog' },
+        );
+    }
 
     const dutyKeys = duties?.length ? duties : Object.keys(dutyNav);
     const seenHrefs = new Set(items.map((item) => item.href));

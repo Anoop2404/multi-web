@@ -81,10 +81,10 @@
                                     class="text-sm font-semibold" @click="toggleBulkEdit">
                                 {{ isBulkEditing ? '✕ Exit Bulk Edit' : '✏️ Bulk Edit' }}
                             </button>
-                            <button v-if="selectedItemId" type="button" class="btn-secondary text-sm" @click="openItemNumberingModal(item)">
+                            <button v-if="selectedItemId && event.event_type !== 'sports'" type="button" class="btn-secondary text-sm" @click="openItemNumberingModal(item)">
                                 🔢 Set starting no (this item)
                             </button>
-                            <button type="button" class="btn-secondary text-sm" @click="openBulkNumberingModal">
+                            <button v-if="event.event_type !== 'sports'" type="button" class="btn-secondary text-sm" @click="openBulkNumberingModal">
                                 🔢 Set common starting no (all items)
                             </button>
                             <button v-if="event.event_type === 'sports'" type="button" class="btn-secondary text-sm font-semibold !text-indigo-700 !bg-indigo-50 border-indigo-200 hover:!bg-indigo-100" @click="openSchoolRangesModal">

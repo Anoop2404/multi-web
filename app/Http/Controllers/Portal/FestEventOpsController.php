@@ -73,6 +73,9 @@ class FestEventOpsController extends Controller
             'sahodaya' => $sahodaya->only('id', 'name'),
             'event'    => $event->only('id', 'title', 'status', 'event_start'),
             'duties'   => $duties,
+            'canManageEvent' => $request->user()->isSuperAdmin()
+                || ($request->user()->hasRole('sahodaya_admin') && $request->user()->tenant_id === $tenantId)
+                || ($request->user()->hasRole('event_admin') && $duties->intersect(['event_admin', 'coordinator'])->isNotEmpty()),
         ]);
     }
 

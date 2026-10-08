@@ -160,7 +160,9 @@ class FestNumberingService
             }
 
             // --- Event-wide fallback (or no school range configured) ---
-            $start     = (int) ($item->chest_no_start ?? $settings['chest_no_start'] ?? 100);
+            $start = (int) ($event->event_type === 'sports'
+                ? ($settings['chest_no_start'] ?? 100)
+                : ($item->chest_no_start ?? $settings['chest_no_start'] ?? 100));
             $candidate = $start;
             while ($used->has($candidate)) {
                 $candidate++;

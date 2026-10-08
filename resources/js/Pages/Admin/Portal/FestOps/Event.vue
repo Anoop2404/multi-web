@@ -30,7 +30,7 @@ import PortalLayout from '@/Layouts/PortalLayout.vue';
 import { festOpsEventNav } from '@/support/festOpsPortalNav.js';
 import { computed } from 'vue';
 
-const props = defineProps({ sahodaya: Object, event: Object, duties: Array });
+const props = defineProps({ sahodaya: Object, event: Object, duties: Array, canManageEvent: { type: Boolean, default: false } });
 
 const dutyMeta = {
     coordinator:  { label: 'Event coordinator', hint: 'Overview & stats', path: 'coordinator' },
@@ -64,9 +64,20 @@ const dutyLinks = computed(() => {
             hint: dutyMeta[d].hint,
             href: `${base}/${dutyMeta[d].path}`,
         }));
+    if (props.canManageEvent) {
+        const adminBase = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
+        links.unshift(
+            { duty: 'manage', label: 'Manage event', hint: 'Settings, registrations, results & certificates', href: adminBase, icon: '⚙️' },
+            { duty: 'batches', label: 'Reporting batches', hint: 'Manage batches & reporting lists', href: `${adminBase}/reporting-batches`, icon: '📋' },
+            { duty: 'venues', label: 'Venues & stages', hint: 'Add and manage venues and stages', href: `${adminBase}/settings/venues`, icon: '🏟️' },
+            { duty: 'areas', label: 'Competition areas', hint: 'Manage competition spaces', href: `${adminBase}/areas`, icon: '📍' },
+            { duty: 'schedule', label: 'Scheduling', hint: 'Plan competition times & stages', href: `${adminBase}/schedule`, icon: '📅' },
+            { duty: 'items', label: 'Items & catalog', hint: 'Edit assigned event items', href: `${adminBase}/items`, icon: '📝' },
+        );
+    }
     links.push({ duty: 'search', label: 'Participant search', hint: 'Lookup & admit cards', href: `${base}/participants/search`, icon: '🔍' });
     return links;
 });
 
-const navItems = computed(() => festOpsEventNav(props.sahodaya.id, props.event.id, props.duties));
+const navItems = computed(() => festOpsEventNav(props.sahodaya.id, props.event.id, props.duties, props.canManageEvent));
 </script>

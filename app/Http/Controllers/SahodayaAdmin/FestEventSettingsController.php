@@ -1862,10 +1862,11 @@ class FestEventSettingsController extends SahodayaAdminController
             if (! in_array((int) $row['id'], $itemIds, true)) {
                 continue;
             }
-            FestEventItem::where('id', $row['id'])->update([
-                'chest_no_start'      => $row['chest_no_start'] ?? null,
-                'item_reg_id_start'   => $row['item_reg_id_start'] ?? null,
-            ]);
+            $updates = ['item_reg_id_start' => $row['item_reg_id_start'] ?? null];
+            if ($event->event_type !== 'sports') {
+                $updates['chest_no_start'] = $row['chest_no_start'] ?? null;
+            }
+            FestEventItem::where('id', $row['id'])->update($updates);
         }
 
         app(PlatformAuditLogger::class)->festEvent(
