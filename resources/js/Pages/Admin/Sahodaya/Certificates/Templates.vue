@@ -146,6 +146,16 @@
                                     <input v-model="form.layout_json.bold_variables" type="checkbox" class="rounded" :true-value="true" :false-value="false">
                                     Bold placeholder values in body text
                                 </label>
+                                <div class="rounded-lg border border-slate-200 p-3">
+                                    <p class="text-sm font-semibold mb-1">Variables to keep plain</p>
+                                    <p class="text-xs text-slate-500 mb-2">Check variables that should not be bold. Other variables follow the bold setting above.</p>
+                                    <div class="flex flex-wrap gap-x-4 gap-y-2">
+                                        <label v-for="token in placeholderTokens" :key="token" class="flex items-center gap-1.5 text-xs text-slate-700">
+                                            <input v-model="form.layout_json.plain_variables" type="checkbox" :value="token.slice(1, -1)" class="rounded">
+                                            {{ token === '{salutation}' ? 'Master/Miss (salutation)' : token }}
+                                        </label>
+                                    </div>
+                                </div>
                                 <label class="flex items-center gap-2 text-sm text-slate-700 font-medium">
                                     <input v-model="form.layout_json.show_certificate_date" type="checkbox" class="rounded" :true-value="true" :false-value="false">
                                     Show certificate date
@@ -942,6 +952,7 @@ function layoutDefaults(from = null) {
         },
         show_recipient_name: src.show_recipient_name ?? d.show_recipient_name ?? false,
         show_participation_label: src.show_participation_label ?? d.show_participation_label ?? true,
+        plain_variables: [...(src.plain_variables ?? d.plain_variables ?? ['salutation'])],
         bold_variables: src.bold_variables ?? d.bold_variables ?? true,
         show_certificate_date: src.show_certificate_date ?? d.show_certificate_date ?? true,
         show_logo_overlay: src.show_logo_overlay ?? d.show_logo_overlay ?? true,

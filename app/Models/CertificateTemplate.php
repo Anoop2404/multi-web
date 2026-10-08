@@ -63,6 +63,7 @@ class CertificateTemplate extends Model
             'show_recipient_name' => false,
             'show_participation_label' => true,
             'bold_variables' => true,
+            'plain_variables' => ['salutation'],
             'achievement_verb' => 'secured',
             'show_certificate_date' => true,
             'show_logo_overlay' => true,
@@ -250,7 +251,18 @@ class CertificateTemplate extends Model
             // server-built, never user input, so skipping escaping here is safe and
             // lets the tag actually render instead of showing as literal text.
             $safe = $key === 'certificate_date' ? (string) $value : e((string) $value);
-            if ($boldVariables && $safe !== '') {
+            $plainVariable = in_array($key, $layout['plain_variables'] ?? ['salutation'], true);
+            if ($plainVariable && $safe !== '') {
+                $safe = '<span style="font-weight: normal">'.$safe.'</span>';
+            }
+            if ($boldVariables && ! $plainVariable && $safe !== '') {
+                if ($key === 'achievement_line') {
+                    $verb = e((string) ($layout['achievement_verb'] ?? 'secured'));
+                    if ($verb !== '' && str_starts_with($safe, $verb)) {
+                        $safe = '<span style="font-weight: normal">'.$verb.'</span>'.substr($safe, strlen($verb));
+                    }
+                    $safe = preg_replace('/\bwith\b/i', '<span style="font-weight: normal">$0</span>', $safe);
+                }
                 $safe = '<strong>'.$safe.'</strong>';
             }
             if (($key === 'item_title' || $key === 'item_details') && count($itemTitlesList) > 3) {
@@ -267,6 +279,7 @@ class CertificateTemplate extends Model
     {
         $defaults = self::defaultBackgroundLayout();
         $custom = is_array($this->layout_json) ? $this->layout_json : [];
+        $defaults['plain_variables'] = $custom['plain_variables'] ?? ['salutation'];
         $defaults['achievement_verb'] = $custom['achievement_verb'] ?? 'secured';
 
         foreach (['show_recipient_name', 'show_participation_label', 'bold_variables', 'show_certificate_date', 'show_logo_overlay', 'show_qr', 'show_photo'] as $flag) {

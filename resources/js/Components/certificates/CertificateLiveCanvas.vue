@@ -347,14 +347,17 @@ function substituteTokens(raw) {
 
     for (const [key, val] of Object.entries(sampleData.value)) {
         const pattern = new RegExp(`\\{${key}\\}`, 'gi');
+        const plainVariable = (props.layout?.plain_variables ?? ['salutation']).includes(key);
+        const shouldBold = boldVariables.value && !plainVariable;
         let value = val;
         if (key === 'achievement_line') {
             const verb = String(props.layout?.achievement_verb || 'secured')
                 .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-            value = String(val).replace(/^secured\b/i, () => verb);
+            value = String(val).replace(/^secured\b/i, () => shouldBold ? `<span style="font-weight: normal">${verb}</span>` : verb);
+            if (shouldBold) value = value.replace(/\bwith\b/gi, word => `<span style="font-weight: normal">${word}</span>`);
         }
-        const formattedVal = boldVariables.value ? `<strong>${value}</strong>` : value;
+        const formattedVal = plainVariable ? `<span style="font-weight: normal">${value}</span>` : shouldBold ? `<strong>${value}</strong>` : value;
         raw = raw.replace(pattern, () => formattedVal);
     }
 
