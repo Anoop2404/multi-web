@@ -317,7 +317,7 @@ class PdfGenerator
      * @param  bool  $requireBrowserRenderer  Same as render()'s — applied to the retry (and
      *                                        to every document when no converter is set).
      */
-    public static function renderEach(iterable $documents, callable $onResult, int $timeoutMs = 300000, bool $requireBrowserRenderer = false): void
+    public static function renderEach(iterable $documents, callable $onResult, int $timeoutMs = 300000, bool $requireBrowserRenderer = false, ?int $concurrency = null): void
     {
         $renderOne = function (array $document) use ($timeoutMs, $requireBrowserRenderer) {
             try {
@@ -385,7 +385,7 @@ class PdfGenerator
         };
 
         (new EachPromise($requests, [
-            'concurrency' => max(1, (int) config('services.pdf_converter.concurrency', 3)),
+            'concurrency' => max(1, $concurrency ?? (int) config('services.pdf_converter.concurrency', 3)),
             'fulfilled' => $settle,
             'rejected' => $settle,
         ]))->promise()->wait();

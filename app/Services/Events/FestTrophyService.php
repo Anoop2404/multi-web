@@ -230,21 +230,27 @@ class FestTrophyService
         arsort($schoolPoints);
         $schools = Tenant::whereIn('id', array_keys($schoolPoints))->pluck('name', 'id');
 
-        $index = $trophy->position - 1;
-        $sortedKeys = array_keys($schoolPoints);
-        if (! isset($sortedKeys[$index])) {
+        $standings = [];
+        foreach (array_keys($schoolPoints) as $index => $schoolId) {
+            $standings[] = [
+                'rank' => $index + 1,
+                'school_id' => $schoolId,
+                'name' => $schools[$schoolId] ?? 'School',
+                'points' => $schoolPoints[$schoolId],
+            ];
+        }
+        $winner = $standings[$trophy->position - 1] ?? null;
+        if (! $winner) {
             return null;
         }
 
-        $winnerSchoolId = $sortedKeys[$index];
-        $points = $schoolPoints[$winnerSchoolId];
-
         return [
             'type' => 'school',
-            'name' => $schools[$winnerSchoolId] ?? 'School',
-            'school_id' => $winnerSchoolId,
-            'points' => $points,
-            'detail' => "{$points} pts across {$items->count()} items",
+            'name' => $winner['name'],
+            'school_id' => $winner['school_id'],
+            'points' => $winner['points'],
+            'detail' => "{$winner['points']} pts across {$items->count()} items",
+            'top_ten' => array_slice($standings, 0, 10),
         ];
     }
 
@@ -326,6 +332,19 @@ class FestTrophyService
 
         $groupName = strtolower((string) ($trophy->item_group_name ?? ''));
         $query = FestEventItem::where('event_id', $event->id);
+        $patterns = $this->documentGroupPatterns($groupName);
+        if ($patterns !== null) {
+            return $query->get()->filter(function ($item) use ($patterns) {
+                $title = preg_replace('/[^a-z0-9]+/', '', strtolower($item->title));
+                foreach ($patterns as $pattern) {
+                    if (str_contains($title, $pattern)) {
+                        return true;
+                    }
+                }
+                return false;
+            })->values();
+        }
+
 
         if (str_contains($groupName, 'music')) {
             $musicKeywords = ['classical music', 'light music', 'mappilappattu', 'violin', 'guitar', 'flute', 'mrudangam', 'tabala', 'vocal'];
@@ -360,6 +379,17 @@ class FestTrophyService
         }
 
         return collect();
+    }
+
+    private function documentGroupPatterns(string $group): ?array
+    {
+        return match ($group) {
+            'new generation items' => ['powerpoint', 'pptpresentation', 'digitalpainting', 'anchoring', 'collage', 'posterdesign'],
+            'literary items' => ['essaywriting', 'storywriting', 'recitation', 'elocution', 'extempore', 'versification'],
+            'traditional art items' => ['ottamthullal', 'ottanthullal', 'thiruvathira', 'tiruvathira', 'margamkali', 'oppana', 'kolkali', 'kolkkali', 'duffmutt', 'duffmut', 'duffmuttu' ],
+            'common group items' => ['groupsong', 'patrioticsong', 'mime', 'oneactplay', 'westernmusic', 'banddisplay'],
+            default => null,
+        };
     }
 
     /**
@@ -457,19 +487,21 @@ class FestTrophyService
     }
 
     /**
-     * Seeds the standard Kochi Metro Sahodaya 60-trophy template from the user's document.
+     * Seeds the standard Kochi Metro Sahodaya 75-trophy template from the user's document.
      */
-    public function seedKochiMetroPreset(FestEvent $event): int
+    public function seedKochiMetroPreset(FestEvent $event, bool $replace = true): int
     {
-        return DB::transaction(function () use ($event) {
+        return DB::transaction(function () use ($event, $replace) {
             // Delete existing trophies to avoid duplicates if re-seeding
-            FestTrophy::where('event_id', $event->id)->delete();
+            if ($replace) {
+                FestTrophy::where('event_id', $event->id)->delete();
+            }
 
-            $template = FestTrophyTemplate::firstOrCreate(
+            $template = FestTrophyTemplate::updateOrCreate(
                 ['event_id' => $event->id, 'code' => 'kochi-metro-kalotsav-60'],
                 [
-                    'name' => 'Metro Kalotsav 2025 Standard List (60 Trophies)',
-                    'description' => 'Official 60-Trophy Distribution Template from Kochi Metro Sahodaya Youth Festival.',
+                    'name' => 'Metro Kalotsav Standard List (75 Trophies)',
+                    'description' => 'Official 75-Trophy Distribution Template from Kochi Metro Sahodaya Youth Festival.',
                     'is_default' => true,
                 ]
             );
@@ -479,6 +511,9 @@ class FestTrophyService
 
             $created = 0;
             foreach ($definitions as $def) {
+                if (! $replace && FestTrophy::where('event_id', $event->id)->where('trophy_no', $def['trophy_no'])->exists()) {
+                    continue;
+                }
                 $matchedItemId = null;
                 if (! empty($def['item_name_pattern'])) {
                     $needle = strtolower($def['item_name_pattern']);
@@ -502,34 +537,8 @@ class FestTrophyService
                 // trophy is missing a group name (shouldn't happen with this preset).
                 $resolvedItemIds = null;
                 if (($def['trophy_type'] ?? null) === 'item_group' && ! empty($def['item_group_name'])) {
-                    $groupName = strtolower($def['item_group_name']);
-                    $resolvedItemIds = $items->filter(function (FestEventItem $it) use ($groupName) {
-                        if (str_contains($groupName, 'music')) {
-                            if (strtolower((string) $it->category) === 'music') {
-                                return true;
-                            }
-                            $title = strtolower($it->title);
-                            foreach (['classical music', 'light music', 'mappilappattu', 'violin', 'guitar', 'flute', 'mrudangam', 'tabala', 'vocal'] as $kw) {
-                                if (str_contains($title, $kw)) {
-                                    return true;
-                                }
-                            }
-                            return false;
-                        }
-                        if (str_contains($groupName, 'art') || str_contains($groupName, 'drawing')) {
-                            if (strtolower((string) $it->category) === 'art') {
-                                return true;
-                            }
-                            $title = strtolower($it->title);
-                            foreach (['pencil drawing', 'painting', 'crayon', 'water colour', 'water color', 'oil colour', 'oil color', 'cartoon', 'clay'] as $kw) {
-                                if (str_contains($title, $kw)) {
-                                    return true;
-                                }
-                            }
-                            return false;
-                        }
-                        return false;
-                    })->pluck('id')->all();
+                    $groupTrophy = new FestTrophy(['item_group_name' => $def['item_group_name']]);
+                    $resolvedItemIds = $this->findItemsForGroup($event, $groupTrophy)->pluck('id')->all();
                 }
 
                 FestTrophy::create([
@@ -671,13 +680,13 @@ class FestTrophyService
     }
 
     /**
-     * Exact 60 trophies definition from Kochi Metro Sahodaya Kalotsav sheet.
+     * Exact 75 trophies definition from Kochi Metro Sahodaya Kalotsav sheet.
      *
      * @return list<array<string, mixed>>
      */
     private function kochiMetroPresetDefinitions(): array
     {
-        return [
+        $definitions = [
             ['trophy_no' => 1, 'title' => 'Ever-rolling trophies shall be awarded to the schools securing First position in overall points.', 'trophy_type' => 'overall', 'position' => 1, 'is_rolling' => true],
             ['trophy_no' => 2, 'title' => 'Ever-rolling trophies shall be awarded to the school securing Second position in overall points.', 'trophy_type' => 'overall', 'position' => 2, 'is_rolling' => true],
             ['trophy_no' => 3, 'title' => 'Ever-rolling trophies shall be awarded to the school securing Third position in overall points.', 'trophy_type' => 'overall', 'position' => 3, 'is_rolling' => true],
@@ -739,5 +748,24 @@ class FestTrophyService
             ['trophy_no' => 59, 'title' => 'Second position in Art items', 'trophy_type' => 'item_group', 'item_group_name' => 'Art items', 'notes' => 'Art items - (Pencil Drawing, Painting Crayon colour, Painting Water colour, Painting, Oil colour, Cartoon)', 'position' => 2],
             ['trophy_no' => 60, 'title' => 'Third Position in Art items', 'trophy_type' => 'item_group', 'item_group_name' => 'Art items', 'notes' => 'Art items - (Pencil Drawing, Painting Crayon colour, Painting Water colour, Painting, Oil colour, Cartoon)', 'position' => 3],
         ];
+        foreach ([
+            [61, 'New Generation items', 'Power Point Presentation, Digital Painting, Anchoring, Collage, Poster Designing'],
+            [64, 'Literary items', 'Essay Writing, Story Writing, Recitation, Elocution, Extempore, Versification'],
+            [67, 'Traditional Art items', 'Ottamthullal, Thiruvathira, Margamkali, Oppana, Kolkali, Duffmutt'],
+            [70, 'Common Group items', 'Group Song, Patriotic Song, Mime, One Act Play, Western Music, Band Display'],
+            [73, 'New Generation items', 'Power Point Presentation, Poster Designing, Digital Painting, Collage, Anchoring'],
+        ] as [$start, $group, $notes]) {
+            foreach ([1 => 'First', 2 => 'Second', 3 => 'Third'] as $position => $label) {
+                $definitions[] = [
+                    'trophy_no' => $start + $position - 1,
+                    'title' => "{$label} position in {$group}",
+                    'trophy_type' => FestTrophy::TYPE_ITEM_GROUP,
+                    'item_group_name' => $group,
+                    'notes' => $notes,
+                    'position' => $position,
+                ];
+            }
+        }
+        return $definitions;
     }
 }

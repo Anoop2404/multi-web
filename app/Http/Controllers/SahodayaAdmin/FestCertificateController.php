@@ -45,7 +45,7 @@ class FestCertificateController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Events/Certificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
             'event' => $event,
             'certificates' => $this->slimCertificates($certificates),
-            'stageItems' => FestEventItem::whereIn('event_id', $event->reportableEventIds())->orderBy('title')->get(['id', 'title', 'category', 'stage_type', 'results_published_at']),
+            'stageItems' => FestEventItem::whereIn('event_id', $event->reportableEventIds())->orderBy('title')->get(['id', 'title', 'item_code', 'category', 'stage_type', 'results_published_at']),
             'publishedItems' => $this->publishedItemsForEvent($event),
             'schools' => $this->schoolsFromCertificates($certificates),
             'winnersByItem' => $this->winnersByItem($certificates, $event),
@@ -141,7 +141,7 @@ class FestCertificateController extends SahodayaAdminController
                 'is_rendered' => $c['is_rendered'],
                 'rendered_at' => $c['rendered_at'],
                 'student' => ['name' => $c['student']?->name ?? $c['participant']?->student?->name],
-                'item' => ! empty($c['item']) ? ['id' => $c['item']->id, 'title' => $c['item']->title] : null,
+                'item' => ! empty($c['item']) ? ['id' => $c['item']->id, 'title' => $c['item']->title, 'results_published_at' => $c['item']->results_published_at?->toIso8601String()] : null,
                 'items' => $c['participation_items'] ?? null,
                 'mark' => $c['mark'] ? ['position' => $c['mark']->position] : null,
                 'registration' => ['school' => $school ? ['id' => $school->id, 'name' => $school->name] : null],
@@ -844,6 +844,7 @@ class FestCertificateController extends SahodayaAdminController
                 return [
                     'item_id' => $first['item']->id,
                     'item_title' => $first['item']->title,
+                    'results_published_at' => $first['item']->results_published_at?->toIso8601String(),
                     'item_code' => $first['item']->item_code,
                     'category_label' => FestItemCategoryLabel::shortLabel($first['item'], $classGroupLabels, $artsCategoryLabels),
                     'gender_label' => $this->itemGenderLabel($first['item']),
@@ -1146,10 +1147,11 @@ class FestCertificateController extends SahodayaAdminController
     public function downloadMergedMerit(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
-        $data = $request->validate(['stage_type' => 'nullable|in:on_stage,off_stage']);
+        $data = $request->validate(['stage_type' => 'nullable|in:on_stage,off_stage', 'item_id' => 'nullable|integer']);
         $service = app(FestCertificateService::class);
         $itemIds = FestEventItem::whereIn('event_id', $event->reportableEventIds())
             ->when($data['stage_type'] ?? null, fn ($q, $stage) => $q->where('stage_type', $stage))
+            ->when($data['item_id'] ?? null, fn ($q, $id) => $q->whereKey($id))
             ->pluck('id')->flip();
         [$certificates, $payloads] = $service->exportScope($event, true, null, null, 'winner');
         $certificates = $certificates->filter(fn ($cert) => $itemIds->has($payloads->get($cert->id)['item']?->id))
@@ -1561,7 +1563,7 @@ class FestCertificateController extends SahodayaAdminController
         ]);
 
         $tenantId = $this->sahodaya->id;
-        $jobs = $certificates->pluck('id')->chunk(30)
+        $jobs = $certificates->pluck('id')->chunk(max(1, min(100, (int) config('certificates.render_chunk_size', 20))))
             ->map(fn ($chunk) => new RenderCertificateChunkJob($batchRow->id, $chunk->values()->all(), $tenantId))
             ->all();
 
@@ -1584,6 +1586,7 @@ class FestCertificateController extends SahodayaAdminController
                 ]);
             })
             ->name('certificate-batch-'.$batchRow->id)
+            ->onQueue(config('certificates.render_queue', 'default'))
             ->dispatch();
 
         $batchRow->update(['queued_job_batch_id' => $laravelBatch->id]);

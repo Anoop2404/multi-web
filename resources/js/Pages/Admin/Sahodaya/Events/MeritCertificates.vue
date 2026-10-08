@@ -39,6 +39,13 @@
                             :all-label="`All schools (${schools.length})`"
                             class="max-w-[220px]"
                         />
+                        <label class="text-xs">Sort items
+                            <select v-model="meritItemSort" class="field text-xs">
+                                <option value="default">Current order</option>
+                                <option value="published_desc">Published newest first</option>
+                                <option value="published_asc">Published oldest first</option>
+                            </select>
+                        </label>
                         <button @click="generate(selectedItemId)" class="btn-secondary py-1.5 px-3 text-xs">
                             ⚡ Generate{{ selectedItemId ? ' for item' : '' }}
                         </button>
@@ -174,6 +181,7 @@
 </template>
 
 <script setup>
+import { sortByPublication } from '@/Support/certificatePublicationSort.js';
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
@@ -212,7 +220,8 @@ const itemOptions = computed(() => props.publishedItems.map(item => {
     return { id: item.id, name };
 }));
 
-const filteredCertificates = computed(() => props.certificates.filter(c => {
+const meritItemSort = ref('default');
+const filteredCertificates = computed(() => sortByPublication(props.certificates.filter(c => {
     if (selectedItemId.value && c.item?.id !== selectedItemId.value) return false;
     if (selectedSchoolId.value) {
         const schoolId = c.registration?.school?.id ?? c.participant?.registration?.school?.id;
@@ -225,7 +234,7 @@ const filteredCertificates = computed(() => props.certificates.filter(c => {
         if (!studentName.includes(q) && !itemTitle.includes(q)) return false;
     }
     return true;
-}));
+}), meritItemSort.value, c => c.item?.results_published_at));
 
 const scopeLabel = computed(() => {
     if (selectedItemId.value) return props.publishedItems.find(i => i.id === selectedItemId.value)?.title ?? 'Item';

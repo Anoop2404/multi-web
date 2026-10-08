@@ -52,6 +52,15 @@ class PdfGeneratorConcurrencyTest extends TestCase
 
             $this->assertSame(array_fill_keys(array_keys($documents), '%PDF-slow'), $results);
             $this->assertLessThan(2.2, $elapsed, sprintf('6 x %.1f s documents took %.2f s — requests are not overlapping (one after another would be ~3 s).', self::RENDER_SECONDS, $elapsed));
+
+            $startedAt = microtime(true);
+            $results = [];
+            PdfGenerator::renderEach($documents, function ($key, $pdf) use (&$results) {
+                $results[$key] = $pdf;
+            }, concurrency: 6);
+            $this->assertSame(array_fill_keys(array_keys($documents), '%PDF-slow'), $results);
+            $this->assertLessThan(1.4, microtime(true) - $startedAt, 'Certificate concurrency override should render six documents in one window.');
+            $this->assertSame(3, config('services.pdf_converter.concurrency'), 'Override must not change other PDF renderers.');
         } finally {
             posix_kill($pid, SIGKILL);
             pcntl_waitpid($pid, $status);

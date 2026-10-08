@@ -64,12 +64,12 @@ class FestTrophyDistributionTest extends TestCase
         return app(FestIndividualChampionshipService::class);
     }
 
-    public function test_can_seed_kochi_metro_60_trophies_preset(): void
+    public function test_can_seed_kochi_metro_75_trophies_preset(): void
     {
         $count = $this->trophyService()->seedKochiMetroPreset($this->parentEvent);
 
-        $this->assertEquals(60, $count);
-        $this->assertDatabaseCount('fest_trophies', 60);
+        $this->assertEquals(75, $count);
+        $this->assertDatabaseCount('fest_trophies', 75);
 
         // Check trophy #1: Ever-rolling overall points
         $trophy1 = FestTrophy::where('event_id', $this->parentEvent->id)->where('trophy_no', 1)->first();
@@ -110,8 +110,8 @@ class FestTrophyDistributionTest extends TestCase
 
         $inheritedCount = $this->trophyService()->copyFromParent($this->childEvent);
 
-        $this->assertEquals(60, $inheritedCount);
-        $this->assertEquals(60, FestTrophy::where('event_id', $this->childEvent->id)->count());
+        $this->assertEquals(75, $inheritedCount);
+        $this->assertEquals(75, FestTrophy::where('event_id', $this->childEvent->id)->count());
     }
 
     public function test_parent_event_can_push_trophies_to_child_events(): void
@@ -120,8 +120,8 @@ class FestTrophyDistributionTest extends TestCase
 
         $pushedCount = $this->trophyService()->pushToChildEvents($this->parentEvent);
 
-        $this->assertEquals(60, $pushedCount);
-        $this->assertEquals(60, FestTrophy::where('event_id', $this->childEvent->id)->count());
+        $this->assertEquals(75, $pushedCount);
+        $this->assertEquals(75, FestTrophy::where('event_id', $this->childEvent->id)->count());
     }
 
     public function test_trophy_winners_resolution_overall_category_and_item(): void

@@ -19,27 +19,47 @@
             </Link>
         </div>
 
-        <div class="card !p-4 mb-6">
-            <p class="font-semibold mb-3">Onstage / Offstage merit certificates</p>
-            <div class="flex flex-wrap gap-3 items-center">
-                <select v-model="stageItemId" class="field">
-                    <option value="">All currently published items</option>
-                    <option v-for="item in stageItems" :key="item.id" :value="item.id">{{ item.title }} · {{ item.category || '—' }} · {{ item.stage_type === 'off_stage' ? 'Offstage' : item.stage_type === 'on_stage' ? 'Onstage' : 'Unassigned' }}</option>
-                </select>
-                <select v-model="stageLabel" class="field">
-                    <option value="off_stage">Offstage</option><option value="on_stage">Onstage</option>
-                </select>
-                <button class="btn-secondary" :disabled="stageSaving" @click="saveItemStage">Save item stage</button>
+        <section class="card !p-5 mb-6">
+            <div class="mb-4">
+                <h2 class="font-semibold text-slate-900">Merit certificates by stage</h2>
+                <p class="text-xs text-slate-500 mt-1">Download published winners in one PDF, with one certificate per page.</p>
             </div>
-            <div class="flex flex-wrap gap-3 items-center mt-3">
-                <select v-model="meritStage" class="field">
-                    <option value="off_stage">Offstage winners</option><option value="on_stage">Onstage winners</option><option value="">All stage winners</option>
-                </select>
-                <a :href="`${base}/merged-merit?stage_type=${meritStage}`" class="btn-primary">Merged merit PDF · With background</a>
-                <a :href="`${base}/merged-merit?stage_type=${meritStage}&plain=1`" class="btn-secondary">Merged merit PDF · Without background</a>
-                <span class="text-xs text-gray-500">Published winners only. One certificate per page. Generate and render certificates first.</span>
+            <div class="grid gap-5 lg:grid-cols-2">
+                <div class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+                    <h3 class="text-sm font-semibold">Download merged PDF</h3>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <label class="text-xs font-medium text-slate-600">Stage
+                            <select v-model="meritStage" class="field mt-1">
+                                <option value="off_stage">Offstage winners</option><option value="on_stage">Onstage winners</option><option value="">All stages</option>
+                            </select>
+                        </label>
+                        <div><label class="text-xs font-medium text-slate-600">Item</label>
+                            <SearchableSelect v-model="meritDownloadItemId" :options="publishedItemOptions" :all-option="true" all-label="All published items" search-placeholder="Search item name or code…" class="mt-1" />
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <a :href="mergedMeritUrl(false)" class="btn-primary text-xs">Download with background</a>
+                        <a :href="mergedMeritUrl(true)" class="btn-secondary text-xs">Download without background</a>
+                    </div>
+                    <p class="text-xs text-slate-500">Generate merit certificates and render files before downloading.</p>
+                </div>
+                <div class="rounded-xl border border-slate-200 p-4 space-y-3">
+                    <h3 class="text-sm font-semibold">Update item stage</h3>
+                    <p class="text-xs text-slate-500">Uses the Onstage / Offstage assignments from Items &amp; catalog.</p>
+                    <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_140px]">
+                        <div><label class="text-xs font-medium text-slate-600">Item to update</label>
+                            <SearchableSelect v-model="stageItemId" :options="stageItemOptions" :all-option="true" all-label="All currently published items" search-placeholder="Search item name or code…" class="mt-1" />
+                        </div>
+                        <label class="text-xs font-medium text-slate-600">Assign stage
+                            <select v-model="stageLabel" class="field mt-1">
+                                <option value="off_stage">Offstage</option><option value="on_stage">Onstage</option>
+                            </select>
+                        </label>
+                    </div>
+                    <button class="btn-secondary text-xs" :disabled="stageSaving" @click="saveItemStage">{{ stageSaving ? 'Saving…' : stageItemId ? 'Save item stage' : 'Apply to published items' }}</button>
+                </div>
             </div>
-        </div>
+        </section>
 
         <!-- Certificate date -->
         <div class="card !p-3 mb-6 flex flex-wrap items-center gap-3 text-xs">
@@ -228,12 +248,23 @@
             <div class="flex items-center justify-between gap-4 mb-3">
                 <div>
                     <h3 class="text-sm font-semibold text-gray-800">Merit Winners Grouped by Item</h3>
+                    <div class="flex flex-wrap gap-3 items-center mt-2">
+                        <input v-model="meritItemSearch" type="search" class="field text-xs sm:!w-72" placeholder="Search item name, code or category…" aria-label="Search merit items">
+                        <span class="text-xs text-slate-500">{{ sortedMeritItems.length }} of {{ winnersByItem.length }} items</span>
+                    </div>
+                    <label class="inline-flex items-center gap-2 text-xs mt-2">Sort items
+                        <select v-model="meritItemSort" class="field text-xs">
+                            <option value="default">Item order</option>
+                            <option value="published_desc">Published newest first</option>
+                            <option value="published_asc">Published oldest first</option>
+                        </select>
+                    </label>
                     <p class="text-xs text-gray-500">Items whose results have been published (Merit Ranks 1–3).</p>
                 </div>
             </div>
 
-            <div v-if="winnersByItem.length" class="card divide-y divide-gray-100">
-                <div v-for="group in winnersByItem" :key="group.item_id" class="py-3 first:pt-0 last:pb-0">
+            <div v-if="sortedMeritItems.length" class="card divide-y divide-gray-100">
+                <div v-for="group in sortedMeritItems" :key="group.item_id" class="py-3 first:pt-0 last:pb-0">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div class="min-w-0 flex items-center gap-3">
                             <span class="shrink-0 text-xs font-semibold text-gray-400 tabular-nums">{{ group.sl_no }}.</span>
@@ -287,7 +318,7 @@
                 </div>
             </div>
             <div v-else class="card p-6 text-center text-gray-500 text-sm">
-                No published merit winners by item yet. Publish item results to generate merit certificates.
+                {{ winnersByItem.length ? 'No items match your search.' : 'No published merit winners by item yet. Publish item results to generate merit certificates.' }}
             </div>
         </div>
 
@@ -854,6 +885,7 @@
 </template>
 
 <script setup>
+import { sortByPublication } from '@/Support/certificatePublicationSort.js';
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
@@ -888,6 +920,10 @@ const stageItemId = ref('');
 const stageLabel = ref('off_stage');
 const meritStage = ref('off_stage');
 const stageSaving = ref(false);
+watch(stageItemId, (id) => {
+    const item = props.stageItems.find(item => String(item.id) === String(id));
+    if (item?.stage_type) stageLabel.value = item.stage_type;
+});
 function saveItemStage() {
     stageSaving.value = true;
     router.post(`${base}/item-stages`, {
@@ -896,6 +932,21 @@ function saveItemStage() {
         stage_type: stageLabel.value,
     }, { preserveScroll: true, onFinish: () => { stageSaving.value = false; } });
 }
+const meritDownloadItemId = ref(null);
+const stageItemOptions = computed(() => props.stageItems.map(item => ({
+    id: item.id,
+    name: `${item.item_code ? `[${item.item_code}] ` : ''}${item.title} · ${item.category || '—'} · ${item.stage_type === 'off_stage' ? 'Offstage' : item.stage_type === 'on_stage' ? 'Onstage' : 'Unassigned'}`,
+})));
+function mergedMeritUrl(plain) {
+    const params = new URLSearchParams();
+    if (meritStage.value) params.set('stage_type', meritStage.value);
+    if (meritDownloadItemId.value) params.set('item_id', meritDownloadItemId.value);
+    if (plain) params.set('plain', '1');
+    return `${base}/merged-merit?${params}`;
+}
+const meritItemSearch = ref('');
+const meritItemSort = ref('default');
+const sortedMeritItems = computed(() => sortByPublication(props.winnersByItem.filter(item => !meritItemSearch.value.trim() || [item.item_title, item.item_code, item.category_label].join(' ').toLowerCase().includes(meritItemSearch.value.trim().toLowerCase())), meritItemSort.value));
 const activeTab = ref('winners_item');
 const plainMode = ref(false);
 const selectedItemId = ref(null);

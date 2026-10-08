@@ -114,7 +114,7 @@ class FestTrophyController extends SahodayaAdminController
 
         $count = $trophyService->seedKochiMetroPreset($event);
 
-        return back()->with('success', "Standard 60-trophy template seeded successfully ({$count} trophies created).");
+        return back()->with('success', "Standard 75-trophy template seeded successfully ({$count} trophies created).");
     }
 
     public function copyFromParent(Request $request, string $tenantId, FestEvent $event, FestTrophyService $trophyService)

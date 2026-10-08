@@ -54,10 +54,10 @@
                     <span>↑</span> Push to {{ hierarchy.child_count }} Child Events
                 </button>
 
-                <!-- Seed 60-Trophy Preset -->
+                <!-- Seed 75-Trophy Preset -->
                 <button type="button" class="btn-secondary text-xs bg-amber-50 border-amber-200 text-amber-900 hover:bg-amber-100 flex items-center gap-1.5"
                         @click="seedPreset">
-                    <span>🏆</span> Seed Metro Kalotsav Preset (60 Trophies)
+                    <span>🏆</span> Seed Metro Kalotsav Preset (75 Trophies)
                 </button>
 
                 <!-- Download Official PDF -->
@@ -197,7 +197,7 @@
                         <tr v-if="!filteredRows.length">
                             <td colspan="7" class="p-12 text-center text-slate-400">
                                 <p class="text-base font-bold text-slate-600">No matching trophies found</p>
-                                <p class="text-xs mt-1">Click "Seed Metro Kalotsav Preset (60 Trophies)" or "+ Add Trophy" to get started.</p>
+                                <p class="text-xs mt-1">Click "Seed Metro Kalotsav Preset (75 Trophies)" or "+ Add Trophy" to get started.</p>
                             </td>
                         </tr>
                     </tbody>
@@ -206,6 +206,21 @@
         </div>
 
         <!-- Add / Edit Trophy Modal -->
+        <section v-if="topTenGroups.length" class="space-y-4 mt-6 mb-6">
+            <h2 class="text-lg font-bold">Top 10 schools by item group</h2>
+            <div class="grid gap-4 lg:grid-cols-2">
+                <div v-for="group in topTenGroups" :key="group.name" class="card overflow-hidden">
+                    <h3 class="font-semibold mb-3">{{ group.name }}</h3>
+                    <table class="data-table">
+                        <thead><tr><th>Rank</th><th>School</th><th>Points</th></tr></thead>
+                        <tbody><tr v-for="school in group.schools" :key="school.school_id">
+                            <td>{{ school.rank }}</td><td>{{ school.name }}</td><td>{{ school.points }}</td>
+                        </tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
         <div v-if="editingModal" class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
             <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
                 <div class="flex items-start justify-between p-6 pb-4 border-b border-slate-100">
@@ -362,6 +377,17 @@ const props = defineProps({
     trophyTypes: { type: Object, default: () => ({}) },
 });
 
+const topTenGroups = computed(() => {
+    const groups = new Map();
+    for (const row of props.trophyRows) {
+        if (row.trophy.trophy_type !== 'item_group' || !row.winner?.top_ten?.length) continue;
+        const name = row.trophy.item_group_name || row.trophy.title;
+        const key = `${name}:${[...(row.trophy.item_ids || [])].sort((a, b) => a - b).join(',')}`;
+        if (!groups.has(key)) groups.set(key, { name, schools: row.winner.top_ten });
+    }
+    return [...groups.values()];
+});
+
 const currentScope = ref(props.scope);
 const searchQuery = ref('');
 const filterType = ref('');
@@ -507,7 +533,7 @@ function deleteTrophy(trophy) {
 }
 
 function seedPreset() {
-    if (props.trophyRows.length && !confirm('This will replace current trophies with the official 60-trophy Metro Kalotsav template. Proceed?')) {
+    if (props.trophyRows.length && !confirm('This will replace current trophies with the official 75-trophy Metro Kalotsav template. Proceed?')) {
         return;
     }
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/trophies/seed-preset`, {}, {
