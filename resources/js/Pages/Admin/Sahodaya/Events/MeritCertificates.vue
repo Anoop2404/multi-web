@@ -42,6 +42,8 @@
                         <label class="text-xs">Sort items
                             <select v-model="meritItemSort" class="field text-xs">
                                 <option value="default">Current order</option>
+                                <option value="code_asc">Item code ascending</option>
+                                <option value="code_desc">Item code descending</option>
                                 <option value="published_desc">Published newest first</option>
                                 <option value="published_asc">Published oldest first</option>
                             </select>
