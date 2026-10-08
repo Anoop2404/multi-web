@@ -11,6 +11,12 @@
                      text, wrapping mid-word inside the button instead of onto a new line.
                      Desktop keeps the original wrap-freely behavior (sm: and up). -->
                 <div class="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 -mb-1 sm:flex-wrap sm:overflow-visible sm:pb-0 sm:mb-0">
+                    <a v-if="event.event_type === 'sports' && props.selectedItemId"
+                       :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/chest-numbers/sports-competition-sheet?item_id=${props.selectedItemId}`"
+                       class="btn-secondary text-xs shrink-0 whitespace-nowrap">Heats / final sheet (PDF)</a>
+                    <a v-if="event.event_type === 'sports'"
+                       :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/chest-numbers/sports-competition-sheet`"
+                       class="btn-secondary text-xs shrink-0 whitespace-nowrap">All sports competition sheets (PDF)</a>
                     <Link :href="markSettingsUrl" class="btn-secondary text-xs shrink-0 whitespace-nowrap">
                         🎚️ Mark Settings
                     </Link>

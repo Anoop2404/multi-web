@@ -373,6 +373,33 @@ class FestChestNumberController extends SahodayaAdminController
         return back()->with('success', 'Chest number revealed.');
     }
 
+    public function sportsCompetitionSheet(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_unless($event->event_type === 'sports', 404);
+        $data = $request->validate(['item_id' => 'nullable|integer']);
+        $items = FestEventItem::whereIn('event_id', $event->reportableEventIds())
+            ->where('is_enabled', true)
+            ->when($data['item_id'] ?? null, fn ($q, $id) => $q->whereKey($id))
+            ->orderBy('title')->get();
+        abort_if($items->isEmpty(), 404, 'No sports items found.');
+        $sheets = [];
+        foreach ($items as $item) {
+            $rows = collect($this->participantRows($event, $item->id, false))
+                ->sortBy(fn ($row) => [$row['chest_no'] ?? PHP_INT_MAX, $row['name'] ?? ''])
+                ->values();
+            $chunks = $rows->isEmpty() ? collect([collect()]) : $rows->chunk(16);
+            foreach ($chunks as $index => $chunk) {
+                $sheets[] = ['title' => $item->title, 'rows' => $chunk->values()->all(), 'offset' => $index * 16];
+            }
+        }
+        $html = view('fest.sports-competition-sheet', ['sheets' => $sheets])->render();
+
+        return PdfGenerator::download($html, str($event->title)->slug().'-sports-competition-sheets.pdf',
+            $request->boolean('inline'), true, null, null,
+            ['top' => '15mm', 'right' => '15mm', 'bottom' => '15mm', 'left' => '15mm']);
+    }
+
     public function print(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

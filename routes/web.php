@@ -323,7 +323,8 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
 
                 // Chest numbers sit with the schedule rather than registrations: they are allocated
                 // once the field is settled, and every printed sheet depends on them.
-                Route::get('/{event}/chest-numbers', [$sched, 'chestNumbers'])->name('chest-numbers');
+                Route::get('/{event}/chest-numbers/sports-competition-sheet', [FestChestNumberController::class, 'sportsCompetitionSheet'])->name('chest-numbers.sports-competition-sheet');
+            Route::get('/{event}/chest-numbers', [$sched, 'chestNumbers'])->name('chest-numbers');
                 Route::post('/{event}/chest-numbers/assign', [$sched, 'assignChestNumbers'])->name('chest-numbers.assign');
                 Route::post('/{event}/chest-numbers/set', [$sched, 'setChestNumber'])->name('chest-numbers.set');
             });
