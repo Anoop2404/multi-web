@@ -234,7 +234,7 @@ const filteredCertificates = computed(() => sortByPublication(props.certificates
         if (!studentName.includes(q) && !itemTitle.includes(q)) return false;
     }
     return true;
-}), meritItemSort.value, c => c.item?.results_published_at));
+}), meritItemSort.value, c => c.item?.results_published_at, c => c.item?.item_code));
 
 const scopeLabel = computed(() => {
     if (selectedItemId.value) return props.publishedItems.find(i => i.id === selectedItemId.value)?.title ?? 'Item';

@@ -141,7 +141,7 @@ class FestCertificateController extends SahodayaAdminController
                 'is_rendered' => $c['is_rendered'],
                 'rendered_at' => $c['rendered_at'],
                 'student' => ['name' => $c['student']?->name ?? $c['participant']?->student?->name],
-                'item' => ! empty($c['item']) ? ['id' => $c['item']->id, 'title' => $c['item']->title, 'results_published_at' => $c['item']->results_published_at?->toIso8601String()] : null,
+                'item' => ! empty($c['item']) ? ['id' => $c['item']->id, 'title' => $c['item']->title, 'item_code' => $c['item']->item_code, 'results_published_at' => $c['item']->results_published_at?->toIso8601String()] : null,
                 'items' => $c['participation_items'] ?? null,
                 'mark' => $c['mark'] ? ['position' => $c['mark']->position] : null,
                 'registration' => ['school' => $school ? ['id' => $school->id, 'name' => $school->name] : null],
