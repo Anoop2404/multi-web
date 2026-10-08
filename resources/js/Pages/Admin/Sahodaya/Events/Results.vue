@@ -251,6 +251,12 @@
                                     <span v-if="!row.category_label && !row.age_group && !row.sport_discipline">—</span>
                                     <span v-if="row.gender_label"> · {{ row.gender_label }}</span>
                                     <span v-if="row.type_label"> · {{ row.type_label }}</span>
+                                    <div class="mt-1.5">
+                                        <span class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                                              :class="row.stage_type === 'on_stage' ? 'bg-indigo-50 text-indigo-700' : row.stage_type === 'off_stage' ? 'bg-teal-50 text-teal-700' : 'bg-slate-100 text-slate-500'">
+                                            {{ row.stage_type === 'on_stage' ? 'Onstage' : row.stage_type === 'off_stage' ? 'Offstage' : 'Stage unassigned' }}
+                                        </span>
+                                    </div>
                                 </td>
                                 <td class="text-xs text-slate-600">{{ formatWindow(row) }}</td>
                                 <td class="text-sm">

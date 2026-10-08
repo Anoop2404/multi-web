@@ -35,7 +35,8 @@
                 <select v-model="meritStage" class="field">
                     <option value="off_stage">Offstage winners</option><option value="on_stage">Onstage winners</option><option value="">All stage winners</option>
                 </select>
-                <a :href="`${base}/merged-merit?stage_type=${meritStage}&plain=${plainMode ? 1 : 0}`" class="btn-primary">Download merged merit PDF</a>
+                <a :href="`${base}/merged-merit?stage_type=${meritStage}`" class="btn-primary">Merged merit PDF · With background</a>
+                <a :href="`${base}/merged-merit?stage_type=${meritStage}&plain=1`" class="btn-secondary">Merged merit PDF · Without background</a>
                 <span class="text-xs text-gray-500">Published winners only. One certificate per page. Generate and render certificates first.</span>
             </div>
         </div>
