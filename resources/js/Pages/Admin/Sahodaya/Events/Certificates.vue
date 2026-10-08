@@ -80,8 +80,14 @@
                 <div class="min-w-0">
                     <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-indigo-700 mb-2">Step 2 · Render &amp; cache</p>
                     <div class="flex flex-wrap items-center gap-3">
-                        <button v-if="certificates.length" @click="renderAndCache()" class="btn-primary py-1.5 px-3 text-xs" :disabled="isBatchRunning">
-                            ⚙️ Render &amp; cache files
+                        <button v-if="certificates.some(c => c.cert_type === 'winner')" @click="renderAndCache({ cert_type: 'winner' })" class="btn-primary py-1.5 px-3 text-xs" :disabled="isBatchRunning">
+                            ⚙️ Render merit
+                        </button>
+                        <button v-if="!participationHeld && certificates.some(c => c.cert_type === 'participation')" @click="renderAndCache({ cert_type: 'participation' })" class="btn-primary py-1.5 px-3 text-xs" :disabled="isBatchRunning">
+                            ⚙️ Render participation
+                        </button>
+                        <button v-if="certificates.length" @click="renderAndCache()" class="btn-secondary py-1.5 px-3 text-xs" :disabled="isBatchRunning">
+                            Render all
                         </button>
                         <button v-if="staleCount" @click="regenerateStale" class="btn-secondary py-1.5 px-3 text-xs !text-amber-700 !border-amber-200" :disabled="isBatchRunning">
                             🔁 {{ staleCount }} stale
