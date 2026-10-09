@@ -64,6 +64,30 @@ class FestTrophyDistributionTest extends TestCase
         return app(FestIndividualChampionshipService::class);
     }
 
+    public function test_team_standings_show_all_performers_and_one_entry_per_group(): void
+    {
+        $item = FestEventItem::create(['event_id' => $this->parentEvent->id, 'title' => 'Group Dance',
+            'item_code' => 'TEAM1', 'participant_type' => 'group']);
+        $registration = FestRegistration::create(['event_id' => $this->parentEvent->id, 'item_id' => $item->id,
+            'school_id' => $this->school1->id, 'status' => 'approved']);
+        $group = \App\Models\FestGroup::create(['event_id' => $this->parentEvent->id, 'registration_id' => $registration->id]);
+        $class = SchoolClass::create(['tenant_id' => $this->school1->id, 'name' => '10A']);
+        foreach (['Aravind', 'Rahul'] as $name) {
+            $student = Student::create(['tenant_id' => $this->school1->id, 'name' => $name, 'school_class_id' => $class->id]);
+            $participant = FestParticipant::create(['registration_id' => $registration->id, 'event_id' => $this->parentEvent->id,
+                'group_id' => $group->id, 'student_id' => $student->id, 'participant_role' => 'performer']);
+            FestMark::create(['event_id' => $this->parentEvent->id, 'item_id' => $item->id,
+                'participant_id' => $participant->id, 'position' => 1, 'score' => 95]);
+        }
+        $trophy = new FestTrophy(['item_id' => $item->id, 'position' => 1]);
+        $method = new \ReflectionMethod(FestTrophyService::class, 'resolveItemWinner');
+        $winner = $method->invoke($this->trophyService(), $this->parentEvent, $trophy);
+        $this->assertSame($this->school1->name, $winner['name']);
+        $this->assertEqualsCanonicalizing(['Aravind', 'Rahul'], $winner['team_members']);
+        $this->assertCount(1, $winner['top_ten']);
+        $this->assertSame(1, $winner['top_ten'][0]['rank']);
+    }
+
     public function test_can_seed_kochi_metro_75_trophies_preset(): void
     {
         $count = $this->trophyService()->seedKochiMetroPreset($this->parentEvent);

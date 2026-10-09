@@ -64,7 +64,7 @@ class FestTrophyService
         ) {
             $winner = match ($trophy->trophy_type) {
                 FestTrophy::TYPE_OVERALL => $this->resolveOverallWinner($trophy, $overallSchoolStandings),
-                FestTrophy::TYPE_CATEGORY => $this->resolveCategoryWinner($trophy, $categorySchoolStandings),
+                FestTrophy::TYPE_CATEGORY => $this->resolveCategoryWinner($trophy, $categorySchoolStandings, $targetEvent),
                 FestTrophy::TYPE_ITEM => $this->resolveItemWinner($targetEvent, $trophy, $cumulative),
                 FestTrophy::TYPE_ITEM_GROUP => $this->resolveItemGroupWinner($targetEvent, $trophy, $cumulative),
                 FestTrophy::TYPE_INDIVIDUAL_CHAMPIONSHIP => $this->resolveIndividualWinner($trophy, $individualLeaderboard),
@@ -81,6 +81,7 @@ class FestTrophyService
                     'position_ordinal' => $trophy->positionOrdinal(),
                     'award_type' => $trophy->award_type,
                     'category_key' => $trophy->category_key,
+                    'category_label' => $trophy->category_key ? FestClassGroupScheme::resolveItemLabel(FestClassGroupScheme::labels(null, $targetEvent), $trophy->category_key) : null,
                     'item_id' => $trophy->item_id,
                     'item_name' => $trophy->item?->title,
                     'item_name_pattern' => $trophy->item_name_pattern,
@@ -117,13 +118,14 @@ class FestTrophyService
             'points' => $row['points'],
             'detail' => "{$row['points']} pts overall",
             'is_tied' => $row['is_tied'] ?? false,
+            'top_ten' => $overallStandings->values()->take(10)->map(fn ($school, $i) => ['rank' => $i + 1, 'name' => $school['school_name'], 'points' => $school['points']])->all(),
         ];
     }
 
     /**
      * Resolve category-wise school winner (1st, 2nd, 3rd in Category I, II, III, IV).
      */
-    private function resolveCategoryWinner(FestTrophy $trophy, array $categoryStandings): ?array
+    private function resolveCategoryWinner(FestTrophy $trophy, array $categoryStandings, FestEvent $event): ?array
     {
         $catKey = strtolower((string) ($trophy->category_key ?? ''));
         // Try direct key or canonical alias
@@ -142,8 +144,9 @@ class FestTrophyService
             'name' => $row['school_name'],
             'school_id' => $row['school_id'],
             'points' => $row['points'],
-            'detail' => "{$row['points']} pts in " . ($trophy->category_key ?: 'Category'),
+            'detail' => "{$row['points']} pts in " . ($trophy->category_key ? FestClassGroupScheme::resolveItemLabel(FestClassGroupScheme::labels(null, $event), $trophy->category_key) : 'Category'),
             'is_tied' => $row['is_tied'] ?? false,
+            'top_ten' => $catRows->values()->take(10)->map(fn ($school, $i) => ['rank' => $i + 1, 'name' => $school['school_name'], 'points' => $school['points']])->all(),
         ];
     }
 
@@ -157,39 +160,38 @@ class FestTrophyService
             return null;
         }
 
-        $mark = FestMark::where('item_id', $item->id)
-            ->where('position', $trophy->position)
-            ->with(['participant.student', 'participant.registration'])
-            ->first();
-
-        if (! $mark || ! $mark->participant) {
-            return null;
-        }
-
-        $participant = $mark->participant;
-        $student = $participant->student;
-        $schoolId = $participant->registration?->school_id;
-        $schoolName = $schoolId ? Tenant::where('id', $schoolId)->value('name') : null;
-
-        $studentName = $student?->name ?? 'Participant';
-        $chestNo = $participant->chest_no ?? $participant->chest_number ?? $student?->reg_no;
-
+        $marks = FestMark::where('item_id', $item->id)
+            ->whereNotNull('position')->orderBy('position')->orderByDesc('score')->orderBy('id')
+            ->with(['participant.student', 'participant.registration', 'participant.group.participants.student'])
+            ->get()->filter(fn ($mark) => $mark->participant && ! $mark->participant->disqualified_at
+                && $mark->participant->participant_role !== 'standby')
+            ->unique(fn ($mark) => $mark->participant->group_id
+                ? 'group:'.$mark->participant->group_id : 'person:'.$mark->participant_id);
+        $schools = Tenant::whereIn('id', $marks->map(fn ($mark) => $mark->participant->registration?->school_id)->filter())
+            ->pluck('name', 'id');
         $isMultiPerson = FestTeamSquadRules::isMultiPerson($item->participant_type);
-        $displayName = $isMultiPerson && $schoolName
-            ? $schoolName . ($studentName ? " ({$studentName})" : '')
-            : ($studentName . ($schoolName ? " — {$schoolName}" : ''));
-
-        return [
-            'type' => $isMultiPerson ? 'school' : 'individual',
-            'name' => $displayName,
-            'student_name' => $studentName,
-            'school_name' => $schoolName,
-            'chest_no' => $chestNo,
-            'score' => $mark->score,
-            'grade' => $mark->grade,
-            'item_title' => $item->title,
-            'detail' => ($mark->grade ? "Grade {$mark->grade} · " : '') . ($mark->score ? "{$mark->score} marks" : ''),
-        ];
+        $standings = $marks->map(function ($mark) use ($item, $schools, $isMultiPerson) {
+            $participant = $mark->participant;
+            $schoolName = $schools[$participant->registration?->school_id] ?? null;
+            $members = $isMultiPerson && $participant->group
+                ? $participant->group->participants->filter(fn ($member) => ! $member->disqualified_at && $member->participant_role !== 'standby')
+                    ->map(fn ($member) => $member->student?->name)->filter()->unique()->values()->all()
+                : [];
+            $studentName = $participant->student?->name ?? 'Participant';
+            return [
+                'rank' => $mark->position,
+                'type' => $isMultiPerson ? 'school' : 'individual',
+                'name' => $isMultiPerson ? ($schoolName ?? 'Team') : $studentName.($schoolName ? " — {$schoolName}" : ''),
+                'student_name' => $studentName,
+                'team_members' => $members,
+                'school_name' => $schoolName,
+                'chest_no' => $participant->chest_no ?? $participant->student?->reg_no,
+                'score' => $mark->score, 'grade' => $mark->grade, 'item_title' => $item->title,
+                'detail' => ($mark->grade ? "Grade {$mark->grade} · " : '').($mark->score !== null ? "{$mark->score} marks" : ''),
+            ];
+        })->values();
+        $winner = $standings->firstWhere('rank', $trophy->position);
+        return $winner ? $winner + ['top_ten' => $standings->take(10)->all()] : null;
     }
 
     /**
@@ -285,6 +287,7 @@ class FestTrophyService
             'school_name' => $winnerRow['school'] ?? null,
             'points' => $winnerRow['points'] ?? 0,
             'detail' => "{$winnerRow['points']} championship pts",
+            'top_ten' => $filtered->take(10)->map(fn ($row) => ['rank' => $row['rank'], 'name' => ($row['student']['name'] ?? 'Student').(! empty($row['school']) ? ' — '.$row['school'] : ''), 'points' => $row['points'] ?? 0])->values()->all(),
         ];
     }
 

@@ -128,7 +128,14 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        <tr v-for="r in filteredRows" :key="r.trophy.id" class="hover:bg-slate-50/70 transition-colors">
+                        <template v-for="group in groupedRows" :key="group.key">
+                        <tr class="bg-slate-100"><td colspan="7" class="p-3">
+                            <div class="flex items-center justify-between gap-3">
+                                <span class="font-bold text-slate-700">{{ group.name }}</span>
+                                <button type="button" class="text-indigo-700 font-semibold" @click="viewStandings(group.rows[0])" aria-label="View top 10">👁 Top 10</button>
+                            </div>
+                        </td></tr>
+                        <tr v-for="r in group.rows" :key="r.trophy.id" class="hover:bg-slate-50/70 transition-colors">
                             <td class="p-3 text-center font-black text-slate-800 text-sm">
                                 #{{ r.trophy.trophy_no }}
                             </td>
@@ -161,6 +168,7 @@
                                         <span class="text-amber-500 font-black">★</span>
                                         <span>{{ r.winner.name }}</span>
                                     </div>
+                                    <p v-if="r.winner.team_members?.length" class="text-xs text-slate-600 mt-1">{{ r.winner.team_members.join(', ') }}</p>
                                     <div v-if="r.winner.chest_no" class="text-[11px] text-slate-500 font-mono mt-0.5">
                                         Chest No: {{ r.winner.chest_no }}
                                     </div>
@@ -186,6 +194,7 @@
                                 </span>
                             </td>
                             <td class="p-3 text-right whitespace-nowrap">
+                                <button type="button" class="text-indigo-600 mr-2" @click="viewStandings(r)" aria-label="View top 10" title="View top 10">👁</button>
                                 <button type="button" class="text-xs font-semibold text-indigo-600 hover:text-indigo-900 mr-2" @click="editTrophy(r.trophy)">
                                     Edit
                                 </button>
@@ -194,6 +203,7 @@
                                 </button>
                             </td>
                         </tr>
+                        </template>
                         <tr v-if="!filteredRows.length">
                             <td colspan="7" class="p-12 text-center text-slate-400">
                                 <p class="text-base font-bold text-slate-600">No matching trophies found</p>
@@ -206,20 +216,23 @@
         </div>
 
         <!-- Add / Edit Trophy Modal -->
-        <section v-if="topTenGroups.length" class="space-y-4 mt-6 mb-6">
-            <h2 class="text-lg font-bold">Top 10 schools by item group</h2>
-            <div class="grid gap-4 lg:grid-cols-2">
-                <div v-for="group in topTenGroups" :key="group.name" class="card overflow-hidden">
-                    <h3 class="font-semibold mb-3">{{ group.name }}</h3>
-                    <table class="data-table">
-                        <thead><tr><th>Rank</th><th>School</th><th>Points</th></tr></thead>
-                        <tbody><tr v-for="school in group.schools" :key="school.school_id">
-                            <td>{{ school.rank }}</td><td>{{ school.name }}</td><td>{{ school.points }}</td>
-                        </tr></tbody>
-                    </table>
+        <div v-if="standingsModal" class="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4" @click.self="standingsModal = null">
+            <section role="dialog" aria-modal="true" aria-labelledby="trophy-standings-title" class="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[85vh] overflow-y-auto p-5">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 id="trophy-standings-title" class="font-bold text-lg">{{ standingsModal.name }} — Top 10</h2>
+                    <button type="button" @click="standingsModal = null" aria-label="Close standings" class="btn-secondary">Close</button>
                 </div>
-            </div>
-        </section>
+                <table v-if="standingsModal.rows.length" class="w-full text-sm text-left">
+                    <thead><tr class="border-b"><th class="p-2">Rank</th><th class="p-2">School / participant</th><th class="p-2">Points / marks</th></tr></thead>
+                    <tbody><tr v-for="(entry, index) in standingsModal.rows" :key="index" class="border-b border-slate-100">
+                        <td class="p-2">{{ entry.rank }}</td>
+                        <td class="p-2">{{ entry.name }}<p v-if="entry.team_members?.length" class="text-xs text-slate-500 mt-1">{{ entry.team_members.join(', ') }}</p></td>
+                        <td class="p-2">{{ entry.points ?? entry.score ?? '—' }}</td>
+                    </tr></tbody>
+                </table>
+                <p v-else class="text-slate-500">No standings available for this award yet.</p>
+            </section>
+        </div>
 
         <div v-if="editingModal" class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
             <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
@@ -377,15 +390,28 @@ const props = defineProps({
     trophyTypes: { type: Object, default: () => ({}) },
 });
 
-const topTenGroups = computed(() => {
+const standingsModal = ref(null);
+function trophyGroupKey(trophy) {
+    return JSON.stringify([trophy.trophy_type, trophy.category_key || '', trophy.gender || '',
+        trophy.item_id || trophy.item_name_pattern || '', trophy.item_group_name || '',
+        [...(trophy.item_ids || [])].sort((a, b) => a - b)]);
+}
+function trophyGroupName(trophy) {
+    return [trophy.item_group_name || trophy.item_name || trophy.item_name_pattern || props.trophyTypes[trophy.trophy_type] || trophy.trophy_type,
+        trophy.category_label || props.categoryOptions.find(option => option.value === trophy.category_key)?.label || trophy.category_key?.replaceAll('_', ' '), trophy.gender].filter(Boolean).join(' · ');
+}
+function viewStandings(row) {
+    const matching = props.trophyRows.find(other => trophyGroupKey(other.trophy) === trophyGroupKey(row.trophy) && other.winner?.top_ten?.length);
+    standingsModal.value = { name: trophyGroupName(row.trophy), rows: matching?.winner?.top_ten || [] };
+}
+const groupedRows = computed(() => {
     const groups = new Map();
-    for (const row of props.trophyRows) {
-        if (row.trophy.trophy_type !== 'item_group' || !row.winner?.top_ten?.length) continue;
-        const name = row.trophy.item_group_name || row.trophy.title;
-        const key = `${name}:${[...(row.trophy.item_ids || [])].sort((a, b) => a - b).join(',')}`;
-        if (!groups.has(key)) groups.set(key, { name, schools: row.winner.top_ten });
+    for (const row of filteredRows.value) {
+        const key = trophyGroupKey(row.trophy);
+        if (!groups.has(key)) groups.set(key, { key, name: trophyGroupName(row.trophy), rows: [] });
+        groups.get(key).rows.push(row);
     }
-    return [...groups.values()];
+    return [...groups.values()].map(group => ({ ...group, rows: group.rows.sort((a, b) => a.trophy.position - b.trophy.position || a.trophy.trophy_no - b.trophy.trophy_no) }));
 });
 
 const currentScope = ref(props.scope);
