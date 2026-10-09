@@ -68,6 +68,8 @@
                                 📦 Download / print ▾
                             </summary>
                             <div class="absolute z-20 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg p-1">
+                                <a v-if="selectedItemId" :href="mergedItemUrl(false)" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">Combined item merit PDF — verification</a>
+                                <a v-if="selectedItemId" :href="mergedItemUrl(true)" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">Combined item merit PDF — without background</a>
                                 <a :href="downloadFilteredUrl" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">📦 Matching certificates (ZIP)</a>
                                 <a :href="printFilteredUrl(false)" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">🖨️ Print matching (with background) ↗</a>
                                 <a :href="printFilteredUrl(true)" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">🖨️ Print matching (plain) ↗</a>
@@ -271,6 +273,12 @@ function scopeParams() {
     if (selectedItemId.value) params.set('item_id', selectedItemId.value);
     if (selectedSchoolId.value) params.set('school_id', selectedSchoolId.value);
     return params;
+}
+
+function mergedItemUrl(plain) {
+    const params = scopeParams();
+    if (plain) params.set('plain', '1');
+    return `${base}/merged-merit?${params}`;
 }
 
 const downloadFilteredUrl = computed(() => `${base}/download-zip?${scopeParams()}`);

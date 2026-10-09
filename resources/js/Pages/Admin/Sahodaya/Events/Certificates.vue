@@ -294,6 +294,8 @@
                                     📦 Download ▾
                                 </summary>
                                 <div class="absolute z-20 right-0 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
+                                    <a :href="`${base}/merged-merit?item_id=${group.item_id}`" class="block px-3 py-2 rounded hover:bg-gray-50">Combined merit PDF — verification</a>
+                                    <a :href="`${base}/merged-merit?item_id=${group.item_id}&plain=1`" class="block px-3 py-2 rounded hover:bg-gray-50">Combined merit PDF — without background</a>
                                     <a :href="`${base}/download-zip?item_id=${group.item_id}&cert_type=winner`" class="block px-3 py-2 rounded hover:bg-gray-50">📦 ZIP</a>
                                     <a :href="`${base}/print-all?item_id=${group.item_id}&cert_type=winner`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (with background) ↗</a>
                                     <a :href="`${base}/print-all?item_id=${group.item_id}&cert_type=winner&plain=1`" target="_blank" class="block px-3 py-2 rounded hover:bg-gray-50">🖨️ Print (plain) ↗</a>

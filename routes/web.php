@@ -323,8 +323,7 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
 
                 // Chest numbers sit with the schedule rather than registrations: they are allocated
                 // once the field is settled, and every printed sheet depends on them.
-                Route::get('/{event}/chest-numbers/sports-competition-sheet', [FestChestNumberController::class, 'sportsCompetitionSheet'])->name('chest-numbers.sports-competition-sheet');
-            Route::get('/{event}/chest-numbers', [$sched, 'chestNumbers'])->name('chest-numbers');
+                Route::get('/{event}/chest-numbers', [$sched, 'chestNumbers'])->name('chest-numbers');
                 Route::post('/{event}/chest-numbers/assign', [$sched, 'assignChestNumbers'])->name('chest-numbers.assign');
                 Route::post('/{event}/chest-numbers/set', [$sched, 'setChestNumber'])->name('chest-numbers.set');
             });
@@ -1700,6 +1699,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/export/results', [FestExportController::class, 'results'])->name('export.results');
             Route::get('/{event}/export/attendance', [FestExportController::class, 'attendance'])->name('export.attendance');
             Route::get('/{event}/export/fees', [FestExportController::class, 'fees'])->name('export.fees');
+            Route::get('/{event}/chest-numbers/sports-competition-sheet', [FestChestNumberController::class, 'sportsCompetitionSheet'])->name('chest-numbers.sports-competition-sheet');
             Route::get('/{event}/chest-numbers', [FestChestNumberController::class, 'index'])->name('chest-numbers.index');
             Route::get('/{event}/chest-numbers/green-room', [FestChestNumberController::class, 'greenRoom'])->name('chest-numbers.green-room');
             Route::post('/{event}/chest-numbers/generate', [FestChestNumberController::class, 'generate'])->name('chest-numbers.generate');

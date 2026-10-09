@@ -1147,11 +1147,11 @@ class FestCertificateController extends SahodayaAdminController
             ->when($data['stage_type'] ?? null, fn ($q, $stage) => $q->where('stage_type', $stage))
             ->when($data['item_id'] ?? null, fn ($q, $id) => $q->whereKey($id))
             ->pluck('id')->flip();
-        [$certificates, $payloads] = $service->exportScope($event, true, null, null, 'winner');
+        [$certificates, $payloads] = $service->exportScope($event, true, $data['item_id'] ?? null, $this->schoolIdFrom($request), 'winner');
         $certificates = $certificates->filter(fn ($cert) => $itemIds->has($payloads->get($cert->id)['item']?->id))
-            ->sortBy(fn ($cert) => sprintf('%010d-%010d', $payloads->get($cert->id)['item']?->id, $cert->id));
+            ->sortBy(fn ($cert) => sprintf('%010d-%03d-%010d', $payloads->get($cert->id)['item']?->id, $payloads->get($cert->id)['mark']?->position ?? 99, $cert->id));
         if ($certificates->isEmpty()) {
-            return back()->with('error', 'No published merit certificates match this stage. Generate Merit certificates first.');
+            return back()->with('error', 'No published merit certificates match the selected item or stage. Publish its results first.');
         }
         $plain = $request->boolean('plain');
         // Preflight before merging: a large download must never render PDFs in the web request.
@@ -1173,7 +1173,9 @@ class FestCertificateController extends SahodayaAdminController
             $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
             $pdf->useTemplate($page);
         }
-        $filename = str($event->title)->slug().'-'.($data['stage_type'] ?? 'all-stages').'-merit.pdf';
+        $item = isset($data['item_id']) ? FestEventItem::whereIn('event_id', $event->reportableEventIds())->find($data['item_id']) : null;
+        $scopeName = $item ? str(($item->item_code ? $item->item_code.'-' : '').$item->title)->slug() : ($data['stage_type'] ?? 'all-stages');
+        $filename = str($event->title)->slug().'-'.$scopeName.'-merit.pdf';
 
         return response($pdf->Output('S'), 200, [
             'Content-Type' => 'application/pdf',

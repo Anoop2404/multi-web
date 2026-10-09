@@ -81,7 +81,16 @@ class FestTrophyDistributionTest extends TestCase
         }
         $trophy = new FestTrophy(['item_id' => $item->id, 'position' => 1]);
         $method = new \ReflectionMethod(FestTrophyService::class, 'resolveItemWinner');
-        $winner = $method->invoke($this->trophyService(), $this->parentEvent, $trophy);
+        $cache = [];
+        $service = $this->trophyService();
+        $args = [$this->parentEvent, $trophy, false, &$cache];
+        $winner = $method->invokeArgs($service, $args);
+        \Illuminate\Support\Facades\DB::enableQueryLog();
+        \Illuminate\Support\Facades\DB::flushQueryLog();
+        $sameWinner = $method->invokeArgs($service, $args);
+        $this->assertSame($winner, $sameWinner);
+        $this->assertCount(0, \Illuminate\Support\Facades\DB::getQueryLog(), 'Other trophy ranks must reuse the item standings.');
+        \Illuminate\Support\Facades\DB::disableQueryLog();
         $this->assertSame($this->school1->name, $winner['name']);
         $this->assertEqualsCanonicalizing(['Aravind', 'Rahul'], $winner['team_members']);
         $this->assertCount(1, $winner['top_ten']);
