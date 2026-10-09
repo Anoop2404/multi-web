@@ -65,6 +65,39 @@ class FestCertificateRevocationTest extends TestCase
         ]);
     }
 
+    public function test_item_publication_and_republication_sync_merit_certificates(): void
+    {
+        $f = $this->fixture();
+        $item = FestEventItem::create(['event_id' => $f['event']->id, 'title' => 'Recitation', 'item_code' => 'AUTO1']);
+        $first = $this->makeParticipant($f['event'], $item, $f['school']->id, 1901);
+        $second = $this->makeParticipant($f['event'], $item, $f['school']->id, 1902);
+        $third = $this->makeParticipant($f['event'], $item, $f['school']->id, 1903);
+        foreach ([$first, $second, $third] as $index => $participant) {
+            FestMark::create(['event_id' => $f['event']->id, 'item_id' => $item->id,
+                'participant_id' => $participant->id, 'position' => $index === 2 ? 4 : $index + 1]);
+        }
+        $summary = [['item_id' => $item->id, 'results_published' => false,
+            'performers' => 3, 'marks_entered' => 3, 'ranks_assigned' => 3]];
+        $results = app(\App\Services\Events\FestItemResultsService::class);
+        $results->publishItem($item, $summary);
+        $this->assertSame(2, Certificate::where('cert_type', 'winner')->count());
+        $this->assertNotNull($item->fresh()->results_published_at);
+        $retained = Certificate::where('entity_id', $first->id)->firstOrFail();
+        $retained->update(['rendered_at' => now(), 'is_stale' => false]);
+
+        $results->unpublishItem($item);
+        FestMark::where('participant_id', $second->id)->update(['position' => 4]);
+        FestMark::where('participant_id', $third->id)->update(['position' => 2]);
+        $results->publishItem($item->fresh(), $summary);
+
+        $this->assertSame(2, Certificate::where('cert_type', 'winner')->count());
+        $this->assertFalse(Certificate::where('entity_id', $second->id)->where('cert_type', 'winner')->exists());
+        $this->assertTrue(Certificate::where('entity_id', $third->id)->where('cert_type', 'winner')->exists());
+        $this->assertTrue($retained->fresh()->is_stale);
+        $this->assertSame($retained->id, Certificate::where('entity_id', $first->id)->value('id'));
+        $this->assertSame(0, Certificate::where('cert_type', 'participation')->count());
+    }
+
     public function test_regenerating_revokes_a_winner_certificate_whose_mark_no_longer_qualifies(): void
     {
         $f = $this->fixture();

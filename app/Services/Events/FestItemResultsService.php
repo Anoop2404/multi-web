@@ -7,6 +7,7 @@ use App\Models\FestEventItem;
 use App\Models\FestParticipant;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestItemCategoryLabel;
+use Illuminate\Support\Facades\DB;
 
 class FestItemResultsService
 {
@@ -303,7 +304,20 @@ class FestItemResultsService
         // results_hidden must clear here too: publishing an item that was previously
         // explicitly unpublished should actually make it visible again, not leave the
         // hidden flag from that earlier unpublish silently overriding this timestamp.
-        FestEventItem::whereIn('id', $itemIds)->update(['results_published_at' => now(), 'results_hidden' => false]);
+        DB::transaction(function () use ($itemIds) {
+            FestEventItem::whereIn('id', $itemIds)->update(['results_published_at' => now(), 'results_hidden' => false]);
+
+            // An inherited item can represent items in several operational events.
+            // Sync each actual item once so new winners are issued and old winners revoked.
+            foreach (FestEventItem::whereIn('id', $itemIds)->with('event')->get() as $publishedItem) {
+                $certificates = app(FestCertificateService::class)->generateForEvent($publishedItem->event, $publishedItem->id);
+                foreach ($certificates as $certificate) {
+                    if ($certificate->rendered_at) {
+                        $certificate->update(['is_stale' => true, 'stale_checked_at' => null]);
+                    }
+                }
+            }
+        });
     }
 
     public function unpublishItem(FestEventItem $item): void

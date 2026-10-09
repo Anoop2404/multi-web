@@ -16,7 +16,6 @@ use App\Models\FestRegistration;
 use App\Models\Tenant;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\FestCertificateService;
-use App\Services\Events\FestEventNotifier;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestItemCategoryLabel;
 use App\Support\FestPageActivity;
@@ -999,12 +998,6 @@ class FestCertificateController extends SahodayaAdminController
             'count' => count($created),
             'item_id' => $itemId,
         ]);
-
-        try {
-            app(FestEventNotifier::class)->certificatesAvailable($event, count($created));
-        } catch (\Throwable) {
-            // ignore notification failures
-        }
 
         return back()->with('success', count($created).' certificate(s) generated.');
     }
