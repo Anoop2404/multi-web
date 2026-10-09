@@ -271,7 +271,7 @@
                         <div class="min-w-0 flex items-center gap-3">
                             <span class="shrink-0 text-xs font-semibold text-gray-400 tabular-nums">{{ group.sl_no }}.</span>
                             <p class="font-semibold text-sm text-gray-900">
-                                {{ group.item_title }}<span v-if="[group.category_label, group.type_label, group.gender_label].some(Boolean)" class="font-normal text-gray-500"> ({{ [group.category_label, group.type_label, group.gender_label].filter(Boolean).join(' · ') }})</span>
+                                <span v-if="group.item_code" class="mr-2 inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{{ group.item_code }}</span>{{ group.item_title }}<span v-if="[group.category_label, group.type_label, group.gender_label].some(Boolean)" class="font-normal text-gray-500"> ({{ [group.category_label, group.type_label, group.gender_label].filter(Boolean).join(' · ') }})</span>
                             </p>
                             <span class="shrink-0 text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">
                                 {{ group.winners.length }} merit winner{{ group.winners.length === 1 ? '' : 's' }}
@@ -439,7 +439,7 @@
                                 {{ w.position ?? '—' }}
                             </span>
                             <span class="font-medium text-gray-800">{{ w.name }}</span>
-                            <span class="text-[11px] text-gray-500">{{ w.item_title }}<template v-if="w.category_label"> ({{ w.category_label }})</template></span>
+                            <span class="text-[11px] text-gray-500"><span v-if="w.item_code" class="mr-1 font-semibold">[{{ w.item_code }}]</span>{{ w.item_title }}<template v-if="w.category_label"> ({{ w.category_label }})</template></span>
                             <span class="flex items-center gap-2 text-[11px]">
                                 <a :href="`/certificates/print/${w.uuid}`" target="_blank" class="text-indigo-600 font-medium hover:underline">Print (With BG) ↗</a>
                                 <a :href="`/certificates/print/${w.uuid}?plain=1`" target="_blank" class="text-gray-500 hover:underline">Plain ↗</a>
@@ -811,7 +811,7 @@
                                     </span>
                                 </div>
                                 <p class="text-xs text-gray-600 mt-0.5 truncate">
-                                    {{ c.item?.title ?? 'Event Participant' }}
+                                    <span v-if="c.item?.item_code" class="mr-1 font-semibold">[{{ c.item.item_code }}]</span>{{ c.item?.title ?? 'Event Participant' }}
                                     <span v-if="c.registration?.school?.name || c.participant?.registration?.school?.name" class="text-gray-400"> · </span>
                                     <span class="text-gray-500 font-medium">{{ c.registration?.school?.name ?? c.participant?.registration?.school?.name }}</span>
                                 </p>

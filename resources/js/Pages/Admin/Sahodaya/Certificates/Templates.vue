@@ -424,7 +424,10 @@
                                         <p class="font-bold text-slate-800 text-xs uppercase tracking-wider">Custom text fields</p>
                                         <p class="text-xs text-slate-500 mt-0.5">For a background whose own artwork already has separate blanks (e.g. "of class ___" on its own line) — each field gets its own position instead of sharing the one Body text box above.</p>
                                     </div>
-                                    <button type="button" class="btn-secondary text-xs whitespace-nowrap" @click="addCustomField">+ Add field</button>
+                                    <div class="flex flex-wrap gap-2 justify-end">
+                                        <button v-if="form.event_type === 'fest' && form.certificate_type === 'participation'" type="button" class="btn-secondary text-xs" @click="positionParticipationItems">Position participation items separately</button>
+                                        <button type="button" class="btn-secondary text-xs whitespace-nowrap" @click="addCustomField">+ Add field</button>
+                                    </div>
                                 </div>
 
                                 <div v-for="(cf, idx) in form.layout_json.custom_fields" :key="idx" class="space-y-2 p-3 bg-white border border-slate-200 rounded-lg">
@@ -439,7 +442,8 @@
                                             {{ token }}
                                         </button>
                                     </div>
-                                    <input v-model="cf.text" class="field font-mono text-xs" placeholder="e.g. Master/Miss {recipient_name} of class {class}">
+                                    <textarea v-model="cf.text" class="field font-mono text-xs" rows="3" maxlength="500" placeholder="Text or HTML, e.g. {participation_items_box}"></textarea>
+                                    <p v-if="cf.text?.includes('{participation_items_box}')" class="text-xs text-slate-500">Participation items: adjust Top % to move the list independently. HTML can add spacing, for example &lt;div style="padding-top:8px"&gt;{participation_items_box}&lt;/div&gt;.</p>
                                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                         <FormField label="Top %">
                                             <template #default="{ id }">
@@ -729,6 +733,18 @@ function addCustomField() {
         text: '', top: 50, left: 10, width: 30, font_size: 14,
         font_family: 'Montserrat', font_weight: 'normal', font_style: 'normal', align: 'left',
     });
+}
+
+function positionParticipationItems() {
+    const token = '{participation_items_box}';
+    if (!form.layout_json.custom_fields.some(field => field.text?.includes(token))) {
+        form.layout_json.custom_fields.push({
+            text: token, top: 56, left: 10, width: 80, font_size: 14,
+            font_family: 'Times New Roman', font_weight: 'normal', font_style: 'normal', align: 'left',
+        });
+    }
+    // The list has one owner, preventing duplicate rendering in the body paragraph.
+    form.body = (form.body ?? '').replace(/\{participation_items_box\}/gi, '').trim();
 }
 
 function removeCustomField(index) {

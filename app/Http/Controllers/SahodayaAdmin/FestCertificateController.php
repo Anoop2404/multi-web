@@ -888,6 +888,7 @@ class FestCertificateController extends SahodayaAdminController
                     'student_id' => $c['student']?->id ?? $c['participant']?->student_id,
                     'name' => $c['student']?->name ?? $c['participant']?->student?->name ?? 'Participant',
                     'item_title' => $c['item']?->title ?? '',
+                    'item_code' => $c['item']?->item_code,
                     'category_label' => FestItemCategoryLabel::shortLabel($c['item'], $classGroupLabels, $artsCategoryLabels),
                     // Participation: every item on the person's one certificate, not
                     // just the anchor row's item.

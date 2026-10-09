@@ -149,7 +149,7 @@
                                 <span v-else-if="!c.is_rendered" class="text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider bg-gray-100 text-gray-500">Not rendered</span>
                             </div>
                             <p class="text-xs text-gray-600 mt-0.5 truncate">
-                                {{ c.item?.title ?? 'Event Participant' }}
+                                <span v-if="c.item?.item_code" class="mr-1 font-semibold">[{{ c.item.item_code }}]</span>{{ c.item?.title ?? 'Event Participant' }}
                                 <span class="text-gray-400"> · </span>
                                 <span class="text-gray-500 font-medium">{{ c.registration?.school?.name ?? c.participant?.registration?.school?.name }}</span>
                             </p>
