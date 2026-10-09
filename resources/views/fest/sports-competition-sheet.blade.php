@@ -16,7 +16,7 @@ td { font-size: 13px; height: 23px; }
 </style></head><body>
 @foreach($sheets as $sheet)
 <div class="sheet">
-<div class="fest-meta">{{ $event->title }}</div>
+<div class="fest-meta">{{ $event->title }} <span style="float:right">Generated on {{ now()->timezone('Asia/Kolkata')->format('d M Y, h:i:s A') }} IST</span></div>
 <table>
 <colgroup><col style="width:6%"><col style="width:8%"><col style="width:9%"><col style="width:25%">
 @for($i=0;$i<6;$i++)<col style="width:8.666%">@endfor</colgroup>

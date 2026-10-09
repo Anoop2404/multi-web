@@ -43,3 +43,5 @@
 @elseif(!empty($itemLine))
     <div style="font-size: 13px; font-weight: bold; color: #0f172a;">{{ $itemLine }}</div>
 @endif
+
+<div style="font-size: 8px; color: #64748b; margin-top: 3px;">Generated on {{ now()->timezone('Asia/Kolkata')->format('d M Y, h:i:s A') }} IST</div>

@@ -127,10 +127,11 @@ class Student extends Model
             ?? $this->photoDataUri();
     }
 
-    /** Full-size S3 fallback also bypasses a failing CloudFront distribution. */
+    /** Cached embedded fallback resolves legacy/local photos across storage disks. */
     public function publicPhotoFallbackUrl(): ?string
     {
-        return TenantStorage::directPhotoUrl($this->photo, thumbnail: false, useCloudFront: false);
+        return $this->photoDataUri()
+            ?? TenantStorage::directPhotoUrl($this->photo, thumbnail: false, useCloudFront: false);
     }
 
     /**

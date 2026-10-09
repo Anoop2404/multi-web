@@ -164,4 +164,17 @@ class TenantStorageTest extends TestCase
         $this->assertStringNotContainsString('.thumb.jpg', $url);
     }
 
+    public function test_public_student_photo_fallback_resolves_a_shared_storage_photo(): void
+    {
+        config(['cache.default' => 'array', 'filesystems.upload_disk' => 'shared']);
+        Storage::fake('shared');
+        $school = new Tenant(['id' => (string) Str::uuid()]);
+        $path = "students/{$school->id}/photo.png";
+        Storage::disk('shared')->put($path, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1V8AAAAASUVORK5CYII='));
+        $student = new \App\Models\Student(['tenant_id' => $school->id, 'photo' => $path]);
+        $student->setRelation('tenant', $school);
+
+        $this->assertStringStartsWith('data:image/', $student->publicPhotoFallbackUrl());
+    }
+
 }

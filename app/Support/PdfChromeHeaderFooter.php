@@ -34,7 +34,7 @@ class PdfChromeHeaderFooter
 
         $orgName = e($heading['orgName'] ?? 'Sahodaya');
         $eventTitle = e($heading['eventTitle'] ?? '');
-        $generated = e(now()->format('d M Y, h:i A'));
+        $generated = e(now()->timezone('Asia/Kolkata')->format('d M Y, h:i:s A').' IST');
 
         $footer = <<<HTML
             <div style="width:100%; font-family:Arial,Helvetica,sans-serif; font-size:7px; color:#64748b; padding:0 28px; box-sizing:border-box; display:flex; justify-content:space-between; border-top:1px solid #cbd5e1; padding-top:4px;">

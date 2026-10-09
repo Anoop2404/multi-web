@@ -10,7 +10,7 @@
                 ? $activeCategoryLabel.' results only — every item entered in this category, with rank, grade, and points.'
                 : 'Full results roster — every item entered, with rank, grade, and points.',
             'badges' => [],
-            'meta' => null,
+            'meta' => 'Page generated on '.now()->timezone('Asia/Kolkata')->format('d M Y, h:i:s A').' IST',
         ])
 
         <div class="flex flex-wrap items-center justify-between gap-3 mt-4 mb-8">
