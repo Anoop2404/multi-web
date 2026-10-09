@@ -577,20 +577,30 @@
                 if (!nav) return;
                 const tabs = [...nav.querySelectorAll('.championship-group-tab')];
                 const rows = [...document.querySelectorAll('#championship-rows tr[data-group]')];
+                let activeTab = null;
                 nav.addEventListener('click', (e) => {
                     const btn = e.target.closest('.championship-group-tab');
                     if (!btn) return;
                     const group = btn.dataset.group;
-                    tabs.forEach(t => {
-                        const active = t === btn;
-                        t.classList.toggle('bg-amber-500', active);
-                        t.classList.toggle('text-slate-950', active);
-                        t.classList.toggle('border-amber-500', active);
-                        t.classList.toggle('bg-slate-800', !active);
-                        t.classList.toggle('text-slate-300', !active);
-                        t.classList.toggle('border-slate-700', !active);
+                    // Swap classes only on the two buttons that changed (not all tabs)
+                    if (activeTab && activeTab !== btn) {
+                        activeTab.classList.replace('bg-amber-500', 'bg-slate-800');
+                        activeTab.classList.replace('text-slate-950', 'text-slate-300');
+                        activeTab.classList.replace('border-amber-500', 'border-slate-700');
+                    }
+                    btn.classList.replace('bg-slate-800', 'bg-amber-500');
+                    btn.classList.replace('text-slate-300', 'text-slate-950');
+                    btn.classList.replace('border-slate-700', 'border-amber-500');
+                    activeTab = btn;
+                    // Batch hidden toggles into a single rAF. With 5,000+ championship
+                    // rows, a synchronous loop forces layout recalculation per row; a
+                    // single frame batch collapses it to one reflow.
+                    if (!group) return;
+                    requestAnimationFrame(() => {
+                        for (let i = 0, len = rows.length; i < len; i++) {
+                            rows[i].hidden = rows[i].dataset.group !== group;
+                        }
                     });
-                    rows.forEach(r => { r.hidden = r.dataset.group !== group; });
                 });
             })();
             </script>
@@ -607,6 +617,14 @@
     const stage = document.getElementById('result-item-stage');
     const items = [...document.querySelectorAll('[data-result-item]')];
     const groups = [...document.querySelectorAll('[data-result-category]')];
+    // Pre-resolve the group each item belongs to (avoids .closest() in the hot loop)
+    // and pre-decode the dataset strings we filter on. With 100+ items, repeated
+    // .dataset.* reads and DOM lookups dominate the cost of every keystroke.
+    const groupsByItem = items.map(item => item.closest('[data-result-category]'));
+    const itemSearches = items.map(item => (item.dataset.search || '').toLocaleLowerCase());
+    const itemModes = items.map(item => item.dataset.mode || '');
+    const itemStages = items.map(item => item.dataset.stage || '');
+    const groupCats = groups.map(g => (g.dataset.resultCategory || '').toLocaleLowerCase());
     const summary = document.getElementById('result-item-summary');
     const empty = document.getElementById('result-item-empty');
     const initialUrl = new URL(window.location.href);
@@ -616,24 +634,50 @@
     stage.value = initialUrl.searchParams.get('stage') || '';
     const apply = () => {
         const query = search.value.trim().toLocaleLowerCase();
+        const catFilter = category.value;
+        const modeFilter = mode.value;
+        const stageFilter = stage.value;
         let count = 0;
-        items.forEach(item => {
-            const group = item.closest('[data-result-category]');
-            const visible = (!query || item.dataset.search.includes(query)) && (!category.value || group.dataset.resultCategory === category.value) && (!mode.value || item.dataset.mode === mode.value) && (!stage.value || item.dataset.stage === stage.value);
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const group = groupsByItem[i];
+            const groupCat = group ? groupCats[groups.indexOf(group)] : '';
+            const itemMode = itemModes[i];
+            const itemStage = itemStages[i];
+            const itemSearch = itemSearches[i];
+            const visible = (!query || itemSearch.indexOf(query) !== -1)
+                && (!catFilter || groupCat === catFilter)
+                && (!modeFilter || itemMode === modeFilter)
+                && (!stageFilter || itemStage === stageFilter);
             item.hidden = !visible;
             if (visible) count++;
-        });
-        groups.forEach(group => group.hidden = !group.querySelector('[data-result-item]:not([hidden])'));
+        }
+        // One querySelectorAll per group is still the cheapest option here — toggling
+        // hidden on the group is cheap, the question is whether any item inside it
+        // stayed visible. We avoid the redundant second loop by inlining the check.
+        for (let i = 0; i < groups.length; i++) {
+            const group = groups[i];
+            const hasVisible = !!group.querySelector('[data-result-item]:not([hidden])');
+            group.hidden = !hasVisible;
+        }
         summary.textContent = `Showing ${count} published ${count === 1 ? 'item result' : 'item results'}`;
         empty.classList.toggle('hidden', count !== 0);
         const nextUrl = new URL(window.location.href);
-        search.value ? nextUrl.searchParams.set('q', search.value.trim()) : nextUrl.searchParams.delete('q');
-        category.value ? nextUrl.searchParams.set('category', category.value) : nextUrl.searchParams.delete('category');
-        mode.value ? nextUrl.searchParams.set('mode', mode.value) : nextUrl.searchParams.delete('mode');
-        stage.value ? nextUrl.searchParams.set('stage', stage.value) : nextUrl.searchParams.delete('stage');
+        if (search.value) nextUrl.searchParams.set('q', search.value.trim()); else nextUrl.searchParams.delete('q');
+        if (category.value) nextUrl.searchParams.set('category', category.value); else nextUrl.searchParams.delete('category');
+        if (mode.value) nextUrl.searchParams.set('mode', mode.value); else nextUrl.searchParams.delete('mode');
+        if (stage.value) nextUrl.searchParams.set('stage', stage.value); else nextUrl.searchParams.delete('stage');
         history.replaceState(null, '', nextUrl);
     };
-    [search, category, mode, stage].forEach(control => control.addEventListener(control === search ? 'input' : 'change', apply));
+    // Debounce to one batch per animation frame. Rapid typing otherwise triggers a
+    // full DOM walk + hidden-toggle on every keystroke, which on 100+ items forces
+    // a layout recalculation per character.
+    let pending = null;
+    const schedule = () => {
+        if (pending !== null) return;
+        pending = requestAnimationFrame(() => { pending = null; apply(); });
+    };
+    [search, category, mode, stage].forEach(control => control.addEventListener(control === search ? 'input' : 'change', schedule));
     apply();
 })();
 </script>
@@ -644,6 +688,10 @@
     const category = document.getElementById('individual-result-category');
     const cards = [...document.querySelectorAll('#individual-result-cards [data-individual-result]')];
     const tableRows = [...document.querySelectorAll('table [data-individual-result]')];
+    // Pre-decode dataset values once — avoiding repeated .dataset.* property access
+    // inside the search loop for 5,000+ individual result rows.
+    const cardSearch = cards.map(c => (c.dataset.search || '').toLocaleLowerCase());
+    const cardCat = cards.map(c => c.dataset.category || '');
     const summary = document.getElementById('individual-result-summary');
     const empty = document.getElementById('individual-result-empty');
     if (!search) return;
@@ -653,24 +701,30 @@
 
     const apply = () => {
         const query = search.value.trim().toLocaleLowerCase();
+        const catFilter = category.value;
         let visible = 0;
-        cards.forEach((card, index) => {
-            const matches = (!query || card.dataset.search.includes(query))
-                && (!category.value || card.dataset.category === category.value);
-            card.hidden = !matches;
-            if (tableRows[index]) tableRows[index].hidden = !matches;
+        for (let i = 0; i < cards.length; i++) {
+            const matches = (!query || cardSearch[i].indexOf(query) !== -1)
+                && (!catFilter || cardCat[i] === catFilter);
+            cards[i].hidden = !matches;
+            if (tableRows[i]) tableRows[i].hidden = !matches;
             if (matches) visible++;
-        });
+        }
         summary.textContent = `Showing ${visible} ${visible === 1 ? 'result' : 'results'}`;
         empty.classList.toggle('hidden', visible !== 0);
         const nextUrl = new URL(window.location.href);
-        search.value ? nextUrl.searchParams.set('q', search.value.trim()) : nextUrl.searchParams.delete('q');
-        category.value ? nextUrl.searchParams.set('category', category.value) : nextUrl.searchParams.delete('category');
+        if (search.value) nextUrl.searchParams.set('q', search.value.trim()); else nextUrl.searchParams.delete('q');
+        if (category.value) nextUrl.searchParams.set('category', category.value); else nextUrl.searchParams.delete('category');
         history.replaceState(null, '', nextUrl);
     };
 
-    search.addEventListener('input', apply);
-    category.addEventListener('change', apply);
+    let pending = null;
+    const schedule = () => {
+        if (pending !== null) return;
+        pending = requestAnimationFrame(() => { pending = null; apply(); });
+    };
+    search.addEventListener('input', schedule);
+    category.addEventListener('change', schedule);
     apply();
 })();
 </script>

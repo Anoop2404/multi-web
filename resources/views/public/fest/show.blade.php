@@ -204,20 +204,37 @@
     const category = document.getElementById('event-item-category');
     const mode = document.getElementById('event-item-mode');
     const items = [...document.querySelectorAll('[data-event-item]')];
+    // Pre-decode dataset values once so the search loop doesn't repeatedly pay for
+    // .dataset.* getters and toLocaleLowerCase() on every keystroke.
+    const itemSearches = items.map(item => (item.dataset.search || '').toLocaleLowerCase());
+    const itemCats = items.map(item => item.dataset.category || '');
+    const itemModes = items.map(item => item.dataset.mode || '');
     const summary = document.getElementById('event-item-summary');
     const empty = document.getElementById('event-item-empty');
     const apply = () => {
         const query = search.value.trim().toLocaleLowerCase();
+        const catFilter = category.value;
+        const modeFilter = mode.value;
         let count = 0;
-        items.forEach(item => {
-            const visible = (!query || item.dataset.search.includes(query)) && (!category.value || item.dataset.category === category.value) && (!mode.value || item.dataset.mode === mode.value);
-            item.hidden = !visible;
+        for (let i = 0; i < items.length; i++) {
+            const visible = (!query || itemSearches[i].indexOf(query) !== -1)
+                && (!catFilter || itemCats[i] === catFilter)
+                && (!modeFilter || itemModes[i] === modeFilter);
+            items[i].hidden = !visible;
             if (visible) count++;
-        });
+        }
         summary.textContent = `Showing ${count} ${count === 1 ? 'item' : 'items'}`;
         empty.classList.toggle('hidden', count !== 0);
     };
-    [search, category, mode].forEach(control => control.addEventListener(control === search ? 'input' : 'change', apply));
+    // rAF-debounce so a 5-character search collapses to a single layout pass instead
+    // of one reflow per keystroke. Critical when there are 100+ items rendered.
+    let pending = null;
+    const schedule = () => {
+        if (pending !== null) return;
+        pending = requestAnimationFrame(() => { pending = null; apply(); });
+    };
+    [search, category, mode].forEach(control => control.addEventListener(control === search ? 'input' : 'change', schedule));
+    apply();
 })();
 </script>
 @endif

@@ -139,11 +139,14 @@ trait RendersPublicPages
             $layout['widgets'] = $widgets;
         }
 
-        return response()->view($view, array_merge($layout, $extra, [
+        $response = response()->view($view, array_merge($layout, $extra, [
             'tenant' => $tenant,
             'experience' => $experience,
             'tenantTheme' => array_merge($layout['theme'] ?? [], $experience['design'] ?? []),
         ]));
+
+        return $response
+            ->header('Cache-Control', 'public, max-age=0, s-maxage=60, stale-while-revalidate=120');
     }
 
     /** Give standalone public pages the same theme and widget policy as the homepage. */

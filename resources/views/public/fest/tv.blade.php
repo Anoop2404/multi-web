@@ -157,7 +157,15 @@
     // to say which item is actually on screen once scrolled a few rows into one.
     let activeSection = null;
     let activeWinnerItem = null;
-    const updateLabel = (scrollY) => {
+    let lastLabelTime = 0;
+    const labelThrottleMs = 120;
+    const updateLabel = (scrollY, now) => {
+        // Throttle to ~8fps — the track already scrolls at 60fps via rAF but the label
+        // update is the expensive part: each call reads offsetTop (forces layout) on
+        // every section and winner-item element. A 120ms throttle drops that to ~8
+        // synchronous layout passes per second, unnoticeable to viewers.
+        if (now && now - lastLabelTime < labelThrottleMs) return;
+        lastLabelTime = now || performance.now();
         const section = activeAt(sections, scrollY);
         const type = section?.dataset.type || '';
         const winnerItem = type === 'winners' ? activeAt(winnerItems, scrollY) : null;
@@ -243,9 +251,11 @@
 
     if (maxScrollY <= 0) {
         // Every section already fits on screen at once — nothing to scroll, just
-        // refresh periodically to pick up new data.
-        updateLabel(0);
-        setTimeout(() => window.location.reload(), 30000);
+        // refresh periodically to pick up new data. Add ±10 s jitter so all TV
+        // displays in a hall don't thundering-herd the server at the same instant.
+        const jitter = Math.random() * 10000;
+        updateLabel(0, performance.now());
+        setTimeout(() => window.location.reload(), 30000 + jitter);
         return;
     }
 
@@ -276,7 +286,7 @@
     const setY = (value) => {
         y = value;
         track.style.transform = `translateY(${-y}px)`;
-        updateLabel(y);
+        updateLabel(y, performance.now());
     };
 
     const jumpTo = (index) => {

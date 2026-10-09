@@ -695,6 +695,13 @@ class FestPortalController extends Controller
             abort_unless(in_array($category, $categories, true), 404);
         }
 
+        // Verify this school is actually registered in this event before exposing anything.
+        $isRegistered = FestRegistration::where('event_id', $event->id)
+            ->where('school_id', $schoolId)
+            ->whereIn('status', ['approved', 'submitted', 'pending_approval'])
+            ->exists();
+        abort_unless($isRegistered, 404);
+
         $school = Tenant::findOrFail($schoolId);
 
         [$overallRows] = $this->resolveScoreboard($event, $selectedScope, $category, $isPublished, $isAdminPreview);
@@ -821,37 +828,49 @@ class FestPortalController extends Controller
             ->get()
             ->groupBy('registration_id');
 
+        $itemCategoryCache = [];
+        $getCategoryLabel = function (FestEventItem $item) use ($event, $categoryColumn, &$itemCategoryCache): string {
+            if (! isset($itemCategoryCache[$item->{$categoryColumn}])) {
+                $itemCategoryCache[$item->{$categoryColumn}] = $this->scoreboards->categoryLabel($event, $item->{$categoryColumn});
+            }
+            return $itemCategoryCache[$item->{$categoryColumn}];
+        };
+        $getGenderLabel = function (?FestEventItem $item): ?string {
+            if (! $item || ! $item->gender) { return null; }
+            static $genderCache = [];
+            if (! isset($genderCache[$item->gender])) {
+                $genderCache[$item->gender] = \App\Support\FestSportsAgeGroup::genderLabel($item->gender);
+            }
+            return $genderCache[$item->gender];
+        };
+        $breakdownCache = [];
+        $getBreakdown = function (FestEvent $ev, FestMark $m) use ($event, &$breakdownCache): array {
+            $key = $m->id;
+            if (! isset($breakdownCache[$key])) {
+                $breakdownCache[$key] = $this->gradePoints->pointsBreakdown($event, $m);
+            }
+            return $breakdownCache[$key];
+        };
+
         return $allSchoolMarks
             ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
             ->unique(fn (FestMark $m) => $m->deduplicationKey())
             ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
             ->map(fn ($group) => $group
-                ->map(function (FestMark $m) use ($event, $categoryColumn, $participantTypeLabels, $allSchoolRosterByRegistration) {
-                    // Splits into (grade points, rank points) per the Kalolsavam Manual's
-                    // formula only when those two components actually sum to this mark's
-                    // real total — null/null otherwise (a custom rule with no defined
-                    // split), in which case only the combined total is shown below.
-                    $breakdown = $this->gradePoints->pointsBreakdown($event, $m);
+                ->map(function (FestMark $m) use ($event, $categoryColumn, $participantTypeLabels, $allSchoolRosterByRegistration, $getBreakdown, $getCategoryLabel, $getGenderLabel) {
+                    $breakdown = $getBreakdown($event, $m);
 
-                    // participant/photo/team come from the same publicWinnerRow() helper
-                    // every other tab on this page already uses — one team member's photo
-                    // for an individual item, every co-performer's for a group/team one.
-                    // Own array goes FIRST: publicWinnerRow() only fills points/grade_points
-                    // when the mark has a position (correct for the Individual tab, which is
-                    // winners-only), but this roster lists every item a school entered,
-                    // including grade-only ones with no numeric rank — and PHP's `+` keeps
-                    // the left side on key collisions, so ours must win or its null does.
                     return [
                         'item' => $m->item?->title,
                         'category' => $m->item?->{$categoryColumn}
-                            ? $this->scoreboards->categoryLabel($event, $m->item->{$categoryColumn})
+                            ? $getCategoryLabel($m->item)
                             : 'Uncategorized',
-                        'gender' => \App\Support\FestSportsAgeGroup::genderLabel($m->item?->gender),
+                        'gender' => $getGenderLabel($m->item),
                         'participant_type' => $participantTypeLabels[$m->item?->participant_type] ?? 'Individual',
                         'rank_points' => $breakdown['rank_points'],
                         'grade_points' => $breakdown['grade_points'],
                         'points' => $breakdown['total'],
-                    ] + $this->publicWinnerRow($m, $event, $allSchoolRosterByRegistration);
+                    ] + $this->publicWinnerRow($m, $event, $allSchoolRosterByRegistration, $getBreakdown);
                 })
                 // Category first so items naturally cluster together on screen, then
                 // position/item within each category — mirrors the Item-wise tab's own
@@ -941,6 +960,11 @@ class FestPortalController extends Controller
             ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.school', 'participant.registration.item', 'participant.registration.event', 'participant.group'])
             ->orderBy('position')
             ->orderByDesc('score')
+            // Safety ceiling: a team item with 100+ performers produces 100 identical
+            // mark rows (one per teammate). The dedup below collapses them, but the query
+            // still hydrates every row. Cap at 500 — enough for any realistic team size,
+            // prevents abuse from a corrupted data state.
+            ->limit(500)
             ->get()
             // Pair/group/team/trio items save one FestMark row PER TEAMMATE (same
             // position/score, see the scoring-dedup note on EventContext) — without this,
@@ -1447,20 +1471,14 @@ public function tv(Request $request, int $eventId)
     }
 
     /** @return array<string, mixed> */
-    private function publicWinnerRow(FestMark $mark, FestEvent $event, ?Collection $rosterByRegistration = null): array
+    private function publicWinnerRow(FestMark $mark, FestEvent $event, ?Collection $rosterByRegistration = null, ?\Closure $getBreakdown = null): array
     {
         $participant = $mark->participant;
         $person = $participant?->student ?? $participant?->teacher;
 
-        // rank_points/grade_points split out from the combined total per the official
-        // Kalolsavam Manual formula — null for both when this mark's actual points don't
-        // match that formula (a custom/Any-Position rule), so the public page can show
-        // just the total in that case instead of an invented split. Computed unconditionally
-        // (not gated on $mark->position): a grade-only mark with no numeric rank still earns
-        // points via pointsForMark()'s "Any Position"/default-grade-only fallback, and
-        // callers that list every entrant — not just top-3 winners — need that real value,
-        // not a null that renders as a blank/zero points column.
-        $breakdown = $this->gradePoints->pointsBreakdown($event, $mark);
+        $breakdown = $getBreakdown
+            ? $getBreakdown($event, $mark)
+            : $this->gradePoints->pointsBreakdown($event, $mark);
 
         $row = [
             'position' => $mark->position,
@@ -1709,18 +1727,22 @@ public function tv(Request $request, int $eventId)
      */
     private function publicResultsVersion(array $eventIds): array
     {
-        // One item aggregate instead of two scans. This short shared cache also
-        // removes all timestamp scans from most scoreboard/results requests.
         sort($eventIds);
         $compute = function () use ($eventIds) {
             $items = FestEventItem::whereIn('event_id', $eventIds)
                 ->selectRaw('MAX(results_published_at) AS published, MAX(updated_at) AS updated')->first();
             $publishedAt = FestResult::whereIn('event_id', $eventIds)->whereNull('item_id')->max('published_at');
+            // Include disqualification timestamps so a judge disqualifying a participant
+            // after results are published busts every cached scoreboard on the next request.
+            $disqualifiedAt = FestParticipant::whereIn('event_id', $eventIds)
+                ->whereNotNull('disqualified_at')
+                ->max('disqualified_at');
             return [sha1(implode('|', [
                 (string) $publishedAt,
                 (string) ($items?->getRawOriginal('published') ?? ''),
                 (string) ($items?->getRawOriginal('updated') ?? ''),
                 (string) FestMark::whereIn('event_id', $eventIds)->max('updated_at'),
+                (string) $disqualifiedAt,
             ])), $publishedAt];
         };
         if (request()->user() ?? auth()->user()) {
@@ -1764,13 +1786,16 @@ public function tv(Request $request, int $eventId)
         $remember = fn () => Cache::remember($key, now()->addSeconds($ttlSeconds), $compute);
 
         try {
-            $result = Cache::lock('lock:'.$key, max(30, $waitSeconds + 5))->block($waitSeconds, $remember);
+            // Lock TTL must exceed waitSeconds — if the lock expires before the blocker
+            // finishes, the second request can acquire it and duplicate the same heavy
+            // computation. Add 10s headroom so the first request always finishes first.
+            $lockTtl = max($waitSeconds + 10, 30);
+            $result = Cache::lock('lock:'.$key, $lockTtl)->block($waitSeconds, $remember);
         } catch (\Throwable) {
             // A request may have filled the key just before our lock timed out. Recheck
             // before falling back so an unavailable lock driver never breaks the page.
             $result = Cache::get($key) ?? $remember();
         }
-
 
         return $result;
     }
@@ -1944,9 +1969,10 @@ public function tv(Request $request, int $eventId)
             } elseif (preg_match('/^[A-Za-z]-\d+$/', $q)) {
                 $matches = $base->where('level_registration_number', strtoupper($q))->limit(30)->get();
             } elseif ($this->visibility->allowNameSearch($event, $isAdminPreview)) {
-                $matches = $base->where(function ($inner) use ($q) {
-                    $inner->whereHas('student', fn ($s) => $s->where('name', 'like', "%{$q}%"))
-                        ->orWhereHas('teacher', fn ($t) => $t->where('name', 'like', "%{$q}%"));
+                $searchTerm = '%'.$q.'%';
+                $matches = $base->where(function ($inner) use ($searchTerm) {
+                    $inner->whereHas('student', fn ($s) => $s->where('name', 'like', $searchTerm))
+                        ->orWhereHas('teacher', fn ($t) => $t->where('name', 'like', $searchTerm));
                 })->limit(30)->get();
             } else {
                 $matches = collect();
