@@ -297,6 +297,12 @@ class CertificateTemplate extends Model
         $custom = is_array($this->layout_json) ? $this->layout_json : [];
         $defaults['plain_variables'] = $custom['plain_variables'] ?? ['salutation'];
         $defaults['achievement_verb'] = $custom['achievement_verb'] ?? 'secured';
+        foreach (['participation_section_html', 'participation_item_html', 'participation_cell_html'] as $key) {
+            if (array_key_exists($key, $custom)) {
+                $defaults[$key] = $custom[$key] ?? '';
+            }
+        }
+
 
         foreach (['show_recipient_name', 'show_participation_label', 'bold_variables', 'show_certificate_date', 'show_logo_overlay', 'show_qr', 'show_photo'] as $flag) {
             if (array_key_exists($flag, $custom)) {

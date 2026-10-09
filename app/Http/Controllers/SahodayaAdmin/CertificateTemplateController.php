@@ -922,6 +922,13 @@ class CertificateTemplateController extends SahodayaAdminController
             $layout['plain_variables'] = $input['plain_variables'] ?? [];
         }
 
+        foreach (['participation_section_html', 'participation_item_html', 'participation_cell_html'] as $key) {
+            if (array_key_exists($key, $input)) {
+                // Empty HTML is intentional; middleware converts empty strings to null.
+                $layout[$key] = $input[$key] ?? '';
+            }
+        }
+
         if (array_key_exists('achievement_verb', $input)) {
             $layout['achievement_verb'] = $input['achievement_verb'] ?: 'secured';
         }
