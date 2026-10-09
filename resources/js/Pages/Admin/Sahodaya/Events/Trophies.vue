@@ -405,13 +405,23 @@ function viewStandings(row) {
     standingsModal.value = { name: trophyGroupName(row.trophy), rows: matching?.winner?.top_ten || [] };
 }
 const groupedRows = computed(() => {
-    const groups = new Map();
-    for (const row of filteredRows.value) {
+    const rows = [...filteredRows.value].sort((a, b) =>
+        Number(a.trophy.trophy_no) - Number(b.trophy.trophy_no) ||
+        Number(a.trophy.sort_order ?? 0) - Number(b.trophy.sort_order ?? 0));
+    const groups = [];
+    // Group adjacent awards only: a repeated category later in the official list
+    // must keep its original trophy numbers, while sharing the same standings dialog.
+    for (const row of rows) {
         const key = trophyGroupKey(row.trophy);
-        if (!groups.has(key)) groups.set(key, { key, name: trophyGroupName(row.trophy), rows: [] });
-        groups.get(key).rows.push(row);
+        const previous = groups[groups.length - 1];
+        if (previous?.categoryKey === key) {
+            previous.rows.push(row);
+        } else {
+            groups.push({ key: `${key}:${row.trophy.id}`, categoryKey: key,
+                name: trophyGroupName(row.trophy), rows: [row] });
+        }
     }
-    return [...groups.values()].map(group => ({ ...group, rows: group.rows.sort((a, b) => a.trophy.position - b.trophy.position || a.trophy.trophy_no - b.trophy.trophy_no) }));
+    return groups;
 });
 
 const currentScope = ref(props.scope);
