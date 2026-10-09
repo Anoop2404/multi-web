@@ -40,7 +40,6 @@ class TrackPublicVisitors
             $response->setContent(str_replace('</body>', $script.'</body>', $response->getContent()));
         }
         $response->headers->setCookie(cookie('fest_visitor', $visitor, 1440, '/', null, $request->isSecure(), true, false, 'lax'));
-        $response->headers->set('Cache-Control', 'private, no-store');
 
         return $response;
     }
