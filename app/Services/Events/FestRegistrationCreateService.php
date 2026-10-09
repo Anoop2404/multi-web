@@ -10,8 +10,8 @@ use App\Models\FestRegistration;
 use App\Models\Student;
 use App\Models\Teacher;
 use App\Models\Tenant;
+use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\Concerns\HandlesFestRegistrationDuplicates;
-use App\Services\Events\EventLifecycleGate;
 use App\Support\FestTeamSquadRules;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -204,10 +204,10 @@ class FestRegistrationCreateService
         $item->loadMissing('head');
 
         try {
-            return DB::transaction(function () use ($event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts, $adminOverride) {
+            return DB::transaction(function () use ($event, $item, $school, $performerIds, $standbyIds, $teamName, $teamContacts, $adminOverride) {
                 // Quota and eligibility checks are inside the transaction with lockForUpdate
                 // to prevent race conditions where concurrent requests overflow per-school quotas.
-                \App\Models\FestEvent::query()->whereKey($event->id)->lockForUpdate()->first();
+                FestEvent::query()->whereKey($event->id)->lockForUpdate()->first();
 
                 $limitErrors = (new FestParticipationLimitService($event))
                     ->validateRegistration($item, $school->id, $performerIds, $standbyIds);
@@ -229,8 +229,8 @@ class FestRegistrationCreateService
                 $feeRequiredBeforeApproval = ($policy['require_fee_before_approval'] ?? false) && $feeService->feeRequired($event);
 
                 $registrationDraft = new FestRegistration([
-                    'event_id'  => $event->id,
-                    'item_id'   => $item->id,
+                    'event_id' => $event->id,
+                    'item_id' => $item->id,
                     'school_id' => $school->id,
                 ]);
                 $registrationDraft->setRelation('item', $item);
@@ -256,10 +256,10 @@ class FestRegistrationCreateService
                 }
 
                 $registration = FestRegistration::create([
-                    'event_id'     => $event->id,
-                    'item_id'      => $item->id,
-                    'school_id'    => $school->id,
-                    'status'       => 'submitted',
+                    'event_id' => $event->id,
+                    'item_id' => $item->id,
+                    'school_id' => $school->id,
+                    'status' => 'submitted',
                     'submitted_at' => $waitlisted ? null : now(),
                 ]);
 
@@ -278,11 +278,11 @@ class FestRegistrationCreateService
                 if (FestTeamSquadRules::isMultiPerson($item->participant_type)) {
                     $group = FestGroup::create([
                         'registration_id' => $registration->id,
-                        'team_name'       => $teamName,
-                        'coach_name'      => filled($teamContacts['coach_name'] ?? null) ? trim((string) $teamContacts['coach_name']) : null,
-                        'coach_phone'     => filled($teamContacts['coach_phone'] ?? null) ? trim((string) $teamContacts['coach_phone']) : null,
-                        'manager_name'    => filled($teamContacts['manager_name'] ?? null) ? trim((string) $teamContacts['manager_name']) : null,
-                        'manager_phone'   => filled($teamContacts['manager_phone'] ?? null) ? trim((string) $teamContacts['manager_phone']) : null,
+                        'team_name' => $teamName,
+                        'coach_name' => filled($teamContacts['coach_name'] ?? null) ? trim((string) $teamContacts['coach_name']) : null,
+                        'coach_phone' => filled($teamContacts['coach_phone'] ?? null) ? trim((string) $teamContacts['coach_phone']) : null,
+                        'manager_name' => filled($teamContacts['manager_name'] ?? null) ? trim((string) $teamContacts['manager_name']) : null,
+                        'manager_phone' => filled($teamContacts['manager_phone'] ?? null) ? trim((string) $teamContacts['manager_phone']) : null,
                     ]);
                     $groupId = $group->id;
                 }
@@ -299,9 +299,9 @@ class FestRegistrationCreateService
 
                 foreach ($performerIds as $studentId) {
                     FestParticipant::create([
-                        'registration_id'  => $registration->id,
-                        'group_id'         => $groupId,
-                        'student_id'       => $studentId,
+                        'registration_id' => $registration->id,
+                        'group_id' => $groupId,
+                        'student_id' => $studentId,
                         'participant_type' => 'student',
                         'participant_role' => 'performer',
                     ]);
@@ -309,9 +309,9 @@ class FestRegistrationCreateService
 
                 foreach ($standbyIds as $studentId) {
                     FestParticipant::create([
-                        'registration_id'  => $registration->id,
-                        'group_id'         => $groupId,
-                        'student_id'       => $studentId,
+                        'registration_id' => $registration->id,
+                        'group_id' => $groupId,
+                        'student_id' => $studentId,
                         'participant_type' => 'student',
                         'participant_role' => 'standby',
                     ]);
@@ -341,9 +341,17 @@ class FestRegistrationCreateService
 
                 if ($registration->status !== $finalStatus) {
                     $registration->update([
-                        'status'       => $finalStatus,
+                        'status' => $finalStatus,
                         'submitted_at' => $finalStatus === 'waitlisted' ? null : ($registration->submitted_at ?? now()),
                     ]);
+                }
+
+                $registration->loadMissing('item', 'school', 'participants.student', 'participants.teacher', 'participants.group');
+                $logger = app(PlatformAuditLogger::class);
+                if ($registration->status === 'approved') {
+                    $logger->festRegistrationApproved($registration);
+                } else {
+                    $logger->festRegistrationSubmitted($registration);
                 }
 
                 return $registration->load(['participants.student', 'item']);
@@ -431,6 +439,7 @@ class FestRegistrationCreateService
         if ($event->event_type === 'teacher_fest') {
             $updated = $this->updateTeacherRegistration($registration, $event, $item, $school, $performerIds, $feeService, $dueBefore);
             $this->notifyIfRosterEditRevokedApproval($wasApproved, $updated);
+            app(PlatformAuditLogger::class)->festRegistrationUpdated($updated);
 
             return $updated;
         }
@@ -458,13 +467,13 @@ class FestRegistrationCreateService
             }
         }
 
-        $updated = DB::transaction(function () use ($registration, $event, $item, $school, $performerIds, $standbyIds, $teamName, $isGroup, $teamContacts, $feeService, $dueBefore, $isPaid, $adminOverride) {
+        $updated = DB::transaction(function () use ($registration, $event, $item, $school, $performerIds, $standbyIds, $teamName, $teamContacts, $feeService, $dueBefore, $isPaid, $adminOverride) {
             // Quota checks locked inside the transaction, same as createForSchool() — this
             // roster-edit path previously validated caps OUTSIDE any lock, so two concurrent
             // edits to different registrations under the same school sharing a pooled cap
             // (e.g. max_onstage_per_school) could both read the same pre-edit count, both
             // pass, and jointly push the school over its cap with no error ever raised.
-            \App\Models\FestEvent::query()->whereKey($event->id)->lockForUpdate()->first();
+            FestEvent::query()->whereKey($event->id)->lockForUpdate()->first();
 
             $limitErrors = (new FestParticipationLimitService($event))
                 ->validateRegistration($item, $school->id, $performerIds, $standbyIds, $registration->id);
@@ -501,10 +510,10 @@ class FestRegistrationCreateService
                 $group = FestGroup::updateOrCreate(
                     ['registration_id' => $registration->id],
                     [
-                        'team_name'     => filled($teamName) ? $teamName : ($existingGroup?->team_name ?: $this->nextDefaultTeamName($event, $item, $school, $registration->id)),
-                        'coach_name'    => filled($teamContacts['coach_name'] ?? null) ? trim((string) $teamContacts['coach_name']) : $existingGroup?->coach_name,
-                        'coach_phone'   => filled($teamContacts['coach_phone'] ?? null) ? trim((string) $teamContacts['coach_phone']) : $existingGroup?->coach_phone,
-                        'manager_name'  => filled($teamContacts['manager_name'] ?? null) ? trim((string) $teamContacts['manager_name']) : $existingGroup?->manager_name,
+                        'team_name' => filled($teamName) ? $teamName : ($existingGroup?->team_name ?: $this->nextDefaultTeamName($event, $item, $school, $registration->id)),
+                        'coach_name' => filled($teamContacts['coach_name'] ?? null) ? trim((string) $teamContacts['coach_name']) : $existingGroup?->coach_name,
+                        'coach_phone' => filled($teamContacts['coach_phone'] ?? null) ? trim((string) $teamContacts['coach_phone']) : $existingGroup?->coach_phone,
+                        'manager_name' => filled($teamContacts['manager_name'] ?? null) ? trim((string) $teamContacts['manager_name']) : $existingGroup?->manager_name,
                         'manager_phone' => filled($teamContacts['manager_phone'] ?? null) ? trim((string) $teamContacts['manager_phone']) : $existingGroup?->manager_phone,
                     ],
                 );
@@ -516,9 +525,9 @@ class FestRegistrationCreateService
             foreach ($performerIds as $studentId) {
                 abort_if(Student::where('id', $studentId)->where('tenant_id', $school->id)->doesntExist(), 403);
                 FestParticipant::create([
-                    'registration_id'  => $registration->id,
-                    'group_id'         => $groupId,
-                    'student_id'       => $studentId,
+                    'registration_id' => $registration->id,
+                    'group_id' => $groupId,
+                    'student_id' => $studentId,
                     'participant_type' => 'student',
                     'participant_role' => 'performer',
                 ]);
@@ -527,9 +536,9 @@ class FestRegistrationCreateService
             foreach ($standbyIds as $studentId) {
                 abort_if(Student::where('id', $studentId)->where('tenant_id', $school->id)->doesntExist(), 403);
                 FestParticipant::create([
-                    'registration_id'  => $registration->id,
-                    'group_id'         => $groupId,
-                    'student_id'       => $studentId,
+                    'registration_id' => $registration->id,
+                    'group_id' => $groupId,
+                    'student_id' => $studentId,
                     'participant_type' => 'student',
                     'participant_role' => 'standby',
                 ]);
@@ -581,6 +590,7 @@ class FestRegistrationCreateService
         });
 
         $this->notifyIfRosterEditRevokedApproval($wasApproved, $updated);
+        app(PlatformAuditLogger::class)->festRegistrationUpdated($updated);
 
         return $updated;
     }
@@ -640,8 +650,8 @@ class FestRegistrationCreateService
             foreach ($teacherIds as $teacherId) {
                 abort_if(Teacher::where('id', $teacherId)->where('tenant_id', $school->id)->doesntExist(), 403);
                 FestParticipant::create([
-                    'registration_id'  => $registration->id,
-                    'teacher_id'       => $teacherId,
+                    'registration_id' => $registration->id,
+                    'teacher_id' => $teacherId,
                     'participant_type' => 'teacher',
                     'participant_role' => 'performer',
                 ]);
@@ -687,15 +697,14 @@ class FestRegistrationCreateService
         }
 
         try {
-            return DB::transaction(function () use ($event, $item, $school, $teacherIds) {
+            $registration = DB::transaction(function () use ($event, $item, $school, $teacherIds) {
                 $registration = FestRegistration::create([
-                    'event_id'     => $event->id,
-                    'item_id'      => $item->id,
-                    'school_id'    => $school->id,
-                    'status'       => 'approved',
+                    'event_id' => $event->id,
+                    'item_id' => $item->id,
+                    'school_id' => $school->id,
+                    'status' => 'approved',
                     'submitted_at' => now(),
                 ]);
-
 
                 if ($event->rootEvent()->usesPhasedRegionalBilling() && $item->phase) {
                     app(FestSchoolPhaseRegionService::class)
@@ -711,8 +720,8 @@ class FestRegistrationCreateService
                 foreach ($teacherIds as $teacherId) {
                     abort_if(Teacher::where('id', $teacherId)->where('tenant_id', $school->id)->doesntExist(), 403);
                     FestParticipant::create([
-                        'registration_id'  => $registration->id,
-                        'teacher_id'       => $teacherId,
+                        'registration_id' => $registration->id,
+                        'teacher_id' => $teacherId,
                         'participant_type' => 'teacher',
                         'participant_role' => 'performer',
                     ]);
@@ -726,6 +735,11 @@ class FestRegistrationCreateService
 
                 return $registration->load(['participants.teacher', 'item']);
             });
+
+            $registration->loadMissing('item', 'school', 'participants.teacher');
+            app(PlatformAuditLogger::class)->festRegistrationApproved($registration);
+
+            return $registration;
         } catch (QueryException $e) {
             $this->abortOnFestRegistrationDuplicate($e);
 

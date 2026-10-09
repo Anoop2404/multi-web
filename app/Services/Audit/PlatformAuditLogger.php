@@ -2,24 +2,30 @@
 
 namespace App\Services\Audit;
 
+use App\Jobs\LogAuthEventJob;
 use App\Models\AuditLog;
 use App\Models\FestAppeal;
 use App\Models\FestEvent;
+use App\Models\FestParticipant;
 use App\Models\FestRegistration;
+use App\Models\FestSubstitutionRequest;
 use App\Models\ImpersonationSession;
 use App\Models\McqExam;
 use App\Models\McqRegistration;
 use App\Models\MembershipPayment;
+use App\Models\PlatformUser;
 use App\Models\SubscriptionInvoice;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionReceipt;
 use App\Models\Tenant;
 use App\Models\TenantSubscription;
+use App\Models\TrainingProgram;
 use App\Models\User;
-use App\Models\PlatformUser;
 use App\Support\AuditLogCatalog;
+use App\Support\FestPageActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class PlatformAuditLogger
 {
@@ -65,15 +71,15 @@ class PlatformAuditLogger
         }
 
         $data = [
-            'user_id'      => $resolvedUserId,
-            'tenant_id'    => $this->resolveTenantId($tenantId, $subject, $properties),
-            'category'     => $category ?? AuditLogCatalog::categoryForAction($action),
-            'action'       => $action,
-            'description'  => $description,
+            'user_id' => $resolvedUserId,
+            'tenant_id' => $this->resolveTenantId($tenantId, $subject, $properties),
+            'category' => $category ?? AuditLogCatalog::categoryForAction($action),
+            'action' => $action,
+            'description' => $description,
             'subject_type' => $subject?->getMorphClass(),
-            'subject_id'   => $subject ? (string) $subject->getKey() : null,
-            'ip_address'   => $this->request?->ip(),
-            'properties'   => $properties ?: null,
+            'subject_id' => $subject ? (string) $subject->getKey() : null,
+            'ip_address' => $this->request?->ip(),
+            'properties' => $properties ?: null,
         ];
 
         try {
@@ -84,7 +90,8 @@ class PlatformAuditLogger
             try {
                 return AuditLog::create($data);
             } catch (\Throwable $e2) {
-                \Illuminate\Support\Facades\Log::warning('PlatformAuditLogger write failed: '.$e2->getMessage());
+                Log::warning('PlatformAuditLogger write failed: '.$e2->getMessage());
+
                 return new AuditLog($data);
             }
         }
@@ -197,7 +204,7 @@ class PlatformAuditLogger
         $context['ip'] = $context['ip'] ?? $this->request?->ip();
 
         if (config('erp.async_auth_audit', true) && ! app()->runningUnitTests()) {
-            dispatch(\App\Jobs\LogAuthEventJob::fromLogin($action, $userId ?? 0, $email, $context));
+            dispatch(LogAuthEventJob::fromLogin($action, $userId ?? 0, $email, $context));
 
             return null;
         }
@@ -278,13 +285,13 @@ class PlatformAuditLogger
             "Fest registration #{$registration->id} approved{$ctx['suffix']}",
             $registration,
             [
-                'event_id'    => $registration->event_id,
-                'school_id'   => $registration->school_id,
-                'school'      => $ctx['school'],
-                'item_id'     => $registration->item_id,
-                'item_title'  => $ctx['item_title'],
+                'event_id' => $registration->event_id,
+                'school_id' => $registration->school_id,
+                'school' => $ctx['school'],
+                'item_id' => $registration->item_id,
+                'item_title' => $ctx['item_title'],
                 'participant' => $ctx['participant'],
-                'page'        => $page ?? \App\Support\FestPageActivity::REGISTRATIONS,
+                'page' => $page ?? FestPageActivity::REGISTRATIONS,
             ],
         );
     }
@@ -298,14 +305,14 @@ class PlatformAuditLogger
             "Fest registration #{$registration->id} rejected{$ctx['suffix']}",
             $registration,
             [
-                'event_id'    => $registration->event_id,
-                'school_id'   => $registration->school_id,
-                'school'      => $ctx['school'],
-                'item_id'     => $registration->item_id,
-                'item_title'  => $ctx['item_title'],
+                'event_id' => $registration->event_id,
+                'school_id' => $registration->school_id,
+                'school' => $ctx['school'],
+                'item_id' => $registration->item_id,
+                'item_title' => $ctx['item_title'],
                 'participant' => $ctx['participant'],
-                'reason'      => $reason ?: $registration->rejection_reason,
-                'page'        => $page ?? \App\Support\FestPageActivity::REGISTRATIONS,
+                'reason' => $reason ?: $registration->rejection_reason,
+                'page' => $page ?? FestPageActivity::REGISTRATIONS,
             ],
         );
     }
@@ -313,20 +320,21 @@ class PlatformAuditLogger
     public function festRegistrationCancelled(FestRegistration $registration, ?string $page = null, ?string $reason = null): AuditLog
     {
         $ctx = $this->registrationContext($registration);
+        $reasonSuffix = $reason ? " — Reason: {$reason}" : '';
 
         return $this->log(
             'fest.registration.cancelled',
-            "Fest registration #{$registration->id} cancelled{$ctx['suffix']}",
+            "Fest registration #{$registration->id} cancelled{$ctx['suffix']}{$reasonSuffix}",
             $registration,
             [
-                'event_id'    => $registration->event_id,
-                'school_id'   => $registration->school_id,
-                'school'      => $ctx['school'],
-                'item_id'     => $registration->item_id,
-                'item_title'  => $ctx['item_title'],
+                'event_id' => $registration->event_id,
+                'school_id' => $registration->school_id,
+                'school' => $ctx['school'],
+                'item_id' => $registration->item_id,
+                'item_title' => $ctx['item_title'],
                 'participant' => $ctx['participant'],
-                'reason'      => $reason,
-                'page'        => $page ?? \App\Support\FestPageActivity::REGISTRATIONS,
+                'reason' => $reason,
+                'page' => $page ?? FestPageActivity::REGISTRATIONS,
             ],
         );
     }
@@ -358,23 +366,229 @@ class PlatformAuditLogger
         $suffix = $suffixParts ? ' ('.implode(' — ', $suffixParts).')' : '';
 
         return [
-            'item_title'  => $itemTitle,
-            'school'      => $schoolName,
+            'item_title' => $itemTitle,
+            'school' => $schoolName,
             'participant' => $names ?: null,
-            'suffix'      => $suffix,
+            'suffix' => $suffix,
         ];
     }
 
-    public function festRegistrationSubmitted(FestRegistration $registration): AuditLog
+    public function festRegistrationSubmitted(FestRegistration $registration, ?string $page = null): AuditLog
     {
+        $ctx = $this->registrationContext($registration);
+
         return $this->log(
             'fest.registration.submitted',
-            "School submitted fest registration #{$registration->id}",
+            "School submitted fest registration #{$registration->id}{$ctx['suffix']}",
             $registration,
             [
-                'event_id'  => $registration->event_id,
+                'event_id' => $registration->event_id,
                 'school_id' => $registration->school_id,
-                'item_id'   => $registration->item_id,
+                'school' => $ctx['school'],
+                'item_id' => $registration->item_id,
+                'item_title' => $ctx['item_title'],
+                'participant' => $ctx['participant'],
+                'page' => $page ?? FestPageActivity::REGISTRATIONS,
+            ],
+        );
+    }
+
+    public function festRegistrationUpdated(FestRegistration $registration, ?string $page = null): AuditLog
+    {
+        $ctx = $this->registrationContext($registration);
+
+        return $this->log(
+            'fest.registration.updated',
+            "Fest registration #{$registration->id} updated{$ctx['suffix']}",
+            $registration,
+            [
+                'event_id' => $registration->event_id,
+                'school_id' => $registration->school_id,
+                'school' => $ctx['school'],
+                'item_id' => $registration->item_id,
+                'item_title' => $ctx['item_title'],
+                'participant' => $ctx['participant'],
+                'page' => $page ?? FestPageActivity::REGISTRATIONS,
+            ],
+        );
+    }
+
+    public function festParticipantSubstituted(FestParticipant $performer, FestParticipant $standby, ?FestEvent $event = null, ?string $page = null): AuditLog
+    {
+        $registration = $performer->registration ?? FestRegistration::find($performer->registration_id);
+        $registration?->loadMissing('item', 'school');
+        $event = $event ?? $registration?->event ?? ($performer->event_id ? FestEvent::find($performer->event_id) : null);
+
+        $performerName = $performer->student?->name ?? $performer->teacher?->name ?? "participant #{$performer->id}";
+        $standbyName = $standby->student?->name ?? $standby->teacher?->name ?? "standby #{$standby->id}";
+        $itemTitle = $registration?->item?->title;
+        $schoolName = $registration?->school?->name;
+
+        $suffixParts = array_filter([$itemTitle, $schoolName]);
+        $suffix = $suffixParts ? ' ('.implode(' — ', $suffixParts).')' : '';
+
+        return $this->log(
+            'fest.registration.participant_substituted',
+            "Substituted performer {$performerName} with standby {$standbyName} for registration #{$performer->registration_id}{$suffix}",
+            $registration ?? $event,
+            [
+                'event_id' => $event?->id ?? $registration?->event_id,
+                'school_id' => $registration?->school_id,
+                'school' => $schoolName,
+                'item_id' => $registration?->item_id,
+                'item_title' => $itemTitle,
+                'registration_id' => $performer->registration_id,
+                'original_participant_id' => $performer->id,
+                'replacement_participant_id' => $standby->id,
+                'performer' => $performerName,
+                'standby' => $standbyName,
+                'page' => $page ?? FestPageActivity::REGISTRATIONS,
+            ],
+        );
+    }
+
+    public function festStandbyPromoted(FestParticipant $standby, ?FestEvent $event = null, ?string $page = null): AuditLog
+    {
+        $registration = $standby->registration ?? FestRegistration::find($standby->registration_id);
+        $registration?->loadMissing('item', 'school');
+        $event = $event ?? $registration?->event ?? ($standby->event_id ? FestEvent::find($standby->event_id) : null);
+
+        $standbyName = $standby->student?->name ?? $standby->teacher?->name ?? "participant #{$standby->id}";
+        $itemTitle = $registration?->item?->title;
+        $schoolName = $registration?->school?->name;
+
+        $suffixParts = array_filter([$itemTitle, $schoolName]);
+        $suffix = $suffixParts ? ' ('.implode(' — ', $suffixParts).')' : '';
+
+        return $this->log(
+            'fest.registration.standby_promoted',
+            "Promoted standby {$standbyName} to performer for registration #{$standby->registration_id}{$suffix}",
+            $registration ?? $event,
+            [
+                'event_id' => $event?->id ?? $registration?->event_id,
+                'school_id' => $registration?->school_id,
+                'school' => $schoolName,
+                'item_id' => $registration?->item_id,
+                'item_title' => $itemTitle,
+                'registration_id' => $standby->registration_id,
+                'participant_id' => $standby->id,
+                'participant' => $standbyName,
+                'page' => $page ?? FestPageActivity::REGISTRATIONS,
+            ],
+        );
+    }
+
+    public function festSubstitutionRequested(FestSubstitutionRequest $request, ?string $page = null): AuditLog
+    {
+        $request->loadMissing(['registration.item', 'school', 'originalParticipant.student', 'replacementParticipant.student', 'replacementStudent']);
+        $originalName = $request->originalParticipant?->student?->name ?? "participant #{$request->original_participant_id}";
+        $replacementName = $request->replacementParticipant?->student?->name ?? $request->replacementStudent?->name ?? 'new participant';
+        $itemTitle = $request->registration?->item?->title;
+        $schoolName = $request->school?->name;
+
+        $suffixParts = array_filter([$itemTitle, $schoolName]);
+        $suffix = $suffixParts ? ' ('.implode(' — ', $suffixParts).')' : '';
+
+        return $this->log(
+            'fest.substitution.requested',
+            "Substitution requested for registration #{$request->registration_id}: {$originalName} -> {$replacementName}{$suffix}",
+            $request->registration ?? $request,
+            [
+                'event_id' => $request->event_id,
+                'school_id' => $request->school_id,
+                'school' => $schoolName,
+                'registration_id' => $request->registration_id,
+                'substitution_request_id' => $request->id,
+                'item_id' => $request->registration?->item_id,
+                'item_title' => $itemTitle,
+                'original_participant_id' => $request->original_participant_id,
+                'replacement_participant_id' => $request->replacement_participant_id,
+                'replacement_student_id' => $request->replacement_student_id,
+                'reason' => $request->reason,
+                'page' => $page ?? FestPageActivity::REGISTRATIONS,
+            ],
+        );
+    }
+
+    public function festSubstitutionApproved(FestSubstitutionRequest $request, ?string $resolutionNote = null, ?string $page = null): AuditLog
+    {
+        $request->loadMissing(['registration.item', 'school', 'originalParticipant.student', 'replacementParticipant.student', 'replacementStudent']);
+        $originalName = $request->originalParticipant?->student?->name ?? "participant #{$request->original_participant_id}";
+        $replacementName = $request->replacementParticipant?->student?->name ?? $request->replacementStudent?->name ?? 'new participant';
+        $itemTitle = $request->registration?->item?->title;
+        $schoolName = $request->school?->name;
+
+        $suffixParts = array_filter([$itemTitle, $schoolName]);
+        $suffix = $suffixParts ? ' ('.implode(' — ', $suffixParts).')' : '';
+
+        return $this->log(
+            'fest.substitution.approved',
+            "Substitution request #{$request->id} approved for registration #{$request->registration_id}: {$originalName} -> {$replacementName}{$suffix}",
+            $request->registration ?? $request,
+            [
+                'event_id' => $request->event_id,
+                'school_id' => $request->school_id,
+                'school' => $schoolName,
+                'registration_id' => $request->registration_id,
+                'substitution_request_id' => $request->id,
+                'item_id' => $request->registration?->item_id,
+                'item_title' => $itemTitle,
+                'reason' => $resolutionNote ?: $request->reason,
+                'page' => $page ?? FestPageActivity::REGISTRATIONS,
+            ],
+        );
+    }
+
+    public function festSubstitutionRejected(FestSubstitutionRequest $request, ?string $resolutionNote = null, ?string $page = null): AuditLog
+    {
+        $request->loadMissing(['registration.item', 'school']);
+        $itemTitle = $request->registration?->item?->title;
+        $schoolName = $request->school?->name;
+
+        $suffixParts = array_filter([$itemTitle, $schoolName]);
+        $suffix = $suffixParts ? ' ('.implode(' — ', $suffixParts).')' : '';
+
+        return $this->log(
+            'fest.substitution.rejected',
+            "Substitution request #{$request->id} rejected for registration #{$request->registration_id}{$suffix}",
+            $request->registration ?? $request,
+            [
+                'event_id' => $request->event_id,
+                'school_id' => $request->school_id,
+                'school' => $schoolName,
+                'registration_id' => $request->registration_id,
+                'substitution_request_id' => $request->id,
+                'item_id' => $request->registration?->item_id,
+                'item_title' => $itemTitle,
+                'reason' => $resolutionNote ?: $request->resolution_note,
+                'page' => $page ?? FestPageActivity::REGISTRATIONS,
+            ],
+        );
+    }
+
+    public function festSubstitutionCancelled(FestSubstitutionRequest $request, ?string $reason = null, ?string $page = null): AuditLog
+    {
+        $request->loadMissing(['registration.item', 'school']);
+        $itemTitle = $request->registration?->item?->title;
+        $schoolName = $request->school?->name;
+
+        $suffixParts = array_filter([$itemTitle, $schoolName]);
+        $suffix = $suffixParts ? ' ('.implode(' — ', $suffixParts).')' : '';
+
+        return $this->log(
+            'fest.substitution.cancelled',
+            "Substitution request #{$request->id} cancelled for registration #{$request->registration_id}{$suffix}",
+            $request->registration ?? $request,
+            [
+                'event_id' => $request->event_id,
+                'school_id' => $request->school_id,
+                'school' => $schoolName,
+                'registration_id' => $request->registration_id,
+                'substitution_request_id' => $request->id,
+                'reason' => $reason ?? $request->resolution_note,
+                'item_id' => $request->registration?->item_id,
+                'item_title' => $itemTitle,
+                'page' => $page ?? FestPageActivity::REGISTRATIONS,
             ],
         );
     }
@@ -399,7 +613,7 @@ class PlatformAuditLogger
         ?Model $subject = null,
     ): AuditLog {
         return $this->log($action, $description, $subject ?? $exam, array_merge([
-            'exam_id'   => $exam->id,
+            'exam_id' => $exam->id,
             'tenant_id' => $exam->tenant_id,
         ], $properties), category: 'mcq');
     }
@@ -414,15 +628,15 @@ class PlatformAuditLogger
             $description,
             [
                 'registration_id' => $registration->id,
-                'school_id'       => $registration->school_id,
-                'student_id'      => $registration->student_id,
+                'school_id' => $registration->school_id,
+                'student_id' => $registration->student_id,
             ],
             $registration,
         );
     }
 
     public function training(
-        \App\Models\TrainingProgram $program,
+        TrainingProgram $program,
         string $action,
         string $description,
         array $properties = [],
@@ -430,7 +644,7 @@ class PlatformAuditLogger
     ): AuditLog {
         return $this->log($action, $description, $subject ?? $program, array_merge([
             'program_id' => $program->id,
-            'tenant_id'  => $program->tenant_id,
+            'tenant_id' => $program->tenant_id,
         ], $properties), category: 'training');
     }
 
@@ -449,7 +663,7 @@ class PlatformAuditLogger
     {
         return $this->festEvent(
             $event,
-            \App\Support\FestPageActivity::MARKS,
+            FestPageActivity::MARKS,
             'fest.mark.entered',
             "Judge entered mark for participant #{$participantId}",
             ['participant_id' => $participantId, 'item_id' => $itemId],
@@ -464,8 +678,8 @@ class PlatformAuditLogger
             $appeal,
             [
                 'event_id' => $appeal->event_id,
-                'status'   => $status,
-                'page'     => \App\Support\FestPageActivity::APPEALS,
+                'status' => $status,
+                'page' => FestPageActivity::APPEALS,
             ],
         );
     }
@@ -490,9 +704,9 @@ class PlatformAuditLogger
         ?Model $subject = null,
     ): AuditLog {
         return $this->log($action, $description, $subject ?? $event, array_merge([
-            'event_id'  => $event->id,
+            'event_id' => $event->id,
             'tenant_id' => $event->tenant_id,
-            'page'      => $page,
+            'page' => $page,
         ], $properties));
     }
 
@@ -507,10 +721,11 @@ class PlatformAuditLogger
     ): AuditLog {
         return $this->log($action, $description, $subject, array_merge([
             'tenant_id' => $tenantId,
-            'program'   => $program,
-            'page'      => $page,
+            'program' => $program,
+            'page' => $page,
         ], $properties));
     }
+
     public function reportDownloaded(string $reportName, array $filters = []): AuditLog
     {
         return $this->log(

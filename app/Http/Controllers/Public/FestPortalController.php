@@ -72,13 +72,16 @@ class FestPortalController extends Controller
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
+        $selectedScope = $this->operationalEvents->directScope($event);
+
         if ($request->user() ?? auth()->user()) {
             return $this->renderEventHome($request, $tenant, $event);
         }
 
         // The busiest public route otherwise rebuilds the full item grid and recent
-        // winners per visitor. Keep anonymous HTML for 30 seconds; never share previews.
-        $key = 'fest-home-html:v1:'.$tenant->id.':'.$event->id.':'.$event->updated_at?->getTimestamp();
+        // winners per visitor. Cache is keyed on event updated_at plus the results
+        // version so it invalidates the moment a new item's results are published.
+        $key = 'fest-home-html:v2:'.$tenant->id.':'.$event->id.':'.$event->updated_at?->getTimestamp().':'.$this->publicResultsVersion($selectedScope['event_ids'])[0];
         $html = $this->rememberPublicHotPath($key, 30,
             fn () => $this->renderEventHome($request, $tenant, $event)->getContent());
 
@@ -1052,10 +1055,10 @@ public function scoreboard(Request $request, int $eventId)
         return $this->renderScoreboardPage($request, $tenant, $event);
     }
     $scope = $this->operationalEvents->directScope($event);
-    $key = 'fest-scoreboard-html:v1:'.$tenant->id.':'.$event->id.':'
+    $key = 'fest-scoreboard-html:v2:'.$tenant->id.':'.$event->id.':'
         .$event->updated_at?->getTimestamp().':'.$this->publicResultsVersion($scope['event_ids'])[0].':'
         .sha1((string) $request->query('category', ''));
-    $html = $this->rememberPublicHotPath($key, 15,
+    $html = $this->rememberPublicHotPath($key, 30,
         fn () => $this->renderScoreboardPage($request, $tenant, $event)->getContent());
     return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
 }
@@ -1114,14 +1117,23 @@ public function scoreboardData(Request $request, int $eventId)
     $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
     $isPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
 
-    $dynamic = $this->scoreboardDynamicData($event, $selectedScope, $category, $isPublished, $isAdminPreview, $request);
+    // Authenticated previews must bypass shared response caches.
+    $cacheKey = 'fest-scoreboard-data:v2:'.$event->tenant_id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.($category ?? 'all').':'.($isPublished ? '1' : '0').':'.$this->publicResultsVersion($selectedScope['event_ids'])[0];
 
-    return response()->json([
-        'standingsPublished' => $isPublished,
-        'isAdminPreview' => $isAdminPreview,
-        'contentHtml' => view('public.fest.partials.scoreboard-content', $dynamic + compact('event', 'isPublished', 'category', 'isAdminPreview'))->render(),
-        'refreshedAt' => now()->toIso8601String(),
-    ])->header('Cache-Control', 'public, max-age=0, s-maxage=10, stale-while-revalidate=30');
+    $compute = function () use ($event, $selectedScope, $category, $isPublished, $isAdminPreview, $request): array {
+        $dynamic = $this->scoreboardDynamicData($event, $selectedScope, $category, $isPublished, $isAdminPreview, $request);
+        return [
+            'standingsPublished' => $isPublished,
+            'isAdminPreview' => $isAdminPreview,
+            'contentHtml' => view('public.fest.partials.scoreboard-content', $dynamic + compact('event', 'isPublished', 'category', 'isAdminPreview'))->render(),
+            'refreshedAt' => now()->toIso8601String(),
+        ];
+    };
+    $authenticated = (bool) ($request->user() ?? auth()->user());
+    $json = $authenticated ? $compute() : $this->rememberPublicHotPath($cacheKey, 30, $compute);
+
+    return response()->json($json)
+        ->header('Cache-Control', $authenticated ? 'private, no-store' : 'public, max-age=0, s-maxage=30, stale-while-revalidate=60');
 }
 
 /**
@@ -1714,7 +1726,7 @@ public function tv(Request $request, int $eventId)
         if (request()->user() ?? auth()->user()) {
             return $compute();
         }
-        return $this->rememberPublicHotPath('fest-results-version:v1:'.tenant('id').':'.implode(',', $eventIds), 5, $compute);
+        return $this->rememberPublicHotPath('fest-results-version:v2:'.tenant('id').':'.implode(',', $eventIds), 15, $compute);
     }
 
     private function scoreboardDynamicData(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished, bool $isAdminPreview = false, ?Request $request = null): array
@@ -1729,9 +1741,9 @@ public function tv(Request $request, int $eventId)
             return $compute();
         }
 
-        $cacheKey = 'fest-scoreboard-dynamic:v2:'.$event->tenant_id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.($category ?? 'all').':'.($isPublished ? '1' : '0').':'.$version;
+        $cacheKey = 'fest-scoreboard-dynamic:v3:'.$event->tenant_id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.($category ?? 'all').':'.($isPublished ? '1' : '0').':'.$version;
 
-        return $this->rememberPublicHotPath($cacheKey, 10, $compute, waitSeconds: 15);
+        return $this->rememberPublicHotPath($cacheKey, 30, $compute, waitSeconds: 15);
     }
 
     /**

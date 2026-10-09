@@ -1,19 +1,24 @@
 <?php
 
+use App\Http\Controllers\SchoolAdmin\CustomFestController;
+use App\Http\Controllers\SchoolAdmin\EnglishFestController;
 use App\Http\Controllers\SchoolAdmin\FestClashRequestController;
+use App\Http\Controllers\SchoolAdmin\FestEventStudentRegistrationController;
+use App\Http\Controllers\SchoolAdmin\FestFeeSlabSelectionController;
+use App\Http\Controllers\SchoolAdmin\FestPhaseRegionSelectionController;
 use App\Http\Controllers\SchoolAdmin\FestRegionChangeRequestController;
-use App\Http\Controllers\SchoolAdmin\FestSubstitutionRequestController;
 use App\Http\Controllers\SchoolAdmin\FestRegistrationController;
 use App\Http\Controllers\SchoolAdmin\FestSchoolReportController;
-use App\Http\Controllers\SchoolAdmin\KidsFestController;
+use App\Http\Controllers\SchoolAdmin\FestStateSlotController;
+use App\Http\Controllers\SchoolAdmin\FestSubstitutionRequestController;
 use App\Http\Controllers\SchoolAdmin\KalotsavController;
+use App\Http\Controllers\SchoolAdmin\KidsFestController;
 use App\Http\Controllers\SchoolAdmin\McqController;
 use App\Http\Controllers\SchoolAdmin\McqRegistrationController;
-use App\Http\Controllers\SchoolAdmin\EnglishFestController;
+use App\Http\Controllers\SchoolAdmin\McqReportController;
 use App\Http\Controllers\SchoolAdmin\ScienceFestController;
 use App\Http\Controllers\SchoolAdmin\SportsMeetController;
 use App\Http\Controllers\SchoolAdmin\TeacherFestController;
-use App\Http\Controllers\SchoolAdmin\CustomFestController;
 use App\Http\Controllers\SchoolAdmin\TrainingController;
 use App\Http\Controllers\SchoolAdmin\TrainingRegistrationController;
 use App\Http\Middleware\EnsureSchoolFestProgramMatchesEvent;
@@ -49,10 +54,10 @@ foreach ($festPrograms as $cfg) {
         Route::get('/events/{event}/eligible-students', [FestRegistrationController::class, 'eligibleStudents'])
             ->defaults('program', $slug)
             ->name('event.eligible-students');
-        Route::post('/events/{event}/phase-region', [\App\Http\Controllers\SchoolAdmin\FestPhaseRegionSelectionController::class, 'store'])
+        Route::post('/events/{event}/phase-region', [FestPhaseRegionSelectionController::class, 'store'])
             ->defaults('program', $slug)
             ->name('event.phase-region');
-        Route::post('/events/{event}/fee-slab', [\App\Http\Controllers\SchoolAdmin\FestFeeSlabSelectionController::class, 'store'])
+        Route::post('/events/{event}/fee-slab', [FestFeeSlabSelectionController::class, 'store'])
             ->defaults('program', $slug)
             ->name('event.fee-slab');
         Route::post('/select-region', [FestRegistrationController::class, 'selectSchoolRegion'])
@@ -86,13 +91,13 @@ foreach ($festPrograms as $cfg) {
             ->name('qualifiers.export');
         // A school's own slots before the Sahodaya registers its winners with State — see
         // App\Services\State\FestStateSlotCollectionService.
-        Route::get('/events/{event}/state-slots', [\App\Http\Controllers\SchoolAdmin\FestStateSlotController::class, 'index'])
+        Route::get('/events/{event}/state-slots', [FestStateSlotController::class, 'index'])
             ->defaults('program', $slug)
             ->name('event.state-slots');
-        Route::post('/events/{event}/state-slots/{selection}/accept', [\App\Http\Controllers\SchoolAdmin\FestStateSlotController::class, 'accept'])
+        Route::post('/events/{event}/state-slots/{selection}/accept', [FestStateSlotController::class, 'accept'])
             ->defaults('program', $slug)
             ->name('event.state-slots.accept');
-        Route::post('/events/{event}/state-slots/{selection}/opt-out', [\App\Http\Controllers\SchoolAdmin\FestStateSlotController::class, 'optOut'])
+        Route::post('/events/{event}/state-slots/{selection}/opt-out', [FestStateSlotController::class, 'optOut'])
             ->defaults('program', $slug)
             ->name('event.state-slots.opt-out');
         Route::get('/import-template', [FestRegistrationController::class, 'importTemplate'])
@@ -107,14 +112,14 @@ foreach ($festPrograms as $cfg) {
         Route::post('/register', [FestRegistrationController::class, 'store'])
             ->defaults('program', $slug)
             ->name('register');
-        Route::post('/events/{event}/register-students', [\App\Http\Controllers\SchoolAdmin\FestEventStudentRegistrationController::class, 'store'])
+        Route::post('/events/{event}/register-students', [FestEventStudentRegistrationController::class, 'store'])
             ->defaults('program', $slug)
             ->name('event.register-students');
-        Route::delete('/events/{event}/register-students/{student}', [\App\Http\Controllers\SchoolAdmin\FestEventStudentRegistrationController::class, 'destroy'])
+        Route::delete('/events/{event}/register-students/{student}', [FestEventStudentRegistrationController::class, 'destroy'])
             ->defaults('program', $slug)
             ->whereNumber('student')
             ->name('event.register-students.destroy');
-        Route::post('/events/{event}/bulk-assign', [\App\Http\Controllers\SchoolAdmin\FestEventStudentRegistrationController::class, 'bulkAssign'])
+        Route::post('/events/{event}/bulk-assign', [FestEventStudentRegistrationController::class, 'bulkAssign'])
             ->defaults('program', $slug)
             ->name('event.bulk-assign');
         Route::post('/registrations/{registration}/withdraw', [FestRegistrationController::class, 'withdraw'])
@@ -315,6 +320,9 @@ foreach ($festPrograms as $cfg) {
         Route::post('/events/{event}/substitution-requests', [FestSubstitutionRequestController::class, 'store'])
             ->defaults('program', $slug)
             ->name('substitution-requests.store');
+        Route::delete('/events/{event}/substitution-requests/{substitutionRequest}', [FestSubstitutionRequestController::class, 'destroy'])
+            ->defaults('program', $slug)
+            ->name('substitution-requests.destroy');
         Route::get('/events/{event}/region-change-requests', [FestRegionChangeRequestController::class, 'index'])
             ->defaults('program', $slug)
             ->name('region-change-requests.index');
@@ -350,15 +358,15 @@ Route::prefix('sports')->name('sports.')->group(function () {
 
 Route::prefix('mcq')->name('mcq.')->group(function () {
     Route::get('/', [McqController::class, 'hub'])->name('index');
-    Route::get('/{exam}/reports/registration/export', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportRegistration'])->name('reports.registration.export');
-    Route::get('/{exam}/reports/registration/pdf', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportRegistrationPdf'])->name('reports.registration.pdf');
-    Route::get('/{exam}/reports/attendance/export', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportAttendance'])->name('reports.attendance.export');
-    Route::get('/{exam}/reports/attendance/pdf', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportAttendancePdf'])->name('reports.attendance.pdf');
-    Route::get('/{exam}/reports/toppers/export', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportToppers'])->name('reports.toppers.export');
-    Route::get('/{exam}/reports/class-wise-counts/export', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportClassWiseCounts'])->name('reports.class-wise-counts.export');
-    Route::get('/{exam}/reports/class-wise-counts/pdf', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportClassWiseCountsPdf'])->name('reports.class-wise-counts.pdf');
-    Route::get('/{exam}/reports/fee-due/export', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportClassWiseFeeDue'])->name('reports.fee-due.export');
-    Route::get('/{exam}/reports/fee-due/pdf', [\App\Http\Controllers\SchoolAdmin\McqReportController::class, 'exportClassWiseFeeDuePdf'])->name('reports.fee-due.pdf');
+    Route::get('/{exam}/reports/registration/export', [McqReportController::class, 'exportRegistration'])->name('reports.registration.export');
+    Route::get('/{exam}/reports/registration/pdf', [McqReportController::class, 'exportRegistrationPdf'])->name('reports.registration.pdf');
+    Route::get('/{exam}/reports/attendance/export', [McqReportController::class, 'exportAttendance'])->name('reports.attendance.export');
+    Route::get('/{exam}/reports/attendance/pdf', [McqReportController::class, 'exportAttendancePdf'])->name('reports.attendance.pdf');
+    Route::get('/{exam}/reports/toppers/export', [McqReportController::class, 'exportToppers'])->name('reports.toppers.export');
+    Route::get('/{exam}/reports/class-wise-counts/export', [McqReportController::class, 'exportClassWiseCounts'])->name('reports.class-wise-counts.export');
+    Route::get('/{exam}/reports/class-wise-counts/pdf', [McqReportController::class, 'exportClassWiseCountsPdf'])->name('reports.class-wise-counts.pdf');
+    Route::get('/{exam}/reports/fee-due/export', [McqReportController::class, 'exportClassWiseFeeDue'])->name('reports.fee-due.export');
+    Route::get('/{exam}/reports/fee-due/pdf', [McqReportController::class, 'exportClassWiseFeeDuePdf'])->name('reports.fee-due.pdf');
     Route::get('/{exam}/eligible-students', [McqController::class, 'eligibleStudents'])->name('eligible-students');
     Route::get('/{exam}/{tab?}', [McqController::class, 'exam'])->name('exam')->where('tab', 'register|students|hall-tickets|fee|results|toppers|reports|attendance');
     Route::post('/{exam}/attendance', [McqController::class, 'storeAttendance'])->name('attendance.store');
@@ -403,7 +411,7 @@ Route::prefix('training')->name('training.')->group(function () {
     Route::get('/{registration}/certificate/pdf', [TrainingRegistrationController::class, 'downloadTeacherCertificatePdf'])->name('certificate.pdf');
 });
 
-Route::get("/programs/{program}", function (string $tenantId, string $program) use ($festProgramSlugs) {
+Route::get('/programs/{program}', function (string $tenantId, string $program) {
     $map = ['kalotsav' => 'kalotsav', 'sports-meet' => 'sports', 'kids-fest' => 'kids-fest', 'teacher-fest' => 'teacher-fest', 'english-fest' => 'english-fest', 'science-fest' => 'science-fest', 'custom' => 'custom'];
     if (isset($map[$program])) {
         return redirect("/school-admin/{$tenantId}/{$map[$program]}", 301);
@@ -412,7 +420,7 @@ Route::get("/programs/{program}", function (string $tenantId, string $program) u
     return redirect("/school-admin/{$tenantId}/fest-programs", 301);
 })->where('program', $festProgramSlugs);
 
-Route::get("/programs/{program}/{path}", function (string $tenantId, string $program, string $path) {
+Route::get('/programs/{program}/{path}', function (string $tenantId, string $program, string $path) {
     $map = ['kalotsav' => 'kalotsav', 'sports-meet' => 'sports', 'kids-fest' => 'kids-fest', 'teacher-fest' => 'teacher-fest', 'english-fest' => 'english-fest', 'science-fest' => 'science-fest', 'custom' => 'custom'];
     if (isset($map[$program])) {
         return redirect("/school-admin/{$tenantId}/{$map[$program]}/{$path}", 301);

@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class FestParticipant extends Model
 {
+    protected $touches = ['registration'];
+
     protected $fillable = [
         'registration_id', 'group_id', 'student_id', 'teacher_id', 'event_id', 'chest_head_id',
         'participant_type', 'participant_role', 'chest_no', 'chest_revealed_at', 'order_no',
@@ -17,7 +19,7 @@ class FestParticipant extends Model
     ];
 
     protected $casts = [
-        'disqualified_at'   => 'datetime',
+        'disqualified_at' => 'datetime',
         'chest_revealed_at' => 'datetime',
     ];
 

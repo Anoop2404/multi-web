@@ -2,49 +2,74 @@
 
 namespace App\Http\Controllers\SchoolAdmin;
 
+use App\Jobs\PromoteWaitlistedRegistrationsJob;
+use App\Models\FeeReceipt;
+use App\Models\FeeReceiptAttachment;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestEventPhase;
-use App\Models\FestRegistrationBatch;
-use App\Models\FestSchoolPhaseRegionSelection;
-use App\Models\FestGroup;
 use App\Models\FestItemHead;
+use App\Models\FestLevelRegistration;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
-use App\Models\FeeReceipt;
-use App\Models\FestSchoolEventFee;
-use App\Models\Student;
-use App\Models\Teacher;
-use App\Models\FestEventInvoice;
+use App\Models\FestRegistrationBatch;
 use App\Models\FestSchedule;
+use App\Models\FestSchoolEventFee;
+use App\Models\FestSchoolPhaseRegionSelection;
+use App\Models\FestSchoolTeamManager;
 use App\Models\FestSchoolVerification;
 use App\Models\FestVenue;
+use App\Models\Region;
 use App\Models\SahodayaProfile;
+use App\Models\SchoolRegionAssignment;
+use App\Models\Student;
+use App\Models\Teacher;
+use App\Models\Tenant;
+use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Events\EventContext;
+use App\Services\Events\EventLifecycleGate;
+use App\Services\Events\FestEventNotifier;
+use App\Services\Events\FestEventRegistrationService;
+use App\Services\Events\FestHeadItemNavigationService;
 use App\Services\Events\FestInvoiceService;
 use App\Services\Events\FestItemFeeResolver;
-use App\Services\Events\FestLevelRegistrationService;
-use App\Services\Events\FestPartitionService;
+use App\Services\Events\FestItemRegistrationGate;
+use App\Services\Events\FestItemSyncService;
+use App\Services\Events\FestItemWindowResolver;
 use App\Services\Events\FestParticipationLimitService;
+use App\Services\Events\FestPartitionService;
 use App\Services\Events\FestRegionPartitionService;
-use App\Services\Events\FestSchoolPartitionService;
+use App\Services\Events\FestRegistrationBatchFeeService;
+use App\Services\Events\FestRegistrationCreateService;
 use App\Services\Events\FestRegistrationEligibilityService;
-use App\Services\Events\FestSchoolEventFeeService;
-use App\Services\Events\FestRegistrationService;
+use App\Services\Events\FestRegistrationFeeGate;
 use App\Services\Events\FestRegistrationImportService;
-use App\Services\Audit\PlatformAuditLogger;
-use App\Services\Events\FestEventNotifier;
-use App\Http\Controllers\SchoolAdmin\Concerns\BuildsSchoolFestEventContext;
+use App\Services\Events\FestRegistrationService;
+use App\Services\Events\FestSchoolEventFeeService;
+use App\Services\Events\FestSchoolPartitionService;
+use App\Services\Events\FestTaxonomyRegistry;
+use App\Services\Events\ProgramHubDataService;
+use App\Services\Fees\FeeReceiptAttachmentService;
+use App\Services\Notifications\SahodayaAdminNotifier;
+use App\Services\School\SchoolDocumentDownloadGateService;
+use App\Services\School\SchoolUserScopeService;
+use App\Services\Students\StudentEditLockService;
+use App\Services\Students\StudentVerificationGate;
+use App\Support\AcademicYear;
+use App\Support\ExcelExport;
 use App\Support\FestClassGroupScheme;
+use App\Support\FestItemCategoryLabel;
 use App\Support\FestSportsAgeGroup;
 use App\Support\FestTeamSquadRules;
 use App\Support\ProgramRouteMap;
 use App\Support\SchoolEventCoordinator;
 use App\Support\SchoolFestProgram;
-use App\Services\Students\StudentEditLockService;
-use App\Services\Students\StudentVerificationGate;
-use App\Services\Notifications\SahodayaAdminNotifier;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class FestRegistrationController extends SchoolAdminController
@@ -95,7 +120,7 @@ class FestRegistrationController extends SchoolAdminController
             ->with('academicYear:id,label,status')
             ->orderByDesc('event_start')
             ->get()
-            ->pipe(fn ($events) => app(\App\Services\School\SchoolUserScopeService::class)
+            ->pipe(fn ($events) => app(SchoolUserScopeService::class)
                 ->filterFestEventsForUser($request->user(), $this->school->id, $program, $events))
             ->pipe(fn ($events) => $this->filterPartitionedEventsForSchool($events, $eventType))
             ->map(fn (FestEvent $event) => $this->hydrateEventForSchoolRegistration($event, $feeService));
@@ -103,13 +128,13 @@ class FestRegistrationController extends SchoolAdminController
         if ($view === 'results') {
             $scoreboards = [];
             foreach ($events as $event) {
-                $scoreboards[$event->id] = \App\Services\Events\EventContext::for($event)->scoreboardBySchool();
+                $scoreboards[$event->id] = EventContext::for($event)->scoreboardBySchool();
             }
 
             return $this->inertia('School/Events/Results', [
-                'program'     => $program,
+                'program' => $program,
                 'programMeta' => $meta,
-                'events'      => $events,
+                'events' => $events,
                 'scoreboards' => $scoreboards,
             ]);
         }
@@ -120,7 +145,7 @@ class FestRegistrationController extends SchoolAdminController
         // for why this couldn't just be removed (it's the only trigger for waitlist
         // promotion in the codebase) and what changes once the queue driver is async.
         if ($events->isNotEmpty()) {
-            \App\Jobs\PromoteWaitlistedRegistrationsJob::dispatch($events->pluck('id')->all(), $this->school->id);
+            PromoteWaitlistedRegistrationsJob::dispatch($events->pluck('id')->all(), $this->school->id);
         }
 
         $registrations = FestRegistration::where('school_id', $this->school->id)
@@ -164,7 +189,7 @@ class FestRegistrationController extends SchoolAdminController
                 ? $eligibilityService->annotateStudents($studentRows, $primaryEvent, $this->school->id)->values()
                 : collect();
 
-            $eventRegMap = \App\Models\FestLevelRegistration::query()
+            $eventRegMap = FestLevelRegistration::query()
                 ->whereIn('event_id', $registrationEventIds)
                 ->where('status', 'active')
                 ->whereIn('student_id', $studentRows->pluck('id'))
@@ -182,34 +207,36 @@ class FestRegistrationController extends SchoolAdminController
                             break;
                         }
                     }
+
                     return array_merge($s, [
                         'event_registered' => $regNo !== null || ($s['event_registered'] ?? false),
                         'event_registration_number' => $regNo ?: ($s['event_registration_number'] ?? null),
                     ]);
                 });
+
                 return [$event->id => $eventStudents];
             });
         }
 
         return $this->inertia('School/Events/Registration', [
-            'program'       => $program,
-            'programMeta'   => $meta,
-            'events'        => $events,
+            'program' => $program,
+            'programMeta' => $meta,
+            'events' => $events,
             'registrations' => $registrations,
-            'schoolRegion'  => $this->schoolRegionContext($eventType),
-            'students'      => $studentsByEvent->first() ?? [],
+            'schoolRegion' => $this->schoolRegionContext($eventType),
+            'students' => $studentsByEvent->first() ?? [],
             'studentsByEvent' => $studentsByEvent,
             'lazyLoadStudents' => $lazyStudents,
-            'studentCount'  => $studentCount,
+            'studentCount' => $studentCount,
             'schoolClasses' => $this->schoolClasses()->values(),
-            'eventType'     => $eventType,
-            'teachers'      => Teacher::where('tenant_id', $this->school->id)->active()->orderBy('name')->get(['id', 'name', 'reg_no', 'designation']),
+            'eventType' => $eventType,
+            'teachers' => Teacher::where('tenant_id', $this->school->id)->active()->orderBy('name')->get(['id', 'name', 'reg_no', 'designation']),
             'isTeacherFest' => $eventType === 'teacher_fest',
-            'presets'       => config('fest_participation_presets'),
+            'presets' => config('fest_participation_presets'),
             'studentEditLock' => app(StudentEditLockService::class)->metaForSchool($this->school),
-            'focusEventId'    => $focusEventId,
-            'profile'         => $this->eventPaymentProfileProp(),
-            'teamManagers'    => $focusEventId ? $this->teamManagersProp((int) $focusEventId) : null,
+            'focusEventId' => $focusEventId,
+            'profile' => $this->eventPaymentProfileProp(),
+            'teamManagers' => $focusEventId ? $this->teamManagersProp((int) $focusEventId) : null,
         ]);
     }
 
@@ -241,28 +268,28 @@ class FestRegistrationController extends SchoolAdminController
      */
     private function teamManagersProp(int $eventId): array
     {
-        $saved = \App\Models\FestSchoolTeamManager::where('event_id', $eventId)
+        $saved = FestSchoolTeamManager::where('event_id', $eventId)
             ->where('school_id', $this->school->id)
             ->first();
 
         $data = [
-            'manager_name_1'  => $saved?->manager_name_1,
+            'manager_name_1' => $saved?->manager_name_1,
             'manager_phone_1' => $saved?->manager_phone_1,
             'manager_email_1' => $saved?->manager_email_1,
-            'manager_role_1'  => $saved?->manager_role_1,
-            'manager_name_2'  => $saved?->manager_name_2,
+            'manager_role_1' => $saved?->manager_role_1,
+            'manager_name_2' => $saved?->manager_name_2,
             'manager_phone_2' => $saved?->manager_phone_2,
             'manager_email_2' => $saved?->manager_email_2,
-            'manager_role_2'  => $saved?->manager_role_2,
-            'notes'           => $saved?->notes,
+            'manager_role_2' => $saved?->manager_role_2,
+            'notes' => $saved?->notes,
         ];
 
         if (blank($data['manager_name_1']) && blank($data['manager_phone_1'])
             && ($coordinator = SchoolEventCoordinator::forSchool($this->school))) {
-            $data['manager_name_1']  = $coordinator['name'];
+            $data['manager_name_1'] = $coordinator['name'];
             $data['manager_phone_1'] = $coordinator['phone'];
             $data['manager_email_1'] = $coordinator['email'];
-            $data['manager_role_1']  = 'Events Coordinator (on file)';
+            $data['manager_role_1'] = 'Events Coordinator (on file)';
         }
 
         return $data;
@@ -281,14 +308,14 @@ class FestRegistrationController extends SchoolAdminController
         }
 
         $sahodayaId = $this->school->parent_id;
-        $regions = \App\Models\Region::forTenant($sahodayaId)->active()->globalOnly()->orderBy('sort_order')->orderBy('name')->get(['id', 'name']);
-        
+        $regions = Region::forTenant($sahodayaId)->active()->globalOnly()->orderBy('sort_order')->orderBy('name')->get(['id', 'name']);
+
         if ($regions->isEmpty()) {
             return null;
         }
 
-        $year = \App\Support\AcademicYear::forSchool($this->school);
-        $regionName = \App\Models\SchoolRegionAssignment::forTenant($sahodayaId)
+        $year = AcademicYear::forSchool($this->school);
+        $regionName = SchoolRegionAssignment::forTenant($sahodayaId)
             ->forYear($year)
             ->where('school_id', $this->school->id)
             ->join('regions', 'regions.id', '=', 'school_region_assignments.region_id')
@@ -296,7 +323,7 @@ class FestRegistrationController extends SchoolAdminController
 
         return [
             'applies' => true,
-            'region'  => $regionName,
+            'region' => $regionName,
             'set_url' => "/school-admin/{$this->school->id}/registration/region",
             'regions' => $regions,
         ];
@@ -322,9 +349,9 @@ class FestRegistrationController extends SchoolAdminController
             $term = strtolower(trim((string) $search));
             $studentQuery->where(function ($q) use ($term) {
                 $q->whereRaw('LOWER(name) LIKE ?', ["%{$term}%"])
-                  ->orWhereRaw('LOWER(reg_no) LIKE ?', ["%{$term}%"])
-                  ->orWhereRaw('LOWER(admission_number) LIKE ?', ["%{$term}%"])
-                  ->orWhereRaw('LOWER(roll_number) LIKE ?', ["%{$term}%"]);
+                    ->orWhereRaw('LOWER(reg_no) LIKE ?', ["%{$term}%"])
+                    ->orWhereRaw('LOWER(admission_number) LIKE ?', ["%{$term}%"])
+                    ->orWhereRaw('LOWER(roll_number) LIKE ?', ["%{$term}%"]);
             });
         }
 
@@ -409,7 +436,7 @@ class FestRegistrationController extends SchoolAdminController
         }
 
         // Queued instead of an inline call — see App\Jobs\PromoteWaitlistedRegistrationsJob.
-        \App\Jobs\PromoteWaitlistedRegistrationsJob::dispatch([$event->id], $this->school->id);
+        PromoteWaitlistedRegistrationsJob::dispatch([$event->id], $this->school->id);
 
         $registrations = FestRegistration::where('school_id', $this->school->id)
             ->whereIn('event_id', $this->registrationEventIdsForSchoolView(collect([$event])))
@@ -419,24 +446,24 @@ class FestRegistrationController extends SchoolAdminController
         return $this->inertia('School/Events/Registration', array_merge(
             $this->schoolFestEventNavProps($event, $meta['slug']),
             [
-                'program'          => $meta['slug'],
-                'programMeta'      => $meta,
-                'events'           => collect([$hydrated]),
-                'registrations'    => $registrations,
-                'students'         => $students,
-                'studentsByEvent'  => collect([$event->id => $students]),
+                'program' => $meta['slug'],
+                'programMeta' => $meta,
+                'events' => collect([$hydrated]),
+                'registrations' => $registrations,
+                'students' => $students,
+                'studentsByEvent' => collect([$event->id => $students]),
                 'lazyLoadStudents' => $lazyStudents,
-                'studentCount'     => $studentCount,
-                'schoolClasses'    => $this->schoolClasses()->values(),
-                'eventType'        => $meta['eventType'],
-                'teachers'         => Teacher::where('tenant_id', $this->school->id)->active()->orderBy('name')->get(['id', 'name', 'reg_no', 'designation']),
-                'isTeacherFest'    => $meta['eventType'] === 'teacher_fest',
-                'presets'          => config('fest_participation_presets'),
-                'studentEditLock'  => app(StudentEditLockService::class)->metaForSchool($this->school),
-                'focusEventId'     => $event->id,
-                'singleEventMode'  => true,
-                'profile'          => $this->eventPaymentProfileProp(),
-                'teamManagers'     => $this->teamManagersProp($event->id),
+                'studentCount' => $studentCount,
+                'schoolClasses' => $this->schoolClasses()->values(),
+                'eventType' => $meta['eventType'],
+                'teachers' => Teacher::where('tenant_id', $this->school->id)->active()->orderBy('name')->get(['id', 'name', 'reg_no', 'designation']),
+                'isTeacherFest' => $meta['eventType'] === 'teacher_fest',
+                'presets' => config('fest_participation_presets'),
+                'studentEditLock' => app(StudentEditLockService::class)->metaForSchool($this->school),
+                'focusEventId' => $event->id,
+                'singleEventMode' => true,
+                'profile' => $this->eventPaymentProfileProp(),
+                'teamManagers' => $this->teamManagersProp($event->id),
             ],
         ));
     }
@@ -466,7 +493,7 @@ class FestRegistrationController extends SchoolAdminController
             ->listedForSchool($this->school->id, $eventType)
             ->orderByDesc('event_start')
             ->get(['id', 'title', 'event_type', 'level_round', 'conducting_school_id', 'parent_event_id', 'partition_role', 'status', 'event_start'])
-            ->pipe(fn ($rows) => app(\App\Services\School\SchoolUserScopeService::class)
+            ->pipe(fn ($rows) => app(SchoolUserScopeService::class)
                 ->filterFestEventsForUser($request->user(), $this->school->id, $programSlug, $rows));
 
         return $events->count() === 1 ? $events->first() : null;
@@ -487,7 +514,7 @@ class FestRegistrationController extends SchoolAdminController
      * (FestRegionPartitionService::assertRegionSelected()) surfaces the right error instead
      * of a silent redirect loop.
      */
-    protected function redirectHubToSchoolPartition(Request $request, FestEvent $event, string $tenantId, string $programSlug, string $suffix): ?\Illuminate\Http\RedirectResponse
+    protected function redirectHubToSchoolPartition(Request $request, FestEvent $event, string $tenantId, string $programSlug, string $suffix): ?RedirectResponse
     {
         // Phased regional billing (Phases & Payment Levels) is a separate, mutually-exclusive
         // conduct system from the legacy region/cluster partitioning resolved below — see
@@ -537,7 +564,7 @@ class FestRegistrationController extends SchoolAdminController
             ->listedForSchool($this->school->id, $meta['eventType'])
             ->firstOrFail();
 
-        $allowed = collect([$resolved])->pipe(fn ($rows) => app(\App\Services\School\SchoolUserScopeService::class)
+        $allowed = collect([$resolved])->pipe(fn ($rows) => app(SchoolUserScopeService::class)
             ->filterFestEventsForUser($request->user(), $this->school->id, $meta['slug'], $rows));
 
         abort_if($allowed->isEmpty(), 403, 'This event isn\'t open for your school to register in.');
@@ -615,21 +642,21 @@ class FestRegistrationController extends SchoolAdminController
     private function sportsItemRegistrationEventPayload(FestEvent $event): array
     {
         return [
-            'id'                         => $event->id,
-            'title'                      => $event->title,
-            'status'                     => $event->status,
-            'schedule_published'         => (bool) ($event->schedule_published ?? false),
-            'fee_required'               => (bool) ($event->fee_required ?? false),
+            'id' => $event->id,
+            'title' => $event->title,
+            'status' => $event->status,
+            'schedule_published' => (bool) ($event->schedule_published ?? false),
+            'fee_required' => (bool) ($event->fee_required ?? false),
             'require_event_registration' => (bool) ($event->require_event_registration ?? false),
-            'require_verified_students'  => (bool) ($event->require_verified_students ?? true),
-            'results_published'          => (bool) ($event->results_published ?? false),
-            'items'                      => $event->getAttribute('items') ?? [],
-            'item_group_labels'          => $event->getAttribute('item_group_labels') ?? [],
-            'head_navigation'            => $event->getAttribute('head_navigation') ?? [],
-            'event_registrations'        => $event->getAttribute('event_registrations') ?? [],
-            'school_fee'                 => $event->getAttribute('school_fee'),
-            'uses_per_head_billing'      => (bool) ($event->getAttribute('uses_per_head_billing') ?? false),
-            'school_head_fees'           => $event->getAttribute('school_head_fees') ?? [],
+            'require_verified_students' => (bool) ($event->require_verified_students ?? true),
+            'results_published' => (bool) ($event->results_published ?? false),
+            'items' => $event->getAttribute('items') ?? [],
+            'item_group_labels' => $event->getAttribute('item_group_labels') ?? [],
+            'head_navigation' => $event->getAttribute('head_navigation') ?? [],
+            'event_registrations' => $event->getAttribute('event_registrations') ?? [],
+            'school_fee' => $event->getAttribute('school_fee'),
+            'uses_per_head_billing' => (bool) ($event->getAttribute('uses_per_head_billing') ?? false),
+            'school_head_fees' => $event->getAttribute('school_head_fees') ?? [],
         ];
     }
 
@@ -640,34 +667,34 @@ class FestRegistrationController extends SchoolAdminController
         array $schedule,
         bool $feeRequired,
         FestItemFeeResolver $itemFeeResolver,
-        \App\Services\Events\FestItemWindowResolver $windowResolver,
-        \App\Services\Events\FestItemRegistrationGate $regGate,
+        FestItemWindowResolver $windowResolver,
+        FestItemRegistrationGate $regGate,
     ): array {
         $item->setRelation('event', $event);
 
         return [
-            'id'                     => $item->id,
-            'title'                  => $item->title,
-            'item_code'              => $item->item_code,
+            'id' => $item->id,
+            'title' => $item->title,
+            'item_code' => $item->item_code,
             'inherited_from_item_id' => $item->inherited_from_item_id,
-            'stage_type'             => $item->stage_type,
-            'participant_type'  => $item->participant_type,
-            'category'          => $item->category,
-            'gender'            => $item->gender,
-            'age_group'         => $item->age_group,
-            'class_group'       => $item->class_group,
-            'kids_band'         => $item->kids_band,
-            'head_id'           => $item->head_id,
-            'max_per_school'    => $item->max_per_school,
-            'min_group_size'    => $item->min_group_size,
-            'max_group_size'    => $item->max_group_size,
-            'squad_summary'     => $item->squad_summary,
+            'stage_type' => $item->stage_type,
+            'participant_type' => $item->participant_type,
+            'category' => $item->category,
+            'gender' => $item->gender,
+            'age_group' => $item->age_group,
+            'class_group' => $item->class_group,
+            'kids_band' => $item->kids_band,
+            'head_id' => $item->head_id,
+            'max_per_school' => $item->max_per_school,
+            'min_group_size' => $item->min_group_size,
+            'max_group_size' => $item->max_group_size,
+            'squad_summary' => $item->squad_summary,
             // FestRegistrationItemRow.vue's showStandbyPicker reads item.criteria_json
             // (max_subs/standbys) directly — squad_summary above is only the display
             // text, it doesn't carry the raw values the "Standbys" picker button needs.
-            'criteria_json'     => $item->criteria_json,
+            'criteria_json' => $item->criteria_json,
             'eligibility_label' => FestSportsAgeGroup::itemEligibilityLabel($item, $event),
-            'item_fee'          => $feeRequired ? $itemFeeResolver->amountForItem($item, $schedule, $event) : null,
+            'item_fee' => $feeRequired ? $itemFeeResolver->amountForItem($item, $schedule, $event) : null,
             'registration_open' => $regGate->isOpen($item),
             // Distinct from reg_start/reg_end below (FestItemWindowResolver's item-level
             // window) — once phase mode is on, the item's phase lifecycle is what actually
@@ -675,13 +702,13 @@ class FestRegistrationController extends SchoolAdminController
             // the item-level dates wouldn't explain why registration_open came back false.
             // Lets the frontend show the real reason instead of a stale/irrelevant date range.
             'phase_block_reason' => $event->phase_mode_enabled
-                ? \App\Services\Events\EventLifecycleGate::registrationBlockedReasonForItem($event, $item)
+                ? EventLifecycleGate::registrationBlockedReasonForItem($event, $item)
                 : null,
-            'reg_start'         => $windowResolver->effectiveRegStart($item)?->format('Y-m-d'),
-            'reg_end'           => $windowResolver->effectiveRegEnd($item)?->format('Y-m-d'),
+            'reg_start' => $windowResolver->effectiveRegStart($item)?->format('Y-m-d'),
+            'reg_end' => $windowResolver->effectiveRegEnd($item)?->format('Y-m-d'),
             'competition_start' => $windowResolver->effectiveCompetitionStart($item)?->format('Y-m-d'),
-            'competition_end'   => $windowResolver->effectiveCompetitionEnd($item)?->format('Y-m-d'),
-            'competition_line'  => $windowResolver->competitionLine($item),
+            'competition_end' => $windowResolver->effectiveCompetitionEnd($item)?->format('Y-m-d'),
+            'competition_line' => $windowResolver->competitionLine($item),
         ];
     }
 
@@ -690,9 +717,9 @@ class FestRegistrationController extends SchoolAdminController
         FestSchoolEventFeeService $feeService,
         ?int $headId = null,
         ?array $headNav = null,
-        ?\App\Services\Events\FestHeadItemNavigationService $navService = null,
+        ?FestHeadItemNavigationService $navService = null,
     ): FestEvent {
-        $navService ??= app(\App\Services\Events\FestHeadItemNavigationService::class);
+        $navService ??= app(FestHeadItemNavigationService::class);
         if ($event->parent_event_id && $event->parentEvent) {
             // Previously ran (and wrote to fest_event_items) unconditionally on every
             // page view. Item sync to existing partitions already happens on the write
@@ -709,7 +736,7 @@ class FestRegistrationController extends SchoolAdminController
             // phase assignment the moment a school admin loaded this page before that
             // leaf had been synced yet.
             if ($event->source_phase_id === null && ! FestEventItem::where('event_id', $event->id)->exists()) {
-                app(\App\Services\Events\FestItemSyncService::class)
+                app(FestItemSyncService::class)
                     ->copyItemsToPartition($event->parentEvent, $event, $event->partition_role ?? 'region');
                 $event->unsetRelation('items');
                 $event->load('items');
@@ -862,7 +889,7 @@ class FestRegistrationController extends SchoolAdminController
         $event->setAttribute('phase_region_options', []);
         if ($usesBatchBilling) {
             $root = $event->rootEvent();
-            $batchFees = app(\App\Services\Events\FestRegistrationBatchFeeService::class)
+            $batchFees = app(FestRegistrationBatchFeeService::class)
                 ->recalculateAll($root, $this->school->id);
 
             // Item-fee/extra-item lines carry meta.item_id but not the item's own class
@@ -987,8 +1014,8 @@ class FestRegistrationController extends SchoolAdminController
         if ($headId !== null) {
             $enabledItems = $enabledItems->filter(fn ($i) => (int) ($i->head_id ?? 0) === $headId);
         }
-        $windowResolver = app(\App\Services\Events\FestItemWindowResolver::class);
-        $regGate = app(\App\Services\Events\FestItemRegistrationGate::class);
+        $windowResolver = app(FestItemWindowResolver::class);
+        $regGate = app(FestItemRegistrationGate::class);
         $enabledItems = $enabledItems->values()
             ->map(fn (FestEventItem $item) => $this->serializeSportsItemRow(
                 $item,
@@ -1008,9 +1035,9 @@ class FestRegistrationController extends SchoolAdminController
         // eligibility/age-group code still reads the Carbon value after this.
         $event->setAttribute('sports_age_cutoff_display', $event->sports_age_cutoff_date?->format('Y-m-d'));
         $event->setAttribute('require_event_registration', (bool) $event->require_event_registration);
-        $feeGate = app(\App\Services\Events\FestRegistrationFeeGate::class);
+        $feeGate = app(FestRegistrationFeeGate::class);
         $eventFeeCleared = $feeGate->isSchoolFeeCleared($event, $this->school->id);
-        $downloadGate = app(\App\Services\School\SchoolDocumentDownloadGateService::class)
+        $downloadGate = app(SchoolDocumentDownloadGateService::class)
             ->payload($this->school, $event);
         $event->setAttribute('event_fee_cleared', $eventFeeCleared);
         $event->setAttribute('download_gate', $downloadGate);
@@ -1019,16 +1046,16 @@ class FestRegistrationController extends SchoolAdminController
         $event->setAttribute('registration_locked', (bool) $event->registration_locked);
         $event->setAttribute('allow_student_self_register', (bool) $event->allow_student_self_register);
         $event->setAttribute('require_verified_students', app(StudentVerificationGate::class)->requiredForEvent($event));
-        $event->setAttribute('event_registrations', app(\App\Services\Events\FestEventRegistrationService::class)
+        $event->setAttribute('event_registrations', app(FestEventRegistrationService::class)
             ->studentEventRegistrations($event, $this->school->id));
         if ($event->event_type === 'sports') {
             // Head = Event: no head tabs/filters on sports events — leftover
             // FestItemHead rows relinked to the sport event would otherwise render
             // a redundant single-head tab. Items group by age group instead.
             $event->setAttribute('head_navigation', [
-                'headItemGroups'  => [],
-                'headsForFilter'  => [],
-                'hasItemHeads'    => false,
+                'headItemGroups' => [],
+                'headsForFilter' => [],
+                'hasItemHeads' => false,
             ]);
         }
         // Per-student event registration fee hint on the Event Registration panel — was
@@ -1044,9 +1071,9 @@ class FestRegistrationController extends SchoolAdminController
             ->where('school_id', $this->school->id)
             ->first();
         $event->setAttribute('verification_status', [
-            'verification_day'     => $event->verification_day?->format('Y-m-d'),
-            'documents_verified'   => (bool) ($verification->documents_verified ?? false),
-            'verified_at'          => $verification?->verified_at?->toIso8601String(),
+            'verification_day' => $event->verification_day?->format('Y-m-d'),
+            'documents_verified' => (bool) ($verification->documents_verified ?? false),
+            'verified_at' => $verification?->verified_at?->toIso8601String(),
         ]);
         [$grouped, $groupLabels] = $this->groupItemsForEvent($event, $enabledItems);
         $event->setAttribute('items_grouped', $grouped);
@@ -1078,22 +1105,22 @@ class FestRegistrationController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $rules = [
-            'event_id'       => 'required|exists:fest_events,id',
-            'item_id'        => [
+            'event_id' => 'required|exists:fest_events,id',
+            'item_id' => [
                 'required',
-                \Illuminate\Validation\Rule::exists('fest_event_items', 'id')->where('event_id', $request->input('event_id')),
+                Rule::exists('fest_event_items', 'id')->where('event_id', $request->input('event_id')),
             ],
-            'team_name'      => 'nullable|string|max:255',
-            'coach_name'     => 'nullable|string|max:255',
-            'coach_phone'    => 'nullable|string|max:40',
-            'manager_name'   => 'nullable|string|max:255',
-            'manager_phone'  => 'nullable|string|max:40',
-            'student_ids'    => $event->event_type === 'teacher_fest' ? 'nullable|array' : 'required|array|min:1',
-            'student_ids.*'  => 'exists:students,id',
-            'teacher_ids'    => $event->event_type === 'teacher_fest' ? 'required|array|min:1' : 'nullable|array',
-            'teacher_ids.*'  => 'exists:teachers,id',
-            'standby_ids'    => 'nullable|array|max:2',
-            'standby_ids.*'  => 'exists:students,id',
+            'team_name' => 'nullable|string|max:255',
+            'coach_name' => 'nullable|string|max:255',
+            'coach_phone' => 'nullable|string|max:40',
+            'manager_name' => 'nullable|string|max:255',
+            'manager_phone' => 'nullable|string|max:40',
+            'student_ids' => $event->event_type === 'teacher_fest' ? 'nullable|array' : 'required|array|min:1',
+            'student_ids.*' => 'exists:students,id',
+            'teacher_ids' => $event->event_type === 'teacher_fest' ? 'required|array|min:1' : 'nullable|array',
+            'teacher_ids.*' => 'exists:teachers,id',
+            'standby_ids' => 'nullable|array|max:2',
+            'standby_ids.*' => 'exists:students,id',
         ];
 
         $data = $request->validate($rules);
@@ -1105,7 +1132,7 @@ class FestRegistrationController extends SchoolAdminController
             : array_values(array_diff($data['student_ids'], $standbyIds));
 
         try {
-            $registration = app(\App\Services\Events\FestRegistrationCreateService::class)->createForSchool(
+            $registration = app(FestRegistrationCreateService::class)->createForSchool(
                 $event,
                 $item,
                 $this->school,
@@ -1119,7 +1146,7 @@ class FestRegistrationController extends SchoolAdminController
                     'manager_phone' => $data['manager_phone'] ?? null,
                 ],
             );
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             $messages = $e->errors();
             $mapped = [];
             foreach ($messages as $key => $errors) {
@@ -1132,10 +1159,8 @@ class FestRegistrationController extends SchoolAdminController
                     $mapped[$key] = $errors;
                 }
             }
-            throw \Illuminate\Validation\ValidationException::withMessages($mapped);
+            throw ValidationException::withMessages($mapped);
         }
-
-        app(PlatformAuditLogger::class)->festRegistrationSubmitted($registration->fresh(['event', 'item']));
 
         // LIFE-11 fix (functional audit, 2026-08-11/12): previously admins only found out
         // about a new submission by opening the review queue themselves — see
@@ -1162,17 +1187,17 @@ class FestRegistrationController extends SchoolAdminController
         $item = FestEventItem::findOrFail($registration->item_id);
 
         $rules = [
-            'team_name'      => 'nullable|string|max:255',
-            'coach_name'     => 'nullable|string|max:255',
-            'coach_phone'    => 'nullable|string|max:40',
-            'manager_name'   => 'nullable|string|max:255',
-            'manager_phone'  => 'nullable|string|max:40',
-            'student_ids'    => $event->event_type === 'teacher_fest' ? 'nullable|array' : 'required|array|min:1',
-            'student_ids.*'  => 'exists:students,id',
-            'teacher_ids'    => $event->event_type === 'teacher_fest' ? 'required|array|min:1' : 'nullable|array',
-            'teacher_ids.*'  => 'exists:teachers,id',
-            'standby_ids'    => 'nullable|array|max:2',
-            'standby_ids.*'  => 'exists:students,id',
+            'team_name' => 'nullable|string|max:255',
+            'coach_name' => 'nullable|string|max:255',
+            'coach_phone' => 'nullable|string|max:40',
+            'manager_name' => 'nullable|string|max:255',
+            'manager_phone' => 'nullable|string|max:40',
+            'student_ids' => $event->event_type === 'teacher_fest' ? 'nullable|array' : 'required|array|min:1',
+            'student_ids.*' => 'exists:students,id',
+            'teacher_ids' => $event->event_type === 'teacher_fest' ? 'required|array|min:1' : 'nullable|array',
+            'teacher_ids.*' => 'exists:teachers,id',
+            'standby_ids' => 'nullable|array|max:2',
+            'standby_ids.*' => 'exists:students,id',
         ];
 
         $data = $request->validate($rules);
@@ -1183,7 +1208,7 @@ class FestRegistrationController extends SchoolAdminController
             : array_values(array_diff($data['student_ids'], $standbyIds));
 
         try {
-            $registration = app(\App\Services\Events\FestRegistrationCreateService::class)->updateForSchool(
+            $registration = app(FestRegistrationCreateService::class)->updateForSchool(
                 $registration,
                 $event,
                 $item,
@@ -1198,7 +1223,7 @@ class FestRegistrationController extends SchoolAdminController
                     'manager_phone' => $data['manager_phone'] ?? null,
                 ],
             );
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             $messages = $e->errors();
             $mapped = [];
             foreach ($messages as $key => $errors) {
@@ -1208,10 +1233,8 @@ class FestRegistrationController extends SchoolAdminController
                     $mapped[$key] = $errors;
                 }
             }
-            throw \Illuminate\Validation\ValidationException::withMessages($mapped);
+            throw ValidationException::withMessages($mapped);
         }
-
-        app(PlatformAuditLogger::class)->festRegistrationSubmitted($registration->fresh(['event', 'item']));
 
         return back()->with('success', 'Registration updated.');
     }
@@ -1240,18 +1263,18 @@ class FestRegistrationController extends SchoolAdminController
         // when the frontend fields didn't exist yet — reverted now that the fields exist.
         // See FLOW_GAP_FIX_PLAN.md.)
         $data = $request->validate([
-            'payment_proof'    => 'required|array|min:1|max:'.\App\Services\Fees\FeeReceiptAttachmentService::MAX_FILES,
-            'payment_proof.*'  => 'file|mimes:pdf,jpg,jpeg,png|max:5120',
-            'transaction_ref'  => 'required|string|max:100',
-            'bank_name'        => 'required|string|max:100',
-            'amount'           => 'required|numeric|min:0.01',
-            'head_id'          => ($usesPerHead ? 'required' : 'nullable').'|integer|exists:fest_item_heads,id',
+            'payment_proof' => 'required|array|min:1|max:'.FeeReceiptAttachmentService::MAX_FILES,
+            'payment_proof.*' => 'file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'transaction_ref' => 'required|string|max:100',
+            'bank_name' => 'required|string|max:100',
+            'amount' => 'required|numeric|min:0.01',
+            'head_id' => ($usesPerHead ? 'required' : 'nullable').'|integer|exists:fest_item_heads,id',
             // Phase-billed events (see usesPerPhaseBilling()) work the same way as
             // per-head ones — the school picks a phase's payment card, which posts here
             // with phase_id set instead of head_id. The two are mutually exclusive today
             // (an event uses one billing shape or the other), so both stay optional
             // unless their own flag requires them.
-            'phase_id'         => ($usesPerPhase ? 'required' : 'nullable').'|integer|exists:fest_event_phases,id',
+            'phase_id' => ($usesPerPhase ? 'required' : 'nullable').'|integer|exists:fest_event_phases,id',
             'registration_batch_id' => ($usesBatchBilling ? 'required' : 'nullable').'|integer|exists:fest_registration_batches,id',
         ]);
 
@@ -1271,7 +1294,7 @@ class FestRegistrationController extends SchoolAdminController
         if ($usesBatchBilling) {
             $batch = FestRegistrationBatch::where('event_id', $event->rootEvent()->id)
                 ->findOrFail((int) $data['registration_batch_id']);
-            app(\App\Services\Events\FestRegistrationBatchFeeService::class)->attachPayment(
+            app(FestRegistrationBatchFeeService::class)->attachPayment(
                 $event,
                 $this->school->id,
                 $batch->id,
@@ -1327,8 +1350,8 @@ class FestRegistrationController extends SchoolAdminController
             $this->school->parent_id,
             'payment.proof.uploaded',
             [
-                'school_name'    => $this->school->name,
-                'context_label'  => $contextLabel,
+                'school_name' => $this->school->name,
+                'context_label' => $contextLabel,
             ],
             "/sahodaya-admin/{$this->school->parent_id}/events/{$event->id}/fees"
         );
@@ -1382,10 +1405,10 @@ class FestRegistrationController extends SchoolAdminController
                 if ($latest) {
                     $query->where('id', $latest->id);
                 } else {
-                    if (\Illuminate\Support\Facades\Schema::hasColumn('fest_school_event_fees', 'head_id')) {
+                    if (Schema::hasColumn('fest_school_event_fees', 'head_id')) {
                         $query->whereNull('head_id');
                     }
-                    if (\Illuminate\Support\Facades\Schema::hasColumn('fest_school_event_fees', 'phase_id')) {
+                    if (Schema::hasColumn('fest_school_event_fees', 'phase_id')) {
                         $query->whereNull('phase_id');
                     }
                 }
@@ -1429,13 +1452,13 @@ class FestRegistrationController extends SchoolAdminController
             ->get();
 
         return view('receipts.fest-fee-official', [
-            'receipt'        => $receipt,
-            'schoolFee'      => $schoolFee,
-            'breakdown'      => $feeService->breakdown($event, $schoolFee, $feeService->resolveSchedule($event)),
-            'registrations'  => $registrations,
-            'event'          => $event,
-            'school'         => $this->school,
-            'sahodaya'       => \App\Models\Tenant::findOrFail($this->school->parent_id),
+            'receipt' => $receipt,
+            'schoolFee' => $schoolFee,
+            'breakdown' => $feeService->breakdown($event, $schoolFee, $feeService->resolveSchedule($event)),
+            'registrations' => $registrations,
+            'event' => $event,
+            'school' => $this->school,
+            'sahodaya' => Tenant::findOrFail($this->school->parent_id),
             'isConsolidated' => $isConsolidated,
         ]);
     }
@@ -1444,7 +1467,7 @@ class FestRegistrationController extends SchoolAdminController
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
-        $sahodaya = \App\Models\Tenant::findOrFail($this->school->parent_id);
+        $sahodaya = Tenant::findOrFail($this->school->parent_id);
         $batchId = $event->usesPhasedRegionalBilling()
             ? (int) $request->query('registration_batch_id')
             : null;
@@ -1481,8 +1504,6 @@ class FestRegistrationController extends SchoolAdminController
         // silently left out of sync with the school's now-smaller roster.
         $registrationService->cancel($registration, $event);
 
-        app(PlatformAuditLogger::class)->festRegistrationCancelled($registration->fresh());
-
         return back()->with('success', 'Registration cancelled.');
     }
 
@@ -1503,26 +1524,26 @@ class FestRegistrationController extends SchoolAdminController
             $schedule = FestSchedule::where('participant_id', $p->id)->first();
 
             return [
-                'name'         => $p->student?->name ?? $p->teacher?->name,
-                'item'         => $p->registration?->item?->title,
+                'name' => $p->student?->name ?? $p->teacher?->name,
+                'item' => $p->registration?->item?->title,
                 // Schools don't see chest numbers for Sahodaya events on their own
                 // pages, unconditionally -- same as the student portal (see
                 // StudentDashboardController::festDaySlots()).
-                'chest_no'     => null,
-                'level_reg'    => $p->level_registration_number,
-                'order'        => $schedule?->sort_order,
+                'chest_no' => null,
+                'level_reg' => $p->level_registration_number,
+                'order' => $schedule?->sort_order,
                 'scheduled_at' => $schedule?->scheduled_at?->toIso8601String(),
-                'stage'        => $schedule?->stage,
-                'called'       => (bool) $schedule?->called_at,
+                'stage' => $schedule?->stage,
+                'called' => (bool) $schedule?->called_at,
             ];
         })->values();
 
         return $this->inertia('School/Events/FestDay', [
-            'school'      => $this->school->only('id', 'name'),
-            'event'       => $event->only('id', 'title', 'status', 'schedule_published', 'verification_day'),
-            'program'     => $meta['slug'],
+            'school' => $this->school->only('id', 'name'),
+            'event' => $event->only('id', 'title', 'status', 'schedule_published', 'verification_day'),
+            'program' => $meta['slug'],
             'programMeta' => $meta,
-            'rows'        => $rows,
+            'rows' => $rows,
             'verificationStatus' => $this->verificationStatusForSchool($event),
         ]);
     }
@@ -1543,17 +1564,17 @@ class FestRegistrationController extends SchoolAdminController
             ->orderByDesc('created_at')
             ->get()
             ->map(fn (FeeReceipt $r) => [
-                'id'               => $r->id,
-                'status'           => $r->status,
-                'amount'           => (float) $r->amount,
-                'transaction_ref'  => $r->transaction_ref,
-                'bank_name'        => $r->bank_name,
-                'payment_date'     => $r->payment_date?->toDateString(),
-                'uploaded_at'      => $r->created_at?->toDateTimeString(),
-                'reviewed_at'      => $r->reviewed_at?->toDateTimeString(),
-                'reviewed_by'      => $r->reviewedBy?->name,
+                'id' => $r->id,
+                'status' => $r->status,
+                'amount' => (float) $r->amount,
+                'transaction_ref' => $r->transaction_ref,
+                'bank_name' => $r->bank_name,
+                'payment_date' => $r->payment_date?->toDateString(),
+                'uploaded_at' => $r->created_at?->toDateTimeString(),
+                'reviewed_at' => $r->reviewed_at?->toDateTimeString(),
+                'reviewed_by' => $r->reviewedBy?->name,
                 'rejection_reason' => $r->rejection_reason,
-                'receipt_number'   => $r->receipt_number,
+                'receipt_number' => $r->receipt_number,
                 // A system-generated entry (FestSchoolEventFeeService::applyAvailableCredit())
                 // recording a fee credit — from a different, earlier cancelled/rejected
                 // registration — automatically offset against this balance. It's a real,
@@ -1569,11 +1590,11 @@ class FestRegistrationController extends SchoolAdminController
                 // adjustment'), not a real upload — without this guard "View proof" showed up
                 // and linked to a file that doesn't exist. Matches the same guard McqController
                 // ::index()'s receipt_history already has.
-                'proof_url'        => ($r->file_path && ! $r->isSystemCredit())
+                'proof_url' => ($r->file_path && ! $r->isSystemCredit())
                     ? route('school.payments.program.proof', ['tenantId' => $this->school->id, 'feeReceipt' => $r->id])
                     : null,
-                'attachments'      => $r->attachments->map(fn (\App\Models\FeeReceiptAttachment $a) => [
-                    'id'  => $a->id,
+                'attachments' => $r->attachments->map(fn (FeeReceiptAttachment $a) => [
+                    'id' => $a->id,
                     'url' => route('school.payments.attachment', ['tenantId' => $this->school->id, 'attachment' => $a->id]),
                 ])->values()->all(),
             ])
@@ -1589,9 +1610,9 @@ class FestRegistrationController extends SchoolAdminController
             ->first();
 
         return [
-            'verification_day'   => $event->verification_day?->format('Y-m-d'),
+            'verification_day' => $event->verification_day?->format('Y-m-d'),
             'documents_verified' => (bool) ($record->documents_verified ?? false),
-            'verified_at'        => $record?->verified_at?->toIso8601String(),
+            'verified_at' => $record?->verified_at?->toIso8601String(),
         ];
     }
 
@@ -1629,13 +1650,13 @@ class FestRegistrationController extends SchoolAdminController
                 ->map(fn (FestEventItem $item) => [
                     $item->id,
                     $item->title,
-                    \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels, $artsCategoryLabels) ?? '',
+                    FestItemCategoryLabel::resolve($item, $classGroupLabels, $artsCategoryLabels) ?? '',
                     '', '', 'performer',
                 ])
                 ->all();
 
             if ($rows !== []) {
-                return \App\Support\ExcelExport::download(
+                return ExcelExport::download(
                     "fest-registration-{$program}-{$event->id}-template",
                     $headers,
                     $rows,
@@ -1660,7 +1681,7 @@ class FestRegistrationController extends SchoolAdminController
             ];
         }
 
-        return \App\Support\ExcelExport::download(
+        return ExcelExport::download(
             "fest-registration-{$program}-template",
             $headers,
             $rows,
@@ -1672,7 +1693,7 @@ class FestRegistrationController extends SchoolAdminController
     {
         $data = $request->validate([
             'event_id' => 'required|exists:fest_events,id',
-            'file'     => 'required|file|mimes:csv,txt,xls,xlsx|max:5120',
+            'file' => 'required|file|mimes:csv,txt,xls,xlsx|max:5120',
         ]);
 
         $event = FestEvent::findOrFail($data['event_id']);
@@ -1685,7 +1706,7 @@ class FestRegistrationController extends SchoolAdminController
         if (! $event->usesPhasedRegionalBilling()) {
             abort_if($event->registration_locked, 422, 'Registration is locked for this event.');
             abort_if(! $event->isRegistrationOpen(), 422, 'Registration is closed for this event.');
-            \App\Services\Events\EventLifecycleGate::allowRegistration($event);
+            EventLifecycleGate::allowRegistration($event);
         }
 
         $result = $importService->importFromSpreadsheet(
@@ -1711,20 +1732,20 @@ class FestRegistrationController extends SchoolAdminController
     public function programHub(string $tenantId, string $program = 'kalotsav')
     {
         $meta = SchoolFestProgram::meta($program);
-        $hubData = app(\App\Services\Events\ProgramHubDataService::class)
+        $hubData = app(ProgramHubDataService::class)
             ->schoolFestHub($this->school, $program);
 
         return $this->inertia('School/Events/ProgramHub', array_merge($hubData, [
-            'program'      => $meta,
+            'program' => $meta,
             'schoolClasses' => $this->schoolClasses()->values(),
-            'studentCount'  => Student::where('tenant_id', $this->school->id)->active()->count(),
-            'eventType'     => $meta['eventType'],
+            'studentCount' => Student::where('tenant_id', $this->school->id)->active()->count(),
+            'eventType' => $meta['eventType'],
             'studentEditLock' => app(StudentEditLockService::class)->metaForSchool($this->school),
         ]));
     }
 
     /** @return array{0: array<string, mixed>, 1: array<string, string>} */
-    private function groupItemsForEvent(FestEvent $event, \Illuminate\Support\Collection $enabledItems): array
+    private function groupItemsForEvent(FestEvent $event, Collection $enabledItems): array
     {
         if ($event->event_type === 'sports') {
             $ageLabels = FestSportsAgeGroup::labels($event->tenant_id);
@@ -1763,25 +1784,25 @@ class FestRegistrationController extends SchoolAdminController
         }
 
         $grouped = [
-            'on_stage'  => $enabledItems->where('stage_type', 'on_stage')->values(),
+            'on_stage' => $enabledItems->where('stage_type', 'on_stage')->values(),
             'off_stage' => $enabledItems->where('stage_type', 'off_stage')->values(),
-            'group'     => $enabledItems->filter(fn ($i) => FestTeamSquadRules::isMultiPerson($i['participant_type'] ?? null))->values(),
-            'other'     => $enabledItems->filter(fn ($i) => empty($i['stage_type']) && ! FestTeamSquadRules::isMultiPerson($i['participant_type'] ?? null))->values(),
+            'group' => $enabledItems->filter(fn ($i) => FestTeamSquadRules::isMultiPerson($i['participant_type'] ?? null))->values(),
+            'other' => $enabledItems->filter(fn ($i) => empty($i['stage_type']) && ! FestTeamSquadRules::isMultiPerson($i['participant_type'] ?? null))->values(),
         ];
 
         // "on_stage"/"off_stage" are real stage_type taxonomy entries, so their labels
         // come from the tenant-editable registry; "group"/"other" are synthetic buckets
         // (a combination of participant_type values, and a catch-all) with no single
         // taxonomy entry of their own, so they keep static labels.
-        $stageLabels = app(\App\Services\Events\FestTaxonomyRegistry::class)
+        $stageLabels = app(FestTaxonomyRegistry::class)
             ->forTenant($event->tenant_id)
             ->labels('stage_type');
 
         return [$grouped, [
-            'on_stage'  => $stageLabels['on_stage'] ?? 'On stage',
+            'on_stage' => $stageLabels['on_stage'] ?? 'On stage',
             'off_stage' => $stageLabels['off_stage'] ?? 'Off stage',
-            'group'     => 'Group / team',
-            'other'     => 'Other',
+            'group' => 'Group / team',
+            'other' => 'Other',
         ]];
     }
 
@@ -1795,14 +1816,14 @@ class FestRegistrationController extends SchoolAdminController
             'group_key' => 'nullable|string',
         ]);
 
-        $region = \App\Models\Region::forTenant($sahodayaId)->globalOnly()->findOrFail($data['region_id']);
-        $year = \App\Support\AcademicYear::forSahodaya($sahodayaId);
+        $region = Region::forTenant($sahodayaId)->globalOnly()->findOrFail($data['region_id']);
+        $year = AcademicYear::forSahodaya($sahodayaId);
         $groupKey = filled($data['group_key'] ?? null) ? $data['group_key'] : null;
 
-        $hasGroupCol = \Illuminate\Support\Facades\Schema::hasColumn('school_region_assignments', 'partition_group');
+        $hasGroupCol = Schema::hasColumn('school_region_assignments', 'partition_group');
 
         $attributes = [
-            'school_id'     => $this->school->id,
+            'school_id' => $this->school->id,
             'academic_year' => $year,
         ];
         if ($hasGroupCol) {
@@ -1810,15 +1831,15 @@ class FestRegistrationController extends SchoolAdminController
         }
 
         $values = [
-            'tenant_id'           => $sahodayaId,
-            'region_id'           => $region->id,
-            'source'              => 'school',
+            'tenant_id' => $sahodayaId,
+            'region_id' => $region->id,
+            'source' => 'school',
             'assigned_by_user_id' => $request->user()?->id,
         ];
 
-        \App\Models\SchoolRegionAssignment::updateOrCreate($attributes, $values);
+        SchoolRegionAssignment::updateOrCreate($attributes, $values);
 
-        app(\App\Services\Events\FestRegionPartitionService::class)->syncSchoolAcrossHubs($sahodayaId, $this->school->id);
+        app(FestRegionPartitionService::class)->syncSchoolAcrossHubs($sahodayaId, $this->school->id);
 
         return back()->with('success', "Region assigned to {$region->name}. Venues and event items updated!");
     }
@@ -1828,20 +1849,20 @@ class FestRegistrationController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $data = $request->validate([
-            'manager_name_1'  => 'required|string|max:255',
+            'manager_name_1' => 'required|string|max:255',
             'manager_phone_1' => 'required|string|max:40',
             'manager_email_1' => 'nullable|email|max:255',
-            'manager_role_1'  => 'nullable|string|max:100',
-            'manager_name_2'  => 'nullable|string|max:255',
+            'manager_role_1' => 'nullable|string|max:100',
+            'manager_name_2' => 'nullable|string|max:255',
             'manager_phone_2' => 'nullable|string|max:40',
             'manager_email_2' => 'nullable|email|max:255',
-            'manager_role_2'  => 'nullable|string|max:100',
-            'notes'           => 'nullable|string|max:1000',
+            'manager_role_2' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:1000',
         ]);
 
-        \App\Models\FestSchoolTeamManager::updateOrCreate(
+        FestSchoolTeamManager::updateOrCreate(
             [
-                'event_id'  => $event->id,
+                'event_id' => $event->id,
                 'school_id' => $this->school->id,
             ],
             array_merge($data, [

@@ -1026,6 +1026,18 @@ class FestPublicScoreboardTest extends TestCase
         return $participant;
     }
 
+    public function test_authenticated_scoreboard_data_bypasses_anonymous_response_cache(): void
+    {
+        $url = "http://public-scoreboard.test/fest/{$this->north->id}/scoreboard/data";
+        $anonymous = $this->getJson($url)->assertOk();
+        $this->travel(5)->seconds();
+        $user = \App\Models\User::factory()->create(['tenant_id' => $this->sahodaya->id]);
+        $authenticated = $this->actingAs($user)->getJson($url)->assertOk();
+        $this->assertNotSame($anonymous->json('refreshedAt'), $authenticated->json('refreshedAt'));
+        $this->assertStringContainsString('private', $authenticated->headers->get('Cache-Control'));
+        $this->assertStringContainsString('no-store', $authenticated->headers->get('Cache-Control'));
+    }
+
     public function test_scoreboard_refreshes_a_partial_without_reloading_the_page(): void
     {
         $page = $this->get("http://public-scoreboard.test/fest/{$this->north->id}/scoreboard");
@@ -1039,7 +1051,7 @@ class FestPublicScoreboardTest extends TestCase
             ->assertJsonPath('standingsPublished', true)
             ->assertJsonStructure(['contentHtml', 'refreshedAt']);
         $this->assertStringContainsString('North Star School', $data->json('contentHtml'));
-        $this->assertStringContainsString('s-maxage=10', $data->headers->get('Cache-Control'));
+        $this->assertStringContainsString('s-maxage=30', $data->headers->get('Cache-Control'));
     }
 
     /**

@@ -6,10 +6,11 @@ use App\Models\FestEvent;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestSubstitutionRequest;
+use App\Services\Audit\PlatformAuditLogger;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestItemCategoryLabel;
-use App\Support\SchoolFestProgram;
 use App\Support\ProgramRouteMap;
+use App\Support\SchoolFestProgram;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -49,21 +50,21 @@ class FestSubstitutionRequestController extends SchoolAdminController
             ->with(['item', 'participants.student'])
             ->get()
             ->map(fn (FestRegistration $r) => [
-                'id'             => $r->id,
-                'item_title'     => $r->item?->title,
+                'id' => $r->id,
+                'item_title' => $r->item?->title,
                 'category_label' => FestItemCategoryLabel::resolve($r->item, $classGroupLabels, $artsCategoryLabels),
-                'participants'   => $r->participants->map(fn (FestParticipant $p) => [
-                    'id'   => $p->id,
+                'participants' => $r->participants->map(fn (FestParticipant $p) => [
+                    'id' => $p->id,
                     'name' => $p->student?->name ?? $p->teacher?->name,
                     'role' => $p->participant_role,
                 ])->values(),
             ]);
 
         return $this->inertia('School/Events/SubstitutionRequests', [
-            'event'         => $event->only('id', 'title', 'status'),
-            'program'       => $meta['slug'],
-            'programMeta'   => $meta,
-            'requests'      => $requests,
+            'event' => $event->only('id', 'title', 'status'),
+            'program' => $meta['slug'],
+            'programMeta' => $meta,
+            'requests' => $requests,
             'registrations' => $registrations,
         ]);
     }
@@ -74,11 +75,11 @@ class FestSubstitutionRequestController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $data = $request->validate([
-            'registration_id'            => 'required|exists:fest_registrations,id',
-            'original_participant_id'    => 'required|exists:fest_participants,id',
+            'registration_id' => 'required|exists:fest_registrations,id',
+            'original_participant_id' => 'required|exists:fest_participants,id',
             'replacement_participant_id' => 'nullable|exists:fest_participants,id',
-            'replacement_student_id'     => 'nullable|exists:students,id',
-            'reason'                     => 'required|string|max:2000',
+            'replacement_student_id' => 'nullable|exists:students,id',
+            'reason' => 'required|string|max:2000',
         ]);
 
         if (empty($data['replacement_participant_id']) && empty($data['replacement_student_id'])) {
@@ -104,19 +105,42 @@ class FestSubstitutionRequestController extends SchoolAdminController
                 ->firstOrFail();
         }
 
-        FestSubstitutionRequest::create([
-            'event_id'                   => $event->id,
-            'school_id'                  => $this->school->id,
-            'registration_id'            => $registration->id,
-            'original_participant_id'    => $original->id,
+        $subRequest = FestSubstitutionRequest::create([
+            'event_id' => $event->id,
+            'school_id' => $this->school->id,
+            'registration_id' => $registration->id,
+            'original_participant_id' => $original->id,
             'replacement_participant_id' => $data['replacement_participant_id'] ?? null,
-            'replacement_student_id'     => $data['replacement_student_id'] ?? null,
-            'reason'                     => $data['reason'],
-            'status'                     => 'pending',
-            'requested_by_user_id'       => $request->user()?->id,
+            'replacement_student_id' => $data['replacement_student_id'] ?? null,
+            'reason' => $data['reason'],
+            'status' => 'pending',
+            'requested_by_user_id' => $request->user()?->id,
         ]);
+
+        app(PlatformAuditLogger::class)->festSubstitutionRequested($subRequest);
 
         return redirect('/school-admin/'.$this->school->id.'/'.ProgramRouteMap::prefixFromSlug($meta['slug'])."/events/{$event->id}/substitution-requests")
             ->with('success', 'Substitution request submitted.');
+    }
+
+    public function destroy(Request $request, string $tenantId, FestEvent $event, string $program, FestSubstitutionRequest $substitutionRequest)
+    {
+        $meta = SchoolFestProgram::meta($program);
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+        abort_unless($substitutionRequest->school_id === $this->school->id, 403);
+        abort_unless(in_array($substitutionRequest->event_id, $event->reportableEventIds(), true), 403);
+        abort_unless($substitutionRequest->status === 'pending', 422, 'Only pending substitution requests can be cancelled.');
+
+        $data = $request->validate(['reason' => 'nullable|string|max:2000']);
+
+        $substitutionRequest->update([
+            'status' => 'cancelled',
+            'resolution_note' => $data['reason'] ?? 'Cancelled by school admin',
+        ]);
+
+        app(PlatformAuditLogger::class)->festSubstitutionCancelled($substitutionRequest, $data['reason'] ?? null);
+
+        return redirect('/school-admin/'.$this->school->id.'/'.ProgramRouteMap::prefixFromSlug($meta['slug'])."/events/{$event->id}/substitution-requests")
+            ->with('success', 'Substitution request cancelled.');
     }
 }

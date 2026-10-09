@@ -7,29 +7,35 @@ use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
-use App\Models\FestSchoolEventFee;
+use App\Models\Region;
+use App\Models\SchoolClass;
 use App\Models\SchoolRegionAssignment;
 use App\Models\Student;
 use App\Models\Tenant;
+use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\EventLifecycleGate;
 use App\Services\Events\FestEventNotifier;
-use App\Services\Events\FestParticipationPolicyService;
-use App\Services\Events\FestRegistrationApprovalService;
+use App\Services\Events\FestHeadItemNavigationService;
+use App\Services\Events\FestLevelRegistrationService;
 use App\Services\Events\FestMandatoryItemService;
-use App\Support\ExcelExport;
+use App\Services\Events\FestNumberingService;
+use App\Services\Events\FestParticipationPolicyService;
+use App\Services\Events\FestQualificationService;
+use App\Services\Events\FestRegistrationApprovalService;
 use App\Services\Events\FestRegistrationBulkService;
+use App\Services\Events\FestRegistrationCreateService;
+use App\Services\Events\FestRegistrationEligibilityService;
+use App\Services\Events\FestRegistrationImportService;
+use App\Services\Events\FestRegistrationService;
+use App\Services\Events\FestSchoolEventFeeService;
+use App\Services\Students\StudentRecordCreator;
+use App\Support\AcademicYear;
+use App\Support\ExcelExport;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestItemCategoryLabel;
 use App\Support\FestPageActivity;
-use App\Services\Events\FestRegistrationCreateService;
-use App\Services\Events\FestRegistrationImportService;
-use App\Services\Events\FestRegistrationEligibilityService;
-use App\Services\Events\FestRegistrationService;
-use App\Services\Events\FestSchoolEventFeeService;
-use App\Services\Audit\PlatformAuditLogger;
-use App\Services\Students\StudentRecordCreator;
-use App\Models\SchoolClass;
-use App\Support\AcademicYear;
+use App\Support\TenantBranding;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -42,7 +48,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $event->load(['items' => fn ($q) => $q->where('is_enabled', true)->orderBy('title')->with('phase:id,source_phase_id')]);
-        $event->setRelation('items', \App\Services\Events\FestHeadItemNavigationService::filterToOwnPhase($event->items, $event));
+        $event->setRelation('items', FestHeadItemNavigationService::filterToOwnPhase($event->items, $event));
 
         $headId = $this->resolveHeadQueryParam($request->query('head_id') ?? $request->query('head'));
         $itemId = $request->integer('item_id') ?: null;
@@ -152,7 +158,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
                 ->values()
                 ->all();
 
-            $existingSchoolRegistrations = \App\Models\FestRegistration::whereIn('event_id', $event->reportableEventIds())
+            $existingSchoolRegistrations = FestRegistration::whereIn('event_id', $event->reportableEventIds())
                 ->where('school_id', $registerSchoolId)
                 ->whereIn('status', ['submitted', 'pending_approval', 'approved', 'waitlisted'])
                 ->with([
@@ -160,23 +166,23 @@ class FestRegistrationReviewController extends SahodayaAdminController
                     'participants' => fn ($q) => $q->with(['student:id,name,reg_no', 'teacher:id,name,reg_no']),
                 ])
                 ->get()
-                ->map(fn (\App\Models\FestRegistration $r) => [
-                    'id'          => $r->id,
-                    'item_id'     => $r->item_id,
-                    'status'      => $r->status,
-                    'team_name'   => $r->team_name,
-                    'performers'  => $r->participants
+                ->map(fn (FestRegistration $r) => [
+                    'id' => $r->id,
+                    'item_id' => $r->item_id,
+                    'status' => $r->status,
+                    'team_name' => $r->team_name,
+                    'performers' => $r->participants
                         ->where('participant_role', 'performer')
                         ->map(fn (FestParticipant $p) => [
-                            'id'     => $p->id,
-                            'name'   => $p->student?->name ?? $p->teacher?->name ?? 'Participant #'.$p->id,
+                            'id' => $p->id,
+                            'name' => $p->student?->name ?? $p->teacher?->name ?? 'Participant #'.$p->id,
                             'reg_no' => $p->student?->reg_no ?? $p->teacher?->reg_no ?? null,
                         ])->values()->all(),
-                    'standbys'    => $r->participants
+                    'standbys' => $r->participants
                         ->where('participant_role', 'standby')
                         ->map(fn (FestParticipant $p) => [
-                            'id'     => $p->id,
-                            'name'   => $p->student?->name ?? $p->teacher?->name ?? 'Participant #'.$p->id,
+                            'id' => $p->id,
+                            'name' => $p->student?->name ?? $p->teacher?->name ?? 'Participant #'.$p->id,
                             'reg_no' => $p->student?->reg_no ?? $p->teacher?->reg_no ?? null,
                         ])->values()->all(),
                 ])->values()->all();
@@ -198,7 +204,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
                 ->pluck('regions.name', 'school_region_assignments.school_id')
                 ->all();
 
-            $regionOptions = \App\Models\Region::forTenant($this->sahodaya->id)
+            $regionOptions = Region::forTenant($this->sahodaya->id)
                 ->active()
                 ->globalOnly()
                 ->orderBy('name')
@@ -208,30 +214,30 @@ class FestRegistrationReviewController extends SahodayaAdminController
         $childEvents = $this->scopedChildEventOptions($event);
 
         return $this->inertia('Sahodaya/Events/Registrations', $this->withEventActivity($event, FestPageActivity::REGISTRATIONS, [
-            'event'                        => $event,
-            'registrations'                => $registrations,
-            'pendingMatchingCount'         => $pendingMatchingCount,
-            'schools'                    => $schools,
-            'schoolNames'                => $schoolNames,
-            'schoolRegions'              => $schoolRegions,
-            'regionOptions'              => $regionOptions,
-            'childEvents'                => $childEvents,
-            'feeRequired'                => $feeService->feeRequired($event),
-            'registerStudents'           => $registerStudents,
+            'event' => $event,
+            'registrations' => $registrations,
+            'pendingMatchingCount' => $pendingMatchingCount,
+            'schools' => $schools,
+            'schoolNames' => $schoolNames,
+            'schoolRegions' => $schoolRegions,
+            'regionOptions' => $regionOptions,
+            'childEvents' => $childEvents,
+            'feeRequired' => $feeService->feeRequired($event),
+            'registerStudents' => $registerStudents,
             'existingSchoolRegistrations' => $existingSchoolRegistrations,
-            'registerSchoolId'           => $registerSchoolId,
-            'eventItems'                 => $this->itemsWithCategoryLabel($event),
-            'classGroupOptions'          => $classGroupOptions,
-            'filters'                    => [
-                'search'      => $request->input('search', ''),
-                'school_id'   => $filterSchoolId ?? '',
-                'status'      => $filterStatus ?? '',
-                'region_id'   => $filterRegionId ?? '',
+            'registerSchoolId' => $registerSchoolId,
+            'eventItems' => $this->itemsWithCategoryLabel($event),
+            'classGroupOptions' => $classGroupOptions,
+            'filters' => [
+                'search' => $request->input('search', ''),
+                'school_id' => $filterSchoolId ?? '',
+                'status' => $filterStatus ?? '',
+                'region_id' => $filterRegionId ?? '',
                 'class_group' => $filterClassGroup ?? '',
             ],
-            'selectedHeadId'             => $selectedHeadId,
-            'selectedItemId'             => $itemId,
-            'competitionUrl'             => "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/competition",
+            'selectedHeadId' => $selectedHeadId,
+            'selectedItemId' => $itemId,
+            'competitionUrl' => "/sahodaya-admin/{$this->sahodaya->id}/events/{$event->id}/competition",
         ]));
     }
 
@@ -294,18 +300,18 @@ class FestRegistrationReviewController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $data = $request->validate([
-            'school_id'        => 'required|exists:central.tenants,id',
-            'item_id'          => 'required|exists:fest_event_items,id',
-            'team_name'        => 'nullable|string|max:255',
-            'coach_name'       => 'nullable|string|max:255',
-            'coach_phone'      => 'nullable|string|max:40',
-            'manager_name'     => 'nullable|string|max:255',
-            'manager_phone'    => 'nullable|string|max:40',
-            'student_ids'      => 'required|array|min:1',
-            'student_ids.*'    => 'integer|exists:students,id',
-            'standby_ids'      => 'nullable|array|max:2',
-            'standby_ids.*'    => 'integer|exists:students,id',
-            'auto_approve'     => 'nullable|boolean',
+            'school_id' => 'required|exists:central.tenants,id',
+            'item_id' => 'required|exists:fest_event_items,id',
+            'team_name' => 'nullable|string|max:255',
+            'coach_name' => 'nullable|string|max:255',
+            'coach_phone' => 'nullable|string|max:40',
+            'manager_name' => 'nullable|string|max:255',
+            'manager_phone' => 'nullable|string|max:40',
+            'student_ids' => 'required|array|min:1',
+            'student_ids.*' => 'integer|exists:students,id',
+            'standby_ids' => 'nullable|array|max:2',
+            'standby_ids.*' => 'integer|exists:students,id',
+            'auto_approve' => 'nullable|boolean',
         ]);
 
         $school = Tenant::where('id', $data['school_id'])
@@ -479,9 +485,9 @@ class FestRegistrationReviewController extends SahodayaAdminController
         $headId = $registration->item?->head_id;
 
         $registration->update([
-            'status'              => 'rejected',
-            'rejection_reason'    => $reason ?: null,
-            'rejected_at'         => now(),
+            'status' => 'rejected',
+            'rejection_reason' => $reason ?: null,
+            'rejected_at' => now(),
             'rejected_by_user_id' => $request->user()->id,
         ]);
 
@@ -500,7 +506,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
         // FestLevelRegistrationService::deactivateIfNoActiveItems(). Mirrors the same fix in
         // FestRegistrationBulkService::rejectMany(), needed here too since this single-item
         // reject path doesn't go through that service.
-        $levelService = app(\App\Services\Events\FestLevelRegistrationService::class);
+        $levelService = app(FestLevelRegistrationService::class);
         foreach ($registration->participants->pluck('student_id')->filter()->unique() as $studentId) {
             $levelService->deactivateIfNoActiveItems($event, $studentId);
         }
@@ -512,7 +518,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
         }
 
         // LIFE-06 fix — see FestQualificationService::revokeQualificationsForRegistration().
-        app(\App\Services\Events\FestQualificationService::class)->revokeQualificationsForRegistration($registration);
+        app(FestQualificationService::class)->revokeQualificationsForRegistration($registration);
 
         app(FestEventNotifier::class)->registrationRejected($registration, $reason);
         $audit->festRegistrationRejected($registration, reason: $reason);
@@ -539,7 +545,6 @@ class FestRegistrationReviewController extends SahodayaAdminController
         );
 
         app(FestRegistrationService::class)->cancel($registration, $event);
-        $audit->festRegistrationCancelled($registration);
 
         return back()->with('success', 'Registration cancelled.');
     }
@@ -572,7 +577,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
             'Cannot cancel — this item\'s results are already published, the registration is already closed, or it was never paid (use the regular cancel action instead).'
         );
 
-        app(FestRegistrationService::class)->cancel($registration, $event);
+        app(FestRegistrationService::class)->cancelWithRefund($registration, $event, $data['reason']);
 
         return back()->with('success', 'Registration cancelled.');
     }
@@ -636,7 +641,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
             $term = strtolower($search);
             $studentQuery->where(function ($q) use ($term) {
                 $q->whereRaw('LOWER(name) LIKE ?', ["%{$term}%"])
-                  ->orWhereRaw('LOWER(reg_no) LIKE ?', ["%{$term}%"]);
+                    ->orWhereRaw('LOWER(reg_no) LIKE ?', ["%{$term}%"]);
             });
         }
 
@@ -675,14 +680,14 @@ class FestRegistrationReviewController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $data = $request->validate([
-            'school_id'        => 'required|exists:central.tenants,id',
-            'name'             => 'required|string|max:255',
-            'gender'           => 'required|in:male,female,other',
-            'dob'              => 'nullable|date|before:today',
+            'school_id' => 'required|exists:central.tenants,id',
+            'name' => 'required|string|max:255',
+            'gender' => 'required|in:male,female,other',
+            'dob' => 'nullable|date|before:today',
             'admission_number' => 'nullable|string|max:100',
-            'school_class_id'  => 'nullable|integer|exists:school_classes,id',
-            'item_id'          => 'nullable|integer|exists:fest_event_items,id',
-            'registration_id'  => 'nullable|integer|exists:fest_registrations,id',
+            'school_class_id' => 'nullable|integer|exists:school_classes,id',
+            'item_id' => 'nullable|integer|exists:fest_event_items,id',
+            'registration_id' => 'nullable|integer|exists:fest_registrations,id',
         ]);
 
         $school = Tenant::findOrFail($data['school_id']);
@@ -690,11 +695,11 @@ class FestRegistrationReviewController extends SahodayaAdminController
 
         $creator = app(StudentRecordCreator::class);
         $student = $creator->create($school, [
-            'name'             => $data['name'],
-            'gender'           => $data['gender'],
-            'dob'              => $data['dob'] ?? null,
+            'name' => $data['name'],
+            'gender' => $data['gender'],
+            'dob' => $data['dob'] ?? null,
             'admission_number' => $data['admission_number'] ?? null,
-            'school_class_id'  => $data['school_class_id'] ?? null,
+            'school_class_id' => $data['school_class_id'] ?? null,
         ]);
 
         $student->load('schoolClass');
@@ -735,10 +740,10 @@ class FestRegistrationReviewController extends SahodayaAdminController
         abort_unless(in_array($registration->event_id, $event->reportableEventIds(), true), 403);
 
         $data = $request->validate([
-            'student_id'    => 'nullable|integer|exists:students,id',
-            'student_ids'   => 'nullable|array',
+            'student_id' => 'nullable|integer|exists:students,id',
+            'student_ids' => 'nullable|array',
             'student_ids.*' => 'integer|exists:students,id',
-            'role'          => 'required|in:performer,standby',
+            'role' => 'required|in:performer,standby',
         ]);
 
         $studentIds = array_values(array_filter(array_unique(array_merge(
@@ -782,10 +787,10 @@ class FestRegistrationReviewController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $data = $request->validate([
-            'registration_ids'   => 'nullable|array',
+            'registration_ids' => 'nullable|array',
             'registration_ids.*' => 'integer|exists:fest_registrations,id',
-            'school_id'          => 'nullable|exists:central.tenants,id',
-            'item_id'            => 'nullable|integer|exists:fest_event_items,id',
+            'school_id' => 'nullable|exists:central.tenants,id',
+            'item_id' => 'nullable|integer|exists:fest_event_items,id',
             'override_lifecycle' => 'nullable|boolean',
         ]);
 
@@ -799,7 +804,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
 
         $audit->festEvent($event, FestPageActivity::REGISTRATIONS, 'fest.registrations.bulk_approved', "Approved {$result['approved']} registration(s)", [
             'approved' => $result['approved'],
-            'skipped'  => $result['skipped'],
+            'skipped' => $result['skipped'],
         ]);
 
         $message = "Approved {$result['approved']} registration(s).";
@@ -817,12 +822,12 @@ class FestRegistrationReviewController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $data = $request->validate([
-            'registration_ids'   => 'nullable|array',
+            'registration_ids' => 'nullable|array',
             'registration_ids.*' => 'integer|exists:fest_registrations,id',
-            'school_id'          => 'nullable|exists:central.tenants,id',
-            'item_id'            => 'nullable|integer|exists:fest_event_items,id',
+            'school_id' => 'nullable|exists:central.tenants,id',
+            'item_id' => 'nullable|integer|exists:fest_event_items,id',
             'override_lifecycle' => 'nullable|boolean',
-            'rejection_reason'   => 'nullable|string|max:500',
+            'rejection_reason' => 'nullable|string|max:500',
         ]);
 
         $result = $bulk->rejectMany(
@@ -836,7 +841,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
 
         $audit->festEvent($event, FestPageActivity::REGISTRATIONS, 'fest.registrations.bulk_rejected', "Rejected {$result['rejected']} registration(s)", [
             'rejected' => $result['rejected'],
-            'reason'   => $data['rejection_reason'] ?? null,
+            'reason' => $data['rejection_reason'] ?? null,
         ]);
 
         return back()->with('success', "Rejected {$result['rejected']} registration(s).");
@@ -893,7 +898,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
 
         $audit->festEvent($event, FestPageActivity::REGISTRATIONS_IMPORT, 'fest.registrations.imported', "Imported {$result['imported']} registration(s)", [
             'imported' => $result['imported'],
-            'skipped'  => $result['skipped'],
+            'skipped' => $result['skipped'],
         ]);
 
         $message = "Imported {$result['imported']} registration(s).";
@@ -934,7 +939,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
             ->with(['item', 'participants.student', 'participants.teacher', 'participants.group', 'school'])
             ->latest()
             ->get();
-        $numbering = app(\App\Services\Events\FestNumberingService::class);
+        $numbering = app(FestNumberingService::class);
         $schools = Tenant::where('parent_id', $this->sahodaya->id)->pluck('name', 'id');
 
         $rows = [];
@@ -952,12 +957,12 @@ class FestRegistrationReviewController extends SahodayaAdminController
                     : $numbering->effectiveChestNumber($p);
 
                 $rows[] = [
-                    'chest_no'         => $chest,
+                    'chest_no' => $chest,
                     'participant_name' => $p->student?->name ?? $p->teacher?->name ?? $p->group?->team_name ?? 'Participant',
-                    'school_name'      => $schoolName,
-                    'item_title'       => $reg->item?->title ?? '—',
-                    'fest_id'          => $p->level_registration_number ?? $p->student?->reg_no ?? '—',
-                    'is_team'          => $isGroup,
+                    'school_name' => $schoolName,
+                    'item_title' => $reg->item?->title ?? '—',
+                    'fest_id' => $p->level_registration_number ?? $p->student?->reg_no ?? '—',
+                    'is_team' => $isGroup,
                 ];
             }
         }
@@ -967,13 +972,13 @@ class FestRegistrationReviewController extends SahodayaAdminController
                 ?: ((int) ($a['chest_no'] ?? 999999) <=> (int) ($b['chest_no'] ?? 999999));
         });
 
-        $logoSrc = \App\Support\TenantBranding::logoEmbedSrc($this->sahodaya);
+        $logoSrc = TenantBranding::logoEmbedSrc($this->sahodaya);
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fest.reports.approved-registrations', [
-            'event'    => $event,
+        $pdf = Pdf::loadView('fest.reports.approved-registrations', [
+            'event' => $event,
             'sahodaya' => $this->sahodaya,
-            'rows'     => $rows,
-            'logoSrc'  => $logoSrc,
+            'rows' => $rows,
+            'logoSrc' => $logoSrc,
         ]);
 
         return $pdf->stream("approved-registrations-event-{$event->id}.pdf");

@@ -439,9 +439,9 @@ class PublicFestScoreboardService
             return $compute();
         }
 
-        $key = 'fest-provisional-scoreboard:'.$root->tenant_id.':'.$root->id.':'.($category ?? 'all').':'.implode(',', $scope['event_ids']);
+        $key = 'fest-provisional-scoreboard:v2:'.$root->tenant_id.':'.$root->id.':'.($category ?? 'all').':'.implode(',', $scope['event_ids']);
 
-        return \Illuminate\Support\Facades\Cache::remember($key, 5, $compute);
+        return \Illuminate\Support\Facades\Cache::remember($key, 30, $compute);
     }
 
     /**

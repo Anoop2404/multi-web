@@ -5,9 +5,14 @@ namespace App\Services\Audit;
 use App\Models\AuditLog;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
+use App\Models\FestMark;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
+use App\Models\Tenant;
+use App\Services\Events\FestGradePointService;
+use App\Services\Events\FestItemResultsService;
 use App\Services\Events\PublicFestScoreboardService;
+use App\Support\FestPageActivity;
 use Illuminate\Support\Collection;
 
 class FestEventActivityService
@@ -35,18 +40,18 @@ class FestEventActivityService
             ->limit($limit)
             ->get()
             ->map(fn (AuditLog $log) => [
-                'id'          => $log->id,
-                'action'      => $log->action,
+                'id' => $log->id,
+                'action' => $log->action,
                 'description' => $log->description,
-                'page'        => $log->properties['page'] ?? null,
-                'item_id'     => $log->properties['item_id'] ?? null,
-                'item_title'  => $log->properties['item_title'] ?? null,
-                'chest_no'    => $log->properties['chest_no'] ?? null,
+                'page' => $log->properties['page'] ?? null,
+                'item_id' => $log->properties['item_id'] ?? null,
+                'item_title' => $log->properties['item_title'] ?? null,
+                'chest_no' => $log->properties['chest_no'] ?? null,
                 'participant' => $log->properties['participant'] ?? null,
-                'school'      => $log->properties['school'] ?? null,
-                'ip_address'  => $log->ip_address,
-                'user'        => $log->user?->only('id', 'name', 'email'),
-                'created_at'  => $log->created_at?->toIso8601String(),
+                'school' => $log->properties['school'] ?? null,
+                'ip_address' => $log->ip_address,
+                'user' => $log->user?->only('id', 'name', 'email'),
+                'created_at' => $log->created_at?->toIso8601String(),
             ])
             ->values()
             ->all();
@@ -63,12 +68,12 @@ class FestEventActivityService
             ->limit($limit)
             ->get()
             ->map(fn (AuditLog $log) => [
-                'id'          => $log->id,
-                'action'      => $log->action,
+                'id' => $log->id,
+                'action' => $log->action,
                 'description' => $log->description,
-                'ip_address'  => $log->ip_address,
-                'user'        => $log->user?->only('id', 'name', 'email'),
-                'created_at'  => $log->created_at?->toIso8601String(),
+                'ip_address' => $log->ip_address,
+                'user' => $log->user?->only('id', 'name', 'email'),
+                'created_at' => $log->created_at?->toIso8601String(),
             ])
             ->values()
             ->all();
@@ -81,6 +86,10 @@ class FestEventActivityService
         $registrationMorph = (new FestRegistration)->getMorphClass();
         $eventId = (string) $event->id;
         $reportableEventIds = $event->reportableEventIds();
+        $reportableEventIdStrings = array_map('strval', $reportableEventIds);
+
+        // Fetch all registration IDs under this event family so registration-subject logs are matched
+        $allRegistrationIds = FestRegistration::whereIn('event_id', $reportableEventIds)->pluck('id')->all();
 
         if ($search !== null && strtolower(trim($search)) === 'all') {
             $search = null;
@@ -89,12 +98,12 @@ class FestEventActivityService
         $searchParticipantIds = [];
         if ($search !== null && $search !== '') {
             $term = '%'.strtolower(trim($search)).'%';
-            $searchParticipantIds = FestParticipant::whereHas('registration', fn ($q) => $q->whereIn('event_id', $event->reportableEventIds()))
+            $searchParticipantIds = FestParticipant::whereHas('registration', fn ($q) => $q->whereIn('event_id', $reportableEventIds))
                 ->where(function ($q) use ($term) {
                     $q->whereRaw('LOWER(CAST(chest_no AS TEXT)) LIKE ?', [$term])
-                      ->orWhereHas('group', fn ($g) => $g->whereRaw('LOWER(CAST(chest_no AS TEXT)) LIKE ?', [$term])->orWhereRaw('LOWER(team_name) LIKE ?', [$term]))
-                      ->orWhereHas('student', fn ($s) => $s->whereRaw('LOWER(name) LIKE ?', [$term])->orWhereRaw('LOWER(CAST(reg_no AS TEXT)) LIKE ?', [$term]))
-                      ->orWhereHas('teacher', fn ($t) => $t->whereRaw('LOWER(name) LIKE ?', [$term]));
+                        ->orWhereHas('group', fn ($g) => $g->whereRaw('LOWER(CAST(chest_no AS TEXT)) LIKE ?', [$term])->orWhereRaw('LOWER(team_name) LIKE ?', [$term]))
+                        ->orWhereHas('student', fn ($s) => $s->whereRaw('LOWER(name) LIKE ?', [$term])->orWhereRaw('LOWER(CAST(reg_no AS TEXT)) LIKE ?', [$term]))
+                        ->orWhereHas('teacher', fn ($t) => $t->whereRaw('LOWER(name) LIKE ?', [$term]));
                 })
                 ->pluck('id')
                 ->all();
@@ -103,8 +112,7 @@ class FestEventActivityService
         $schoolParticipantIds = [];
         $schoolRegistrationIds = [];
         if ($schoolId !== null && $schoolId !== '') {
-            $schoolParticipantIds = FestParticipant::whereHas('registration', fn ($q) => 
-                $q->whereIn('event_id', $reportableEventIds)->where('school_id', $schoolId)
+            $schoolParticipantIds = FestParticipant::whereHas('registration', fn ($q) => $q->whereIn('event_id', $reportableEventIds)->where('school_id', $schoolId)
             )->pluck('id')->all();
 
             $schoolRegistrationIds = FestRegistration::whereIn('event_id', $reportableEventIds)
@@ -113,39 +121,79 @@ class FestEventActivityService
                 ->all();
         }
 
+        $itemRegistrationIds = [];
+        if ($itemId !== null) {
+            $itemRegistrationIds = FestRegistration::whereIn('event_id', $reportableEventIds)
+                ->where('item_id', $itemId)
+                ->pluck('id')
+                ->all();
+        }
+
+        $auditTenantIds = Tenant::where('parent_id', $event->tenant_id)->pluck('id')->push($event->tenant_id)->all();
         $builder = AuditLog::query()
+            ->whereIn('tenant_id', $auditTenantIds)
             ->with('user:id,name,email')
-            ->where(function ($q) use ($morph, $eventId, $reportableEventIds) {
-                $q->where(function ($q2) use ($morph, $eventId) {
-                    $q2->where('subject_type', $morph)->where('subject_id', $eventId);
-                })->orWhereIn('properties->event_id', $reportableEventIds);
+            ->where(function ($q) use ($morph, $eventId, $reportableEventIds, $reportableEventIdStrings, $registrationMorph, $allRegistrationIds) {
+                $q->where(function ($q2) use ($morph, $eventId, $reportableEventIdStrings) {
+                    $q2->where('subject_type', $morph)->whereIn('subject_id', array_merge([$eventId], $reportableEventIdStrings));
+                })
+                    ->orWhereIn('properties->event_id', array_merge($reportableEventIds, $reportableEventIdStrings));
+
+                if (! empty($allRegistrationIds)) {
+                    $allRegistrationIdStrings = array_map('strval', $allRegistrationIds);
+                    $q->orWhere(function ($q2) use ($registrationMorph, $allRegistrationIds, $allRegistrationIdStrings) {
+                        $q2->where('subject_type', $registrationMorph)
+                            ->whereIn('subject_id', array_merge($allRegistrationIds, $allRegistrationIdStrings));
+                    })
+                        ->orWhereIn('properties->registration_id', array_merge($allRegistrationIds, $allRegistrationIdStrings));
+                }
             })
             ->when($dateFrom !== null && $dateFrom !== '', fn ($q) => $q->whereDate('created_at', '>=', $dateFrom))
             ->when($dateTo !== null && $dateTo !== '', fn ($q) => $q->whereDate('created_at', '<=', $dateTo))
-            ->when($page !== null && $page !== '', fn ($q) => $q->where('properties->page', $page))
-            ->when($itemId !== null, function ($q) use ($itemId) {
-                $q->where(function ($q2) use ($itemId) {
+            ->when($page !== null && $page !== '', function ($q) use ($page) {
+                // Support page aliases (e.g., 'event.registrations' and 'registrations')
+                $pages = [$page];
+                if ($page === FestPageActivity::REGISTRATIONS) {
+                    $pages[] = 'registrations';
+                } elseif ($page === 'registrations') {
+                    $pages[] = FestPageActivity::REGISTRATIONS;
+                }
+                $q->whereIn('properties->page', $pages);
+            })
+            ->when($itemId !== null, function ($q) use ($itemId, $itemRegistrationIds, $registrationMorph) {
+                $q->where(function ($q2) use ($itemId, $itemRegistrationIds, $registrationMorph) {
                     $q2->where('properties->item_id', $itemId)
-                       ->orWhere('properties->item_id', (string) $itemId);
+                        ->orWhere('properties->item_id', (string) $itemId);
+
+                    if (! empty($itemRegistrationIds)) {
+                        $itemRegistrationIdStrings = array_map('strval', $itemRegistrationIds);
+                        $q2->orWhere(function ($q3) use ($registrationMorph, $itemRegistrationIds, $itemRegistrationIdStrings) {
+                            $q3->where('subject_type', $registrationMorph)
+                                ->whereIn('subject_id', array_merge($itemRegistrationIds, $itemRegistrationIdStrings));
+                        })
+                            ->orWhereIn('properties->registration_id', array_merge($itemRegistrationIds, $itemRegistrationIdStrings));
+                    }
                 });
             })
             ->when($schoolId !== null && $schoolId !== '', function ($q) use ($schoolId, $schoolParticipantIds, $schoolRegistrationIds, $registrationMorph) {
                 $q->where(function ($q2) use ($schoolId, $schoolParticipantIds, $schoolRegistrationIds, $registrationMorph) {
                     $q2->where('properties->school_id', $schoolId)
-                       ->orWhere('properties->school_id', (string) $schoolId);
+                        ->orWhere('properties->school_id', (string) $schoolId);
 
                     if (! empty($schoolRegistrationIds)) {
-                        $q2->orWhere(function ($q3) use ($registrationMorph, $schoolRegistrationIds) {
+                        $schoolRegistrationIdStrings = array_map('strval', $schoolRegistrationIds);
+                        $q2->orWhere(function ($q3) use ($registrationMorph, $schoolRegistrationIds, $schoolRegistrationIdStrings) {
                             $q3->where('subject_type', $registrationMorph)
-                               ->whereIn('subject_id', $schoolRegistrationIds);
-                        });
+                                ->whereIn('subject_id', array_merge($schoolRegistrationIds, $schoolRegistrationIdStrings));
+                        })
+                            ->orWhereIn('properties->registration_id', array_merge($schoolRegistrationIds, $schoolRegistrationIdStrings));
                     }
 
                     if (! empty($schoolParticipantIds)) {
                         foreach ($schoolParticipantIds as $pid) {
                             $q2->orWhere('properties->participant_id', $pid)
-                               ->orWhere('properties->participant_id', (string) $pid)
-                               ->orWhere('description', 'LIKE', "%participant #{$pid}%");
+                                ->orWhere('properties->participant_id', (string) $pid)
+                                ->orWhere('description', 'LIKE', "%participant #{$pid}%");
                         }
                     }
                 });
@@ -154,15 +202,15 @@ class FestEventActivityService
                 $term = '%'.strtolower($search).'%';
                 $q->where(function ($q2) use ($term, $searchParticipantIds) {
                     $q2->whereRaw('LOWER(description) LIKE ?', [$term])
-                       ->orWhereHas('user', fn ($u) => $u->whereRaw('LOWER(name) LIKE ?', [$term]))
-                       ->orWhereRaw('LOWER(CAST(properties AS TEXT)) LIKE ?', [$term])
-                       ->orWhereRaw('LOWER(COALESCE(ip_address, \'\')) LIKE ?', [$term]);
+                        ->orWhereHas('user', fn ($u) => $u->whereRaw('LOWER(name) LIKE ?', [$term]))
+                        ->orWhereRaw('LOWER(CAST(properties AS TEXT)) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(COALESCE(ip_address, \'\')) LIKE ?', [$term]);
 
                     if (! empty($searchParticipantIds)) {
                         foreach ($searchParticipantIds as $pid) {
                             $q2->orWhere('properties->participant_id', $pid)
-                               ->orWhere('properties->participant_id', (string) $pid)
-                               ->orWhere('description', 'LIKE', "%participant #{$pid}%");
+                                ->orWhere('properties->participant_id', (string) $pid)
+                                ->orWhere('description', 'LIKE', "%participant #{$pid}%");
                         }
                     }
                 });
@@ -205,7 +253,7 @@ class FestEventActivityService
                 ->get()
                 ->keyBy('id');
 
-            $marksMap = \App\Models\FestMark::whereIn('participant_id', array_unique($missingParticipantIds))
+            $marksMap = FestMark::whereIn('participant_id', array_unique($missingParticipantIds))
                 ->get()
                 ->keyBy(fn ($m) => "{$m->item_id}-{$m->participant_id}");
         }
@@ -218,44 +266,52 @@ class FestEventActivityService
         }
 
         // Registration-level actions (approve/reject/cancel/submit) log the registration
-        // itself as the audit subject — subject_id is always the registration id, even for
-        // entries written before item_title/participant/school were captured into
-        // properties (see PlatformAuditLogger::registrationContext()). Falling back to the
-        // registration's CURRENT item/participants/school here means old entries display
-        // this too, not just ones logged after that enrichment shipped — no backfill
-        // migration needed, just a live lookup by the id the log already carried.
+        // either as the audit subject or inside properties->registration_id.
         $registrationMorph = (new FestRegistration)->getMorphClass();
-        $missingRegistrationIds = $logs
-            ->filter(function (AuditLog $log) use ($registrationMorph) {
-                $props = $log->properties ?? [];
+        $missingRegistrationIds = [];
+        foreach ($logs as $log) {
+            $props = $log->properties ?? [];
+            $regId = null;
+            if ($log->subject_type === $registrationMorph && $log->subject_id !== null) {
+                $regId = (int) $log->subject_id;
+            } elseif (! empty($props['registration_id'])) {
+                $regId = (int) $props['registration_id'];
+            } elseif (preg_match('/registration\s+#(\d+)/i', $log->description, $matches)) {
+                $regId = (int) $matches[1];
+            }
 
-                return $log->subject_type === $registrationMorph
-                    && $log->subject_id !== null
-                    && (empty($props['item_title']) || empty($props['participant']) || empty($props['school']));
-            })
-            ->pluck('subject_id')
-            ->filter()
-            ->unique()
-            ->all();
+            if ($regId && (empty($props['item_title']) || empty($props['participant']) || empty($props['school']))) {
+                $missingRegistrationIds[] = $regId;
+            }
+        }
 
         $registrationsMap = collect();
         if (! empty($missingRegistrationIds)) {
-            $registrationsMap = FestRegistration::whereIn('id', $missingRegistrationIds)
+            $registrationsMap = FestRegistration::whereIn('id', array_unique($missingRegistrationIds))
                 ->with(['item', 'school', 'participants.student', 'participants.teacher', 'participants.group'])
                 ->get()
                 ->keyBy('id');
         }
 
         $scoreboards = app(PublicFestScoreboardService::class);
-        $gradePointService = app(\App\Services\Events\FestGradePointService::class);
-        $itemResultsService = app(\App\Services\Events\FestItemResultsService::class);
+        $gradePointService = app(FestGradePointService::class);
+        $itemResultsService = app(FestItemResultsService::class);
 
         $mapped = $logs->map(function (AuditLog $log) use ($participantsMap, $marksMap, $itemsMap, $registrationsMap, $registrationMorph, $event, $scoreboards, $gradePointService, $itemResultsService) {
             $props = $log->properties ?? [];
             $registration = null;
 
+            $regId = null;
             if ($log->subject_type === $registrationMorph && $log->subject_id !== null) {
-                $registration = $registrationsMap->get((int) $log->subject_id);
+                $regId = (int) $log->subject_id;
+            } elseif (! empty($props['registration_id'])) {
+                $regId = (int) $props['registration_id'];
+            } elseif (preg_match('/registration\s+#(\d+)/i', $log->description, $matches)) {
+                $regId = (int) $matches[1];
+            }
+
+            if ($regId) {
+                $registration = $registrationsMap->get($regId);
                 if ($registration) {
                     if (empty($props['item_title'])) {
                         $props['item_title'] = $registration->item?->title;
@@ -284,7 +340,7 @@ class FestEventActivityService
             }
 
             $participant = $pid ? $participantsMap->get((int) $pid) : null;
-            $itemId = $props['item_id'] ?? $participant?->registration?->item_id;
+            $itemId = $props['item_id'] ?? $participant?->registration?->item_id ?? $registration?->item_id;
             $markRecord = ($itemId && $pid) ? $marksMap->get("{$itemId}-{$pid}") : ($pid ? $marksMap->filter(fn ($m) => $m->participant_id == $pid)->first() : null);
 
             if ($markRecord) {
@@ -327,16 +383,22 @@ class FestEventActivityService
             }
             $personName = $props['participant'] ?? $participant?->student?->name ?? $participant?->teacher?->name ?? $participant?->group?->name;
             $chestNo = $props['chest_no'] ?? $participant?->group?->chest_no ?? $participant?->chest_no;
-            $schoolName = $props['school'] ?? $participant?->registration?->school?->name;
+            $schoolName = $props['school'] ?? $participant?->registration?->school?->name ?? $registration?->school?->name;
             $regNo = $participant?->student?->reg_no ?? $participant?->teacher?->reg_no;
 
-            $itemId = $props['item_id'] ?? $participant?->registration?->item_id;
+            $itemId = $props['item_id'] ?? $participant?->registration?->item_id ?? $registration?->item_id;
             $itemModel = $itemId ? $itemsMap->get((int) $itemId) : null;
-            $itemTitle = $props['item_title'] ?? $itemModel?->title ?? $participant?->registration?->item?->title;
+            $itemTitle = $props['item_title'] ?? $itemModel?->title ?? $participant?->registration?->item?->title ?? $registration?->item?->title;
             $categoryKey = $itemModel?->class_group ?? $itemModel?->age_group;
             $categoryLabel = $categoryKey ? $scoreboards->categoryLabel($event, $categoryKey) : null;
 
             $description = $log->description;
+            if (preg_match('/^Fest registration #\d+\s+(submitted|approved|cancelled|updated|rejected)$/i', trim($description))) {
+                $suffixParts = array_filter([$itemTitle, $schoolName, $personName]);
+                if ($suffixParts !== []) {
+                    $description .= ' ('.implode(' — ', $suffixParts).')';
+                }
+            }
             if (str_starts_with($description, 'Mark saved for participant #') && $participant) {
                 $chestLabel = $chestNo ? "Chest #{$chestNo}" : "Participant #{$pid}";
                 $itemLabel = $itemTitle ? " in {$itemTitle}" : '';
@@ -352,32 +414,32 @@ class FestEventActivityService
                 if (! empty($props['grade'])) {
                     $details[] = "Grade: {$props['grade']}";
                 }
-                $detailStr = $details !== [] ? ' [' . implode(', ', $details) . ']' : '';
+                $detailStr = $details !== [] ? ' ['.implode(', ', $details).']' : '';
 
                 $description = "Mark saved for {$chestLabel} - {$personName}{$schoolLabel}{$itemLabel}{$detailStr}";
             }
 
             return [
-                'id'            => $log->id,
-                'action'        => $log->action,
-                'description'   => $description,
-                'page'          => $props['page'] ?? null,
-                'item_id'       => $itemId,
-                'item_title'    => $itemTitle,
-                'item_code'     => $itemModel?->item_code,
+                'id' => $log->id,
+                'action' => $log->action,
+                'description' => $description,
+                'page' => $props['page'] ?? null,
+                'item_id' => $itemId,
+                'item_title' => $itemTitle,
+                'item_code' => $itemModel?->item_code,
                 'item_category' => $categoryLabel,
-                'chest_no'      => $chestNo,
-                'participant'   => $personName,
-                'school'        => $schoolName,
-                'school_id'     => isset($props['school_id']) ? (string) $props['school_id'] : ($participant?->registration?->school_id ? (string) $participant->registration->school_id : ($registration?->school_id ? (string) $registration->school_id : null)),
-                'reg_no'        => $regNo,
-                'reason'        => $props['reason'] ?? null,
-                'ip_address'    => $log->ip_address,
-                'user_agent'    => $props['user_agent'] ?? null,
-                'actor_type'    => $props['actor_type'] ?? null,
-                'user'          => $log->user?->only('id', 'name', 'email'),
-                'properties'    => $props,
-                'created_at'    => $log->created_at?->toIso8601String(),
+                'chest_no' => $chestNo,
+                'participant' => $personName,
+                'school' => $schoolName,
+                'school_id' => isset($props['school_id']) ? (string) $props['school_id'] : ($participant?->registration?->school_id ? (string) $participant->registration->school_id : ($registration?->school_id ? (string) $registration->school_id : null)),
+                'reg_no' => $regNo,
+                'reason' => $props['reason'] ?? null,
+                'ip_address' => $log->ip_address,
+                'user_agent' => $props['user_agent'] ?? null,
+                'actor_type' => $props['actor_type'] ?? null,
+                'user' => $log->user?->only('id', 'name', 'email'),
+                'properties' => $props,
+                'created_at' => $log->created_at?->toIso8601String(),
             ];
         });
 
@@ -415,7 +477,7 @@ class FestEventActivityService
         }
 
         return [
-            'logs'  => $mapped,
+            'logs' => $mapped,
             'total' => $totalCount,
         ];
     }

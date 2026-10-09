@@ -27,7 +27,7 @@ class SetPublicCacheHeaders
             }
 
             if ($request->is('fest/*/live/data') || $request->is('fest/*/scoreboard/data')) {
-                $response->headers->set('Cache-Control', 'public, max-age=0, s-maxage=10, stale-while-revalidate=30');
+                $response->headers->set('Cache-Control', 'public, max-age=0, s-maxage=30, stale-while-revalidate=60');
             } elseif ($request->is('fest/*/live') || $request->is('fest/*/scoreboard') || $request->is('fest/*/tv')) {
                 $response->headers->set('Cache-Control', 'public, max-age=10, s-maxage=30, stale-while-revalidate=60');
             } elseif (

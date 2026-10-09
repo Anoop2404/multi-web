@@ -11,12 +11,13 @@ use App\Models\FestRegistration;
 use App\Models\FestSchoolEventFee;
 use App\Models\Student;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Support\FestPageActivity;
 use App\Support\FestTeamSquadRules;
 use Illuminate\Support\Facades\DB;
 
 class FestRegistrationService
 {
-    public function cancel(FestRegistration $registration, FestEvent $event, bool $notify = true): void
+    public function cancel(FestRegistration $registration, FestEvent $event, bool $notify = true, ?string $reason = null): void
     {
         // Registrations for a partitioned hub are created against the school's assigned
         // region child, not the hub — a strict id match 403'd this for every such
@@ -90,13 +91,19 @@ class FestRegistrationService
         app(FestQualificationService::class)->revokeQualificationsForRegistration($registration);
 
         if ($notify) {
-            app(FestEventNotifier::class)->registrationWithdrawn($registration);
+            try {
+                app(FestEventNotifier::class)->registrationWithdrawn($registration);
+            } catch (\Throwable) {
+                // non-blocking — notification failure must never roll back the cancel
+            }
             try {
                 app(FestEventNotifier::class)->registrationWithdrawnAdmin($registration);
             } catch (\Throwable) {
                 // non-blocking — sahodaya notification failure must never roll back the cancel
             }
         }
+
+        app(PlatformAuditLogger::class)->festRegistrationCancelled($registration, reason: $reason);
     }
 
     public function canAdminCancelWithRefund(FestRegistration $registration, FestEvent $event): bool
@@ -106,7 +113,7 @@ class FestRegistrationService
 
     public function cancelWithRefund(FestRegistration $registration, FestEvent $event, string $reason, bool $notify = true): void
     {
-        $this->cancel($registration, $event, $notify);
+        $this->cancel($registration, $event, $notify, reason: $reason);
     }
 
     /**
@@ -220,10 +227,11 @@ class FestRegistrationService
         // number (and showing up on the Chest Numbers page as if performing; see
         // FestChestNumberController's participant_role filter added alongside this).
         // The promoted standby doesn't inherit it automatically — re-assign via the
-        // Chest Numbers page (Generate/Assign Missing or manual entry), same as any
-        // other participant who needs one.
         $performer->update(['participant_role' => 'standby', 'chest_no' => null, 'order_no' => null, 'chest_revealed_at' => null]);
         $standby->update(['participant_role' => 'performer']);
+        $performer->registration?->touch();
+
+        app(PlatformAuditLogger::class)->festParticipantSubstituted($performer, $standby);
     }
 
     /**
@@ -252,11 +260,14 @@ class FestRegistrationService
         } else {
             $maxAllowed = (int) ($item?->max_per_school ?? 1);
             if ($performerCount + 1 > $maxAllowed) {
-                abort(422, "This item allows at most {$maxAllowed} performer".($maxAllowed === 1 ? '' : 's')." — no open slot. Use Substitute to swap with an existing performer instead.");
+                abort(422, "This item allows at most {$maxAllowed} performer".($maxAllowed === 1 ? '' : 's').' — no open slot. Use Substitute to swap with an existing performer instead.');
             }
         }
 
         $standby->update(['participant_role' => 'performer']);
+        $standby->registration?->touch();
+
+        app(PlatformAuditLogger::class)->festStandbyPromoted($standby);
     }
 
     /**
@@ -324,13 +335,15 @@ class FestRegistrationService
 
         $participant = DB::transaction(function () use ($registration, $event, $student, $role, $groupId) {
             $participant = FestParticipant::create([
-                'registration_id'  => $registration->id,
-                'group_id'         => $groupId,
-                'event_id'         => $event->id,
-                'student_id'       => $student->id,
+                'registration_id' => $registration->id,
+                'group_id' => $groupId,
+                'event_id' => $event->id,
+                'student_id' => $student->id,
                 'participant_type' => 'student',
                 'participant_role' => $role,
             ]);
+
+            $registration->touch();
 
             app(FestNumberingService::class)->assignParticipantNumbers($participant);
             app(FestSchoolEventFeeService::class)->recalculate($event, $registration->school_id);
@@ -338,12 +351,23 @@ class FestRegistrationService
             return $participant;
         });
 
+        $registration->loadMissing('item', 'school');
         app(PlatformAuditLogger::class)->festEvent(
             $event,
-            'registrations',
+            FestPageActivity::REGISTRATIONS,
             'fest.registration.participant_added',
             "Added {$student->name} ({$role}) to registration #{$registration->id}",
-            ['registration_id' => $registration->id, 'student_id' => $student->id, 'role' => $role],
+            [
+                'registration_id' => $registration->id,
+                'student_id' => $student->id,
+                'role' => $role,
+                'item_id' => $registration->item_id,
+                'item_title' => $registration->item?->title,
+                'school_id' => (string) $registration->school_id,
+                'school' => $registration->school?->name,
+                'participant' => $student->name,
+            ],
+            $registration,
         );
 
         return $participant;
@@ -363,7 +387,7 @@ class FestRegistrationService
         abort_unless($registration && in_array($registration->event_id, $event->reportableEventIds(), true), 422);
         abort_if($registration->item?->results_published_at, 422, 'This item\'s results are already published. Unpublish it first to remove a participant.');
 
-        $registration->loadMissing('participants');
+        $registration->loadMissing('participants', 'item', 'school');
         abort_if($registration->participants->count() <= 1, 422, 'Cannot remove the last participant on a registration — cancel the registration instead.');
 
         $schoolId = $registration->school_id;
@@ -371,18 +395,28 @@ class FestRegistrationService
         $participantId = $participant->id;
         $label = $participant->student?->name ?? $participant->teacher?->name ?? "participant #{$participantId}";
 
-        DB::transaction(function () use ($participant, $event, $schoolId) {
+        DB::transaction(function () use ($participant, $event, $schoolId, $registration) {
             FestMark::where('participant_id', $participant->id)->delete();
             $participant->delete();
+            $registration->touch();
             app(FestSchoolEventFeeService::class)->recalculate($event, $schoolId);
         });
 
         app(PlatformAuditLogger::class)->festEvent(
             $event,
-            'registrations',
+            FestPageActivity::REGISTRATIONS,
             'fest.registration.participant_removed',
             "Removed {$label} from registration #{$registrationId}",
-            ['registration_id' => $registrationId, 'participant_id' => $participantId],
+            [
+                'registration_id' => $registrationId,
+                'participant_id' => $participantId,
+                'item_id' => $registration->item_id,
+                'item_title' => $registration->item?->title,
+                'school_id' => (string) $schoolId,
+                'school' => $registration->school?->name,
+                'participant' => $label,
+            ],
+            $registration,
         );
     }
 }

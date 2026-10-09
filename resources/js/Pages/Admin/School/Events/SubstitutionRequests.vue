@@ -25,6 +25,7 @@
                         <th>Replacement</th>
                         <th>Status</th>
                         <th>Submitted</th>
+                        <th class="w-20 text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -38,9 +39,20 @@
                             <p v-if="r.reviewed_at" class="text-[11px] text-slate-400 mt-1">Reviewed {{ new Date(r.reviewed_at).toLocaleString() }}</p>
                         </td>
                         <td class="text-xs">{{ r.created_at ? new Date(r.created_at).toLocaleString() : '—' }}</td>
+                        <td class="text-right">
+                            <button
+                                v-if="r.status === 'pending'"
+                                type="button"
+                                class="text-xs text-red-600 hover:text-red-800 font-medium disabled:opacity-50"
+                                :disabled="cancellingId === r.id"
+                                @click="cancelRequest(r)"
+                            >
+                                {{ cancellingId === r.id ? 'Cancelling...' : 'Cancel' }}
+                            </button>
+                        </td>
                     </tr>
                     <tr v-if="!requests.length">
-                        <td colspan="5" class="text-center text-slate-400 py-8">No substitution requests yet.</td>
+                        <td colspan="6" class="text-center text-slate-400 py-8">No substitution requests yet.</td>
                     </tr>
                 </tbody>
             </table>
@@ -49,8 +61,8 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
-import { Link, useForm } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { Link, router, useForm } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
@@ -66,6 +78,8 @@ const props = defineProps({
 });
 
 const { programLabel, programBase } = useSchoolProgramContext(props);
+
+const cancellingId = ref(null);
 
 const form = useForm({
     registration_id: '',
@@ -102,11 +116,21 @@ function submit() {
     form.post(`${programBase}/events/${props.event.id}/substitution-requests`, { preserveScroll: true, onSuccess: () => form.reset() });
 }
 
+function cancelRequest(r) {
+    if (!confirm('Are you sure you want to cancel this substitution request?')) return;
+    cancellingId.value = r.id;
+    router.delete(`${programBase}/events/${props.event.id}/substitution-requests/${r.id}`, {
+        preserveScroll: true,
+        onFinish: () => { cancellingId.value = null; },
+    });
+}
+
 function statusClass(status) {
     return {
         pending: 'bg-amber-100 text-amber-800',
         approved: 'bg-emerald-100 text-emerald-800',
         rejected: 'bg-red-100 text-red-700',
+        cancelled: 'bg-slate-100 text-slate-500',
     }[status] ?? 'bg-slate-100 text-slate-600';
 }
 </script>

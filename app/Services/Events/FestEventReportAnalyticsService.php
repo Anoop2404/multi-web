@@ -2,10 +2,13 @@
 
 namespace App\Services\Events;
 
-use App\Support\CsvSafety;
+use App\Models\AuditLog;
+use App\Models\FestAttendance;
+use App\Models\FestCateringOrder;
+use App\Models\FestCompetitionArea;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
-use App\Models\FestCompetitionArea;
+use App\Models\FestEventPhase;
 use App\Models\FestItemHead;
 use App\Models\FestJudgeAssignment;
 use App\Models\FestMark;
@@ -14,26 +17,27 @@ use App\Models\FestRegistration;
 use App\Models\FestSchedule;
 use App\Models\FestSchoolEventFee;
 use App\Models\FestVolunteer;
-use App\Models\FestCateringOrder;
-use App\Models\FestAttendance;
-use App\Models\AuditLog;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Events\Reports\FestReportScope;
+use App\Support\CsvSafety;
 use App\Support\ExcelExport;
 use App\Support\FestCategoryMerge;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestIdCardTemplates;
 use App\Support\FestItemCategoryLabel;
 use App\Support\FestOverallCategoryExclusion;
-use App\Services\Events\FestIdCardService;
 use App\Support\FestTeamSquadRules;
+use App\Support\PdfGenerator;
 use App\Support\TenantBranding;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Http\Request;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Response;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use App\Services\Events\Reports\FestReportScope;
 
 class FestEventReportAnalyticsService
 {
@@ -52,7 +56,7 @@ class FestEventReportAnalyticsService
      * This prefetches every item in the event's topology once and resolves every
      * family from that in memory.
      *
-     * @param \Illuminate\Support\Collection<int, FestEventItem> $items
+     * @param  Collection<int, FestEventItem>  $items
      * @return array{0: list<int>, 1: array<int, int>} [allReportableItemIds, itemId => canonicalItemId]
      */
     private function itemFamiliesFor($items): array
@@ -105,7 +109,7 @@ class FestEventReportAnalyticsService
      *
      * @param  list<string>  $with  relations to eager-load (e.g. ['head'])
      */
-    private function catalogItems(array $with = []): \Illuminate\Support\Collection
+    private function catalogItems(array $with = []): Collection
     {
         $targetEventId = FestEventItem::where('event_id', $this->event->id)->where('is_enabled', true)->exists()
             ? $this->event->id
@@ -118,7 +122,7 @@ class FestEventReportAnalyticsService
             ->orderBy('title')
             ->get();
 
-        return \App\Services\Events\FestHeadItemNavigationService::filterToOwnPhase($items, $this->event);
+        return FestHeadItemNavigationService::filterToOwnPhase($items, $this->event);
     }
 
     /**
@@ -155,11 +159,11 @@ class FestEventReportAnalyticsService
                 ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId));
 
             $rows[] = [
-                'discipline'       => $discipline,
+                'discipline' => $discipline,
                 'discipline_label' => $labels[$discipline] ?? ($discipline === 'unspecified' ? 'Unspecified' : $discipline),
-                'item_count'       => $itemIds->count(),
-                'approved'         => $regQuery('approved')->count(),
-                'pending'          => $regQuery('submitted')->count(),
+                'item_count' => $itemIds->count(),
+                'approved' => $regQuery('approved')->count(),
+                'pending' => $regQuery('submitted')->count(),
             ];
         }
 
@@ -202,10 +206,10 @@ class FestEventReportAnalyticsService
         sort($ageGroups);
 
         return [
-            'schools'     => $schoolIds->map(fn ($id) => ['id' => $id, 'name' => $schools[$id] ?? $id])->values()->all(),
-            'age_groups'  => collect($ageGroups)->map(fn ($k) => ['key' => $k, 'label' => $ageLabels[$k] ?? strtoupper($k)])->values()->all(),
-            'matrix'      => $matrix,
-            'totals'      => $totals,
+            'schools' => $schoolIds->map(fn ($id) => ['id' => $id, 'name' => $schools[$id] ?? $id])->values()->all(),
+            'age_groups' => collect($ageGroups)->map(fn ($k) => ['key' => $k, 'label' => $ageLabels[$k] ?? strtoupper($k)])->values()->all(),
+            'matrix' => $matrix,
+            'totals' => $totals,
         ];
     }
 
@@ -222,14 +226,14 @@ class FestEventReportAnalyticsService
             ->orderBy('school_id')
             ->get()
             ->map(fn (FestSchoolEventFee $fee) => [
-                'school_id'        => $fee->school_id,
-                'school_name'      => $schools[$fee->school_id] ?? $fee->school_id,
-                'total_due'        => (float) $fee->total_due,
-                'paid'             => (float) ($fee->feeReceipt?->amount ?? 0),
-                'status'           => $fee->status,
+                'school_id' => $fee->school_id,
+                'school_name' => $schools[$fee->school_id] ?? $fee->school_id,
+                'total_due' => (float) $fee->total_due,
+                'paid' => (float) ($fee->feeReceipt?->amount ?? 0),
+                'status' => $fee->status,
                 'registration_batch_id' => $fee->registration_batch_id,
                 'registration_batch' => $fee->registrationBatch?->name,
-                'receipt_no'       => $fee->feeReceipt?->receipt_number,
+                'receipt_no' => $fee->feeReceipt?->receipt_number,
                 // See docs/FEST_PAYMENT_REGISTRATION_FLOW_GAPS.md §14.
                 'available_credit' => $fee->outstandingCredit(),
             ])
@@ -246,7 +250,7 @@ class FestEventReportAnalyticsService
      * (already correctly resolved by FestReportScopeResolver, including the
      * FestSchoolPhaseRegionSelection-based school list) instead of re-deriving it.
      */
-    private function feeCollectionQuery(): \Illuminate\Database\Eloquent\Builder
+    private function feeCollectionQuery(): Builder
     {
         $feeService = app(FestSchoolEventFeeService::class);
         $feeOwnerEvent = $feeService->feeOwnerEvent($this->event);
@@ -259,7 +263,7 @@ class FestEventReportAnalyticsService
             }
 
             $batchId = $this->scope->registrationBatchId
-                ?? ($this->scope->competitionPhaseId ? \App\Models\FestEventPhase::find($this->scope->competitionPhaseId)?->registration_batch_id : null);
+                ?? ($this->scope->competitionPhaseId ? FestEventPhase::find($this->scope->competitionPhaseId)?->registration_batch_id : null);
 
             if ($batchId) {
                 $query->where('registration_batch_id', $batchId);
@@ -312,13 +316,13 @@ class FestEventReportAnalyticsService
             $estimated = $items->sum(fn (FestEventItem $item) => $itemResolver->amountForItem($item, $schedule, $this->event));
 
             $row = [
-                'head_id'        => $head->id,
-                'head_name'      => $head->name,
-                'item_count'     => $items->count(),
-                'registrations'  => $regCount,
-                'default_fee'    => $head->default_item_fee !== null ? (float) $head->default_item_fee : null,
-                'extra_fee'      => $head->extra_item_fee !== null ? (float) $head->extra_item_fee : null,
-                'catalog_total'  => round($estimated, 2),
+                'head_id' => $head->id,
+                'head_name' => $head->name,
+                'item_count' => $items->count(),
+                'registrations' => $regCount,
+                'default_fee' => $head->default_item_fee !== null ? (float) $head->default_item_fee : null,
+                'extra_fee' => $head->extra_item_fee !== null ? (float) $head->extra_item_fee : null,
+                'catalog_total' => round($estimated, 2),
             ];
 
             // When this event actually bills per-head, surface the real collected/pending
@@ -418,7 +422,7 @@ class FestEventReportAnalyticsService
         foreach ($participantRows as $row) {
             $participantMap[$row->head_id] = [
                 'participant_count' => (int) $row->participant_count,
-                'verified_count'    => (int) $row->verified_count,
+                'verified_count' => (int) $row->verified_count,
             ];
         }
 
@@ -459,7 +463,7 @@ class FestEventReportAnalyticsService
             $headFeesByHead = $allHeadFees->groupBy('head_id');
         }
 
-        return $heads->map(function (FestItemHead $head) use ($schoolId, $usesPerHeadBilling, $itemCountByHead, $statusMap, $participantMap, $maxItemRegByHead, $headFeesByHead) {
+        return $heads->map(function (FestItemHead $head) use ($usesPerHeadBilling, $itemCountByHead, $statusMap, $participantMap, $maxItemRegByHead, $headFeesByHead) {
             $approved = $statusMap[$head->id]['approved'] ?? 0;
             $pending = ($statusMap[$head->id]['submitted'] ?? 0) + ($statusMap[$head->id]['pending_approval'] ?? 0);
             $waitlisted = $statusMap[$head->id]['waitlisted'] ?? 0;
@@ -472,22 +476,22 @@ class FestEventReportAnalyticsService
             $quota = max(0, (int) ($head->included_items_per_student ?? 0));
 
             $row = [
-                'head_id'             => $head->id,
-                'head_name'           => $head->name,
-                'item_count'          => (int) ($itemCountByHead[$head->id] ?? 0),
+                'head_id' => $head->id,
+                'head_name' => $head->name,
+                'item_count' => (int) ($itemCountByHead[$head->id] ?? 0),
                 'registration_count' => $approved + $pending,
-                'approved_count'      => $approved,
-                'pending_count'       => $pending,
-                'waitlisted_count'    => $waitlisted,
-                'participant_count'   => $participantCount,
-                'verified_count'      => $verifiedParticipants,
-                'unverified_count'    => max(0, $participantCount - $verifiedParticipants),
-                'max_item_reg_count'  => (int) $maxItemReg,
-                'included_quota'      => $quota,
+                'approved_count' => $approved,
+                'pending_count' => $pending,
+                'waitlisted_count' => $waitlisted,
+                'participant_count' => $participantCount,
+                'verified_count' => $verifiedParticipants,
+                'unverified_count' => max(0, $participantCount - $verifiedParticipants),
+                'max_item_reg_count' => (int) $maxItemReg,
+                'included_quota' => $quota,
                 'verification_policy' => $head->verification_policy ?? 'all_students',
-                'approval_policy'     => $head->approval_policy ?? 'auto',
-                'default_item_fee'    => $head->default_item_fee !== null ? (float) $head->default_item_fee : null,
-                'extra_item_fee'      => $head->extra_item_fee !== null ? (float) $head->extra_item_fee : null,
+                'approval_policy' => $head->approval_policy ?? 'auto',
+                'default_item_fee' => $head->default_item_fee !== null ? (float) $head->default_item_fee : null,
+                'extra_item_fee' => $head->extra_item_fee !== null ? (float) $head->extra_item_fee : null,
             ];
 
             if ($usesPerHeadBilling) {
@@ -565,7 +569,7 @@ class FestEventReportAnalyticsService
         foreach ($participantRows as $row) {
             $participantMap[$row->event_id] = [
                 'participant_count' => (int) $row->participant_count,
-                'verified_count'    => (int) $row->verified_count,
+                'verified_count' => (int) $row->verified_count,
             ];
         }
 
@@ -600,25 +604,25 @@ class FestEventReportAnalyticsService
             $fees = $feesBySport->get($sport->id, collect());
 
             return [
-                'head_id'             => $sport->id,
-                'head_name'           => $sport->title,
-                'item_count'          => (int) ($itemCountBySport[$sport->id] ?? 0),
-                'registration_count'  => $approved + $pending,
-                'approved_count'      => $approved,
-                'pending_count'       => $pending,
-                'waitlisted_count'    => $waitlisted,
-                'participant_count'   => $participantCount,
-                'verified_count'      => $verifiedParticipants,
-                'unverified_count'    => max(0, $participantCount - $verifiedParticipants),
-                'max_item_reg_count'  => (int) $maxItemReg,
-                'included_quota'      => max(0, (int) ($sport->included_items_per_student ?? 0)),
+                'head_id' => $sport->id,
+                'head_name' => $sport->title,
+                'item_count' => (int) ($itemCountBySport[$sport->id] ?? 0),
+                'registration_count' => $approved + $pending,
+                'approved_count' => $approved,
+                'pending_count' => $pending,
+                'waitlisted_count' => $waitlisted,
+                'participant_count' => $participantCount,
+                'verified_count' => $verifiedParticipants,
+                'unverified_count' => max(0, $participantCount - $verifiedParticipants),
+                'max_item_reg_count' => (int) $maxItemReg,
+                'included_quota' => max(0, (int) ($sport->included_items_per_student ?? 0)),
                 'verification_policy' => $sport->verification_policy ?? 'all_students',
-                'approval_policy'     => $sport->approval_policy ?? 'auto',
-                'due_total'           => round((float) $fees->sum('total_due'), 2),
-                'collected_total'     => round((float) $fees->where('status', 'approved')->sum('total_due'), 2),
-                'pending_fee_total'   => round((float) $fees->whereNotIn('status', ['approved', 'waived'])->sum('total_due'), 2),
-                'default_item_fee'    => $sport->default_item_fee !== null ? (float) $sport->default_item_fee : null,
-                'extra_item_fee'      => $sport->extra_item_fee !== null ? (float) $sport->extra_item_fee : null,
+                'approval_policy' => $sport->approval_policy ?? 'auto',
+                'due_total' => round((float) $fees->sum('total_due'), 2),
+                'collected_total' => round((float) $fees->where('status', 'approved')->sum('total_due'), 2),
+                'pending_fee_total' => round((float) $fees->whereNotIn('status', ['approved', 'waived'])->sum('total_due'), 2),
+                'default_item_fee' => $sport->default_item_fee !== null ? (float) $sport->default_item_fee : null,
+                'extra_item_fee' => $sport->extra_item_fee !== null ? (float) $sport->extra_item_fee : null,
             ];
         })->all();
     }
@@ -653,7 +657,7 @@ class FestEventReportAnalyticsService
             ->orderBy('title')
             ->get();
 
-        $items = \App\Services\Events\FestHeadItemNavigationService::filterToOwnPhase($items, $this->event);
+        $items = FestHeadItemNavigationService::filterToOwnPhase($items, $this->event);
 
         if ($items->isEmpty()) {
             return [];
@@ -693,7 +697,7 @@ class FestEventReportAnalyticsService
             $prevAssigned = $participantMap[$canonicalId]['assigned'] ?? 0;
             $participantMap[$canonicalId] = [
                 'participants' => $prevPart + (int) $row->participant_count,
-                'assigned'     => $prevAssigned + (int) $row->assigned_count,
+                'assigned' => $prevAssigned + (int) $row->assigned_count,
             ];
         }
 
@@ -736,30 +740,30 @@ class FestEventReportAnalyticsService
             $lineFee = $feePerItem !== null ? round($feePerItem * $totalRegs, 2) : null;
 
             $rows[] = [
-                'item_id'            => $item->id,
-                'head_id'            => $item->head_id,
-                'head_name'          => $item->head?->name,
-                'title'              => $item->title,
-                'item_code'          => $item->item_code,
-                'class_group'        => $item->class_group,
-                'age_group'          => $item->age_group,
-                'category_label'     => FestItemCategoryLabel::resolve($item, $classGroupLabels, $artsCategoryLabels),
-                'stage_type'         => $item->stage_type,
-                'participant_type'   => $item->participant_type,
-                'approved'           => $approved,
-                'pending'            => $pending,
+                'item_id' => $item->id,
+                'head_id' => $item->head_id,
+                'head_name' => $item->head?->name,
+                'title' => $item->title,
+                'item_code' => $item->item_code,
+                'class_group' => $item->class_group,
+                'age_group' => $item->age_group,
+                'category_label' => FestItemCategoryLabel::resolve($item, $classGroupLabels, $artsCategoryLabels),
+                'stage_type' => $item->stage_type,
+                'participant_type' => $item->participant_type,
+                'approved' => $approved,
+                'pending' => $pending,
                 'registration_count' => $totalRegs,
-                'participant_count'  => $participants,
-                'item_reg_assigned'  => $itemRegAssigned,
-                'school_count'       => $schoolCount,
-                'max_per_school'     => $item->max_per_school,
-                'fee_per_item'       => $feePerItem,
-                'line_fee'           => $lineFee,
-                'reg_start'          => $item->reg_start,
-                'reg_end'            => $item->reg_end,
-                'competition_start'  => $item->competition_start,
-                'competition_end'    => $item->competition_end,
-                'competition_time'   => $item->competition_time,
+                'participant_count' => $participants,
+                'item_reg_assigned' => $itemRegAssigned,
+                'school_count' => $schoolCount,
+                'max_per_school' => $item->max_per_school,
+                'fee_per_item' => $feePerItem,
+                'line_fee' => $lineFee,
+                'reg_start' => $item->reg_start,
+                'reg_end' => $item->reg_end,
+                'competition_start' => $item->competition_start,
+                'competition_end' => $item->competition_end,
+                'competition_time' => $item->competition_time,
             ];
         }
 
@@ -770,13 +774,13 @@ class FestEventReportAnalyticsService
     public function itemRegistrationTotals(array $rows): array
     {
         return [
-            'items'           => count($rows),
-            'approved'        => array_sum(array_column($rows, 'approved')),
-            'pending'         => array_sum(array_column($rows, 'pending')),
-            'registrations'   => array_sum(array_column($rows, 'registration_count')),
-            'participants'    => array_sum(array_column($rows, 'participant_count')),
+            'items' => count($rows),
+            'approved' => array_sum(array_column($rows, 'approved')),
+            'pending' => array_sum(array_column($rows, 'pending')),
+            'registrations' => array_sum(array_column($rows, 'registration_count')),
+            'participants' => array_sum(array_column($rows, 'participant_count')),
             'unique_students' => $this->uniqueStudentCount(),
-            'estimated_fee'   => round(collect($rows)->sum(fn ($r) => (float) ($r['line_fee'] ?? 0)), 2),
+            'estimated_fee' => round(collect($rows)->sum(fn ($r) => (float) ($r['line_fee'] ?? 0)), 2),
         ];
     }
 
@@ -797,7 +801,7 @@ class FestEventReportAnalyticsService
             ->where('is_enabled', true)
             ->get();
 
-        $items = \App\Services\Events\FestHeadItemNavigationService::filterToOwnPhase($items, $this->event);
+        $items = FestHeadItemNavigationService::filterToOwnPhase($items, $this->event);
         if ($items->isEmpty()) {
             return 0;
         }
@@ -828,8 +832,8 @@ class FestEventReportAnalyticsService
             $maxRow = $headRows->sortByDesc('registration_count')->first();
 
             return array_merge($head, [
-                'estimated_fee'     => round($headRows->sum(fn ($r) => (float) ($r['line_fee'] ?? 0)), 2),
-                'max_item_title'    => $maxRow['title'] ?? null,
+                'estimated_fee' => round($headRows->sum(fn ($r) => (float) ($r['line_fee'] ?? 0)), 2),
+                'max_item_title' => $maxRow['title'] ?? null,
                 'busiest_item_regs' => (int) ($maxRow['registration_count'] ?? 0),
             ]);
         })->values()->all();
@@ -917,8 +921,8 @@ class FestEventReportAnalyticsService
         $performerMap = [];
         foreach ($performerRows as $row) {
             $performerMap[$row->item_id] = [
-                'performers'        => (int) $row->performers,
-                'chest_assigned'    => (int) $row->chest_assigned,
+                'performers' => (int) $row->performers,
+                'chest_assigned' => (int) $row->chest_assigned,
                 'item_reg_assigned' => (int) $row->item_reg_assigned,
             ];
         }
@@ -988,29 +992,29 @@ class FestEventReportAnalyticsService
             $judges = (int) ($judgesMap[$item->id] ?? 0);
 
             $rows[] = [
-                'item_id'                => $item->id,
-                'head_id'                => $item->head_id,
-                'head_name'              => $item->head?->name,
-                'title'                  => $item->title,
-                'age_group'              => $item->age_group,
-                'class_group'            => $item->class_group,
-                'category_label'         => FestItemCategoryLabel::resolve($item, $classGroupLabels, $artsCategoryLabels),
-                'approved'               => $approved,
-                'pending'                => $pending,
-                'registration_count'   => $approved + $pending,
-                'performers'             => $performers,
-                'chest_assigned'         => $chestAssigned,
-                'chest_missing'          => max(0, $performers - $chestAssigned),
-                'item_reg_assigned'      => $itemRegAssigned,
-                'item_reg_missing'       => max(0, $performers - $itemRegAssigned),
-                'item_scheduled'         => $itemScheduleIds->has($item->id),
+                'item_id' => $item->id,
+                'head_id' => $item->head_id,
+                'head_name' => $item->head?->name,
+                'title' => $item->title,
+                'age_group' => $item->age_group,
+                'class_group' => $item->class_group,
+                'category_label' => FestItemCategoryLabel::resolve($item, $classGroupLabels, $artsCategoryLabels),
+                'approved' => $approved,
+                'pending' => $pending,
+                'registration_count' => $approved + $pending,
+                'performers' => $performers,
+                'chest_assigned' => $chestAssigned,
+                'chest_missing' => max(0, $performers - $chestAssigned),
+                'item_reg_assigned' => $itemRegAssigned,
+                'item_reg_missing' => max(0, $performers - $itemRegAssigned),
+                'item_scheduled' => $itemScheduleIds->has($item->id),
                 'participants_scheduled' => $scheduledParticipants,
-                'marks_entered'          => $marksEntered,
-                'marks_pending'          => max(0, $performers - $marksEntered),
-                'ranks_assigned'         => $ranksAssigned,
-                'ranks_pending'          => max(0, $performers - $ranksAssigned),
-                'judges_assigned'        => $judges,
-                'ready_for_event'      => $performers > 0
+                'marks_entered' => $marksEntered,
+                'marks_pending' => max(0, $performers - $marksEntered),
+                'ranks_assigned' => $ranksAssigned,
+                'ranks_pending' => max(0, $performers - $ranksAssigned),
+                'judges_assigned' => $judges,
+                'ready_for_event' => $performers > 0
                     && $chestAssigned >= $performers
                     && $itemRegAssigned >= $performers
                     && $marksEntered >= $performers,
@@ -1024,13 +1028,13 @@ class FestEventReportAnalyticsService
     public function assignmentCompletenessTotals(array $rows): array
     {
         return [
-            'items'            => count($rows),
-            'performers'       => array_sum(array_column($rows, 'performers')),
-            'chest_missing'    => array_sum(array_column($rows, 'chest_missing')),
+            'items' => count($rows),
+            'performers' => array_sum(array_column($rows, 'performers')),
+            'chest_missing' => array_sum(array_column($rows, 'chest_missing')),
             'item_reg_missing' => array_sum(array_column($rows, 'item_reg_missing')),
-            'marks_pending'    => array_sum(array_column($rows, 'marks_pending')),
-            'pending_regs'     => array_sum(array_column($rows, 'pending')),
-            'items_scheduled'  => count(array_filter($rows, fn ($r) => $r['item_scheduled'])),
+            'marks_pending' => array_sum(array_column($rows, 'marks_pending')),
+            'pending_regs' => array_sum(array_column($rows, 'pending')),
+            'items_scheduled' => count(array_filter($rows, fn ($r) => $r['item_scheduled'])),
         ];
     }
 
@@ -1067,13 +1071,13 @@ class FestEventReportAnalyticsService
         );
     }
 
-    /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */
-    private function numberingRegisterRowsSorted(?string $schoolId): \Illuminate\Support\Collection
+    /** @return Collection<int, array<string, mixed>> */
+    private function numberingRegisterRowsSorted(?string $schoolId): Collection
     {
         // Computed once, outside the row loop below — this hits fest_class_category_scheme_groups,
         // and every row shares the same event's scheme, so resolving it per-row would be exactly
         // the kind of per-row DB lookup we've been eliminating elsewhere in this file.
-        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $this->event->rootEvent());
+        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event->rootEvent());
 
         return FestParticipant::query()
             ->whereHas('registration', fn ($q) => $q
@@ -1102,22 +1106,22 @@ class FestEventReportAnalyticsService
 
                 return [
                     'participant_id' => $p->id,
-                    'head_name'      => $item?->head?->name,
-                    'item_id'        => $p->registration?->item_id,
-                    'item'           => $item?->title,
-                    'category_label' => \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels),
-                    'type_label'     => \App\Support\FestItemCategoryLabel::typeLabel($item?->participant_type),
-                    'gender_label'   => \App\Support\FestItemCategoryLabel::genderLabel($item?->gender),
-                    'school'         => $p->registration?->school?->name,
-                    'school_id'      => $p->registration?->school_id,
-                    'name'           => $p->student?->name ?? $p->teacher?->name,
-                    'reg_no'         => $p->student?->admission_number ?? $p->teacher?->reg_no,
-                    'reg_status'     => $p->registration?->status,
-                    'role'           => $p->participant_role ?? 'performer',
-                    'fest_id'        => $p->level_registration_number,
-                    'item_reg'       => $p->item_registration_number,
-                    'chest_no'       => $p->chest_no,
-                    'disqualified'   => $p->disqualified_at !== null,
+                    'head_name' => $item?->head?->name,
+                    'item_id' => $p->registration?->item_id,
+                    'item' => $item?->title,
+                    'category_label' => FestItemCategoryLabel::resolve($item, $classGroupLabels),
+                    'type_label' => FestItemCategoryLabel::typeLabel($item?->participant_type),
+                    'gender_label' => FestItemCategoryLabel::genderLabel($item?->gender),
+                    'school' => $p->registration?->school?->name,
+                    'school_id' => $p->registration?->school_id,
+                    'name' => $p->student?->name ?? $p->teacher?->name,
+                    'reg_no' => $p->student?->admission_number ?? $p->teacher?->reg_no,
+                    'reg_status' => $p->registration?->status,
+                    'role' => $p->participant_role ?? 'performer',
+                    'fest_id' => $p->level_registration_number,
+                    'item_reg' => $p->item_registration_number,
+                    'chest_no' => $p->chest_no,
+                    'disqualified' => $p->disqualified_at !== null,
                 ];
             });
     }
@@ -1159,14 +1163,14 @@ class FestEventReportAnalyticsService
     {
         return [
             'registration_id' => $reg->id,
-            'school_id'       => $reg->school_id,
-            'school'          => $reg->school?->name,
-            'head_name'       => $reg->item?->head?->name,
-            'item_id'         => $reg->item_id,
-            'item'            => $reg->item?->title,
+            'school_id' => $reg->school_id,
+            'school' => $reg->school?->name,
+            'head_name' => $reg->item?->head?->name,
+            'item_id' => $reg->item_id,
+            'item' => $reg->item?->title,
             'participant_count' => $reg->participants->count(),
-            'participants'    => $reg->participants->map(fn ($p) => $p->student?->name ?? $p->teacher?->name)->filter()->values()->all(),
-            'submitted_at'    => $reg->updated_at?->toIso8601String(),
+            'participants' => $reg->participants->map(fn ($p) => $p->student?->name ?? $p->teacher?->name)->filter()->values()->all(),
+            'submitted_at' => $reg->updated_at?->toIso8601String(),
         ];
     }
 
@@ -1283,26 +1287,26 @@ class FestEventReportAnalyticsService
 
             foreach ($participants as $p) {
                 $rows[] = [
-                    'head_id'    => $head->id,
-                    'head_name'  => $head->name,
-                    'item_id'    => $p->registration?->item_id,
-                    'school'     => $p->registration?->school?->name,
+                    'head_id' => $head->id,
+                    'head_name' => $head->name,
+                    'item_id' => $p->registration?->item_id,
+                    'school' => $p->registration?->school?->name,
                     'student_id' => $p->student_id,
-                    'student'    => $p->student?->name ?? $p->teacher?->name,
-                    'reg_no'     => $p->student?->reg_no ?? $p->teacher?->reg_no,
-                    'class'      => $p->student?->schoolClass?->name,
-                    'photo_url'  => $photoForSchoolAdmin ? $p->student?->photoUrl() : $p->student?->sahodayaPhotoUrl($this->event->tenant_id),
-                    'item'       => $p->registration?->item?->title,
+                    'student' => $p->student?->name ?? $p->teacher?->name,
+                    'reg_no' => $p->student?->reg_no ?? $p->teacher?->reg_no,
+                    'class' => $p->student?->schoolClass?->name,
+                    'photo_url' => $photoForSchoolAdmin ? $p->student?->photoUrl() : $p->student?->sahodayaPhotoUrl($this->event->tenant_id),
+                    'item' => $p->registration?->item?->title,
                     'category_label' => FestItemCategoryLabel::resolve($p->registration?->item, $classGroupLabels, $artsCategoryLabels),
-                    'item_reg'   => $p->item_registration_number,
-                    'chest_no'   => $p->chest_no,
-                    'fest_id'    => $p->level_registration_number,
-                    'status'     => $p->registration?->status,
-                    'role'       => $p->participant_role,
-                    'team_name'  => $p->registration?->team_name,
+                    'item_reg' => $p->item_registration_number,
+                    'chest_no' => $p->chest_no,
+                    'fest_id' => $p->level_registration_number,
+                    'status' => $p->registration?->status,
+                    'role' => $p->participant_role,
+                    'team_name' => $p->registration?->team_name,
                     'competition_start' => $p->registration?->item?->competition_start,
-                    'competition_end'   => $p->registration?->item?->competition_end,
-                    'competition_time'  => $p->registration?->item?->competition_time,
+                    'competition_end' => $p->registration?->item?->competition_end,
+                    'competition_time' => $p->registration?->item?->competition_time,
                 ];
             }
         }
@@ -1355,26 +1359,26 @@ class FestEventReportAnalyticsService
 
             foreach ($participants as $p) {
                 $rows[] = [
-                    'head_id'    => $sport->id,
-                    'head_name'  => $sport->title,
-                    'item_id'    => $p->registration?->item_id,
-                    'school'     => $p->registration?->school?->name,
+                    'head_id' => $sport->id,
+                    'head_name' => $sport->title,
+                    'item_id' => $p->registration?->item_id,
+                    'school' => $p->registration?->school?->name,
                     'student_id' => $p->student_id,
-                    'student'    => $p->student?->name ?? $p->teacher?->name,
-                    'reg_no'     => $p->student?->reg_no ?? $p->teacher?->reg_no,
-                    'class'      => $p->student?->schoolClass?->name,
-                    'photo_url'  => $photoForSchoolAdmin ? $p->student?->photoUrl() : $p->student?->sahodayaPhotoUrl($this->event->tenant_id),
-                    'item'       => $p->registration?->item?->title,
+                    'student' => $p->student?->name ?? $p->teacher?->name,
+                    'reg_no' => $p->student?->reg_no ?? $p->teacher?->reg_no,
+                    'class' => $p->student?->schoolClass?->name,
+                    'photo_url' => $photoForSchoolAdmin ? $p->student?->photoUrl() : $p->student?->sahodayaPhotoUrl($this->event->tenant_id),
+                    'item' => $p->registration?->item?->title,
                     'category_label' => FestItemCategoryLabel::resolve($p->registration?->item, $classGroupLabels, $artsCategoryLabels),
-                    'item_reg'   => $p->item_registration_number,
-                    'chest_no'   => $p->chest_no,
-                    'fest_id'    => $p->level_registration_number,
-                    'status'     => $p->registration?->status,
-                    'role'       => $p->participant_role,
-                    'team_name'  => $p->registration?->team_name,
+                    'item_reg' => $p->item_registration_number,
+                    'chest_no' => $p->chest_no,
+                    'fest_id' => $p->level_registration_number,
+                    'status' => $p->registration?->status,
+                    'role' => $p->participant_role,
+                    'team_name' => $p->registration?->team_name,
                     'competition_start' => $p->registration?->item?->competition_start,
-                    'competition_end'   => $p->registration?->item?->competition_end,
-                    'competition_time'  => $p->registration?->item?->competition_time,
+                    'competition_end' => $p->registration?->item?->competition_end,
+                    'competition_time' => $p->registration?->item?->competition_time,
                 ];
             }
         }
@@ -1403,17 +1407,17 @@ class FestEventReportAnalyticsService
 
             foreach ($regs as $reg) {
                 $members = $reg->participants->map(fn ($p) => [
-                    'name'   => $p->student?->name ?? $p->teacher?->name,
+                    'name' => $p->student?->name ?? $p->teacher?->name,
                     'reg_no' => $p->student?->reg_no ?? $p->teacher?->reg_no,
-                    'role'   => $p->participant_role ?? 'performer',
+                    'role' => $p->participant_role ?? 'performer',
                 ])->values()->all();
 
                 $rows[] = [
-                    'item_id'      => $item->id,
-                    'item_title'   => $item->title,
-                    'school_name'  => $reg->school?->name,
+                    'item_id' => $item->id,
+                    'item_title' => $item->title,
+                    'school_name' => $reg->school?->name,
                     'member_count' => count($members),
-                    'members'      => $members,
+                    'members' => $members,
                 ];
             }
         }
@@ -1451,7 +1455,7 @@ class FestEventReportAnalyticsService
         $rows = [];
         foreach ($bySchool as $sid => $counts) {
             $rows[] = array_merge([
-                'school_id'   => $sid,
+                'school_id' => $sid,
                 'school_name' => $schoolNames[$sid] ?? $sid,
             ], $counts);
         }
@@ -1528,7 +1532,7 @@ class FestEventReportAnalyticsService
     /** @return list<array<string, mixed>> */
     public function areaWiseSummary(?string $schoolId = null): array
     {
-        if (! \Illuminate\Support\Facades\Schema::hasTable('fest_competition_areas')) {
+        if (! Schema::hasTable('fest_competition_areas')) {
             return [];
         }
 
@@ -1557,7 +1561,7 @@ class FestEventReportAnalyticsService
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, int>|array<int, int>  $itemIds
+     * @param  Collection<int, int>|array<int, int>  $itemIds
      * @return array<string, mixed>
      */
     private function summarizeAreaBucket(int $areaId, string $areaName, $itemIds, ?string $schoolId, ?float $defaultFee): array
@@ -1596,7 +1600,7 @@ class FestEventReportAnalyticsService
     /** @return list<array<string, mixed>> */
     public function areaWiseParticipantRows(?int $areaId = null, ?string $schoolId = null): array
     {
-        if (! \Illuminate\Support\Facades\Schema::hasTable('fest_competition_areas')) {
+        if (! Schema::hasTable('fest_competition_areas')) {
             return [];
         }
 
@@ -1705,18 +1709,18 @@ class FestEventReportAnalyticsService
 
     public function teamSquadPdf(?string $schoolId = null)
     {
-        return \App\Support\PdfGenerator::fromView('fest.reports.team-squads', [
+        return PdfGenerator::fromView('fest.reports.team-squads', [
             'event' => $this->event,
-            'rows'  => $this->teamSquadRows($schoolId),
+            'rows' => $this->teamSquadRows($schoolId),
             ...$this->brandingData(),
         ], str($this->event->title)->slug()->limit(40).'-team-squads.pdf');
     }
 
     public function medalTallyPdf()
     {
-        return \App\Support\PdfGenerator::fromView('fest.reports.medal-tally', [
+        return PdfGenerator::fromView('fest.reports.medal-tally', [
             'event' => $this->event,
-            'rows'  => $this->medalTallyBySchool(),
+            'rows' => $this->medalTallyBySchool(),
             ...$this->brandingData(),
         ], str($this->event->title)->slug()->limit(40).'-medal-tally.pdf');
     }
@@ -1729,9 +1733,9 @@ class FestEventReportAnalyticsService
             ->orderBy('name')
             ->get()
             ->map(fn (FestVolunteer $v) => [
-                'name'  => $v->name,
+                'name' => $v->name,
                 'phone' => $v->phone,
-                'duty'  => $v->duty,
+                'duty' => $v->duty,
                 'notes' => $v->notes,
             ])
             ->all();
@@ -1751,16 +1755,16 @@ class FestEventReportAnalyticsService
         foreach ($schoolIds as $sid) {
             $schoolOrders = $orders->where('school_id', $sid);
             $rows[] = [
-                'school_id'   => $sid,
+                'school_id' => $sid,
                 'school_name' => $schoolNames[$sid] ?? $sid,
                 'order_count' => $schoolOrders->count(),
                 'total_heads' => $schoolOrders->sum('head_count'),
-                'confirmed'   => $schoolOrders->where('status', 'confirmed')->count(),
-                'pending'     => $schoolOrders->whereIn('status', ['pending', 'submitted'])->count(),
-                'breakfast'   => $schoolOrders->where('meal_type', 'breakfast')->sum('head_count'),
-                'lunch'       => $schoolOrders->where('meal_type', 'lunch')->sum('head_count'),
-                'dinner'      => $schoolOrders->where('meal_type', 'dinner')->sum('head_count'),
-                'snacks'      => $schoolOrders->where('meal_type', 'snacks')->sum('head_count'),
+                'confirmed' => $schoolOrders->where('status', 'confirmed')->count(),
+                'pending' => $schoolOrders->whereIn('status', ['pending', 'submitted'])->count(),
+                'breakfast' => $schoolOrders->where('meal_type', 'breakfast')->sum('head_count'),
+                'lunch' => $schoolOrders->where('meal_type', 'lunch')->sum('head_count'),
+                'dinner' => $schoolOrders->where('meal_type', 'dinner')->sum('head_count'),
+                'snacks' => $schoolOrders->where('meal_type', 'snacks')->sum('head_count'),
             ];
         }
 
@@ -1773,25 +1777,41 @@ class FestEventReportAnalyticsService
     public function auditLogRows(): array
     {
         $morph = (new FestEvent)->getMorphClass();
+        $registrationMorph = (new FestRegistration)->getMorphClass();
         $eventId = (string) $this->event->id;
+        $reportableEventIds = $this->event->reportableEventIds();
+        $reportableEventIdStrings = array_map('strval', $reportableEventIds);
+
+        $allRegistrationIds = FestRegistration::whereIn('event_id', $reportableEventIds)->pluck('id')->all();
+
+        $auditTenantIds = Tenant::where('parent_id', $this->event->tenant_id)->pluck('id')->push($this->event->tenant_id)->all();
 
         return AuditLog::query()
+            ->whereIn('tenant_id', $auditTenantIds)
             ->with('user:id,name,email')
-            ->where(function ($q) use ($morph, $eventId) {
-                $q->where(function ($q2) use ($morph, $eventId) {
-                    $q2->where('subject_type', $morph)->where('subject_id', $eventId);
-                })->orWhere('properties->event_id', $this->event->id);
+            ->where(function ($q) use ($morph, $eventId, $reportableEventIds, $reportableEventIdStrings, $registrationMorph, $allRegistrationIds) {
+                $q->where(function ($q2) use ($morph, $eventId, $reportableEventIdStrings) {
+                    $q2->where('subject_type', $morph)->whereIn('subject_id', array_merge([$eventId], $reportableEventIdStrings));
+                })->orWhereIn('properties->event_id', array_merge($reportableEventIds, $reportableEventIdStrings));
+
+                if (! empty($allRegistrationIds)) {
+                    $allRegistrationIdStrings = array_map('strval', $allRegistrationIds);
+                    $q->orWhere(function ($q2) use ($registrationMorph, $allRegistrationIds, $allRegistrationIdStrings) {
+                        $q2->where('subject_type', $registrationMorph)
+                            ->whereIn('subject_id', array_merge($allRegistrationIds, $allRegistrationIdStrings));
+                    })->orWhereIn('properties->registration_id', array_merge($allRegistrationIds, $allRegistrationIdStrings));
+                }
             })
             ->orderByDesc('created_at')
             ->limit(5000)
             ->get()
             ->map(fn (AuditLog $log) => [
-                'created_at'  => $log->created_at?->toDateTimeString(),
-                'user'        => $log->user?->name ?? $log->user?->email ?? 'System',
-                'action'      => $log->action,
+                'created_at' => $log->created_at?->toDateTimeString(),
+                'user' => $log->user?->name ?? $log->user?->email ?? 'System',
+                'action' => $log->action,
                 'description' => $log->description,
-                'page'        => $log->properties['page'] ?? '',
-                'category'    => $log->category ?? '',
+                'page' => $log->properties['page'] ?? '',
+                'category' => $log->category ?? '',
             ])
             ->all();
     }
@@ -1853,7 +1873,7 @@ class FestEventReportAnalyticsService
         }, str($this->event->title)->slug()->limit(40).'-audit-log.csv', ['Content-Type' => 'text/csv']);
     }
 
-    public function idCardsByHeadPdf(?int $headId = null, ?string $schoolId = null, ?string $template = null): \Illuminate\Http\Response
+    public function idCardsByHeadPdf(?int $headId = null, ?string $schoolId = null, ?string $template = null): Response
     {
         $service = app(FestIdCardService::class);
         $filters = array_filter([
@@ -1864,7 +1884,7 @@ class FestEventReportAnalyticsService
             ->when($headId, fn ($c) => $c->where('head_id', $headId))
             ->map(fn ($section) => [
                 'item_title' => $section['head_title'],
-                'cards'      => $section['cards'],
+                'cards' => $section['cards'],
             ])
             ->values()
             ->all();
@@ -1877,13 +1897,13 @@ class FestEventReportAnalyticsService
         $headSuffix = $headId ? "-head-{$headId}" : '-all-heads';
 
         return Pdf::loadView($view, [
-            'cards'          => [],
-            'sections'       => $sections,
-            'clusterName'    => $cluster?->name ?? 'Sahodaya',
+            'cards' => [],
+            'sections' => $sections,
+            'clusterName' => $cluster?->name ?? 'Sahodaya',
             'clusterLogoSrc' => $cluster ? TenantBranding::logoEmbedSrc($cluster) : null,
-            'eventTitle'     => $this->event->title,
-            'audience'       => 'student',
-            'showTitle'      => true,
+            'eventTitle' => $this->event->title,
+            'audience' => 'student',
+            'showTitle' => true,
         ])->download("{$slug}{$headSuffix}-id-cards.pdf");
     }
 
@@ -1950,23 +1970,23 @@ class FestEventReportAnalyticsService
                     && app(FestItemResultsService::class)->isItemVisible($item, $itemEvent);
 
                 return [
-                    'item_id'           => $p->registration?->item_id,
-                    'item_title'        => $item?->title,
-                    'head_name'         => $item?->head?->name,
-                    'category_label'    => FestItemCategoryLabel::shortLabel($item, $classGroupLabels, $artsCategoryLabels),
-                    'stage_type'        => $item?->stage_type,
-                    'participant_type'  => $item?->participant_type,
-                    'status'            => $p->registration?->status,
-                    'fest_id'           => $p->level_registration_number,
-                    'item_reg'          => $p->item_registration_number,
-                    'chest_no'          => $p->chest_no,
+                    'item_id' => $p->registration?->item_id,
+                    'item_title' => $item?->title,
+                    'head_name' => $item?->head?->name,
+                    'category_label' => FestItemCategoryLabel::shortLabel($item, $classGroupLabels, $artsCategoryLabels),
+                    'stage_type' => $item?->stage_type,
+                    'participant_type' => $item?->participant_type,
+                    'status' => $p->registration?->status,
+                    'fest_id' => $p->level_registration_number,
+                    'item_reg' => $p->item_registration_number,
+                    'chest_no' => $p->chest_no,
                     'results_published' => $resultsPublished,
-                    'grade'             => $resultsPublished ? $mark?->grade : null,
-                    'position'          => $resultsPublished ? $mark?->position : null,
-                    'score'             => $resultsPublished ? $mark?->score : null,
-                    'mark_value'        => $resultsPublished ? $mark?->measurement_value : null,
-                    'mark_unit'         => $resultsPublished ? $mark?->measurement_unit : null,
-                    'sport_event_id'    => $p->registration?->event_id,
+                    'grade' => $resultsPublished ? $mark?->grade : null,
+                    'position' => $resultsPublished ? $mark?->position : null,
+                    'score' => $resultsPublished ? $mark?->score : null,
+                    'mark_value' => $resultsPublished ? $mark?->measurement_value : null,
+                    'mark_unit' => $resultsPublished ? $mark?->measurement_unit : null,
+                    'sport_event_id' => $p->registration?->event_id,
                     'sport_event_title' => $item?->event?->title,
                 ];
             })->values()->all();
@@ -1985,19 +2005,19 @@ class FestEventReportAnalyticsService
             }
 
             $rows[] = [
-                'student_id'     => (int) $studentId,
-                'school_id'      => $first->registration?->school_id,
-                'school_name'    => $first->registration?->school?->name,
-                'school_code'    => $first->registration?->school?->school_prefix,
-                'name'           => $name,
-                'reg_no'         => $regNo,
-                'gender'         => $student->gender,
-                'class_name'     => $student->schoolClass?->name,
-                'photo_url'      => $photoForSchoolAdmin ? $student->photoUrl() : $student->sahodayaPhotoUrl($this->event->tenant_id),
+                'student_id' => (int) $studentId,
+                'school_id' => $first->registration?->school_id,
+                'school_name' => $first->registration?->school?->name,
+                'school_code' => $first->registration?->school?->school_prefix,
+                'name' => $name,
+                'reg_no' => $regNo,
+                'gender' => $student->gender,
+                'class_name' => $student->schoolClass?->name,
+                'photo_url' => $photoForSchoolAdmin ? $student->photoUrl() : $student->sahodayaPhotoUrl($this->event->tenant_id),
                 'photo_data_uri' => $includePhotoDataUri ? $student->photoDataUri() : null,
-                'item_count'     => count($items),
-                'total_score'    => collect($items)->sum(fn ($i) => (float) ($i['score'] ?? 0)),
-                'items'          => $items,
+                'item_count' => count($items),
+                'total_score' => collect($items)->sum(fn ($i) => (float) ($i['score'] ?? 0)),
+                'items' => $items,
             ];
         }
 
@@ -2036,7 +2056,7 @@ class FestEventReportAnalyticsService
         // straight off whatever event it's given with no parent walk, so passing a phase
         // leaf here (this->event, e.g. a "PHASE 2" operational child) misses the Sahodaya's
         // actual configured scheme entirely and falls back to the platform default.
-        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $this->event->rootEvent());
+        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event->rootEvent());
         $usesPhasedRegionalBilling = $this->event->rootEvent()->usesPhasedRegionalBilling();
         $gradePointService = app(FestGradePointService::class);
 
@@ -2133,34 +2153,34 @@ class FestEventReportAnalyticsService
                 }
 
                 return [
-                    'id'              => $p->id,
-                    'item_id'         => $item->id,
-                    'item_title'      => $item->title,
-                    'item_code'       => $item->item_code,
-                    'category'        => \App\Support\FestClassGroupScheme::resolveItemKey($classGroupLabels, $item->class_group),
-                    'category_label'  => \App\Support\FestClassGroupScheme::resolveItemLabel($classGroupLabels, $item->class_group),
-                    'stage_type'      => $item->stage_type,
+                    'id' => $p->id,
+                    'item_id' => $item->id,
+                    'item_title' => $item->title,
+                    'item_code' => $item->item_code,
+                    'category' => FestClassGroupScheme::resolveItemKey($classGroupLabels, $item->class_group),
+                    'category_label' => FestClassGroupScheme::resolveItemLabel($classGroupLabels, $item->class_group),
+                    'stage_type' => $item->stage_type,
                     'participant_type' => $item->participant_type,
                     'results_published' => $itemPublished,
-                    'gender_label'    => \App\Support\FestItemCategoryLabel::genderLabel($item->gender),
-                    'type_label'      => \App\Support\FestItemCategoryLabel::typeLabel($item->participant_type),
-                    'phase_name'      => $usesPhasedRegionalBilling ? ($event?->sourcePhase?->name) : null,
-                    'region_name'     => $event?->region?->name,
-                    'region_code'     => $event?->region?->code,
-                    'school_id'       => $registration->school_id,
-                    'school_name'     => $registration->school?->name,
-                    'participant'     => $p->student?->name ?? $p->teacher?->name,
-                    'reg_no'          => $p->student?->reg_no ?? $p->teacher?->reg_no,
-                    'fest_id'         => $p->level_registration_number,
-                    'item_reg'        => $p->item_registration_number,
-                    'chest_no'        => $p->chest_no,
-                    'status'          => $registration->status,
-                    'grade'           => $showMark ? $originalGrade : null,
-                    'position'        => $position,
+                    'gender_label' => FestItemCategoryLabel::genderLabel($item->gender),
+                    'type_label' => FestItemCategoryLabel::typeLabel($item->participant_type),
+                    'phase_name' => $usesPhasedRegionalBilling ? ($event?->sourcePhase?->name) : null,
+                    'region_name' => $event?->region?->name,
+                    'region_code' => $event?->region?->code,
+                    'school_id' => $registration->school_id,
+                    'school_name' => $registration->school?->name,
+                    'participant' => $p->student?->name ?? $p->teacher?->name,
+                    'reg_no' => $p->student?->reg_no ?? $p->teacher?->reg_no,
+                    'fest_id' => $p->level_registration_number,
+                    'item_reg' => $p->item_registration_number,
+                    'chest_no' => $p->chest_no,
+                    'status' => $registration->status,
+                    'grade' => $showMark ? $originalGrade : null,
+                    'position' => $position,
                     // Raw marks/score are judge-facing working data — a school only ever
                     // sees the grade and the points it earns, never the underlying score.
-                    'score'           => $schoolId === null ? $mark?->score : null,
-                    'points'          => $points,
+                    'score' => $schoolId === null ? $mark?->score : null,
+                    'points' => $points,
                 ];
             });
 
@@ -2205,7 +2225,7 @@ class FestEventReportAnalyticsService
         return FestEventItem::whereIn('event_id', $this->eventIds())
             ->distinct()
             ->pluck('class_group')
-            ->filter(fn ($raw) => \App\Support\FestClassGroupScheme::resolveItemKey($classGroupLabels, $raw === '' ? null : $raw) === $category)
+            ->filter(fn ($raw) => FestClassGroupScheme::resolveItemKey($classGroupLabels, $raw === '' ? null : $raw) === $category)
             ->values()
             ->all();
     }
@@ -2265,20 +2285,20 @@ class FestEventReportAnalyticsService
                 $event = $registration->event;
 
                 return [
-                    'item_id'        => $item->id,
-                    'item_title'     => $item->title,
-                    'item_code'      => $item->item_code,
+                    'item_id' => $item->id,
+                    'item_title' => $item->title,
+                    'item_code' => $item->item_code,
                     'category_label' => $taxonomy[$item->category] ?? ucfirst((string) $item->category),
-                    'phase_name'     => $usesPhasedRegionalBilling ? ($event?->sourcePhase?->name) : null,
-                    'region_name'    => $event?->region?->name,
-                    'region_code'    => $event?->region?->code,
-                    'school_id'      => $registration->school_id,
-                    'school_name'    => $registration->school?->name,
-                    'participant'    => $p->student?->name ?? $p->teacher?->name,
-                    'reg_no'         => $p->student?->reg_no ?? $p->teacher?->reg_no,
-                    'chest_no'       => $p->group?->chest_no ?? $p->chest_no,
-                    'marked_by'      => $markedByNames->get($attendance->marked_by),
-                    'marked_at'      => $attendance->marked_at?->format('Y-m-d H:i'),
+                    'phase_name' => $usesPhasedRegionalBilling ? ($event?->sourcePhase?->name) : null,
+                    'region_name' => $event?->region?->name,
+                    'region_code' => $event?->region?->code,
+                    'school_id' => $registration->school_id,
+                    'school_name' => $registration->school?->name,
+                    'participant' => $p->student?->name ?? $p->teacher?->name,
+                    'reg_no' => $p->student?->reg_no ?? $p->teacher?->reg_no,
+                    'chest_no' => $p->group?->chest_no ?? $p->chest_no,
+                    'marked_by' => $markedByNames->get($attendance->marked_by),
+                    'marked_at' => $attendance->marked_at?->format('Y-m-d H:i'),
                 ];
             })
             ->sortBy(['item_title', 'participant'])
@@ -2328,11 +2348,11 @@ class FestEventReportAnalyticsService
         return $items
             ->groupBy(fn (FestEventItem $item) => FestCategoryMerge::resolve($root, $item->{$column} ?: 'open'))
             ->map(fn ($group) => $group->map(fn (FestEventItem $item) => [
-                'id'               => $item->id,
-                'title'            => $item->title,
-                'item_code'        => $item->item_code,
+                'id' => $item->id,
+                'title' => $item->title,
+                'item_code' => $item->item_code,
                 'participant_type' => $item->participant_type,
-                'gender'           => $item->gender,
+                'gender' => $item->gender,
             ])->values()->all())
             ->all();
     }
@@ -2411,11 +2431,11 @@ class FestEventReportAnalyticsService
                 }
 
                 return [
-                    'school_id'         => $schoolId,
-                    'school_name'       => $name,
-                    'points_by_item'    => $points,
+                    'school_id' => $schoolId,
+                    'school_name' => $name,
+                    'points_by_item' => $points,
                     'breakdown_by_item' => $cellBreakdown[$schoolId] ?? [],
-                    'subtotal'          => $subtotal,
+                    'subtotal' => $subtotal,
                 ];
             })
             ->sortByDesc('subtotal')
@@ -2435,11 +2455,11 @@ class FestEventReportAnalyticsService
 
         return [
             'items' => $items->map(fn (FestEventItem $item) => [
-                'id'               => $item->id,
-                'title'            => $item->title,
-                'item_code'        => $item->item_code,
+                'id' => $item->id,
+                'title' => $item->title,
+                'item_code' => $item->item_code,
                 'participant_type' => $item->participant_type,
-                'gender'           => $item->gender,
+                'gender' => $item->gender,
             ])->all(),
             'schools' => $schools,
         ];
@@ -2484,11 +2504,11 @@ class FestEventReportAnalyticsService
                 ->map(fn ($headGroup) => [
                     'head_label' => $headGroup->first()->head?->name ?? 'General',
                     'items' => $headGroup->map(fn (FestEventItem $item) => [
-                        'id'               => $item->id,
-                        'title'            => $item->title,
-                        'item_code'        => $item->item_code,
+                        'id' => $item->id,
+                        'title' => $item->title,
+                        'item_code' => $item->item_code,
                         'participant_type' => $item->participant_type,
-                        'gender'           => $item->gender,
+                        'gender' => $item->gender,
                     ])->values()->all(),
                 ])
                 ->sortBy('head_label')
@@ -2581,9 +2601,9 @@ class FestEventReportAnalyticsService
 
         $categories = collect($itemsByCategory)
             ->map(fn (array $heads, string $key) => [
-                'key'                 => $key,
-                'label'               => $key === 'open' ? 'Open' : $scoreboards->categoryLabel($this->event, $key),
-                'heads'               => $heads,
+                'key' => $key,
+                'label' => $key === 'open' ? 'Open' : $scoreboards->categoryLabel($this->event, $key),
+                'heads' => $heads,
                 // Informational only — the category's own Sub column still totals every
                 // item in it; this just tells the UI why OVERALL doesn't equal the sum of
                 // every Sub column when an admin has excluded one from the combined total.
@@ -2609,12 +2629,12 @@ class FestEventReportAnalyticsService
                 }
 
                 return [
-                    'school_id'         => $schoolId,
-                    'school_name'       => $name,
-                    'points_by_item'    => $points,
+                    'school_id' => $schoolId,
+                    'school_name' => $name,
+                    'points_by_item' => $points,
                     'breakdown_by_item' => $breakdown,
-                    'category_totals'   => $categoryTotals,
-                    'overall'           => $overallPoints[$schoolId] ?? 0,
+                    'category_totals' => $categoryTotals,
+                    'overall' => $overallPoints[$schoolId] ?? 0,
                 ];
             })
             ->sortByDesc('overall')
@@ -2638,7 +2658,7 @@ class FestEventReportAnalyticsService
 
         return [
             'categories' => $categories->all(),
-            'schools'    => $schools,
+            'schools' => $schools,
         ];
     }
 
@@ -2723,7 +2743,7 @@ class FestEventReportAnalyticsService
             }
 
             $pages[] = [
-                'categories'   => array_map(fn ($ci) => $pageCategories[$ci], $orderOnThisPage),
+                'categories' => array_map(fn ($ci) => $pageCategories[$ci], $orderOnThisPage),
                 'is_last_page' => $pageIndex === $totalChunks - 1,
             ];
         }
@@ -2754,13 +2774,13 @@ class FestEventReportAnalyticsService
                 $person = $participant?->student ?? $participant?->teacher;
 
                 return [
-                    'participant'  => $person?->name,
-                    'school'       => $participant?->registration?->school?->name,
-                    'position'     => $mark->position,
-                    'grade'        => $mark->grade,
-                    'rank_points'  => $breakdown['rank_points'],
+                    'participant' => $person?->name,
+                    'school' => $participant?->registration?->school?->name,
+                    'position' => $mark->position,
+                    'grade' => $mark->grade,
+                    'rank_points' => $breakdown['rank_points'],
                     'grade_points' => $breakdown['grade_points'],
-                    'total'        => $breakdown['total'],
+                    'total' => $breakdown['total'],
                 ];
             })
             ->values()

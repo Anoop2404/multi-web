@@ -5,6 +5,8 @@ namespace App\Http\Controllers\SahodayaAdmin;
 use App\Models\FestEvent;
 use App\Models\FestParticipant;
 use App\Models\FestSubstitutionRequest;
+use App\Models\Student;
+use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\FestRegistrationService;
 use Illuminate\Http\Request;
 
@@ -31,7 +33,7 @@ class FestSubstitutionReviewController extends SahodayaAdminController
             ->paginate(30);
 
         return $this->inertia('Sahodaya/Events/SubstitutionReview', [
-            'event'    => $event->only('id', 'title'),
+            'event' => $event->only('id', 'title'),
             'requests' => $requests,
         ]);
     }
@@ -56,17 +58,20 @@ class FestSubstitutionReviewController extends SahodayaAdminController
             app(FestRegistrationService::class)->substitutePerformer($original, $standby);
         } elseif ($substitutionRequest->replacement_student_id) {
             // Verify the replacement student belongs to the same school as the original registration.
-            $student = \App\Models\Student::findOrFail($substitutionRequest->replacement_student_id);
+            $student = Student::findOrFail($substitutionRequest->replacement_student_id);
             abort_if($student->tenant_id !== $schoolId, 422, 'The replacement student belongs to a different school.');
             $original->update(['student_id' => $substitutionRequest->replacement_student_id]);
+            $registration?->touch();
         }
 
         $substitutionRequest->update([
-            'status'               => 'approved',
-            'resolution_note'        => $data['resolution_note'] ?? null,
-            'reviewed_by_user_id'    => $request->user()?->id,
-            'reviewed_at'            => now(),
+            'status' => 'approved',
+            'resolution_note' => $data['resolution_note'] ?? null,
+            'reviewed_by_user_id' => $request->user()?->id,
+            'reviewed_at' => now(),
         ]);
+
+        app(PlatformAuditLogger::class)->festSubstitutionApproved($substitutionRequest, $data['resolution_note'] ?? null);
 
         return back()->with('success', 'Substitution request approved.');
     }
@@ -80,11 +85,13 @@ class FestSubstitutionReviewController extends SahodayaAdminController
         $data = $request->validate(['resolution_note' => 'nullable|string|max:2000']);
 
         $substitutionRequest->update([
-            'status'               => 'rejected',
-            'resolution_note'        => $data['resolution_note'] ?? null,
-            'reviewed_by_user_id'    => $request->user()?->id,
-            'reviewed_at'            => now(),
+            'status' => 'rejected',
+            'resolution_note' => $data['resolution_note'] ?? null,
+            'reviewed_by_user_id' => $request->user()?->id,
+            'reviewed_at' => now(),
         ]);
+
+        app(PlatformAuditLogger::class)->festSubstitutionRejected($substitutionRequest, $data['resolution_note'] ?? null);
 
         return back()->with('success', 'Substitution request rejected.');
     }

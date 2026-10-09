@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FestGroup extends Model
 {
+    protected $touches = ['registration'];
+
     protected $fillable = [
         'registration_id', 'event_id', 'team_name', 'status',
         'coach_name', 'coach_phone', 'manager_name', 'manager_phone',
