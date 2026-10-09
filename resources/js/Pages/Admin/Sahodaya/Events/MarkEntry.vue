@@ -14,9 +14,15 @@
                     <a v-if="event.event_type === 'sports' && props.selectedItemId"
                        :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/chest-numbers/sports-competition-sheet?item_id=${props.selectedItemId}`"
                        class="btn-secondary text-xs shrink-0 whitespace-nowrap">Heats / final sheet (PDF)</a>
+                    <a v-if="event.event_type === 'sports' && props.selectedItemId"
+                       :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/chest-numbers/sports-competition-sheet?item_id=${props.selectedItemId}&inline=1`"
+                       target="_blank" rel="noopener" class="btn-secondary text-xs shrink-0 whitespace-nowrap">Preview heats / final sheet</a>
                     <a v-if="event.event_type === 'sports'"
                        :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/chest-numbers/sports-competition-sheet`"
                        class="btn-secondary text-xs shrink-0 whitespace-nowrap">All sports competition sheets (PDF)</a>
+                    <a v-if="event.event_type === 'sports'"
+                       :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/chest-numbers/sports-competition-sheet?inline=1`"
+                       target="_blank" rel="noopener" class="btn-secondary text-xs shrink-0 whitespace-nowrap">Preview all sports sheets</a>
                     <Link :href="markSettingsUrl" class="btn-secondary text-xs shrink-0 whitespace-nowrap">
                         🎚️ Mark Settings
                     </Link>

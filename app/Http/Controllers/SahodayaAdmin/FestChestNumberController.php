@@ -393,9 +393,11 @@ class FestChestNumberController extends SahodayaAdminController
                 $sheets[] = ['title' => $item->title, 'rows' => $chunk->values()->all(), 'offset' => $index * 16];
             }
         }
-        $html = view('fest.sports-competition-sheet', ['sheets' => $sheets])->render();
+        $html = view('fest.sports-competition-sheet', ['sheets' => $sheets, 'event' => $event])->render();
 
-        return PdfGenerator::download($html, str($event->title)->slug().'-sports-competition-sheets.pdf',
+        $itemSuffix = $items->count() === 1 ? '-'.str($items->first()->title)->slug() : '-all-items';
+
+        return PdfGenerator::download($html, str($event->title)->slug().$itemSuffix.'-sports-competition-sheets.pdf',
             $request->boolean('inline'), true, null, null,
             ['top' => '15mm', 'right' => '15mm', 'bottom' => '15mm', 'left' => '15mm']);
     }

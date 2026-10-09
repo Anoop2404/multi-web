@@ -11,9 +11,12 @@ th, td { border: 1px solid #222; text-align: center; padding: 2px 4px; }
 .columns th { font-family: "Times New Roman", serif; font-size: 12px; height: 20px; }
 td { font-size: 13px; height: 23px; }
 .name { overflow-wrap: anywhere; font-size: 12px; }
+.fest-meta { font-size: 11px; margin-bottom: 8px; }
 </style></head><body>
 @foreach($sheets as $sheet)
-<div class="sheet"><table>
+<div class="sheet">
+<div class="fest-meta">{{ $event->title }} | Fest ID: {{ $event->id }}</div>
+<table>
 <colgroup><col style="width:7%"><col style="width:9%"><col style="width:28%">
 @for($i=0;$i<6;$i++)<col style="width:9.333%">@endfor</colgroup>
 <thead><tr><th class="title" colspan="9">{{ mb_strtoupper($sheet['title']) }}</th></tr>
