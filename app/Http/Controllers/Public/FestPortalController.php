@@ -1172,8 +1172,12 @@ public function scoreboardData(Request $request, int $eventId)
 public function tv(Request $request, int $eventId)
 {
     $tenant = $this->resolveTenant();
-    $event = $this->findEvent($tenant->id, $eventId);
+    $event = $this->findEvent($tenant->id, $eventId, allowTvOverride: true);
     $selectedScope = $this->operationalEvents->directScope($event);
+
+    if ($event->tv_public_override) {
+        $selectedScope['results_published'] = true;
+    }
 
     $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
     $isPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
@@ -2146,14 +2150,14 @@ public function tv(Request $request, int $eventId)
             ->exists();
     }
 
-    private function findEvent(string $tenantId, int $eventId): FestEvent
+    private function findEvent(string $tenantId, int $eventId, bool $allowTvOverride = false): FestEvent
     {
         $event = FestEvent::where('tenant_id', $tenantId)
             ->where('id', $eventId)
             ->whereIn('status', PublicOperationalEventService::PUBLIC_STATUSES)
             ->firstOrFail();
 
-        abort_unless($this->operationalEvents->isPubliclyAccessible($event), 404);
+        abort_unless(($allowTvOverride && $event->tv_public_override) || $this->operationalEvents->isPubliclyAccessible($event), 404);
 
         return $event;
     }
