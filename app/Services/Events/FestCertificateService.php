@@ -302,7 +302,7 @@ class FestCertificateService
      * attendance page, both writing the same table) — someone with no attendance record
      * at all is treated as present, not excluded.
      */
-    private function eligibleParticipantsForEvent(FestEvent $event): \Illuminate\Support\Collection
+    private function eligibleParticipantsForEvent(FestEvent $event, ?array $people = null): \Illuminate\Support\Collection
     {
         $absentParticipantIds = FestAttendance::query()
             ->whereIn('event_id', $event->reportableEventIds())
@@ -312,11 +312,35 @@ class FestCertificateService
         return FestParticipant::whereHas('registration', fn ($q) => $q
             ->whereIn('event_id', $event->reportableEventIds())
             ->where('status', 'approved'))
+            ->when($people !== null, function ($query) use ($people) {
+                $query->where(function ($query) use ($people) {
+                    $query->whereIn('student_id', $people['students'])
+                        ->orWhere(function ($query) use ($people) {
+                            $query->whereNull('student_id')->whereIn('teacher_id', $people['teachers']);
+                        });
+                });
+            })
             ->whereNull('disqualified_at')
             ->where('participant_role', '!=', 'standby')
             ->whereNotIn('id', $absentParticipantIds)
             ->with(['registration.item', 'group'])
             ->get();
+    }
+
+    /** Load only the chunk's people, retaining every eligible item for each person. */
+    public function participationRenderCache(\Illuminate\Support\Collection $payloads): array
+    {
+        $cache = [];
+        foreach ($payloads->filter(fn ($payload) => ($payload['event'] ?? null) && ($payload['participant'] ?? null))
+            ->groupBy(fn ($payload) => $payload['event']->id) as $eventId => $group) {
+            $people = $group->pluck('participant');
+            $cache[$eventId] = $this->eligibleParticipantsForEvent($group->first()['event'], [
+                'students' => $people->pluck('student_id')->filter()->unique()->values()->all(),
+                'teachers' => $people->filter(fn ($person) => ! $person->student_id)->pluck('teacher_id')->filter()->unique()->values()->all(),
+            ]);
+        }
+
+        return $cache;
     }
 
     /**

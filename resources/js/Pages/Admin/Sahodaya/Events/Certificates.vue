@@ -1147,19 +1147,41 @@ function allNonDownloadedCertificateIds() {
 const filteredParticipationBySchool = computed(() => props.participationBySchool.filter(matchesSchoolSearch));
 const filteredWinnersBySchool = computed(() => props.winnersBySchool.filter(matchesSchoolSearch));
 
+let pollGeneration = 0;
+function stopPolling() {
+    pollGeneration++;
+    if (pollTimer) clearTimeout(pollTimer);
+    pollTimer = null;
+}
 function startPolling(batchId) {
     if (!batchId) return;
-    if (pollTimer) clearInterval(pollTimer);
-    pollTimer = setInterval(async () => {
-        const res = await fetch(`${base}/batches/${batchId}/progress`, { headers: { Accept: 'application/json' } });
-        jobStatus.value = await res.json();
-        if (['completed', 'completed_with_errors', 'failed', 'cancelled'].includes(jobStatus.value?.status)) {
-            clearInterval(pollTimer);
-            if (['completed', 'completed_with_errors'].includes(jobStatus.value.status)) {
-                router.reload({ only: ['certificates', 'recentBatches', 'staleCount'] });
+    stopPolling();
+    const generation = pollGeneration;
+    const poll = async () => {
+        if (generation !== pollGeneration) return;
+        try {
+            // Hidden tabs do not need live progress. Schedule after completion so
+            // slow responses never create overlapping PHP requests.
+            if (!document.hidden) {
+                const res = await fetch(`${base}/batches/${batchId}/progress`, { headers: { Accept: 'application/json' } });
+                if (generation !== pollGeneration) return;
+                if ([401, 403, 404].includes(res.status)) { stopPolling(); return; }
+                if (!res.ok) throw new Error('Progress request failed');
+                const status = await res.json();
+                if (generation !== pollGeneration) return;
+                jobStatus.value = status;
+                if (['completed', 'completed_with_errors', 'failed', 'cancelled'].includes(status.status)) {
+                    stopPolling();
+                    if (['completed', 'completed_with_errors'].includes(status.status)) {
+                        router.reload({ only: ['certificates', 'recentBatches', 'staleCount'] });
+                    }
+                    return;
+                }
             }
-        }
-    }, 3000);
+        } catch { /* Retry transient errors on the next scheduled poll. */ }
+        if (generation === pollGeneration) pollTimer = setTimeout(poll, 10000);
+    };
+    pollTimer = setTimeout(poll, 1000);
 }
 
 function renderAndCache(scope = {}) {
@@ -1236,7 +1258,7 @@ onMounted(() => {
     document.addEventListener('keydown', closeDropdownMenusOnEscape);
 });
 onUnmounted(() => {
-    if (pollTimer) clearInterval(pollTimer);
+    stopPolling();
     document.removeEventListener('click', closeDropdownMenus);
     document.removeEventListener('keydown', closeDropdownMenusOnEscape);
 });

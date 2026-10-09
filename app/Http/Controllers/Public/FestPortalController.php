@@ -72,6 +72,21 @@ class FestPortalController extends Controller
     {
         $tenant = $this->resolveTenant();
         $event = $this->findEvent($tenant->id, $eventId);
+        if ($request->user() ?? auth()->user()) {
+            return $this->renderEventHome($request, $tenant, $event);
+        }
+
+        // The busiest public route otherwise rebuilds the full item grid and recent
+        // winners per visitor. Keep anonymous HTML for 20 seconds; never share previews.
+        $key = 'fest-home-html:v1:'.$tenant->id.':'.$event->id.':'.$event->updated_at?->getTimestamp();
+        $html = $this->rememberPublicHotPath($key, 20,
+            fn () => $this->renderEventHome($request, $tenant, $event)->getContent());
+
+        return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
+    }
+
+    private function renderEventHome(Request $request, Tenant $tenant, FestEvent $event)
+    {
         $selectedScope = $this->operationalEvents->directScope($event);
         $scopes = [$selectedScope];
 
@@ -1875,9 +1890,19 @@ public function tv(Request $request, int $eventId)
                 // registration number. Return both instead of letting one namespace hide
                 // the other when the same number exists in each.
                 $matches = (clone $base)
-                    ->where(fn ($query) => $query
-                        ->where('chest_no', (int) $q)
-                        ->orWhere('level_registration_number', $q))
+                    ->where(function ($query) use ($q, $base) {
+                        // PostgreSQL otherwise infers a smallint parameter from legacy
+                        // chest columns and rejects valid larger Fest IDs before the OR.
+                        $number = filter_var(ltrim($q, '0') ?: '0', FILTER_VALIDATE_INT);
+                        if ($number !== false) {
+                            if ($base->getModel()->getConnection()->getDriverName() === 'pgsql') {
+                                $query->whereRaw('chest_no = CAST(? AS BIGINT)', [$number]);
+                            } else {
+                                $query->where('chest_no', $number);
+                            }
+                        }
+                        $query->orWhere('level_registration_number', $q);
+                    })
                     ->limit(30)
                     ->get();
                 if ($matches->isEmpty()) {

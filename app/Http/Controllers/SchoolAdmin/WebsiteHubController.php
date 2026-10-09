@@ -51,7 +51,7 @@ class WebsiteHubController extends SchoolAdminController
             'readiness' => $readiness,
             'stats' => [
                 'news_count' => $this->school->news()->count(),
-                'upcoming_events_count' => $this->school->events()->where('event_date', '>=', now())->count(),
+                'upcoming_events_count' => $this->school->events()->where('start_date', '>=', now()->toDateString())->count(),
                 'sections_count' => $sections->count(),
                 'active_sections' => $activeCount,
                 'draft_sections' => $draftCount,

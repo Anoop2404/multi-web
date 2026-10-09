@@ -102,7 +102,9 @@ class RenderCertificateChunkJob implements ShouldQueue
         $payloads = $service->payloadsFor($certificates->values());
 
         $templateCache = [];
-        $participantsCache = [];
+        $participantsCache = $service->participationRenderCache(
+            $payloads->filter(fn ($payload, $id) => $certificates->get($id)?->cert_type === 'participation')
+        );
         $assetCache = [];
 
         $consecutiveConnectionFailures = 0;
