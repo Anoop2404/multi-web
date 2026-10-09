@@ -457,10 +457,9 @@ class TenantStorage
      * every cache miss spend CPU on image encoding. This method deliberately performs
      * no exists()/HEAD request: S3/CloudFront serves the bytes directly to the browser.
      *
-     * When AWS_PUBLIC_URL is configured it should be the public S3/CloudFront base URL
-     * and a stable, CDN-cacheable URL is returned. Private buckets fall back to a
-     * presigned S3 URL; signing is local and still keeps the image request away from
-     * the app.
+     * Student/teacher objects remain private even when AWS_PUBLIC_URL serves public
+     * logos. Use cacheable signed CloudFront URLs or presigned S3 URLs; signing is
+     * local and keeps image requests away from PHP without exposing private objects.
      */
     public static function directPhotoUrl(?string $relativePath, bool $thumbnail = true): ?string
     {
@@ -482,17 +481,14 @@ class TenantStorage
             try {
                 $storage = Storage::disk('s3');
 
-                // A configured public/CDN URL is stable, so CloudFront and browsers can
-                // collapse thousands of identical requests onto one cached object.
-                if (filled(config('filesystems.disks.s3.public_url'))) {
-                    return $storage->url($path);
+                if ($url = self::cloudFrontSignedUrl($path, null, true, null, self::cacheableCloudFrontExpiry())) {
+                    return $url;
                 }
 
-                try {
-                    return $storage->temporaryUrl($path, now()->addHours(6));
-                } catch (\Throwable) {
-                    return $storage->url($path);
-                }
+                // A CDN base URL does not grant access to private photo objects.
+                // Signing failure falls back to the existing cached data URI instead
+                // of returning an unsigned URL that browsers cannot load.
+                return $storage->temporaryUrl($path, now()->addHours(6));
             } catch (\Throwable) {
                 // Local/test installs continue through the existing data-URI fallback.
             }
