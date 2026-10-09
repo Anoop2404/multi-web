@@ -163,7 +163,7 @@ class FestPortalController extends Controller
                 // item's winners the moment the event overall went public, even ones nobody
                 // had published yet.
                 ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
-                ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.school'])
+                ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.school', 'participant.registration.item', 'participant.registration.event', 'participant.group'])
                 ->latest('updated_at')
                 ->limit(200)
                 ->get();
@@ -484,7 +484,7 @@ class FestPortalController extends Controller
             // publish or not — see the comment on PublicFestScoreboardService::scoreboard()'s
             // category branch for the production leak this convention exists to prevent.
             ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
-            ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school'])
+            ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school', 'participant.registration.item', 'participant.registration.event', 'participant.group'])
             ->orderBy('item_id')
             ->orderBy('position')
             ->get();
@@ -613,7 +613,9 @@ class FestPortalController extends Controller
         // it won), each with its position, grade, and points, so the sum of the listed
         // rows always agrees with $schoolBoard's official total above. Shared with
         // schoolResults()'s own dedicated per-school page.
-        $resultsBySchool = $this->schoolResultsRoster($event, $selectedScope, $isPublished);
+        $resultsBySchool = $tab === 'school'
+            ? $this->schoolResultsRoster($event, $selectedScope, $isPublished)
+            : collect();
         $schoolWinnersBoard = collect($schoolBoard)
             ->map(fn (array $row) => $row + ['winners' => $resultsBySchool[$row['school_id']] ?? []])
             ->filter(fn (array $row) => $row['winners'] !== [])
@@ -708,7 +710,7 @@ class FestPortalController extends Controller
             abort_unless($schoolRow, 404);
         }
 
-        $roster = $this->schoolResultsRoster($event, $selectedScope, $isPublished, $category)->get($schoolId, []);
+        $roster = $this->schoolResultsRoster($event, $selectedScope, $isPublished, $category, $schoolId)->get($schoolId, []);
         if (empty($roster) && ! $isAdminPreview) {
             abort(404, 'No results recorded for this school yet.');
         }
@@ -758,7 +760,7 @@ class FestPortalController extends Controller
     /**
      * @return \Illuminate\Support\Collection<string, array<int, array<string, mixed>>> roster keyed by school_id
      */
-    private function schoolResultsRoster(FestEvent $event, array $selectedScope, bool $isPublished, ?string $category = null): \Illuminate\Support\Collection
+    private function schoolResultsRoster(FestEvent $event, array $selectedScope, bool $isPublished, ?string $category = null, ?string $schoolId = null): \Illuminate\Support\Collection
     {
         $categoryColumn = $event->event_type === 'sports' ? 'age_group' : 'class_group';
         $participantTypeLabels = ['pair' => 'Pair', 'trio' => 'Trio', 'group' => 'Group', 'team' => 'Team'];
@@ -799,7 +801,8 @@ class FestPortalController extends Controller
                 fn ($q) => $q->whereIn($categoryColumn, FestCategoryMerge::sourceKeysFor($event->rootEvent(), $category))
             ))
             ->when($excludedCategories, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotIn($categoryColumn, $excludedCategories)))
-            ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school'])
+            ->when($schoolId, fn ($q) => $q->whereHas('participant.registration', fn ($r) => $r->where('school_id', $schoolId)))
+            ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.group', 'participant.registration.school', 'participant.registration.item', 'participant.registration.event'])
             ->get();
 
         // Same team-roster batch-fetch as the item tab's own $rosterByRegistration — a
@@ -811,7 +814,7 @@ class FestPortalController extends Controller
             $allSchoolMarks->pluck('participant.registration_id')->filter()->unique()->values()
         )
             ->where('participant_role', 'performer')
-            ->with(['student', 'teacher'])
+            ->with(['student', 'teacher', 'group', 'registration.item', 'registration.event'])
             ->get()
             ->groupBy('registration_id');
 
@@ -932,7 +935,7 @@ class FestPortalController extends Controller
 
         $allMarks = FestMark::where('event_id', $item->event_id)
             ->where('item_id', $item->id)
-            ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.school'])
+            ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.school', 'participant.registration.item', 'participant.registration.event', 'participant.group'])
             ->orderBy('position')
             ->orderByDesc('score')
             ->get()
@@ -1018,7 +1021,7 @@ class FestPortalController extends Controller
 
         $marks = FestMark::where('event_id', $item->event_id)
             ->where('item_id', $item->id)
-            ->with(['participant.student', 'participant.teacher', 'participant.registration.school'])
+            ->with(['participant.student', 'participant.teacher', 'participant.registration.school', 'participant.registration.item', 'participant.registration.event', 'participant.group'])
             ->orderBy('position')
             ->orderByDesc('score')
             ->limit($topN)
@@ -1159,7 +1162,7 @@ public function tv(Request $request, int $eventId)
 
     $marks = FestMark::whereIn('event_id', $crossPhaseEventIds ?? $selectedScope['event_ids'])
         ->whereIn('position', [1, 2, 3])
-        ->with(['item', 'participant.registration.school'])
+        ->with(['item', 'participant.registration.school', 'participant.registration.item', 'participant.registration.event', 'participant.group'])
         // Unconditional, regardless of $isPublished: an item's own results_published_at
         // is the only thing that makes its marks visible to the public — see the note on
         // results()'s $marks query above.
@@ -1780,7 +1783,7 @@ public function tv(Request $request, int $eventId)
         $categoryColumn = $event->event_type === 'sports' ? 'age_group' : 'class_group';
         $winnerMarks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
             ->whereIn('position', [1, 2, 3])
-            ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school'])
+            ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school', 'participant.registration.item', 'participant.registration.event', 'participant.group'])
             ->latest('updated_at')
             // Raw safety ceiling only, not a "recent teaser" cap — every published item's
             // winners should show here (the widget already scrolls its own container).
