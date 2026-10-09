@@ -66,7 +66,7 @@
                 <div v-if="bodyLayout"
                      class="absolute text-center text-slate-700 leading-relaxed"
                      :style="overlayStyle(bodyLayout, { top: 48, left: 12, width: 76, font_size: 12.5, font_family: 'Montserrat' })">
-                    <p v-for="(paragraph, idx) in paragraphs" :key="idx" class="mb-2" v-html="paragraph"></p>
+                    <div v-for="(paragraph, idx) in paragraphs" :key="idx" class="mb-2" v-html="paragraph"></div>
                 </div>
 
                 <!-- Date Overlay -->
@@ -378,7 +378,10 @@ const paragraphs = computed(() => {
         }
     }
 
-    return substituteTokens(raw).split(/\n\s*\n/).filter(p => p.trim());
+    return raw.split(/\n\s*\n/).filter(p => p.trim()).map(paragraph => {
+        const text = paragraph.trim();
+        return substituteTokens(/<\/?[a-z][^>]*>/i.test(text) ? text : text.replace(/\n/g, '<br />\n'));
+    });
 });
 
 function substituteCustomFieldText(text) {

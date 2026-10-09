@@ -274,6 +274,22 @@ class CertificateTemplate extends Model
         return $text;
     }
 
+    /** Format authored text before inserting HTML tokens, so layout newlines never become breaks. */
+    public static function bodyParagraphs(string $body, array $fieldValues, bool $boldVariables, array $layout): array
+    {
+        $paragraphs = preg_split('/\n\s*\n/', $body);
+
+        return array_values(array_map(function ($paragraph) use ($fieldValues, $boldVariables, $layout) {
+            $paragraph = trim($paragraph);
+            // HTML authors control spacing with tags/CSS; plain text keeps line breaks.
+            if (! preg_match('/<\/?[a-z][^>]*>/i', $paragraph)) {
+                $paragraph = nl2br($paragraph);
+            }
+
+            return self::substituteTokens($paragraph, $fieldValues, $boldVariables, $layout);
+        }, array_filter($paragraphs, fn ($paragraph) => trim($paragraph) !== '')));
+    }
+
     /** @return array<string, mixed> */
     public function overlayLayout(): array
     {

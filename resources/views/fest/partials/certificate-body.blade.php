@@ -30,8 +30,7 @@
         if ($rawBody === null && $customFields === []) {
             $rawBody = \App\Models\CertificateTemplate::defaultFestBody();
         }
-        $body = \App\Models\CertificateTemplate::substituteTokens($rawBody ?? '', $fieldValues ?? [], $boldVariables, $layout);
-        $paragraphs = array_filter(array_map('trim', preg_split('/\n\s*\n/', $body)));
+        $paragraphs = \App\Models\CertificateTemplate::bodyParagraphs($rawBody ?? '', $fieldValues ?? [], $boldVariables, $layout);
         $hasBackground = ! empty($backgroundUrl) || ! empty($template);
     @endphp
 
@@ -77,7 +76,7 @@
                  scrollHeight meaningful while still telling the script where the zone ends. --}}
             <div class="overlay-field body" data-zone-bottom="{{ $b['bottom'] ?? '' }}" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($b, ['top' => 48, 'left' => 12, 'width' => 76, 'font_size' => 12.5, 'font_family' => 'Montserrat']) }}">
                 @foreach($paragraphs as $paragraph)
-                    <p style="margin-bottom:8px;">{!! nl2br($paragraph) !!}</p>
+                    <div style="margin-bottom:8px;">{!! $paragraph !!}</div>
                 @endforeach
             </div>
 
@@ -169,7 +168,7 @@
 
             <div class="body-text" style="{{ $bStyle }}">
                 @foreach($paragraphs as $paragraph)
-                    <p>{!! nl2br($paragraph) !!}</p>
+                    <div style="margin-bottom:8px;">{!! $paragraph !!}</div>
                 @endforeach
                 @if($showCertificateDate)
                     <p class="date-line" style="{{ $dStyle }}"><strong>Date:</strong> {!! $fieldValues['certificate_date'] ?? now()->format('j F Y') !!}</p>
