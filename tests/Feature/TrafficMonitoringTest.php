@@ -54,6 +54,8 @@ class TrafficMonitoringTest extends TestCase
         $this->assertSame($entries[0]['request_id'], $entries[1]['request_id']);
         $this->assertSame(12.5, $entries[0]['duration_ms']);
         $this->assertSame(503, $entries[1]['status']);
+        $this->assertIsNumeric($entries[1]['response_duration_ms']);
+        $this->assertGreaterThanOrEqual($entries[1]['response_duration_ms'], $entries[1]['duration_ms']);
         $this->assertSame(1, $entries[1]['query_count']);
         $this->assertSame('https://example.test/users', $entries[1]['url']);
         $this->assertStringNotContainsString('secret', $raw);
@@ -70,6 +72,17 @@ class TrafficMonitoringTest extends TestCase
         $entry = json_decode(trim(file_get_contents(glob($this->monitorStorage.'/logs/*')[0])), true);
         $this->assertSame('select * from "tenants" where "domain" = ? and "id" = ?', $entry['sql']);
         $this->assertSame('https://example.test/dashboard', $entry['url']);
+    }
+
+    public function test_fresh_capture_removes_only_monitoring_logs_and_creates_new_file(): void
+    {
+        file_put_contents($this->monitorStorage.'/logs/monitoring-2025-01-01.jsonl', 'old');
+        file_put_contents($this->monitorStorage.'/logs/laravel.log', 'keep');
+        $this->artisan('monitor:traffic', ['--fresh' => true])->assertSuccessful();
+        $this->assertFileDoesNotExist($this->monitorStorage.'/logs/monitoring-2025-01-01.jsonl');
+        $this->assertSame('keep', file_get_contents($this->monitorStorage.'/logs/laravel.log'));
+        $this->assertSame('', file_get_contents($this->monitorStorage.'/logs/monitoring-'.now()->format('Y-m-d').'.jsonl'));
+        $this->assertGreaterThan(time(), RequestTrace::until());
     }
 
     public function test_expired_or_stopped_capture_does_not_log_requests(): void

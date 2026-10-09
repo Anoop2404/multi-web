@@ -7,7 +7,7 @@ use Illuminate\Console\Command;
 
 class MonitorTraffic extends Command
 {
-    protected $signature = 'monitor:traffic {action=start : start, stop, or status} {--minutes=15 : Capture duration in minutes}';
+    protected $signature = 'monitor:traffic {action=start : start, stop, or status} {--minutes=15 : Capture duration in minutes} {--fresh : Delete previous monitoring logs before starting}';
 
     protected $description = 'Capture HTTP URLs and SQL execution timings in daily JSONL logs';
 
@@ -26,6 +26,21 @@ class MonitorTraffic extends Command
 
                 return self::FAILURE;
             }
+            if ($this->option('fresh')) {
+                foreach (glob(storage_path('logs/monitoring-????-??-??.jsonl')) ?: [] as $file) {
+                    if (! @unlink($file)) {
+                        $this->error('Unable to delete monitoring log: '.$file);
+
+                        return self::FAILURE;
+                    }
+                }
+            }
+            $logPath = storage_path('logs/monitoring-'.now()->format('Y-m-d').'.jsonl');
+            if (@file_put_contents($logPath, '', FILE_APPEND | LOCK_EX) === false) {
+                $this->error('Unable to create monitoring log: '.$logPath);
+
+                return self::FAILURE;
+            }
             if (! is_writable(storage_path('logs')) || @file_put_contents(RequestTrace::statePath(), time() + $minutes * 60, LOCK_EX) === false) {
                 $this->error('Monitoring requires writable storage/framework and storage/logs directories.');
 
@@ -40,7 +55,7 @@ class MonitorTraffic extends Command
         }
         $until = RequestTrace::until();
         $this->info($until > time() ? 'Monitoring active until '.date('c', $until) : 'Monitoring inactive.');
-        $this->line('Logs: '.storage_path('logs/monitoring-YYYY-MM-DD.jsonl'));
+        $this->line('Logs: '.storage_path('logs/monitoring-'.now()->format('Y-m-d').'.jsonl'));
 
         return self::SUCCESS;
     }

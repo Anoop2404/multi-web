@@ -35,6 +35,7 @@ class RequestTrace
             'method' => $this->method, 'url' => $this->url,
             'connection' => $query->connectionName,
             'sql' => $sql, 'duration_ms' => $query->time,
+            'request_elapsed_ms' => round((hrtime(true) - $this->started) / 1e6, 3),
         ]);
     }
 

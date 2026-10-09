@@ -3,7 +3,7 @@
 Run in the deployed project directory:
 
 ```bash
-php artisan monitor:traffic start --minutes=15
+php artisan monitor:traffic start --minutes=15 --fresh
 php artisan monitor:traffic status
 tail -f storage/logs/monitoring-$(date +%F).jsonl
 php artisan monitor:traffic stop
@@ -16,3 +16,5 @@ Daily JSONL files contain request_started records (written before processing), q
 Monitoring captures queries during HTTP requests, including tenant connections. It does not capture queue workers or console commands, failed SQL executions, static files served directly by the web server, or external server availability. It adds one file write per completed query. Log write failures do not interrupt user requests. Logs are not automatically deleted; remove or rotate old files according to your retention needs.
 
 Enable separately on each server/container: state and logs use local storage. Ensure both CLI and web process can read storage/framework/monitoring-until and write storage/logs. The middleware/provider changes must be deployed before enabling capture; restart long-running application servers after deployment.
+
+The optional `--fresh` flag deletes only dated monitoring JSONL files and creates an empty log immediately. It preserves laravel.log. Omit it to append. Previously in-flight requests may still append after clearing. Request summaries include response_duration_ms (time until the response is ready) and duration_ms (time through termination). These measure application processing, not browser/network latency. Each query includes request_elapsed_ms, its URL, SQL template, and its own duration_ms.
