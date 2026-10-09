@@ -61,9 +61,6 @@ class LimitPublicEventVisitors
             $response->setContent(str_replace('</body>', $script.'</body>', $response->getContent()));
         }
 
-        $response->headers->set('Cache-Control', 'private, no-store');
-        $response->headers->setCookie(cookie('fest_visitor', $visitor, 1440, '/', null, $request->isSecure(), true, false, 'lax'));
-
         return $response;
     }
 }
