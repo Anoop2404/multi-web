@@ -1,7 +1,7 @@
 # Large certificate render runs
 
 A run of 4,000 certificates is split into 200 jobs of 20 certificates. Each job
-renders background and plain PDFs using up to six concurrent converter requests.
+renders background and plain PDFs using up to two concurrent converter requests.
 Progress continues to update every five certificates. Existing scopes (merit,
 participation, school and item) continue to work.
 
@@ -11,7 +11,7 @@ dedicated production pool, configure:
 ```dotenv
 CERTIFICATE_RENDER_QUEUE=certificates
 CERTIFICATE_RENDER_CHUNK_SIZE=20
-CERTIFICATE_RENDER_CONCURRENCY=6
+CERTIFICATE_RENDER_CONCURRENCY=2
 DB_QUEUE_RETRY_AFTER=1900
 REDIS_QUEUE_RETRY_AFTER=1900
 ```
@@ -24,7 +24,7 @@ with four processes running this command from the application directory:
 php artisan queue:work --queue=certificates --sleep=1 --tries=3 --timeout=1800
 ```
 
-Four workers permit up to 24 simultaneous converter requests. Ensure the PDF
+Four workers permit up to eight simultaneous converter requests. Ensure the PDF
 converter can handle that capacity; reduce concurrency or worker count if it
 cannot. More workers do not improve a converter that is already saturated.
 Use an asynchronous queue connection (database or Redis), not sync.

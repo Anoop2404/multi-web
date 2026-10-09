@@ -188,7 +188,7 @@ class RenderCertificateChunkJob implements ShouldQueue
             if ($processedSinceFlush >= self::PROGRESS_FLUSH_EVERY) {
                 $this->flushProgress($batch, $processedSinceFlush, $succeededSinceFlush, $failedSinceFlush, $failedItemsSinceFlush);
             }
-        }, concurrency: max(1, min(12, (int) config('certificates.render_concurrency', 6))));
+        }, concurrency: max(1, min(12, (int) config('certificates.render_concurrency', 2))));
 
         $this->flushProgress($batch, $processedSinceFlush, $succeededSinceFlush, $failedSinceFlush, $failedItemsSinceFlush);
 
@@ -201,7 +201,7 @@ class RenderCertificateChunkJob implements ShouldQueue
             'prepare_seconds' => round($prepareSeconds, 1),
             'store_seconds' => round($storeSeconds, 1),
             'converter_wait_seconds' => round(max(0, $totalSeconds - $prepareSeconds - $storeSeconds), 1),
-            'concurrency' => max(1, min(12, (int) config('certificates.render_concurrency', 6))),
+            'concurrency' => max(1, min(12, (int) config('certificates.render_concurrency', 2))),
         ]);
     }
 
