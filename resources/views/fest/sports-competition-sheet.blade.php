@@ -15,17 +15,17 @@ td { font-size: 13px; height: 23px; }
 </style></head><body>
 @foreach($sheets as $sheet)
 <div class="sheet">
-<div class="fest-meta">{{ $event->title }} | Fest ID: {{ $event->id }}</div>
+<div class="fest-meta">{{ $event->title }}</div>
 <table>
-<colgroup><col style="width:7%"><col style="width:9%"><col style="width:28%">
-@for($i=0;$i<6;$i++)<col style="width:9.333%">@endfor</colgroup>
-<thead><tr><th class="title" colspan="9">{{ mb_strtoupper($sheet['title']) }}</th></tr>
-<tr class="columns"><th style="width:7%">SL NO</th><th style="width:9%">CHEST NO</th><th style="width:28%">NAME</th><th>HEATS</th><th>TIME</th><th>SEMI-FINAL</th><th>TIME</th><th>FINAL</th><th>RESULT</th></tr></thead>
+<colgroup><col style="width:6%"><col style="width:8%"><col style="width:9%"><col style="width:25%">
+@for($i=0;$i<6;$i++)<col style="width:8.666%">@endfor</colgroup>
+<thead><tr><th class="title" colspan="10">{{ mb_strtoupper($sheet['title']) }}</th></tr>
+<tr class="columns"><th style="width:6%">SL NO</th><th style="width:8%">CHEST NO</th><th style="width:9%">FEST ID</th><th style="width:25%">NAME</th><th>HEATS</th><th>TIME</th><th>SEMI-FINAL</th><th>TIME</th><th>FINAL</th><th>RESULT</th></tr></thead>
 <tbody>
 @for($i=0;$i<16;$i++)
 @php($row = $sheet['rows'][$i] ?? null)
-<tr><td style="width:7%">{{ $row ? $sheet['offset'] + $i + 1 : '' }}</td><td style="width:9%">{{ $row['chest_no'] ?? '' }}</td><td class="name" style="width:28%">{{ mb_strtoupper($row['name'] ?? '') }}</td>
-@for($j=0;$j<6;$j++)<td style="width:9.333%">&nbsp;</td>@endfor</tr>
+<tr><td style="width:6%">{{ $row ? $sheet['offset'] + $i + 1 : '' }}</td><td style="width:8%">{{ $row['chest_no'] ?? '' }}</td><td style="width:9%">{{ $row['fest_id'] ?? '' }}</td><td class="name" style="width:25%">{{ mb_strtoupper($row['name'] ?? '') }}</td>
+@for($j=0;$j<6;$j++)<td style="width:8.666%">&nbsp;</td>@endfor</tr>
 @endfor
 </tbody></table></div>
 @endforeach
