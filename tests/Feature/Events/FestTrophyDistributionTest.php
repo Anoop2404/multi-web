@@ -97,6 +97,35 @@ class FestTrophyDistributionTest extends TestCase
         $this->assertSame(1, $winner['top_ten'][0]['rank']);
     }
 
+    public function test_open_group_item_does_not_replace_the_individual_championship_category(): void
+    {
+        $solo = FestEventItem::create(['event_id' => $this->parentEvent->id, 'title' => 'Essay Writing',
+            'class_group' => 'category_3', 'participant_type' => 'individual', 'results_published_at' => now(), 'results_hidden' => false]);
+        $group = FestEventItem::create(['event_id' => $this->parentEvent->id, 'title' => 'Thiruvathirakali',
+            'class_group' => 'open', 'participant_type' => 'group', 'results_published_at' => now(), 'results_hidden' => false]);
+        $class = SchoolClass::create(['tenant_id' => $this->school1->id, 'name' => '10A']);
+        // Verify both database iteration orders: solo then group, and group then solo.
+        foreach ([[$solo, $group], [$group, $solo]] as $index => $items) {
+            $student = Student::create(['tenant_id' => $this->school1->id, 'name' => 'Category student '.$index,
+                'gender' => 'female', 'school_class_id' => $class->id]);
+            foreach ($items as $item) {
+                $registration = FestRegistration::create(['event_id' => $this->parentEvent->id, 'item_id' => $item->id,
+                    'school_id' => $this->school1->id, 'status' => 'approved']);
+                $participant = FestParticipant::create(['registration_id' => $registration->id,
+                    'event_id' => $this->parentEvent->id, 'student_id' => $student->id, 'participant_role' => 'performer']);
+                FestMark::create(['event_id' => $this->parentEvent->id, 'item_id' => $item->id,
+                    'participant_id' => $participant->id, 'position' => 3, 'grade' => 'A', 'score' => 80]);
+            }
+        }
+        $rows = $this->championshipService()->pointsForEvent($this->parentEvent);
+        $this->assertCount(2, $rows);
+        foreach ($rows as $row) {
+            $this->assertSame('hs', $row->category);
+            $this->assertGreaterThan(0, $row->points);
+            $this->assertGreaterThan(0, $row->group_points);
+        }
+    }
+
     public function test_can_seed_kochi_metro_75_trophies_preset(): void
     {
         $count = $this->trophyService()->seedKochiMetroPreset($this->parentEvent);

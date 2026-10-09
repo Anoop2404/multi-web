@@ -387,7 +387,14 @@ class FestIndividualChampionshipService
                 $isMulti = FestTeamSquadRules::isMultiPerson($item->participant_type);
 
                 $studentItems[$student->id]['student'] = $student;
-                $studentItems[$student->id]['category'] = $category;
+                // Open group items must not move an individual competitor out of
+                // their own class category merely because that mark was read last.
+                $existing = $studentItems[$student->id] ?? [];
+                if (! isset($existing['category']) || (! $isMulti &&
+                    (($existing['category_from_group'] ?? false) || $existing['category'] === 'open'))) {
+                    $studentItems[$student->id]['category'] = $category;
+                    $studentItems[$student->id]['category_from_group'] = $isMulti;
+                }
                 $studentItems[$student->id]['gender'] = $gender;
                 $studentItems[$student->id]['marks'][] = [
                     'mark' => $mark,

@@ -345,7 +345,7 @@ class FestPortalController extends Controller
             return $renderResults();
         }
 
-        $cacheKey = 'fest-results-html:v2:'.$event->tenant_id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.$resultsVersion.':'.$tab;
+        $cacheKey = 'fest-results-html:v3:'.$event->tenant_id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.$resultsVersion.':'.$tab;
         $html = $this->rememberPublicHotPath(
             $cacheKey,
             120,
