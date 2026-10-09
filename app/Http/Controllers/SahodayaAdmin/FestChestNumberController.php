@@ -378,9 +378,13 @@ class FestChestNumberController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_unless($event->event_type === 'sports', 404);
         $data = $request->validate(['item_id' => 'nullable|integer']);
+        $bulkItemIds = $this->resolveBulkChestItemIds($event, $request);
+        abort_if($bulkItemIds === [], 404, 'No sports items found.');
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
         $items = FestEventItem::whereIn('event_id', $event->reportableEventIds())
             ->where('is_enabled', true)
-            ->when($data['item_id'] ?? null, fn ($q, $id) => $q->whereKey($id))
+            ->when($bulkItemIds !== null, fn ($q) => $q->whereIn('id', $bulkItemIds))
+            ->when($bulkItemIds === null && ($data['item_id'] ?? null), fn ($q) => $q->whereKey($data['item_id']))
             ->orderBy('title')->get();
         abort_if($items->isEmpty(), 404, 'No sports items found.');
         $sheets = [];
@@ -390,7 +394,7 @@ class FestChestNumberController extends SahodayaAdminController
                 ->values();
             $chunks = $rows->isEmpty() ? collect([collect()]) : $rows->chunk(16);
             foreach ($chunks as $index => $chunk) {
-                $sheets[] = ['title' => $item->title, 'rows' => $chunk->values()->all(), 'offset' => $index * 16];
+                $sheets[] = ['title' => $item->title, 'category' => \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels), 'rows' => $chunk->values()->all(), 'offset' => $index * 16];
             }
         }
         $html = view('fest.sports-competition-sheet', ['sheets' => $sheets, 'event' => $event])->render();
@@ -398,7 +402,7 @@ class FestChestNumberController extends SahodayaAdminController
         $itemSuffix = $items->count() === 1 ? '-'.str($items->first()->title)->slug() : '-all-items';
 
         return PdfGenerator::download($html, str($event->title)->slug().$itemSuffix.'-sports-competition-sheets.pdf',
-            $request->boolean('inline'), true, null, null,
+            ($request->boolean('inline') || $request->boolean('preview')) && ! $request->boolean('download'), true, null, null,
             ['top' => '15mm', 'right' => '15mm', 'bottom' => '15mm', 'left' => '15mm']);
     }
 

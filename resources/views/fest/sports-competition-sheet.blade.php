@@ -8,6 +8,7 @@ body { margin: 0; color: #000; font-family: Arial, sans-serif; }
 table { width: 100%; border-collapse: collapse; table-layout: auto; }
 th, td { border: 1px solid #222; text-align: center; padding: 2px 4px; }
 .title { font-family: "Times New Roman", serif; font-size: 20px; font-weight: bold; height: 30px; }
+.category { font-size: 13px; font-weight: bold; height: 22px; }
 .columns th { font-family: "Times New Roman", serif; font-size: 12px; height: 20px; }
 td { font-size: 13px; height: 23px; }
 .name { overflow-wrap: anywhere; font-size: 12px; }
@@ -20,6 +21,9 @@ td { font-size: 13px; height: 23px; }
 <colgroup><col style="width:6%"><col style="width:8%"><col style="width:9%"><col style="width:25%">
 @for($i=0;$i<6;$i++)<col style="width:8.666%">@endfor</colgroup>
 <thead><tr><th class="title" colspan="10">{{ mb_strtoupper($sheet['title']) }}</th></tr>
+@if(!empty($sheet['category']))
+<tr><th class="category" colspan="10">Category: {{ $sheet['category'] }}</th></tr>
+@endif
 <tr class="columns"><th style="width:6%">SL NO</th><th style="width:8%">CHEST NO</th><th style="width:9%">FEST ID</th><th style="width:25%">NAME</th><th>HEATS</th><th>TIME</th><th>SEMI-FINAL</th><th>TIME</th><th>FINAL</th><th>RESULT</th></tr></thead>
 <tbody>
 @for($i=0;$i<16;$i++)

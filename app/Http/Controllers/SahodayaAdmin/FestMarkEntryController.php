@@ -53,7 +53,7 @@ class FestMarkEntryController extends SahodayaAdminController
         // part of this bulk "print blank forms" picker.
         'sum_sheet', 'sum_sheet_no_chest',
         'result_declaration',
-        'chest_number_list',
+        'chest_number_list', 'sports_competition_sheet',
         'attendance_sheet', 'attendance_sheet_no_chest',
         'timesheet', 'timesheet_no_chest',
     ];
@@ -1835,6 +1835,8 @@ class FestMarkEntryController extends SahodayaAdminController
                     'result_declaration' => $this->resultDeclarationSheet($subRequest, $tenantId, $event, $numbering),
                     'chest_number_list' => app()->makeWith(\App\Http\Controllers\SahodayaAdmin\FestChestNumberController::class, ['request' => $subRequest])
                         ->print($subRequest, $tenantId, $event),
+                    'sports_competition_sheet' => app()->makeWith(\App\Http\Controllers\SahodayaAdmin\FestChestNumberController::class, ['request' => $subRequest])
+                        ->sportsCompetitionSheet($subRequest, $tenantId, $event),
                     'attendance_sheet', 'attendance_sheet_no_chest' => tap(new \App\Services\Events\FestReportService($event), fn ($s) => $s->preview = false)
                         ->export('attendance-sheet', $subRequest),
                     'timesheet', 'timesheet_no_chest' => tap(new \App\Services\Events\FestReportService($event), fn ($s) => $s->preview = false)

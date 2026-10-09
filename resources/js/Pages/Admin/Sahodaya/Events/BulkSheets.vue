@@ -169,6 +169,8 @@ const bulkSelectionActive = computed(() => bulkSelectedItemIds.value.length > 0 
 // download. attendance-sheet/timesheet actually default to preview already (see the
 // comment below) -- explicit download:1 only when NOT previewing keeps that reversed.
 const reportTypeOptions = [
+    ...(isSports.value ? [{ key: 'sports_competition_sheet', label: '🏃 Heats / Final Sheet',
+        url: (o = {}) => bulkSheetUrl('chest-numbers/sports-competition-sheet', o.preview ? { preview: 1 } : {}, o) }] : []),
     { key: 'judge_sheet', label: '🖨️ Judge Sheets',
         url: (o = {}) => bulkSheetUrl('reports/mark-entry-sheet', o.preview ? { preview: 1 } : {}, o) },
     { key: 'judge_sheet_no_chest', label: '🖨️ Judge Sheets — No Chest No',
