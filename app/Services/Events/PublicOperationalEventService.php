@@ -3,6 +3,7 @@
 namespace App\Services\Events;
 
 use App\Models\FestEvent;
+use App\Models\FestEventPhase;
 use Illuminate\Support\Collection;
 
 /**
@@ -172,6 +173,33 @@ class PublicOperationalEventService
             'source_phase_id' => $event->source_phase_id ? (int) $event->source_phase_id : null,
             'region_id' => $event->region_id ? (int) $event->region_id : null,
         ];
+    }
+
+    /**
+     * Batch-load every phase and its leaf events for a hub in exactly two queries
+     * (one for phases, one for all leaves keyed by phase id), replacing the N+1
+     * pattern of iterating phases and querying leaves one phase at a time.
+     *
+     * @return array{0: Collection<int, FestEventPhase>, 1: array<int, Collection<int, FestEvent>>}
+     */
+    public function loadPhasedLeaves(FestEvent $hub): array
+    {
+        $phases = FestEventPhase::where('event_id', $hub->id)
+            ->orderBy('sort_order')
+            ->get();
+
+        if ($phases->isEmpty()) {
+            return [$phases, []];
+        }
+
+        $phaseIds = $phases->pluck('id')->all();
+        $leaves = FestEvent::where('parent_event_id', $hub->id)
+            ->whereIn('source_phase_id', $phaseIds)
+            ->orderBy('source_phase_id')
+            ->get()
+            ->groupBy('source_phase_id');
+
+        return [$phases, $leaves];
     }
 
     public function isAdministrativeContainer(FestEvent $event): bool

@@ -82,12 +82,19 @@ class FestPhaseScoreboardService
             ->get();
 
         if ($phaseLeaves->isNotEmpty()) {
+            // Batch-load the child phase ids for all leaves in one query, instead of
+            // firing one per-leaf query inside the closure (which runs N times per
+            // phase per category — adds up fast when crossPhaseScoreboard() iterates
+            // phases and the TV page iterates categories).
+            $leafIds = $phaseLeaves->pluck('id')->all();
+            $childPhaseIds = FestEventPhase::whereIn('event_id', $leafIds)
+                ->where('source_phase_id', $sourcePhase->id)
+                ->pluck('id', 'event_id');
+
             return $this->partitions->aggregateScoreboardAcrossPartitions(
                 $phaseLeaves,
-                function (FestEvent $leaf) use ($sourcePhase, $category) {
-                    $childPhaseId = FestEventPhase::where('event_id', $leaf->id)
-                        ->where('source_phase_id', $sourcePhase->id)
-                        ->value('id');
+                function (FestEvent $leaf) use ($sourcePhase, $category, $childPhaseIds) {
+                    $childPhaseId = $childPhaseIds[$leaf->id] ?? null;
 
                     return $childPhaseId
                         ? EventContext::for($leaf)->scoreboardByPhase((int) $childPhaseId, $category)

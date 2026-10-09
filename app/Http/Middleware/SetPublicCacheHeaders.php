@@ -12,7 +12,7 @@ class SetPublicCacheHeaders
     {
         $response = $next($request);
 
-        if ($request->attributes->get('event_visitor_limit') || $request->attributes->get('public_visitor_tracking')) {
+        if ($request->attributes->get('event_visitor_limit')) {
             $response->headers->set('Cache-Control', 'private, no-store');
 
             return $response;

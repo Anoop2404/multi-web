@@ -240,71 +240,92 @@ class FestPortalController extends Controller
         $event = $this->findEvent($tenant->id, $eventId);
         $selectedScope = $this->operationalEvents->directScope($event);
 
-        $targetEvent = FestEventItem::where('event_id', $event->id)->where('is_enabled', true)->exists()
-            ? $event
-            : ($event->parent_event_id ? $event->rootEvent() : $event);
-
-        $rawItems = FestEventItem::where('event_id', $targetEvent->id)
-            ->where('is_enabled', true)
-            ->with(['head:id,name', 'phase:id,source_phase_id'])
-            ->orderBy('display_order')
-            ->orderBy('title')
-            ->get(['id', 'title', 'stage_type', 'category', 'class_group', 'age_group', 'participant_type', 'head_id', 'event_id', 'results_published_at', 'results_hidden', 'phase_id']);
-
-        $allItems = \App\Services\Events\FestHeadItemNavigationService::filterToOwnPhase($rawItems, $event);
-
-        $scheduledItemIds = FestSchedule::where('event_id', $event->id)
-            ->whereNotNull('item_id')
-            ->distinct()
-            ->pluck('item_id');
-
-        // An item can be flagged results_published_at without a single mark ever having
-        // been entered for it (published too early, or a no-show item) — the Results
-        // button must not render as a normal, inviting link into a page that can only
-        // ever say "No published results for this item." in that case.
-        $resultedItemIds = FestMark::where('event_id', $targetEvent->id)
-            ->whereIn('item_id', $allItems->pluck('id'))
-            ->distinct()
-            ->pluck('item_id');
-
         $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
 
-        // itemResults() itself requires the EVENT-wide results_published flag as a hard
-        // gate (FestItemResultsService::isItemVisible()) — an item's own
-        // results_published_at is not enough on its own, ever, even if it's set ahead of
-        // the event-wide publish. The button must not show as a normal, clickable link
-        // into a page that will just 403 the moment the event itself isn't published yet.
-        $itemResultsService = app(FestItemResultsService::class);
-        $visibleResultItemIds = $allItems
-            ->filter(fn (FestEventItem $item) => $isAdminPreview || $itemResultsService->isItemVisible($item, $event))
-            ->pluck('id');
+        // The full page payload is cached as a single array (30s TTL) so the
+        // view-rendering loop and the four underlying queries all skip on a
+        // repeat hit. The cache key incorporates the event updated_at, the
+        // results version, and a coarse schedule-published version so
+        // publish/hide mutations and edit ticks invalidate within the TTL.
+        $resultsVersion = $this->publicResultsVersion($selectedScope['event_ids'])[0];
+        $cacheKey = 'fest-item-finder:v1:'.$event->tenant_id.':'.$event->id.':'.$event->updated_at?->getTimestamp().':'.$resultsVersion.':'.($selectedScope['schedule_published'] ? '1' : '0');
+        $compute = function () use ($event, $selectedScope, $isAdminPreview) {
+            $targetEvent = FestEventItem::where('event_id', $event->id)->where('is_enabled', true)->exists()
+                ? $event
+                : ($event->parent_event_id ? $event->rootEvent() : $event);
 
-        // Items whose results are actually out (the same "Results" button condition the
-        // view itself renders on — visible AND has recorded marks) float to the top, so a
-        // grid mostly full of "Not yet published" cards doesn't bury the handful that are
-        // actually ready. Collection::sortByDesc() is a stable sort, so within each of the
-        // two groups items keep their original display_order/title ordering.
-        $allItems = $allItems
-            ->sortByDesc(fn (FestEventItem $item) => ($visibleResultItemIds->contains($item->id) && $resultedItemIds->contains($item->id)) ? 1 : 0)
-            ->values();
+            $rawItems = FestEventItem::where('event_id', $targetEvent->id)
+                ->where('is_enabled', true)
+                ->with(['head:id,name', 'phase:id,source_phase_id'])
+                ->orderBy('display_order')
+                ->orderBy('title')
+                ->get(['id', 'title', 'stage_type', 'category', 'class_group', 'age_group', 'participant_type', 'head_id', 'event_id', 'results_published_at', 'results_hidden', 'phase_id']);
 
-        $itemCategoryKeys = $allItems
-            ->map(fn ($item) => $item->class_group ?: $item->age_group ?: $item->category)
-            ->filter()->unique()->values();
-        $categoryLabels = $itemCategoryKeys->mapWithKeys(
-            fn (string $key) => [$key => $this->scoreboards->categoryLabel($event, $key)]
-        );
+            $allItems = \App\Services\Events\FestHeadItemNavigationService::filterToOwnPhase($rawItems, $event);
+
+            $scheduledItemIds = FestSchedule::where('event_id', $event->id)
+                ->whereNotNull('item_id')
+                ->distinct()
+                ->pluck('item_id');
+
+            // An item can be flagged results_published_at without a single mark ever having
+            // been entered for it (published too early, or a no-show item) — the Results
+            // button must not render as a normal, inviting link into a page that can only
+            // ever say "No published results for this item." in that case.
+            $resultedItemIds = FestMark::where('event_id', $targetEvent->id)
+                ->whereIn('item_id', $allItems->pluck('id'))
+                ->distinct()
+                ->pluck('item_id');
+
+            // itemResults() itself requires the EVENT-wide results_published flag as a hard
+            // gate (FestItemResultsService::isItemVisible()) — an item's own
+            // results_published_at is not enough on its own, ever, even if it's set ahead of
+            // the event-wide publish. The button must not show as a normal, clickable link
+            // into a page that will just 403 the moment the event itself isn't published yet.
+            $itemResultsService = app(FestItemResultsService::class);
+            $visibleResultItemIds = $allItems
+                ->filter(fn (FestEventItem $item) => $isAdminPreview || $itemResultsService->isItemVisible($item, $event))
+                ->pluck('id');
+
+            // Items whose results are actually out (the same "Results" button condition the
+            // view itself renders on — visible AND has recorded marks) float to the top, so a
+            // grid mostly full of "Not yet published" cards doesn't bury the handful that are
+            // actually ready. Collection::sortByDesc() is a stable sort, so within each of the
+            // two groups items keep their original display_order/title ordering.
+            $allItems = $allItems
+                ->sortByDesc(fn (FestEventItem $item) => ($visibleResultItemIds->contains($item->id) && $resultedItemIds->contains($item->id)) ? 1 : 0)
+                ->values();
+
+            $itemCategoryKeys = $allItems
+                ->map(fn ($item) => $item->class_group ?: $item->age_group ?: $item->category)
+                ->filter()->unique()->values();
+            $categoryLabels = $itemCategoryKeys->mapWithKeys(
+                fn (string $key) => [$key => $this->scoreboards->categoryLabel($event, $key)]
+            );
+
+            return [
+                'allItems' => $allItems,
+                'categoryLabels' => $categoryLabels,
+                'scheduledItemIds' => $scheduledItemIds,
+                'resultedItemIds' => $resultedItemIds,
+                'visibleResultItemIds' => $visibleResultItemIds,
+            ];
+        };
+
+        $payload = $isAdminPreview
+            ? $compute()
+            : $this->rememberPublicHotPath($cacheKey, 30, $compute);
 
         return $this->renderPublic('public.fest.item-finder', $tenant, [
             'event' => $event,
             'eventContext' => $this->operationalEvents->publicContext($event),
-            'allItems' => $allItems,
-            'categoryLabels' => $categoryLabels,
+            'allItems' => $payload['allItems'],
+            'categoryLabels' => $payload['categoryLabels'],
             'isAdminPreview' => $isAdminPreview,
             'scopeSchedulePublished' => (bool) $selectedScope['schedule_published'],
-            'scheduledItemIds' => $scheduledItemIds,
-            'resultedItemIds' => $resultedItemIds,
-            'visibleResultItemIds' => $visibleResultItemIds,
+            'scheduledItemIds' => $payload['scheduledItemIds'],
+            'resultedItemIds' => $payload['resultedItemIds'],
+            'visibleResultItemIds' => $payload['visibleResultItemIds'],
             'pageSeo' => ['title' => 'Item Finder — '.$event->title.' — '.$tenant->name],
         ]);
     }
@@ -382,9 +403,9 @@ class FestPortalController extends Controller
         if ($isPublished && in_array($tab, ['championship', 'toppers'], true)) {
             if ($championshipUsesPhases) {
                 $visibleLeafIds = collect();
-                foreach (FestEventPhase::where('event_id', $championshipRoot->id)->get() as $phase) {
-                    $leaves = FestEvent::where('parent_event_id', $championshipRoot->id)->where('source_phase_id', $phase->id)->get();
-                    foreach ($leaves as $leaf) {
+                [$championshipPhases, $championshipLeaves] = $this->phasedLeavesForHub($championshipRoot);
+                foreach ($championshipLeaves as $phaseLeaves) {
+                    foreach ($phaseLeaves as $leaf) {
                         if ($this->operationalEvents->directScope($leaf)['results_published'] || $this->isAuthorizedAdminPreview($request, $leaf)) {
                             $visibleLeafIds->push($leaf->id);
                         }
@@ -955,50 +976,56 @@ class FestPortalController extends Controller
         // hidden) item's winners the moment the event overall went public.
         abort_unless($isAdminPreview || app(FestItemResultsService::class)->isItemVisible($item, $event), 403, 'Results for this item are not published yet.');
 
-        $allMarks = FestMark::where('event_id', $item->event_id)
-            ->where('item_id', $item->id)
-            ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.school', 'participant.registration.item', 'participant.registration.event', 'participant.group'])
-            ->orderBy('position')
-            ->orderByDesc('score')
-            // Safety ceiling: a team item with 100+ performers produces 100 identical
-            // mark rows (one per teammate). The dedup below collapses them, but the query
-            // still hydrates every row. Cap at 500 — enough for any realistic team size,
-            // prevents abuse from a corrupted data state.
-            ->limit(500)
-            ->get()
-            // Pair/group/team/trio items save one FestMark row PER TEAMMATE (same
-            // position/score, see the scoring-dedup note on EventContext) — without this,
-            // an 11-person choir would render its own result card 11 times over.
-            ->unique(fn (FestMark $m) => $m->deduplicationKey());
-
-        // Pair/group/team/trio items: the mark is only ever attached to one performer
-        // on the registration (see the same note in results() above) — resolve the rest
-        // of the roster so this page doesn't show a single arbitrary member as if they
-        // competed solo. Skipped for individual items, which are the common case.
-        $rosterByRegistration = $item->isTeamItem()
-            ? FestParticipant::whereIn(
-                'registration_id',
-                $allMarks->pluck('participant.registration_id')->filter()->unique()->values()
-            )
-                ->where('participant_role', 'performer')
-                ->with(['student', 'teacher'])
+        $resultsVersion = $this->publicResultsVersion([$event->id])[0];
+        $cacheKey = 'fest-item-results:v1:'.$event->tenant_id.':'.$event->id.':'.$item->id.':'.$resultsVersion;
+        $compute = function () use ($event, $item) {
+            $allMarks = FestMark::where('event_id', $item->event_id)
+                ->where('item_id', $item->id)
+                ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.school', 'participant.registration.item', 'participant.registration.event', 'participant.group'])
+                ->orderBy('position')
+                ->orderByDesc('score')
+                ->limit(500)
                 ->get()
-                ->groupBy('registration_id')
-            : null;
+                ->unique(fn (FestMark $m) => $m->deduplicationKey());
 
-        // One query/roster resolution feeds both sections. The visual Winner Roster is
-        // reserved for the podium (including ties), while Full Results remains the clear
-        // source for every ranked participant and the exact points breakdown.
-        $allMarks = $allMarks->map(fn (FestMark $m) => $this->publicWinnerRow($m, $event, $rosterByRegistration) + [
-            'mark_id' => $m->id,
-            'poster_url' => in_array((int) $m->position, [1, 2, 3], true)
-                ? route('tenant.fest.winner-poster', [$event->id, $item->id, $m->id])
-                : null,
-        ])->values();
+            // Pair/group/team/trio items: the mark is only ever attached to one performer
+            // on the registration (see the same note in results() above) — resolve the rest
+            // of the roster so this page doesn't show a single arbitrary member as if they
+            // competed solo. Skipped for individual items, which are the common case.
+            $rosterByRegistration = $item->isTeamItem()
+                ? FestParticipant::whereIn(
+                    'registration_id',
+                    $allMarks->pluck('participant.registration_id')->filter()->unique()->values()
+                )
+                    ->where('participant_role', 'performer')
+                    ->with(['student', 'teacher'])
+                    ->get()
+                    ->groupBy('registration_id')
+                : null;
 
-        $marks = $allMarks
-            ->filter(fn (array $row) => in_array((int) $row['position'], [1, 2, 3], true))
-            ->values();
+            // One query/roster resolution feeds both sections. The visual Winner Roster is
+            // reserved for the podium (including ties), while Full Results remains the clear
+            // source for every ranked participant and the exact points breakdown.
+            $allMarks = $allMarks->map(fn (FestMark $m) => $this->publicWinnerRow($m, $event, $rosterByRegistration) + [
+                'mark_id' => $m->id,
+                'poster_url' => in_array((int) $m->position, [1, 2, 3], true)
+                    ? route('tenant.fest.winner-poster', [$event->id, $item->id, $m->id])
+                    : null,
+            ])->values();
+
+            return [
+                'marks' => $allMarks
+                    ->filter(fn (array $row) => in_array((int) $row['position'], [1, 2, 3], true))
+                    ->values(),
+                'allMarks' => $allMarks,
+            ];
+        };
+
+        $markData = $isAdminPreview
+            ? $compute()
+            : $this->rememberPublicHotPath($cacheKey, 30, $compute);
+        $marks = $markData['marks'];
+        $allMarks = $markData['allMarks'];
 
         $categoryLabel = FestItemCategoryLabel::resolve(
             $item,
@@ -1612,7 +1639,7 @@ public function tv(Request $request, int $eventId)
             return self::$crossPhaseBoards[$cacheKey];
         }
 
-        $phases = FestEventPhase::where('event_id', $hub->id)->get();
+        [$phases, $leaves] = $this->phasedLeavesForHub($hub);
         if ($phases->isEmpty()) {
             self::$crossPhaseBoards[$cacheKey] = null;
 
@@ -1623,10 +1650,10 @@ public function tv(Request $request, int $eventId)
         $names = [];
         $anyVisible = false;
         foreach ($phases as $phase) {
-            $leaves = FestEvent::where('parent_event_id', $hub->id)->where('source_phase_id', $phase->id)->get();
-            $leafVisible = $leaves->contains(fn (FestEvent $leaf) => $this->operationalEvents->directScope($leaf)['results_published']
+            $phaseLeaves = $leaves[$phase->id] ?? collect();
+            $visiblePhaseLeaves = $phaseLeaves->filter(fn (FestEvent $leaf) => $this->operationalEvents->directScope($leaf)['results_published']
                 || $this->isAuthorizedAdminPreview($request, $leaf));
-            if (! $leafVisible) {
+            if ($visiblePhaseLeaves->isEmpty()) {
                 continue;
             }
             $anyVisible = true;
@@ -1668,6 +1695,39 @@ public function tv(Request $request, int $eventId)
     private static array $crossPhaseBoards = [];
 
     /**
+     * Return phases and leaves for $hub in at most two queries, memoized per
+     * hub across the request. Replaces the N+1 of iterating phases and
+     * querying leaves one phase at a time.
+     *
+     * @return array{0: Collection<int, FestEventPhase>, 1: array<int, Collection<int, FestEvent>>}
+     */
+    private function phasedLeavesForHub(FestEvent $hub): array
+    {
+        return $this->operationalEvents->loadPhasedLeaves($hub);
+    }
+
+    /**
+     * Whether every leaf for a given phase id is visible (published or admin
+     * preview). Memoized per hub+phase so repeated calls in the same request
+     * don't re-check.
+     */
+    private function phaseLeavesAreVisible(FestEvent $hub, int $phaseId, Request $request): bool
+    {
+        $cacheKey = $hub->id.':'.$phaseId;
+
+        if (! isset(self::$leafVisibilityCache[$cacheKey])) {
+            [$phases, $leaves] = $this->phasedLeavesForHub($hub);
+            $phaseLeaves = $leaves[$phaseId] ?? collect();
+            self::$leafVisibilityCache[$cacheKey] = $phaseLeaves->contains(
+                fn (FestEvent $leaf) => $this->operationalEvents->directScope($leaf)['results_published']
+                    || $this->isAuthorizedAdminPreview($request, $leaf)
+            );
+        }
+
+        return self::$leafVisibilityCache[$cacheKey];
+    }
+
+    /**
      * The event_ids of every leaf across every VISIBLE phase of $event's hub — the same
      * phase/leaf-visibility gating crossPhaseScoreboard() uses to decide whether to sum
      * points across phases, exposed separately so callers that need to scope a raw
@@ -1689,7 +1749,7 @@ public function tv(Request $request, int $eventId)
             return self::$crossPhaseEventIds[$cacheKey];
         }
 
-        $phases = FestEventPhase::where('event_id', $hub->id)->get();
+        [$phases, $leaves] = $this->phasedLeavesForHub($hub);
         if ($phases->isEmpty()) {
             self::$crossPhaseEventIds[$cacheKey] = null;
 
@@ -1697,17 +1757,16 @@ public function tv(Request $request, int $eventId)
         }
 
         $eventIds = [];
-        foreach ($phases as $phase) {
-            $leaves = FestEvent::where('parent_event_id', $hub->id)->where('source_phase_id', $phase->id)->get();
-            $visibleLeaves = $leaves->filter(fn (FestEvent $leaf) => $this->operationalEvents->directScope($leaf)['results_published']
-                || $this->isAuthorizedAdminPreview($request, $leaf));
-
-            foreach ($visibleLeaves as $leaf) {
-                $eventIds[] = $leaf->id;
+        foreach ($leaves as $phaseLeaves) {
+            foreach ($phaseLeaves as $leaf) {
+                if ($this->operationalEvents->directScope($leaf)['results_published']
+                    || $this->isAuthorizedAdminPreview($request, $leaf)) {
+                    $eventIds[] = $leaf->id;
+                }
             }
         }
 
-        $eventIds = array_unique($eventIds);
+        $eventIds = array_values(array_unique($eventIds));
 
         self::$crossPhaseEventIds[$cacheKey] = $eventIds ?: null;
 
@@ -1934,90 +1993,100 @@ public function tv(Request $request, int $eventId)
         // unauthenticated endpoint, so it must not trust the type of client input.
         $q = trim((string) $request->query('q', ''));
 
-        $results = collect();
-        if (strlen($q) >= 1) {
-            $base = FestParticipant::whereHas('registration', fn ($r) => $r
-                ->where('event_id', $event->id)
-                ->where('status', 'approved'))
-                ->with(['student', 'teacher', 'registration.item', 'registration.event', 'registration.school']);
+        $resultsVersion = $this->publicResultsVersion($selectedScope['event_ids'])[0];
+        $cacheKey = 'fest-search:v1:'.$event->tenant_id.':'.$event->id.':'.md5($q).':'.$resultsVersion.':'.($isAdminPreview ? '1' : '0');
+        $compute = function () use ($event, $q, $isAdminPreview, $selectedScope) {
+            $results = collect();
+            if (strlen($q) >= 1) {
+                $base = FestParticipant::whereHas('registration', fn ($r) => $r
+                    ->where('event_id', $event->id)
+                    ->where('status', 'approved'))
+                    ->with(['student', 'teacher', 'registration.item', 'registration.event', 'registration.school']);
 
-            if (ctype_digit($q)) {
-                // A numeric query can legitimately be either a chest number or a level
-                // registration number. Return both instead of letting one namespace hide
-                // the other when the same number exists in each.
-                $matches = (clone $base)
-                    ->where(function ($query) use ($q, $base) {
-                        // PostgreSQL otherwise infers a smallint parameter from legacy
-                        // chest columns and rejects valid larger Fest IDs before the OR.
-                        $number = filter_var(ltrim($q, '0') ?: '0', FILTER_VALIDATE_INT);
-                        if ($number !== false) {
-                            if ($base->getModel()->getConnection()->getDriverName() === 'pgsql') {
-                                $query->whereRaw('chest_no = CAST(? AS BIGINT)', [$number]);
-                            } else {
-                                $query->where('chest_no', $number);
+                if (ctype_digit($q)) {
+                    // A numeric query can legitimately be either a chest number or a level
+                    // registration number. Return both instead of letting one namespace hide
+                    // the other when the same number exists in each.
+                    $matches = (clone $base)
+                        ->where(function ($query) use ($q, $base) {
+                            // PostgreSQL otherwise infers a smallint parameter from legacy
+                            // chest columns and rejects valid larger Fest IDs before the OR.
+                            $number = filter_var(ltrim($q, '0') ?: '0', FILTER_VALIDATE_INT);
+                            if ($number !== false) {
+                                if ($base->getModel()->getConnection()->getDriverName() === 'pgsql') {
+                                    $query->whereRaw('chest_no = CAST(? AS BIGINT)', [$number]);
+                                } else {
+                                    $query->where('chest_no', $number);
+                                }
                             }
-                        }
-                        $query->orWhere('level_registration_number', $q);
-                    })
-                    ->limit(30)
-                    ->get();
-                if ($matches->isEmpty()) {
-                    // Before reveal, the chest number shown/linked publicly is a *computed*
-                    // preview (FestNumberingService::effectiveChestNumber()) that isn't a
-                    // persisted column — see the matching note on findParticipantByRef().
-                    $numbering = app(FestNumberingService::class);
-                    $matches = $base->get()
-                        ->filter(fn (FestParticipant $p) => $numbering->effectiveChestNumber($p) === (int) $q)
-                        ->take(30);
+                            $query->orWhere('level_registration_number', $q);
+                        })
+                        ->limit(30)
+                        ->get();
+                    if ($matches->isEmpty()) {
+                        // Before reveal, the chest number shown/linked publicly is a *computed*
+                        // preview (FestNumberingService::effectiveChestNumber()) that isn't a
+                        // persisted column — see the matching note on findParticipantByRef().
+                        $numbering = app(FestNumberingService::class);
+                        $matches = $base->get()
+                            ->filter(fn (FestParticipant $p) => $numbering->effectiveChestNumber($p) === (int) $q)
+                            ->take(30);
+                    }
+                } elseif (preg_match('/^[A-Za-z]-\d+$/', $q)) {
+                    $matches = $base->where('level_registration_number', strtoupper($q))->limit(30)->get();
+                } elseif ($this->visibility->allowNameSearch($event, $isAdminPreview)) {
+                    $searchTerm = '%'.$q.'%';
+                    $matches = $base->where(function ($inner) use ($searchTerm) {
+                        $inner->whereHas('student', fn ($s) => $s->where('name', 'like', $searchTerm))
+                            ->orWhereHas('teacher', fn ($t) => $t->where('name', 'like', $searchTerm));
+                    })->limit(30)->get();
+                } else {
+                    $matches = collect();
                 }
-            } elseif (preg_match('/^[A-Za-z]-\d+$/', $q)) {
-                $matches = $base->where('level_registration_number', strtoupper($q))->limit(30)->get();
-            } elseif ($this->visibility->allowNameSearch($event, $isAdminPreview)) {
-                $searchTerm = '%'.$q.'%';
-                $matches = $base->where(function ($inner) use ($searchTerm) {
-                    $inner->whereHas('student', fn ($s) => $s->where('name', 'like', $searchTerm))
-                        ->orWhereHas('teacher', fn ($t) => $t->where('name', 'like', $searchTerm));
-                })->limit(30)->get();
-            } else {
-                $matches = collect();
+
+                $showSchool = $this->visibility->showSchoolName($event, $isAdminPreview);
+                $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
+                $results = $matches
+                    // A student has one FestParticipant row per registration. Showing each
+                    // row separately made one person appear several times and amplified the
+                    // ambiguous-reference bug fixed in participantLinkRef().
+                    ->groupBy(fn (FestParticipant $p) => $p->student_id
+                        ? 'student-'.$p->student_id
+                        : ($p->teacher_id ? 'teacher-'.$p->teacher_id : 'participant-'.$p->id))
+                    ->map(function (Collection $entries) use ($event, $isAdminPreview, $showSchool, $classGroupLabels) {
+                        /** @var FestParticipant $participant */
+                        $participant = $entries->sortBy('id')->first();
+                        $public = $this->visibility->formatPublicParticipant($event, $participant, null, null, $isAdminPreview);
+                        $matchedItems = $entries
+                            ->map(fn (FestParticipant $entry) => [
+                                'title' => $entry->registration?->item?->title,
+                                'category' => FestItemCategoryLabel::resolve(
+                                    $entry->registration?->item,
+                                    $classGroupLabels,
+                                    config('fest_item_taxonomy.arts_category', [])
+                                ),
+                            ])
+                            ->filter(fn (array $item) => filled($item['title']))
+                            ->unique('title')
+                            ->values()
+                            ->all();
+
+                        return $public + [
+                            'school' => $showSchool ? $participant->registration?->school?->name : null,
+                            'matched_items' => $matchedItems,
+                            'item_count' => count($matchedItems),
+                        ];
+                    })
+                    ->take(30)
+                    ->values();
             }
 
-            $showSchool = $this->visibility->showSchoolName($event, $isAdminPreview);
-            $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
-            $results = $matches
-                // A student has one FestParticipant row per registration. Showing each
-                // row separately made one person appear several times and amplified the
-                // ambiguous-reference bug fixed in participantLinkRef().
-                ->groupBy(fn (FestParticipant $p) => $p->student_id
-                    ? 'student-'.$p->student_id
-                    : ($p->teacher_id ? 'teacher-'.$p->teacher_id : 'participant-'.$p->id))
-                ->map(function (Collection $entries) use ($event, $isAdminPreview, $showSchool, $classGroupLabels) {
-                    /** @var FestParticipant $participant */
-                    $participant = $entries->sortBy('id')->first();
-                    $public = $this->visibility->formatPublicParticipant($event, $participant, null, null, $isAdminPreview);
-                    $matchedItems = $entries
-                        ->map(fn (FestParticipant $entry) => [
-                            'title' => $entry->registration?->item?->title,
-                            'category' => FestItemCategoryLabel::resolve(
-                                $entry->registration?->item,
-                                $classGroupLabels,
-                                config('fest_item_taxonomy.arts_category', [])
-                            ),
-                        ])
-                        ->filter(fn (array $item) => filled($item['title']))
-                        ->unique('title')
-                        ->values()
-                        ->all();
+            return $results;
+        };
 
-                    return $public + [
-                        'school' => $showSchool ? $participant->registration?->school?->name : null,
-                        'matched_items' => $matchedItems,
-                        'item_count' => count($matchedItems),
-                    ];
-                })
-                ->take(30)
-                ->values();
-        }
+        $results = $isAdminPreview
+            ? $compute()
+            : $this->rememberPublicHotPath($cacheKey, 30, $compute);
 
         return $this->renderPublic('public.fest.search', $tenant, [
             'event' => $event,
@@ -2047,24 +2116,43 @@ public function tv(Request $request, int $eventId)
         $participant = $this->visibility->findParticipantByRef($event, $ref);
         abort_unless($participant, 404);
 
-        $mark = FestMark::where('participant_id', $participant->id)->first();
-        $schedule = FestSchedule::where('participant_id', $participant->id)->first();
-        // The view reads sort_order straight off this model, so drop it entirely while the
-        // schedule is unpublished rather than relying on each field being nulled downstream.
-        if (! $isAdminPreview && ! $this->visibility->showSchedulePublicly($event)) {
-            $schedule = null;
-        }
+        $cacheKey = 'fest-participant:v1:'.$event->tenant_id.':'.$event->id.':'.$participant->id.':'.($isAdminPreview ? '1' : '0');
+        $compute = function () use ($event, $participant, $isAdminPreview) {
+            $mark = FestMark::where('participant_id', $participant->id)->first();
+            $schedule = FestSchedule::where('participant_id', $participant->id)->first();
+            // The view reads sort_order straight off this model, so drop it entirely while the
+            // schedule is unpublished rather than relying on each field being nulled downstream.
+            if (! $isAdminPreview && ! $this->visibility->showSchedulePublicly($event)) {
+                $schedule = null;
+            }
 
-        $public = $this->visibility->formatPublicParticipant($event, $participant, $schedule, $mark, $isAdminPreview);
-        // Cross-phase: a championship/results page linking here already shows this
-        // student's combined standing across every phase, so their own page should
-        // list every item across those same phases too, not just the one leaf $event
-        // happened to be reached through.
-        $items = $this->visibility->publicParticipantItems($event, $participant, $isAdminPreview, acrossPhases: true);
+            $public = $this->visibility->formatPublicParticipant($event, $participant, $schedule, $mark, $isAdminPreview);
+            // Cross-phase: a championship/results page linking here already shows this
+            // student's combined standing across every phase, so their own page should
+            // list every item across those same phases too, not just the one leaf $event
+            // happened to be reached through.
+            $items = $this->visibility->publicParticipantItems($event, $participant, $isAdminPreview, acrossPhases: true);
+
+            return [
+                'public' => $public,
+                'mark' => $mark,
+                'schedule' => $schedule,
+                'items' => $items,
+            ];
+        };
+
+        $data = $isAdminPreview
+            ? $compute()
+            : $this->rememberPublicHotPath($cacheKey, 30, $compute);
 
         return $this->renderPublic('public.fest.participant', $tenant, compact(
-            'event', 'public', 'participant', 'schedule', 'mark', 'items'
-        ) + ['isAdminPreview' => $isAdminPreview]);
+            'event', 'participant', 'isAdminPreview'
+        ) + [
+            'public' => $data['public'],
+            'mark' => $data['mark'],
+            'schedule' => $data['schedule'],
+            'items' => $data['items'],
+        ]);
     }
 
     /** @return list<array<string, mixed>> */
