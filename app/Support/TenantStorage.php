@@ -461,7 +461,7 @@ class TenantStorage
      * logos. Use cacheable signed CloudFront URLs or presigned S3 URLs; signing is
      * local and keeps image requests away from PHP without exposing private objects.
      */
-    public static function directPhotoUrl(?string $relativePath, bool $thumbnail = true): ?string
+    public static function directPhotoUrl(?string $relativePath, bool $thumbnail = true, bool $useCloudFront = true): ?string
     {
         if (! $relativePath) {
             return null;
@@ -481,14 +481,15 @@ class TenantStorage
             try {
                 $storage = Storage::disk('s3');
 
-                if ($url = self::cloudFrontSignedUrl($path, null, true, null, self::cacheableCloudFrontExpiry())) {
+                if ($useCloudFront && ($url = self::cloudFrontSignedUrl($path, null, true, null, self::cacheableCloudFrontExpiry()))) {
                     return $url;
                 }
 
                 // A CDN base URL does not grant access to private photo objects.
                 // Signing failure falls back to the existing cached data URI instead
                 // of returning an unsigned URL that browsers cannot load.
-                return $storage->temporaryUrl($path, now()->addHours(6));
+                // Match the page-cache lifetime and reuse URLs within each signing window.
+                return $storage->temporaryUrl($path, \Illuminate\Support\Carbon::createFromTimestamp(self::cacheableCloudFrontExpiry()));
             } catch (\Throwable) {
                 // Local/test installs continue through the existing data-URI fallback.
             }

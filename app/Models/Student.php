@@ -127,10 +127,10 @@ class Student extends Model
             ?? $this->photoDataUri();
     }
 
-    /** Full-size fallback for photos uploaded before thumbnail generation existed. */
+    /** Full-size S3 fallback also bypasses a failing CloudFront distribution. */
     public function publicPhotoFallbackUrl(): ?string
     {
-        return TenantStorage::directPhotoUrl($this->photo, thumbnail: false);
+        return TenantStorage::directPhotoUrl($this->photo, thumbnail: false, useCloudFront: false);
     }
 
     /**

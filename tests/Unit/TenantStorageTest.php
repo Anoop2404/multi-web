@@ -142,4 +142,26 @@ class TenantStorageTest extends TestCase
             TenantStorage::directPhotoUrl($path, thumbnail: false),
         );
     }
+    public function test_student_photo_fallback_bypasses_cloudfront_and_signs_the_original_s3_object(): void
+    {
+        config([
+            'filesystems.disks.s3.key' => 'test-key',
+            'filesystems.disks.s3.secret' => 'test-secret',
+            'filesystems.disks.s3.region' => 'ap-south-1',
+            'filesystems.disks.s3.bucket' => 'test-bucket',
+            'filesystems.disks.s3.root' => 'domains',
+            'filesystems.disks.s3.endpoint' => null,
+            'filesystems.disks.s3.use_path_style_endpoint' => false,
+        ]);
+        Storage::forgetDisk('s3');
+        $student = new \App\Models\Student(['photo' => 'students/school-123/photo.jpg']);
+        $url = $student->publicPhotoFallbackUrl();
+
+        $this->assertNotNull($url);
+        $this->assertStringContainsString('test-bucket.s3.ap-south-1.amazonaws.com', $url);
+        $this->assertStringContainsString('/domains/students/school-123/photo.jpg?', $url);
+        $this->assertStringContainsString('X-Amz-Signature=', $url);
+        $this->assertStringNotContainsString('.thumb.jpg', $url);
+    }
+
 }
