@@ -11,7 +11,7 @@ class PublicVisitorMonitorController extends Controller
 {
     public function index()
     {
-        return Inertia::render('Admin/PublicVisitors', ['monitor' => $this->snapshot()]);
+        return Inertia::render('PublicVisitors', ['monitor' => $this->snapshot()]);
     }
 
     public function data()

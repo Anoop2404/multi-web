@@ -5,14 +5,14 @@
  */
 
 export function superadminNav(options = {}) {
-    const { pendingReceiptsCount = 0 } = options;
+    const { pendingReceiptsCount = 0, publicVisitorsCount = 0 } = options;
 
     const groups = [
         {
             section: 'Overview',
             items: [
                 { label: 'Dashboard', href: '/admin/dashboard', icon: 'grid', exact: true },
-                { label: 'Live public visitors', href: '/admin/public-visitors', icon: 'users' },
+                { label: 'Live public visitors', href: '/admin/public-visitors', icon: 'users', badge: publicVisitorsCount },
             ],
         },
         {

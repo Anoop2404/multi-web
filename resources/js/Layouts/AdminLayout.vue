@@ -104,7 +104,7 @@ import SidebarNavGroup from '@/Components/ui/SidebarNavGroup.vue';
 import SahodayaSidebarNavSearch from '@/Components/sahodaya/SahodayaSidebarNavSearch.vue';
 import { filterNavGroups } from '@/support/filterNavGroups.js';
 import { adminNavItemActive, stateAdminNav, superadminNav } from '@/support/adminNav.js';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue';
 
 defineProps({
     title: { type: String, default: 'Dashboard' },
@@ -124,10 +124,32 @@ const isStateAdmin = computed(() => userRoles.value.some(r => ['state_admin', 's
 const isStateStaff = computed(() => userRoles.value.includes('state_staff'));
 const isSuperAdmin = computed(() => userRoles.value.includes('superadmin'));
 
+const publicVisitorsCount = ref(page.props.monitor?.active_visitors ?? 0);
+let visitorTimer;
+let visitorRequest;
+async function refreshVisitorCount() {
+    if (!isSuperAdmin.value || document.visibilityState !== 'visible' || visitorRequest) return;
+    visitorRequest = new AbortController();
+    try {
+        const response = await fetch('/admin/public-visitors/data', { headers: { Accept: 'application/json' }, cache: 'no-store', signal: visitorRequest.signal });
+        if (response.ok) publicVisitorsCount.value = (await response.json()).active_visitors ?? 0;
+    } catch (_) {
+        // Keep the last successful count if the network is unavailable.
+    } finally { visitorRequest = null; }
+}
+onMounted(() => {
+    if (isSuperAdmin.value) {
+        refreshVisitorCount();
+        visitorTimer = setInterval(refreshVisitorCount, 10000);
+    }
+});
+onBeforeUnmount(() => { clearInterval(visitorTimer); visitorRequest?.abort(); });
+
 const navGroups = computed(() => {
     if (isSuperAdmin.value) {
         return superadminNav({
             pendingReceiptsCount: page.props.pendingReceiptsCount || 0,
+            publicVisitorsCount: publicVisitorsCount.value,
         });
     }
     if (isStateAdmin.value) return stateAdminNav();
