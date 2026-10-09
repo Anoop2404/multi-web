@@ -20,6 +20,7 @@ class FestEventSettingsPayload
             'record_tracking_enabled',
             'strict_item_payment_gating',
             'tv_show_overall_standings',
+            'tv_public_override',
         ], [
             'scoring_locked'                      => false,
             'appeals_open'                        => false,
@@ -31,6 +32,7 @@ class FestEventSettingsPayload
             'record_tracking_enabled'             => false,
             'strict_item_payment_gating'           => false,
             'tv_show_overall_standings'            => true,
+            'tv_public_override'                  => false,
         ]);
     }
 }

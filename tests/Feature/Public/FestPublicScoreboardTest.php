@@ -1109,6 +1109,28 @@ class FestPublicScoreboardTest extends TestCase
      * built for exactly this case, so gating it behind publish status on top of that
      * only broke the venue display for no benefit.
      */
+    public function test_tv_override_opens_only_tv_for_a_hidden_event_and_can_be_disabled(): void
+    {
+        $event = FestEvent::create([
+            'tenant_id' => $this->sahodaya->id,
+            'title' => 'Venue TV Only',
+            'event_type' => 'kalotsav',
+            'status' => 'ongoing',
+            'nav_hidden' => true,
+            'results_published' => false,
+            'tv_public_override' => true,
+        ]);
+
+        $base = "http://public-scoreboard.test/fest/{$event->id}";
+        $this->get("{$base}/tv")->assertOk();
+        $this->get("{$base}/scoreboard")->assertNotFound();
+        $this->get("{$base}/results")->assertNotFound();
+        $this->assertFalse($event->fresh()->results_published);
+
+        $event->update(['tv_public_override' => false]);
+        $this->get("{$base}/tv")->assertNotFound();
+    }
+
     public function test_tv_screen_never_403s_even_when_nothing_is_published_yet(): void
     {
         $freshEvent = FestEvent::create([

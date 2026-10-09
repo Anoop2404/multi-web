@@ -55,7 +55,10 @@
                         </label>
                     </div>
                 </FormField>
-                <FormField label="Public TV screen" hint="Category-wise standings always rotate on the TV screen regardless of this toggle.">
+                <FormField label="Public TV screen" hint="The TV override enables the TV URL even when the event is hidden or public results are off. Only individually published, visible item results are shown; other public pages keep their existing settings.">
+                    <label class="flex items-center gap-2 text-sm text-slate-700 mb-2">
+                        <input type="checkbox" v-model="settingsForm.tv_public_override"> Enable TV screen independently of public event visibility
+                    </label>
                     <label class="flex items-center gap-2 text-sm text-slate-700">
                         <input type="checkbox" v-model="settingsForm.tv_show_overall_standings"> Show fest-wide Overall Standings slide
                     </label>

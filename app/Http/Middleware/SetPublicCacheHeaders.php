@@ -12,6 +12,12 @@ class SetPublicCacheHeaders
     {
         $response = $next($request);
 
+        if ($request->attributes->get('event_visitor_limit') || $request->attributes->get('public_visitor_tracking')) {
+            $response->headers->set('Cache-Control', 'private, no-store');
+
+            return $response;
+        }
+
         if ($request->isMethod('GET') && $response->isSuccessful()) {
             // Admin preview responses can contain unpublished results and must never be
             // stored by a shared edge cache. Anonymous festival GETs do not need a PHP

@@ -87,6 +87,7 @@ export function useEventSettingsForms(props) {
         max_participants: props.event.max_participants ?? '',
         max_teams: props.event.max_teams ?? '',
         tv_show_overall_standings: props.event.tv_show_overall_standings ?? true,
+        tv_public_override: props.event.tv_public_override ?? false,
     });
 
     // Event-level notification gating — mirrors the per-head form in

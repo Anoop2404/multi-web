@@ -397,6 +397,7 @@ class FestEventSettingsController extends SahodayaAdminController
             // through the fest-wide Overall Standings slide. Category-wise standings
             // always show regardless of this toggle.
             'tv_show_overall_standings'           => 'nullable|boolean',
+            'tv_public_override'                 => 'nullable|boolean',
         ]);
 
         $data = FestEventSettingsPayload::applyDefaults($data);

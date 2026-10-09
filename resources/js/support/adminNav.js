@@ -12,6 +12,7 @@ export function superadminNav(options = {}) {
             section: 'Overview',
             items: [
                 { label: 'Dashboard', href: '/admin/dashboard', icon: 'grid', exact: true },
+                { label: 'Live public visitors', href: '/admin/public-visitors', icon: 'users' },
             ],
         },
         {

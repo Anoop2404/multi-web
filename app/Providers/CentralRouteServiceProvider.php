@@ -39,10 +39,10 @@ class CentralRouteServiceProvider extends ServiceProvider
                     }
 
                     if (\App\Support\TenantPublicSite::isEnabled(tenancy()->tenant)) {
-                        return app(PublicSiteController::class)->home($request);
+                        return app(\App\Http\Middleware\TrackPublicVisitors::class)->handle($request, fn ($request) => app(PublicSiteController::class)->home($request));
                     }
 
-                    return app(RegistrationLandingController::class)($request);
+                    return app(\App\Http\Middleware\TrackPublicVisitors::class)->handle($request, fn ($request) => app(RegistrationLandingController::class)($request));
                 });
 
                 Route::redirect('/admin', '/admin/dashboard');

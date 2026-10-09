@@ -356,6 +356,8 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
 
     // ── Superadmin-only platform routes ─────────────────────────────────────
     Route::middleware('super.admin')->group(function () {
+    Route::get('/public-visitors', [\App\Http\Controllers\Admin\PublicVisitorMonitorController::class, 'index'])->name('public-visitors.index');
+    Route::get('/public-visitors/data', [\App\Http\Controllers\Admin\PublicVisitorMonitorController::class, 'data'])->name('public-visitors.data');
 
     Route::prefix('states')->name('states.')->group(function () {
         Route::get('/', [\App\Http\Controllers\Admin\StateController::class, 'index'])->name('index');

@@ -24,9 +24,12 @@ Route::middleware([
     'web',
     InitializeTenancyByRequestHost::class,
     PreventAccessFromCentralDomains::class,
+    \App\Http\Middleware\TrackPublicVisitors::class,
 ])->group(function () {
 
     // Home route is registered in CentralRouteServiceProvider (host-aware central + tenant).
+
+    Route::get('/visitor-heartbeat', fn () => response()->noContent())->name('tenant.visitor-heartbeat');
 
     // Portal landing (register + login options; always available)
     Route::get('/portal', RegistrationLandingController::class)->name('tenant.portal');
@@ -72,7 +75,7 @@ Route::middleware([
     // IDs are numeric: a non-numeric {event} (bots, mangled links) used to reach the
     // controllers' int $eventId and 500 with a TypeError, and a non-numeric {item}/{mark}
     // a Postgres bigint cast error — now they're a plain 404.
-    Route::prefix('fest')->name('tenant.fest.')->where(['event' => '[0-9]+', 'item' => '[0-9]+', 'mark' => '[0-9]+'])->group(function () {
+    Route::prefix('fest')->name('tenant.fest.')->middleware(\App\Http\Middleware\LimitPublicEventVisitors::class)->where(['event' => '[0-9]+', 'item' => '[0-9]+', 'mark' => '[0-9]+'])->group(function () {
         Route::get('/', [FestPortalController::class, 'index'])->name('index');
         Route::get('/{event}', [FestPortalController::class, 'show'])->name('show');
         Route::get('/{event}/schedule', [FestPortalController::class, 'schedule'])->name('schedule');
@@ -90,6 +93,8 @@ Route::middleware([
         Route::get('/{event}/items/{item}/winners/{mark}/poster.svg', [FestPortalController::class, 'winnerPoster'])->name('winner-poster');
         Route::get('/{event}/scoreboard', [FestPortalController::class, 'scoreboard'])->name('scoreboard');
         Route::get('/{event}/scoreboard/data', [FestPortalController::class, 'scoreboardData'])->name('scoreboard.data');
+        Route::get('/{event}/tv/visitor-heartbeat', fn () => response()->noContent())->name('tv-heartbeat');
+        Route::get('/{event}/visitor-heartbeat', fn () => response()->noContent())->name('visitor-heartbeat');
         Route::get('/{event}/tv', [FestPortalController::class, 'tv'])->name('tv');
         Route::get('/{event}/manual', [FestPortalController::class, 'manual'])->name('manual');
         Route::get('/{event}/live', [FestPortalController::class, 'live'])->name('live');
