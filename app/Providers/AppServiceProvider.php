@@ -12,7 +12,10 @@ use App\Observers\FeeReceiptObserver;
 use App\Observers\McqCertificateObserver;
 use App\Observers\TenantObserver;
 use App\Services\BoardResults\TopperCountService;
+use App\Support\Monitoring\RequestTrace;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
 use Stancl\Tenancy\DatabaseConfig;
@@ -36,6 +39,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        DB::listen(function (QueryExecuted $query): void {
+            if ($this->app->runningInConsole()) {
+                return;
+            }
+            $trace = request()->attributes->get('_monitoring_trace');
+            if ($trace instanceof RequestTrace) {
+                $trace->query($query);
+            }
+        });
+
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
         ResetPassword::createUrlUsing(function (object $user, string $token) {

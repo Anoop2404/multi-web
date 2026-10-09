@@ -23,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->prepend(\App\Http\Middleware\MonitorRequests::class);
         // On central /sahodaya-admin/{tenantId} routes, tenancy must start AFTER the session
         // (so database/file sessions stay on the central store) but BEFORE route model binding.
         $middleware->prependToPriorityList(
