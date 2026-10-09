@@ -77,9 +77,9 @@ class FestPortalController extends Controller
         }
 
         // The busiest public route otherwise rebuilds the full item grid and recent
-        // winners per visitor. Keep anonymous HTML for 20 seconds; never share previews.
+        // winners per visitor. Keep anonymous HTML for 30 seconds; never share previews.
         $key = 'fest-home-html:v1:'.$tenant->id.':'.$event->id.':'.$event->updated_at?->getTimestamp();
-        $html = $this->rememberPublicHotPath($key, 20,
+        $html = $this->rememberPublicHotPath($key, 30,
             fn () => $this->renderEventHome($request, $tenant, $event)->getContent());
 
         return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
@@ -323,23 +323,7 @@ class FestPortalController extends Controller
             $tab = $selectedScope['results_published'] ? 'school' : 'item';
         }
 
-        $publishedAt = FestResult::whereIn('event_id', $selectedScope['event_ids'])
-            ->whereNull('item_id')
-            ->max('published_at');
-        // resultsVersion must track every signal that changes what's publicly
-        // visible: event-level publish (FestResult.published_at), individual
-        // item publish (results_published_at), item explicit unpublish/hide
-        // (results_hidden — no dedicated timestamp, but toggling it updates the
-        // row's updated_at), and live mark changes (FestMark.updated_at).
-        // Previously the hash skipped results_hidden, so hiding an item after
-        // event-level publish left the cached tab HTML serving the now-hidden
-        // results until a mark was touched.
-        $resultsVersion = sha1(implode('|', [
-            (string) $publishedAt,
-            (string) FestEventItem::whereIn('event_id', $selectedScope['event_ids'])->max('results_published_at'),
-            (string) FestEventItem::whereIn('event_id', $selectedScope['event_ids'])->max('updated_at'),
-            (string) FestMark::whereIn('event_id', $selectedScope['event_ids'])->max('updated_at'),
-        ]));
+        [$resultsVersion, $publishedAt] = $this->publicResultsVersion($selectedScope['event_ids']);
 
         // Bypassed for ANY authenticated request, not just $isAdminPreview — the
         // championship computation below also runs a per-SIBLING-LEAF
@@ -351,7 +335,7 @@ class FestPortalController extends Controller
         $bypassCache = (bool) ($request->user() ?? auth()->user());
 
         $renderResults = function () use ($request, $event, $selectedScope, $isPublished, $publishedAt, $scopes, $tenant, $tab) {
-            $payload = $this->buildResultsPayload($request, $event, $selectedScope, $isPublished, $publishedAt, $scopes);
+            $payload = $this->buildResultsPayload($request, $event, $selectedScope, $isPublished, $publishedAt, $scopes, $tab);
 
             return $this->renderPublic('public.fest.results', $tenant, $payload + ['tab' => $tab]);
         };
@@ -375,7 +359,7 @@ class FestPortalController extends Controller
      * The shared results computation. results() caches only the final HTML for the
      * requested tab, so this method's Eloquent objects never enter the cache store.
      */
-    private function buildResultsPayload(Request $request, FestEvent $event, array $selectedScope, bool $isPublished, mixed $publishedAt, array $scopes): array
+    private function buildResultsPayload(Request $request, FestEvent $event, array $selectedScope, bool $isPublished, mixed $publishedAt, array $scopes, string $tab): array
     {
         // FestIndividualChampionshipPoint is a stored aggregate across every item in the
         // event (recalculated on demand by an admin action), not a live per-item query —
@@ -392,7 +376,7 @@ class FestPortalController extends Controller
         $championshipUsesPhases = $championshipRoot->usesPhasedRegionalBilling();
         $championshipRows = collect();
         $championshipEventIds = [$selectedScope['event_id'] ?: $event->id];
-        if ($isPublished) {
+        if ($isPublished && in_array($tab, ['championship', 'toppers'], true)) {
             if ($championshipUsesPhases) {
                 $visibleLeafIds = collect();
                 foreach (FestEventPhase::where('event_id', $championshipRoot->id)->get() as $phase) {
@@ -462,7 +446,7 @@ class FestPortalController extends Controller
             ->all();
 
         $categories = $this->scoreboards->categories($event, $selectedScope);
-        $categoryBoards = collect($categories)
+        $categoryBoards = collect(in_array($tab, ['category', 'toppers'], true) ? $categories : [])
             ->map(function (string $key) use ($event, $selectedScope, $isPublished) {
                 [$rows] = $this->resolveScoreboard($event, $selectedScope, $key, $isPublished);
 
@@ -1061,6 +1045,20 @@ public function scoreboard(Request $request, int $eventId)
 {
     $tenant = $this->resolveTenant();
     $event = $this->findEvent($tenant->id, $eventId);
+    if ($request->user() ?? auth()->user()) {
+        return $this->renderScoreboardPage($request, $tenant, $event);
+    }
+    $scope = $this->operationalEvents->directScope($event);
+    $key = 'fest-scoreboard-html:v1:'.$tenant->id.':'.$event->id.':'
+        .$event->updated_at?->getTimestamp().':'.$this->publicResultsVersion($scope['event_ids'])[0].':'
+        .sha1((string) $request->query('category', ''));
+    $html = $this->rememberPublicHotPath($key, 15,
+        fn () => $this->renderScoreboardPage($request, $tenant, $event)->getContent());
+    return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
+}
+
+private function renderScoreboardPage(Request $request, Tenant $tenant, FestEvent $event)
+{
     $selectedScope = $this->operationalEvents->directScope($event);
 
     $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
@@ -1694,17 +1692,33 @@ public function tv(Request $request, int $eventId)
      * event/category's own $isAdminPreview is false — see the identical note on
      * results()'s cache. Only genuinely anonymous requests share the cache.
      */
+    private function publicResultsVersion(array $eventIds): array
+    {
+        // One item aggregate instead of two scans. This short shared cache also
+        // removes all timestamp scans from most scoreboard/results requests.
+        sort($eventIds);
+        $compute = function () use ($eventIds) {
+            $items = FestEventItem::whereIn('event_id', $eventIds)
+                ->selectRaw('MAX(results_published_at) AS published, MAX(updated_at) AS updated')->first();
+            $publishedAt = FestResult::whereIn('event_id', $eventIds)->whereNull('item_id')->max('published_at');
+            return [sha1(implode('|', [
+                (string) $publishedAt,
+                (string) ($items?->getRawOriginal('published') ?? ''),
+                (string) ($items?->getRawOriginal('updated') ?? ''),
+                (string) FestMark::whereIn('event_id', $eventIds)->max('updated_at'),
+            ])), $publishedAt];
+        };
+        if (request()->user() ?? auth()->user()) {
+            return $compute();
+        }
+        return $this->rememberPublicHotPath('fest-results-version:v1:'.tenant('id').':'.implode(',', $eventIds), 5, $compute);
+    }
+
     private function scoreboardDynamicData(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished, bool $isAdminPreview = false, ?Request $request = null): array
     {
         $bypassCache = (bool) ($request?->user() ?? auth()->user());
 
-        $versionInputs = [
-            (string) FestResult::whereIn('event_id', $selectedScope['event_ids'])->whereNull('item_id')->max('published_at'),
-            (string) FestEventItem::whereIn('event_id', $selectedScope['event_ids'])->max('results_published_at'),
-            (string) FestEventItem::whereIn('event_id', $selectedScope['event_ids'])->max('updated_at'),
-            (string) FestMark::whereIn('event_id', $selectedScope['event_ids'])->max('updated_at'),
-        ];
-        $version = sha1(implode('|', $versionInputs));
+        $version = $this->publicResultsVersion($selectedScope['event_ids'])[0];
 
         $compute = fn () => $this->computeScoreboardDynamicData($event, $selectedScope, $category, $isPublished, $isAdminPreview, $request);
 
@@ -1728,7 +1742,6 @@ public function tv(Request $request, int $eventId)
         // under this method's short TTLs, returning null instead of falling through
         // to recompute — check the value itself, not existence.
         if (($cached = Cache::get($key)) !== null) {
-            Log::channel('tall')->info('fest.public_hotpath.cache_hit', ['key' => $key, 'ttl' => $ttlSeconds]);
 
             return $cached;
         }
@@ -1743,7 +1756,6 @@ public function tv(Request $request, int $eventId)
             $result = Cache::get($key) ?? $remember();
         }
 
-        Log::channel('tall')->info('fest.public_hotpath.cache_set', ['key' => $key, 'ttl' => $ttlSeconds]);
 
         return $result;
     }

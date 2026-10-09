@@ -135,6 +135,17 @@ class FestPublicResultsTeamRosterTest extends TestCase
             'filesystems.disks.s3.root' => 'domains',
         ]);
 
+        $key = openssl_pkey_new(['private_key_bits' => 2048]);
+        openssl_pkey_export($key, $pem);
+        $keyPath = tempnam(sys_get_temp_dir(), 'public-photo-key-');
+        file_put_contents($keyPath, $pem);
+        config(['services.cloudfront' => [
+            'url' => 'https://media.example.test',
+            'key_pair_id' => 'TESTKEY', 'private_key_path' => $keyPath,
+            'origin_path' => '', 'ttl' => 600,
+        ]]);
+        \Illuminate\Support\Facades\Storage::forgetDisk('s3');
+
         $student = Student::where('name', 'Anu Krishna')->firstOrFail();
         $photoPath = 'students/'.$student->tenant_id.'/anu.jpg';
         $student->update(['photo' => $photoPath]);
@@ -143,8 +154,10 @@ class FestPublicResultsTeamRosterTest extends TestCase
 
         $response->assertOk()
             ->assertSee('https://media.example.test/domains/'.$photoPath.'.thumb.jpg', false)
-            ->assertSee('data-fallback-src="https://media.example.test/domains/'.$photoPath.'"', false)
+            ->assertSee('data-fallback-src="https://media.example.test/domains/'.$photoPath.'?', false)
+            ->assertSee('Key-Pair-Id=TESTKEY', false)
             ->assertDontSee('data:image/', false);
+        unlink($keyPath);
     }
 
     public function test_results_item_tab_shows_the_items_gender_badge(): void

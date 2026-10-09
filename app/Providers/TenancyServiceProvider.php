@@ -67,6 +67,17 @@ class TenancyServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->bootEvents();
+        foreach ([Events\TenantSaved::class, Events\TenantDeleted::class] as $event) {
+            Event::listen($event, fn ($e) => \App\Support\TenantRequestResolver::forgetTenant((string) $e->tenant->getTenantKey()));
+        }
+        foreach ([Events\DomainSaved::class, Events\DomainDeleted::class] as $event) {
+            Event::listen($event, function ($e) {
+                \App\Support\TenantRequestResolver::forgetDomain($e->domain->domain);
+                if ($old = $e->domain->getOriginal('domain')) {
+                    \App\Support\TenantRequestResolver::forgetDomain($old);
+                }
+            });
+        }
         $this->mapRoutes();
         $this->makeTenancyMiddlewareHighestPriority();
     }

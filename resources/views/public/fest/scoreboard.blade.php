@@ -164,9 +164,9 @@
     // the dedicated TV display; this page refreshes the current category in place.
     setInterval(() => {
         if (!document.hidden) loadCategory(current, {silent: true});
-    }, 30000);
+    }, 60000);
     document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && Date.now() - lastUpdated > 30000) loadCategory(current, {silent: true});
+        if (!document.hidden && Date.now() - lastUpdated > 60000) loadCategory(current, {silent: true});
     });
 })();
 </script>
