@@ -26,15 +26,43 @@ class PublicEventVisitorMonitor
     public static function snapshot(): array
     {
         $cache = self::cache();
+        $now = time();
+        $cutoff = $now - 300;
+
         $rows = [];
         $unique = [];
         foreach ($cache->get('fest-visitor-monitor:index', []) as $key => $event) {
-            $active = array_filter($cache->get($key, []), fn ($seen) => $seen > time() - 300);
+            $active = array_filter($cache->get($key, []), fn ($seen) => $seen > $cutoff);
             if (! $active) continue;
             foreach ($active as $id => $seen) $unique[$event['tenant_id'].':'.$id] = true;
             $rows[] = $event + ['active' => count($active), 'limit' => 200];
         }
 
-        return ['active_visitors' => count(array_filter($cache->get('public-active-visitors', []), fn ($seen) => $seen > time() - 300)), 'active_tv_screens' => count(array_filter($cache->get('tv-active-visitors', []), fn ($seen) => $seen > time() - 300)), 'events' => $rows, 'updated_at' => now()->timezone('Asia/Kolkata')->format('d M Y, h:i:s A').' IST'];
+        $activePublic = array_filter($cache->get('public-active-visitors', []), fn ($seen) => $seen > $cutoff);
+        $activeTv = array_filter($cache->get('tv-active-visitors', []), fn ($seen) => $seen > $cutoff);
+
+        $sahodayaBreakdown = [];
+        foreach ($activePublic as $compoundId => $seen) {
+            $parts = explode(':', (string) $compoundId, 2);
+            $tenantId = $parts[0] ?? '';
+            if ($tenantId !== '') {
+                $sahodayaBreakdown[$tenantId]['public'] = ($sahodayaBreakdown[$tenantId]['public'] ?? 0) + 1;
+            }
+        }
+        foreach ($activeTv as $compoundId => $seen) {
+            $parts = explode(':', (string) $compoundId, 2);
+            $tenantId = $parts[0] ?? '';
+            if ($tenantId !== '') {
+                $sahodayaBreakdown[$tenantId]['tv'] = ($sahodayaBreakdown[$tenantId]['tv'] ?? 0) + 1;
+            }
+        }
+
+        return [
+            'active_visitors' => count($activePublic),
+            'active_tv_screens' => count($activeTv),
+            'events' => $rows,
+            'sahodayas' => $sahodayaBreakdown,
+            'updated_at' => now()->timezone('Asia/Kolkata')->format('d M Y, h:i:s A').' IST',
+        ];
     }
 }
