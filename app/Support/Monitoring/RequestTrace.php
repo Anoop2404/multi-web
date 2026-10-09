@@ -26,9 +26,13 @@ class RequestTrace
         $this->queryTimeMs += $query->time;
         // Never interpolate bindings. Also redact inline SQL literals and comments.
         $sql = preg_replace('/\/\*.*?\*\/|--[^\r\n]*|#[^\r\n]*/s', ' ', $query->sql);
-        $sql = preg_replace('/\'(?:\'\'|\\\\.|[^\'\\\\])*\'|"(?:""|\\\\.|[^"\\\\])*"|\b\d+(?:\.\d+)?\b/s', '?', $sql);
+        $sql = preg_replace('/\'(?:\'\'|\\\\.|[^\'\\\\])*\'|\b\d+(?:\.\d+)?\b/s', '?', $sql);
+        if ($query->connection->getDriverName() !== 'pgsql') {
+            $sql = preg_replace('/"(?:""|\\\\.|[^"\\\\])*"/s', '?', $sql);
+        }
         self::write([
             'type' => 'query', 'request_id' => $this->id,
+            'method' => $this->method, 'url' => $this->url,
             'connection' => $query->connectionName,
             'sql' => $sql, 'duration_ms' => $query->time,
         ]);

@@ -13,7 +13,12 @@ class MonitorRequests
     {
         if (RequestTrace::until() > time()) {
             // Exclude query strings, credentials, headers and request bodies.
-            $request->attributes->set('_monitoring_trace', new RequestTrace($request->method(), $request->url()));
+            $trace = new RequestTrace($request->method(), $request->url());
+            $request->attributes->set('_monitoring_trace', $trace);
+            RequestTrace::write([
+                'type' => 'request_started', 'request_id' => $trace->id,
+                'method' => $trace->method, 'url' => $trace->url,
+            ]);
         }
 
         return $next($request);

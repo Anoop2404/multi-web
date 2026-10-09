@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Middleware\MonitorRequests;
 use App\Support\Monitoring\RequestTrace;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Database\PostgresConnection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
@@ -48,7 +49,8 @@ class TrafficMonitoringTest extends TestCase
         $middleware->terminate($request, $response);
         $raw = file_get_contents(glob($this->monitorStorage.'/logs/*')[0]);
         $entries = array_map(fn ($line) => json_decode($line, true), explode("\n", trim($raw)));
-        $this->assertCount(2, $entries);
+        $this->assertCount(3, $entries);
+        $this->assertSame('request_started', array_shift($entries)['type']);
         $this->assertSame($entries[0]['request_id'], $entries[1]['request_id']);
         $this->assertSame(12.5, $entries[0]['duration_ms']);
         $this->assertSame(503, $entries[1]['status']);
@@ -58,6 +60,16 @@ class TrafficMonitoringTest extends TestCase
         $this->assertStringNotContainsString('private@example.test', $raw);
         $this->assertStringNotContainsString('42', $entries[0]['sql']);
         $this->assertNull($request->attributes->get('_monitoring_trace'));
+    }
+
+    public function test_postgres_identifiers_are_preserved_while_values_are_redacted(): void
+    {
+        $connection = new PostgresConnection(fn () => null, 'test', '', ['driver' => 'pgsql']);
+        $trace = new RequestTrace('GET', 'https://example.test/dashboard');
+        $trace->query(new QueryExecuted('select * from "tenants" where "domain" = \'private.test\' and "id" = 42', [], 123, $connection));
+        $entry = json_decode(trim(file_get_contents(glob($this->monitorStorage.'/logs/*')[0])), true);
+        $this->assertSame('select * from "tenants" where "domain" = ? and "id" = ?', $entry['sql']);
+        $this->assertSame('https://example.test/dashboard', $entry['url']);
     }
 
     public function test_expired_or_stopped_capture_does_not_log_requests(): void
