@@ -68,6 +68,8 @@
                                 📦 Download / print ▾
                             </summary>
                             <div class="absolute z-20 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg p-1">
+                                <a v-if="selectedItemId" :href="`${base}/merit-winner-sheet?${scopeParams()}`" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">Winner verification sheet (PDF)</a>
+                                <a v-if="selectedItemId" :href="`${base}/merit-winner-sheet?${scopeParams()}&inline=1`" target="_blank" rel="noopener" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">Preview winner verification sheet</a>
                                 <a v-if="selectedItemId" :href="mergedItemUrl(false)" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">Combined item merit PDF — verification</a>
                                 <a v-if="selectedItemId" :href="mergedItemUrl(true)" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">Combined item merit PDF — without background</a>
                                 <a :href="downloadFilteredUrl" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">📦 Matching certificates (ZIP)</a>

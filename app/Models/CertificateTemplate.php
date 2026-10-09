@@ -465,7 +465,16 @@ BODY;
      * Sample preview HTML for {participation_items_box} token.
      * Mirrors FestCertificateService::participationItemsBoxHtml() with 7 sample items.
      */
-    public static function sampleParticipationItemsBoxHtml(): string
+    public static function participationLayoutHtml(array $layout, string $key, array $values): string
+    {
+        static $defaults;
+        $defaults ??= json_decode(file_get_contents(resource_path('js/support/participationItemsLayout.json')), true);
+        $html = $layout[$key] ?? $defaults[$key];
+
+        return strtr($html, $values);
+    }
+
+    public static function sampleParticipationItemsBoxHtml(array $layout = []): string
     {
         $sampleItems = [
             ['title' => 'Classical Music (Solo)', 'category' => 'Category I', 'type' => 'Individual', 'grade' => 'A'],
@@ -477,27 +486,22 @@ BODY;
             ['title' => 'Patriotic Song (Group)', 'category' => 'Category I', 'type' => 'Group', 'grade' => 'A'],
         ];
 
-        $cellsHtml = array_map(function ($item) {
+        $cellsHtml = array_map(function ($item) use ($layout) {
             $meta = trim($item['category'].' • '.$item['type']);
             $metaSafe = '('.$meta.')';
             $metaInline = ' <span style="font-size:0.86em;font-weight:400;color:#64748b;">'.$metaSafe.'</span>';
             $gradeInline = $item['grade'] ? ' <span style="font-size:0.86em;font-weight:700;color:#b45309;">— Grade '.$item['grade'].'</span>' : '';
 
-            return '<span style="display:block;font-size:0.95em;line-height:1.35;color:#172033;">&bull;&nbsp;<strong>'.$item['title'].'</strong>'.$metaInline.$gradeInline.'</span>';
+            return self::participationLayoutHtml($layout, 'participation_item_html', ['{item_title}' => e($item['title']), '{item_meta}' => $metaInline, '{item_grade}' => $gradeInline]);
         }, $sampleItems);
 
         $rows = '';
         foreach (array_chunk($cellsHtml, 2) as $pair) {
-            $tds = '<td style="width:50%;vertical-align:top;padding:2px 6px 2px 0;">'.$pair[0].'</td>';
-            $tds .= isset($pair[1])
-                ? '<td style="width:50%;vertical-align:top;padding:2px 6px 2px 0;">'.$pair[1].'</td>'
-                : '<td style="width:50%;"></td>';
+            $tds = self::participationLayoutHtml($layout, 'participation_cell_html', ['{item_content}' => $pair[0]]);
+            $tds .= self::participationLayoutHtml($layout, 'participation_cell_html', ['{item_content}' => $pair[1] ?? '']);
             $rows .= '<tr>'.$tds.'</tr>';
         }
 
-        return '<div style="border:1px solid #d6a95c;border-radius:6px;padding:6px 10px;margin:5px auto 0;max-width:98%;background:rgba(180,83,9,0.04);">'
-            .'<div style="text-align:center;font-size:0.85em;font-weight:700;letter-spacing:1.5px;color:#b45309;text-transform:uppercase;margin-bottom:5px;">&bull;&nbsp;Participated Items (7)&nbsp;&bull;</div>'
-            .'<table style="width:100%;border-collapse:collapse;">'.$rows.'</table>'
-            .'</div>';
+        return self::participationLayoutHtml($layout, 'participation_section_html', ['{items_rows}' => $rows, '{items_count}' => (string) count($sampleItems)]);
     }
 }

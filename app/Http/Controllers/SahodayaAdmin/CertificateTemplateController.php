@@ -130,7 +130,7 @@ class CertificateTemplateController extends SahodayaAdminController
                     'achievement_line' => 'First Prize with A Grade',
                     'position'         => 'First',
                     'grade'            => 'A',
-                    'participation_items_box' => CertificateTemplate::sampleParticipationItemsBoxHtml(),
+                    'participation_items_box' => CertificateTemplate::sampleParticipationItemsBoxHtml($template->layout_json ?? []),
                     'sahodaya_name'    => strtoupper($this->sahodaya->name),
                     // A fixed illustrative date (matching event_dates' sample end date
                     // above), not today's real date — every other sample value here is a
@@ -363,6 +363,9 @@ class CertificateTemplateController extends SahodayaAdminController
             'layout_json.signature_blocks.*.school.font_weight' => 'nullable|in:normal,bold',
             'layout_json.signature_blocks.*.school.font_style' => 'nullable|in:normal,italic',
             'layout_json.signature_blocks.*.school.align'      => 'nullable|in:left,right,center,none,justify',
+            'layout_json.participation_section_html' => 'nullable|string|max:20000',
+            'layout_json.participation_item_html' => 'nullable|string|max:20000',
+            'layout_json.participation_cell_html' => 'nullable|string|max:20000',
             'layout_json.custom_fields'                    => 'nullable|array',
             'layout_json.custom_fields.*.text'              => 'nullable|string|max:500',
             'layout_json.custom_fields.*.top'               => 'nullable|numeric|min:0|max:100',
@@ -626,6 +629,9 @@ class CertificateTemplateController extends SahodayaAdminController
             'layout_json.signature_blocks.*.school.font_weight' => 'nullable|in:normal,bold',
             'layout_json.signature_blocks.*.school.font_style' => 'nullable|in:normal,italic',
             'layout_json.signature_blocks.*.school.align'      => 'nullable|in:left,right,center,none,justify',
+            'layout_json.participation_section_html' => 'nullable|string|max:20000',
+            'layout_json.participation_item_html' => 'nullable|string|max:20000',
+            'layout_json.participation_cell_html' => 'nullable|string|max:20000',
             'layout_json.custom_fields'                    => 'nullable|array',
             'layout_json.custom_fields.*.text'              => 'nullable|string|max:500',
             'layout_json.custom_fields.*.top'               => 'nullable|numeric|min:0|max:100',

@@ -1,0 +1,5 @@
+{
+  "participation_section_html": "<div style=\"border:1px solid #d6a95c;border-radius:6px;padding:6px 10px;margin:5px auto 0;max-width:98%;background:rgba(180,83,9,0.04);\">\n<div style=\"text-align:center;font-size:0.85em;font-weight:700;letter-spacing:1.5px;color:#b45309;text-transform:uppercase;margin-bottom:5px;\">&bull;&nbsp;Participated Items&nbsp;&bull;</div>\n<table style=\"width:100%;border-collapse:collapse;\">{items_rows}</table>\n</div>",
+  "participation_item_html": "<span style=\"display:block;font-size:0.95em;line-height:1.35;color:#172033;\">&bull;&nbsp;<strong>{item_title}</strong>{item_meta}{item_grade}</span>",
+  "participation_cell_html": "<td style=\"width:50%;vertical-align:top;padding:2px 6px 2px 0;\">{item_content}</td>"
+}

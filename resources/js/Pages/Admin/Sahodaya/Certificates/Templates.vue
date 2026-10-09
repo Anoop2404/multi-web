@@ -489,6 +489,19 @@
                                     </div>
                                 </div>
                                 <p v-if="!form.layout_json.custom_fields.length" class="text-xs text-slate-400">No custom fields yet — the Body text paragraph below covers everything.</p>
+                                <div v-if="form.event_type === 'fest' && form.certificate_type === 'participation'" class="space-y-3 p-4 bg-white border border-slate-200 rounded-lg">
+                                    <div class="flex items-center justify-between gap-3"><h3 class="font-semibold">Participation items content</h3><button type="button" class="btn-secondary text-xs" @click="Object.assign(form.layout_json, participationLayoutDefaults)">Restore default content</button></div>
+                                    <p class="text-xs text-slate-500">Edit the heading, HTML and spacing. The current layout is loaded by default; student items remain dynamic. Use the separate participation field’s Top % to move the whole section.</p>
+                                    <label class="block text-sm font-medium">Section HTML</label>
+                                    <textarea v-model="form.layout_json.participation_section_html" rows="7" class="w-full rounded-lg border-slate-300 font-mono text-xs" />
+                                    <p class="text-xs text-slate-500">{items_rows} inserts the item rows. {items_count} inserts the total number of items.</p>
+                                    <label class="block text-sm font-medium">Each item HTML</label>
+                                    <textarea v-model="form.layout_json.participation_item_html" rows="4" class="w-full rounded-lg border-slate-300 font-mono text-xs" />
+                                    <p class="text-xs text-slate-500">{item_title}, {item_meta} and {item_grade} insert the actual item name, category/type and grade.</p>
+                                    <label class="block text-sm font-medium">Item cell HTML / spacing</label>
+                                    <textarea v-model="form.layout_json.participation_cell_html" rows="3" class="w-full rounded-lg border-slate-300 font-mono text-xs" />
+                                    <p class="text-xs text-slate-500">Keep {item_content} to show the item. Adjust padding and alignment here; rows contain two cells.</p>
+                                </div>
                             </div>
                         </template>
 
@@ -677,6 +690,7 @@ import { ref, watch, computed } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import CertificateLiveCanvas from '@/Components/certificates/CertificateLiveCanvas.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import participationLayoutDefaults from '@/support/participationItemsLayout.json';
 import { useConfirm } from '@/composables/useConfirm';
 
 const { confirm } = useConfirm();
@@ -1031,6 +1045,9 @@ function layoutDefaults(from = null) {
                 school: textFieldDefaults(blk.school, {}, base.school),
             };
         }),
+        participation_section_html: src.participation_section_html ?? d.participation_section_html ?? participationLayoutDefaults.participation_section_html,
+        participation_item_html: src.participation_item_html ?? d.participation_item_html ?? participationLayoutDefaults.participation_item_html,
+        participation_cell_html: src.participation_cell_html ?? d.participation_cell_html ?? participationLayoutDefaults.participation_cell_html,
         custom_fields: (src.custom_fields ?? d.custom_fields ?? []).map((cf) => ({
             text: cf.text ?? '',
             ...textFieldDefaults(cf, null, {

@@ -816,7 +816,7 @@ class FestCertificateService
             $eventParticipants = $participantsCache[$event->id];
         }
 
-        $fieldValues = $this->resolveFieldValues($payload, $sahodaya, $certificate->cert_type, $eventParticipants);
+        $fieldValues = $this->resolveFieldValues($payload, $sahodaya, $certificate->cert_type, $eventParticipants, $template?->layout_json ?? []);
 
         return array_merge($payload, [
             'sahodaya'      => $sahodaya,
@@ -1063,7 +1063,7 @@ class FestCertificateService
     }
 
     /** @return array<string, string> */
-    private function resolveFieldValues(array $payload, ?Tenant $sahodaya, string $certType, ?\Illuminate\Support\Collection $eventParticipants = null): array
+    private function resolveFieldValues(array $payload, ?Tenant $sahodaya, string $certType, ?\Illuminate\Support\Collection $eventParticipants = null, array $layout = []): array
     {
         $event = $payload['event'] ?? null;
         $item = $payload['item'] ?? null;
@@ -1236,7 +1236,7 @@ class FestCertificateService
             // a structured list instead of item_title's single run-on sentence. Empty
             // string for non-participation certs and templates that don't reference the
             // {participation_items_box} token at all.
-            'participation_items_box' => $certType === 'participation' ? $this->participationItemsBoxHtml($items, $taxonomies, $itemGrades) : '',
+            'participation_items_box' => $certType === 'participation' ? $this->participationItemsBoxHtml($items, $taxonomies, $itemGrades, $layout) : '',
             'sahodaya_name'       => $sahodaya ? strtoupper($sahodaya->name) : '',
             // Ordinal suffix ("25th August 2026") to match the convention already used
             // elsewhere for fest dates (event_dates/conducted_on's sample values are
@@ -1446,7 +1446,7 @@ class FestCertificateService
      * @param  \Illuminate\Support\Collection<int, array{category: string, type: string}>  $taxonomies  Same order/keys as $items.
      * @param  \Illuminate\Support\Collection<int, string>|null  $gradesByItemId  item_id => grade, only for items that actually have one (see participationGradesByItem()).
      */
-    private function participationItemsBoxHtml(\Illuminate\Support\Collection $items, \Illuminate\Support\Collection $taxonomies, ?\Illuminate\Support\Collection $gradesByItemId = null): string
+    private function participationItemsBoxHtml(\Illuminate\Support\Collection $items, \Illuminate\Support\Collection $taxonomies, ?\Illuminate\Support\Collection $gradesByItemId = null, array $layout = []): string
     {
         if ($items->isEmpty()) {
             return '';
@@ -1473,7 +1473,7 @@ class FestCertificateService
         // stacked on its own line below — halves the box's height for the same item
         // count, which is what makes the larger font size here affordable within the
         // reserved zone.
-        $entries = $shown->values()->map(function (FestEventItem $item, int $i) use ($taxonomies, $gradesByItemId) {
+        $entries = $shown->values()->map(function (FestEventItem $item, int $i) use ($taxonomies, $gradesByItemId, $layout) {
             $tax = $taxonomies->get($i, ['category' => '', 'type' => '']);
             $meta = trim(implode('  •  ', array_filter([$tax['category'] ?? '', $tax['type'] ?? ''])));
             // Bold just the digits ("Category 1" -> "Category <strong>1</strong>") —
@@ -1501,7 +1501,7 @@ class FestCertificateService
             $grade = $gradesByItemId?->get($item->id);
             $gradeInline = $grade ? ' <span style="font-size:0.86em;font-weight:700;color:#b45309;">— Grade '.e($grade).'</span>' : '';
 
-            return '<span style="display:block;font-size:0.95em;line-height:1.35;color:#172033;">&bull;&nbsp;<strong>'.e($item->title).'</strong>'.$metaInline.$gradeInline.'</span>';
+            return CertificateTemplate::participationLayoutHtml($layout, 'participation_item_html', ['{item_title}' => e($item->title), '{item_meta}' => $metaInline, '{item_grade}' => $gradeInline]);
         });
 
         if ($overflow > 0) {
@@ -1510,9 +1510,9 @@ class FestCertificateService
 
         $rows = '';
         foreach ($entries->chunk(2) as $pair) {
-            $cells = $pair->map(fn ($html) => '<td style="width:50%;vertical-align:top;padding:2px 6px 2px 0;">'.$html.'</td>')->implode('');
+            $cells = $pair->map(fn ($html) => CertificateTemplate::participationLayoutHtml($layout, 'participation_cell_html', ['{item_content}' => $html]))->implode('');
             if ($pair->count() === 1) {
-                $cells .= '<td style="width:50%;"></td>';
+                $cells .= CertificateTemplate::participationLayoutHtml($layout, 'participation_cell_html', ['{item_content}' => '']);
             }
             $rows .= '<tr>'.$cells.'</tr>';
         }
@@ -1521,10 +1521,7 @@ class FestCertificateService
         // testing that DomPDF's font set renders &bull; correctly but shows the star as
         // a missing-glyph "?"; Chromium renders both fine, but this box must degrade
         // correctly on the DomPDF fallback too.
-        return '<div style="border:1px solid #d6a95c;border-radius:6px;padding:6px 10px;margin:5px auto 0;max-width:98%;background:rgba(180,83,9,0.04);">'
-            .'<div style="text-align:center;font-size:0.85em;font-weight:700;letter-spacing:1.5px;color:#b45309;text-transform:uppercase;margin-bottom:5px;">&bull;&nbsp;Participated Items&nbsp;&bull;</div>'
-            .'<table style="width:100%;border-collapse:collapse;">'.$rows.'</table>'
-            .'</div>';
+        return CertificateTemplate::participationLayoutHtml($layout, 'participation_section_html', ['{items_rows}' => $rows, '{items_count}' => (string) $items->count()]);
     }
 
     /** @param  list<string>  $items */

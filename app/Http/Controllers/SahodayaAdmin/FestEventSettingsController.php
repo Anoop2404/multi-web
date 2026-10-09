@@ -743,11 +743,10 @@ class FestEventSettingsController extends SahodayaAdminController
         // FestEventItem/FestItemHead rows, which that read-side redirect never touches.
         app(FestSchoolEventFeeService::class)->propagateFeeSettingsToChildren($event->fresh());
 
-        // Recalculate every already-registered school's fee now that the schedule
-        // changed, instead of leaving it to the registration page's own read-time
-        // recalculation (removed — see FestRegistrationController::
-        // hydrateEventForSchoolRegistration()). Queued: see RecalculateEventSchoolFeesJob.
-        \App\Jobs\RecalculateEventSchoolFeesJob::dispatch($event->id);
+        // Complete recalculation before reporting success: the fees page reads saved
+        // totals, so queuing this can show the new breakdown alongside old dues until
+        // a worker processes the job (or indefinitely when no worker is running).
+        \App\Jobs\RecalculateEventSchoolFeesJob::dispatchSync($event->id);
 
         app(PlatformAuditLogger::class)->festEvent(
             $event,
@@ -756,7 +755,7 @@ class FestEventSettingsController extends SahodayaAdminController
             'Fee settings saved',
         );
 
-        return back()->with('success', 'Fee settings saved.');
+        return back()->with('success', 'Fee settings saved and school dues recalculated.');
     }
 
     public function updateLedgerAccount(Request $request, string $tenantId, FestEvent $event)
@@ -805,7 +804,7 @@ class FestEventSettingsController extends SahodayaAdminController
         // Same reasoning as updateFeeSettings() above — this single-item fee edit also
         // changes what schools owe, so recalculate eagerly here rather than relying on
         // the (now removed) read-time recalculation on the registration page.
-        \App\Jobs\RecalculateEventSchoolFeesJob::dispatch($event->id);
+        \App\Jobs\RecalculateEventSchoolFeesJob::dispatchSync($event->id);
 
         app(PlatformAuditLogger::class)->festEvent(
             $event,

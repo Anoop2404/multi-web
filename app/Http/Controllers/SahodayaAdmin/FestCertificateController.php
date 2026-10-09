@@ -1138,6 +1138,35 @@ class FestCertificateController extends SahodayaAdminController
         return back()->with('success', "Updated stage label for {$count} items.");
     }
 
+    public function meritWinnerSheet(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        $data = $request->validate(['item_id' => 'required|integer']);
+        $item = FestEventItem::whereIn('event_id', $event->reportableEventIds())->findOrFail($data['item_id']);
+        [$certificates, $payloads] = app(FestCertificateService::class)->exportScope(
+            $event, true, $item->id, $this->schoolIdFrom($request), 'winner'
+        );
+        $rows = $certificates->map(function ($certificate) use ($payloads) {
+            $payload = $payloads->get($certificate->id);
+            $participant = $payload['participant'] ?? null;
+            return [
+                'name' => ($payload['student'] ?? null)?->name ?? $participant?->student?->name ?? 'Participant',
+                'school' => ($payload['registration'] ?? null)?->school?->name ?? $participant?->registration?->school?->name ?? '',
+                'rank' => ($payload['mark'] ?? null)?->position,
+                'grade' => ($payload['mark'] ?? null)?->grade,
+                'fest_id' => $participant?->level_registration_number,
+                'chest_no' => $participant?->chest_no,
+            ];
+        })->sortBy(fn ($row) => [$row['rank'] ?? 99, mb_strtolower($row['name'])])->values();
+        if ($rows->isEmpty()) {
+            return back()->with('error', 'No published merit certificates found for this item.');
+        }
+        $html = view('fest.merit-winner-sheet', compact('event', 'item', 'rows'))->render();
+
+        return PdfGenerator::download($html, str($event->title)->slug().'-'.str($item->title)->slug().'-merit-winners.pdf',
+            $request->boolean('inline'), true);
+    }
+
     public function downloadMergedMerit(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

@@ -8,15 +8,10 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
 /**
- * Runs FestSchoolEventFeeService::recalculateAllRegisteredSchools() for an event —
- * dispatched from FestEventSettingsController::updateFeeSettings()/updateItemFee()
- * whenever an admin changes a fee schedule, so already-registered schools (up to
- * 30-100 per Sahodaya) get their fee recalculated once, at the point of change,
- * instead of the school registration page recalculating on every single page view
- * (the anti-pattern this job replaces — see PERFORMANCE_FIX_PLAN_2026_08_13.md and
- * the perf_fixes_implemented follow-up memory entry). Queued rather than inline
- * because a settings save can affect many schools at once and there's no reason to
- * make the admin wait on all of them synchronously.
+ * Recalculates registered-school dues using the latest event fee schedule.
+ * Settings saves dispatch this synchronously so their success response guarantees
+ * that persisted invoice totals match the updated fee breakdown. The job remains
+ * queueable for callers that explicitly choose background maintenance.
  */
 class RecalculateEventSchoolFeesJob implements ShouldQueue
 {
