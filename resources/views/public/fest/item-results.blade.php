@@ -18,10 +18,10 @@
             'badges' => collect([$categoryLabel ?? null, $genderLabel ?? null, $typeLabels[$item->participant_type] ?? ucfirst($item->participant_type ?: 'individual')])->filter()->all(),
         ])
 
-        @if($allMarks->isEmpty())
+        @if(! ($allMarks instanceof \Illuminate\Support\Collection) ? empty($allMarks) : $allMarks->isEmpty())
         <div class="rounded-2xl border border-dashed border-slate-700 p-10 text-center text-white/30 mt-6">No published results for this item.</div>
         @else
-        @if($marks->isNotEmpty())
+        @if(! ($marks instanceof \Illuminate\Support\Collection) ? !empty($marks) : $marks->isNotEmpty())
         <div class="mt-6 flex flex-wrap items-end justify-between gap-2">
             <div class="flex items-center gap-2 text-amber-300/90">
                 <span class="text-lg" aria-hidden="true">🏆</span>

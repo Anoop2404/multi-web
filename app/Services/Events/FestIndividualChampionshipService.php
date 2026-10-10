@@ -48,6 +48,26 @@ class FestIndividualChampionshipService
             'minimum_points' => (int) ($stored['minimum_points'] ?? 0),
             'excluded_item_categories' => (array) ($stored['excluded_item_categories'] ?? []),
             'active_categories' => ! empty($stored['active_categories']) ? (array) $stored['active_categories'] : null,
+            'group_by_gender' => (bool) ($stored['group_by_gender'] ?? true),
+        ];
+    }
+
+    /**
+     * Resolves the public-facing overlay config for the Individual Championship
+     * tab on the public results page. Stored in aggregation_config['public_overlays'].
+     *
+     * @return array{enabled: bool, categories: list<string>}
+     */
+    public function getPublicOverlayConfig(FestEvent $event): array
+    {
+        $root = $event->rootEvent();
+        $stored = $root->aggregation_config['public_overlays'] ?? [];
+
+        return [
+            'enabled' => (bool) ($stored['enabled'] ?? true),
+            'categories' => isset($stored['categories']) && is_array($stored['categories'])
+                ? array_values(array_unique($stored['categories']))
+                : [],
         ];
     }
 

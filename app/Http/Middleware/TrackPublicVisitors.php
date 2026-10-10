@@ -20,8 +20,10 @@ class TrackPublicVisitors
         if (! is_string($visitor) || ! Str::isUuid($visitor)) $visitor = (string) Str::uuid();
         // Share the identifier with the event limiter on this first request.
         $request->cookies->set('fest_visitor', $visitor);
-        $request->attributes->set('public_visitor_tracking', true);
         $response = $next($request);
+        if ($response instanceof \Illuminate\View\View) {
+            $response = response($response->render());
+        }
         if (! $response->isSuccessful()) return $response;
 
         $cache = PublicEventVisitorMonitor::cache();

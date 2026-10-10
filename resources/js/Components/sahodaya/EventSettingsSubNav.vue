@@ -31,7 +31,7 @@ const currentTab = computed(() => {
     if (['fees', 'registration', 'participation'].includes(a)) return 'fees';
     if (['points', 'eligibility', 'grades', 'combo', 'records'].includes(a)) return 'points';
     if (['venues', 'numbering', 'volunteers'].includes(a)) return 'venues';
-    if (['lifecycle', 'locks', 'clone'].includes(a)) return 'lifecycle';
+    if (['lifecycle', 'locks', 'clone', 'public-overlays'].includes(a)) return 'lifecycle';
     return a;
 });
 </script>

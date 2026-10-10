@@ -13,7 +13,7 @@ class TenantPublicSiteTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_home_shows_registration_portal_when_public_website_disabled(): void
+    public function test_home_redirects_to_login_when_public_website_disabled(): void
     {
         $sahodaya = Tenant::create([
             'id'        => (string) Str::uuid(),
@@ -26,11 +26,24 @@ class TenantPublicSiteTest extends TestCase
 
         $response = $this->get('http://portalmode.sahodaya.test/');
 
+        $response->assertRedirect('http://portalmode.sahodaya.test/login');
+    }
+
+    public function test_portal_route_shows_registration_landing(): void
+    {
+        $sahodaya = Tenant::create([
+            'id'        => (string) Str::uuid(),
+            'type'      => 'sahodaya',
+            'name'      => 'Malappuram Sahodaya',
+            'subdomain' => 'portalroute',
+            'is_active' => true,
+        ]);
+
+        $response = $this->get('http://portalroute.sahodaya.test/portal');
+
         $response->assertOk();
         $response->assertSee('School Registration');
         $response->assertSee('School Login');
-        $response->assertSee('Register students for Kalotsav');
-        $response->assertSee('Malappuram Sahodaya');
     }
 
     public function test_school_login_page_loads_on_sahodaya_tenant(): void

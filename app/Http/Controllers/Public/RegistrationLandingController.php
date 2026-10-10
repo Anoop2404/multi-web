@@ -49,7 +49,7 @@ class RegistrationLandingController extends Controller
             ];
         }
 
-        return view('public.registration-landing', [
+        return response()->view('public.registration-landing', [
             'tenant' => $tenant,
             'isSahodaya' => $isSahodaya,
             'logoUrl' => TenantBranding::logoUrl($tenant),

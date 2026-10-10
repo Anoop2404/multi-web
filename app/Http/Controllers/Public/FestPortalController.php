@@ -385,22 +385,16 @@ class FestPortalController extends Controller
      */
     private function buildResultsPayload(Request $request, FestEvent $event, array $selectedScope, bool $isPublished, mixed $publishedAt, array $scopes, string $tab): array
     {
-        // FestIndividualChampionshipPoint is a stored aggregate across every item in the
-        // event (recalculated on demand by an admin action), not a live per-item query —
-        // unlike the school scoreboard there's no "provisional, published-items-only"
-        // variant to fall back to, so the whole tab stays empty until the event's
-        // official publish has actually run (matches how $overallBoard/$categoryBoards
-        // being empty pre-publish is already handled further down). Ranked within
-        // category AND gender (FestIndividualChampionshipService::rankAndFormat()) — boys
-        // and girls in the same category get separate #1s, not one mixed ranking — and,
-        // when this hub uses phases, combined across every phase the viewer can actually
-        // see (same per-leaf visibility gate crossPhaseScoreboard() uses for the school
-        // board, so an unpublished sibling phase can't leak its points into the total).
         $championshipRoot = $event->rootEvent();
         $championshipUsesPhases = $championshipRoot->usesPhasedRegionalBilling();
+        $overlayConfig = $this->individualChampionship->getPublicOverlayConfig($event);
         $championshipRows = collect();
         $championshipEventIds = [$selectedScope['event_id'] ?: $event->id];
-        if ($isPublished && in_array($tab, ['championship', 'toppers'], true)) {
+        $needsChampionship = $isPublished
+            && $overlayConfig['enabled']
+            && in_array($tab, ['championship', 'toppers'], true);
+
+        if ($needsChampionship) {
             if ($championshipUsesPhases) {
                 $visibleLeafIds = collect();
                 [$championshipPhases, $championshipLeaves] = $this->phasedLeavesForHub($championshipRoot);
@@ -412,34 +406,35 @@ class FestPortalController extends Controller
                     }
                 }
                 $championshipRows = $this->individualChampionship->crossPhaseStandingForVisibleLeaves($championshipRoot, $visibleLeafIds, directPhotoUrls: true);
-                // A student's ranked row here is a cross-phase total — their own eye-icon
-                // link must resolve against WHICHEVER leaf they're actually registered in
-                // (findParticipantByRef() requires an exact match), not the single leaf
-                // $event happens to be, or every student outside that one leaf silently
-                // loses the icon.
                 $championshipEventIds = $visibleLeafIds->all();
             } else {
                 $championshipRows = $this->individualChampionship->leaderboardForEvent($event, directPhotoUrls: true);
             }
+
+            // Apply category filter from overlay config before computing refs and
+            // formatting — avoids paying the join cost for students we'll drop.
+            if (! empty($overlayConfig['categories'])) {
+                $championshipRows = $championshipRows->filter(fn (array $row) => in_array($row['category'], $overlayConfig['categories'], true));
+            }
         }
 
-        // Link each championship row through the same typed participant reference used
-        // by search, avoiding collisions between numeric chest and registration numbers.
-        // Each ref is paired with the specific leaf event its registration actually
-        // belongs to (not necessarily $event) — the link the view builds must point
-        // there or the participant page's own lookup (scoped to one event) 404s.
-        $championshipRefs = FestParticipant::whereHas('registration', fn ($q) => $q->whereIn('event_id', $championshipEventIds))
-            ->whereIn('student_id', $championshipRows->pluck('student.id')->filter()->unique())
-            ->with('registration:id,event_id')
-            ->orderBy('id')
-            ->get()
-            ->unique('student_id')
-            ->mapWithKeys(fn (FestParticipant $participant) => [
-                $participant->student_id => [
-                    'ref' => $this->visibility->participantLinkRef($participant),
-                    'event_id' => $participant->registration?->event_id ?? $event->id,
-                ],
-            ]);
+        // participantLinkRef() is just 'p-'.$participant->id — no need for the
+        // registration eager load. Only fetch when we actually have students.
+        $championshipRefs = $championshipRows->isNotEmpty()
+            ? FestParticipant::query()
+                ->select('id', 'student_id', 'registration_id')
+                ->whereHas('registration', fn ($q) => $q->whereIn('event_id', $championshipEventIds))
+                ->whereIn('student_id', $championshipRows->pluck('student.id')->filter()->unique())
+                ->get()
+                ->unique('student_id')
+                ->mapWithKeys(fn (FestParticipant $p) => [
+                    $p->student_id => [
+                        'ref' => $this->visibility->participantLinkRef($p),
+                        'event_id' => $p->registration?->event_id ?? $event->id,
+                    ],
+                ])
+            : collect();
+
         // FestIndividualChampionshipPoint.category is always one of the fixed lp/up/hs/
         // hss/open keys, regardless of event_type — canonicalLabels() resolves each back
         // to this Sahodaya's own configured category name (e.g. "Category 3 — Classes 8,
@@ -469,18 +464,29 @@ class FestPortalController extends Controller
             ->values()
             ->all();
 
-        $categories = $this->scoreboards->categories($event, $selectedScope);
-        $categoryBoards = collect(in_array($tab, ['category', 'toppers'], true) ? $categories : [])
-            ->map(function (string $key) use ($event, $selectedScope, $isPublished) {
-                [$rows] = $this->resolveScoreboard($event, $selectedScope, $key, $isPublished);
+        // Lazily compute boards — category boards only for category/toppers tabs,
+        // the school scoreboard only when displayed, marks only for tabs that need
+        // them. $categories feeds both $categoryBoards (toppers tab) and
+        // $itemResultsByCategory (category tab); school/item/individual/championship
+        // don't need it.
+        $needsCategoryBoards = in_array($tab, ['category', 'toppers'], true);
+        $needsMarks = in_array($tab, ['item', 'individual', 'school'], true);
+        $categories = $needsCategoryBoards
+            ? $this->scoreboards->categories($event, $selectedScope)
+            : [];
+        $categoryBoards = $needsCategoryBoards && $categories !== []
+            ? collect($categories)
+                ->map(function (string $key) use ($event, $selectedScope, $isPublished) {
+                    [$rows] = $this->resolveScoreboard($event, $selectedScope, $key, $isPublished);
 
-                return [
-                    'key' => $key,
-                    'label' => $this->scoreboards->categoryLabel($event, $key),
-                    'rows' => $rows,
-                ];
-            })
-            ->all();
+                    return [
+                        'key' => $key,
+                        'label' => $this->scoreboards->categoryLabel($event, $key),
+                        'rows' => $rows,
+                    ];
+                })
+                ->all()
+            : [];
 
         // §7.3a (docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md, 2026-08-15): a phased event's
         // "Overall" school board is the progressive sum of every published phase's
@@ -498,171 +504,227 @@ class FestPortalController extends Controller
             ? $this->phaseScoreboards->phaseBreakdown($event)
             : [];
 
-        // A partitioned hub's marks live on its region/finale children, not the hub's own
-        // event_id — without this expansion, a partitioned hub's public results page
-        // showed zero item results even after results_published was cascaded true.
-        $marks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
-            ->whereIn('position', [1, 2, 3])
-            // Unconditional, regardless of $isPublished: an item's own results_published_at
-            // is the only thing that makes its marks visible to the public, whole-event
-            // publish or not — see the comment on PublicFestScoreboardService::scoreboard()'s
-            // category branch for the production leak this convention exists to prevent.
-            ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
-            ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school', 'participant.registration.item', 'participant.registration.event', 'participant.group'])
-            ->orderBy('item_id')
-            ->orderBy('position')
-            ->get();
+        // Marks, item results, and medal tally only needed for relevant tabs.
+        $marks = collect();
+        $rosterByRegistration = collect();
+        $medalTally = collect();
+        $itemResults = collect();
+        $itemResultsByCategory = [];
+        $individualResults = [];
 
-        // Pair/group items register every performer as their own FestParticipant row
-        // sharing one registration_id (FestRegistrationCreateService) — only the row a
-        // judge happened to enter the mark against is on $mark->participant, so batch-
-        // fetch every co-performer up front rather than trusting the single mark row.
-        $rosterByRegistration = FestParticipant::whereIn(
-            'registration_id',
-            $marks->pluck('participant.registration_id')->filter()->unique()->values()
-        )
-            ->where('participant_role', 'performer')
-            ->with(['student', 'teacher'])
-            ->get()
-            ->groupBy('registration_id');
+        if ($needsMarks) {
+            // A partitioned hub's marks live on its region/finale children, not the hub's
+            // own event_id — without this expansion, a partitioned hub's public results
+            // page showed zero item results even after results_published was cascaded
+            // true.
+            $marks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
+                ->whereIn('position', [1, 2, 3])
+                // Unconditional, regardless of $isPublished: an item's own
+                // results_published_at is the only thing that makes its marks visible to
+                // the public, whole-event publish or not — see the comment on
+                // PublicFestScoreboardService::scoreboard()'s category branch for the
+                // production leak this convention exists to prevent.
+                ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
+                ->select('id', 'item_id', 'position', 'score', 'grade', 'grade_points', 'participant_id', 'registration_id')
+                ->with([
+                    'item:id,title,event_id,' . ($event->event_type === 'sports' ? 'age_group' : 'class_group') . ',participant_type,stage_type,gender,results_published_at,head_id',
+                    'participant:id,registration_id,student_id,teacher_id,participant_role,disqualified_at',
+                    'participant.student:id,name,photo,photo_fallback,reg_no',
+                    'participant.teacher:id,name',
+                    'participant.registration:id,school_id,event_id',
+                    'participant.registration.school:id,name',
+                    'participant.registration.item:id,event_id',
+                    'item.head:id,name',
+                    'participant.group:id,name',
+                ])
+                ->orderBy('item_id')
+                ->orderBy('position')
+                ->get();
 
-        $categoryColumn = $event->event_type === 'sports' ? 'age_group' : 'class_group';
+            // Pair/group items register every performer as their own FestParticipant row
+            // sharing one registration_id (FestRegistrationCreateService) — only the row
+            // a judge happened to enter the mark against is on $mark->participant, so
+            // batch-fetch every co-performer up front rather than trusting the single
+            // mark row.
+            $rosterByRegistration = FestParticipant::query()
+                ->select('id', 'registration_id', 'student_id', 'teacher_id', 'participant_role')
+                ->whereIn(
+                    'registration_id',
+                    $marks->pluck('registration_id')->filter()->unique()->values()
+                )
+                ->where('participant_role', 'performer')
+                ->with('student:id,name,photo,photo_fallback')
+                ->get()
+                ->groupBy('registration_id');
 
-        $itemResults = $marks
-            ->groupBy('item_id')
-            ->map(function ($group) use ($event, $rosterByRegistration, $categoryColumn) {
-                /** @var FestMark $first */
-                $first = $group->first();
+            if ($tab === 'item') {
+                $categoryColumn = $event->event_type === 'sports' ? 'age_group' : 'class_group';
 
-                return [
-                    'item_id' => $first->item_id,
-                    'item' => $first->item?->title,
-                    'head' => $first->item?->head?->name,
-                    'category' => $first->item?->{$categoryColumn},
-                    'gender_label' => \App\Support\FestSportsAgeGroup::genderLabel($first->item?->gender),
-                    'participant_type' => $first->item?->participant_type,
-                    'stage_type' => $first->item?->stage_type,
-                    'results_published_at' => $first->item?->results_published_at,
-                    // Pair/group items save one FestMark per teammate (all with the same
-                    // position/score — see the roster batch-fetch above), so without this
-                    // the same team would render as N identical winner cards.
-                    'winners' => $group
-                        ->unique(fn (FestMark $mark) => $mark->deduplicationKey())
-                        ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event, $rosterByRegistration))
-                        ->values()
-                        ->all(),
-                ];
-            })
-            // Most recently published item first — items were previously left in
-            // item_id order (registration order), which reads as arbitrary once results
-            // start trickling in; visitors want to see what just got published.
-            ->sortByDesc('results_published_at')
-            ->values();
+                $itemResults = $marks
+                    ->groupBy('item_id')
+                    ->map(function ($group) use ($event, $rosterByRegistration, $categoryColumn) {
+                        /** @var FestMark $first */
+                        $first = $group->first();
 
-        // Group item-wise results under the same category labels/order already used by
-        // the Category-wise tab above, so "region-wise, category-wise" results line up.
-        $itemResultsByCategory = collect($categories)
-            ->map(fn (string $key) => [
-                'key' => $key,
-                'label' => $this->scoreboards->categoryLabel($event, $key),
-                'items' => $itemResults->where('category', $key)->values()->all(),
-            ])
-            ->filter(fn (array $group) => count($group['items']) > 0)
-            ->values();
+                        return [
+                            'item_id' => $first->item_id,
+                            'item' => $first->item?->title,
+                            'head' => $first->item?->head?->name,
+                            'category' => $first->item?->{$categoryColumn},
+                            'gender_label' => \App\Support\FestSportsAgeGroup::genderLabel($first->item?->gender),
+                            'participant_type' => $first->item?->participant_type,
+                            'stage_type' => $first->item?->stage_type,
+                            'results_published_at' => $first->item?->results_published_at,
+                            // Pair/group items save one FestMark per teammate (all with the
+                            // same position/score — see the roster batch-fetch above), so
+                            // without this the same team would render as N identical winner
+                            // cards.
+                            'winners' => $group
+                                ->unique(fn (FestMark $mark) => $mark->deduplicationKey())
+                                ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event, $rosterByRegistration))
+                                ->values()
+                                ->all(),
+                        ];
+                    })
+                    // Most recently published item first — items were previously left in
+                    // item_id order (registration order), which reads as arbitrary once
+                    // results start trickling in; visitors want to see what just got
+                    // published.
+                    ->sortByDesc('results_published_at')
+                    ->values();
 
-        $uncategorized = $itemResults->whereNotIn('category', $categories)->values()->all();
-        if ($uncategorized !== []) {
-            $itemResultsByCategory->push([
-                'key' => null,
-                'label' => 'Other Items',
-                'items' => $uncategorized,
-            ]);
+                // Group item-wise results under the same category labels/order already
+                // used by the Category-wise tab above, so "region-wise, category-wise"
+                // results line up.
+                $itemResultsByCategory = collect($categories)
+                    ->map(fn (string $key) => [
+                        'key' => $key,
+                        'label' => $this->scoreboards->categoryLabel($event, $key),
+                        'items' => $itemResults->where('category', $key)->values()->all(),
+                    ])
+                    ->filter(fn (array $group) => count($group['items']) > 0)
+                    ->values();
+
+                $uncategorized = $itemResults->whereNotIn('category', $categories)->values()->all();
+                if ($uncategorized !== []) {
+                    $itemResultsByCategory->push([
+                        'key' => null,
+                        'label' => 'Other Items',
+                        'items' => $uncategorized,
+                    ]);
+                }
+                $itemResultsByCategory = $itemResultsByCategory->all();
+            }
+
+            if ($tab === 'individual') {
+                $individualClassGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
+                $individualResults = $marks
+                    ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event) + [
+                        'item' => $mark->item?->title,
+                        'head' => $mark->item?->head?->name,
+                        'category' => FestItemCategoryLabel::resolve(
+                            $mark->item,
+                            $individualClassGroupLabels,
+                            config('fest_item_taxonomy.arts_category', [])
+                        ),
+                    ])
+                    ->sortBy(fn (array $row) => [$row['participant'] ?? '', $row['item'] ?? ''])
+                    ->values()
+                    ->all();
+            }
+
+            if ($tab === 'school') {
+                // Medal tally (gold/silver/bronze counts) per school, layered onto
+                // $schoolBoard's existing points-based rank rather than replacing it —
+                // points come from a grade scheme (FestGradePointService) that doesn't
+                // always track 1st/2nd/3rd counts 1:1, so the official rank stays
+                // points-driven and medals are informational. Built from the same top-3
+                // $marks fetched above for the item tab, scoped to whichever
+                // region/cluster/phase the page is currently showing. Deduped by
+                // registration first — pair/group items save one FestMark per teammate,
+                // so an 11-person choir's single silver would otherwise tally as 11
+                // silvers for its school (same root cause as the scoring-dedup note on
+                // EventContext).
+                //
+                // This only ever feeds $schoolBoard (the combined "All Categories"
+                // board) — $categoryBoards above already gets its own rows straight from
+                // resolveScoreboard(), unaffected by this — so it must honor
+                // excluded_overall_categories the same way that combined total does, or
+                // an excluded category's podium finishes would still show up in
+                // gold/silver/bronze next to a Total Points that correctly leaves them
+                // out.
+                $excludedCategoriesForMedals = FestOverallCategoryExclusion::excluded($event->rootEvent());
+                $medalTally = $marks
+                    ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
+                    ->filter(fn (FestMark $m) => ! $excludedCategoriesForMedals
+                        || ! in_array(FestOverallCategoryExclusion::categoryKeyForItem($event, $m->item), $excludedCategoriesForMedals, true))
+                    ->unique(fn (FestMark $m) => $m->deduplicationKey())
+                    ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
+                    ->map(fn ($group) => [
+                        'gold' => $group->where('position', 1)->count(),
+                        'silver' => $group->where('position', 2)->count(),
+                        'bronze' => $group->where('position', 3)->count(),
+                    ]);
+            }
         }
-        $itemResultsByCategory = $itemResultsByCategory->all();
 
-        $individualClassGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
-        $individualResults = $marks
-            ->map(fn (FestMark $mark) => $this->publicWinnerRow($mark, $event) + [
-                'item' => $mark->item?->title,
-                'head' => $mark->item?->head?->name,
-                'category' => FestItemCategoryLabel::resolve(
-                    $mark->item,
-                    $individualClassGroupLabels,
-                    config('fest_item_taxonomy.arts_category', [])
-                ),
-            ])
-            ->sortBy(fn (array $row) => [$row['participant'] ?? '', $row['item'] ?? ''])
-            ->values()
-            ->all();
+        // School board needed for school, toppers (overallSchoolToppers), and
+        // category (schoolCategoryToppers) tabs.
+        $needsSchoolBoard = in_array($tab, ['school', 'toppers', 'category'], true);
+        $schoolBoard = [];
+        $lockedCumulativeStanding = null;
+        $showPhasePoints = false;
 
-        // Medal tally (gold/silver/bronze counts) per school, layered onto $schoolBoard's
-        // existing points-based rank rather than replacing it — points come from a grade
-        // scheme (FestGradePointService) that doesn't always track 1st/2nd/3rd counts
-        // 1:1, so the official rank stays points-driven and medals are informational.
-        // Built from the same top-3 $marks already fetched above for the item tab, scoped
-        // to whichever region/cluster/phase the page is currently showing. Deduped by
-        // registration first — pair/group items save one FestMark per teammate, so an
-        // 11-person choir's single silver would otherwise tally as 11 silvers for its
-        // school (same root cause as the scoring-dedup note on EventContext).
-        //
-        // This only ever feeds $schoolBoard (the combined "All Categories" board) —
-        // $categoryBoards above already gets its own rows straight from
-        // resolveScoreboard(), unaffected by this — so it must honor
-        // excluded_overall_categories the same way that combined total does, or an
-        // excluded category's podium finishes would still show up in gold/silver/bronze
-        // next to a Total Points that correctly leaves them out.
-        $excludedCategoriesForMedals = FestOverallCategoryExclusion::excluded($event->rootEvent());
-        $medalTally = $marks
-            ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
-            ->filter(fn (FestMark $m) => ! $excludedCategoriesForMedals
-                || ! in_array(FestOverallCategoryExclusion::categoryKeyForItem($event, $m->item), $excludedCategoriesForMedals, true))
-            ->unique(fn (FestMark $m) => $m->deduplicationKey())
-            ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
-            ->map(fn ($group) => [
-                'gold' => $group->where('position', 1)->count(),
-                'silver' => $group->where('position', 2)->count(),
-                'bronze' => $group->where('position', 3)->count(),
-            ]);
+        if ($needsSchoolBoard) {
+            [$overallRows, $lockedCumulativeStanding] = $this->resolveScoreboard($event, $selectedScope, null, $isPublished);
+            $schoolBoard = collect($overallRows)
+                ->map(fn (array $row) => $row + [
+                    'gold' => $medalTally[$row['school_id']]['gold'] ?? 0,
+                    'silver' => $medalTally[$row['school_id']]['silver'] ?? 0,
+                    'bronze' => $medalTally[$row['school_id']]['bronze'] ?? 0,
+                ])
+                ->all();
 
-        [$overallRows, $lockedCumulativeStanding] = $this->resolveScoreboard($event, $selectedScope, null, $isPublished);
-        $schoolBoard = collect($overallRows)
-            ->map(fn (array $row) => $row + [
-                'gold' => $medalTally[$row['school_id']]['gold'] ?? 0,
-                'silver' => $medalTally[$row['school_id']]['silver'] ?? 0,
-                'bronze' => $medalTally[$row['school_id']]['bronze'] ?? 0,
-            ])
-            ->all();
+            $showPhasePoints = collect($schoolBoard)->contains(
+                fn (array $row) => (int) ($row['event_points'] ?? 0) !== (int) ($row['phase_points'] ?? 0)
+            );
+        }
 
-        // Per-school results roster — every item that school entered (not just the ones
-        // it won), each with its position, grade, and points, so the sum of the listed
-        // rows always agrees with $schoolBoard's official total above. Shared with
-        // schoolResults()'s own dedicated per-school page.
+        // Per-school results roster — every item that school entered (not just the
+        // ones it won), each with its position, grade, and points, so the sum of the
+        // listed rows always agrees with $schoolBoard's official total above. Shared
+        // with schoolResults()'s own dedicated per-school page.
         $resultsBySchool = $tab === 'school'
             ? $this->schoolResultsRoster($event, $selectedScope, $isPublished)
             : collect();
-        $schoolWinnersBoard = collect($schoolBoard)
-            ->map(fn (array $row) => $row + ['winners' => $resultsBySchool[$row['school_id']] ?? []])
-            ->filter(fn (array $row) => $row['winners'] !== [])
-            ->values()
-            ->all();
+        $schoolWinnersBoard = $tab === 'school'
+            ? collect($schoolBoard)
+                ->map(fn (array $row) => $row + ['winners' => $resultsBySchool[$row['school_id']] ?? []])
+                ->filter(fn (array $row) => $row['winners'] !== [])
+                ->values()
+                ->all()
+            : [];
 
-        $showPhasePoints = collect($schoolBoard)->contains(
-            fn (array $row) => (int) ($row['event_points'] ?? 0) !== (int) ($row['phase_points'] ?? 0)
-        );
-        $overallSchoolToppers = collect($schoolBoard)->take(3)->values()->all();
-        $schoolCategoryToppers = collect($categoryBoards)
-            ->map(fn (array $board) => $board + ['rows' => collect($board['rows'])->take(3)->values()->all()])
-            ->filter(fn (array $board) => $board['rows'] !== [])
-            ->values()
-            ->all();
-        $studentCategoryToppers = collect($championship)
-            ->groupBy(fn (array $row) => trim(($row['category'] ?: 'Open').' · '.($row['gender'] ?: 'All')))
-            ->map(fn (Collection $rows, string $label) => [
-                'label' => $label,
-                'rows' => $rows->take(3)->values()->map(fn (array $row, int $index) => $row + ['category_rank' => $index + 1])->all(),
-            ])
-            ->values()
-            ->all();
+        $overallSchoolToppers = $needsSchoolBoard
+            ? collect($schoolBoard)->take(3)->values()->all()
+            : [];
+        $schoolCategoryToppers = $needsCategoryBoards
+            ? collect($categoryBoards)
+                ->map(fn (array $board) => $board + ['rows' => collect($board['rows'])->take(3)->values()->all()])
+                ->filter(fn (array $board) => $board['rows'] !== [])
+                ->values()
+                ->all()
+            : [];
+        $studentCategoryToppers = $needsChampionship
+            ? collect($championship)
+                ->groupBy(fn (array $row) => trim(($row['category'] ?: 'Open').' · '.($row['gender'] ?: 'All')))
+                ->map(fn (Collection $rows, string $label) => [
+                    'label' => $label,
+                    'rows' => $rows->take(3)->values()->map(fn (array $row, int $index) => $row + ['category_rank' => $index + 1])->all(),
+                ])
+                ->values()
+                ->all()
+            : [];
 
         return [
             'event' => $event,
@@ -1016,16 +1078,17 @@ class FestPortalController extends Controller
             return [
                 'marks' => $allMarks
                     ->filter(fn (array $row) => in_array((int) $row['position'], [1, 2, 3], true))
-                    ->values(),
-                'allMarks' => $allMarks,
+                    ->values()
+                    ->all(),
+                'allMarks' => $allMarks->all(),
             ];
         };
 
         $markData = $isAdminPreview
             ? $compute()
             : $this->rememberPublicHotPath($cacheKey, 30, $compute);
-        $marks = $markData['marks'];
-        $allMarks = $markData['allMarks'];
+        $marks = collect($markData['marks'] ?? []);
+        $allMarks = collect($markData['allMarks'] ?? []);
 
         $categoryLabel = FestItemCategoryLabel::resolve(
             $item,

@@ -42,7 +42,11 @@ class CentralRouteServiceProvider extends ServiceProvider
                         return app(\App\Http\Middleware\TrackPublicVisitors::class)->handle($request, fn ($request) => app(PublicSiteController::class)->home($request));
                     }
 
-                    return app(\App\Http\Middleware\TrackPublicVisitors::class)->handle($request, fn ($request) => app(RegistrationLandingController::class)($request));
+                    if (auth()->check()) {
+                        return redirect()->to(AuthController::homeFor(auth()->user()));
+                    }
+
+                    return redirect()->route('login');
                 });
 
                 Route::redirect('/admin', '/admin/dashboard');

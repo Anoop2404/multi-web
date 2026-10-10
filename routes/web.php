@@ -1733,6 +1733,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
                 ->where('tab', 'lifecycle|locks|venues|combo|grades|points|participation|eligibility|fees|registration|numbering|volunteers|records|clone')
                 ->name('settings');
             Route::put('/{event}/settings', [FestEventSettingsController::class, 'updateSettings'])->name('settings.update');
+            Route::get('/{event}/settings/public-overlays', [FestEventSettingsController::class, 'getPublicOverlays'])->name('settings.public-overlays.show');
+            Route::post('/{event}/settings/public-overlays', [FestEventSettingsController::class, 'updatePublicOverlays'])->name('settings.public-overlays.update');
             Route::put('/{event}/notification-settings', [FestEventSettingsController::class, 'updateNotifications'])->name('notification-settings.update');
             Route::put('/{event}/registration-settings', [FestEventSettingsController::class, 'updateRegistrationSettings'])->name('registration-settings.update');
             Route::put('/{event}/numbering-settings', [FestEventSettingsController::class, 'updateNumberingSettings'])->name('numbering-settings.update');

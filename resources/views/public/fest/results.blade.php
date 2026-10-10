@@ -10,6 +10,12 @@
         'individual' => 'Individual',
         'championship' => 'Individual Championship',
     ];
+
+    // If public overlays are disabled, hide the Individual Championship tab
+    // so visitors can't navigate to an empty page.
+    if (($overlayConfig['enabled'] ?? true) === false) {
+        unset($tabs['championship']);
+    }
 @endphp
 
 <section class="py-8 sm:py-12 px-4 bg-slate-950 text-white min-h-screen">
@@ -31,6 +37,9 @@
 
         <nav class="sticky top-16 z-20 flex gap-2 overflow-x-auto mt-4 mb-8 rounded-2xl border border-slate-800 bg-slate-900/90 backdrop-blur p-2 shadow-xl" aria-label="Result views">
             @foreach($tabs as $key => $label)
+                @if($key === 'championship' && !($overlayConfig['enabled'] ?? true))
+                    @continue
+                @endif
                 <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => $key]) }}"
                    class="shrink-0 px-4 py-2 rounded-xl text-sm border font-semibold transition {{ $tab === $key ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-transparent text-white/60 border-transparent hover:border-amber-500/40 hover:text-white' }}">
                     {{ $label }}

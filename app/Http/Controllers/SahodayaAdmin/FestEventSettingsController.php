@@ -422,6 +422,53 @@ class FestEventSettingsController extends SahodayaAdminController
         return back()->with('success', 'Event settings saved.');
     }
 
+    public function updatePublicOverlays(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'show_individual_championship' => 'nullable|boolean',
+            'category_filter' => 'nullable|array',
+            'category_filter.*' => 'string|in:lp,up,hs,hss,open',
+        ]);
+
+        $root = $event->rootEvent();
+        $config = $root->aggregation_config ?? [];
+        $config['public_overlays'] = [
+            'enabled' => (bool) ($data['show_individual_championship'] ?? true),
+            'categories' => array_values(array_unique($data['category_filter'] ?? [])),
+        ];
+        $root->update(['aggregation_config' => $config]);
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            FestPageActivity::settingsTab('public-overlays'),
+            'fest.settings.public_overlays_saved',
+            'Public overlay settings saved',
+            [
+                'overlay_enabled' => $config['public_overlays']['enabled'],
+                'overlay_categories' => $config['public_overlays']['categories'],
+            ],
+        );
+
+        return back()->with('success', 'Public display settings saved.');
+    }
+
+    /**
+     * Return current public overlay config as JSON for the admin settings tab.
+     */
+    public function getPublicOverlays(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $overlay = $event->rootEvent()->aggregation_config['public_overlays'] ?? null;
+
+        return response()->json([
+            'show_individual_championship' => $overlay['enabled'] ?? true,
+            'category_filter' => $overlay['categories'] ?? [],
+        ]);
+    }
+
     /**
      * Event-level notification gating — the equivalent of
      * FestItemHeadController::updateNotifications() but for the event itself, so it works

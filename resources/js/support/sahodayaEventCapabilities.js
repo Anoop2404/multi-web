@@ -47,6 +47,7 @@ export function capabilitiesForEvent(event) {
         volunteers: true,
         recordSettings: type === 'sports',
         ageGroupFees: type === 'sports' || type === 'kids_fest',
+        publicOverlays: type !== 'sports',
     };
 }
 
@@ -60,7 +61,7 @@ export function settingsTabsForEvent(event) {
         // 'points' tab, which would otherwise redirect the admin straight out of Settings.
         { id: caps.isSports ? 'eligibility' : 'combo', label: caps.isSports ? '🏆 Scoring & Rules' : '🏆 Points & Rules', icon: '🏆' },
         { id: 'venues', label: '📍 Venues & Numbering', icon: '📍' },
-        { id: 'lifecycle', label: '⚙️ General & Operations', icon: '⚙️' },
+        { id: 'lifecycle', label: caps.isSports ? '⚙️ General & Operations' : '⚙️ General & Display', icon: '⚙️' },
     ];
 }
 

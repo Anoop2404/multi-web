@@ -48,6 +48,7 @@
                 <template v-else>
                     <div id="section-lifecycle" class="scroll-mt-6"><LifecycleTab /></div>
                     <div id="section-locks" class="scroll-mt-6"><LocksTab /></div>
+                    <div id="section-overlays" class="scroll-mt-6"><OverlaysTab /></div>
                     <div id="section-clone" class="scroll-mt-6"><CloneTab /></div>
                 </template>
             </div>
@@ -129,6 +130,7 @@ import FeesTab from './Settings/Tabs/FeesTab.vue';
 import RegistrationTab from './Settings/Tabs/RegistrationTab.vue';
 import NumberingTab from './Settings/Tabs/NumberingTab.vue';
 import CloneTab from './Settings/Tabs/CloneTab.vue';
+import OverlaysTab from './Settings/Tabs/OverlaysTab.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -220,9 +222,12 @@ const activeCategory = computed(() => {
     const sections = [
         { id: 'lifecycle', label: 'Lifecycle & Verification', href: `${base.value}/settings/lifecycle` },
         { id: 'locks', label: 'System Locks', href: `${base.value}/settings/locks` },
-        { id: 'clone', label: 'Clone Event', href: `${base.value}/settings/clone` },
     ];
-    return { title: '⚙️ General & Operations', sections };
+    if (!isSports.value) {
+        sections.push({ id: 'overlays', label: 'Public Display', href: `${base.value}/settings/public-overlays` });
+    }
+    sections.push({ id: 'clone', label: 'Clone Event', href: `${base.value}/settings/clone` });
+    return { title: isSports.value ? '⚙️ General & Operations' : '⚙️ General & Display', sections };
 });
 
 function scrollToCurrentSection() {
