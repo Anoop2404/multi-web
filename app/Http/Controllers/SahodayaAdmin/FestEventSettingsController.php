@@ -1647,6 +1647,28 @@ class FestEventSettingsController extends SahodayaAdminController
         return back()->with('success', 'Point rule removed.');
     }
 
+    private function recalculateRankPointEvents(FestEvent $event): void
+    {
+        $frontier = collect([$event]);
+        $seen = [];
+        while ($frontier->isNotEmpty()) {
+            $nextIds = [];
+            foreach ($frontier as $current) {
+                if (isset($seen[$current->id])) {
+                    continue;
+                }
+                $seen[$current->id] = true;
+                EventContext::for($current)->recalculateSchoolPoints();
+                // Publish-state timestamps also invalidate the public rendered-results cache.
+                $current->items()->update(['updated_at' => now()]);
+                $nextIds[] = $current->id;
+            }
+            $frontier = $nextIds
+                ? FestEvent::where('tenant_id', $event->tenant_id)->whereIn('parent_event_id', $nextIds)->get()
+                : collect();
+        }
+    }
+
     public function storeRankTemplate(Request $request, string $tenantId, FestEvent $event, FestRankPointService $rankPoints)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
@@ -1678,7 +1700,7 @@ class FestEventSettingsController extends SahodayaAdminController
         $rankPoints->renameTemplate($template, $data['name']);
         $rankPoints->assignTypes($template, $data['participant_types'] ?? []);
 
-        EventContext::for($event)->recalculateSchoolPoints();
+        $this->recalculateRankPointEvents($event);
 
         app(PlatformAuditLogger::class)->festEvent(
             $event, FestPageActivity::settingsTab('points'), 'fest.settings.rank_template_updated',
@@ -1699,7 +1721,7 @@ class FestEventSettingsController extends SahodayaAdminController
         $name = $template->name;
         $rankPoints->deleteTemplate($template);
 
-        EventContext::for($event)->recalculateSchoolPoints();
+        $this->recalculateRankPointEvents($event);
 
         app(PlatformAuditLogger::class)->festEvent(
             $event, FestPageActivity::settingsTab('points'), 'fest.settings.rank_template_deleted',
@@ -1722,7 +1744,7 @@ class FestEventSettingsController extends SahodayaAdminController
 
         $count = $rankPoints->replaceRows($template, $data['ranks']);
 
-        EventContext::for($event)->recalculateSchoolPoints();
+        $this->recalculateRankPointEvents($event);
 
         app(PlatformAuditLogger::class)->festEvent(
             $event,
@@ -1742,7 +1764,7 @@ class FestEventSettingsController extends SahodayaAdminController
 
         $count = $rankPoints->seedAthleticsStandard($template);
 
-        EventContext::for($event)->recalculateSchoolPoints();
+        $this->recalculateRankPointEvents($event);
 
         app(PlatformAuditLogger::class)->festEvent(
             $event,

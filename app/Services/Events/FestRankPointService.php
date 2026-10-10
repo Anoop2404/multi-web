@@ -32,9 +32,22 @@ class FestRankPointService
 
     public function templateForType(FestEvent $event, string $participantType): ?FestRankPointTemplate
     {
-        return FestRankPointTemplate::where('event_id', $event->id)
-            ->whereJsonContains('participant_types', $participantType)
-            ->first();
+        $current = $event;
+        $visited = [];
+        while ($current && ! isset($visited[$current->id])) {
+            $visited[$current->id] = true;
+            $template = FestRankPointTemplate::where('event_id', $current->id)
+                ->whereJsonContains('participant_types', $participantType)
+                ->first();
+            if ($template) {
+                return $template;
+            }
+            $current = $current->parent_event_id
+                ? FestEvent::where('tenant_id', $event->tenant_id)->find($current->parent_event_id)
+                : null;
+        }
+
+        return null;
     }
 
     public function createTemplate(FestEvent $event, string $name, array $participantTypes = []): FestRankPointTemplate

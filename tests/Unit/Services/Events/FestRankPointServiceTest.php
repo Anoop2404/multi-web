@@ -63,6 +63,19 @@ class FestRankPointServiceTest extends TestCase
         $this->assertSame([], $service->rowsForType($event, 'team'));
     }
 
+    public function test_unassigned_template_does_not_award_points(): void
+    {
+        $event = $this->makeEvent();
+        $this->makeTemplate($event, 'Skating', [], [
+            ['rank' => 1, 'points' => 5],
+            ['rank' => 2, 'points' => 3],
+            ['rank' => 3, 'points' => 1],
+        ]);
+        $service = app(FestRankPointService::class);
+        $this->assertSame(0, $service->pointsForRank($event, 1, 'individual'));
+        $this->assertSame([], $service->rowsForType($event, 'individual'));
+    }
+
     public function test_missing_rank_does_not_inherit_hardcoded_points(): void
     {
         $event = $this->makeEvent();
@@ -111,6 +124,25 @@ class FestRankPointServiceTest extends TestCase
         $data['score'] = 42;
         $service->save($event, $data, 1, false);
         $this->assertSame(42.0, (float) $mark->fresh()->score);
+    }
+
+    public function test_child_sports_event_inherits_assigned_parent_points(): void
+    {
+        $parent = $this->makeEvent();
+        $child = FestEvent::create(['tenant_id' => $parent->tenant_id, 'parent_event_id' => $parent->id,
+            'title' => 'Under 8', 'event_type' => 'sports']);
+        $this->makeTemplate($parent, 'Individual', ['individual'], [
+            ['rank' => 1, 'points' => 10], ['rank' => 2, 'points' => 5], ['rank' => 3, 'points' => 3],
+        ]);
+        $service = app(FestRankPointService::class);
+        $this->assertSame(10, $service->pointsForRank($child, 1, 'individual'));
+        $this->assertSame(5, $service->pointsForRank($child, 2, 'individual'));
+        $this->assertSame(3, $service->pointsForRank($child, 3, 'individual'));
+        $this->assertSame(0, $service->pointsForRank($child, 4, 'individual'));
+        $this->assertCount(3, $service->rowsForType($child, 'individual'));
+        $this->makeTemplate($child, 'Individual override', ['individual'], [['rank' => 1, 'points' => 20]]);
+        $this->assertSame(20, $service->pointsForRank($child, 1, 'individual'));
+        $this->assertSame(0, $service->pointsForRank($child, 2, 'individual'));
     }
 
     public function test_explicit_team_template_row_still_wins_over_the_individual_fallback(): void

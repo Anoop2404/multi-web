@@ -64,6 +64,10 @@
                     </div>
                 </div>
 
+                <p v-if="!draft.participant_types.length" class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                    This template is not assigned to any participants. Select Individual or the appropriate types, then click Save Name &amp; Types to apply these points to results.
+                </p>
+
                 <div class="flex justify-end">
                     <button type="button" class="btn-secondary text-xs !py-1.5 !px-3" :disabled="draft.seeding" @click="seedAthletics(draft)">
                         {{ draft.seeding ? 'Loading...' : '⚡ Load Athletics Standard (8,7,6,5,4,3)' }}
@@ -407,7 +411,7 @@ function saveTemplateMeta(draft) {
 
 async function deleteTemplate(draft) {
     const ok = await confirm({
-        message: `Delete the "${draft.name}" rank points template? This removes all its rank/points rows. Participant types assigned to it will fall back to the Individual template (or the default table) until reassigned.`,
+        message: `Delete the "${draft.name}" rank points template? This removes all its rank/points rows. Assigned participants will use any applicable parent-event or Individual template; without a configured rule they receive zero points.`,
         destructive: true,
     });
     if (!ok) return;
