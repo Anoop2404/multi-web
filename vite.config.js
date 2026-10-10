@@ -4,6 +4,11 @@ import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
+    build: {
+        // Open tabs and cached HTML can still reference the previous build's chunks.
+        // Keep those hashed files available when rebuilding into the same directory.
+        emptyOutDir: false,
+    },
     plugins: [
         laravel({
             input: [
