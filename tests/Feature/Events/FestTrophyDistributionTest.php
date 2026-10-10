@@ -97,6 +97,28 @@ class FestTrophyDistributionTest extends TestCase
         $this->assertSame(1, $winner['top_ten'][0]['rank']);
     }
 
+    public function test_item_trophy_shows_all_joint_first_place_winners(): void
+    {
+        $item = FestEventItem::create(['event_id' => $this->parentEvent->id, 'title' => 'Mime', 'participant_type' => 'group']);
+        foreach ([$this->school1, $this->school2] as $school) {
+            $registration = FestRegistration::create(['event_id' => $this->parentEvent->id, 'item_id' => $item->id,
+                'school_id' => $school->id, 'status' => 'approved']);
+            foreach (range(1, 2) as $member) {
+                $participant = FestParticipant::create(['registration_id' => $registration->id,
+                    'event_id' => $this->parentEvent->id, 'participant_role' => 'performer']);
+                FestMark::create(['event_id' => $this->parentEvent->id, 'item_id' => $item->id,
+                    'participant_id' => $participant->id, 'position' => 1, 'score' => 90, 'grade' => 'A']);
+            }
+        }
+        $row = $this->trophyService()->resolveWinners($this->parentEvent, collect([
+            new FestTrophy(['trophy_type' => FestTrophy::TYPE_ITEM, 'item_id' => $item->id, 'position' => 1]),
+        ]))->first();
+        $this->assertTrue($row['winner']['is_tied']);
+        $this->assertCount(2, $row['winner']['joint_winners']);
+        $this->assertEqualsCanonicalizing([$this->school1->name, $this->school2->name], array_map('strtoupper', array_column($row['winner']['joint_winners'], 'name')));
+        $this->assertSame([1, 1], array_column($row['winner']['joint_winners'], 'rank'));
+    }
+
     public function test_school_trophies_count_each_group_once_and_individuals_separately(): void
     {
         $marks = collect();

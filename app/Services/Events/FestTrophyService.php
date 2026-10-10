@@ -202,8 +202,20 @@ class FestTrophyService
             $cache[$key] = $standings;
         }
         $standings = $cache[$key];
-        $winner = $standings->firstWhere('rank', $trophy->position);
-        return $winner ? $winner + ['top_ten' => $standings->take(10)->all()] : null;
+        $winners = $standings->where('rank', $trophy->position)->values();
+        $winner = $winners->first();
+        if (! $winner) {
+            return null;
+        }
+        if ($winners->count() > 1) {
+            $winner['name'] = $winners->pluck('name')->implode(' / ');
+        }
+
+        return $winner + [
+            'joint_winners' => $winners->all(),
+            'is_tied' => $winners->count() > 1,
+            'top_ten' => $standings->take(10)->all(),
+        ];
     }
 
     /**

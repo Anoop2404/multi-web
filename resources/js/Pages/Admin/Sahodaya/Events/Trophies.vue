@@ -164,13 +164,16 @@
                             </td>
                             <td class="p-3">
                                 <template v-if="r.winner && r.winner.name">
+                                    <p v-if="r.winner.is_tied" class="text-xs font-semibold text-amber-700 mb-2">Joint winners</p>
+                                    <div v-for="(winner, winnerIndex) in (r.winner.joint_winners || [r.winner])" :key="winnerIndex" :class="winnerIndex ? 'mt-3 border-t border-slate-200 pt-2' : ''">
                                     <div class="font-bold text-slate-900 text-[13px] flex items-center gap-1.5">
                                         <span class="text-amber-500 font-black">★</span>
-                                        <span>{{ r.winner.name }}</span>
+                                        <span>{{ winner.name }}</span>
                                     </div>
-                                    <p v-if="r.winner.team_members?.length" class="text-xs text-slate-600 mt-1">{{ r.winner.team_members.join(', ') }}</p>
-                                    <div v-if="r.winner.chest_no" class="text-[11px] text-slate-500 font-mono mt-0.5">
-                                        Chest No: {{ r.winner.chest_no }}
+                                    <p v-if="winner.team_members?.length" class="text-xs text-slate-600 mt-1">{{ winner.team_members.join(', ') }}</p>
+                                    <div v-if="winner.chest_no" class="text-[11px] text-slate-500 font-mono mt-0.5">
+                                        Chest No: {{ winner.chest_no }}
+                                    </div>
                                     </div>
                                 </template>
                                 <template v-else>
@@ -179,7 +182,7 @@
                             </td>
                             <td class="p-3">
                                 <template v-if="r.winner && (r.winner.detail || r.winner.points)">
-                                    <span class="font-bold font-mono text-slate-800">{{ r.winner.detail || (r.winner.points + ' pts') }}</span>
+                                    <div v-for="(winner, winnerIndex) in (r.winner.joint_winners || [r.winner])" :key="winnerIndex" :class="winnerIndex ? 'mt-3' : ''" class="font-bold font-mono text-slate-800">{{ winner.detail || (winner.points + ' pts') }}</div>
                                 </template>
                                 <template v-else>
                                     <span class="text-slate-300">—</span>
