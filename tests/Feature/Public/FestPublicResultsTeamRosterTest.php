@@ -5,6 +5,7 @@ namespace Tests\Feature\Public;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestMark;
+use App\Models\FestGroup;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\FestResult;
@@ -99,6 +100,29 @@ class FestPublicResultsTeamRosterTest extends TestCase
             'rank' => 2,
             'published_at' => now(),
         ]);
+    }
+
+    public function test_item_results_load_attached_groups_using_real_group_columns(): void
+    {
+        $item = FestEventItem::where('event_id', $this->event->id)->where('title', 'Group Dance')->firstOrFail();
+        $registration = FestRegistration::where('item_id', $item->id)->firstOrFail();
+        $group = FestGroup::create([
+            'event_id' => $this->event->id, 'registration_id' => $registration->id,
+            'team_name' => 'Alpha Dance Team', 'chest_no' => 'G101', 'status' => 'active',
+        ]);
+        FestParticipant::where('registration_id', $registration->id)->update(['group_id' => $group->id]);
+        $queries = [];
+        \Illuminate\Support\Facades\DB::listen(function ($query) use (&$queries) {
+            if (str_contains($query->sql, 'fest_groups')) {
+                $queries[] = $query->sql;
+            }
+        });
+        $this->get("http://roster-test.test/fest/{$this->event->id}/results?tab=item")
+            ->assertOk()->assertSee('Ravi Nair')->assertSee('Sita Menon')->assertSee('Meera Pillai');
+        $this->assertNotEmpty($queries);
+        foreach ($queries as $query) {
+            $this->assertDoesNotMatchRegularExpression('/["`]name["`]/', $query);
+        }
     }
 
     public function test_results_school_tab_shows_medal_counts_per_school(): void

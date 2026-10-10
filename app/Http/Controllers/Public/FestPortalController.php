@@ -536,7 +536,7 @@ class FestPortalController extends Controller
                     'participant.registration.school:id,name',
                     'participant.registration.item:id,event_id',
                     'item.head:id,name',
-                    'participant.group:id,name',
+                    'participant.group:id,team_name,chest_no',
                 ])
                 ->orderBy('item_id')
                 ->orderBy('position')
