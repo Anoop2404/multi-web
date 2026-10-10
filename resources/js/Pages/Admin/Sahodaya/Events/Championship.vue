@@ -691,7 +691,7 @@ function viewStudentBreakdown(studentId) {
 }
 
 const filterCategory = ref('');
-const topThreeOnly = ref(false);
+const topThreeOnly = ref(true);
 const filterGender = ref('');
 
 const categories = computed(() => {
