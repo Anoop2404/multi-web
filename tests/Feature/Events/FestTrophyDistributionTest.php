@@ -97,6 +97,22 @@ class FestTrophyDistributionTest extends TestCase
         $this->assertSame(1, $winner['top_ten'][0]['rank']);
     }
 
+    public function test_school_point_trophies_share_first_second_and_third_positions(): void
+    {
+        $standings = collect([68, 68, 66, 66, 64, 64])->map(fn ($points, $index) => [
+            'school_id' => 'school-'.$index, 'school_name' => 'School '.$index, 'points' => $points,
+        ]);
+        $method = new \ReflectionMethod(FestTrophyService::class, 'resolveSchoolPointWinners');
+        foreach ([1 => 68, 2 => 66, 3 => 64] as $rank => $points) {
+            $winner = $method->invoke($this->trophyService(), $standings, $rank, fn ($p) => "{$p} pts");
+            $this->assertTrue($winner['is_tied']);
+            $this->assertCount(2, $winner['joint_winners']);
+            $this->assertSame([$rank, $rank], array_column($winner['joint_winners'], 'rank'));
+            $this->assertSame([$points, $points], array_column($winner['joint_winners'], 'points'));
+            $this->assertSame([1, 1, 2, 2, 3, 3], array_column($winner['top_ten'], 'rank'));
+        }
+    }
+
     public function test_item_trophy_shows_all_joint_first_place_winners(): void
     {
         $item = FestEventItem::create(['event_id' => $this->parentEvent->id, 'title' => 'Mime', 'participant_type' => 'group']);

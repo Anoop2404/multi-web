@@ -112,21 +112,7 @@ class FestTrophyService
      */
     private function resolveOverallWinner(FestTrophy $trophy, Collection $overallStandings): ?array
     {
-        $index = $trophy->position - 1;
-        $row = $overallStandings->values()->get($index);
-        if (! $row) {
-            return null;
-        }
-
-        return [
-            'type' => 'school',
-            'name' => $row['school_name'],
-            'school_id' => $row['school_id'],
-            'points' => $row['points'],
-            'detail' => "{$row['points']} pts overall",
-            'is_tied' => $row['is_tied'] ?? false,
-            'top_ten' => $overallStandings->values()->take(10)->map(fn ($school, $i) => ['rank' => $i + 1, 'name' => $school['school_name'], 'points' => $school['points']])->all(),
-        ];
+        return $this->resolveSchoolPointWinners($overallStandings, $trophy->position, fn ($points) => "{$points} pts overall");
     }
 
     /**
@@ -140,21 +126,8 @@ class FestTrophyService
             ?? $categoryStandings[FestClassGroupScheme::canonicalKey($catKey)]
             ?? collect();
 
-        $index = $trophy->position - 1;
-        $row = $catRows->values()->get($index);
-        if (! $row) {
-            return null;
-        }
-
-        return [
-            'type' => 'school',
-            'name' => $row['school_name'],
-            'school_id' => $row['school_id'],
-            'points' => $row['points'],
-            'detail' => "{$row['points']} pts in " . ($trophy->category_key ? FestClassGroupScheme::resolveItemLabel(FestClassGroupScheme::labels(null, $event), $trophy->category_key) : 'Category'),
-            'is_tied' => $row['is_tied'] ?? false,
-            'top_ten' => $catRows->values()->take(10)->map(fn ($school, $i) => ['rank' => $i + 1, 'name' => $school['school_name'], 'points' => $school['points']])->all(),
-        ];
+        $label = $trophy->category_key ? FestClassGroupScheme::resolveItemLabel(FestClassGroupScheme::labels(null, $event), $trophy->category_key) : 'Category';
+        return $this->resolveSchoolPointWinners($catRows, $trophy->position, fn ($points) => "{$points} pts in {$label}");
     }
 
     /**
@@ -277,19 +250,7 @@ class FestTrophyService
         }
         $standings = $cache[$key]['standings'];
         $itemCount = $cache[$key]['count'];
-        $winner = $standings[$trophy->position - 1] ?? null;
-        if (! $winner) {
-            return null;
-        }
-
-        return [
-            'type' => 'school',
-            'name' => $winner['name'],
-            'school_id' => $winner['school_id'],
-            'points' => $winner['points'],
-            'detail' => "{$winner['points']} pts across {$itemCount} items",
-            'top_ten' => array_slice($standings, 0, 10),
-        ];
+        return $this->resolveSchoolPointWinners(collect($standings), $trophy->position, fn ($points) => "{$points} pts across {$itemCount} items");
     }
 
     /**
@@ -310,21 +271,19 @@ class FestTrophyService
             $filtered = $filtered->filter(fn ($r) => strtolower((string) ($r['gender'] ?? '')) === $gender);
         }
 
-        $winnerRow = $filtered->firstWhere('rank', $trophy->position);
-        if (! $winnerRow) {
-            return null;
-        }
-
-        return [
+        $winners = $filtered->where('rank', $trophy->position)->map(fn ($row) => [
             'type' => 'individual',
-            'name' => ($winnerRow['student']['name'] ?? 'Student') . ($winnerRow['school'] ? " ({$winnerRow['school']})" : ''),
-            'student_name' => $winnerRow['student']['name'] ?? null,
-            'reg_no' => $winnerRow['student']['reg_no'] ?? null,
-            'school_name' => $winnerRow['school'] ?? null,
-            'points' => $winnerRow['points'] ?? 0,
-            'detail' => "{$winnerRow['points']} championship pts",
-            'top_ten' => $filtered->take(10)->map(fn ($row) => ['rank' => $row['rank'], 'name' => ($row['student']['name'] ?? 'Student').(! empty($row['school']) ? ' — '.$row['school'] : ''), 'points' => $row['points'] ?? 0])->values()->all(),
-        ];
+            'name' => ($row['student']['name'] ?? 'Student').(! empty($row['school']) ? " ({$row['school']})" : ''),
+            'student_name' => $row['student']['name'] ?? null,
+            'reg_no' => $row['student']['reg_no'] ?? null,
+            'school_name' => $row['school'] ?? null,
+            'points' => $row['points'] ?? 0,
+            'detail' => "{$row['points']} championship pts",
+        ])->values();
+        return $this->jointWinnerResult($winners, $filtered->take(10)->map(fn ($row) => [
+            'rank' => $row['rank'], 'name' => ($row['student']['name'] ?? 'Student').(! empty($row['school']) ? ' — '.$row['school'] : ''),
+            'points' => $row['points'] ?? 0,
+        ])->values()->all());
     }
 
     /**
@@ -418,6 +377,37 @@ class FestTrophyService
         }
 
         return collect();
+    }
+
+    private function jointWinnerResult(Collection $winners, array $topTen): ?array
+    {
+        $winner = $winners->first();
+        if (! $winner) {
+            return null;
+        }
+        if ($winners->count() > 1) {
+            $winner['name'] = $winners->pluck('name')->implode(' / ');
+        }
+        return $winner + ['joint_winners' => $winners->all(), 'is_tied' => $winners->count() > 1, 'top_ten' => $topTen];
+    }
+
+    private function resolveSchoolPointWinners(Collection $standings, int $position, callable $detail): ?array
+    {
+        $rank = 0;
+        $previousPoints = null;
+        $ranked = $standings->sortByDesc('points')->values()->map(function ($row) use (&$rank, &$previousPoints, $detail) {
+            $points = (float) $row['points'];
+            if ($previousPoints === null || $points !== $previousPoints) {
+                $rank++;
+            }
+            $previousPoints = $points;
+            return [
+                'rank' => $rank, 'type' => 'school', 'school_id' => $row['school_id'],
+                'name' => $row['school_name'] ?? $row['name'], 'points' => $row['points'],
+                'detail' => $detail($row['points']),
+            ];
+        });
+        return $this->jointWinnerResult($ranked->where('rank', $position)->values(), $ranked->take(10)->all());
     }
 
     private function documentGroupPatterns(string $group): ?array
