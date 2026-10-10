@@ -41,6 +41,19 @@
                             :all-label="`All schools (${schools.length})`"
                             class="max-w-[220px]"
                         />
+                        <details class="relative">
+                            <summary class="btn-secondary py-1.5 px-3 text-xs cursor-pointer">Select multiple schools ({{ selectedSchoolIds.length }})</summary>
+                            <div class="absolute z-20 mt-1 w-80 rounded-lg border bg-white shadow-lg p-3">
+                                <input v-model="schoolSearch" placeholder="Search schools…" class="w-full rounded border-gray-300 text-xs mb-2">
+                                <button type="button" @click="selectedSchoolIds = []" class="text-xs text-indigo-600 mb-2">Clear school selection</button>
+                                <div class="max-h-64 overflow-y-auto space-y-2">
+                                    <label v-for="school in schoolChoices" :key="school.id" class="flex gap-2 items-center text-xs">
+                                        <input v-model="selectedSchoolIds" :value="school.id" type="checkbox" class="rounded border-gray-300">
+                                        {{ school.name }}
+                                    </label>
+                                </div>
+                            </div>
+                        </details>
                         <button @click="generate" class="btn-secondary py-1.5 px-3 text-xs">⚡ Generate all</button>
                     </div>
                 </div>
@@ -53,6 +66,7 @@
                         <button @click="renderFiltered" class="btn-primary py-1.5 px-3 text-xs" :disabled="isBatchRunning || !filteredCertificates.length">
                             ⚙️ Render matching
                         </button>
+                        <a v-if="selectedSchoolIds.length && filteredCertificates.length" :href="printFilteredUrl(false)" target="_blank" class="btn-primary py-1.5 px-3 text-xs">Print selected schools ↗</a>
                         <a :href="previewFilteredUrl" target="_blank" class="text-xs font-semibold text-gray-500 hover:text-gray-800">👁️ Preview ↗</a>
                         <details v-if="filteredCertificates.length" class="relative">
                             <summary class="btn-secondary py-1.5 px-3 text-xs inline-flex list-none cursor-pointer [&::-webkit-details-marker]:hidden">
@@ -107,6 +121,7 @@
 
         <div class="card p-4">
             <div class="mb-3 flex flex-wrap items-center gap-3">
+                <button type="button" @click="selectedCertIds = filteredCertificates.map(c => c.id)" :disabled="!filteredCertificates.length" class="btn-secondary text-xs">Select all matching students ({{ filteredCertificates.length }})</button>
                 <div class="relative min-w-[200px] flex-1">
                     <input v-model="searchQuery" type="text" placeholder="Search student or item..."
                            class="w-full text-xs py-2 pl-8 pr-3 rounded border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
@@ -173,7 +188,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSignatoriesCard from '@/Components/certificates/EventSignatoriesCard.vue';
@@ -198,6 +213,9 @@ const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/cert
 const searchQuery = ref('');
 const selectedItemId = ref(null);
 const selectedSchoolId = ref(null);
+const selectedSchoolIds = ref([]);
+const schoolSearch = ref('');
+const schoolChoices = computed(() => props.schools.filter(s => s.name.toLowerCase().includes(schoolSearch.value.toLowerCase().trim())));
 const perPage = ref(25);
 const currentPage = ref(1);
 const selectedCertIds = ref([]);
@@ -218,7 +236,11 @@ function itemsText(c) {
 }
 
 const filteredCertificates = computed(() => props.certificates.filter(c => {
-    if (selectedItemId.value && c.item?.id !== selectedItemId.value) return false;
+    if (selectedItemId.value && !(c.items?.length ? c.items : [c.item]).some(item => String(item?.id) === String(selectedItemId.value))) return false;
+    if (selectedSchoolIds.value.length) {
+        const schoolId = c.registration?.school?.id ?? c.participant?.registration?.school?.id;
+        if (!selectedSchoolIds.value.includes(schoolId)) return false;
+    }
     if (selectedSchoolId.value) {
         const schoolId = c.registration?.school?.id ?? c.participant?.registration?.school?.id;
         if (schoolId !== selectedSchoolId.value) return false;
@@ -233,6 +255,7 @@ const filteredCertificates = computed(() => props.certificates.filter(c => {
 }));
 
 const scopeLabel = computed(() => {
+    if (selectedSchoolIds.value.length) return `${selectedSchoolIds.value.length} selected schools`;
     if (selectedItemId.value) return props.publishedItems.find(i => i.id === selectedItemId.value)?.title ?? 'Item';
     if (selectedSchoolId.value) return props.schools.find(s => s.id === selectedSchoolId.value)?.name ?? 'School';
     return 'Whole event';
@@ -264,6 +287,9 @@ function scopeParams() {
     const params = new URLSearchParams({ cert_type: 'participation' });
     if (selectedItemId.value) params.set('item_id', selectedItemId.value);
     if (selectedSchoolId.value) params.set('school_id', selectedSchoolId.value);
+    if (selectedSchoolIds.value.length || searchQuery.value.trim() || selectedItemId.value) {
+        params.set('certificate_ids', filteredCertificates.value.map(c => c.id).join(','));
+    }
     return params;
 }
 
@@ -300,6 +326,7 @@ function renderFiltered() {
     const scope = { cert_type: 'participation' };
     if (selectedItemId.value) scope.item_id = selectedItemId.value;
     if (selectedSchoolId.value) scope.school_id = selectedSchoolId.value;
+    if (selectedSchoolIds.value.length || searchQuery.value.trim() || selectedItemId.value) scope.certificate_ids = filteredCertificates.value.map(c => c.id).join(',');
     router.post(`${base}/batches`, scope, {
         preserveScroll: true,
         onSuccess: () => startPolling(page.props.flash?.certificate_batch_id),
@@ -326,6 +353,17 @@ function bulkDownload() {
     if (!selectedCertIds.value.length) return;
     window.location.href = `${base}/download-zip?certificate_ids=${selectedCertIds.value.join(',')}`;
 }
+
+watch(selectedSchoolId, value => {
+    if (value) selectedSchoolIds.value = [];
+});
+watch(selectedSchoolIds, value => {
+    if (value.length) selectedSchoolId.value = null;
+});
+watch([selectedSchoolId, selectedSchoolIds, selectedItemId, searchQuery], () => {
+    currentPage.value = 1;
+    selectedCertIds.value = [];
+});
 
 onMounted(() => {
     const lastBatch = props.recentBatches?.[0];
