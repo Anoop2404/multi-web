@@ -8,6 +8,7 @@
         <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="certificates" class="mb-4" />
 
         <div class="mb-4 flex flex-wrap items-center gap-3 text-xs">
+            <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/school-list`" class="btn-secondary text-xs">Download school list PDF</a>
             <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/merit`" class="font-semibold text-amber-700 hover:text-amber-900">
                 🏆 Open Merit Certificates workspace →
             </Link>

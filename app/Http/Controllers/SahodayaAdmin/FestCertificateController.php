@@ -933,6 +933,19 @@ class FestCertificateController extends SahodayaAdminController
      * plain; no participation columns. The Excel file adds medals by category. Same data as
      * the tally page (certificateTally()'s medals_1/2/3).
      */
+    public function schoolListPdf(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $schoolIds = FestRegistration::whereIn('event_id', $event->reportableEventIds())
+            ->where('status', 'approved')->select('school_id');
+        $schools = Tenant::whereIn('id', $schoolIds)->orderBy('name')->get(['id', 'name']);
+
+        return PdfGenerator::fromView('fest.reports.certificate-school-list', [
+            'event' => $event, 'orgName' => $this->sahodaya->name, 'schools' => $schools,
+        ], \App\Support\ReportFilename::buildForEvent('certificate-school-list', $event, organizationName: $this->sahodaya->name), $request->boolean('inline'));
+    }
+
     public function tallyMedalReport(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

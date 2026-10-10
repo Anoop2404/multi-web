@@ -167,6 +167,30 @@ class FestCertificateExportTest extends TestCase
         $zip->close();
     }
 
+    public function test_certificate_school_list_downloads_pdf_with_blank_status_and_sign(): void
+    {
+        config(['services.pdf_converter.url' => null]);
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $sahodaya = $this->makeSahodaya();
+        $school = $this->makeSchool($sahodaya->id);
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+        $event = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'School List Event', 'event_type' => 'kalolsavam']);
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song']);
+        $this->makeCertificate($event, $item, $school->id);
+        $this->makeCertificate($event, $item, $school->id);
+
+        $response = $this->actingAs($admin)->get(route('sahodaya.events.certificates.school-list', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]));
+        $response->assertOk();
+        $this->assertStringContainsString('certificate-school-list', $response->headers->get('Content-Disposition'));
+        $html = view('fest.reports.certificate-school-list', ['event' => $event, 'orgName' => $sahodaya->name, 'schools' => collect([$school])])->render();
+        $this->assertStringContainsString('<th>Status</th><th>Sign</th>', $html);
+        $this->assertSame(1, substr_count($html, $school->name));
+        $this->assertStringContainsString('<td></td><td></td>', $html);
+    }
+
     public function test_print_all_shows_every_certificate_on_its_own_page(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);

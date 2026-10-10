@@ -1827,6 +1827,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/certificates/merit', [FestCertificateController::class, 'meritCertificates'])->name('certificates.merit');
             Route::get('/{event}/certificates/participants', [FestCertificateController::class, 'participationCertificatesPage'])->name('certificates.participants');
             Route::get('/{event}/certificates/tally', [FestCertificateController::class, 'tally'])->name('certificates.tally');
+            Route::get('/{event}/certificates/school-list', [FestCertificateController::class, 'schoolListPdf'])->name('certificates.school-list');
             Route::get('/{event}/certificates/tally/medal-report', [FestCertificateController::class, 'tallyMedalReport'])->name('certificates.tally.medal-report');
             Route::post('/{event}/certificates/generate', [FestCertificateController::class, 'generate'])->name('certificates.generate');
             Route::post('/{event}/certificates/school-downloaded', [FestCertificateController::class, 'markSchoolDownloaded'])->name('certificates.school-downloaded');

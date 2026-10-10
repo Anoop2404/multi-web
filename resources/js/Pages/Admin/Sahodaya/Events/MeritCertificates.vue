@@ -5,6 +5,7 @@
                     description="Winner certificates (Merit Ranks 1–3), filterable by item or school." />
 
         <div class="mb-4 flex flex-wrap items-center gap-3 text-xs">
+            <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/school-list`" class="btn-secondary text-xs">Download school list PDF</a>
             <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates`" class="text-gray-500 hover:text-gray-800">
                 ← All certificates
             </Link>
