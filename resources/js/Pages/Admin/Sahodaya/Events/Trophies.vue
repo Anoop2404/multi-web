@@ -108,6 +108,9 @@
                     <input v-model="searchQuery" type="text" class="fld text-xs !w-72" placeholder="Search trophy #, title, or recipient school...">
                     <SearchableSelect v-model="filterType" class="w-48 text-xs" :options="typeOptions" :all-option="true" all-label="All Trophy Types" />
                     <SearchableSelect v-model="filterStatus" class="w-40 text-xs" :options="statusOptions" :all-option="true" all-label="All Statuses" />
+                    <SearchableSelect v-model="filterActivity" class="w-44 text-xs" :options="activityOptions" :all-option="true" all-label="Enabled & Disabled" />
+                    <SearchableSelect v-model="filterCategory" class="w-56 text-xs" :options="categoryOptions" :all-option="true" all-label="All Categories" />
+                    <button type="button" class="btn-secondary text-xs" @click="filterActivity = 'disabled'">Preview disabled trophies</button>
                 </div>
                 <div class="text-xs text-slate-500 font-medium">
                     Showing {{ filteredRows.length }} of {{ trophyRows.length }} trophies
@@ -157,6 +160,7 @@
                                 </div>
                             </td>
                             <td class="p-3">
+                                <span v-if="!r.trophy.is_active" class="block text-xs font-semibold text-amber-700 mb-1">Disabled — admin preview</span>
                                 <span class="px-2 py-0.5 rounded-md font-medium text-[10px] uppercase tracking-wide"
                                       :class="badgeClassForType(r.trophy.trophy_type)">
                                     {{ trophyTypes[r.trophy.trophy_type] || r.trophy.trophy_type }}
@@ -434,6 +438,9 @@ const currentScope = ref(props.scope);
 const searchQuery = ref('');
 const filterType = ref('');
 const filterStatus = ref('');
+const filterActivity = ref('');
+const filterCategory = ref('');
+const activityOptions = [{ value: 'enabled', label: 'Enabled trophies' }, { value: 'disabled', label: 'Disabled trophies' }];
 const editingModal = ref(false);
 
 const typeOptions = computed(() => Object.entries(props.trophyTypes).map(([v, l]) => ({ value: v, label: l })));
@@ -467,6 +474,8 @@ const filteredGroupItems = computed(() => {
 
 const filteredRows = computed(() => {
     let list = props.trophyRows;
+    if (filterActivity.value) list = list.filter(r => Boolean(r.trophy.is_active) === (filterActivity.value === 'enabled'));
+    if (filterCategory.value) list = list.filter(r => r.trophy.category_key === filterCategory.value);
 
     if (searchQuery.value) {
         const q = searchQuery.value.toLowerCase().trim();
@@ -598,7 +607,10 @@ function pushToChildren() {
 }
 
 const pdfExportUrl = computed(() => {
-    return `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/trophies/export-pdf?scope=${currentScope.value}`;
+    const params = new URLSearchParams({ scope: currentScope.value });
+    if (filterActivity.value) params.set('activity', filterActivity.value);
+    if (filterCategory.value) params.set('category', filterCategory.value);
+    return `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/trophies/export-pdf?${params}`;
 });
 </script>
 

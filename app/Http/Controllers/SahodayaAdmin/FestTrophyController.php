@@ -142,6 +142,12 @@ class FestTrophyController extends SahodayaAdminController
 
         $scope = $request->input('scope', 'phase');
         $trophies = $trophyService->trophiesForEvent($event);
+        if (in_array($request->query('activity'), ['enabled', 'disabled'], true)) {
+            $trophies = $trophies->where('is_active', $request->query('activity') === 'enabled')->values();
+        }
+        if ($request->filled('category')) {
+            $trophies = $trophies->where('category_key', $request->query('category'))->values();
+        }
         $resolvedRows = $trophyService->resolveWinners($event, $trophies, cumulative: $scope === 'cumulative');
 
         $slug = \Illuminate\Support\Str::slug($event->title);

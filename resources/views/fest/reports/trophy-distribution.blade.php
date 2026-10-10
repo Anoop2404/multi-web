@@ -90,6 +90,9 @@
                     <td class="col-no">{{ $t['trophy_no'] }}</td>
                     <td class="col-title">
                         <div>{{ $t['title'] }}</div>
+                        @if(!($t['is_active'] ?? true))
+                            <div style="font-size:8px;color:#92400e;">Disabled — admin preview</div>
+                        @endif
                         @if(count($winners) > 1)
                             <div style="font-size:8px;color:#92400e;">Joint winner</div>
                         @endif
