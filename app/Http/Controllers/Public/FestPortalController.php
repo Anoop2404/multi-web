@@ -368,7 +368,8 @@ class FestPortalController extends Controller
             return $renderResults();
         }
 
-        $cacheKey = 'fest-results-html:v3:'.$event->tenant_id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.$resultsVersion.':'.$tab;
+        $settingsVersion = hash('sha256', json_encode($event->rootEvent()->aggregation_config));
+        $cacheKey = 'fest-results-html:v4:'.$settingsVersion.':'.$event->tenant_id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.$resultsVersion.':'.$tab;
         $html = $this->rememberPublicHotPath(
             $cacheKey,
             120,
@@ -528,10 +529,10 @@ class FestPortalController extends Controller
                 ->select('id', 'item_id', 'position', 'score', 'grade', 'grade_points', 'participant_id', 'registration_id')
                 ->with([
                     'item:id,title,event_id,' . ($event->event_type === 'sports' ? 'age_group' : 'class_group') . ',participant_type,stage_type,gender,results_published_at,head_id',
-                    'participant:id,registration_id,student_id,teacher_id,participant_role,disqualified_at',
-                    'participant.student:id,name,photo,photo_fallback,reg_no',
-                    'participant.teacher:id,name',
-                    'participant.registration:id,school_id,event_id',
+                    'participant:id,registration_id,group_id,student_id,teacher_id,participant_role,disqualified_at',
+                    'participant.student:id,tenant_id,name,photo,reg_no,updated_at',
+                    'participant.teacher:id,tenant_id,name,photo,updated_at',
+                    'participant.registration:id,school_id,event_id,item_id',
                     'participant.registration.school:id,name',
                     'participant.registration.item:id,event_id',
                     'item.head:id,name',
@@ -553,7 +554,7 @@ class FestPortalController extends Controller
                     $marks->pluck('registration_id')->filter()->unique()->values()
                 )
                 ->where('participant_role', 'performer')
-                ->with('student:id,name,photo,photo_fallback')
+                ->with('student:id,tenant_id,name,photo,updated_at')
                 ->get()
                 ->groupBy('registration_id');
 
@@ -739,6 +740,7 @@ class FestPortalController extends Controller
             'individualResults' => $individualResults,
             'championship' => $championship,
             'championshipCombinesPhases' => $championshipUsesPhases,
+            'championshipConfig' => $this->individualChampionship->getConfig($event),
             'publishedAt' => $publishedAt,
             'scopes' => $scopes,
             'selectedScope' => $selectedScope,

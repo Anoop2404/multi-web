@@ -23,11 +23,12 @@ class FestChampionshipController extends SahodayaAdminController
         $categoryMap = $this->categoryMergeMap($root);
         $usesPhases = $root->usesPhasedRegionalBilling();
 
-        $championsSummary = $championship->championsSummary($event);
+        $leaderboard = $championship->leaderboardForEvent($event);
+        $championsSummary = $championship->championsSummary($event, false, $leaderboard);
 
         return $this->inertia('Sahodaya/Events/Championship', $this->withEventActivity($event, FestPageActivity::CHAMPIONSHIP, [
             'event'                      => $event,
-            'leaderboard'                => $championship->leaderboardForEvent($event),
+            'leaderboard'                => $leaderboard,
             'championsSummary'           => $championsSummary,
             'championshipConfig'         => $championship->getConfig($event),
             'categoryOptions'            => collect($categoryLabels)->map(fn ($label, $key) => ['value' => $key, 'label' => $label])->values(),
@@ -57,6 +58,10 @@ class FestChampionshipController extends SahodayaAdminController
             'minimum_points'           => 'nullable|integer|min:0|max:999',
             'excluded_item_categories' => 'nullable|array',
             'excluded_item_categories.*' => 'string',
+            'disabled'                 => 'nullable|boolean',
+            'group_by_gender'          => 'nullable|boolean',
+            'excluded_individual_categories' => 'nullable|array',
+            'excluded_individual_categories.*' => 'string|in:lp,up,hs,hss,open',
         ]);
 
         $root = $event->rootEvent();
@@ -65,12 +70,15 @@ class FestChampionshipController extends SahodayaAdminController
             'male_title'               => $data['male_title'],
             'female_title'             => $data['female_title'],
             'runner_up_title'          => $data['runner_up_title'],
+            'disabled'                 => (bool) ($data['disabled'] ?? false),
             'max_counting_items'       => (int) ($data['max_counting_items'] ?? 0),
             'multi_person_mode'        => $data['multi_person_mode'],
             'group_weight_percent'     => (int) ($data['group_weight_percent'] ?? 100),
             'must_have_first_place'    => (bool) ($data['must_have_first_place'] ?? false),
             'minimum_points'           => (int) ($data['minimum_points'] ?? 0),
             'excluded_item_categories' => array_values(array_unique($data['excluded_item_categories'] ?? [])),
+            'group_by_gender'          => (bool) ($data['group_by_gender'] ?? true),
+            'excluded_individual_categories' => array_values(array_unique($data['excluded_individual_categories'] ?? [])),
         ];
 
         $root->update(['aggregation_config' => $config]);

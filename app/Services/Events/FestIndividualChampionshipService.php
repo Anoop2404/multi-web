@@ -41,13 +41,14 @@ class FestIndividualChampionshipService
             'male_title' => $stored['male_title'] ?? ($event->event_type === 'sports' ? 'Individual Champion (Boys)' : 'Kalaprathibha'),
             'female_title' => $stored['female_title'] ?? ($event->event_type === 'sports' ? 'Individual Champion (Girls)' : 'Kalathilakam'),
             'runner_up_title' => $stored['runner_up_title'] ?? 'Runner Up',
+            'disabled' => (bool) ($stored['disabled'] ?? false),
             'max_counting_items' => (int) ($stored['max_counting_items'] ?? 0), // 0 = unlimited / all items
             'multi_person_mode' => $stored['multi_person_mode'] ?? 'tie_break_only', // 'tie_break_only', 'include_weighted', 'exclude'
             'group_weight_percent' => (int) ($stored['group_weight_percent'] ?? 100),
             'must_have_first_place' => (bool) ($stored['must_have_first_place'] ?? false),
             'minimum_points' => (int) ($stored['minimum_points'] ?? 0),
             'excluded_item_categories' => (array) ($stored['excluded_item_categories'] ?? []),
-            'active_categories' => ! empty($stored['active_categories']) ? (array) $stored['active_categories'] : null,
+            'excluded_individual_categories' => (array) ($stored['excluded_individual_categories'] ?? []),
             'group_by_gender' => (bool) ($stored['group_by_gender'] ?? true),
         ];
     }
@@ -64,7 +65,7 @@ class FestIndividualChampionshipService
         $stored = $root->aggregation_config['public_overlays'] ?? [];
 
         return [
-            'enabled' => (bool) ($stored['enabled'] ?? true),
+            'enabled' => ! $this->getConfig($event)['disabled'] && (bool) ($stored['enabled'] ?? true),
             'categories' => isset($stored['categories']) && is_array($stored['categories'])
                 ? array_values(array_unique($stored['categories']))
                 : [],
@@ -74,7 +75,12 @@ class FestIndividualChampionshipService
     /** @return Collection<int, array<string, mixed>> */
     public function leaderboardForEvent(FestEvent $event, bool $directPhotoUrls = false): Collection
     {
-        return $this->rankAndFormat($this->pointsForEvent($event), $directPhotoUrls, $this->getConfig($event));
+        $config = $this->getConfig($event);
+        if ($config['disabled']) {
+            return collect();
+        }
+
+        return $this->rankAndFormat($this->pointsForEvent($event), $directPhotoUrls, $config);
     }
 
     /**
@@ -86,6 +92,11 @@ class FestIndividualChampionshipService
     public function rankAndFormat(Collection $allRows, bool $directPhotoUrls = false, ?array $config = null): Collection
     {
         $config = $config ?? [];
+        if ($config['disabled'] ?? false) {
+            return collect();
+        }
+        $excluded = (array) ($config['excluded_individual_categories'] ?? []);
+        $allRows = $allRows->reject(fn ($row) => in_array($row->category, $excluded, true));
         $minPoints = (int) ($config['minimum_points'] ?? 0);
         $mustFirst = (bool) ($config['must_have_first_place'] ?? false);
 
@@ -101,7 +112,10 @@ class FestIndividualChampionshipService
                 <=> [$a->points, $a->firsts ?? 0, $a->group_points, $b->student_id];
         })->values();
 
-        $rankedByCategoryAndGender = $allRows->groupBy(fn ($row) => $row->category.'|'.$row->gender)
+        $rankKey = ($config['group_by_gender'] ?? true) !== false
+            ? fn ($row) => $row->category.'|'.$row->gender
+            : fn ($row) => $row->category;
+        $rankedByCategory = $allRows->groupBy($rankKey)
             ->flatMap(function ($groupRows) {
                 $rank = 0;
                 $previousKey = null;
@@ -123,7 +137,7 @@ class FestIndividualChampionshipService
             ->get(['id', 'name', 'type'])
             ->mapWithKeys(fn (Tenant $school) => [$school->id => $school->name]);
 
-        return $rankedByCategoryAndGender->map(function (array $pair) use ($overallRankByStudent, $schoolNames, $directPhotoUrls) {
+        return $rankedByCategory->map(function (array $pair) use ($overallRankByStudent, $schoolNames, $directPhotoUrls) {
             [$row, $rank] = $pair;
 
             return [
@@ -155,12 +169,13 @@ class FestIndividualChampionshipService
      *
      * @return array<string, mixed>
      */
-    public function championsSummary(FestEvent $event, bool $directPhotoUrls = false): array
+    public function championsSummary(FestEvent $event, bool $directPhotoUrls = false, ?Collection $leaderboard = null): array
     {
         $config = $this->getConfig($event);
-        $leaderboard = $this->leaderboardForEvent($event, $directPhotoUrls);
+        $leaderboard ??= $this->leaderboardForEvent($event, $directPhotoUrls);
         $root = $event->rootEvent();
         $canonicalLabels = FestClassGroupScheme::canonicalLabels(null, $root);
+        $groupByGender = ($config['group_by_gender'] ?? true) !== false;
 
         $categories = $leaderboard->pluck('category')->unique()->values();
 
@@ -168,33 +183,46 @@ class FestIndividualChampionshipService
         foreach ($categories as $catKey) {
             $catRows = $leaderboard->filter(fn ($r) => $r['category'] === $catKey);
 
-            $boys = $catRows->filter(fn ($r) => $r['gender'] === 'male')->values();
-            $girls = $catRows->filter(fn ($r) => $r['gender'] === 'female')->values();
+            if ($groupByGender) {
+                $boys = $catRows->filter(fn ($r) => $r['gender'] === 'male')->values();
+                $girls = $catRows->filter(fn ($r) => $r['gender'] === 'female')->values();
 
-            $maleChamp = $boys->firstWhere('rank', 1);
-            $maleRunner = $boys->firstWhere('rank', 2);
-            $femaleChamp = $girls->firstWhere('rank', 1);
-            $femaleRunner = $girls->firstWhere('rank', 2);
-
-            $categoryChampions[] = [
-                'category' => $catKey,
-                'category_label' => $canonicalLabels[$catKey] ?? strtoupper($catKey),
-                'male_champion' => $maleChamp ? $maleChamp + ['title' => $config['male_title']] : null,
-                'male_runner_up' => $maleRunner ? $maleRunner + ['title' => $config['runner_up_title']] : null,
-                'female_champion' => $femaleChamp ? $femaleChamp + ['title' => $config['female_title']] : null,
-                'female_runner_up' => $femaleRunner ? $femaleRunner + ['title' => $config['runner_up_title']] : null,
-            ];
+                $categoryChampions[] = [
+                    'category' => $catKey,
+                    'category_label' => $canonicalLabels[$catKey] ?? strtoupper($catKey),
+                    'male_champion' => $boys->firstWhere('rank', 1) ? $boys->firstWhere('rank', 1) + ['title' => $config['male_title']] : null,
+                    'male_runner_up' => $boys->firstWhere('rank', 2) ? $boys->firstWhere('rank', 2) + ['title' => $config['runner_up_title']] : null,
+                    'female_champion' => $girls->firstWhere('rank', 1) ? $girls->firstWhere('rank', 1) + ['title' => $config['female_title']] : null,
+                    'female_runner_up' => $girls->firstWhere('rank', 2) ? $girls->firstWhere('rank', 2) + ['title' => $config['runner_up_title']] : null,
+                ];
+            } else {
+                $top = $catRows->sortBy('rank')->values();
+                $categoryChampions[] = [
+                    'category' => $catKey,
+                    'category_label' => $canonicalLabels[$catKey] ?? strtoupper($catKey),
+                    'champion' => $top->first() ? $top->first() + ['title' => $config['male_title']] : null,
+                    'runner_up' => $top->firstWhere('rank', 2) ? $top->firstWhere('rank', 2) + ['title' => $config['runner_up_title']] : null,
+                ];
+            }
         }
 
-        // Overall fest champions (top overall boy and girl across any category)
-        $allBoys = $leaderboard->filter(fn ($r) => $r['gender'] === 'male')->sortBy('overall_rank')->values();
-        $allGirls = $leaderboard->filter(fn ($r) => $r['gender'] === 'female')->sortBy('overall_rank')->values();
+        if ($groupByGender) {
+            // Overall fest champions (top overall boy and girl across any category)
+            $allBoys = $leaderboard->filter(fn ($r) => $r['gender'] === 'male')->sortBy('overall_rank')->values();
+            $allGirls = $leaderboard->filter(fn ($r) => $r['gender'] === 'female')->sortBy('overall_rank')->values();
+
+            return [
+                'config' => $config,
+                'category_champions' => $categoryChampions,
+                'overall_male_champion' => $allBoys->first() ? $allBoys->first() + ['title' => 'Overall ' . $config['male_title']] : null,
+                'overall_female_champion' => $allGirls->first() ? $allGirls->first() + ['title' => 'Overall ' . $config['female_title']] : null,
+            ];
+        }
 
         return [
             'config' => $config,
             'category_champions' => $categoryChampions,
-            'overall_male_champion' => $allBoys->first() ? $allBoys->first() + ['title' => 'Overall ' . $config['male_title']] : null,
-            'overall_female_champion' => $allGirls->first() ? $allGirls->first() + ['title' => 'Overall ' . $config['female_title']] : null,
+            'overall_champion' => $leaderboard->sortBy('overall_rank')->first() ? $leaderboard->sortBy('overall_rank')->first() + ['title' => 'Overall ' . $config['male_title']] : null,
         ];
     }
 
@@ -297,12 +325,18 @@ class FestIndividualChampionshipService
     /** @return Collection<int, array<string, mixed>> */
     public function crossPhaseStanding(FestEvent $hub, bool $directPhotoUrls = false): Collection
     {
+        if ($this->getConfig($hub)['disabled']) {
+            return collect();
+        }
         return $this->rankAndFormat($this->sumAcrossLeaves($this->allPhaseLeaves($hub)), $directPhotoUrls, $this->getConfig($hub));
     }
 
     /** @return Collection<int, array<string, mixed>> */
     public function crossPhaseStandingForVisibleLeaves(FestEvent $hub, Collection $visibleLeafIds, bool $directPhotoUrls = false): Collection
     {
+        if ($this->getConfig($hub)['disabled']) {
+            return collect();
+        }
         $visible = $this->allPhaseLeaves($hub)->filter(fn (FestEvent $leaf) => $visibleLeafIds->contains($leaf->id));
 
         return $this->rankAndFormat($this->sumAcrossLeaves($visible), $directPhotoUrls, $this->getConfig($hub));

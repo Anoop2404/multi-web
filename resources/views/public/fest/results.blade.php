@@ -500,18 +500,32 @@
             <p id="individual-result-empty" class="hidden rounded-2xl border border-dashed border-slate-700 p-8 text-center text-white/40">No individual results match those filters.</p>
         @else
             @if(empty($championship))
-            <div class="rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-8 sm:p-10 text-center">
-                <h2 class="font-bold text-white">No individual championship standing is published</h2>
-                <p class="text-sm text-white/45 mt-2 max-w-xl mx-auto">{{ $event->status === 'completed' ? 'This event has ended without a published individual championship table.' : 'The championship table will appear here if the event committee publishes cumulative individual points.' }}</p>
-            </div>
+                @php $champDisabled = ($championshipConfig['disabled'] ?? false); @endphp
+                @if($champDisabled)
+                <div class="rounded-2xl border border-red-900/50 bg-red-950/20 p-8 sm:p-10 text-center">
+                    <h2 class="font-bold text-red-400">Individual Championship</h2>
+                    <p class="text-sm text-white/45 mt-2 max-w-xl mx-auto">Championship rankings are disabled for this event.</p>
+                </div>
+                @else
+                <div class="rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-8 sm:p-10 text-center">
+                    <h2 class="font-bold text-white">No individual championship standing is published</h2>
+                    <p class="text-sm text-white/45 mt-2 max-w-xl mx-auto">{{ $event->status === 'completed' ? 'This event has ended without a published individual championship table.' : 'The championship table will appear here if the event committee publishes cumulative individual points.' }}</p>
+                </div>
+                @endif
             @else
             @php
+                $groupByGender = ($championshipConfig['group_by_gender'] ?? true);
                 $genderLabels = ['male' => 'Boys', 'female' => 'Girls', 'open' => 'Open'];
+                $groupFn = $groupByGender
+                    ? fn (array $row) => $row['category_key'].'|'.$row['gender_key']
+                    : fn (array $row) => $row['category_key'];
                 $comboGroups = collect($championship)
-                    ->groupBy(fn (array $row) => $row['category_key'].'|'.$row['gender_key'])
+                    ->groupBy($groupFn)
                     ->map(fn ($rows, $key) => [
                         'group' => $key,
-                        'label' => ($rows->first()['category'] ?? '').' · '.($genderLabels[$rows->first()['gender_key']] ?? $rows->first()['gender']),
+                        'label' => $groupByGender
+                            ? ($rows->first()['category'] ?? '').' · '.($genderLabels[$rows->first()['gender_key']] ?? $rows->first()['gender'])
+                            : ($rows->first()['category'] ?? ''),
                     ])
                     ->values();
                 $firstGroup = $comboGroups->first()['group'] ?? null;
@@ -519,7 +533,7 @@
             <div class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden overflow-x-auto">
                 <div class="px-4 py-3 bg-white/5 border-b border-slate-800">
                     <h2 class="font-bold text-white">Individual Championship Standings</h2>
-                    <p class="text-xs text-white/40">Individual championship points, ranked within each category &amp; gender{{ ($championshipCombinesPhases ?? false) ? ' — combined across every published phase' : '' }}. Not the same as the Individual tab's per-result list.</p>
+                    <p class="text-xs text-white/40">Individual championship points{{ $groupByGender ? ', ranked within each category &amp; gender' : ', ranked within each category' }}{{ ($championshipCombinesPhases ?? false) ? ' — combined across every published phase' : '' }}. Not the same as the Individual tab's per-result list.</p>
                 </div>
 
                 @if($comboGroups->count() > 1)
