@@ -135,7 +135,7 @@ class EventContext
 
         $gradePointService = app(FestGradePointService::class);
 
-        $marksQuery = FestMark::where('event_id', $this->event->id)
+        $marksQuery = FestMark::currentPerformers()->where('event_id', $this->event->id)
             ->with(['participant.registration', 'item']);
 
         if ($this->event->event_type === 'sports') {
@@ -303,7 +303,7 @@ class EventContext
         // out of the target's own phase board/total.
         $sourceCategoryKeys = $category ? FestCategoryMerge::sourceKeysFor($this->event->rootEvent(), $category) : null;
 
-        $marks = FestMark::where('event_id', $this->event->id)
+        $marks = FestMark::currentPerformers()->where('event_id', $this->event->id)
             ->whereHas('item', function ($q) use ($phaseId, $sourceCategoryKeys, $categoryColumn, $excludedCategories) {
                 $q->where('phase_id', $phaseId)
                     ->whereNotNull('results_published_at')
@@ -455,7 +455,7 @@ class EventContext
         // was true, so a school's real ranking/certificate could silently include marks
         // from an item that was never actually published, or one explicitly left
         // unpublished after testing.
-        $marks = FestMark::where('event_id', $this->event->id)
+        $marks = FestMark::currentPerformers()->where('event_id', $this->event->id)
             ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at'))
             ->with(['participant.registration.item', 'item'])
             ->get()

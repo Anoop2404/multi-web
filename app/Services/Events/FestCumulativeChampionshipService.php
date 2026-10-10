@@ -188,7 +188,7 @@ class FestCumulativeChampionshipService
         // it needs the same gate applied directly, or an item nobody had individually
         // published results for yet (or one later hidden) would still contribute to that
         // category's own locked/cumulative standing.
-        $marks = FestMark::where('event_id', $event->id)
+        $marks = FestMark::currentPerformers()->where('event_id', $event->id)
             ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
             ->with(['item', 'participant.registration.item'])
             ->get()->unique(fn (FestMark $mark) => $mark->deduplicationKey());

@@ -315,9 +315,17 @@ class PublicFestScoreboardService
         }
 
         if (! $category) {
+            // Published snapshots can predate a roster change. Use the current
+            // published performers so demoted substitutes never retain public points.
+            $hasDemotedMarks = FestMark::whereIn('event_id', $scope['event_ids'])
+                ->whereHas('participant', fn ($q) => $q->whereNotNull('participant_role')->where('participant_role', '!=', 'performer'))
+                ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at'))
+                ->exists();
+            if ($hasDemotedMarks) {
+                return $this->provisionalScoreboard($event, $scope);
+            }
             if ($scope['event_id']) {
-                $partition = FestEvent::where('tenant_id', $root->tenant_id)
-                    ->findOrFail($scope['event_id']);
+                $partition = FestEvent::where('tenant_id', $root->tenant_id)->findOrFail($scope['event_id']);
 
                 return EventContext::for($partition)->scoreboardBySchoolForEvent();
             }
@@ -336,7 +344,7 @@ class PublicFestScoreboardService
         // Pair/group items save one FestMark per teammate (same registration_id,
         // same position/score) — count each registration once, not once per teammate.
         $sourceCategoryKeys = FestCategoryMerge::sourceKeysFor($root, $category);
-        $marks = FestMark::whereIn('event_id', $scope['event_ids'])
+        $marks = FestMark::currentPerformers()->whereIn('event_id', $scope['event_ids'])
             ->with(['participant.registration.item', 'item'])
             ->whereHas('item', function ($query) use ($root, $sourceCategoryKeys) {
                 $column = $root->event_type === 'sports' ? 'age_group' : 'class_group';
@@ -406,7 +414,7 @@ class PublicFestScoreboardService
         $bypass = auth()->check() || request()->user();
 
         $compute = function () use ($root, $scope, $categoryColumn, $sourceCategoryKeys, $excludedCategories, $event) {
-            $marks = FestMark::whereIn('event_id', $scope['event_ids'])
+            $marks = FestMark::currentPerformers()->whereIn('event_id', $scope['event_ids'])
                 ->whereHas('item', function ($query) use ($sourceCategoryKeys, $categoryColumn, $excludedCategories) {
                     $query->whereNotNull('results_published_at');
                     if ($sourceCategoryKeys) {

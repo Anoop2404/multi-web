@@ -999,6 +999,28 @@ class FestPublicScoreboardTest extends TestCase
         $schoolTab->assertDontSee('South Valley School');
     }
 
+    public function test_demoted_performer_does_not_keep_published_points(): void
+    {
+        $item = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'Replacement Race',
+            'participant_type' => 'individual', 'class_group' => 'hs',
+            'results_published_at' => now(), 'results_hidden' => false,
+        ]);
+        $old = $this->markItemWinner($this->north, $item, $this->northSchool);
+        $new = $this->markItemWinner($this->north, $item, $this->northSchool);
+        $old->update(['participant_role' => 'standby']);
+        $new->update(['participant_role' => 'performer']);
+
+        $this->assertSame([$new->id], FestMark::currentPerformers()->where('item_id', $item->id)->pluck('participant_id')->all());
+        $this->assertSame(2, FestMark::where('item_id', $item->id)->count());
+        $service = app(\App\Services\Events\PublicFestScoreboardService::class);
+        $rows = $service->scoreboard($this->north, ['event_ids' => [$this->north->id], 'event_id' => $this->north->id]);
+        $expected = app(\App\Services\Events\FestGradePointService::class)->pointsForMark($this->north, $new->mark);
+        $this->assertSame($expected, $rows[0]['total_points']);
+        \App\Services\Events\EventContext::for($this->north)->recalculateSchoolPoints();
+        $this->assertSame($expected, (int) FestResult::where('event_id', $this->north->id)->where('school_id', $this->northSchool->id)->whereNull('item_id')->value('total_points'));
+    }
+
     private function markItemWinner(FestEvent $event, FestEventItem $item, Tenant $school): FestParticipant
     {
         $registration = FestRegistration::create([

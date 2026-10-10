@@ -247,7 +247,7 @@ class FestIndividualChampionshipService
         $multiMode = $config['multi_person_mode'];
         $groupWeight = $config['group_weight_percent'];
 
-        $marks = FestMark::where('event_id', $event->id)
+        $marks = FestMark::currentPerformers()->where('event_id', $event->id)
             ->whereHas('participant', fn ($q) => $q->where('student_id', $studentId))
             ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
             ->with(['item', 'participant'])
@@ -404,7 +404,7 @@ class FestIndividualChampionshipService
 
         $studentItems = [];
 
-        FestMark::where('event_id', $event->id)
+        FestMark::currentPerformers()->where('event_id', $event->id)
             ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
             ->with(['item', 'participant.student', 'participant.registration.item'])
             ->each(function (FestMark $mark) use ($event, $categoryMap, $excludedCategories, &$studentItems) {

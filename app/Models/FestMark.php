@@ -7,6 +7,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FestMark extends Model
 {
+    public function scopeCurrentPerformers(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->whereHas('participant', fn ($participant) => $participant
+            ->whereNull('disqualified_at')
+            ->where(fn ($role) => $role->where('participant_role', 'performer')->orWhereNull('participant_role')));
+    }
+
     protected $fillable = [
         'event_id', 'item_id', 'participant_id', 'grade', 'position',
         'score', 'measurement_value', 'measurement_unit',

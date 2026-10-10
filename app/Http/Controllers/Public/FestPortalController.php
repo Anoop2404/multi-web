@@ -116,7 +116,7 @@ class FestPortalController extends Controller
         // (published too early, or a no-show item). Without both checks here, this
         // page's own item grid rendered a normal, inviting "Results" link into a page
         // that either 403s or just says "No published results for this item."
-        $resultedItemIds = FestMark::where('event_id', $targetEvent->id)
+        $resultedItemIds = FestMark::currentPerformers()->where('event_id', $targetEvent->id)
             ->whereIn('item_id', $items->pluck('id'))
             ->distinct()
             ->pluck('item_id');
@@ -156,7 +156,7 @@ class FestPortalController extends Controller
         $publishedItemCount = 0;
 
         if ($isResultsPublished) {
-            $recentMarks = FestMark::where('event_id', $event->id)
+            $recentMarks = FestMark::currentPerformers()->where('event_id', $event->id)
                 ->whereIn('position', [1, 2, 3])
                 // Matches the category/toppers scoreboard convention (see the comment on
                 // PublicFestScoreboardService::scoreboard()'s category branch): an item only
@@ -272,7 +272,7 @@ class FestPortalController extends Controller
             // been entered for it (published too early, or a no-show item) — the Results
             // button must not render as a normal, inviting link into a page that can only
             // ever say "No published results for this item." in that case.
-            $resultedItemIds = FestMark::where('event_id', $targetEvent->id)
+            $resultedItemIds = FestMark::currentPerformers()->where('event_id', $targetEvent->id)
                 ->whereIn('item_id', $allItems->pluck('id'))
                 ->distinct()
                 ->pluck('item_id');
@@ -518,7 +518,7 @@ class FestPortalController extends Controller
             // own event_id — without this expansion, a partitioned hub's public results
             // page showed zero item results even after results_published was cascaded
             // true.
-            $marks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
+            $marks = FestMark::currentPerformers()->whereIn('event_id', $selectedScope['event_ids'])
                 ->whereIn('position', [1, 2, 3])
                 // Unconditional, regardless of $isPublished: an item's own
                 // results_published_at is the only thing that makes its marks visible to
@@ -860,7 +860,7 @@ class FestPortalController extends Controller
         // top-3-only — it also feeds the item/individual/medal-tally tabs, where
         // "winners only" is the correct scope), not a reuse of it.
 
-        $allSchoolMarks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
+        $allSchoolMarks = FestMark::currentPerformers()->whereIn('event_id', $selectedScope['event_ids'])
             // Unconditional, regardless of whether the event overall is published — an
             // item that was never individually published (still "Pending" in admin) must
             // never resurface here just because the event-wide toggle went on. Previously
@@ -1030,7 +1030,7 @@ class FestPortalController extends Controller
         $resultsVersion = $this->publicResultsVersion([$event->id])[0];
         $cacheKey = 'fest-item-results:v1:'.$event->tenant_id.':'.$event->id.':'.$item->id.':'.$resultsVersion;
         $compute = function () use ($event, $item) {
-            $allMarks = FestMark::where('event_id', $item->event_id)
+            $allMarks = FestMark::currentPerformers()->where('event_id', $item->event_id)
                 ->where('item_id', $item->id)
                 ->with(['item', 'participant.student', 'participant.teacher', 'participant.registration.school', 'participant.registration.item', 'participant.registration.event', 'participant.group'])
                 ->orderBy('position')
@@ -1125,7 +1125,7 @@ class FestPortalController extends Controller
 
         $topN = min(50, max(1, $request->integer('top_n') ?: 10));
 
-        $marks = FestMark::where('event_id', $item->event_id)
+        $marks = FestMark::currentPerformers()->where('event_id', $item->event_id)
             ->where('item_id', $item->id)
             ->with(['participant.student', 'participant.teacher', 'participant.registration.school', 'participant.registration.item', 'participant.registration.event', 'participant.group'])
             ->orderBy('position')
@@ -1279,7 +1279,7 @@ public function tv(Request $request, int $eventId)
         .':'.implode(',', $selectedScope['event_ids'])
         .':'.implode(',', $crossPhaseEventIds ?? []);
 
-    $marks = FestMark::whereIn('event_id', $crossPhaseEventIds ?? $selectedScope['event_ids'])
+    $marks = FestMark::currentPerformers()->whereIn('event_id', $crossPhaseEventIds ?? $selectedScope['event_ids'])
         ->whereIn('position', [1, 2, 3])
         ->with(['item', 'participant.registration.school', 'participant.registration.item', 'participant.registration.event', 'participant.group'])
         // Unconditional, regardless of $isPublished: an item's own results_published_at
@@ -1873,6 +1873,8 @@ public function tv(Request $request, int $eventId)
                 (string) ($items?->getRawOriginal('updated') ?? ''),
                 (string) FestMark::whereIn('event_id', $eventIds)->max('updated_at'),
                 (string) $disqualifiedAt,
+                (string) FestParticipant::whereIn('event_id', $eventIds)->max('updated_at'),
+                (string) FestParticipant::whereIn('event_id', $eventIds)->count(),
             ])), $publishedAt];
         };
         if (request()->user() ?? auth()->user()) {
@@ -1948,7 +1950,7 @@ public function tv(Request $request, int $eventId)
         }
 
         $categoryColumn = $event->event_type === 'sports' ? 'age_group' : 'class_group';
-        $winnerMarks = FestMark::whereIn('event_id', $selectedScope['event_ids'])
+        $winnerMarks = FestMark::currentPerformers()->whereIn('event_id', $selectedScope['event_ids'])
             ->whereIn('position', [1, 2, 3])
             ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.registration.school', 'participant.registration.item', 'participant.registration.event', 'participant.group'])
             ->latest('updated_at')
@@ -2185,7 +2187,7 @@ public function tv(Request $request, int $eventId)
 
         $cacheKey = 'fest-participant:v1:'.$event->tenant_id.':'.$event->id.':'.$participant->id.':'.($isAdminPreview ? '1' : '0');
         $compute = function () use ($event, $participant, $isAdminPreview) {
-            $mark = FestMark::where('participant_id', $participant->id)->first();
+            $mark = FestMark::currentPerformers()->where('participant_id', $participant->id)->first();
             $schedule = FestSchedule::where('participant_id', $participant->id)->first();
             // The view reads sort_order straight off this model, so drop it entirely while the
             // schedule is unpublished rather than relying on each field being nulled downstream.
