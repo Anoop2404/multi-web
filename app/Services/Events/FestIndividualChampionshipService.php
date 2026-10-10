@@ -157,10 +157,14 @@ class FestIndividualChampionshipService
                 ],
                 'school' => $schoolNames[$row->student?->tenant_id] ?? null,
             ];
-        })->sortBy([
-            ['category', 'asc'],
-            ['gender', 'asc'],
-            ['rank', 'asc'],
+        })->sortBy(fn (array $row) => [
+            array_search($row['category'], self::INDIVIDUAL_CATEGORY_KEYS, true) === false
+                ? count(self::INDIVIDUAL_CATEGORY_KEYS)
+                : array_search($row['category'], self::INDIVIDUAL_CATEGORY_KEYS, true),
+            $row['category'],
+            ($config['group_by_gender'] ?? true) ? $row['gender'] : '',
+            $row['rank'],
+            $row['student']['id'],
         ])->values();
     }
 

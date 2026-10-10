@@ -526,7 +526,7 @@ class FestPortalController extends Controller
                 // PublicFestScoreboardService::scoreboard()'s category branch for the
                 // production leak this convention exists to prevent.
                 ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
-                ->select('id', 'item_id', 'position', 'score', 'grade', 'grade_points', 'participant_id', 'registration_id')
+                ->select('id', 'event_id', 'item_id', 'position', 'score', 'grade', 'participant_id')
                 ->with([
                     'item:id,title,event_id,' . ($event->event_type === 'sports' ? 'age_group' : 'class_group') . ',participant_type,stage_type,gender,results_published_at,head_id',
                     'participant:id,registration_id,group_id,student_id,teacher_id,participant_role,disqualified_at',
@@ -551,7 +551,7 @@ class FestPortalController extends Controller
                 ->select('id', 'registration_id', 'student_id', 'teacher_id', 'participant_role')
                 ->whereIn(
                     'registration_id',
-                    $marks->pluck('registration_id')->filter()->unique()->values()
+                    $marks->pluck('participant.registration_id')->filter()->unique()->values()
                 )
                 ->where('participant_role', 'performer')
                 ->with('student:id,tenant_id,name,photo,updated_at')

@@ -551,7 +551,7 @@
                     </thead>
                     <tbody id="championship-rows" class="divide-y divide-slate-800">
                         @foreach($championship as $row)
-                            @php $rowGroup = $row['category_key'].'|'.$row['gender_key']; @endphp
+                            @php $rowGroup = $groupFn($row); @endphp
                             <tr data-group="{{ $rowGroup }}" @if($comboGroups->count() > 1 && $rowGroup !== $firstGroup) hidden @endif>
                                 <td class="p-3 font-bold text-amber-400">
                                     @if($row['rank'] <= 3)
@@ -600,7 +600,7 @@
                 if (!nav) return;
                 const tabs = [...nav.querySelectorAll('.championship-group-tab')];
                 const rows = [...document.querySelectorAll('#championship-rows tr[data-group]')];
-                let activeTab = null;
+                let activeTab = tabs.find(tab => tab.classList.contains('bg-amber-500')) || null;
                 nav.addEventListener('click', (e) => {
                     const btn = e.target.closest('.championship-group-tab');
                     if (!btn) return;

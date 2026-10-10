@@ -136,6 +136,31 @@ class FestIndividualChampionshipGroupByGenderTest extends TestCase
         $this->assertSame(1, $combined->firstWhere('gender', 'female')['rank']);
     }
 
+    public function test_combined_public_tabs_match_their_rows_and_keep_category_order(): void
+    {
+        $service = app(FestIndividualChampionshipService::class);
+        $rows = collect(['hs', 'hss', 'lp', 'open', 'up'])->map(fn ($category, $index) =>
+            (object) ['student_id' => $index + 1, 'student' => null, 'category' => $category, 'gender' => 'male', 'points' => 10, 'firsts' => 0, 'group_points' => 0]
+        );
+        $ranked = $service->rankAndFormat($rows, true, ['group_by_gender' => false]);
+        $this->assertSame(['lp', 'up', 'hs', 'hss', 'open'], $ranked->pluck('category')->all());
+        $championship = $ranked->map(fn ($row) => [
+            'category_key' => $row['category'], 'category' => $row['category'],
+            'gender_key' => $row['gender'], 'gender' => $row['gender'], 'rank' => $row['rank'],
+            'photo' => null, 'student' => 'Test Student', 'school' => 'Test School',
+            'points' => $row['points'], 'ref' => null,
+        ])->all();
+        $source = file_get_contents(resource_path('views/public/fest/results.blade.php'));
+        $start = strrpos(substr($source, 0, strpos($source, '$groupByGender =')), '@php');
+        $end = strpos($source, '</script>', $start) + strlen('</script>');
+        $html = \Illuminate\Support\Facades\Blade::render(substr($source, $start, $end - $start), [
+            'championship' => $championship, 'championshipConfig' => ['group_by_gender' => false],
+        ]);
+        $this->assertStringContainsString('<tr data-group="lp" >', $html);
+        $this->assertStringContainsString('<tr data-group="up"  hidden >', $html);
+        $this->assertStringNotContainsString('data-group="lp|male"', $html);
+    }
+
     public function test_returns_empty_leaderboard_when_disabled(): void
     {
         [$event] = $this->makeChampionshipFixture(true, true);
