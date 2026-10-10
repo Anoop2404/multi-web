@@ -373,6 +373,7 @@
                 <input v-model="topThreeOnly" type="checkbox" class="rounded text-indigo-600">
                 Show top three ranks per category (includes joint winners)
             </label>
+            <p class="text-xs text-slate-500">Leave unchecked to preview all ranks, including joint winners. The PDF uses the same selection.</p>
             <div class="flex gap-2">
                 <a :href="championshipPdfUrl" class="btn-secondary text-xs">Download championship PDF</a>
                 <a :href="`${championshipPdfUrl}&inline=1`" target="_blank" rel="noopener" class="btn-secondary text-xs">Preview PDF</a>
@@ -678,7 +679,7 @@ function viewStudentBreakdown(studentId) {
 }
 
 const filterCategory = ref('');
-const topThreeOnly = ref(props.adminPreview);
+const topThreeOnly = ref(false);
 const filterGender = ref('');
 
 const categories = computed(() => {
