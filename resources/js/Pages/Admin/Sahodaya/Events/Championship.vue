@@ -37,12 +37,18 @@
                 <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/trophies`" class="btn-secondary text-xs">
                     View Trophy Distribution →
                 </a>
+                <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/championship${adminPreview ? '' : '?preview_disabled=1'}`" class="btn-secondary text-xs">
+                    {{ adminPreview ? 'Exit admin preview' : 'Preview hidden championship categories' }}
+                </a>
             </div>
         </div>
 
         <!-- Disabled notice -->
         <div v-if="championshipConfig.disabled" class="mt-4 p-4 rounded-xl border border-red-200 bg-red-50 text-red-800 text-sm">
-            ⚠️ Individual Championship is <strong>disabled</strong> for this event. No championship rankings or title honours will be computed or shown.
+            Individual Championship is <strong>disabled</strong> for this event. Public rankings remain hidden.
+        </div>
+        <div v-if="adminPreview" class="mt-4 p-4 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 text-sm">
+            Admin preview includes disabled individual championship categories. Choose a category in the leaderboard filter below. Public settings are unchanged.
         </div>
 
         <!-- Top Honours Podium / Crowned Champions Cards -->
@@ -592,6 +598,7 @@ import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({
+    adminPreview: { type: Boolean, default: false },
     sahodaya: Object,
     publicUrl: String,
     pendingPaymentsCount: Number,

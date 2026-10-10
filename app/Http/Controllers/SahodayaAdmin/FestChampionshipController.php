@@ -14,7 +14,7 @@ use Illuminate\Http\Request;
 
 class FestChampionshipController extends SahodayaAdminController
 {
-    public function index(string $tenantId, FestEvent $event, FestIndividualChampionshipService $championship)
+    public function index(Request $request, string $tenantId, FestEvent $event, FestIndividualChampionshipService $championship)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
@@ -23,11 +23,17 @@ class FestChampionshipController extends SahodayaAdminController
         $categoryMap = $this->categoryMergeMap($root);
         $usesPhases = $root->usesPhasedRegionalBilling();
 
+        $adminPreview = $request->boolean('preview_disabled');
         $leaderboard = $championship->leaderboardForEvent($event);
+        if ($adminPreview) {
+            $previewConfig = array_merge($championship->getConfig($event), ['disabled' => false, 'excluded_individual_categories' => []]);
+            $leaderboard = $championship->rankAndFormat($championship->pointsForEvent($event), false, $previewConfig);
+        }
         $championsSummary = $championship->championsSummary($event, false, $leaderboard);
 
         return $this->inertia('Sahodaya/Events/Championship', $this->withEventActivity($event, FestPageActivity::CHAMPIONSHIP, [
             'event'                      => $event,
+            'adminPreview'               => $adminPreview,
             'leaderboard'                => $leaderboard,
             'championsSummary'           => $championsSummary,
             'championshipConfig'         => $championship->getConfig($event),
