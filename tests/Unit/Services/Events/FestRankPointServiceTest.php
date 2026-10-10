@@ -89,6 +89,30 @@ class FestRankPointServiceTest extends TestCase
         $this->assertSame(0, $service->pointsForMark($event, $mark));
     }
 
+    public function test_saving_sports_rank_keeps_optional_score_empty(): void
+    {
+        $event = $this->makeEvent();
+        $this->makeTemplate($event, 'Individual', ['individual'], [['rank' => 1, 'points' => 8]]);
+        $item = \App\Models\FestEventItem::create(['event_id' => $event->id, 'title' => 'Race', 'participant_type' => 'individual']);
+        $registration = \App\Models\FestRegistration::create([
+            'event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $event->tenant_id, 'status' => 'approved',
+        ]);
+        $participant = \App\Models\FestParticipant::create([
+            'event_id' => $event->id, 'registration_id' => $registration->id,
+            'participant_type' => 'student', 'participant_role' => 'performer',
+        ]);
+        $data = ['item_id' => $item->id, 'participant_id' => $participant->id, 'position' => 1, 'score' => null];
+        $service = app(\App\Services\Events\FestMarkSaveService::class);
+        $service->save($event, $data, 1, false);
+        $mark = \App\Models\FestMark::where('participant_id', $participant->id)->firstOrFail();
+        $this->assertNull($mark->score);
+        $this->assertSame(1, (int) $mark->position);
+        $this->assertSame(8, app(\App\Services\Events\FestGradePointService::class)->pointsForMark($event, $mark));
+        $data['score'] = 42;
+        $service->save($event, $data, 1, false);
+        $this->assertSame(42.0, (float) $mark->fresh()->score);
+    }
+
     public function test_explicit_team_template_row_still_wins_over_the_individual_fallback(): void
     {
         $event = $this->makeEvent();

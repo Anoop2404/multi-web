@@ -65,6 +65,66 @@ class FestResultsPublishRankRequiredTest extends TestCase
         ]);
     }
 
+    public function test_sports_top_three_can_publish_with_other_participants_unmarked(): void
+    {
+        $f = $this->fixture();
+        $f['event']->update(['event_type' => 'sports', 'require_all_marks_before_publish' => true]);
+        $f['item']->update(['participant_type' => 'individual']);
+        for ($rank = 1; $rank <= 5; $rank++) {
+            $participant = $this->addPerformer($f['event'], $f['item'], $f['school'], $rank);
+            if ($rank <= 3) {
+                FestMark::create(['event_id' => $f['event']->id, 'item_id' => $f['item']->id,
+                    'participant_id' => $participant->id, 'position' => $rank]);
+            }
+        }
+        $service = app(FestItemResultsService::class);
+        $summary = $service->itemSummaries($f['event'])[0];
+        $this->assertTrue($summary['marks_ready']);
+        $this->assertSame(3, $summary['marks_entered']);
+        $this->assertSame(5, $summary['performers']);
+        $service->assertCanPublish($f['item']);
+        \App\Services\Events\EventLifecycleGate::allowPublishResults($f['event']);
+    }
+
+    public function test_sports_with_two_teams_only_requires_two_places(): void
+    {
+        $f = $this->fixture();
+        $f['event']->update(['event_type' => 'sports']);
+        $f['item']->update(['participant_type' => 'team']);
+        foreach ([1, 2] as $rank) {
+            $participant = $this->addPerformer($f['event'], $f['item'], $f['school'], $rank);
+            for ($member = 0; $member < 2; $member++) {
+                FestParticipant::create(['registration_id' => $participant->registration_id,
+                    'event_id' => $f['event']->id, 'participant_type' => 'student', 'participant_role' => 'performer']);
+            }
+            FestMark::create(['event_id' => $f['event']->id, 'item_id' => $f['item']->id,
+                'participant_id' => $participant->id, 'position' => $rank]);
+        }
+        $summary = app(FestItemResultsService::class)->itemSummaries($f['event'])[0];
+        $this->assertTrue($summary['marks_ready']);
+        $this->assertSame([1, 2], $summary['required_podium_ranks']);
+        app(FestItemResultsService::class)->assertCanPublish($f['item']);
+    }
+
+    public function test_sports_publication_rejects_a_missing_podium_rank(): void
+    {
+        $f = $this->fixture();
+        $f['event']->update(['event_type' => 'sports']);
+        $f['item']->update(['participant_type' => 'individual']);
+        for ($rank = 1; $rank <= 4; $rank++) {
+            $participant = $this->addPerformer($f['event'], $f['item'], $f['school'], $rank);
+            if ($rank !== 2 && $rank <= 3) {
+                FestMark::create(['event_id' => $f['event']->id, 'item_id' => $f['item']->id,
+                    'participant_id' => $participant->id, 'position' => $rank]);
+            }
+        }
+        $summary = app(FestItemResultsService::class)->itemSummaries($f['event'])[0];
+        $this->assertFalse($summary['marks_ready']);
+        $this->assertSame([2], $summary['missing_podium_ranks']);
+        $this->expectException(HttpException::class);
+        app(FestItemResultsService::class)->assertCanPublish($f['item']);
+    }
+
     public function test_publish_is_blocked_when_a_performer_has_a_score_but_no_rank(): void
     {
         $f = $this->fixture();

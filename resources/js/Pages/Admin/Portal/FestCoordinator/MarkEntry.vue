@@ -104,7 +104,7 @@
                                            type="number" min="1"
                                            class="field !py-1 text-xs w-16"
                                            placeholder="#"
-                                           @input="applyRankPoints(participant.id, item, markForms)">
+                                           >
                                 </td>
                                 <td class="p-2 text-right align-middle">
                                     <button type="button"
@@ -177,7 +177,6 @@ const {
     attendanceStatus,
     isAbsent,
     showMeasurement,
-    applyRankPoints,
     buildMarkPayload,
     rankOptionsForItem,
     setRank,

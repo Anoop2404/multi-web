@@ -5,6 +5,7 @@ namespace App\Services\Events;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestParticipant;
+use App\Models\FestMark;
 use App\Support\FestClassGroupScheme;
 use App\Support\FestItemCategoryLabel;
 use Illuminate\Support\Facades\DB;
@@ -64,6 +65,21 @@ class FestItemResultsService
         $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
         $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
 
+        $sportsEntries = collect();
+        $sportsPodium = collect();
+        if ($event->event_type === 'sports') {
+            $eligible = FestParticipant::whereHas('registration', fn ($q) => $q
+                ->whereIn('item_id', $items->pluck('id'))->where('status', 'approved'))
+                ->where(fn ($q) => $q->where('participant_role', 'performer')->orWhereNull('participant_role'))
+                ->whereNull('disqualified_at')
+                ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('fest_attendance')
+                    ->whereColumn('fest_attendance.participant_id', 'fest_participants.id')->where('status', 'absent'))
+                ->with('registration:id,item_id')->get(['id', 'registration_id', 'group_id']);
+            $sportsEntries = $eligible->groupBy(fn ($p) => $p->registration->item_id);
+            $sportsPodium = FestMark::whereIn('participant_id', $eligible->pluck('id'))
+                ->whereIn('position', [1, 2, 3])->get(['item_id', 'position'])->groupBy('item_id');
+        }
+
         // Group items by canonical root item ID (inherited_from_item_id ?: id)
         $grouped = $items->groupBy(fn (FestEventItem $item) => (int) ($item->inherited_from_item_id ?: $item->id));
 
@@ -98,6 +114,18 @@ class FestItemResultsService
             }
 
             $marksReady = $performers > 0 && $marksEntered >= $performers;
+            $requiredRanks = [];
+            $missingRanks = [];
+            if ($event->event_type === 'sports') {
+                $entries = collect($groupItemIds)->flatMap(fn ($id) => $sportsEntries->get($id, collect()));
+                $entryCount = $primary->isTeamItem()
+                    ? $entries->unique(fn ($p) => $p->group_id ? 'group:'.$p->group_id : 'registration:'.$p->registration_id)->count()
+                    : $entries->count();
+                $requiredRanks = $entryCount > 0 ? range(1, min(3, $entryCount)) : [];
+                $podium = collect($groupItemIds)->flatMap(fn ($id) => $sportsPodium->get($id, collect()))->pluck('position')->map(fn ($rank) => (int) $rank)->all();
+                $missingRanks = array_values(array_diff($requiredRanks, $podium));
+                $marksReady = $entryCount > 0 && $missingRanks === [];
+            }
 
             $summaries[] = [
                 'item_id'               => $primary->id,
@@ -120,6 +148,8 @@ class FestItemResultsService
                 'marks_entered'         => $marksEntered,
                 'marks_pending'         => max(0, $performers - $marksEntered),
                 'marks_ready'           => $marksReady,
+                'required_podium_ranks' => $requiredRanks,
+                'missing_podium_ranks' => $missingRanks,
                 'ranks_assigned'        => $ranksAssigned,
                 'ranks_pending'         => max(0, $performers - $ranksAssigned),
                 'judges_assigned'       => $judgesAssigned,
@@ -257,6 +287,11 @@ class FestItemResultsService
 
         $performers = (int) ($summary['performers'] ?? 0);
         abort_if($performers === 0, 422, 'No approved participants for this item.');
+
+        if ($event->event_type === 'sports') {
+            abort_unless($summary['marks_ready'] ?? false, 422, 'Assign the top-three ranks before publishing (or all places when fewer than three entries compete).');
+            return;
+        }
 
         $marksEntered = (int) ($summary['marks_entered'] ?? 0);
         abort_if(

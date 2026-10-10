@@ -135,13 +135,9 @@ class FestResultsController extends SahodayaAdminController
         $rows = app(FestItemResultsService::class)->resultRowsForItem($event, $item->id);
         usort($rows, fn ($a, $b) => ($a['position'] ?? PHP_INT_MAX) <=> ($b['position'] ?? PHP_INT_MAX));
 
-        $itemCategory = null;
-        if ($item->class_group && $item->class_group !== 'open') {
-            $itemCategory = \App\Support\FestClassGroupScheme::resolveItemLabel(
-                \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent()),
-                $item->class_group,
-            );
-        }
+        $itemCategory = \App\Support\FestItemCategoryLabel::resolve(
+            $item, \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent()),
+        );
 
         $html = view('fest.reports.item-results-ranked', [
             'event'        => $event,
@@ -156,7 +152,9 @@ class FestResultsController extends SahodayaAdminController
         $filename = str($event->title.'-'.$item->title)->slug()->limit(60)->toString().'-results.pdf';
         $preview = $request->boolean('preview') || $request->boolean('inline');
 
-        return \App\Support\PdfGenerator::download($html, $filename, $preview);
+        return \App\Support\PdfGenerator::download($html, $filename, $preview,
+            margin: ['top' => '15mm', 'right' => '15mm', 'bottom' => '20mm', 'left' => '15mm'],
+        );
     }
 
     /**

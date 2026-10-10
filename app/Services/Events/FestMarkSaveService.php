@@ -101,10 +101,6 @@ class FestMarkSaveService
             }
         }
 
-        if ($event->event_type === 'sports' && ! empty($data['position']) && ($data['score'] ?? '') === '') {
-            $data['score'] = app(FestRankPointService::class)->pointsForRank($event, (int) $data['position'], $item?->participant_type ?? 'individual');
-        }
-
         $mark = FestMark::updateOrCreate(
             ['item_id' => $data['item_id'], 'participant_id' => $data['participant_id']],
             array_merge($data, [
@@ -114,7 +110,7 @@ class FestMarkSaveService
             ])
         );
 
-        if (($mark->score ?? '') === '' && ($mark->grade || $mark->position)) {
+        if ($event->event_type !== 'sports' && ($mark->score ?? '') === '' && ($mark->grade || $mark->position)) {
             $mark->update(['score' => $this->gradePointService->pointsForMark($event, $mark->fresh())]);
         }
 

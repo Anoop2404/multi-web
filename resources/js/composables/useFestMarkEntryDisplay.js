@@ -134,7 +134,7 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
         }
 
         // rankPointsByType is pre-resolved server-side per participant_type (including
-        // the individual/athletics-standard fallback chain) — see
+        // configured individual-template inheritance) — see
         // FestRankPointService::rowsForAllTypes(). No fallback logic needed here.
         const rows = props.rankPointsByType?.[item?.participant_type] ?? [];
         const row = rows.find((r) => r.rank === rank);
@@ -155,14 +155,12 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
 
         const rows = props.rankPointsByType?.[item?.participant_type] ?? [];
 
-        return rows
-            .slice()
-            .sort((a, b) => a.rank - b.rank)
-            .map((r) => ({
-                rank: r.rank,
-                label: rankLabel(r.rank),
-                points: r.points,
-            }));
+        const ranks = [...new Set([1, 2, 3, ...rows.map(row => row.rank)])];
+        return ranks.sort((a, b) => a - b).map(rank => ({
+            rank,
+            label: rankLabel(rank),
+            points: rows.find(row => row.rank === rank)?.points ?? null,
+        }));
     }
 
     function setRank(participantId, item, markForms, rawValue) {
@@ -172,7 +170,6 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
         }
 
         form.position = rawValue === '' || rawValue == null ? null : Number(rawValue);
-        applyRankPoints(participantId, item, markForms);
     }
 
     function displayTeamPts(participantId, item, markForms) {
@@ -182,22 +179,6 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
         }
 
         return pointsForRank(form.position, item);
-    }
-
-    function applyRankPoints(participantId, item, markForms) {
-        if (!isSports.value) {
-            return;
-        }
-
-        const form = markForms[participantId];
-        if (!form) {
-            return;
-        }
-
-        const pts = pointsForRank(form.position, item);
-        if (pts != null) {
-            form.score = pts;
-        }
     }
 
     function applyBulkRank(section, markForms) {
@@ -213,7 +194,6 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
 
             if (markForms[participant.id]) {
                 markForms[participant.id].position = rank;
-                applyRankPoints(participant.id, item, markForms);
             }
         }
     }
@@ -268,7 +248,6 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
         setRank,
         pointsForRank,
         displayTeamPts,
-        applyRankPoints,
         applyBulkRank,
         buildMarkPayload,
         iterSaveRows,

@@ -25,6 +25,23 @@ class FestItemResultsDownloadTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_sports_results_sheet_shows_measurements_without_grades_or_scores(): void
+    {
+        $event = new FestEvent(['title' => 'Skating Meet', 'event_type' => 'sports']);
+        $item = new FestEventItem(['title' => 'Rink Race', 'participant_type' => 'individual', 'gender' => 'male']);
+        $html = view('fest.reports.item-results-ranked', [
+            'event' => $event, 'item' => $item, 'itemCategory' => 'Under 8', 'orgName' => 'Test Sahodaya', 'logoSrc' => null,
+            'rows' => [['position' => 1, 'chest_no' => 100, 'name' => 'Test Student', 'school' => 'Test School',
+                'grade' => 'A', 'score' => '9876.54', 'measurement' => '7.45', 'measurement_unit' => 's']],
+        ])->render();
+        $this->assertStringContainsString('Time / Distance', $html);
+        $this->assertStringContainsString('7.45 s', $html);
+        $this->assertStringContainsString('Under 8', $html);
+        $this->assertStringNotContainsString('>Grade</th>', $html);
+        $this->assertStringNotContainsString('>Score</th>', $html);
+        $this->assertStringNotContainsString('9876.54', $html);
+    }
+
     public function test_download_returns_a_pdf_with_every_participant_sorted_by_rank(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);

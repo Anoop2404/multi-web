@@ -364,6 +364,14 @@ class EventLifecycleGate
 
     private static function assertAllParticipantsMarked(FestEvent $event): void
     {
+        if ($event->event_type === 'sports') {
+            $pending = collect(app(FestItemResultsService::class)->itemSummaries($event))
+                ->first(fn ($item) => $item['performers'] > 0 && ! $item['marks_ready']);
+            if ($pending) {
+                throw new HttpException(422, 'Assign the top-three ranks before publishing: '.$pending['title']);
+            }
+            return;
+        }
         // A partitioned hub's registrations/marks live on its region/finale children
         // (see FestRegistrationCreateService/FestRegistrationRouterService), never the
         // hub's own event_id — filtering by the hub id alone found zero participants and

@@ -59,7 +59,7 @@
             </div>
             <div class="card card--muted !py-4 text-center">
                 <p class="text-2xl font-bold">{{ publishTotals.marks_ready }}/{{ publishTotals.items }}</p>
-                <p class="text-xs text-slate-500 mt-1">Marks complete</p>
+                <p class="text-xs text-slate-500 mt-1">{{ isSports ? 'Ranks ready' : 'Marks complete' }}</p>
             </div>
         </div>
 
@@ -123,7 +123,7 @@
 
                     <div v-if="selectedItem && !selectedItem.marks_ready"
                          class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                        Enter marks for all participants before publishing this item.
+                        {{ isSports ? 'Assign the top-three ranks before publishing. Other participants can remain unranked.' : 'Enter marks for all participants before publishing this item.' }}
                         <Link :href="marksUrl(selectedItem)" class="font-semibold underline ml-1">Go to mark entry →</Link>
                     </div>
 
@@ -139,8 +139,8 @@
                                         <th>School</th>
                                         <th>Chest</th>
                                         <th>Rank</th>
-                                        <th>Grade</th>
-                                        <th>Score</th>
+                                        <th v-if="!isSports">Grade</th>
+                                        <th v-if="!isSports">Score</th>
                                         <th v-if="isSports">Time / distance</th>
                                     </tr>
                                 </thead>
@@ -153,15 +153,15 @@
                                         <td class="text-sm">{{ row.school ?? '—' }}</td>
                                         <td class="font-mono text-xs">{{ row.chest_no ?? '—' }}</td>
                                         <td>{{ row.position ?? '—' }}</td>
-                                        <td>{{ row.grade ?? '—' }}</td>
-                                        <td>{{ row.score ?? '—' }}</td>
+                                        <td v-if="!isSports">{{ row.grade ?? '—' }}</td>
+                                        <td v-if="!isSports">{{ row.score ?? '—' }}</td>
                                         <td v-if="isSports">
                                             <span v-if="row.measurement">{{ row.measurement }} {{ row.measurement_unit }}</span>
                                             <span v-else>—</span>
                                         </td>
                                     </tr>
                                     <tr v-if="!itemResultRows.length">
-                                        <td :colspan="isSports ? 7 : 6" class="p-0">
+                                        <td :colspan="isSports ? 5 : 6" class="p-0">
                                             <EmptyState title="No marks entered yet"
                                                 description="Enter marks for this item before results can show here." icon="✍️" class="py-8">
                                                 <template #action>
@@ -267,7 +267,7 @@
                                 <td>
                                     <span class="status-pill text-xs"
                                           :class="row.results_published ? 'status-pill--published' : (row.marks_ready ? 'status-pill--open' : 'status-pill--draft')">
-                                        {{ row.results_published ? 'Published' : (row.marks_ready ? 'Ready' : 'Marks pending') }}
+                                        {{ row.results_published ? 'Published' : (row.marks_ready ? 'Ready' : (isSports ? 'Ranks pending' : 'Marks pending')) }}
                                     </span>
                                 </td>
                                 <td class="pr-5 text-right">
