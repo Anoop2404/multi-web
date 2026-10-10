@@ -10,7 +10,7 @@ use Illuminate\Support\Collection;
 
 class FestRankPointService
 {
-    /** Standard school athletics: rank → championship points. Final fallback when nothing's configured. */
+    /** Optional athletics preset, applied only when an administrator explicitly loads it. */
     public const ATHLETICS_STANDARD = [
         1 => 8,
         2 => 7,
@@ -154,10 +154,6 @@ class FestRankPointService
             }
         }
 
-        if ($event->event_type === 'sports') {
-            return (int) (self::ATHLETICS_STANDARD[$rank] ?? 0);
-        }
-
         return 0;
     }
 
@@ -176,10 +172,6 @@ class FestRankPointService
         if ($rows === [] && FestTeamSquadRules::isMultiPerson($participantType)) {
             $individual = $this->templateForType($event, 'individual');
             $rows = $individual ? $this->pointsMapForTemplate($individual) : [];
-        }
-
-        if ($rows === [] && $event->event_type === 'sports') {
-            $rows = self::ATHLETICS_STANDARD;
         }
 
         return collect($rows)

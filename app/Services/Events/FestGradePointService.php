@@ -65,6 +65,11 @@ class FestGradePointService
         $item = $mark->item ?? $mark->participant?->registration?->item;
         $itemId = $mark->item_id ?? $item?->id;
         $participantType = strtolower((string) ($item?->participant_type ?? 'individual'));
+        if ($event->event_type === 'sports') {
+            return $mark->position
+                ? app(FestRankPointService::class)->pointsForRank($event, (int) $mark->position, $participantType)
+                : 0;
+        }
         $isGroup = $this->isGroupItemForPoints($event, $item);
 
         if ($mark->score !== null && $itemId) {
@@ -89,10 +94,6 @@ class FestGradePointService
 
         if (! $hasCustomPointRules && $event->scoring_preset === 'confed_kalotsav') {
             return $this->confedPointsForMark($mark, $isGroup);
-        }
-
-        if ($event->event_type === 'sports' && $mark->position) {
-            return app(FestRankPointService::class)->pointsForRank($event, (int) $mark->position, $participantType);
         }
 
         // Nothing to go on at all — no rank and no grade to award anything from.

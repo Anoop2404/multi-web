@@ -49,15 +49,44 @@ class FestRankPointServiceTest extends TestCase
         $this->assertSame(12, $points, 'An unconfigured team rank must fall back to the individual table\'s value, not 0.');
     }
 
-    public function test_unconfigured_team_rank_falls_back_to_athletics_standard_for_sports_events(): void
+    public function test_unconfigured_sports_ranks_receive_zero_and_have_no_autofill_points(): void
     {
         $event = $this->makeEvent('sports');
-        // No templates configured at all — should reach the built-in athletics-standard
-        // default (2nd = 7), same as an unconfigured individual rank would.
+        // No configured rule means no awarded or auto-filled points.
 
         $points = app(FestRankPointService::class)->pointsForRank($event, 2, 'team');
 
-        $this->assertSame(FestRankPointService::ATHLETICS_STANDARD[2], $points);
+        $this->assertSame(0, $points);
+        $service = app(FestRankPointService::class);
+        $this->assertSame(0, $service->pointsForRank($event, 1, 'individual'));
+        $this->assertSame([], $service->rowsForType($event, 'individual'));
+        $this->assertSame([], $service->rowsForType($event, 'team'));
+    }
+
+    public function test_missing_rank_does_not_inherit_hardcoded_points(): void
+    {
+        $event = $this->makeEvent();
+        $this->makeTemplate($event, 'Individual', ['individual'], [['rank' => 1, 'points' => 12]]);
+        $service = app(FestRankPointService::class);
+        $this->assertSame(12, $service->pointsForRank($event, 1, 'individual'));
+        $this->assertSame(0, $service->pointsForRank($event, 2, 'individual'));
+        $this->assertSame(0, $service->pointsForRank($event, 2, 'team'));
+        $this->assertSame([['rank' => 1, 'points' => 12]], $service->rowsForType($event, 'individual'));
+    }
+
+    public function test_sports_scoring_uses_configured_ranks_and_never_grade_defaults(): void
+    {
+        $event = $this->makeEvent();
+        $this->makeTemplate($event, 'Individual', ['individual'], [['rank' => 1, 'points' => 12]]);
+        $item = new \App\Models\FestEventItem(['participant_type' => 'individual']);
+        $mark = new \App\Models\FestMark(['position' => 1, 'grade' => 'A', 'score' => 95]);
+        $mark->setRelation('item', $item);
+        $service = app(\App\Services\Events\FestGradePointService::class);
+        $this->assertSame(12, $service->pointsForMark($event, $mark));
+        $mark->position = 2;
+        $this->assertSame(0, $service->pointsForMark($event, $mark));
+        $mark->position = null;
+        $this->assertSame(0, $service->pointsForMark($event, $mark));
     }
 
     public function test_explicit_team_template_row_still_wins_over_the_individual_fallback(): void
