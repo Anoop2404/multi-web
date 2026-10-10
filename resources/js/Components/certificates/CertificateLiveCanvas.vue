@@ -379,7 +379,10 @@ const paragraphs = computed(() => {
     }
 
     return raw.split(/\n\s*\n/).filter(p => p.trim()).map(paragraph => {
-        const text = paragraph.trim();
+        let text = paragraph.trim();
+        if (props.layout?.body?.align === 'justify') {
+            text = text.replace(/<br\s*\/?\s*>/gi, ' ').replace(/\r?\n/g, ' ');
+        }
         return substituteTokens(/<\/?[a-z][^>]*>/i.test(text) ? text : text.replace(/\n/g, '<br />\n'));
     });
 });

@@ -281,6 +281,12 @@ class CertificateTemplate extends Model
 
         return array_values(array_map(function ($paragraph) use ($fieldValues, $boldVariables, $layout) {
             $paragraph = trim($paragraph);
+            if (($layout['body']['align'] ?? null) === 'justify') {
+                // Authored line breaks defeat justification. Keep paragraph boundaries
+                // and token-generated participation tables, but let prose wrap naturally.
+                $paragraph = preg_replace('/<br\s*\/?\s*>/i', ' ', $paragraph);
+                $paragraph = preg_replace('/\r?\n/', ' ', $paragraph);
+            }
             // HTML authors control spacing with tags/CSS; plain text keeps line breaks.
             if (! preg_match('/<\/?[a-z][^>]*>/i', $paragraph)) {
                 $paragraph = nl2br($paragraph);
