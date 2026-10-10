@@ -122,6 +122,26 @@ class FestIndividualChampionshipGroupByGenderTest extends TestCase
         $this->assertEmpty($service->crossPhaseStandingForVisibleLeaves($event, collect([$event->id]), true));
     }
 
+    public function test_admin_cumulative_preview_includes_hidden_category_ranks(): void
+    {
+        [$leaf, $tenant] = $this->makeChampionshipFixture();
+        $hub = FestEvent::create([
+            'tenant_id' => $tenant->id, 'title' => 'Season hub', 'event_type' => 'kalolsavam',
+            'aggregation_config' => ['individual_championship_config' => [
+                'disabled' => true, 'excluded_individual_categories' => ['open'],
+            ]],
+        ]);
+        $phase = \App\Models\FestEventPhase::create(['event_id' => $hub->id, 'name' => 'Final', 'code' => 'final']);
+        $leaf->update(['parent_event_id' => $hub->id, 'source_phase_id' => $phase->id]);
+        $service = app(FestIndividualChampionshipService::class);
+        $this->assertEmpty($service->crossPhaseStanding($hub, true));
+        $config = array_merge($service->getConfig($hub), ['disabled' => false, 'excluded_individual_categories' => []]);
+        $rows = $service->crossPhaseStanding($hub, true, $config);
+        $this->assertCount(4, $rows);
+        $this->assertTrue($rows->every(fn ($row) => $row['rank'] >= 1));
+        $this->assertEmpty($service->crossPhaseStanding($hub, true));
+    }
+
     public function test_combined_rankings_compare_boys_and_girls_in_the_same_category(): void
     {
         $rows = collect([

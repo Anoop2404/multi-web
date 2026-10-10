@@ -52,7 +52,7 @@
         </div>
 
         <!-- Top Honours Podium / Crowned Champions Cards -->
-        <div v-if="championsSummary && (championsSummary.category_champions?.length || championsSummary.overall_male_champion || championsSummary.overall_champion)" class="mt-6 mb-6">
+        <div v-if="adminPreview ? previewCategories.length : championsSummary && (championsSummary.category_champions?.length || championsSummary.overall_male_champion || championsSummary.overall_champion)" class="mt-6 mb-6">
             <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                 <span>🏅</span> Crowned Champions ({{ championshipConfig.male_title }} &amp; {{ championshipConfig.female_title }})
             </h3>
@@ -146,7 +146,19 @@
             </div>
 
             <!-- Category Champions Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div v-if="adminPreview" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div v-for="category in previewCategories" :key="category.key" class="card !p-3.5">
+                    <h3 class="font-bold text-sm mb-3">{{ rowCategoryLabel(category.key) }}</h3>
+                    <button v-for="row in category.rows" :key="row.student.id" type="button"
+                            class="w-full flex items-center gap-3 border-t py-2 text-left"
+                            @click="viewStudentBreakdown(row.student.id)">
+                        <span class="font-bold shrink-0">#{{ row.rank }}</span>
+                        <span class="flex-1 min-w-0"><span class="block font-semibold text-sm">{{ row.student.name }}</span><span class="block text-xs text-slate-500">{{ row.school }} · {{ row.gender }}</span></span>
+                        <span class="font-bold shrink-0 text-sm">{{ row.points }} pts</span>
+                    </button>
+                </div>
+            </div>
+            <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div v-for="cat in championsSummary.category_champions" :key="cat.category"
                      class="card !p-3.5 bg-white border border-slate-200/80 shadow-xs hover:border-slate-300 transition-all">
                     <div class="border-b border-slate-100 pb-2 mb-2 flex items-center justify-between">
@@ -624,7 +636,7 @@ const props = defineProps({
     cumulativeLeaderboard: { type: Array, default: () => [] },
 });
 
-const scope = ref('phase');
+const scope = ref(props.usesPhases && !props.event.parent_event_id ? 'cumulative' : 'phase');
 const activeLeaderboard = computed(() => (scope.value === 'cumulative' ? props.cumulativeLeaderboard : props.leaderboard));
 
 const showBuilderConfig = ref(false);
@@ -750,6 +762,14 @@ const filteredLeaderboard = computed(() => {
         list = list.filter(r => String(r.gender).toLowerCase() === filterGender.value.toLowerCase());
     }
     return list;
+});
+const previewCategories = computed(() => {
+    const groups = new Map();
+    for (const row of filteredLeaderboard.value) {
+        if (!groups.has(row.category)) groups.set(row.category, []);
+        groups.get(row.category).push(row);
+    }
+    return [...groups].map(([key, rows]) => ({ key, rows }));
 });
 const championshipPdfUrl = computed(() => {
     const params = new URLSearchParams({ preview_disabled: props.adminPreview ? '1' : '0', top_three: topThreeOnly.value ? '1' : '0', scope: scope.value });

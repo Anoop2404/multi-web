@@ -42,7 +42,7 @@ class FestChampionshipController extends SahodayaAdminController
             'categoryMergeGroups'        => $this->mergeGroupsForDisplay($categoryMap),
             'excludedOverallCategories'  => \App\Support\FestOverallCategoryExclusion::excluded($root),
             'usesPhases'                 => $usesPhases,
-            'cumulativeLeaderboard'      => $usesPhases ? $championship->crossPhaseStanding($root) : [],
+            'cumulativeLeaderboard'      => $usesPhases ? $championship->crossPhaseStanding($root, false, $adminPreview ? $previewConfig : null) : [],
         ]));
     }
 
@@ -58,7 +58,7 @@ class FestChampionshipController extends SahodayaAdminController
             $config = array_merge($config, ['disabled' => false, 'excluded_individual_categories' => []]);
         }
         $rows = $request->query('scope') === 'cumulative'
-            ? $championship->crossPhaseStanding($event->rootEvent())
+            ? $championship->crossPhaseStanding($event->rootEvent(), false, $config)
             : $championship->rankAndFormat($championship->pointsForEvent($event), false, $config);
         $rows = $rows->filter(fn ($r) => ($r['points'] ?? 0) > 0 && ($r['rank'] ?? 0) >= 1
             && (! $request->boolean('top_three', true) || $r['rank'] <= 3)

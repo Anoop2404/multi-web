@@ -327,12 +327,13 @@ class FestIndividualChampionshipService
     }
 
     /** @return Collection<int, array<string, mixed>> */
-    public function crossPhaseStanding(FestEvent $hub, bool $directPhotoUrls = false): Collection
+    public function crossPhaseStanding(FestEvent $hub, bool $directPhotoUrls = false, ?array $config = null): Collection
     {
-        if ($this->getConfig($hub)['disabled']) {
+        $config ??= $this->getConfig($hub);
+        if ($config['disabled']) {
             return collect();
         }
-        return $this->rankAndFormat($this->sumAcrossLeaves($this->allPhaseLeaves($hub)), $directPhotoUrls, $this->getConfig($hub));
+        return $this->rankAndFormat($this->sumAcrossLeaves($this->allPhaseLeaves($hub)), $directPhotoUrls, $config);
     }
 
     /** @return Collection<int, array<string, mixed>> */
