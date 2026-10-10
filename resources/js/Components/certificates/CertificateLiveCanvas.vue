@@ -382,6 +382,8 @@ const paragraphs = computed(() => {
         let text = paragraph.trim();
         if (props.layout?.body?.align === 'justify') {
             text = text.replace(/<br\s*\/?\s*>/gi, ' ').replace(/\r?\n/g, ' ');
+            text = text.replace(/text-align\s*:\s*(?:left|right|center|start|end|justify)\b/gi, 'text-align:justify')
+                .replace(/\balign\s*=\s*(["'])(?:left|right|center)\1/gi, 'align="justify"');
         }
         return substituteTokens(/<\/?[a-z][^>]*>/i.test(text) ? text : text.replace(/\n/g, '<br />\n'));
     });

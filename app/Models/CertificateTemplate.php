@@ -286,6 +286,8 @@ class CertificateTemplate extends Model
                 // and token-generated participation tables, but let prose wrap naturally.
                 $paragraph = preg_replace('/<br\s*\/?\s*>/i', ' ', $paragraph);
                 $paragraph = preg_replace('/\r?\n/', ' ', $paragraph);
+                $paragraph = preg_replace('/text-align\s*:\s*(?:left|right|center|start|end|justify)\b/i', 'text-align:justify', $paragraph);
+                $paragraph = preg_replace('/\balign\s*=\s*([\"\x27])(?:left|right|center)\1/i', 'align="justify"', $paragraph);
             }
             // HTML authors control spacing with tags/CSS; plain text keeps line breaks.
             if (! preg_match('/<\/?[a-z][^>]*>/i', $paragraph)) {
