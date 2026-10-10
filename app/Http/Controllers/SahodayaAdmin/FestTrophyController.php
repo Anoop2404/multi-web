@@ -152,6 +152,6 @@ class FestTrophyController extends SahodayaAdminController
             'sahodaya' => $this->sahodaya,
             'rows' => $resolvedRows,
             'cumulative' => $scope === 'cumulative',
-        ], $filename, inline: false, isLandscape: false);
+        ], $filename, inline: $request->boolean('inline'), isLandscape: false);
     }
 }

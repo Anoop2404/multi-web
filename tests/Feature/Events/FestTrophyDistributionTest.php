@@ -117,6 +117,18 @@ class FestTrophyDistributionTest extends TestCase
         $this->assertCount(2, $row['winner']['joint_winners']);
         $this->assertEqualsCanonicalizing([$this->school1->name, $this->school2->name], array_map('strtoupper', array_column($row['winner']['joint_winners'], 'name')));
         $this->assertSame([1, 1], array_column($row['winner']['joint_winners'], 'rank'));
+        $html = view('fest.reports.trophy-distribution', [
+            'event' => $this->parentEvent, 'sahodaya' => $this->sahodaya,
+            'rows' => collect([$row]), 'cumulative' => false,
+        ])->render();
+        $this->assertStringContainsString(strtoupper($this->school1->name), $html);
+        $this->assertStringContainsString(strtoupper($this->school2->name), $html);
+        $this->assertSame(2, substr_count($html, '<div class="checkbox-box"></div>'));
+        $this->assertSame(2, substr_count($html, 'Joint winner</div>'));
+        $this->assertSame(1, substr_count($html, '<tr class="group-heading">'));
+        $this->assertStringContainsString('<td colspan="6">Mime</td>', $html);
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html)->output();
+        $this->assertStringStartsWith('%PDF-', $pdf);
     }
 
     public function test_school_trophies_count_each_group_once_and_individuals_separately(): void

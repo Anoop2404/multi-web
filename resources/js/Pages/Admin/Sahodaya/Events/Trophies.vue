@@ -64,6 +64,9 @@
                 <a :href="pdfExportUrl" target="_blank" class="btn-secondary text-xs flex items-center gap-1.5">
                     <span>📄</span> Download Valedictory PDF
                 </a>
+                <a :href="`${pdfExportUrl}&inline=1`" target="_blank" rel="noopener" class="btn-secondary text-xs flex items-center gap-1.5">
+                    Preview Valedictory PDF
+                </a>
 
                 <!-- Add Custom Trophy -->
                 <button type="button" class="btn-primary text-xs" @click="startNewTrophy">

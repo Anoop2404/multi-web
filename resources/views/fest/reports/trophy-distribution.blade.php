@@ -15,6 +15,8 @@
         th { background: #1d3557; color: #ffffff; padding: 6px 8px; font-size: 9px; font-weight: bold; text-align: left; border: 1px solid #1d3557; }
         td { border: 1px solid #000; padding: 5px 8px; font-size: 9.5px; vertical-align: middle; }
         tbody tr:nth-child(even) { background: #f8fafc; }
+        thead { display: table-header-group; }
+        tr { page-break-inside: avoid; }
         
         .col-no { width: 32px; text-align: center; font-weight: bold; color: #1e293b; }
         .col-title { width: 220px; font-weight: 500; }
@@ -24,6 +26,8 @@
         .col-details { font-size: 8.5px; color: #475569; }
         .col-sign { width: 60px; text-align: center; }
         .checkbox-box { display: inline-block; width: 14px; height: 14px; border: 1px solid #000; }
+        .group-heading td { background: #e8eef5; color: #1d3557; font-weight: bold; padding: 8px; }
+        .group-heading { page-break-after: avoid; }
         
         .empty-winner { color: #94a3b8; font-style: italic; font-weight: normal; }
         
@@ -59,15 +63,36 @@
             </tr>
         </thead>
         <tbody>
+            @php $previousGroupKey = null; @endphp
             @forelse($rows as $r)
                 @php
                     $t = $r['trophy'];
                     $w = $r['winner'];
+                    $winners = $w['joint_winners'] ?? [$w];
+                    $itemIds = $t['item_ids'] ?? [];
+                    sort($itemIds);
+                    $groupKey = json_encode([$t['trophy_type'], $t['category_key'] ?? '', $t['gender'] ?? '',
+                        $t['item_id'] ?: ($t['item_name_pattern'] ?? ''), $t['item_group_name'] ?? '', $itemIds]);
+                    $typeLabels = ['overall' => 'Overall championship', 'category' => 'Category championship',
+                        'item' => 'Single item winners', 'item_group' => 'Item group / cluster',
+                        'individual_championship' => 'Individual championship'];
+                    $groupName = implode(' · ', array_filter([
+                        $t['item_group_name'] ?: ($t['item_name'] ?: ($t['item_name_pattern'] ?: ($typeLabels[$t['trophy_type']] ?? $t['trophy_type']))),
+                        $t['category_label'] ?? $t['category_key'] ?? null, $t['gender'] ?? null,
+                    ]));
                 @endphp
+                @if($groupKey !== $previousGroupKey)
+                    <tr class="group-heading"><td colspan="6">{{ $groupName }}</td></tr>
+                    @php $previousGroupKey = $groupKey; @endphp
+                @endif
+                @foreach($winners as $w)
                 <tr>
                     <td class="col-no">{{ $t['trophy_no'] }}</td>
                     <td class="col-title">
                         <div>{{ $t['title'] }}</div>
+                        @if(count($winners) > 1)
+                            <div style="font-size:8px;color:#92400e;">Joint winner</div>
+                        @endif
                         @if($t['is_rolling'])
                             <span class="col-badge badge-rolling">Ever-rolling</span>
                         @endif
@@ -81,6 +106,9 @@
                     <td class="col-winner">
                         @if($w && !empty($w['name']))
                             <div>{{ strtoupper($w['name']) }}</div>
+                            @if(!empty($w['team_members']))
+                                <div style="font-size:8px;font-weight:normal;margin-top:3px;">{{ implode(', ', $w['team_members']) }}</div>
+                            @endif
                             @if(!empty($w['chest_no']))
                                 <div style="font-size: 8px; color: #64748b; font-weight: normal;">Chest No: {{ $w['chest_no'] }}</div>
                             @endif
@@ -101,6 +129,7 @@
                         <div class="checkbox-box"></div>
                     </td>
                 </tr>
+                @endforeach
             @empty
                 <tr>
                     <td colspan="6" style="text-align: center; padding: 20px; color: #64748b;">
