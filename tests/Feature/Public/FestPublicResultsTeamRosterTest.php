@@ -162,6 +162,42 @@ class FestPublicResultsTeamRosterTest extends TestCase
         $this->assertEmpty($markQueries);
     }
 
+    public function test_published_school_report_hides_marks_and_ranks_below_third(): void
+    {
+        $solo = FestEventItem::where('event_id', $this->event->id)->where('title', 'Solo Song')->firstOrFail();
+        FestMark::where('item_id', $solo->id)->update(['position' => 4, 'score' => 9876.54, 'grade' => 'B']);
+        $group = FestEventItem::where('event_id', $this->event->id)->where('title', 'Group Dance')->firstOrFail();
+        $group->update(['results_hidden' => true]);
+        $service = new \App\Services\Events\FestReportService($this->event);
+        $marks = $service->marks($this->schoolA->id, null, null, true);
+        $this->assertCount(1, $marks);
+        $html = view('fest.reports.school-wise', [
+            'event' => $this->event, 'marks' => $marks, 'publishedOnly' => true,
+            'schoolResults' => $service->publishedSchoolResultRows($this->schoolA->id),
+            'orgName' => 'Test Sahodaya', 'logoSrc' => null,
+        ])->render();
+        $this->assertStringContainsString('Anu Krishna', $html);
+        $this->assertStringContainsString('<td>B</td>', $html);
+        $this->assertStringNotContainsString('<th>Score</th>', $html);
+        $this->assertStringNotContainsString('9876.54', $html);
+        $this->assertStringNotContainsString('<td>4</td>', $html);
+        $this->assertStringNotContainsString('Group Dance', $html);
+        $group->update(['results_hidden' => false, 'results_published_at' => null]);
+        $this->assertCount(1, $service->marks($this->schoolA->id, null, null, true));
+        $group->update(['results_published_at' => now()]);
+        $marks = $service->marks($this->schoolA->id, null, null, true);
+        $this->assertCount(2, $marks);
+        $html = view('fest.reports.school-wise', [
+            'event' => $this->event, 'marks' => $marks, 'publishedOnly' => true,
+            'schoolResults' => $service->publishedSchoolResultRows($this->schoolA->id),
+            'orgName' => 'Test Sahodaya', 'logoSrc' => null,
+        ])->render();
+        $this->assertStringContainsString('<td>1</td><td>A</td>', $html);
+        $this->assertStringContainsString('Sita Menon', $html);
+        $this->assertStringContainsString('Meera Pillai', $html);
+        $this->assertStringContainsString($this->schoolA->name, $html);
+    }
+
     public function test_results_school_tab_shows_medal_counts_per_school(): void
     {
         $response = $this->get("http://roster-test.test/fest/{$this->event->id}/results?tab=school");

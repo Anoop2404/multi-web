@@ -549,11 +549,14 @@ class FestReportService
             ->get();
     }
 
-    public function marks(?string $schoolId = null, ?int $itemId = null, ?string $classGroup = null)
+    public function marks(?string $schoolId = null, ?int $itemId = null, ?string $classGroup = null, bool $publishedOnly = false)
     {
         $schoolId = $this->scopedSchoolId($schoolId);
 
         return FestMark::whereIn('event_id', $this->eventIds())
+            ->when($publishedOnly, fn ($q) => $q
+                ->whereHas('item', fn ($item) => $item->whereNotNull('results_published_at')->where('results_hidden', false))
+                ->whereHas('participant', fn ($participant) => $participant->whereNull('disqualified_at')))
             ->when($this->scope?->isActorRestricted, fn ($q) => $q->whereHas(
                 'participant.registration',
                 fn ($registration) => $registration->whereIn('school_id', $this->scope->schoolIds)
@@ -565,6 +568,46 @@ class FestReportService
             ->orderBy('item_id')
             ->orderBy('position')
             ->get();
+    }
+
+    /** Published results grouped by school and student, without scores or points. */
+    public function publishedSchoolResultRows(?string $schoolId = null, ?string $classGroup = null): array
+    {
+        $marks = $this->marks($schoolId, null, $classGroup, true);
+        $marks->loadMissing(['participant.registration.participants.student', 'participant.registration.participants.teacher']);
+        $schools = [];
+        $categoryLabels = FestClassGroupScheme::labels(null, $this->event);
+        foreach ($marks->unique(fn (FestMark $mark) => $mark->deduplicationKey()) as $mark) {
+            $participant = $mark->participant;
+            $registration = $participant?->registration;
+            if (! $registration) {
+                continue;
+            }
+            $members = $mark->item?->isTeamItem()
+                ? $registration->participants->where('participant_role', 'performer')->whereNull('disqualified_at')
+                : collect([$participant]);
+            foreach ($members as $member) {
+                $person = $member->student ?? $member->teacher;
+                if (! $person) {
+                    continue;
+                }
+                $schoolKey = $registration->school_id;
+                $personKey = get_class($person).':'.$person->id;
+                $schools[$schoolKey]['school_name'] = $registration->school?->name ?? 'School';
+                $schools[$schoolKey]['students'][$personKey]['key'] = $personKey;
+                $schools[$schoolKey]['students'][$personKey]['name'] = $person->name;
+                $schools[$schoolKey]['students'][$personKey]['results'][] = [
+                    'item' => $mark->item?->title ?? 'Item',
+                    'category' => $categoryLabels[$mark->item?->class_group] ?? $mark->item?->age_group ?? '',
+                    'rank' => in_array((int) $mark->position, [1, 2, 3], true) ? (int) $mark->position : null,
+                    'grade' => $mark->grade,
+                ];
+            }
+        }
+        return collect($schools)->sortBy('school_name')->map(function ($school) {
+            $school['students'] = collect($school['students'])->sortBy('name')->values()->all();
+            return $school;
+        })->values()->all();
     }
 
     /**
@@ -1204,7 +1247,8 @@ class FestReportService
 
     private function schoolWisePdf(Request $request): \Symfony\Component\HttpFoundation\Response
     {
-        $marks = $this->marks(
+        $publishedOnly = $request->input('result_mode') === 'published';
+        $marks = $publishedOnly ? collect() : $this->marks(
             $request->input('school_id'),
             null,
             $request->input('class_group'),
@@ -1213,8 +1257,10 @@ class FestReportService
         return $this->renderPdf('fest.reports.school-wise', [
             'event'   => $this->event,
             'marks'   => $marks,
+            'publishedOnly' => $publishedOnly,
+            'schoolResults' => $publishedOnly ? $this->publishedSchoolResultRows($request->input('school_id'), $request->input('class_group')) : [],
             ...$this->brandingData(),
-        ], $this->slug().'-school-wise.pdf');
+        ], $this->slug().($publishedOnly ? '-school-published-results.pdf' : '-school-wise.pdf'));
     }
 
     /**

@@ -346,17 +346,18 @@ class FestReportController extends SahodayaAdminController
         $service = $this->scopedReportService($request, $this->regionAwareTargetEvent($request, $event));
         $schoolId = $request->input('school_id');
         $classGroup = $request->input('class_group');
+        $publishedOnly = $request->input('result_mode') === 'published';
         $grouped = [];
 
-        if ($schoolId) {
-            $marks = $service->marks($schoolId, null, $classGroup);
+        if ($schoolId && ! $publishedOnly) {
+            $marks = $service->marks($schoolId, null, $classGroup, $publishedOnly);
             foreach ($marks as $m) {
                 $itemTitle = $m->item?->title ?? 'Item';
                 $grouped[$itemTitle][] = [
                     'students' => $m->participant?->student?->name ?? $m->participant?->teacher?->name ?? '—',
-                    'position' => $m->position,
+                    'position' => ! $publishedOnly || in_array((int) $m->position, [1, 2, 3], true) ? $m->position : null,
                     'grade'    => $m->grade,
-                    'score'    => $m->score,
+                    ...($publishedOnly ? [] : ['score' => $m->score]),
                 ];
             }
         }
@@ -364,10 +365,11 @@ class FestReportController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Events/Reports/SchoolDetailed', $this->withEventActivity($event, FestPageActivity::REPORTS, $this->reportProps($tenantId, $event, [
             'schools'     => $service->schools(),
             'classGroups' => FestReportService::classGroups($event),
-            'filters'     => ['school_id' => $schoolId, 'class_group' => $classGroup],
+            'filters'     => ['school_id' => $schoolId, 'class_group' => $classGroup, 'result_mode' => $publishedOnly ? 'published' : 'full'],
             'grouped'     => $grouped,
+            'schoolResults' => $schoolId && $publishedOnly ? $service->publishedSchoolResultRows($schoolId, $classGroup) : [],
             'pdfUrl'      => $schoolId ? "/sahodaya-admin/{$tenantId}/events/{$event->id}/reports/export/school-wise?".http_build_query(array_filter([
-                'school_id' => $schoolId, 'class_group' => $classGroup,
+                'school_id' => $schoolId, 'class_group' => $classGroup, 'result_mode' => $publishedOnly ? 'published' : 'full',
             ])) : null,
         ])));
     }

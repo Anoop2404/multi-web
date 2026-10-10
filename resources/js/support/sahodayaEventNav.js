@@ -159,6 +159,7 @@ export function eventScopedNav(sahodayaId, eventId, event = null, programEvents 
     groups.push({ section: 'Competition', items: competitionItems });
 
     const outputItems = [
+        { label: 'School published results', href: `${base}/reports/school-detailed?result_mode=published`, icon: 'building', permissions: FEST_VIEW },
         { label: 'Reports hub', href: `${base}/reports`, icon: 'file-text', permissions: FEST_VIEW },
         { label: 'Overall Ranking', href: `${base}/reports/overall-ranking`, icon: 'award', permissions: FEST_VIEW },
         { label: 'Category & Item-wise Report', href: `${base}/reports/category-item-matrix`, icon: 'grid', permissions: FEST_VIEW },

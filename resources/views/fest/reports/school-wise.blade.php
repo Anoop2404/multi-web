@@ -5,9 +5,28 @@
     @include('partials.pdf-generated-footer', ['generatedAt' => $generatedAt ?? null])
 @include('partials.pdf-branding-header', ['orgName' => $orgName ?? ($sahodaya->name ?? 'Sahodaya'), 'logoSrc' => $logoSrc ?? null])
 
-<h2 style="text-align:center">{{ $event->title }} — School-wise Results</h2>
+@php $publishedOnly = $publishedOnly ?? false; @endphp
+<h2 style="text-align:center">{{ $event->title }} — School-wise {{ $publishedOnly ? 'Published Results' : 'Results' }}</h2>
 <p style="text-align:center;font-size:10px;color:#64748b;margin-top:2px">Generated on {{ now()->format('d M Y, h:i A') }}</p>
-<table><thead><tr><th>Sl No</th><th>Item</th><th>School</th><th>Participant</th><th>Pos</th><th>Grade</th><th>Score</th></tr></thead>
+@if($publishedOnly)
+@forelse($schoolResults ?? [] as $school)
+<h3>{{ $school['school_name'] }}</h3>
+<table><thead><tr><th>Student</th><th>Item</th><th>Rank</th><th>Grade</th></tr></thead><tbody>
+@foreach($school['students'] as $student)
+@foreach($student['results'] as $result)
+<tr>
+@if($loop->first)<td rowspan="{{ count($student['results']) }}" style="vertical-align:top">{{ $student['name'] }}</td>@endif
+<td>{{ $result['item'] }}@if($result['category'])<br><small>{{ $result['category'] }}</small>@endif</td>
+<td>{{ $result['rank'] ?? '—' }}</td><td>{{ $result['grade'] ?? '—' }}</td>
+</tr>
+@endforeach
+@endforeach
+</tbody></table>
+@empty
+<p>No published results for the selected school.</p>
+@endforelse
+@else
+<table><thead><tr><th>Sl No</th><th>Item</th><th>School</th><th>Participant</th><th>Pos</th><th>Grade</th>@unless($publishedOnly)<th>Score</th>@endunless</tr></thead>
 <tbody>
 @foreach($marks as $m)
 <tr>
@@ -15,7 +34,9 @@
 <td>{{ $m->item?->title }}</td>
 <td>{{ strtoupper($m->participant?->registration?->school?->name ?? '') }}</td>
 <td>{{ $m->participant?->student?->name ?? $m->participant?->teacher?->name ?? '' }}</td>
-<td>{{ $m->position ?? '—' }}</td><td>{{ $m->grade ?? '—' }}</td><td>{{ $m->score ?? '' }}</td>
+<td>{{ ! $publishedOnly || in_array((int) $m->position, [1, 2, 3], true) ? ($m->position ?? '—') : '—' }}</td><td>{{ $m->grade ?? '—' }}</td>@unless($publishedOnly)<td>{{ $m->score ?? '' }}</td>@endunless
 </tr>
 @endforeach
-</tbody></table></body></html>
+</tbody></table>
+@endif
+</body></html>
