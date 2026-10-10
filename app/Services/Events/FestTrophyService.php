@@ -170,13 +170,12 @@ class FestTrophyService
                 return null;
             }
 
-            $marks = FestMark::where('item_id', $item->id)
+            $marks = FestMark::currentPerformers()->where('item_id', $item->id)
                 ->whereNotNull('position')->orderBy('position')->orderByDesc('score')->orderBy('id')
-                ->with(['participant.student', 'participant.registration', 'participant.group.participants.student'])
+                ->with(['item', 'participant.student', 'participant.registration', 'participant.group.participants.student'])
                 ->get()->filter(fn ($mark) => $mark->participant && ! $mark->participant->disqualified_at
                     && $mark->participant->participant_role !== 'standby')
-                ->unique(fn ($mark) => $mark->participant->group_id
-                    ? 'group:'.$mark->participant->group_id : 'person:'.$mark->participant_id);
+                ->unique(fn (FestMark $mark) => $mark->deduplicationKey());
             $schools = Tenant::whereIn('id', $marks->map(fn ($mark) => $mark->participant->registration?->school_id)->filter())
                 ->pluck('name', 'id');
             $isMultiPerson = FestTeamSquadRules::isMultiPerson($item->participant_type);
@@ -223,11 +222,12 @@ class FestTrophyService
             }
 
             $itemIds = $items->pluck('id');
-            $marks = FestMark::whereIn('item_id', $itemIds)
+            $marks = FestMark::currentPerformers()->whereIn('item_id', $itemIds)
                 ->whereNotNull('position')
                 ->with(['participant.registration', 'item'])
                 ->get()
-                ->filter(fn (FestMark $m) => $m->participant && $m->participant->registration);
+                ->filter(fn (FestMark $m) => $m->participant && $m->participant->registration)
+                ->unique(fn (FestMark $mark) => $mark->deduplicationKey());
 
             if ($marks->isEmpty()) {
                 $cache[$key] = ['standings' => [], 'count' => 0];
@@ -428,10 +428,11 @@ class FestTrophyService
     {
         $excludedCategories = FestOverallCategoryExclusion::excluded($event->rootEvent());
 
-        $marks = FestMark::where('event_id', $event->id)
+        $marks = FestMark::currentPerformers()->where('event_id', $event->id)
             ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
             ->with(['participant.registration', 'item'])
-            ->get();
+            ->get()
+            ->unique(fn (FestMark $mark) => $mark->deduplicationKey());
 
         $scores = [];
         foreach ($marks as $mark) {
@@ -472,10 +473,11 @@ class FestTrophyService
     {
         $categoryMap = FestCategoryMerge::map($event->rootEvent());
 
-        $marks = FestMark::where('event_id', $event->id)
+        $marks = FestMark::currentPerformers()->where('event_id', $event->id)
             ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
             ->with(['participant.registration', 'item'])
-            ->get();
+            ->get()
+            ->unique(fn (FestMark $mark) => $mark->deduplicationKey());
 
         $byCategory = [];
         $schoolIds = [];

@@ -97,6 +97,40 @@ class FestTrophyDistributionTest extends TestCase
         $this->assertSame(1, $winner['top_ten'][0]['rank']);
     }
 
+    public function test_school_trophies_count_each_group_once_and_individuals_separately(): void
+    {
+        $marks = collect();
+        $items = collect();
+        foreach (['group', 'individual'] as $type) {
+            $item = FestEventItem::create(['event_id' => $this->parentEvent->id, 'title' => $type.' Entry',
+                'participant_type' => $type, 'class_group' => 'category_3', 'results_published_at' => now(), 'results_hidden' => false]);
+            $items->push($item);
+            $registration = FestRegistration::create(['event_id' => $this->parentEvent->id, 'item_id' => $item->id,
+                'school_id' => $this->school1->id, 'status' => 'approved']);
+            // No group_id: legacy group registrations must still count just once.
+            foreach (['performer', 'performer', 'standby'] as $role) {
+                $participant = FestParticipant::create(['event_id' => $this->parentEvent->id,
+                    'registration_id' => $registration->id, 'participant_role' => $role]);
+                $marks->push(FestMark::create(['event_id' => $this->parentEvent->id, 'item_id' => $item->id,
+                    'participant_id' => $participant->id, 'position' => 1, 'grade' => 'A', 'score' => 95]));
+            }
+        }
+        $points = app(\App\Services\Events\FestGradePointService::class);
+        $expected = $points->pointsForMark($this->parentEvent, $marks[0])
+            + $points->pointsForMark($this->parentEvent, $marks[3])
+            + $points->pointsForMark($this->parentEvent, $marks[4]);
+        $trophies = collect([
+            new FestTrophy(['trophy_type' => FestTrophy::TYPE_OVERALL, 'position' => 1]),
+            new FestTrophy(['trophy_type' => FestTrophy::TYPE_CATEGORY, 'category_key' => 'category_3', 'position' => 1]),
+            new FestTrophy(['trophy_type' => FestTrophy::TYPE_ITEM_GROUP, 'item_ids' => $items->pluck('id')->all(), 'position' => 1]),
+        ]);
+        $resolved = $this->trophyService()->resolveWinners($this->parentEvent, $trophies);
+        foreach ($resolved as $row) {
+            $this->assertTrue($row['has_winner']);
+            $this->assertEquals($expected, $row['winner']['points']);
+        }
+    }
+
     public function test_open_group_item_does_not_replace_the_individual_championship_category(): void
     {
         $solo = FestEventItem::create(['event_id' => $this->parentEvent->id, 'title' => 'Essay Writing',
