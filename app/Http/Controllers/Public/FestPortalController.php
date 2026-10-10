@@ -369,7 +369,7 @@ class FestPortalController extends Controller
         }
 
         $settingsVersion = hash('sha256', json_encode($event->rootEvent()->aggregation_config));
-        $cacheKey = 'fest-results-html:v4:'.$settingsVersion.':'.$event->tenant_id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.$resultsVersion.':'.$tab;
+        $cacheKey = 'fest-results-html:v5:'.$settingsVersion.':'.$event->tenant_id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.$resultsVersion.':'.$tab;
         $html = $this->rememberPublicHotPath(
             $cacheKey,
             120,
@@ -471,7 +471,7 @@ class FestPortalController extends Controller
         // $itemResultsByCategory (category tab); school/item/individual/championship
         // don't need it.
         $needsCategoryBoards = in_array($tab, ['category', 'toppers'], true);
-        $needsMarks = in_array($tab, ['item', 'individual', 'school'], true);
+        $needsMarks = in_array($tab, ['item', 'individual'], true);
         $categories = $needsCategoryBoards
             ? $this->scoreboards->categories($event, $selectedScope)
             : [];
@@ -634,39 +634,17 @@ class FestPortalController extends Controller
                     ->all();
             }
 
-            if ($tab === 'school') {
-                // Medal tally (gold/silver/bronze counts) per school, layered onto
-                // $schoolBoard's existing points-based rank rather than replacing it —
-                // points come from a grade scheme (FestGradePointService) that doesn't
-                // always track 1st/2nd/3rd counts 1:1, so the official rank stays
-                // points-driven and medals are informational. Built from the same top-3
-                // $marks fetched above for the item tab, scoped to whichever
-                // region/cluster/phase the page is currently showing. Deduped by
-                // registration first — pair/group items save one FestMark per teammate,
-                // so an 11-person choir's single silver would otherwise tally as 11
-                // silvers for its school (same root cause as the scoring-dedup note on
-                // EventContext).
-                //
-                // This only ever feeds $schoolBoard (the combined "All Categories"
-                // board) — $categoryBoards above already gets its own rows straight from
-                // resolveScoreboard(), unaffected by this — so it must honor
-                // excluded_overall_categories the same way that combined total does, or
-                // an excluded category's podium finishes would still show up in
-                // gold/silver/bronze next to a Total Points that correctly leaves them
-                // out.
-                $excludedCategoriesForMedals = FestOverallCategoryExclusion::excluded($event->rootEvent());
-                $medalTally = $marks
-                    ->filter(fn (FestMark $m) => $m->participant?->registration?->school_id && ! $m->participant->disqualified_at)
-                    ->filter(fn (FestMark $m) => ! $excludedCategoriesForMedals
-                        || ! in_array(FestOverallCategoryExclusion::categoryKeyForItem($event, $m->item), $excludedCategoriesForMedals, true))
-                    ->unique(fn (FestMark $m) => $m->deduplicationKey())
-                    ->groupBy(fn (FestMark $m) => (string) $m->participant->registration->school_id)
-                    ->map(fn ($group) => [
-                        'gold' => $group->where('position', 1)->count(),
-                        'silver' => $group->where('position', 2)->count(),
-                        'bronze' => $group->where('position', 3)->count(),
-                    ]);
-            }
+        }
+
+        $resultsBySchool = $tab === 'school'
+            ? $this->schoolResultsRoster($event, $selectedScope, $isPublished)
+            : collect();
+        if ($tab === 'school') {
+            $medalTally = $resultsBySchool->map(fn ($rows) => [
+                'gold' => collect($rows)->where('position', 1)->count(),
+                'silver' => collect($rows)->where('position', 2)->count(),
+                'bronze' => collect($rows)->where('position', 3)->count(),
+            ]);
         }
 
         // School board needed for school, toppers (overallSchoolToppers), and
@@ -695,9 +673,6 @@ class FestPortalController extends Controller
         // ones it won), each with its position, grade, and points, so the sum of the
         // listed rows always agrees with $schoolBoard's official total above. Shared
         // with schoolResults()'s own dedicated per-school page.
-        $resultsBySchool = $tab === 'school'
-            ? $this->schoolResultsRoster($event, $selectedScope, $isPublished)
-            : collect();
         $schoolWinnersBoard = $tab === 'school'
             ? collect($schoolBoard)
                 ->map(fn (array $row) => $row + ['winners' => $resultsBySchool[$row['school_id']] ?? []])
@@ -774,82 +749,96 @@ class FestPortalController extends Controller
 
         abort_unless($isPublished, 403, 'Public scoreboard & results are disabled for this event.');
 
-        $categories = $this->scoreboards->categories($event, $selectedScope);
-        $category = $this->stringQuery($request, 'category');
-        if ($category !== null) {
-            abort_unless(in_array($category, $categories, true), 404);
+        $renderSchool = function () use ($request, $tenant, $event, $schoolId, $selectedScope, $isPublished, $isAdminPreview) {
+            $categories = $this->scoreboards->categories($event, $selectedScope);
+            $category = $this->stringQuery($request, 'category');
+            if ($category !== null) {
+                abort_unless(in_array($category, $categories, true), 404);
+            }
+
+            // Verify this school is actually registered in this event before exposing anything.
+            $isRegistered = FestRegistration::where('event_id', $event->id)
+                ->where('school_id', $schoolId)
+                ->whereIn('status', ['approved', 'submitted', 'pending_approval'])
+                ->exists();
+            abort_unless($isRegistered, 404);
+
+            $school = Tenant::findOrFail($schoolId);
+
+            [$overallRows] = $this->resolveScoreboard($event, $selectedScope, $category, $isPublished, $isAdminPreview);
+            $schoolRow = collect($overallRows)->firstWhere('school_id', $schoolId);
+            if (! $schoolRow && $isAdminPreview) {
+                $schoolRow = [
+                    'school_id' => $schoolId,
+                    'school_name' => $school->name,
+                    'total_points' => '0.00',
+                    'rank' => '—',
+                    'gold' => 0,
+                    'silver' => 0,
+                    'bronze' => 0,
+                ];
+            } else {
+                abort_unless($schoolRow, 404);
+            }
+
+            $roster = $this->schoolResultsRoster($event, $selectedScope, $isPublished, $category, $schoolId)->get($schoolId, []);
+            if (empty($roster) && ! $isAdminPreview) {
+                abort(404, 'No results recorded for this school yet.');
+            }
+
+            $rosterTotalPoints = collect($roster)->sum('points');
+            if ($schoolRow) {
+                $schoolRow['total_points'] = (string) $rosterTotalPoints;
+            } else {
+                $schoolRow = [
+                    'school_id' => $schoolId,
+                    'school_name' => $school->name,
+                    'total_points' => (string) $rosterTotalPoints,
+                    'rank' => '—',
+                    'gold' => 0,
+                    'silver' => 0,
+                    'bronze' => 0,
+                ];
+            }
+
+            // This event may be one phase (or one region-partition child of a phase) of a
+            // larger hub — show this school's cross-phase combined total instead of just
+            // this one phase's number. See crossPhaseScoreboard()'s docblock.
+            $crossPhaseBoard = $this->crossPhaseScoreboard($event, $category, $request);
+            $phaseCumulativeTotal = $crossPhaseBoard
+                ? collect($crossPhaseBoard)->firstWhere('school_id', $schoolId)['total_points'] ?? null
+                : null;
+
+            return $this->renderPublic('public.fest.school-results', $tenant, [
+                'event' => $event,
+                'eventContext' => $this->operationalEvents->publicContext($event),
+                'school' => $school,
+                'schoolRow' => $schoolRow,
+                'phaseCumulativeTotal' => $phaseCumulativeTotal,
+                'roster' => $roster,
+                // Named activeCategory*, not category* — the view's own @foreach groups the
+                // roster by each row's category LABEL using a loop variable also called
+                // $category, which would silently shadow a same-named top-level variable.
+                'activeCategory' => $category,
+                'activeCategoryLabel' => $category ? $this->scoreboards->categoryLabel($event, $category) : null,
+                'scopes' => [$selectedScope],
+                'selectedScope' => $selectedScope,
+                'isAdminPreview' => $isAdminPreview,
+                'pageSeo' => ['title' => $event->title.' — '.$school->name.' — Results'],
+            ]);
+        };
+
+        if ($request->user() ?? auth()->user()) {
+            return $renderSchool();
         }
 
-        // Verify this school is actually registered in this event before exposing anything.
-        $isRegistered = FestRegistration::where('event_id', $event->id)
-            ->where('school_id', $schoolId)
-            ->whereIn('status', ['approved', 'submitted', 'pending_approval'])
-            ->exists();
-        abort_unless($isRegistered, 404);
+        $settingsVersion = hash('sha256', json_encode($event->rootEvent()->aggregation_config));
+        $cacheKey = 'fest-school-results-html:v1:'.$tenant->id.':'.$event->id.':'.$schoolId.':'
+            .hash('sha256', (string) $request->query('category')).':'.$settingsVersion.':'
+            .$this->publicResultsVersion($selectedScope['event_ids'])[0];
+        $html = $this->rememberPublicHotPath($cacheKey, 120, fn () => $renderSchool()->getContent(), waitSeconds: 30);
 
-        $school = Tenant::findOrFail($schoolId);
-
-        [$overallRows] = $this->resolveScoreboard($event, $selectedScope, $category, $isPublished, $isAdminPreview);
-        $schoolRow = collect($overallRows)->firstWhere('school_id', $schoolId);
-        if (! $schoolRow && $isAdminPreview) {
-            $schoolRow = [
-                'school_id' => $schoolId,
-                'school_name' => $school->name,
-                'total_points' => '0.00',
-                'rank' => '—',
-                'gold' => 0,
-                'silver' => 0,
-                'bronze' => 0,
-            ];
-        } else {
-            abort_unless($schoolRow, 404);
-        }
-
-        $roster = $this->schoolResultsRoster($event, $selectedScope, $isPublished, $category, $schoolId)->get($schoolId, []);
-        if (empty($roster) && ! $isAdminPreview) {
-            abort(404, 'No results recorded for this school yet.');
-        }
-
-        $rosterTotalPoints = collect($roster)->sum('points');
-        if ($schoolRow) {
-            $schoolRow['total_points'] = (string) $rosterTotalPoints;
-        } else {
-            $schoolRow = [
-                'school_id' => $schoolId,
-                'school_name' => $school->name,
-                'total_points' => (string) $rosterTotalPoints,
-                'rank' => '—',
-                'gold' => 0,
-                'silver' => 0,
-                'bronze' => 0,
-            ];
-        }
-
-        // This event may be one phase (or one region-partition child of a phase) of a
-        // larger hub — show this school's cross-phase combined total instead of just
-        // this one phase's number. See crossPhaseScoreboard()'s docblock.
-        $crossPhaseBoard = $this->crossPhaseScoreboard($event, $category, $request);
-        $phaseCumulativeTotal = $crossPhaseBoard
-            ? collect($crossPhaseBoard)->firstWhere('school_id', $schoolId)['total_points'] ?? null
-            : null;
-
-        return $this->renderPublic('public.fest.school-results', $tenant, [
-            'event' => $event,
-            'eventContext' => $this->operationalEvents->publicContext($event),
-            'school' => $school,
-            'schoolRow' => $schoolRow,
-            'phaseCumulativeTotal' => $phaseCumulativeTotal,
-            'roster' => $roster,
-            // Named activeCategory*, not category* — the view's own @foreach groups the
-            // roster by each row's category LABEL using a loop variable also called
-            // $category, which would silently shadow a same-named top-level variable.
-            'activeCategory' => $category,
-            'activeCategoryLabel' => $category ? $this->scoreboards->categoryLabel($event, $category) : null,
-            'scopes' => [$selectedScope],
-            'selectedScope' => $selectedScope,
-            'isAdminPreview' => $isAdminPreview,
-            'pageSeo' => ['title' => $event->title.' — '.$school->name.' — Results'],
-        ]);
+        return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
     }
 
     /**
@@ -878,10 +867,7 @@ class FestPortalController extends Controller
             // only enforced while the event was unpublished, so once an admin published
             // the event, every item not explicitly hidden leaked onto this roster
             // (including grade/points) even if that specific item was still Pending.
-            ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at'))
-            // Unconditional too — an explicitly unpublished item must never resurface
-            // just because the event overall got published.
-            ->whereHas('item', fn ($q) => $q->where('results_hidden', false))
+            ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
             // Only set when schoolResults() was reached from a category-filtered
             // scoreboard — narrows the roster to that one category instead of the
             // school's full cross-category report. $category may itself be a merge
@@ -897,7 +883,7 @@ class FestPortalController extends Controller
             ))
             ->when($excludedCategories, fn ($query) => $query->whereHas('item', fn ($q) => $q->whereNotIn($categoryColumn, $excludedCategories)))
             ->when($schoolId, fn ($q) => $q->whereHas('participant.registration', fn ($r) => $r->where('school_id', $schoolId)))
-            ->with(['item.head', 'participant.student', 'participant.teacher', 'participant.group', 'participant.registration.school', 'participant.registration.item', 'participant.registration.event'])
+            ->with(['item.head', 'participant.student.tenant', 'participant.teacher.tenant', 'participant.group', 'participant.registration.school', 'participant.registration.item', 'participant.registration.event'])
             ->get();
 
         // Same team-roster batch-fetch as the item tab's own $rosterByRegistration — a
@@ -906,10 +892,11 @@ class FestPortalController extends Controller
         // registration to list the whole team, not just that one row.
         $allSchoolRosterByRegistration = FestParticipant::whereIn(
             'registration_id',
-            $allSchoolMarks->pluck('participant.registration_id')->filter()->unique()->values()
+            $allSchoolMarks->filter(fn (FestMark $mark) => $mark->item?->isTeamItem())
+                ->pluck('participant.registration_id')->filter()->unique()->values()
         )
             ->where('participant_role', 'performer')
-            ->with(['student', 'teacher', 'group', 'registration.item', 'registration.event'])
+            ->with(['student.tenant', 'teacher.tenant'])
             ->get()
             ->groupBy('registration_id');
 
@@ -1566,6 +1553,21 @@ public function tv(Request $request, int $eventId)
         return redirect()->route('tenant.fest.scoreboard', ['event' => $eventId], 301);
     }
 
+    private array $publicPersonPhotos = [];
+
+    private function publicPersonPhotos(?\Illuminate\Database\Eloquent\Model $person): array
+    {
+        if (! $person) {
+            return ['photo' => null, 'photo_fallback' => null];
+        }
+        $key = get_class($person).':'.$person->getKey();
+
+        return $this->publicPersonPhotos[$key] ??= [
+            'photo' => $person->publicPhotoUrl(),
+            'photo_fallback' => $person->publicPhotoFallbackUrl(),
+        ];
+    }
+
     /** @return array<string, mixed> */
     private function publicWinnerRow(FestMark $mark, FestEvent $event, ?Collection $rosterByRegistration = null, ?\Closure $getBreakdown = null): array
     {
@@ -1585,8 +1587,8 @@ public function tv(Request $request, int $eventId)
             'grade_points' => $breakdown['grade_points'],
             'measurement' => trim(($mark->measurement_value ?? '').' '.($mark->measurement_unit ?? '')),
             'participant' => $person?->name,
-            'photo' => $person?->publicPhotoUrl(),
-            'photo_fallback' => $person?->publicPhotoFallbackUrl(),
+            'photo' => $this->publicPersonPhotos($person)['photo'],
+            'photo_fallback' => $this->publicPersonPhotos($person)['photo_fallback'],
             'reference' => $participant ? $this->visibility->publicReference($event, $participant) : null,
             'school' => $participant?->registration?->school?->name,
         ];
@@ -1610,8 +1612,8 @@ public function tv(Request $request, int $eventId)
 
                     return [
                         'name' => $memberPerson?->name,
-                        'photo' => $memberPerson?->publicPhotoUrl(),
-                        'photo_fallback' => $memberPerson?->publicPhotoFallbackUrl(),
+                        'photo' => $this->publicPersonPhotos($memberPerson)['photo'],
+                        'photo_fallback' => $this->publicPersonPhotos($memberPerson)['photo_fallback'],
                     ];
                 })
                 ->values()

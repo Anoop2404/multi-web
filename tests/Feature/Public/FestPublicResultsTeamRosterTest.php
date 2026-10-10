@@ -125,6 +125,43 @@ class FestPublicResultsTeamRosterTest extends TestCase
         }
     }
 
+    public function test_school_tab_reuses_full_roster_for_medals_and_only_fetches_teammates(): void
+    {
+        $queries = [];
+        \Illuminate\Support\Facades\DB::listen(function ($query) use (&$queries) {
+            $queries[] = ['sql' => $query->sql, 'bindings' => $query->bindings];
+        });
+        $this->get("http://roster-test.test/fest/{$this->event->id}/results?tab=school")
+            ->assertOk()->assertSee('Anu Krishna')->assertSee('Ravi Nair')->assertSee('Meera Pillai');
+        foreach ($queries as $query) {
+            if (str_contains($query['sql'], 'from "fest_marks"')) {
+                $this->assertStringNotContainsString('"position" in', $query['sql']);
+            }
+        }
+        $teamQueries = array_values(array_filter($queries, fn ($query) =>
+            str_contains($query['sql'], 'from "fest_participants"')
+            && str_contains($query['sql'], '"registration_id" in')
+            && str_contains($query['sql'], '"participant_role" =')
+        ));
+        $this->assertCount(1, $teamQueries);
+        // One team registration plus the performer role, without the two solo registrations.
+        $this->assertCount(2, $teamQueries[0]['bindings']);
+    }
+
+    public function test_repeat_school_detail_requests_reuse_rendered_roster(): void
+    {
+        $url = "http://roster-test.test/fest/{$this->event->id}/results/schools/{$this->schoolA->id}";
+        $first = $this->get($url)->assertOk()->assertSee('Ravi Nair')->assertSee('Anu Krishna');
+        $markQueries = [];
+        \Illuminate\Support\Facades\DB::listen(function ($query) use (&$markQueries) {
+            if (str_contains($query->sql, 'from "fest_marks"')) {
+                $markQueries[] = $query->sql;
+            }
+        });
+        $this->get($url)->assertOk()->assertSee('Ravi Nair')->assertSee('Anu Krishna');
+        $this->assertEmpty($markQueries);
+    }
+
     public function test_results_school_tab_shows_medal_counts_per_school(): void
     {
         $response = $this->get("http://roster-test.test/fest/{$this->event->id}/results?tab=school");
