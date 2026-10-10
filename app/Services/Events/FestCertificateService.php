@@ -1844,6 +1844,18 @@ class FestCertificateService
         ?Tenant $sahodaya = null,
     ): \Illuminate\Support\Collection {
         [$certificates, $payloads] = $this->exportScope($event, $publishedOnly, $itemId, $schoolId, $certType, $certIds);
+        if ($itemId !== null && $certificates->every(fn (Certificate $certificate) => $certificate->cert_type === 'winner')) {
+            $certificates = $certificates->sortBy(function (Certificate $certificate) use ($payloads) {
+                $payload = $payloads->get($certificate->id);
+                $registration = $payload['registration'] ?? null;
+
+                return [
+                    $payload['mark']?->position ?? PHP_INT_MAX,
+                    mb_strtolower($registration?->originSchool?->name ?? $registration?->school?->name ?? ''),
+                    $certificate->id,
+                ];
+            })->values();
+        }
         $buildContext = $this->exportContextBuilder($embedAssets, $plain, $sahodaya);
 
         return $certificates->map(fn (Certificate $certificate) => $buildContext($certificate, $payloads->get($certificate->id)));
