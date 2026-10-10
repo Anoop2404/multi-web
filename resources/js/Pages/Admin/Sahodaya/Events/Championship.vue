@@ -369,6 +369,14 @@
 
         <!-- Filters panel -->
         <div class="card mb-4 space-y-3">
+            <label class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <input v-model="topThreeOnly" type="checkbox" class="rounded text-indigo-600">
+                Show top three ranks per category (includes joint winners)
+            </label>
+            <div class="flex gap-2">
+                <a :href="championshipPdfUrl" class="btn-secondary text-xs">Download championship PDF</a>
+                <a :href="`${championshipPdfUrl}&inline=1`" target="_blank" rel="noopener" class="btn-secondary text-xs">Preview PDF</a>
+            </div>
             <div class="flex flex-wrap gap-2 items-end">
                 <div>
                     <label class="text-xs font-semibold text-gray-600">Filter by category</label>
@@ -670,6 +678,7 @@ function viewStudentBreakdown(studentId) {
 }
 
 const filterCategory = ref('');
+const topThreeOnly = ref(props.adminPreview);
 const filterGender = ref('');
 
 const categories = computed(() => {
@@ -731,7 +740,8 @@ const stats = computed(() => {
 });
 
 const filteredLeaderboard = computed(() => {
-    let list = activeLeaderboard.value ?? [];
+    let list = (activeLeaderboard.value ?? []).filter(r => Number(r.points) > 0 && Number(r.rank) >= 1);
+    if (topThreeOnly.value) list = list.filter(r => Number(r.rank) >= 1 && Number(r.rank) <= 3);
     if (filterCategory.value) {
         list = list.filter(r => String(r.category).toLowerCase() === filterCategory.value.toLowerCase());
     }
@@ -739,6 +749,12 @@ const filteredLeaderboard = computed(() => {
         list = list.filter(r => String(r.gender).toLowerCase() === filterGender.value.toLowerCase());
     }
     return list;
+});
+const championshipPdfUrl = computed(() => {
+    const params = new URLSearchParams({ preview_disabled: props.adminPreview ? '1' : '0', top_three: topThreeOnly.value ? '1' : '0', scope: scope.value });
+    if (filterCategory.value) params.set('category', filterCategory.value);
+    if (filterGender.value) params.set('gender', filterGender.value);
+    return `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/championship/export-pdf?${params}`;
 });
 </script>
 

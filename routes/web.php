@@ -1802,6 +1802,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/certificates/{certificate}/collect', [FestCertificateOpsController::class, 'collect'])->name('certificates.collect');
             Route::post('/certificates/bulk-collect', [FestCertificateOpsController::class, 'bulkCollect'])->name('certificates.bulk-collect');
             Route::get('/{event}/championship', [FestChampionshipController::class, 'index'])->name('championship.index');
+            Route::get('/{event}/championship/export-pdf', [FestChampionshipController::class, 'exportPdf'])->name('championship.export-pdf');
             Route::put('/{event}/championship/config', [FestChampionshipController::class, 'updateConfig'])->name('championship.config');
             Route::get('/{event}/championship/students/{studentId}/breakdown', [FestChampionshipController::class, 'studentBreakdown'])->name('championship.student-breakdown');
             Route::post('/{event}/championship/sync-to-trophies', [FestChampionshipController::class, 'syncToTrophyTemplate'])->name('championship.sync-to-trophies');

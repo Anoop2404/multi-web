@@ -49,6 +49,28 @@ class FestChampionshipController extends SahodayaAdminController
     /**
      * Updates individual championship builder rules (titles, max counting items, solo/group, first place req).
      */
+    public function exportPdf(Request $request, string $tenantId, FestEvent $event, FestIndividualChampionshipService $championship)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        $preview = $request->boolean('preview_disabled');
+        $config = $championship->getConfig($event);
+        if ($preview) {
+            $config = array_merge($config, ['disabled' => false, 'excluded_individual_categories' => []]);
+        }
+        $rows = $request->query('scope') === 'cumulative'
+            ? $championship->crossPhaseStanding($event->rootEvent())
+            : $championship->rankAndFormat($championship->pointsForEvent($event), false, $config);
+        $rows = $rows->filter(fn ($r) => ($r['points'] ?? 0) > 0 && ($r['rank'] ?? 0) >= 1
+            && (! $request->boolean('top_three', true) || $r['rank'] <= 3)
+            && (! $request->filled('category') || strtolower($r['category']) === strtolower($request->query('category')))
+            && (! $request->filled('gender') || strtolower($r['gender'] ?? '') === strtolower($request->query('gender'))));
+        $labels = FestClassGroupScheme::canonicalLabels(null, $event->rootEvent());
+        return \App\Support\PdfGenerator::fromView('fest.reports.individual-championship', [
+            'event' => $event, 'orgName' => $this->sahodaya->name, 'rows' => $rows,
+            'labels' => $labels, 'preview' => $preview,
+        ], \App\Support\ReportFilename::buildForEvent('individual-championship', $event), $request->boolean('inline'));
+    }
+
     public function updateConfig(Request $request, string $tenantId, FestEvent $event, FestIndividualChampionshipService $championship)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
