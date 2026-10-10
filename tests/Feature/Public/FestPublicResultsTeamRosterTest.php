@@ -162,7 +162,7 @@ class FestPublicResultsTeamRosterTest extends TestCase
         $this->assertEmpty($markQueries);
     }
 
-    public function test_published_school_report_hides_marks_and_ranks_below_third(): void
+    public function test_published_school_report_hides_marks_and_shows_serial_numbers_and_ranks(): void
     {
         $solo = FestEventItem::where('event_id', $this->event->id)->where('title', 'Solo Song')->firstOrFail();
         FestMark::where('item_id', $solo->id)->update(['position' => 4, 'score' => 9876.54, 'grade' => 'B']);
@@ -177,10 +177,12 @@ class FestPublicResultsTeamRosterTest extends TestCase
             'orgName' => 'Test Sahodaya', 'logoSrc' => null,
         ])->render();
         $this->assertStringContainsString('Anu Krishna', $html);
-        $this->assertStringContainsString('<td>B</td>', $html);
+        $this->assertStringContainsString('<td class="result-grade">B</td>', $html);
         $this->assertStringNotContainsString('<th>Score</th>', $html);
         $this->assertStringNotContainsString('9876.54', $html);
-        $this->assertStringNotContainsString('<td>4</td>', $html);
+        $this->assertStringContainsString('<td class="result-rank">4</td>', $html);
+        $this->assertStringContainsString('<th>Sl No</th>', $html);
+        $this->assertStringContainsString('<td rowspan="1">1</td>', $html);
         $this->assertStringNotContainsString('Group Dance', $html);
         $group->update(['results_hidden' => false, 'results_published_at' => null]);
         $this->assertCount(1, $service->marks($this->schoolA->id, null, null, true));
@@ -192,7 +194,7 @@ class FestPublicResultsTeamRosterTest extends TestCase
             'schoolResults' => $service->publishedSchoolResultRows($this->schoolA->id),
             'orgName' => 'Test Sahodaya', 'logoSrc' => null,
         ])->render();
-        $this->assertStringContainsString('<td>1</td><td>A</td>', $html);
+        $this->assertStringContainsString('<td class="result-rank">1</td><td class="result-grade">A</td>', $html);
         $this->assertStringContainsString('Sita Menon', $html);
         $this->assertStringContainsString('Meera Pillai', $html);
         $this->assertStringContainsString($this->schoolA->name, $html);

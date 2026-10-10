@@ -599,7 +599,7 @@ class FestReportService
                 $schools[$schoolKey]['students'][$personKey]['results'][] = [
                     'item' => $mark->item?->title ?? 'Item',
                     'category' => $categoryLabels[$mark->item?->class_group] ?? $mark->item?->age_group ?? '',
-                    'rank' => in_array((int) $mark->position, [1, 2, 3], true) ? (int) $mark->position : null,
+                    'rank' => $mark->position ? (int) $mark->position : null,
                     'grade' => $mark->grade,
                 ];
             }
@@ -1260,7 +1260,9 @@ class FestReportService
             'publishedOnly' => $publishedOnly,
             'schoolResults' => $publishedOnly ? $this->publishedSchoolResultRows($request->input('school_id'), $request->input('class_group')) : [],
             ...$this->brandingData(),
-        ], $this->slug().($publishedOnly ? '-school-published-results.pdf' : '-school-wise.pdf'));
+        ], $this->slug().($publishedOnly ? '-school-published-results.pdf' : '-school-wise.pdf'),
+            margin: ['top' => '15mm', 'right' => '15mm', 'bottom' => '20mm', 'left' => '15mm'],
+        );
     }
 
     /**
