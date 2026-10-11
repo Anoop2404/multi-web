@@ -335,9 +335,10 @@
                         </div>
 
                         <!-- Individual Championship: gender -->
-                        <div v-if="form.trophy_type === 'individual_championship'">
-                            <label class="lbl">Eligibility</label>
-                            <SearchableSelect v-model="form.gender" class="w-full" :options="genderOptions" :all-option="false" placeholder="Select eligibility…" />
+                        <div v-if="['individual_championship', 'overall', 'category'].includes(form.trophy_type)">
+                            <label class="lbl">Gender</label>
+                            <SearchableSelect v-model="form.gender" class="w-full" :options="genderOptions" :all-option="false" placeholder="Combined — Boys & Girls" />
+                            <p v-if="form.trophy_type !== 'individual_championship'" class="text-xs text-slate-500 mt-1">Combined by default. Boys/Girls totals use gender-specific items and the student's gender for open individual items. Open or mixed group items count only in Combined.</p>
                         </div>
                     </fieldset>
 
@@ -455,9 +456,9 @@ const itemsWithNull = computed(() => [{ value: null, label: '— Use name patter
 }))]);
 
 const genderOptions = [
-    { value: null, label: 'Any Gender / Open' },
-    { value: 'male', label: 'Boys (Kalaprathibha)' },
-    { value: 'female', label: 'Girls (Kalathilakam)' },
+    { value: null, label: 'Combined — Boys & Girls' },
+    { value: 'male', label: 'Boys only' },
+    { value: 'female', label: 'Girls only' },
 ];
 
 const itemGroupFilter = ref('');

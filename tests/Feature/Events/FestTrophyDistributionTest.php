@@ -181,6 +181,73 @@ class FestTrophyDistributionTest extends TestCase
         }
     }
 
+    public function test_school_overall_and_category_trophies_can_filter_gender(): void
+    {
+        $marks = [];
+        foreach ([['male', $this->school1, 'group'], ['female', $this->school2, 'individual']] as [$gender, $school, $type]) {
+            $item = FestEventItem::create(['event_id' => $this->parentEvent->id, 'title' => $gender,
+                'gender' => $gender, 'participant_type' => $type, 'class_group' => 'category_3',
+                'results_published_at' => now(), 'results_hidden' => false]);
+            $registration = FestRegistration::create(['event_id' => $this->parentEvent->id, 'item_id' => $item->id,
+                'school_id' => $school->id, 'status' => 'approved']);
+            foreach ([1, 2] as $index) {
+                $participant = FestParticipant::create(['event_id' => $this->parentEvent->id,
+                    'registration_id' => $registration->id, 'participant_role' => 'performer']);
+                $marks[$gender] = FestMark::create(['event_id' => $this->parentEvent->id, 'item_id' => $item->id,
+                    'participant_id' => $participant->id, 'position' => 1, 'grade' => 'A', 'score' => 95]);
+            }
+        }
+        $trophies = collect();
+        foreach ([FestTrophy::TYPE_OVERALL, FestTrophy::TYPE_CATEGORY] as $type) {
+            foreach ([null, 'male', 'female'] as $gender) {
+                $trophies->push(new FestTrophy(['trophy_type' => $type, 'category_key' => 'category_3',
+                    'gender' => $gender, 'position' => 1]));
+            }
+        }
+        $resolved = $this->trophyService()->resolveWinners($this->parentEvent, $trophies);
+        $points = app(\App\Services\Events\FestGradePointService::class);
+        foreach ($resolved->where('trophy.gender', 'male') as $row) {
+            $this->assertSame($this->school1->id, $row['winner']['school_id']);
+            $this->assertEquals($points->pointsForMark($this->parentEvent, $marks['male']), $row['winner']['points']);
+        }
+        foreach ($resolved->where('trophy.gender', 'female') as $row) {
+            $this->assertSame($this->school2->id, $row['winner']['school_id']);
+            $this->assertEquals(2 * $points->pointsForMark($this->parentEvent, $marks['female']), $row['winner']['points']);
+        }
+        foreach ($resolved->whereNull('trophy.gender') as $row) {
+            $this->assertTrue($row['has_winner']);
+            $this->assertGreaterThan(0, $row['winner']['points']);
+        }
+    }
+
+    public function test_gender_school_totals_use_student_gender_only_for_open_individual_items(): void
+    {
+        $class = SchoolClass::create(['tenant_id' => $this->school1->id, 'name' => '10A']);
+        $student = Student::create(['tenant_id' => $this->school1->id, 'name' => 'Boy',
+            'gender' => 'male', 'school_class_id' => $class->id]);
+        $marks = [];
+        foreach (['individual', 'group'] as $type) {
+            $item = FestEventItem::create(['event_id' => $this->parentEvent->id, 'title' => $type,
+                'gender' => 'open', 'participant_type' => $type, 'class_group' => 'category_3',
+                'results_published_at' => now(), 'results_hidden' => false]);
+            $registration = FestRegistration::create(['event_id' => $this->parentEvent->id, 'item_id' => $item->id,
+                'school_id' => $this->school1->id, 'status' => 'approved']);
+            $participant = FestParticipant::create(['event_id' => $this->parentEvent->id,
+                'registration_id' => $registration->id, 'student_id' => $student->id, 'participant_role' => 'performer']);
+            $marks[$type] = FestMark::create(['event_id' => $this->parentEvent->id, 'item_id' => $item->id,
+                'participant_id' => $participant->id, 'position' => 1, 'grade' => 'A', 'score' => 95]);
+        }
+        $trophies = collect([new FestTrophy(['trophy_type' => 'category', 'category_key' => 'category_3', 'gender' => 'male', 'position' => 1]),
+            new FestTrophy(['trophy_type' => 'category', 'category_key' => 'category_3', 'gender' => 'female', 'position' => 1]),
+            new FestTrophy(['trophy_type' => 'category', 'category_key' => 'category_3', 'position' => 1])]);
+        $rows = $this->trophyService()->resolveWinners($this->parentEvent, $trophies);
+        $points = app(\App\Services\Events\FestGradePointService::class);
+        $solo = $points->pointsForMark($this->parentEvent, $marks['individual']);
+        $this->assertEquals($solo, $rows[0]['winner']['points']);
+        $this->assertFalse($rows[1]['has_winner']);
+        $this->assertEquals($solo + $points->pointsForMark($this->parentEvent, $marks['group']), $rows[2]['winner']['points']);
+    }
+
     public function test_open_group_item_does_not_replace_the_individual_championship_category(): void
     {
         $solo = FestEventItem::create(['event_id' => $this->parentEvent->id, 'title' => 'Essay Writing',

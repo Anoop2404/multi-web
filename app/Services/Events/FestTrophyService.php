@@ -53,8 +53,14 @@ class FestTrophyService
         $itemStandings = [];
         $groupStandings = [];
         // Only compute leaderboards the configured trophies actually use.
-        $overallSchoolStandings = $types->contains(FestTrophy::TYPE_OVERALL) ? $this->overallSchoolPoints($targetEvent, $cumulative) : collect();
-        $categorySchoolStandings = $types->contains(FestTrophy::TYPE_CATEGORY) ? $this->categorySchoolPoints($targetEvent, $cumulative) : [];
+        $overallSchoolStandings = [];
+        $categorySchoolStandings = [];
+        foreach ($trophies->where('trophy_type', FestTrophy::TYPE_OVERALL)->pluck('gender')->unique() as $gender) {
+            $overallSchoolStandings[$gender ?: 'combined'] = $this->overallSchoolPoints($targetEvent, $cumulative, $gender);
+        }
+        foreach ($trophies->where('trophy_type', FestTrophy::TYPE_CATEGORY)->pluck('gender')->unique() as $gender) {
+            $categorySchoolStandings[$gender ?: 'combined'] = $this->categorySchoolPoints($targetEvent, $cumulative, $gender);
+        }
         $individualLeaderboard = ! $types->contains(FestTrophy::TYPE_INDIVIDUAL_CHAMPIONSHIP) ? collect() : ($cumulative
             ? $this->individualChampionship->crossPhaseStanding($root)
             : $this->individualChampionship->leaderboardForEvent($event));
@@ -70,8 +76,8 @@ class FestTrophyService
             &$groupStandings
         ) {
             $winner = match ($trophy->trophy_type) {
-                FestTrophy::TYPE_OVERALL => $this->resolveOverallWinner($trophy, $overallSchoolStandings),
-                FestTrophy::TYPE_CATEGORY => $this->resolveCategoryWinner($trophy, $categorySchoolStandings, $targetEvent),
+                FestTrophy::TYPE_OVERALL => $this->resolveOverallWinner($trophy, $overallSchoolStandings[$trophy->gender ?: 'combined'] ?? collect()),
+                FestTrophy::TYPE_CATEGORY => $this->resolveCategoryWinner($trophy, $categorySchoolStandings[$trophy->gender ?: 'combined'] ?? [], $targetEvent),
                 FestTrophy::TYPE_ITEM => $this->resolveItemWinner($targetEvent, $trophy, $cumulative, $itemStandings),
                 FestTrophy::TYPE_ITEM_GROUP => $this->resolveItemGroupWinner($targetEvent, $trophy, $cumulative, $groupStandings),
                 FestTrophy::TYPE_INDIVIDUAL_CHAMPIONSHIP => $this->resolveIndividualWinner($trophy, $individualLeaderboard),
@@ -426,12 +432,27 @@ class FestTrophyService
      *
      * @return Collection<int, array{school_id: string, school_name: string, points: float, is_tied: bool}>
      */
-    private function overallSchoolPoints(FestEvent $event, bool $cumulative = false): Collection
+    /** Open individual items use the student's gender; open/mixed groups stay combined. */
+    private function filterSchoolMarksByGender($query, string $gender): void
+    {
+        $query->where(function ($q) use ($gender) {
+            $q->whereHas('item', fn ($item) => $item->where('gender', $gender))
+                ->orWhere(function ($open) use ($gender) {
+                    $open->whereHas('item', fn ($item) => $item->where('participant_type', 'individual')->where(function ($eligibility) {
+                        $eligibility->whereNull('gender')->orWhereNotIn('gender', ['male', 'female']);
+                    }))->whereHas('participant', fn ($participant) => $participant->whereNull('group_id')
+                        ->whereHas('student', fn ($student) => $student->where('gender', $gender)));
+                });
+        });
+    }
+
+    private function overallSchoolPoints(FestEvent $event, bool $cumulative = false, ?string $gender = null): Collection
     {
         $excludedCategories = FestOverallCategoryExclusion::excluded($event->rootEvent());
 
         $marks = FestMark::currentPerformers()->where('event_id', $event->id)
             ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
+            ->when($gender, fn ($q) => $this->filterSchoolMarksByGender($q, $gender))
             ->with(['participant.registration', 'item'])
             ->get()
             ->unique(fn (FestMark $mark) => $mark->deduplicationKey());
@@ -471,12 +492,13 @@ class FestTrophyService
      *
      * @return array<string, Collection<int, array{school_id: string, school_name: string, points: float, is_tied: bool}>>
      */
-    private function categorySchoolPoints(FestEvent $event, bool $cumulative = false): array
+    private function categorySchoolPoints(FestEvent $event, bool $cumulative = false, ?string $gender = null): array
     {
         $categoryMap = FestCategoryMerge::map($event->rootEvent());
 
         $marks = FestMark::currentPerformers()->where('event_id', $event->id)
             ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
+            ->when($gender, fn ($q) => $this->filterSchoolMarksByGender($q, $gender))
             ->with(['participant.registration', 'item'])
             ->get()
             ->unique(fn (FestMark $mark) => $mark->deduplicationKey());
