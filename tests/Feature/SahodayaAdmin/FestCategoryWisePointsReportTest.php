@@ -58,6 +58,25 @@ class FestCategoryWisePointsReportTest extends TestCase
         return [$sahodaya, $event, $admin, $school];
     }
 
+    public function test_sports_reports_use_event_age_groups_and_optional_gender_settings(): void
+    {
+        [$sahodaya, $event, $admin] = $this->fixture();
+        $event->update(['event_type' => 'sports']);
+        foreach (['male', 'female'] as $gender) {
+            FestEventItem::create(['event_id' => $event->id, 'title' => 'Race '.$gender,
+                'participant_type' => 'individual', 'class_group' => 'open', 'age_group' => 'u8',
+                'gender' => $gender, 'is_enabled' => true]);
+        }
+        $analytics = new FestEventReportAnalyticsService($event);
+        $this->assertSame(['u8'], array_keys($analytics->categoryWiseItemRows()));
+        $event->update(['aggregation_config' => ['school_gender_categories' => ['u8', '*']]]);
+        $analytics = new FestEventReportAnalyticsService($event->fresh());
+        $this->assertEqualsCanonicalizing(['u8:male', 'u8:female'], array_keys($analytics->categoryWiseItemRows()));
+        $this->assertStringContainsString('Boys', $analytics->reportCategoryLabel('u8:male'));
+        $this->assertCount(1, $analytics->categorySchoolPointsTable('u8:male')['items']);
+        $this->actingAs($admin)->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports")->assertOk();
+    }
+
     public function test_a_merged_category_folds_into_its_target_tab_here(): void
     {
         [$sahodaya, $event, $admin, $school] = $this->fixture();

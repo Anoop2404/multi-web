@@ -810,6 +810,24 @@ class FestReportService
 
     public function schoolRankingRows(?string $schoolTier = null): Collection
     {
+        if (! $schoolTier && \App\Support\FestSchoolGenderStandings::enabled($this->event)) {
+            $analytics = new FestEventReportAnalyticsService($this->event, $this->scope);
+            $medalsByGender = [];
+            foreach (['male', 'female'] as $gender) {
+                $marks = FestMark::currentPerformers()->whereIn('event_id', $this->eventIds())
+                    ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
+                    ->with('participant.registration');
+                \App\Support\FestSchoolGenderStandings::filterMarks($marks, $gender);
+                $medalsByGender[$gender] = $marks->get()->unique(fn ($mark) => $mark->deduplicationKey())
+                    ->groupBy(fn ($mark) => $mark->participant?->registration?->school_id);
+            }
+            return collect($analytics->schoolItemPointsMatrix()['schools'])->map(function ($row) use ($medalsByGender) {
+                $medals = $medalsByGender[$row['gender']]->get($row['school_id'], collect());
+                return (object) ['id' => $row['school_id'].':'.$row['gender'], 'name' => $row['school_name'],
+                    'gold' => $medals->where('position', 1)->count(), 'silver' => $medals->where('position', 2)->count(),
+                    'bronze' => $medals->where('position', 3)->count(), 'total_points' => $row['overall'], 'rank' => $row['rank']];
+            });
+        }
         $ctx = EventContext::for($this->event);
         $board = collect($schoolTier ? $ctx->scoreboardBySchoolTier($schoolTier) : $ctx->scoreboardBySchool());
 

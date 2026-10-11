@@ -19,7 +19,7 @@ class FestChampionshipController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $root = $event->rootEvent();
-        $categoryLabels = FestClassGroupScheme::labels(null, $root);
+        $categoryLabels = $this->schoolCategoryLabels($root);
         $categoryMap = $this->categoryMergeMap($root);
         $usesPhases = $root->usesPhasedRegionalBilling();
 
@@ -40,6 +40,7 @@ class FestChampionshipController extends SahodayaAdminController
             'categoryOptions'            => collect($categoryLabels)->map(fn ($label, $key) => ['value' => $key, 'label' => $label])->values(),
             'championshipCategoryLabels' => FestClassGroupScheme::canonicalLabels(null, $root),
             'categoryMergeGroups'        => $this->mergeGroupsForDisplay($categoryMap),
+            'schoolGenderCategories' => \App\Support\FestSchoolGenderStandings::categories($root),
             'excludedOverallCategories'  => \App\Support\FestOverallCategoryExclusion::excluded($root),
             'usesPhases'                 => $usesPhases,
             'cumulativeLeaderboard'      => $usesPhases ? $championship->crossPhaseStanding($root, false, $adminPreview ? $previewConfig : null) : [],
@@ -261,6 +262,36 @@ class FestChampionshipController extends SahodayaAdminController
         EventContext::for($event)->recalculateSchoolPoints();
 
         return back()->with('success', 'Overall scoreboard exclusions saved.');
+    }
+
+    public function updateSchoolGenderCategories(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        $data = $request->validate(['categories' => 'present|array', 'categories.*' => 'string']);
+        $root = $event->rootEvent();
+        $allowed = array_merge(['*'], array_keys($this->schoolCategoryLabels($root)));
+        $config = $root->aggregation_config ?? [];
+        $config['school_gender_categories'] = array_values(array_intersect(array_unique($data['categories']), $allowed));
+        $root->update(['aggregation_config' => $config]);
+        return back()->with('success', 'School gender-wise standings saved.');
+    }
+
+    /** Categories actually configured on this event's items, using the event's own labels. */
+    private function schoolCategoryLabels(FestEvent $root): array
+    {
+        $sports = $root->event_type === 'sports';
+        $labels = $sports ? \App\Support\FestSportsAgeGroup::labels($root->tenant_id)
+            : FestClassGroupScheme::labels(null, $root);
+        $keys = \App\Models\FestEventItem::whereIn('event_id', $root->reportableEventIds())
+            ->whereNotNull($sports ? 'age_group' : 'class_group')
+            ->distinct()->pluck($sports ? 'age_group' : 'class_group')->filter()->all();
+        if (! $keys) return $labels;
+        $scoreboards = app(\App\Services\Events\PublicFestScoreboardService::class);
+        $result = array_intersect_key($labels, array_flip($keys));
+        foreach ($keys as $key) {
+            $result[$key] ??= $scoreboards->categoryLabel($root, $key);
+        }
+        return $result;
     }
 
     /** @return array<string, string> */

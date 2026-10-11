@@ -51,6 +51,15 @@
             </div>
         </header>
 
+        @if(\App\Support\FestSchoolGenderStandings::categories($event))
+        <div class="flex flex-wrap gap-2 my-4" aria-label="School standings gender">
+            @foreach(['' => 'Combined', 'male' => 'Boys', 'female' => 'Girls'] as $genderKey => $genderLabel)
+                <a href="{{ route('tenant.fest.scoreboard', array_filter(['event' => $event->id, 'category' => $category, 'gender' => $genderKey])) }}" class="px-4 py-2 rounded-xl border text-sm {{ request('gender', '') === $genderKey ? 'bg-amber-500 text-slate-950 border-amber-500' : 'border-slate-700 text-white' }}">{{ $genderLabel }}</a>
+            @endforeach
+            <p class="w-full text-xs text-slate-400">Boys/Girls apply to categories enabled by the event administrator.</p>
+        </div>
+        @endif
+
         @if(count($categories ?? []))
         <nav id="scoreboard-category-nav" class="flex gap-2 overflow-x-auto rounded-2xl p-3 border border-slate-800 bg-slate-900/70" aria-label="Event category">
             {{-- Auto-rotates through these every 3s until a visitor clicks one (see the
@@ -60,11 +69,11 @@
                  $categories/$categoryLabels already fold through FestCategoryMerge) always
                  show and rotate regardless. --}}
             @if($event->tv_show_overall_standings ?? true)
-            <a href="{{ route('tenant.fest.scoreboard', ['event' => $event->id]) }}" data-category=""
+            <a href="{{ route('tenant.fest.scoreboard', array_filter(['event' => $event->id, 'gender' => request('gender')])) }}" data-category=""
                class="shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold border {{ !$category ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-amber-500' }}">All Categories</a>
             @endif
             @foreach($categories as $cat)
-            <a href="{{ route('tenant.fest.scoreboard', ['event' => $event->id, 'category' => $cat]) }}" data-category="{{ $cat }}"
+            <a href="{{ route('tenant.fest.scoreboard', array_filter(['event' => $event->id, 'category' => $cat, 'gender' => request('gender')])) }}" data-category="{{ $cat }}"
                class="shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold border {{ ($category ?? '') === $cat ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-amber-500' }}">{{ $categoryLabels[$cat] ?? strtoupper($cat) }}</a>
             @endforeach
         </nav>
@@ -102,6 +111,8 @@
     const urlFor = (cat) => {
         const url = new URL(root.dataset.baseUrl, window.location.origin);
         if (cat) url.searchParams.set('category', cat);
+        const gender = new URL(window.location.href).searchParams.get('gender');
+        if (gender) url.searchParams.set('gender', gender);
         return url.toString();
     };
 

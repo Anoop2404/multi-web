@@ -429,6 +429,31 @@ class FestPublicScoreboardTest extends TestCase
      * still leaked onto a school's own roster page (and into its point total there), even
      * though the main scoreboard's combined total already correctly left it out.
      */
+    public function test_optional_school_gender_standings_split_each_category_using_item_gender(): void
+    {
+        $boys = $this->markCategoryWinner($this->north, $this->northSchool, 'Boys HS Item');
+        $boys->update(['gender' => 'male']);
+        $girls = $this->markCategoryWinner($this->north, $this->southSchool, 'Girls HS Item');
+        $girls->update(['gender' => 'female']);
+        $url = "http://public-scoreboard.test/fest/{$this->north->id}/results?tab=category";
+        $this->get($url)->assertOk()->assertDontSee('HS — Boys');
+        $this->hub->update(['aggregation_config' => array_merge($this->hub->aggregation_config ?? [], [
+            'school_gender_categories' => ['hs', '*'],
+        ])]);
+        $service = app(\App\Services\Events\PublicFestScoreboardService::class);
+        $scope = ['event_ids' => [$this->north->id]];
+        $male = collect($service->provisionalScoreboard($this->north, $scope, 'hs', 'male'));
+        $female = collect($service->provisionalScoreboard($this->north, $scope, 'hs', 'female'));
+        $this->assertTrue($male->contains('school_id', $this->northSchool->id));
+        $this->assertFalse($male->contains('school_id', $this->southSchool->id));
+        $this->assertTrue($female->contains('school_id', $this->southSchool->id));
+        $this->assertFalse($female->contains('school_id', $this->northSchool->id));
+        $this->assertCount(2, $service->provisionalScoreboard($this->north, $scope, 'hs'));
+        $this->get($url)->assertOk()->assertSee('Boys')->assertSee('Girls');
+        $this->get("http://public-scoreboard.test/fest/{$this->north->id}/scoreboard?category=hs&gender=male")
+            ->assertOk()->assertSee('School standings gender');
+    }
+
     public function test_school_detail_page_roster_and_total_exclude_an_admin_excluded_category(): void
     {
         $this->hub->update(['aggregation_config' => array_merge(

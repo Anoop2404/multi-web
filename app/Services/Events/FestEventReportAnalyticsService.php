@@ -2328,33 +2328,31 @@ class FestEventReportAnalyticsService
      *
      * @return array<string, list<array<string, mixed>>> category key => items
      */
-    public function categoryWiseItemRows(): array
+    private function reportCategoryGroups(Collection $items): Collection
     {
         $root = $this->event->rootEvent();
         $column = $root->event_type === 'sports' ? 'age_group' : 'class_group';
+        return $items->groupBy(function (FestEventItem $item) use ($root, $column) {
+            $category = FestCategoryMerge::resolve($root, $item->{$column} ?: 'open');
+            if (! \App\Support\FestSchoolGenderStandings::enabled($root, $category)) return $category;
+            return $category.':'.(in_array($item->gender, ['male', 'female'], true) ? $item->gender : 'open');
+        });
+    }
 
-        $items = $this->catalogItems();
+    public function reportCategoryLabel(string $key): string
+    {
+        [$category, $gender] = array_pad(explode(':', $key, 2), 2, null);
+        $label = app(PublicFestScoreboardService::class)->categoryLabel($this->event, $category);
+        return $label.($gender ? ' — '.(['male' => 'Boys', 'female' => 'Girls', 'open' => 'Open / Mixed'][$gender] ?? $gender) : '');
+    }
 
-        // Grouped by the MERGE TARGET (aggregation_config.championship_category_map),
-        // same as the consolidated matrix — a category the admin folded into another
-        // for the combined championship no longer gets its own tab here; its items
-        // join the target category's tab instead, matching the official scoring rule
-        // instead of presenting a category as independently scored when it isn't.
-        // A category excluded from OVERALL (aggregation_config.
-        // excluded_overall_categories) still keeps its own tab here, unlike the
-        // consolidated matrix's downloads — this Sahodaya wants to browse/print that
-        // category's own points table even though it isn't counted toward OVERALL; the
-        // caller (FestReportController::categoryWisePoints()) flags which tab that is.
-        return $items
-            ->groupBy(fn (FestEventItem $item) => FestCategoryMerge::resolve($root, $item->{$column} ?: 'open'))
+    public function categoryWiseItemRows(): array
+    {
+        return $this->reportCategoryGroups($this->catalogItems())
             ->map(fn ($group) => $group->map(fn (FestEventItem $item) => [
-                'id' => $item->id,
-                'title' => $item->title,
-                'item_code' => $item->item_code,
-                'participant_type' => $item->participant_type,
-                'gender' => $item->gender,
-            ])->values()->all())
-            ->all();
+                'id' => $item->id, 'title' => $item->title, 'item_code' => $item->item_code,
+                'participant_type' => $item->participant_type, 'gender' => $item->gender,
+            ])->values()->all())->all();
     }
 
     /**
@@ -2375,7 +2373,7 @@ class FestEventReportAnalyticsService
         $root = $this->event->rootEvent();
         $column = $root->event_type === 'sports' ? 'age_group' : 'class_group';
 
-        $items = $this->catalogItems()->filter(fn (FestEventItem $item) => FestCategoryMerge::resolve($root, $item->{$column} ?: 'open') === $category)->values();
+        $items = ($this->reportCategoryGroups($this->catalogItems())->get($category) ?? collect())->values();
 
         // Expands the deduplicated $items to every phase/region clone sharing the same
         // family (a real bug found live: an item split across two phases otherwise
@@ -2391,7 +2389,7 @@ class FestEventReportAnalyticsService
         // published/non-hidden gate as schoolItemPointsMatrix() too, for the same reason
         // — a judge's marks shouldn't move a school's total here before the admin has
         // actually published that item's results.
-        $marks = FestMark::whereIn('event_id', $this->eventIds())
+        $marks = FestMark::currentPerformers()->whereIn('event_id', $this->eventIds())
             ->whereIn('item_id', $allReportableItemIds)
             ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
             ->with(['participant.registration.school'])
@@ -2497,8 +2495,7 @@ class FestEventReportAnalyticsService
         // category's items belong under the target's band here too, so the consolidated
         // matrix's category columns match the merged category the school/championship
         // boards already show, instead of splitting the same bucket across two headers.
-        return $items
-            ->groupBy(fn (FestEventItem $item) => FestCategoryMerge::resolve($root, $item->{$column} ?: 'open'))
+        return $this->reportCategoryGroups($items)
             ->map(fn ($group) => $group
                 ->groupBy(fn (FestEventItem $item) => $item->head_id ?: 0)
                 ->map(fn ($headGroup) => [
@@ -2534,8 +2531,19 @@ class FestEventReportAnalyticsService
      *
      * @return array{categories: list<array<string, mixed>>, schools: list<array<string, mixed>>}
      */
-    public function schoolItemPointsMatrix(): array
+    public function schoolItemPointsMatrix(?string $gender = null): array
     {
+        if ($gender === null && \App\Support\FestSchoolGenderStandings::enabled($this->event)) {
+            $boys = $this->schoolItemPointsMatrix('male');
+            $girls = $this->schoolItemPointsMatrix('female');
+            $labelRows = fn (array $rows, string $gender, string $label) => array_map(fn ($row) => array_merge($row, [
+                'gender' => $gender, 'school_name' => $row['school_name'].' — '.$label,
+            ]), $rows);
+            $boys['schools'] = $labelRows($boys['schools'], 'male', 'Boys');
+            $girls['schools'] = $labelRows($girls['schools'], 'female', 'Girls');
+            return ['categories' => $boys['categories'], 'schools' => array_merge($boys['schools'], $girls['schools'])];
+        }
+
         $itemsByCategory = $this->categoryHeadItemRows();
         $gradePointService = app(FestGradePointService::class);
         $scoreboards = app(PublicFestScoreboardService::class);
@@ -2555,7 +2563,8 @@ class FestEventReportAnalyticsService
         // PublicFestScoreboardService/FestCumulativeChampionshipService apply — so a
         // school's totals on this sheet can't include marks a judge has entered but the
         // admin hasn't published yet.
-        $marks = FestMark::whereIn('event_id', $this->eventIds())
+        $marks = FestMark::currentPerformers()->whereIn('event_id', $this->eventIds())
+            ->when($gender, fn ($q) => \App\Support\FestSchoolGenderStandings::filterMarks($q, $gender))
             ->whereIn('item_id', $allReportableItemIds)
             ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
             ->with(['participant.registration.school', 'item'])
@@ -2602,12 +2611,12 @@ class FestEventReportAnalyticsService
         $categories = collect($itemsByCategory)
             ->map(fn (array $heads, string $key) => [
                 'key' => $key,
-                'label' => $key === 'open' ? 'Open' : $scoreboards->categoryLabel($this->event, $key),
+                'label' => $this->reportCategoryLabel($key),
                 'heads' => $heads,
                 // Informational only — the category's own Sub column still totals every
                 // item in it; this just tells the UI why OVERALL doesn't equal the sum of
                 // every Sub column when an admin has excluded one from the combined total.
-                'excluded_from_overall' => in_array($key, $excludedRawCategories, true),
+                'excluded_from_overall' => in_array(explode(':', $key, 2)[0], $excludedRawCategories, true),
             ])
             ->sortBy('label')
             ->values();

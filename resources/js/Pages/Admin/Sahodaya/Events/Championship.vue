@@ -457,6 +457,17 @@
             </div>
         </div>
 
+        <div class="card mb-6 space-y-3">
+            <h3 class="section-title !mb-0">Gender-wise school standings</h3>
+            <p class="section-desc">Combined school standings are the default. Enable categories below to list separate Boys and Girls school totals on the public portal.</p>
+            <div class="flex flex-wrap gap-2">
+                <label v-for="opt in [{ value: '*', label: 'Overall — All Categories' }, ...categoryOptions]" :key="opt.value" class="flex items-center gap-2 rounded-full border px-3 py-2 text-xs">
+                    <input type="checkbox" :value="opt.value" v-model="schoolGenderCategories" @change="saveSchoolGenderCategories" class="rounded">{{ opt.label }} — Boys / Girls
+                </label>
+            </div>
+            <p class="text-xs text-slate-500">Uses each item's Boys/Girls eligibility. Open individual items use the student's gender; open/mixed group items appear in combined standings.</p>
+        </div>
+
         <!-- Overall exclusions -->
         <div class="card mb-6 space-y-3">
             <div>
@@ -631,6 +642,7 @@ const props = defineProps({
     categoryOptions: { type: Array, default: () => [] },
     championshipCategoryLabels: { type: Object, default: () => ({}) },
     categoryMergeGroups: { type: Array, default: () => [] },
+    schoolGenderCategories: { type: Array, default: () => [] },
     excludedOverallCategories: { type: Array, default: () => [] },
     usesPhases: { type: Boolean, default: false },
     cumulativeLeaderboard: { type: Array, default: () => [] },
@@ -734,6 +746,11 @@ function saveMergeGroups() {
     router.put(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/championship/category-merge`, {
         groups: mergeGroups.value,
     }, { preserveScroll: true });
+}
+
+const schoolGenderCategories = ref([...props.schoolGenderCategories]);
+function saveSchoolGenderCategories() {
+    router.put(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/championship/school-gender-categories`, { categories: schoolGenderCategories.value }, { preserveScroll: true });
 }
 
 const excludedCategories = ref([...props.excludedOverallCategories]);

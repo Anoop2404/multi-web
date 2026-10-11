@@ -32,7 +32,7 @@
                     <div class="flex items-center gap-3 min-w-0"><span class="shrink-0 w-10 h-10 rounded-xl {{ $podium ? 'bg-amber-400/20' : 'bg-slate-800 text-slate-300 border border-slate-700' }} flex items-center justify-center font-extrabold">@if($podium)<img src="{{ asset('images/fest/medals/rank-'.$row['rank'].'.webp') }}" alt="Rank {{ $row['rank'] }}" class="w-8 h-8">@else{{ $row['rank'] }}@endif</span><span class="font-bold text-white text-sm sm:text-base">{{ $row['school_name'] }}</span></div>
                     <div class="flex items-center gap-2 shrink-0">
                         <div class="text-right"><span class="font-mono font-extrabold text-xl text-amber-400">{{ $row['total_points'] }}</span><span class="text-[10px] text-slate-400 uppercase block font-bold">PTS</span></div>
-                        <a href="{{ route('tenant.fest.results.school', array_filter(['event' => $event->id, 'school' => $row['school_id'], 'category' => $category ?? null])) }}"
+                        <a href="{{ route('tenant.fest.results.school', array_filter(['event' => $event->id, 'school' => $row['school_id'], 'category' => $category ?? null, 'gender' => request('gender')])) }}"
                            title="View {{ $row['school_name'] }}'s {{ ($category ?? null) ? 'roster for this category' : 'full roster' }}"
                            aria-label="View {{ $row['school_name'] }}'s {{ ($category ?? null) ? 'roster for this category' : 'full roster' }}"
                            class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-white/40 hover:text-amber-400 hover:bg-white/5 transition-colors">
@@ -51,7 +51,7 @@
                     <span class="font-semibold text-sm text-white flex-1">{{ $row['school_name'] }}</span>
                     <span class="font-mono font-extrabold text-amber-400">{{ $row['total_points'] }}</span>
                 </div>
-                <a href="{{ route('tenant.fest.results.school', array_filter(['event' => $event->id, 'school' => $row['school_id'], 'category' => $category ?? null])) }}"
+                <a href="{{ route('tenant.fest.results.school', array_filter(['event' => $event->id, 'school' => $row['school_id'], 'category' => $category ?? null, 'gender' => request('gender')])) }}"
                    title="View {{ $row['school_name'] }}'s {{ ($category ?? null) ? 'roster for this category' : 'full roster' }}"
                    aria-label="View {{ $row['school_name'] }}'s {{ ($category ?? null) ? 'roster for this category' : 'full roster' }}"
                    class="absolute top-2 right-2 inline-flex items-center justify-center w-8 h-8 rounded-lg text-white/40 hover:text-amber-400 hover:bg-white/5 transition-colors">

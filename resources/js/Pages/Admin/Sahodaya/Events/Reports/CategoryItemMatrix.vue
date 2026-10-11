@@ -78,7 +78,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        <tr v-for="(school, idx) in schools" :key="school.school_id" :class="idx % 2 ? 'bg-slate-50/60' : 'bg-white'">
+                        <tr v-for="(school, idx) in schools" :key="`${school.school_id}-${school.gender || 'combined'}`" :class="idx % 2 ? 'bg-slate-50/60' : 'bg-white'">
                             <td class="sticky left-0 z-10 p-2.5 text-center font-semibold text-slate-500 border-r border-slate-200"
                                 :class="idx % 2 ? 'bg-slate-50' : 'bg-white'">
                                 {{ school.rank }}

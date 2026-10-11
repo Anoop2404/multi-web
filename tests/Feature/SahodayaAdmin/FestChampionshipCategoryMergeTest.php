@@ -79,6 +79,19 @@ class FestChampionshipCategoryMergeTest extends TestCase
         $this->assertSame(['hs' => 'open'], $event->fresh()->aggregation_config['championship_category_map']);
     }
 
+    public function test_school_gender_categories_default_to_combined_and_save_event_age_groups(): void
+    {
+        ['event' => $event, 'admin' => $admin, 'sahodaya' => $sahodaya] = $this->makeFixture();
+        $event->update(['event_type' => 'sports']);
+        $event->items()->update(['age_group' => 'u8']);
+        $this->assertSame([], \App\Support\FestSchoolGenderStandings::categories($event));
+        $url = "http://{$sahodaya->domain}/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/championship/school-gender-categories";
+        $this->actingAs($admin)->put($url, ['categories' => ['u8', '*', 'hs']])->assertRedirect();
+        $this->assertSame(['u8', '*'], \App\Support\FestSchoolGenderStandings::categories($event->fresh()));
+        $this->actingAs($admin)->put($url, ['categories' => []])->assertRedirect();
+        $this->assertSame([], \App\Support\FestSchoolGenderStandings::categories($event->fresh()));
+    }
+
     /**
      * The individual championship is computed live (FestIndividualChampionshipService::
      * pointsForEvent(), no more admin "Recalculate" button or stored snapshot) — so the

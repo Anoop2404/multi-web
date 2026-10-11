@@ -401,7 +401,7 @@ class PublicFestScoreboardService
      *
      * @return list<array{school_id: string, school_name: string, total_points: int, rank: int}>
      */
-    public function provisionalScoreboard(FestEvent $event, array $scope, ?string $category = null): array
+    public function provisionalScoreboard(FestEvent $event, array $scope, ?string $category = null, ?string $gender = null): array
     {
         $root = $this->rootEvent($event);
         $categoryColumn = $root->event_type === 'sports' ? 'age_group' : 'class_group';
@@ -413,10 +413,11 @@ class PublicFestScoreboardService
 
         $bypass = auth()->check() || request()->user();
 
-        $compute = function () use ($root, $scope, $categoryColumn, $sourceCategoryKeys, $excludedCategories, $event) {
+        $compute = function () use ($root, $scope, $categoryColumn, $sourceCategoryKeys, $excludedCategories, $event, $gender) {
             $marks = FestMark::currentPerformers()->whereIn('event_id', $scope['event_ids'])
+                ->when($gender, fn ($q) => \App\Support\FestSchoolGenderStandings::filterMarks($q, $gender))
                 ->whereHas('item', function ($query) use ($sourceCategoryKeys, $categoryColumn, $excludedCategories) {
-                    $query->whereNotNull('results_published_at');
+                    $query->whereNotNull('results_published_at')->where('results_hidden', false);
                     if ($sourceCategoryKeys) {
                         $query->whereIn($categoryColumn, $sourceCategoryKeys);
                     }
@@ -429,6 +430,7 @@ class PublicFestScoreboardService
                 ->unique(fn (FestMark $m) => $m->deduplicationKey());
 
             $totals = [];
+            $medals = [];
             foreach ($marks as $mark) {
                 $participant = $mark->participant;
                 $schoolId = $participant?->registration?->school_id;
@@ -438,16 +440,21 @@ class PublicFestScoreboardService
                 }
 
                 $totals[$schoolId] = ($totals[$schoolId] ?? 0) + $this->gradePoints->pointsForMark($event, $mark);
+                if ($gender && in_array((int) $mark->position, [1, 2, 3], true)) {
+                    $key = [1 => 'gold', 2 => 'silver', 3 => 'bronze'][(int) $mark->position];
+                    $medals[$schoolId][$key] = ($medals[$schoolId][$key] ?? 0) + $this->gradePoints->pointsForMark($event, $mark);
+                }
             }
 
-            return $this->rankTotals($totals);
+            $rows = $this->rankTotals($totals);
+            return $gender ? collect($rows)->map(fn ($row) => $row + ($medals[$row['school_id']] ?? []) + ['gold' => 0, 'silver' => 0, 'bronze' => 0])->all() : $rows;
         };
 
         if ($bypass) {
             return $compute();
         }
 
-        $key = 'fest-provisional-scoreboard:v2:'.$root->tenant_id.':'.$root->id.':'.($category ?? 'all').':'.implode(',', $scope['event_ids']);
+        $key = 'fest-provisional-scoreboard:v2:'.$root->tenant_id.':'.$root->id.':'.($category ?? 'all').':'.($gender ?? 'combined').':'.sha1(json_encode($root->aggregation_config)).':'.implode(',', $scope['event_ids']);
 
         return \Illuminate\Support\Facades\Cache::remember($key, 30, $compute);
     }

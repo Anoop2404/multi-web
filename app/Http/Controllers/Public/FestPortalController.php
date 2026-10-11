@@ -369,7 +369,7 @@ class FestPortalController extends Controller
         }
 
         $settingsVersion = hash('sha256', json_encode($event->rootEvent()->aggregation_config));
-        $cacheKey = 'fest-results-html:v5:'.$settingsVersion.':'.$event->tenant_id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.$resultsVersion.':'.$tab;
+        $cacheKey = 'fest-results-html:v5:'.$settingsVersion.':'.$event->tenant_id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.$resultsVersion.':'.$tab.':'.(\App\Support\FestSchoolGenderStandings::requestedGender($event) ?? 'combined');
         $html = $this->rememberPublicHotPath(
             $cacheKey,
             120,
@@ -476,17 +476,14 @@ class FestPortalController extends Controller
             ? $this->scoreboards->categories($event, $selectedScope)
             : [];
         $categoryBoards = $needsCategoryBoards && $categories !== []
-            ? collect($categories)
-                ->map(function (string $key) use ($event, $selectedScope, $isPublished) {
-                    [$rows] = $this->resolveScoreboard($event, $selectedScope, $key, $isPublished);
-
-                    return [
-                        'key' => $key,
-                        'label' => $this->scoreboards->categoryLabel($event, $key),
-                        'rows' => $rows,
-                    ];
-                })
-                ->all()
+            ? collect($categories)->flatMap(function (string $key) use ($event, $selectedScope, $isPublished) {
+                $genders = \App\Support\FestSchoolGenderStandings::enabled($event, $key) ? ['male', 'female'] : [null];
+                return collect($genders)->map(function ($gender) use ($event, $selectedScope, $key, $isPublished) {
+                    [$rows] = $this->resolveScoreboard($event, $selectedScope, $key, $isPublished, false, $gender);
+                    return ['key' => $key.($gender ? ':'.$gender : ''), 'category_key' => $key, 'gender' => $gender,
+                        'label' => $this->scoreboards->categoryLabel($event, $key).($gender ? ' — '.($gender === 'male' ? 'Boys' : 'Girls') : ''), 'rows' => $rows];
+                });
+            })->values()->all()
             : [];
 
         // §7.3a (docs/KALOTSAV_PHASED_LEVEL_FEE_PLAN.md, 2026-08-15): a phased event's
@@ -861,6 +858,7 @@ class FestPortalController extends Controller
         // "winners only" is the correct scope), not a reuse of it.
 
         $allSchoolMarks = FestMark::currentPerformers()->whereIn('event_id', $selectedScope['event_ids'])
+            ->when(\App\Support\FestSchoolGenderStandings::requestedGender($event, $category), fn ($q, $gender) => \App\Support\FestSchoolGenderStandings::filterMarks($q, $gender))
             // Unconditional, regardless of whether the event overall is published — an
             // item that was never individually published (still "Pending" in admin) must
             // never resurface here just because the event-wide toggle went on. Previously
@@ -1160,7 +1158,7 @@ public function scoreboard(Request $request, int $eventId)
     $scope = $this->operationalEvents->directScope($event);
     $key = 'fest-scoreboard-html:v2:'.$tenant->id.':'.$event->id.':'
         .$event->updated_at?->getTimestamp().':'.$this->publicResultsVersion($scope['event_ids'])[0].':'
-        .sha1((string) $request->query('category', ''));
+        .sha1((string) $request->query('category', '').':'.(string) $request->query('gender', '').':'.json_encode($event->rootEvent()->aggregation_config));
     $html = $this->rememberPublicHotPath($key, 30,
         fn () => $this->renderScoreboardPage($request, $tenant, $event)->getContent());
     return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
@@ -1649,12 +1647,18 @@ public function tv(Request $request, int $eventId)
      *
      * @return array{0: array, 1: ?array}
      */
-    private function resolveScoreboard(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished, bool $isAdminPreview = false): array
+    private function resolveScoreboard(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished, bool $isAdminPreview = false, ?string $gender = null): array
     {
         if (! $isPublished) {
             // When public results visibility is disabled for this event, do not compute
             // or reveal provisional standings/scores on the public portal.
             return [[], null];
+        }
+
+        $gender ??= \App\Support\FestSchoolGenderStandings::requestedGender($event, $category);
+        if ($gender) {
+            return [$this->crossPhaseScoreboard($event, $category, request(), $gender)
+                ?? $this->scoreboards->provisionalScoreboard($event, $selectedScope, $category, $gender), null];
         }
 
         if ($isAdminPreview && ! $selectedScope['results_published']) {
@@ -1693,14 +1697,15 @@ public function tv(Request $request, int $eventId)
      *
      * @return list<array{school_id: string, school_name: string, total_points: float, rank: int}>|null
      */
-    private function crossPhaseScoreboard(FestEvent $event, ?string $category, Request $request): ?array
+    private function crossPhaseScoreboard(FestEvent $event, ?string $category, Request $request, ?string $gender = null): ?array
     {
         $hub = $event->rootEvent();
         // Memoized within-request: tv() calls this once for "Overall" + once per
         // category, and scoreboardDynamicData()/schoolResults() call it too. All
         // callers in the same request see the same hub + category, so the inner
         // computation runs once and subsequent calls return the cached value.
-        $cacheKey = $hub->id.':'.($category ?? 'overall');
+        $gender ??= \App\Support\FestSchoolGenderStandings::requestedGender($event, $category);
+        $cacheKey = $hub->id.':'.($category ?? 'overall').':'.($gender ?? 'combined');
 
         if (isset(self::$crossPhaseBoards[$cacheKey])) {
             return self::$crossPhaseBoards[$cacheKey];
@@ -1714,6 +1719,7 @@ public function tv(Request $request, int $eventId)
         }
 
         $totals = [];
+        $genderMedals = [];
         $names = [];
         $anyVisible = false;
         foreach ($phases as $phase) {
@@ -1724,10 +1730,15 @@ public function tv(Request $request, int $eventId)
                 continue;
             }
             $anyVisible = true;
-            foreach ($this->phaseScoreboards->phaseScoreboard($phase, $category) as $row) {
+            foreach (($gender ? $this->scoreboards->provisionalScoreboard($hub, ['event_ids' => $visiblePhaseLeaves->pluck('id')->all()], $category, $gender) : $this->phaseScoreboards->phaseScoreboard($phase, $category)) as $row) {
                 $sid = $row['school_id'];
                 $totals[$sid] = ($totals[$sid] ?? 0) + (float) $row['total_points'];
                 $names[$sid] = $row['school_name'];
+                if ($gender) {
+                    foreach (['gold', 'silver', 'bronze'] as $medal) {
+                        $genderMedals[$sid][$medal] = ($genderMedals[$sid][$medal] ?? 0) + ($row[$medal] ?? 0);
+                    }
+                }
             }
         }
 
@@ -1750,7 +1761,7 @@ public function tv(Request $request, int $eventId)
                 'school_name' => $names[$schoolId],
                 'total_points' => $total,
                 'rank' => $rank,
-            ];
+            ] + ($gender ? ($genderMedals[$schoolId] ?? ['gold' => 0, 'silver' => 0, 'bronze' => 0]) : []);
         }
 
         self::$crossPhaseBoards[$cacheKey] = $rows;
@@ -1895,7 +1906,7 @@ public function tv(Request $request, int $eventId)
             return $compute();
         }
 
-        $cacheKey = 'fest-scoreboard-dynamic:v3:'.$event->tenant_id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.($category ?? 'all').':'.($isPublished ? '1' : '0').':'.$version;
+        $cacheKey = 'fest-scoreboard-dynamic:v3:'.$event->tenant_id.':'.$event->id.':'.($selectedScope['event_id'] ?? $event->id).':'.($category ?? 'all').':'.($isPublished ? '1' : '0').':'.$version.':'.(\App\Support\FestSchoolGenderStandings::requestedGender($event, $category) ?? 'combined').':'.sha1(json_encode($event->rootEvent()->aggregation_config));
 
         return $this->rememberPublicHotPath($cacheKey, 30, $compute, waitSeconds: 15);
     }

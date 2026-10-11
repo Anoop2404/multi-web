@@ -40,12 +40,20 @@
                 @if($key === 'championship' && !($overlayConfig['enabled'] ?? true))
                     @continue
                 @endif
-                <a href="{{ route('tenant.fest.results', ['event' => $event->id, 'tab' => $key]) }}"
+                <a href="{{ route('tenant.fest.results', array_filter(['event' => $event->id, 'tab' => $key, 'gender' => request('gender')])) }}"
                    class="shrink-0 px-4 py-2 rounded-xl text-sm border font-semibold transition {{ $tab === $key ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-transparent text-white/60 border-transparent hover:border-amber-500/40 hover:text-white' }}">
                     {{ $label }}
                 </a>
             @endforeach
         </nav>
+
+        @if(in_array($tab, ['school', 'toppers']) && \App\Support\FestSchoolGenderStandings::enabled($event))
+            <div class="flex gap-2 mb-6" aria-label="Overall school standings gender">
+                @foreach(['' => 'Combined', 'male' => 'Boys', 'female' => 'Girls'] as $genderKey => $genderLabel)
+                    <a href="{{ route('tenant.fest.results', array_filter(['event' => $event->id, 'tab' => $tab, 'gender' => $genderKey])) }}" class="px-4 py-2 rounded-xl border text-sm {{ request('gender', '') === $genderKey ? 'bg-amber-500 text-slate-950 border-amber-500' : 'border-slate-700 text-white' }}">{{ $genderLabel }}</a>
+                @endforeach
+            </div>
+        @endif
 
         @if($tab === 'toppers')
             @php $podium = [1 => '1st', 2 => '2nd', 3 => '3rd']; @endphp
@@ -210,7 +218,7 @@
                                 </td>
                                 <td class="p-3 text-right font-mono font-bold text-base text-white">{{ $row['total_points'] }}</td>
                                 <td class="p-3 text-right">
-                                    <a href="{{ route('tenant.fest.results.school', ['event' => $event->id, 'school' => $row['school_id']]) }}"
+                                    <a href="{{ route('tenant.fest.results.school', array_filter(['event' => $event->id, 'school' => $row['school_id'], 'gender' => request('gender')])) }}"
                                        title="View {{ $row['school_name'] }}'s full roster" aria-label="View {{ $row['school_name'] }}'s full roster"
                                        class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-white/40 hover:text-amber-400 hover:bg-white/5 transition-colors">
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">

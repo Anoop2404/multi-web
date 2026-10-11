@@ -201,13 +201,6 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        if ($event->event_type === 'sports' && ! request()->boolean('all')) {
-            return redirect()->route('sahodaya.events.reports.by-head', [
-                'tenantId' => $tenantId,
-                'event'    => $event->id,
-            ]);
-        }
-
         $service = new FestReportService($event);
         $allowedPhases = EventLifecycleGate::allowedReportPhases($event);
         $currentPhase = EventLifecycleGate::currentReportPhase($event);
@@ -1207,14 +1200,14 @@ class FestReportController extends SahodayaAdminController
         $categories = collect($itemsByCategory)
             ->map(fn (array $items, string $key) => [
                 'key'                   => $key,
-                'label'                 => $key === 'open' ? 'Open' : $scoreboards->categoryLabel($targetEvent, $key),
+                'label'                 => $analytics->reportCategoryLabel($key),
                 'items'                 => $items,
                 // Informational only, same meaning as schoolItemPointsMatrix()'s own
                 // flag -- this Sahodaya still wants to browse/print an excluded
                 // category's own points table (its schools' totals here are real, just
                 // not counted toward OVERALL), so it keeps its tab; the Vue page badges
                 // it instead of hiding it.
-                'excluded_from_overall' => in_array($key, $excludedKeys, true),
+                'excluded_from_overall' => in_array(explode(':', $key, 2)[0], $excludedKeys, true),
             ])
             ->sortBy('label')
             ->values()
@@ -1259,7 +1252,7 @@ class FestReportController extends SahodayaAdminController
         $table = $analytics->categorySchoolPointsTable($category);
 
         $scoreboards = app(\App\Services\Events\PublicFestScoreboardService::class);
-        $categoryLabel = $category === 'open' ? 'Open' : $scoreboards->categoryLabel($targetEvent, $category);
+        $categoryLabel = $analytics->reportCategoryLabel($category);
 
         // Kept as ONE page always, even for a 50+ item category (this Sahodaya's
         // Category 3 has 59) -- explicitly requested over splitting into several pages
@@ -1344,7 +1337,7 @@ class FestReportController extends SahodayaAdminController
         $table = $analytics->categorySchoolPointsTable($category);
 
         $scoreboards = app(\App\Services\Events\PublicFestScoreboardService::class);
-        $categoryLabel = $category === 'open' ? 'Open' : $scoreboards->categoryLabel($targetEvent, $category);
+        $categoryLabel = $analytics->reportCategoryLabel($category);
 
         $rows = collect($table['schools'])->map(fn (array $school) => [
             strtoupper($school['school_name']), $school['subtotal'], $school['rank'],
@@ -1408,22 +1401,31 @@ class FestReportController extends SahodayaAdminController
             ->values()
             ->all();
 
-        $overall = $wantOverall ? $podium($analytics->schoolItemPointsMatrix()['schools'], 'overall') : null;
+        $schoolRows = $wantOverall ? $analytics->schoolItemPointsMatrix()['schools'] : [];
+        $overall = $wantOverall ? $podium($schoolRows, 'overall') : null;
+        $overallSections = [];
+        if ($wantOverall) {
+            foreach (\App\Support\FestSchoolGenderStandings::enabled($targetEvent) ? ['male' => 'Boys', 'female' => 'Girls'] : ['' => 'All Schools'] as $gender => $label) {
+                $overallSections[] = ['label' => 'Overall — '.$label.' — Top 3 Schools', 'excluded' => false,
+                    'rows' => $podium(collect($schoolRows)->filter(fn ($row) => $gender === '' || ($row['gender'] ?? '') === $gender), 'overall'),
+                    'empty' => 'No overall results recorded yet.'];
+            }
+        }
 
         $categories = collect($analytics->categoryWiseItemRows())
             ->keys()
             ->filter(fn (string $key) => $onlyCategories === null || in_array($key, $onlyCategories, true))
             ->map(fn (string $key) => [
                 'key'      => $key,
-                'label'    => $key === 'open' ? 'Open' : $scoreboards->categoryLabel($targetEvent, $key),
-                'excluded' => in_array($key, $excludedKeys, true),
+                'label'    => $analytics->reportCategoryLabel($key),
+                'excluded' => in_array(explode(':', $key, 2)[0], $excludedKeys, true),
                 'rows'     => $podium($analytics->categorySchoolPointsTable($key)['schools'], 'subtotal'),
             ])
             ->sortBy('label')
             ->values()
             ->all();
 
-        return ['overall' => $overall, 'categories' => $categories];
+        return ['overall' => $overall, 'overallSections' => $overallSections, 'categories' => $categories];
     }
 
     public function finalResultSummaryPdf(Request $request, string $tenantId, FestEvent $event)
@@ -1450,8 +1452,8 @@ class FestReportController extends SahodayaAdminController
         $styles = [1 => 'overall'];
 
         $sheets = [];
-        if ($data['overall'] !== null) {
-            $sheets['Overall'] = ['headers' => $headers, 'rows' => $toRows($data['overall']), 'columnStyles' => $styles];
+        foreach ($data['overallSections'] as $section) {
+            $sheets[count($data['overallSections']) === 1 ? 'Overall' : (str_contains($section['label'], 'Boys') ? 'Overall Boys' : 'Overall Girls')] = ['headers' => $headers, 'rows' => $toRows($section['rows']), 'columnStyles' => $styles];
         }
         foreach ($data['categories'] as $category) {
             $sheets[$category['label']] = ['headers' => $headers, 'rows' => $toRows($category['rows']), 'columnStyles' => $styles];
