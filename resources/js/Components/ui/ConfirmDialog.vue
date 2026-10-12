@@ -1,6 +1,6 @@
 <template>
     <Teleport to="body">
-        <div v-if="state.open" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div v-if="state.open" class="fixed inset-0 z-[99999] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/50" @click="cancel" />
             <div class="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4" role="alertdialog" aria-modal="true">
                 <h2 class="text-lg font-bold text-slate-900">{{ state.title }}</h2>
