@@ -103,9 +103,15 @@ class FestRevertToSingleEvent extends Command
                     ->where('item_id', $mappedRootItemId)
                     ->first();
 
-                $action = $existingRootReg
-                    ? "Merge participants into Root Reg #{$existingRootReg->id}"
-                    : "Move Reg to Root #{$event->id}";
+                if ($existingRootReg) {
+                    if ($cReg->status === 'withdrawn') {
+                        $action = "Withdrawn duplicate: Root Reg #{$existingRootReg->id} is already active. Prune child duplicate.";
+                    } else {
+                        $action = "Merge participants into Root Reg #{$existingRootReg->id} (skipping already enrolled)";
+                    }
+                } else {
+                    $action = "Move Reg to Root #{$event->id}";
+                }
 
                 if ($existingRootReg && ! in_array($cReg->status, ['withdrawn', 'rejected'], true) && ! in_array($existingRootReg->status, ['withdrawn', 'rejected'], true)) {
                     $activeCollisions[] = [
@@ -251,12 +257,42 @@ class FestRevertToSingleEvent extends Command
                         ->first();
 
                     if ($existing) {
-                        // Same school & same item already registered on root event: move participants to existing reg
-                        FestParticipant::where('registration_id', $childReg->id)
-                            ->update([
-                                'registration_id' => $existing->id,
-                                'event_id'        => $event->id,
-                            ]);
+                        // Same school & same item already registered on root event:
+                        // Move participants that aren't already on the existing reg, delete duplicates
+                        $childParticipants = FestParticipant::where('registration_id', $childReg->id)->get();
+                        foreach ($childParticipants as $cPart) {
+                            $alreadyExists = FestParticipant::where('registration_id', $existing->id)
+                                ->when($cPart->student_id, fn ($q) => $q->where('student_id', $cPart->student_id))
+                                ->when($cPart->teacher_id, fn ($q) => $q->where('teacher_id', $cPart->teacher_id))
+                                ->exists();
+
+                            if ($alreadyExists) {
+                                // Already on the root registration — delete duplicate participant row
+                                $cPart->delete();
+                            } else {
+                                // Move to root registration
+                                $cPart->update([
+                                    'registration_id' => $existing->id,
+                                    'event_id'        => $event->id,
+                                ]);
+                            }
+                        }
+
+                        // Handle groups on child registration
+                        $childGroups = FestGroup::where('registration_id', $childReg->id)->get();
+                        $existingGroup = FestGroup::where('registration_id', $existing->id)->first();
+                        foreach ($childGroups as $cGroup) {
+                            if ($existingGroup) {
+                                FestParticipant::where('group_id', $cGroup->id)->update(['group_id' => $existingGroup->id]);
+                                $cGroup->delete();
+                            } else {
+                                $cGroup->update([
+                                    'registration_id' => $existing->id,
+                                    'event_id'        => $event->id,
+                                ]);
+                            }
+                        }
+
                         $childReg->delete();
                     } else {
                         // Move registration to root event with mapped item
@@ -265,6 +301,8 @@ class FestRevertToSingleEvent extends Command
                             'item_id'  => $mappedItemId ?: $childReg->item_id,
                         ]);
                         FestParticipant::where('registration_id', $childReg->id)
+                            ->update(['event_id' => $event->id]);
+                        FestGroup::where('registration_id', $childReg->id)
                             ->update(['event_id' => $event->id]);
                     }
                 }
