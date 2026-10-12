@@ -9,6 +9,7 @@ use App\Models\FestGroup;
 use App\Models\FestLevelRegistration;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
+use App\Models\Student;
 use App\Models\Tenant;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -59,27 +60,176 @@ class FestRevertToSingleEvent extends Command
             $schoolPartitionsCount = FestEventSchoolPartition::where('event_id', $event->id)->count();
             $this->info("School partition mappings: {$schoolPartitionsCount}");
 
-            $childRegistrations = FestRegistration::whereIn('event_id', $childIds)->get();
-
-            // Build item map: child item id -> root parent item id
+            // 1. Analyze Items Mapping
             $rootItems = FestEventItem::where('event_id', $event->id)->get()->keyBy('item_code');
-            $childItems = FestEventItem::whereIn('event_id', $childIds)->get();
+            $childItems = FestEventItem::whereIn('event_id', $childIds)->get()->keyBy('id');
             $itemMap = [];
+            $missingItems = [];
             foreach ($childItems as $cItem) {
-                if ($cItem->inherited_from_item_id) {
+                if ($cItem->inherited_from_item_id && FestEventItem::where('id', $cItem->inherited_from_item_id)->where('event_id', $event->id)->exists()) {
                     $itemMap[$cItem->id] = $cItem->inherited_from_item_id;
                 } elseif ($rootItems->has($cItem->item_code)) {
                     $itemMap[$cItem->id] = $rootItems->get($cItem->item_code)->id;
+                } else {
+                    $missingItems[] = "Item #{$cItem->id} ({$cItem->item_code}: {$cItem->title})";
                 }
             }
 
+            if (! empty($missingItems)) {
+                $this->error('The following child items could not be mapped to root Event #'.$event->id.':');
+                foreach ($missingItems as $mi) {
+                    $this->line(' - '.$mi);
+                }
+
+                return self::FAILURE;
+            }
+
+            // 2. Analyze Registrations
+            $childRegistrations = FestRegistration::whereIn('event_id', $childIds)->get();
+            $schoolIds = $childRegistrations->pluck('school_id')->unique()->all();
+            $schools = Tenant::whereIn('id', $schoolIds)->get()->keyBy('id');
+
+            $regRows = [];
+            $activeCollisions = [];
+            foreach ($childRegistrations as $cReg) {
+                $schoolName = $schools->get($cReg->school_id)?->name ?? $cReg->school_id;
+                $childItem = $childItems->get($cReg->item_id);
+                $mappedRootItemId = $itemMap[$cReg->item_id] ?? null;
+                $rootItem = $mappedRootItemId ? FestEventItem::find($mappedRootItemId) : null;
+                $partCount = FestParticipant::where('registration_id', $cReg->id)->count();
+
+                $existingRootReg = FestRegistration::where('event_id', $event->id)
+                    ->where('school_id', $cReg->school_id)
+                    ->where('item_id', $mappedRootItemId)
+                    ->first();
+
+                $action = $existingRootReg
+                    ? "Merge participants into Root Reg #{$existingRootReg->id}"
+                    : "Move Reg to Root #{$event->id}";
+
+                if ($existingRootReg && ! in_array($cReg->status, ['withdrawn', 'rejected'], true) && ! in_array($existingRootReg->status, ['withdrawn', 'rejected'], true)) {
+                    $activeCollisions[] = [
+                        'school' => $schoolName,
+                        'item' => ($rootItem?->item_code ?? '').' — '.($rootItem?->title ?? ''),
+                        'root_reg_id' => $existingRootReg->id,
+                        'child_reg_id' => $cReg->id,
+                    ];
+                }
+
+                $regRows[] = [
+                    $cReg->id,
+                    $schoolName,
+                    $childItem?->item_code ?? '—',
+                    $rootItem ? ($rootItem->item_code.' (ID: '.$rootItem->id.')') : 'Unmapped',
+                    $partCount,
+                    $cReg->status,
+                    $action,
+                ];
+            }
+
+            // 3. Analyze Student Fest IDs (fest_level_registrations)
+            $rootLevels = FestLevelRegistration::where('event_id', $event->id)->get()->keyBy('student_id');
+            $childLevels = FestLevelRegistration::whereIn('event_id', $childIds)->get();
+            $studentIds = $childLevels->pluck('student_id')->unique()->all();
+            $students = Student::whereIn('id', $studentIds)->get()->keyBy('id');
+
+            // Find used numbers on root event
+            $usedNumbers = $rootLevels->pluck('registration_number')
+                ->merge(FestParticipant::where('event_id', $event->id)->pluck('level_registration_number'))
+                ->filter()
+                ->map(fn ($n) => (string) $n);
+
+            $usedSet = $usedNumbers->flip()->all();
+            $nextNumber = 1;
+            foreach ($usedNumbers as $num) {
+                if (ctype_digit((string) $num)) {
+                    $nextNumber = max($nextNumber, (int) $num + 1);
+                }
+            }
+
+            $festIdRows = [];
+            $duplicateEnrolments = 0;
+            $newStudents = 0;
+            $idCollisions = 0;
+            $canonicalPlan = [];
+
+            foreach ($childLevels->sortBy('id') as $cLevel) {
+                $student = $students->get($cLevel->student_id);
+                $studentName = $student?->name ?? 'Student #'.$cLevel->student_id;
+                $schoolName = $schools->get($cLevel->school_id)?->name ?? $cLevel->school_id;
+                $childNumber = (string) $cLevel->registration_number;
+
+                if ($rootLevels->has($cLevel->student_id)) {
+                    $rootNumber = (string) $rootLevels->get($cLevel->student_id)->registration_number;
+                    $canonicalNumber = $rootNumber;
+                    $action = "Exists on Root (#{$rootNumber}) — Consolidate duplicate";
+                    $duplicateEnrolments++;
+                } else {
+                    if (isset($usedSet[$childNumber])) {
+                        $newNumber = (string) $nextNumber++;
+                        $usedSet[$newNumber] = true;
+                        $canonicalNumber = $newNumber;
+                        $action = "Number #{$childNumber} taken on Root — Assign #{$newNumber}";
+                        $idCollisions++;
+                    } else {
+                        $canonicalNumber = $childNumber;
+                        $usedSet[$childNumber] = true;
+                        if (ctype_digit($childNumber)) {
+                            $nextNumber = max($nextNumber, (int) $childNumber + 1);
+                        }
+                        $action = "Retain unique Fest ID #{$childNumber}";
+                    }
+                    $newStudents++;
+                }
+
+                $canonicalPlan[$cLevel->student_id] = $canonicalNumber;
+
+                $festIdRows[] = [
+                    $cLevel->student_id,
+                    $studentName,
+                    $schoolName,
+                    $childNumber,
+                    $canonicalNumber,
+                    $action,
+                ];
+            }
+
             if ($isDryRun) {
-                $this->comment('--- DRY RUN: No database changes will be made ---');
-                $this->line("Would update Event #{$event->id} conduct_mode to 'standard'.");
-                $this->line('Would relocate/merge '.count($childRegistrations).' child registration(s) to root Event #'.$event->id.' (mapping child items to parent items).');
-                $this->line('Would consolidate student Fest IDs (fest_level_registrations) onto root Event #'.$event->id.'.');
-                $this->line('Would detach and archive '.count($children).' child partition event(s) and delete their copied items.');
-                $this->line("Would remove {$schoolPartitionsCount} school partition mapping(s).");
+                $this->newLine();
+                $this->info('=== DRY RUN: REGISTRATION & ITEM MAPPING ===');
+                $this->table(
+                    ['Child Reg ID', 'School', 'Child Item', 'Root Item', 'Participants', 'Status', 'Action'],
+                    $regRows
+                );
+
+                $this->newLine();
+                $this->info('=== DRY RUN: STUDENT FEST ID AUDIT ===');
+                if (empty($festIdRows)) {
+                    $this->line('No student level registrations found on child partitions.');
+                } else {
+                    $this->table(
+                        ['Student ID', 'Student Name', 'School', 'Child Fest ID', 'Target Fest ID', 'Status / Action'],
+                        $festIdRows
+                    );
+                }
+
+                $this->newLine();
+                $this->info('=== SUMMARY AUDIT REPORT ===');
+                $this->line(' • Total child registrations: '.count($childRegistrations));
+                $this->line(' • Active duplicate registrations for same school+item: '.count($activeCollisions));
+                $this->line(' • Existing Fest IDs on Root Event: '.$rootLevels->count());
+                $this->line(' • Duplicate student enrolments to consolidate: '.$duplicateEnrolments);
+                $this->line(' • New students being added to Root Event: '.$newStudents);
+                if ($idCollisions > 0) {
+                    $this->warn(' • Fest ID number collisions re-numbered: '.$idCollisions);
+                } else {
+                    $this->info(' • Fest ID number collisions: 0 (All numbers clean)');
+                }
+                $this->line(' • Next available Fest ID on Root: '.$nextNumber);
+                $this->line(' • School partition mappings to delete: '.$schoolPartitionsCount);
+                $this->line(' • Child partitions to detach & archive: '.count($children));
+                $this->newLine();
+                $this->comment('--- DRY RUN COMPLETE: No database changes were made ---');
 
                 return self::SUCCESS;
             }
@@ -90,7 +240,7 @@ class FestRevertToSingleEvent extends Command
                 return self::SUCCESS;
             }
 
-            DB::transaction(function () use ($event, $children, $childIds, $childRegistrations, $itemMap) {
+            DB::transaction(function () use ($event, $children, $childIds, $childRegistrations, $itemMap, $canonicalPlan, $childLevels, $rootLevels) {
                 // 1. Relocate child registrations and remap items
                 foreach ($childRegistrations as $childReg) {
                     $mappedItemId = $itemMap[$childReg->item_id] ?? null;
@@ -120,20 +270,24 @@ class FestRevertToSingleEvent extends Command
                 }
 
                 // 2. Consolidate level registrations (student Fest IDs)
-                $rootLevels = FestLevelRegistration::where('event_id', $event->id)->get()->keyBy('student_id');
-                $childLevels = FestLevelRegistration::whereIn('event_id', $childIds)->get();
-
                 foreach ($childLevels as $cLevel) {
+                    $targetNumber = $canonicalPlan[$cLevel->student_id] ?? $cLevel->registration_number;
+
                     if ($rootLevels->has($cLevel->student_id)) {
-                        $rLevel = $rootLevels->get($cLevel->student_id);
-                        FestParticipant::where('event_id', $event->id)
-                            ->where('student_id', $cLevel->student_id)
-                            ->update(['level_registration_number' => $rLevel->registration_number]);
+                        // Consolidate duplicate level registration
                         $cLevel->delete();
                     } else {
-                        $cLevel->update(['event_id' => $event->id]);
-                        $rootLevels->put($cLevel->student_id, $cLevel);
+                        // Migrate level registration to root event with canonical number
+                        $cLevel->update([
+                            'event_id'            => $event->id,
+                            'registration_number' => $targetNumber,
+                        ]);
                     }
+
+                    // Update participant level registration number
+                    FestParticipant::where('event_id', $event->id)
+                        ->where('student_id', $cLevel->student_id)
+                        ->update(['level_registration_number' => $targetNumber]);
                 }
 
                 // 3. Move groups and user event scopes
@@ -167,7 +321,7 @@ class FestRevertToSingleEvent extends Command
             });
 
             $this->info("Event #{$event->id} ('{$event->title}') successfully reverted to Single ('standard').");
-            $this->info('Child registrations have been merged into the main event and partitions cleaned up.');
+            $this->info('Child registrations and Fest IDs have been merged into the main event and partitions cleaned up.');
 
             return self::SUCCESS;
         };
