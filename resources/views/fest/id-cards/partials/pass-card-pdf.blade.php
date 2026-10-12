@@ -43,7 +43,9 @@
     $passLabel = $card['role_title'] ?? ucwords(strtolower($card['role_label'] ?? 'Participant'));
     $eventProgramName = $card['program_label']
         ?? ($programLabel ?? null)
-        ?? (!empty($card['is_sports']) || ($card['event_type'] ?? null) === 'sports' ? 'Sports Meet' : 'Kalotsav');
+        ?? (!empty($card['is_sports']) || ($card['event_type'] ?? null) === 'sports'
+            ? 'Sports Meet'
+            : (\App\Support\ProgramRouteMap::labelForEventType($card['event_type'] ?? null) ?: 'Kalotsav'));
 @endphp
 <div class="pass-card-pdf">
     <div class="pass-card-pdf__header">
