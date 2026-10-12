@@ -145,7 +145,7 @@ class FestRegionPartitionService
             ? FestEvent::find($event->parent_event_id) ?? $event
             : $event;
 
-        if ($hub->event_type === 'sports') {
+        if ($hub->isSportsSeasonEvent()) {
             return;
         }
 
@@ -265,7 +265,7 @@ class FestRegionPartitionService
     public function syncPartitionsFromRegions(FestEvent $hub): array
     {
         abort_if($hub->parent_event_id, 422, 'Sync regions on the hub event, not a partition.');
-        abort_if($hub->event_type === 'sports', 422, 'Sports regions must be synced below each sport discipline.');
+        abort_if($hub->isSportsSeasonEvent(), 422, 'Sports season regions must be synced below each sport discipline.');
         $this->partitions->assertLegacyPartitioningAllowed($hub);
 
         $regions = Region::forTenant($hub->tenant_id)->active()->globalOnly()->orderBy('sort_order')->orderBy('name')->get();
@@ -377,7 +377,7 @@ class FestRegionPartitionService
         // per-regional-phase sync primitive (operates on a real FestEventPhase, keyed by
         // region_partition_group), not a competing write path. See that guard's docblock.
         abort_if($hub->parent_event_id, 422, 'Sync regions on the hub event, not a partition.');
-        abort_if($hub->event_type === 'sports', 422, 'Sports regions must be synced below each sport discipline.');
+        abort_if($hub->isSportsSeasonEvent(), 422, 'Sports season regions must be synced below each sport discipline.');
         abort_if((int) $phase->event_id !== (int) $hub->id, 422, 'Phase does not belong to this hub event.');
 
         $partitionGroup = $phase->region_partition_group;

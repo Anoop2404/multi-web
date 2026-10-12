@@ -143,7 +143,31 @@ class FestEventSettingsController extends SahodayaAdminController
             'ageGroupLabels' => FestSportsAgeGroup::labels($this->sahodaya->id),
             'defaultAgeGroupFees' => FestSportsAgeGroup::defaultFees($this->sahodaya->id),
             'venues'       => FestVenue::where('event_id', $event->id)->with('region:id,name')->orderBy('name')->get(),
-            'regions'      => \App\Models\Region::forTenant($this->sahodaya->id)->active()->globalOnly()->orderBy('sort_order')->orderBy('name')->get(['id', 'name']),
+            'regions'      => (function () use ($event) {
+                $partitionRegionIds = FestEvent::where('parent_event_id', $event->id)
+                    ->whereNotNull('region_id')
+                    ->pluck('region_id');
+
+                $partitionKeys = FestEvent::where('parent_event_id', $event->id)
+                    ->pluck('partition_key')
+                    ->filter();
+
+                $partitionLabels = FestEvent::where('parent_event_id', $event->id)
+                    ->pluck('cluster_label')
+                    ->filter();
+
+                return \App\Models\Region::forTenant($this->sahodaya->id)
+                    ->where(function ($q) use ($event, $partitionRegionIds, $partitionKeys, $partitionLabels) {
+                        $q->where(fn ($sub) => $sub->active()->globalOnly())
+                          ->orWhere('fest_event_id', $event->id)
+                          ->when($partitionRegionIds->isNotEmpty(), fn ($sub) => $sub->orWhereIn('id', $partitionRegionIds))
+                          ->when($partitionKeys->isNotEmpty(), fn ($sub) => $sub->orWhereIn('code', $partitionKeys))
+                          ->when($partitionLabels->isNotEmpty(), fn ($sub) => $sub->orWhereIn('name', $partitionLabels));
+                    })
+                    ->orderBy('sort_order')
+                    ->orderBy('name')
+                    ->get(['id', 'name']);
+            })(),
             'stages'       => FestStage::where('event_id', $event->id)
                 ->with('venue:id,name')
                 ->orderBy('sort_order')

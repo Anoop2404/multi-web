@@ -333,7 +333,7 @@
                         </div>
 
                         <!-- Assigned Regional Venues List -->
-                        <div v-if="regions?.length" class="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                        <div v-if="eventRegions?.length" class="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                             <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
                                 <h5 class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                                     <span>📍</span> Assigned Regional Venues
@@ -344,13 +344,13 @@
                             </div>
 
                             <div class="divide-y divide-slate-100 text-xs">
-                                <div v-for="r in regions" :key="r.id" class="py-2.5 flex items-center justify-between gap-4">
+                                <div v-for="r in eventRegions" :key="r.id" class="py-2.5 flex items-center justify-between gap-4">
                                     <span class="font-medium text-slate-900 flex items-center gap-1.5">
                                         <span class="w-2 h-2 rounded-full bg-indigo-600"></span>
                                         {{ r.name }}
                                     </span>
-                                    <span v-if="venueForRegion(r.id)" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center gap-1">
-                                        📍 {{ venueForRegion(r.id).name }}
+                                    <span v-if="r.venue" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center gap-1">
+                                        📍 {{ r.venue }}
                                     </span>
                                     <span v-else class="text-slate-400 italic">No venue assigned yet</span>
                                 </div>
@@ -472,6 +472,30 @@ async function syncRegionPartitions() {
 function venueForRegion(regionId) {
     return props.venues?.find(v => v.region_id === regionId);
 }
+
+const eventRegions = computed(() => {
+    // When the event has configured custom partitions (e.g. Manjeri, nilambur, tirur),
+    // display only these custom regions for this event.
+    const customPartitions = (props.partitions || []).filter(p => !p.source_phase_id && ['region', 'cluster'].includes(p.partition_role || 'region'));
+    if (customPartitions.length) {
+        return customPartitions.map(p => {
+            const cleanTitle = p.cluster_label || p.title?.replace(props.event.title, '').replace(/^[\s—–-]+/, '').trim() || p.title;
+            const assignedVenue = p.venue || (p.region_id ? venueForRegion(p.region_id)?.name : null);
+            return {
+                id: p.id,
+                name: cleanTitle,
+                venue: assignedVenue,
+            };
+        });
+    }
+
+    // Fallback to Sahodaya regions if no custom partitions exist yet
+    return (props.regions || []).map(r => ({
+        id: r.id,
+        name: r.name,
+        venue: venueForRegion(r.id)?.name || null,
+    }));
+});
 
 const showShareModal = ref(false);
 const fixingSeason = ref(false);

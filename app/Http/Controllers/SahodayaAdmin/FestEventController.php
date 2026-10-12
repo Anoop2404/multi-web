@@ -968,8 +968,16 @@ class FestEventController extends SahodayaAdminController
         ]);
 
         if ($data['conduct_mode'] === 'partitioned') {
-            app(\App\Services\Events\FestRegionPartitionService::class)
-                ->syncPartitionsFromRegions($event);
+            $hasPartitions = $event->childEvents()
+                ->where(function ($q) {
+                    $q->whereNotNull('partition_key')
+                      ->orWhereNotNull('cluster_key');
+                })->exists();
+
+            if (! $hasPartitions && ! $event->isSportsSeasonEvent()) {
+                app(\App\Services\Events\FestRegionPartitionService::class)
+                    ->syncPartitionsFromRegions($event);
+            }
         }
 
         $audit->festEvent($event, FestPageActivity::LEVELS, 'fest.levels.topology_updated', 'Conduct topology updated', $data);
@@ -1444,7 +1452,31 @@ class FestEventController extends SahodayaAdminController
             'feeSchedule'   => $feeSchedule,
             'conductMode'   => $event->conduct_mode ?? 'standard',
             'partitions'    => FestEvent::where('parent_event_id', $event->id)->get(),
-            'regions'       => \App\Models\Region::forTenant($this->sahodaya->id)->active()->globalOnly()->orderBy('sort_order')->orderBy('name')->get(['id', 'name']),
+            'regions'       => (function () use ($event) {
+                $partitionRegionIds = FestEvent::where('parent_event_id', $event->id)
+                    ->whereNotNull('region_id')
+                    ->pluck('region_id');
+
+                $partitionKeys = FestEvent::where('parent_event_id', $event->id)
+                    ->pluck('partition_key')
+                    ->filter();
+
+                $partitionLabels = FestEvent::where('parent_event_id', $event->id)
+                    ->pluck('cluster_label')
+                    ->filter();
+
+                return \App\Models\Region::forTenant($this->sahodaya->id)
+                    ->where(function ($q) use ($event, $partitionRegionIds, $partitionKeys, $partitionLabels) {
+                        $q->where(fn ($sub) => $sub->active()->globalOnly())
+                          ->orWhere('fest_event_id', $event->id)
+                          ->when($partitionRegionIds->isNotEmpty(), fn ($sub) => $sub->orWhereIn('id', $partitionRegionIds))
+                          ->when($partitionKeys->isNotEmpty(), fn ($sub) => $sub->orWhereIn('code', $partitionKeys))
+                          ->when($partitionLabels->isNotEmpty(), fn ($sub) => $sub->orWhereIn('name', $partitionLabels));
+                    })
+                    ->orderBy('sort_order')
+                    ->orderBy('name')
+                    ->get(['id', 'name']);
+            })(),
             'venues'        => \App\Models\FestVenue::where('event_id', $event->id)->with('region:id,name')->orderBy('name')->get(),
             'ageRuleSummary' => $event->event_type === 'sports' ? FestSportsAgeGroup::ageRuleSummary($event) : null,
             'suggestedAgeCutoff' => $event->event_type === 'sports'
