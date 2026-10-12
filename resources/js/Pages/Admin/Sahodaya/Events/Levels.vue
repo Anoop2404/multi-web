@@ -128,7 +128,8 @@
                  actual region children; lets a full admin see every region's status
                  at a glance instead of navigating into each region's own page. -->
             <RegionDrillDownPanel v-if="isPartitionedHub && !event.parent_event_id && regionDrillDown.length"
-                                  :sahodaya-id="sahodaya.id" :regions="regionDrillDown" />
+                                  :sahodaya-id="sahodaya.id" :regions="regionDrillDown"
+                                  @edit-region="openEditVenueModal" />
 
             <!-- Two-Column Operations Layout -->
             <div class="grid lg:grid-cols-12 gap-6">
@@ -178,7 +179,7 @@
                         <div v-if="activePartitions.length" class="space-y-3">
                             <h5 class="text-xs font-bold uppercase tracking-wider text-slate-400">Configured Partitions / Sub-Events</h5>
                             <div class="grid sm:grid-cols-2 gap-3">
-                                <div v-for="c in activePartitions" :key="c.id" class="rounded-xl border border-slate-200 bg-white p-3.5 space-y-2 hover:border-indigo-300 hover:shadow-md transition">
+                                <div v-for="c in activePartitions" :key="c.id" class="rounded-xl border border-slate-200 bg-white p-3.5 space-y-2 hover:border-indigo-300 hover:shadow-md transition flex flex-col">
                                     <div class="flex items-start justify-between gap-2">
                                         <div>
                                             <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${c.id}`" class="font-bold text-slate-900 text-sm hover:text-indigo-600 transition flex items-center gap-1.5">
@@ -186,14 +187,20 @@
                                                 <span class="text-xs text-indigo-600">↗</span>
                                             </Link>
                                             <p v-if="c.venue" class="text-[11px] text-slate-500 mt-0.5">📍 {{ c.venue }}</p>
+                                            <p v-if="c.event_start || c.event_end" class="text-[11px] text-slate-500 mt-0.5">📅 {{ c.event_start?.slice(0, 10) || 'TBD' }} to {{ c.event_end?.slice(0, 10) || 'TBD' }}</p>
                                         </div>
                                         <span v-if="c.partition_role" class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
                                             {{ c.partition_role }}
                                         </span>
                                     </div>
-                                    <div v-if="c.cluster_label" class="text-[11px] text-slate-600 bg-slate-50 px-2 py-1 rounded border border-slate-100 flex items-center justify-between">
-                                        <span>Display Label:</span>
-                                        <span class="font-medium text-slate-800">{{ c.cluster_label }}</span>
+                                    <div class="flex items-center justify-between gap-2 mt-auto pt-2 border-t border-slate-100">
+                                        <div v-if="c.cluster_label" class="text-[11px] text-slate-600 bg-slate-50 px-2 py-0.5 rounded border border-slate-100 truncate">
+                                            <span class="font-medium text-slate-800">{{ c.cluster_label }}</span>
+                                        </div>
+                                        <button type="button" @click="openEditVenueModal(c)" class="btn-secondary !py-1 !px-2.5 text-xs flex items-center gap-1 ml-auto hover:border-indigo-400">
+                                            <span>✏️</span>
+                                            <span>Edit Venue &amp; Dates</span>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -358,6 +365,19 @@
             <!-- Activity Logs -->
             <EventPageActivityLog :logs="activityLogs" class="pt-4" />
         </div>
+
+        <EditRegionalVenueModal
+            v-if="showEditVenueModal"
+            :show="showEditVenueModal"
+            :tenant-id="sahodaya.id"
+            :event-id="event.id"
+            :parent-event="event"
+            :region-data="editingRegionData"
+            :available-regions="regions"
+            :existing-venues="venues"
+            :is-new="isNewRegionVenue"
+            @close="showEditVenueModal = false"
+        />
     </SahodayaEventsLayout>
 </template>
 
@@ -369,6 +389,7 @@ import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import RegionDrillDownPanel from '@/Components/sahodaya/RegionDrillDownPanel.vue';
+import EditRegionalVenueModal from '@/Components/sahodaya/EditRegionalVenueModal.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -379,6 +400,8 @@ const props = defineProps({
     conductMode: { type: String, default: 'standard' },
     isPartitionedHub: { type: Boolean, default: false },
     partitions: { type: Array, default: () => [] },
+    regions: { type: Array, default: () => [] },
+    venues: { type: Array, default: () => [] },
     conductPresets: { type: Array, default: () => [] },
     memberSchools: { type: Array, default: () => [] },
     schoolPartitions: { type: Object, default: () => ({}) },
@@ -390,6 +413,34 @@ const props = defineProps({
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
 const { confirm } = useConfirm();
+
+const showEditVenueModal = ref(false);
+const editingRegionData = ref(null);
+const isNewRegionVenue = ref(false);
+
+function openEditVenueModal(region) {
+    isNewRegionVenue.value = false;
+    editingRegionData.value = {
+        id: region.id,
+        partition_id: region.id,
+        region_id: region.region_id,
+        partition_key: region.partition_key,
+        cluster_label: region.cluster_label || region.label || region.title,
+        venue: region.venue,
+        event_start: region.event_start,
+        event_end: region.event_end,
+        registration_open: region.registration_open,
+        registration_close: region.registration_close,
+        status: region.status,
+    };
+    showEditVenueModal.value = true;
+}
+
+function openAddVenueModal() {
+    isNewRegionVenue.value = true;
+    editingRegionData.value = null;
+    showEditVenueModal.value = true;
+}
 // kids_fest/sports have their own bespoke cluster/season flows (spawnCluster(),
 // SportsSetupSubNav) that predate and don't map onto the generic "Region Split vs Phases
 // & Payment Levels" choice below -- leave their experience exactly as it was. Child

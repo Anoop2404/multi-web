@@ -6,6 +6,7 @@ use App\Support\AcademicYear;
 use Illuminate\Validation\Rule;
 use App\Models\FestEvent;
 use App\Models\FestVenue;
+use App\Models\Region;
 use App\Models\FestCompetitionArea;
 use App\Models\FestSchoolEventFee;
 use App\Models\FestEventItem;
@@ -653,9 +654,16 @@ class FestEventController extends SahodayaAdminController
             'partitions' => $partitionService->legacyPartitions($event)->map(fn ($p) => [
                 'id' => $p->id,
                 'title' => $p->title,
+                'venue' => $p->venue,
+                'region_id' => $p->region_id,
                 'partition_key' => $p->partition_key ?? $p->cluster_key,
                 'partition_role' => $p->partition_role ?? 'cluster',
                 'cluster_label' => $p->cluster_label,
+                'event_start' => $p->event_start?->toDateString(),
+                'event_end' => $p->event_end?->toDateString(),
+                'registration_open' => $p->registration_open?->toDateString(),
+                'registration_close' => $p->registration_close?->toDateString(),
+                'status' => $p->status,
             ])->values(),
             'conductPresets' => array_keys(config('fest_conduct_presets', [])),
             'memberSchools' => $memberSchools,
@@ -919,6 +927,126 @@ class FestEventController extends SahodayaAdminController
 
         return redirect("/sahodaya-admin/{$this->sahodaya->id}/events/{$child->id}")
             ->with('success', 'Partition event created.');
+    }
+
+    public function saveRegionalVenue(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'partition_id'       => 'nullable|integer',
+            'region_id'          => 'nullable|integer',
+            'cluster_label'      => 'nullable|string|max:255',
+            'title'              => 'nullable|string|max:255',
+            'venue'              => 'nullable|string|max:255',
+            'event_start'        => 'nullable|date',
+            'event_end'          => 'nullable|date',
+            'registration_open'  => 'nullable|date',
+            'registration_close' => 'nullable|date',
+            'status'             => 'nullable|in:draft,published,registration_open,ongoing,completed,cancelled',
+        ]);
+
+        $partition = null;
+        if (! empty($data['partition_id'])) {
+            $partition = FestEvent::where('parent_event_id', $event->id)->find($data['partition_id']);
+        } elseif (! empty($data['region_id'])) {
+            $partition = FestEvent::where('parent_event_id', $event->id)->where('region_id', $data['region_id'])->first();
+        }
+
+        if ($partition) {
+            $updateData = [];
+            if (array_key_exists('venue', $data)) $updateData['venue'] = $data['venue'];
+            if (array_key_exists('event_start', $data)) $updateData['event_start'] = $data['event_start'];
+            if (array_key_exists('event_end', $data)) $updateData['event_end'] = $data['event_end'];
+            if (array_key_exists('registration_open', $data)) $updateData['registration_open'] = $data['registration_open'];
+            if (array_key_exists('registration_close', $data)) $updateData['registration_close'] = $data['registration_close'];
+            if (! empty($data['status'])) $updateData['status'] = $data['status'];
+            if (! empty($data['cluster_label'])) {
+                $updateData['cluster_label'] = $data['cluster_label'];
+                if (empty($data['title'])) {
+                    $updateData['title'] = "{$event->title} — {$data['cluster_label']}";
+                }
+            }
+            if (! empty($data['title'])) $updateData['title'] = $data['title'];
+
+            $partition->update($updateData);
+
+            $regionId = $partition->region_id ?: ($data['region_id'] ?? null);
+            if ($regionId && ! empty($data['venue'])) {
+                FestVenue::updateOrCreate(
+                    [
+                        'tenant_id' => $this->sahodaya->id,
+                        'event_id'  => $event->id,
+                        'region_id' => $regionId,
+                    ],
+                    [
+                        'name'      => $data['venue'],
+                        'is_active' => true,
+                    ]
+                );
+            }
+
+            $audit->festEvent($event, FestPageActivity::LEVELS, 'fest.levels.partition_updated', "Region details updated for: {$partition->cluster_label}", [
+                'partition_id' => $partition->id,
+                'venue'        => $partition->venue,
+            ]);
+
+            return back()->with('success', "Regional details for \"{$partition->cluster_label}\" updated successfully.");
+        }
+
+        if (! empty($data['region_id'])) {
+            $region = Region::forTenant($this->sahodaya->id)->find($data['region_id']);
+            if ($region) {
+                if (! empty($data['venue'])) {
+                    FestVenue::updateOrCreate(
+                        [
+                            'tenant_id' => $this->sahodaya->id,
+                            'event_id'  => $event->id,
+                            'region_id' => $region->id,
+                        ],
+                        [
+                            'name'      => $data['venue'],
+                            'is_active' => true,
+                        ]
+                    );
+                }
+
+                if (($event->conduct_mode ?? 'standard') === 'partitioned') {
+                    $key = app(\App\Services\Events\FestRegionPartitionService::class)->partitionKeyForRegion($region);
+                    $newPartition = app(\App\Services\Events\FestPartitionService::class)->spawnPartition($event, [
+                        'title'          => "{$event->title} — {$region->name}",
+                        'partition_key'  => $key,
+                        'cluster_label'  => $data['cluster_label'] ?? $region->name,
+                        'partition_role' => 'region',
+                        'region_id'      => $region->id,
+                        'venue'          => $data['venue'] ?? null,
+                        'event_start'    => $data['event_start'] ?? $event->event_start,
+                        'event_end'      => $data['event_end'] ?? $event->event_end,
+                    ]);
+                    if (! empty($data['status'])) {
+                        $newPartition->update(['status' => $data['status']]);
+                    }
+                }
+
+                return back()->with('success', "Regional venue for \"{$region->name}\" saved successfully.");
+            }
+        }
+
+        $clusterLabel = $data['cluster_label'] ?? 'New Region';
+        $title = $data['title'] ?? "{$event->title} — {$clusterLabel}";
+        $newChild = app(\App\Services\Events\FestPartitionService::class)->spawnPartition($event, [
+            'title'          => $title,
+            'cluster_label'  => $clusterLabel,
+            'partition_role' => 'region',
+            'venue'          => $data['venue'] ?? null,
+            'event_start'    => $data['event_start'] ?? $event->event_start,
+            'event_end'      => $data['event_end'] ?? $event->event_end,
+        ]);
+        if (! empty($data['status'])) {
+            $newChild->update(['status' => $data['status']]);
+        }
+
+        return back()->with('success', "Regional partition \"{$clusterLabel}\" created successfully.");
     }
 
     public function applyConductPreset(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)

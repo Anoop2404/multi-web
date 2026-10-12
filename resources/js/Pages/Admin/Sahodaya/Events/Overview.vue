@@ -24,6 +24,19 @@
                           :qr-image-url="`${base}/share/qr-image`" :qr-pdf-url="`${base}/share/qr-pdf`"
                           @close="showShareModal = false" />
 
+        <EditRegionalVenueModal
+            v-if="showEditVenueModal"
+            :show="showEditVenueModal"
+            :tenant-id="sahodaya.id"
+            :event-id="event.id"
+            :parent-event="event"
+            :region-data="editingRegionData"
+            :available-regions="regions"
+            :existing-venues="venues"
+            :is-new="isNewRegionVenue"
+            @close="showEditVenueModal = false"
+        />
+
         <EventSubNav v-if="event.event_type !== 'sports'"
                      :sahodaya-id="sahodaya.id" :event-id="event.id" active="overview" />
 
@@ -333,27 +346,49 @@
                         </div>
 
                         <!-- Assigned Regional Venues List -->
-                        <div v-if="eventRegions?.length" class="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                        <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
                             <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
                                 <h5 class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                                     <span>📍</span> Assigned Regional Venues
                                 </h5>
-                                <Link :href="`${base}/settings/venues`" class="link-brand text-xs font-semibold">
-                                    Manage &amp; Assign Venues →
-                                </Link>
+                                <div class="flex items-center gap-3">
+                                    <button type="button" @click="openAddVenueModal" class="btn-secondary !py-1 !px-2.5 text-xs font-semibold inline-flex items-center gap-1 hover:border-indigo-400">
+                                        <span>+</span> Add Regional Venue
+                                    </button>
+                                    <Link :href="`${base}/settings/venues`" class="link-brand text-xs font-semibold">
+                                        Manage &amp; Assign Venues →
+                                    </Link>
+                                </div>
                             </div>
 
-                            <div class="divide-y divide-slate-100 text-xs">
+                            <div v-if="eventRegions?.length" class="divide-y divide-slate-100 text-xs">
                                 <div v-for="r in eventRegions" :key="r.id" class="py-2.5 flex items-center justify-between gap-4">
-                                    <span class="font-medium text-slate-900 flex items-center gap-1.5">
-                                        <span class="w-2 h-2 rounded-full bg-indigo-600"></span>
-                                        {{ r.name }}
-                                    </span>
-                                    <span v-if="r.venue" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center gap-1">
-                                        📍 {{ r.venue }}
-                                    </span>
-                                    <span v-else class="text-slate-400 italic">No venue assigned yet</span>
+                                    <div class="min-w-0">
+                                        <div class="flex items-center gap-2">
+                                            <span class="w-2 h-2 rounded-full bg-indigo-600 shrink-0"></span>
+                                            <span class="font-medium text-slate-900">{{ r.name }}</span>
+                                            <span v-if="r.status" class="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase font-bold" :class="statusClass(r.status)">
+                                                {{ r.status }}
+                                            </span>
+                                        </div>
+                                        <div v-if="r.event_start || r.event_end" class="text-[11px] text-slate-500 mt-0.5 ml-4 flex items-center gap-2">
+                                            <span>📅 {{ r.event_start?.slice(0, 10) || 'TBD' }} to {{ r.event_end?.slice(0, 10) || 'TBD' }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        <span v-if="r.venue" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center gap-1">
+                                            📍 {{ r.venue }}
+                                        </span>
+                                        <span v-else class="text-slate-400 italic">No venue assigned yet</span>
+                                        <button type="button" @click="openEditVenueModal(r)" class="btn-ghost !p-1 text-xs text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg flex items-center gap-1" title="Edit regional venue & dates">
+                                            <span>✏️</span>
+                                            <span class="text-[11px] font-medium">Edit</span>
+                                        </button>
+                                    </div>
                                 </div>
+                            </div>
+                            <div v-else class="text-center py-4 text-xs text-slate-400">
+                                No regional venues configured yet. Click "+ Add Regional Venue" or sync from Sahodaya regions.
                             </div>
                         </div>
                     </div>
@@ -428,6 +463,7 @@ import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import EventLifecyclePanel from '@/Components/sahodaya/EventLifecyclePanel.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import EventShareModal from '@/Components/sahodaya/EventShareModal.vue';
+import EditRegionalVenueModal from '@/Components/sahodaya/EditRegionalVenueModal.vue';
 import FormGrid from '@/Components/ui/FormGrid.vue';
 import FormField from '@/Components/ui/FormField.vue';
 import CheckboxField from '@/Components/ui/CheckboxField.vue';
@@ -483,8 +519,17 @@ const eventRegions = computed(() => {
             const assignedVenue = p.venue || (p.region_id ? venueForRegion(p.region_id)?.name : null);
             return {
                 id: p.id,
+                partition_id: p.id,
+                region_id: p.region_id,
+                partition_key: p.partition_key,
+                cluster_label: p.cluster_label || cleanTitle,
                 name: cleanTitle,
                 venue: assignedVenue,
+                event_start: p.event_start,
+                event_end: p.event_end,
+                registration_open: p.registration_open,
+                registration_close: p.registration_close,
+                status: p.status,
             };
         });
     }
@@ -492,10 +537,34 @@ const eventRegions = computed(() => {
     // Fallback to Sahodaya regions if no custom partitions exist yet
     return (props.regions || []).map(r => ({
         id: r.id,
+        region_id: r.id,
+        partition_id: null,
+        cluster_label: r.name,
         name: r.name,
         venue: venueForRegion(r.id)?.name || null,
+        event_start: null,
+        event_end: null,
+        registration_open: null,
+        registration_close: null,
+        status: null,
     }));
 });
+
+const showEditVenueModal = ref(false);
+const editingRegionData = ref(null);
+const isNewRegionVenue = ref(false);
+
+function openEditVenueModal(region) {
+    isNewRegionVenue.value = false;
+    editingRegionData.value = region;
+    showEditVenueModal.value = true;
+}
+
+function openAddVenueModal() {
+    isNewRegionVenue.value = true;
+    editingRegionData.value = null;
+    showEditVenueModal.value = true;
+}
 
 const showShareModal = ref(false);
 const fixingSeason = ref(false);

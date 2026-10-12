@@ -21,6 +21,9 @@
                     <div>
                         <p class="font-bold text-slate-900 text-sm leading-snug">{{ r.label }}</p>
                         <p v-if="r.venue" class="text-[11px] text-slate-500 mt-0.5">📍 {{ r.venue }}</p>
+                        <p v-if="r.event_start || r.event_end" class="text-[11px] text-slate-500 mt-0.5">
+                            📅 {{ r.event_start?.slice(0, 10) || 'TBD' }} to {{ r.event_end?.slice(0, 10) || 'TBD' }}
+                        </p>
                     </div>
                     <span class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0"
                           :class="statusClass(r.status)">
@@ -59,11 +62,18 @@
                     </span>
                 </div>
 
-                <Link :href="`/sahodaya-admin/${sahodayaId}/events/${r.id}`"
-                      class="btn-secondary text-xs justify-center !py-2 w-full mt-auto flex items-center gap-1.5">
-                    <span>View region</span>
-                    <span>→</span>
-                </Link>
+                <div class="flex items-center gap-2 mt-auto pt-1">
+                    <button type="button" @click="$emit('edit-region', r)"
+                            class="btn-secondary text-xs justify-center !py-2 flex-1 flex items-center gap-1 hover:border-indigo-400">
+                        <span>✏️</span>
+                        <span>Edit</span>
+                    </button>
+                    <Link :href="`/sahodaya-admin/${sahodayaId}/events/${r.id}`"
+                          class="btn-secondary text-xs justify-center !py-2 flex-1 flex items-center gap-1.5">
+                        <span>View</span>
+                        <span>→</span>
+                    </Link>
+                </div>
             </div>
         </div>
     </div>
@@ -71,6 +81,8 @@
 
 <script setup>
 import { Link } from '@inertiajs/vue3';
+
+defineEmits(['edit-region']);
 
 defineProps({
     sahodayaId: { type: [String, Number], required: true },

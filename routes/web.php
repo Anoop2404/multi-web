@@ -1448,6 +1448,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/spawn', [FestEventController::class, 'spawnCascade'])->name('spawn');
             Route::post('/{event}/spawn-cluster', [FestEventController::class, 'spawnCluster'])->name('spawn-cluster');
             Route::post('/{event}/spawn-partition', [FestEventController::class, 'spawnPartition'])->name('spawn-partition');
+            Route::post('/{event}/save-regional-venue', [FestEventController::class, 'saveRegionalVenue'])->name('save-regional-venue');
             Route::post('/{event}/apply-conduct-preset', [FestEventController::class, 'applyConductPreset'])->name('apply-conduct-preset');
             Route::post('/{event}/conduct-topology', [FestEventController::class, 'updateConductTopology'])->name('conduct-topology.update');
             Route::post('/{event}/assign-school-partitions', [FestEventController::class, 'assignSchoolPartitions'])->name('assign-school-partitions');
