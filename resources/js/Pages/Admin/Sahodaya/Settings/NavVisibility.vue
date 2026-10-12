@@ -18,9 +18,13 @@
                         class="flex items-center justify-between gap-4 px-4 py-3 bg-white">
                         <div>
                             <p class="text-sm font-medium text-slate-900">{{ programLabels[slug] ?? slug }}</p>
+                            <p v-if="isProgramLocked(slug)" class="text-xs text-amber-700 mt-0.5 font-medium">
+                                🔒 Locked by Platform Super Admin (Central Admin → Tenants → {{ sahodaya?.name }}).
+                            </p>
                         </div>
-                        <label class="inline-flex items-center gap-2 text-sm text-slate-600 cursor-pointer shrink-0">
-                            <input type="checkbox" v-model="form.programs[slug]" class="rounded border-slate-300">
+                        <label class="inline-flex items-center gap-2 text-sm text-slate-600 shrink-0"
+                               :class="isProgramLocked(slug) ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'">
+                            <input type="checkbox" v-model="form.programs[slug]" :disabled="isProgramLocked(slug)" class="rounded border-slate-300">
                             <span>{{ form.programs[slug] ? 'Visible' : 'Hidden' }}</span>
                         </label>
                     </li>
@@ -37,9 +41,13 @@
                         class="flex items-center justify-between gap-4 px-4 py-3 bg-white">
                         <div>
                             <p class="text-sm font-medium text-slate-900">{{ label }}</p>
+                            <p v-if="isMenuLocked(key)" class="text-xs text-amber-700 mt-0.5 font-medium">
+                                🔒 Locked by Platform Super Admin.
+                            </p>
                         </div>
-                        <label class="inline-flex items-center gap-2 text-sm text-slate-600 cursor-pointer shrink-0">
-                            <input type="checkbox" v-model="form.menus[key]" class="rounded border-slate-300">
+                        <label class="inline-flex items-center gap-2 text-sm text-slate-600 shrink-0"
+                               :class="isMenuLocked(key) ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'">
+                            <input type="checkbox" v-model="form.menus[key]" :disabled="isMenuLocked(key)" class="rounded border-slate-300">
                             <span>{{ form.menus[key] ? 'Visible' : 'Hidden' }}</span>
                         </label>
                     </li>
@@ -65,10 +73,19 @@ const props = defineProps({
     publicUrl: String,
     pendingPaymentsCount: Number,
     visibility: { type: Object, required: true },
+    platformOverrides: { type: Object, default: null },
     programLabels: { type: Object, required: true },
     menuLabels: { type: Object, required: true },
     programSlugs: { type: Array, required: true },
 });
+
+function isProgramLocked(slug) {
+    return props.platformOverrides?.programs?.[slug] === false;
+}
+
+function isMenuLocked(key) {
+    return props.platformOverrides?.menus?.[key] === false;
+}
 
 const form = useForm({
     programs: { ...props.visibility.programs },

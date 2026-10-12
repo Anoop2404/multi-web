@@ -17,10 +17,11 @@ class NavVisibilityController extends SahodayaAdminController
         );
 
         return $this->inertia('Sahodaya/Settings/NavVisibility', [
-            'visibility'     => SahodayaNavVisibility::forProfile($profile),
-            'programLabels'  => SahodayaNavVisibility::programLabels(),
-            'menuLabels'     => SahodayaNavVisibility::menuLabels(),
-            'programSlugs'   => SahodayaNavVisibility::programSlugs(),
+            'visibility'        => SahodayaNavVisibility::forProfile($profile, $this->sahodaya->nav_overrides),
+            'platformOverrides' => is_array($this->sahodaya->nav_overrides) ? $this->sahodaya->nav_overrides : null,
+            'programLabels'     => SahodayaNavVisibility::programLabels(),
+            'menuLabels'        => SahodayaNavVisibility::menuLabels(),
+            'programSlugs'      => SahodayaNavVisibility::programSlugs(),
         ]);
     }
 
