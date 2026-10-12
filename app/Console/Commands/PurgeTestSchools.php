@@ -12,7 +12,7 @@ class PurgeTestSchools extends Command
                             {--sahodaya= : Sahodaya tenant ID or subdomain}
                             {--pattern= : Delete schools whose name contains this (case-insensitive)}
                             {--status= : Delete schools whose membership_status is in this comma-separated list (e.g. approved,rejected)}
-                            {--school= : Purge one school by ID}
+                            {--school= : Purge one or more schools by ID (comma-separated)}
                             {--dry-run : List matches without deleting}
                             {--force : Delete without confirmation}';
 
@@ -100,7 +100,9 @@ class PurgeTestSchools extends Command
             ->where('parent_id', $sahodaya->id);
 
         if ($schoolId = $this->option('school')) {
-            return $query->where('id', $schoolId)->get();
+            $ids = array_values(array_filter(array_map('trim', explode(',', $schoolId))));
+
+            return $query->whereIn('id', $ids)->get();
         }
 
         $pattern = trim((string) $this->option('pattern'));
