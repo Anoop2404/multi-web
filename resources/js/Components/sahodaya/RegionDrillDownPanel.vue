@@ -73,6 +73,11 @@
                         <span>View</span>
                         <span>→</span>
                     </Link>
+                    <button type="button" @click="$emit('delete-region', r)"
+                            class="btn-ghost !p-2 text-xs text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg flex items-center justify-center shrink-0"
+                            title="Delete this regional partition">
+                        <span>🗑️</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -82,7 +87,7 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
 
-defineEmits(['edit-region']);
+defineEmits(['edit-region', 'delete-region']);
 
 defineProps({
     sahodayaId: { type: [String, Number], required: true },

@@ -129,7 +129,8 @@
                  at a glance instead of navigating into each region's own page. -->
             <RegionDrillDownPanel v-if="isPartitionedHub && !event.parent_event_id && regionDrillDown.length"
                                   :sahodaya-id="sahodaya.id" :regions="regionDrillDown"
-                                  @edit-region="openEditVenueModal" />
+                                  @edit-region="openEditVenueModal"
+                                  @delete-region="deletePartition" />
 
             <!-- Two-Column Operations Layout -->
             <div class="grid lg:grid-cols-12 gap-6">
