@@ -903,8 +903,27 @@ class FestEventSettingsController extends SahodayaAdminController
             'label' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
             'classes' => 'nullable|array',
-            'classes.*' => 'integer|min:1|max:12',
+            'classes.*' => ['required', function ($attribute, $value, $fail) {
+                $validKg = ['pre-kg', 'pre_kg', 'lkg', 'ukg'];
+                if (in_array(strtolower((string) $value), $validKg, true)) {
+                    return;
+                }
+                if (is_numeric($value) && (int) $value >= 1 && (int) $value <= 12) {
+                    return;
+                }
+                $fail("The {$attribute} must be a valid class (Pre-KG, LKG, UKG, or 1 to 12).");
+            }],
         ]);
+
+        if (isset($data['classes']) && is_array($data['classes'])) {
+            $data['classes'] = collect($data['classes'])->map(function ($c) {
+                $lower = strtolower(trim((string) $c));
+                if ($lower === 'pre-kg' || $lower === 'pre_kg') return 'Pre-KG';
+                if ($lower === 'lkg') return 'LKG';
+                if ($lower === 'ukg') return 'UKG';
+                return is_numeric($c) ? (int) $c : $c;
+            })->values()->all();
+        }
 
         $nextOrder = (int) FestEventClassGroup::where('event_id', $event->id)->max('sort_order') + 1;
 
@@ -996,8 +1015,27 @@ class FestEventSettingsController extends SahodayaAdminController
             'label' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
             'classes' => 'nullable|array',
-            'classes.*' => 'integer|min:1|max:12',
+            'classes.*' => ['required', function ($attribute, $value, $fail) {
+                $validKg = ['pre-kg', 'pre_kg', 'lkg', 'ukg'];
+                if (in_array(strtolower((string) $value), $validKg, true)) {
+                    return;
+                }
+                if (is_numeric($value) && (int) $value >= 1 && (int) $value <= 12) {
+                    return;
+                }
+                $fail("The {$attribute} must be a valid class (Pre-KG, LKG, UKG, or 1 to 12).");
+            }],
         ]);
+
+        if (isset($data['classes']) && is_array($data['classes'])) {
+            $data['classes'] = collect($data['classes'])->map(function ($c) {
+                $lower = strtolower(trim((string) $c));
+                if ($lower === 'pre-kg' || $lower === 'pre_kg') return 'Pre-KG';
+                if ($lower === 'lkg') return 'LKG';
+                if ($lower === 'ukg') return 'UKG';
+                return is_numeric($c) ? (int) $c : $c;
+            })->values()->all();
+        }
 
         $nextOrder = (int) $classCategoryScheme->groups()->max('sort_order') + 1;
 
@@ -1024,8 +1062,27 @@ class FestEventSettingsController extends SahodayaAdminController
             'label' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
             'classes' => 'nullable|array',
-            'classes.*' => 'integer|min:1|max:12',
+            'classes.*' => ['required', function ($attribute, $value, $fail) {
+                $validKg = ['pre-kg', 'pre_kg', 'lkg', 'ukg'];
+                if (in_array(strtolower((string) $value), $validKg, true)) {
+                    return;
+                }
+                if (is_numeric($value) && (int) $value >= 1 && (int) $value <= 12) {
+                    return;
+                }
+                $fail("The {$attribute} must be a valid class (Pre-KG, LKG, UKG, or 1 to 12).");
+            }],
         ]);
+
+        if (isset($data['classes']) && is_array($data['classes'])) {
+            $data['classes'] = collect($data['classes'])->map(function ($c) {
+                $lower = strtolower(trim((string) $c));
+                if ($lower === 'pre-kg' || $lower === 'pre_kg') return 'Pre-KG';
+                if ($lower === 'lkg') return 'LKG';
+                if ($lower === 'ukg') return 'UKG';
+                return is_numeric($c) ? (int) $c : $c;
+            })->values()->all();
+        }
 
         $classCategorySchemeGroup->update($data);
 

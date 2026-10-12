@@ -82,23 +82,63 @@ class FestStudentClassResolver
         return $categoryId > 0 ? FestClassGroupScheme::clusterKey($categoryId) : null;
     }
 
+    public static function normalizedClassFromName(?string $className): ?string
+    {
+        if (! filled($className)) {
+            return null;
+        }
+
+        $name = strtolower(trim($className));
+
+        if (preg_match('/(?:pre[\s\-_]?kg|nursery|play\s*group|playgroup)/i', $name)) {
+            return 'Pre-KG';
+        }
+
+        if (preg_match('/(?:lkg|lower[\s\-_]?kg|lower[\s\-_]?kindergarten|kg[\s\-_]?1)/i', $name)) {
+            return 'LKG';
+        }
+
+        if (preg_match('/(?:ukg|upper[\s\-_]?kg|upper[\s\-_]?kindergarten|kg[\s\-_]?2)/i', $name)) {
+            return 'UKG';
+        }
+
+        $num = self::classNumberFromName($className);
+        if ($num !== null) {
+            return (string) $num;
+        }
+
+        return null;
+    }
+
+    public static function normalizedClassFromStudent(Student $student): ?string
+    {
+        $className = $student->schoolClass?->name ?? $student->class ?? null;
+        if (! filled($className) && $student->exists && ! $student->relationLoaded('schoolClass')) {
+            $student->loadMissing('schoolClass');
+            $className = $student->schoolClass?->name ?? $student->class ?? null;
+        }
+
+        return self::normalizedClassFromName($className);
+    }
+
     /**
-     * Match a student's class number against this event's custom FestEventClassGroup
-     * rows (each carries its own `classes` array of class numbers). Falls back to the
+     * Match a student's class against this event's custom FestEventClassGroup
+     * rows (each carries its own `classes` array of class identifiers). Falls back to the
      * 'open' catch-all key when no custom category claims this student's class — mirrors
      * how the built-in schemes always keep an 'open' bucket in their labels() output.
      */
     public static function customClassGroupForStudent(Student $student, FestEvent $event): ?string
     {
-        $classNumber = self::classNumberFromStudent($student);
-        if ($classNumber === null) {
+        $normalized = self::normalizedClassFromStudent($student);
+        if ($normalized === null) {
             return null;
         }
 
         $groups = \App\Models\FestEventClassGroup::where('event_id', $event->id)->get(['key', 'classes']);
 
         foreach ($groups as $group) {
-            if (in_array($classNumber, array_map('intval', $group->classes ?? []), true)) {
+            $groupClasses = collect($group->classes ?? [])->map(fn ($c) => strtoupper(trim((string) $c)))->all();
+            if (in_array(strtoupper($normalized), $groupClasses, true)) {
                 return $group->key;
             }
         }
@@ -107,21 +147,22 @@ class FestStudentClassResolver
     }
 
     /**
-     * Match a student's class number against a named FestClassCategoryScheme's groups
+     * Match a student's class against a named FestClassCategoryScheme's groups
      * (the scheme's own `classes` arrays), mirroring customClassGroupForStudent() but for
      * the Sahodaya-wide, reusable schemes rather than one-off per-event categories.
      */
     public static function schemeGroupForStudent(Student $student, int $schemeId): ?string
     {
-        $classNumber = self::classNumberFromStudent($student);
-        if ($classNumber === null) {
+        $normalized = self::normalizedClassFromStudent($student);
+        if ($normalized === null) {
             return null;
         }
 
         $groups = self::$schemeGroupsCache[$schemeId] ??= \App\Models\FestClassCategorySchemeGroup::where('scheme_id', $schemeId)->get(['key', 'classes']);
 
         foreach ($groups as $group) {
-            if (in_array($classNumber, array_map('intval', $group->classes ?? []), true)) {
+            $groupClasses = collect($group->classes ?? [])->map(fn ($c) => strtoupper(trim((string) $c)))->all();
+            if (in_array(strtoupper($normalized), $groupClasses, true)) {
                 return $group->key;
             }
         }

@@ -11,18 +11,30 @@ trait HasClassesSuffix
 {
     public function classesSuffix(): string
     {
-        $classes = collect($this->classes ?? [])->map(fn ($c) => (int) $c)->filter()->sort()->values();
+        $order = ['pre-kg' => -3, 'pre_kg' => -3, 'lkg' => -2, 'ukg' => -1];
+
+        $classes = collect($this->classes ?? [])
+            ->map(fn ($c) => trim((string) $c))
+            ->filter(fn ($c) => $c !== '')
+            ->sort(function ($a, $b) use ($order) {
+                $valA = $order[strtolower($a)] ?? (is_numeric($a) ? (int) $a : 99);
+                $valB = $order[strtolower($b)] ?? (is_numeric($b) ? (int) $b : 99);
+                return $valA <=> $valB;
+            })
+            ->values();
 
         if ($classes->isEmpty()) {
             return '';
         }
 
         if ($classes->count() === 1) {
-            return ' — Class '.$classes->first();
+            $first = $classes->first();
+            $prefix = is_numeric($first) ? 'Class ' : 'Classes ';
+            return ' — ' . $prefix . $first;
         }
 
         $last = $classes->pop();
 
-        return ' — Classes '.$classes->implode(', ').' & '.$last;
+        return ' — Classes ' . $classes->implode(', ') . ' & ' . $last;
     }
 }

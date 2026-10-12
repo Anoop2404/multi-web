@@ -753,14 +753,15 @@
                                 <div>
                                     <p class="form-label text-xs mb-1">Classes in this category</p>
                                     <div class="flex flex-wrap gap-1.5">
-                                        <label v-for="n in 12" :key="n"
-                                               class="inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs cursor-pointer select-none"
-                                               :class="schemeGroupForm.classes.includes(n)
-                                                   ? 'bg-indigo-600 border-indigo-600 text-white font-semibold'
-                                                   : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'">
-                                            <input type="checkbox" class="hidden" :value="n" v-model="schemeGroupForm.classes">
-                                            Class {{ n }}
-                                        </label>
+                                        <button type="button"
+                                                v-for="c in availableClasses" :key="c.value"
+                                                @click="toggleClass(schemeGroupForm, c.value)"
+                                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border text-xs cursor-pointer select-none transition"
+                                                :class="hasClass(schemeGroupForm.classes, c.value)
+                                                    ? 'bg-indigo-600 border-indigo-600 text-white font-semibold shadow-xs'
+                                                    : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'">
+                                            {{ c.label }}
+                                        </button>
                                     </div>
                                     <p class="text-[11px] text-slate-400 mt-1">
                                         A class left unassigned to any category in this scheme falls back to "Open / All Categories".
@@ -796,14 +797,15 @@
                                             <div>
                                                 <p class="form-label text-xs mb-1">Classes in this category</p>
                                                 <div class="flex flex-wrap gap-1.5">
-                                                    <label v-for="n in 12" :key="n"
-                                                           class="inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs cursor-pointer select-none"
-                                                           :class="schemeGroupEditForm.classes.includes(n)
-                                                               ? 'bg-indigo-600 border-indigo-600 text-white font-semibold'
-                                                               : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'">
-                                                        <input type="checkbox" class="hidden" :value="n" v-model="schemeGroupEditForm.classes">
-                                                        Class {{ n }}
-                                                    </label>
+                                                    <button type="button"
+                                                            v-for="c in availableClasses" :key="c.value"
+                                                            @click="toggleClass(schemeGroupEditForm, c.value)"
+                                                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border text-xs cursor-pointer select-none transition"
+                                                            :class="hasClass(schemeGroupEditForm.classes, c.value)
+                                                                ? 'bg-indigo-600 border-indigo-600 text-white font-semibold shadow-xs'
+                                                                : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'">
+                                                        {{ c.label }}
+                                                    </button>
                                                 </div>
                                             </div>
                                             <div class="flex justify-end gap-2">
@@ -818,7 +820,7 @@
                                                 <span class="font-semibold text-slate-900">{{ g.label }}</span>
                                                 <span class="font-mono text-[10px] text-slate-400 ml-1">({{ g.key }})</span>
                                                 <p class="text-slate-500">
-                                                    {{ g.classes?.length ? `Classes ${[...g.classes].sort((a, b) => a - b).join(', ')}` : 'No classes assigned yet' }}
+                                                    {{ formatClasses(g.classes) }}
                                                 </p>
                                                 <p v-if="g.description" class="text-slate-400">{{ g.description }}</p>
                                             </div>
@@ -1179,6 +1181,41 @@ async function confirmDeleteSchemeGroup(scheme, group) {
 
     if (!(await confirm({ message, destructive: true }))) return;
     removeClassCategorySchemeGroup(scheme.id, group.id);
+}
+
+const availableClasses = [
+    { value: 'Pre-KG', label: 'Pre-KG' },
+    { value: 'LKG', label: 'LKG' },
+    { value: 'UKG', label: 'UKG' },
+    ...Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: `Class ${i + 1}` })),
+];
+
+function hasClass(classList, val) {
+    if (!Array.isArray(classList)) return false;
+    return classList.some((c) => String(c).trim().toUpperCase() === String(val).trim().toUpperCase());
+}
+
+function toggleClass(form, val) {
+    if (!Array.isArray(form.classes)) {
+        form.classes = [];
+    }
+    const idx = form.classes.findIndex((c) => String(c).trim().toUpperCase() === String(val).trim().toUpperCase());
+    if (idx >= 0) {
+        form.classes.splice(idx, 1);
+    } else {
+        form.classes.push(val);
+    }
+}
+
+function formatClasses(classes) {
+    if (!classes || !classes.length) return 'No classes assigned yet';
+    const order = { 'pre-kg': -3, 'pre_kg': -3, 'lkg': -2, 'ukg': -1 };
+    const sorted = [...classes].sort((a, b) => {
+        const valA = order[String(a).toLowerCase()] ?? (Number(a) || 99);
+        const valB = order[String(b).toLowerCase()] ?? (Number(b) || 99);
+        return valA - valB;
+    });
+    return `Classes ${sorted.map((c) => (typeof c === 'number' || (!isNaN(Number(c)) && !isNaN(parseFloat(c)))) ? c : c).join(', ')}`;
 }
 
 // Historical note: this relabel predates the separate 'kalolsavam_composite' fee_model
