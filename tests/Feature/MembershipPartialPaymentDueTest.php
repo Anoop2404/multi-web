@@ -68,20 +68,17 @@ class MembershipPartialPaymentDueTest extends TestCase
         $resolver = app(PaymentDueResolver::class);
         $items = $resolver->items($sahodaya->id, [$school->id], $academicYear);
 
-        $this->assertCount(1, $items);
-        $item = $items->first();
-
-        // Should return remaining balance due (35000 - 5000 = 30000)
-        $this->assertEquals(30000.0, $item['membership_fee_amount']);
-        $this->assertEquals(35000.0, $item['total_fee_amount']);
-        $this->assertEquals(5000.0, $item['amount_paid']);
+        // A school with a partial payment should NOT be listed in Payment Not Done (items)
+        $this->assertCount(0, $items);
         $this->assertEquals(30000.0, $registration->outstandingBalance());
 
-        // Test partialItems resolver
+        // Test partialItems resolver — should be listed here exclusively
         $partialItems = $resolver->partialItems($sahodaya->id, [$school->id], $academicYear);
         $this->assertCount(1, $partialItems);
         $partialItem = $partialItems->first();
         $this->assertEquals(30000.0, $partialItem['membership_fee_amount']);
+        $this->assertEquals(35000.0, $partialItem['total_fee_amount']);
+        $this->assertEquals(5000.0, $partialItem['amount_paid']);
         $this->assertCount(1, $partialItem['school_payments']);
         $this->assertEquals(5000.0, $partialItem['school_payments'][0]['amount']);
         $this->assertEquals('verified', $partialItem['school_payments'][0]['status']);

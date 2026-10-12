@@ -41,6 +41,11 @@ class PaymentDueResolver
                 continue;
             }
 
+            // Exclude partial payments — they belong in the Partial Payment tab
+            if (($mapped['amount_paid'] ?? 0) > 0) {
+                continue;
+            }
+
             $items->push($mapped);
         }
 
@@ -152,7 +157,10 @@ class PaymentDueResolver
         $registrations = Registration::query()
             ->whereIn('school_id', $schoolIds)
             ->where('academic_year', $academicYear)
-            ->where('amount_paid', '>', 0)
+            ->where(function ($q) {
+                $q->where('amount_paid', '>', 0)
+                    ->orWhereHas('payments', fn ($p) => $p->where('status', 'verified'));
+            })
             ->whereIn('registration_status', ['payment_pending', 'payment_rejected', 'completed', 'approved'])
             ->with([
                 'school:id,name,school_prefix,membership_status,parent_id,created_at,application_payload',
@@ -169,10 +177,8 @@ class PaymentDueResolver
 
             $mapped = $this->mapRegistration($registration, $school, $academicYear);
 
-            // registration_status can lag a just-completed final installment (see
-            // MembershipPaymentApprovalService::verify()), so a status/amount filter alone
-            // isn't enough — only rows with an actual remaining balance are "partial".
-            if (($mapped['membership_fee_amount'] ?? 0) <= 0) {
+            // A row is "partial" only if a payment has been made (> 0) AND there is still balance due (> 0).
+            if (($mapped['membership_fee_amount'] ?? 0) <= 0 || ($mapped['amount_paid'] ?? 0) <= 0) {
                 continue;
             }
 
