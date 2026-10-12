@@ -87,8 +87,7 @@
             </table>
 
             <div class="sign-box">
-                <div class="sign-col" style="width: 100%;">Convenor Signature: __________________________________</div>
-                <div class="clear"></div>
+                @include('fest.reports.partials.stage-manager-signature')
                 <div class="published-at">Published At: ______________________________________________ (Date &amp; Time)</div>
             </div>
         </div>

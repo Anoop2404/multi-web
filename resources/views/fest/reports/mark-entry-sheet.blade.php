@@ -225,19 +225,18 @@
             <div class="sign-box">
                 @php
                     $jCount = max(1, (int) ($sheet['judge_count'] ?? 1));
-                    $colsCount = !empty($sheet['is_sum_sheet']) ? ($jCount + 1) : 2;
+                    $colsCount = !empty($sheet['is_sum_sheet']) ? $jCount : 1;
                     $colWidth = floor(100 / max(1, $colsCount));
                 @endphp
                 @if(!empty($sheet['is_sum_sheet']))
                     @for($j = 1; $j <= $jCount; $j++)
                         <div class="sign-col" style="width: {{ $colWidth }}%;">Judge {{ $j }} Signature: __________________</div>
                     @endfor
-                    <div class="sign-col" style="width: {{ $colWidth }}%;">Convenor Signature: __________________</div>
                 @else
-                    <div class="sign-col" style="width: 50%;">Judge Signature: __________________</div>
-                    <div class="sign-col" style="width: 50%;">Convenor Signature: __________________</div>
+                    <div class="sign-col" style="width: 100%;">Judge Signature: __________________</div>
                 @endif
                 <div class="clear"></div>
+                @include('fest.reports.partials.stage-manager-signature')
             </div>
         </div>
     @endforeach
