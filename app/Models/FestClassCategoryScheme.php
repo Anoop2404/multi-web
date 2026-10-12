@@ -141,7 +141,7 @@ class FestClassCategoryScheme extends Model
         $groupSortOrder = 0;
         foreach ($categories as $category) {
             $classNumbers = ($classesByCategory[$category->id] ?? collect())
-                ->map(fn ($masterClass) => FestStudentClassResolver::classNumberFromName($masterClass->name))
+                ->map(fn ($masterClass) => \App\Support\FestStudentClassResolver::normalizedClassFromName($masterClass->name) ?? \App\Support\FestStudentClassResolver::classNumberFromName($masterClass->name))
                 ->filter()
                 ->unique()
                 ->values()
