@@ -203,9 +203,16 @@
                             <FormField label="Event Title" class-extra="sm:col-span-2" required>
                                 <input v-model="form.title" class="field" required>
                             </FormField>
-                            <FormField label="Lifecycle Phase Status" class-extra="sm:col-span-2" :hint="nextStepHint">
+                            <FormField label="Lifecycle Phase Status" class-extra="sm:col-span-2" :hint="nextStepHint" :error="statusError">
                                 <SearchableSelect v-model="form.status" :options="lifecycleStatusOptions"
                                                   :all-option="false" class="font-medium" />
+                                <div v-if="['published', 'registration_open'].includes(form.status) && Number(stats?.items ?? 0) === 0"
+                                     class="mt-2.5 p-2.5 rounded-lg border border-amber-200 bg-amber-50 text-xs text-amber-900 flex items-center justify-between gap-3">
+                                    <span>⚠️ This event has <strong>0 items</strong>. Add at least one competition item before publishing.</span>
+                                    <Link :href="`${base}/items`" class="btn-primary text-xs !py-1 !px-2.5 shrink-0 !bg-amber-600 hover:!bg-amber-700 !border-transparent">
+                                        + Add items →
+                                    </Link>
+                                </div>
                             </FormField>
                         </FormGrid>
 
@@ -351,26 +358,43 @@
                         </div>
                     </div>
 
-                    <div v-if="form.errors.status" class="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
+                    <div v-if="statusError" class="rounded-xl border p-4 flex items-start gap-3"
+                         :class="isTransitionMatrixError ? 'border-amber-200 bg-amber-50' : 'border-rose-200 bg-rose-50'">
                         <span class="text-lg leading-none">⚠️</span>
                         <div class="flex-1">
-                            <p class="text-sm font-bold text-amber-900">
-                                Can't skip ahead to "{{ statusLabels[form.status] ?? form.status }}"
-                            </p>
-                            <p class="text-xs text-amber-800 mt-1 leading-relaxed">
-                                This event is currently <strong>{{ statusLabels[event.status] ?? event.status }}</strong>.
-                                Phases move one step at a time —
-                                <template v-if="nextStepLabelList.length">
-                                    the next allowed step{{ nextStepLabelList.length > 1 ? 's are' : ' is' }}
-                                    <strong>{{ nextStepLabelList.join(' or ') }}</strong>.
-                                </template>
-                                <template v-else>this event has no further steps available.</template>
-                            </p>
-                            <button v-if="firstNextStatus" type="button"
-                                    class="btn-primary text-xs mt-2.5 !bg-amber-600 hover:!bg-amber-700 !border-transparent"
-                                    :disabled="form.processing" @click="applyNextStatus">
-                                {{ form.processing ? 'Saving...' : `Set to ${statusLabels[firstNextStatus]} instead` }}
-                            </button>
+                            <template v-if="isTransitionMatrixError">
+                                <p class="text-sm font-bold text-amber-900">
+                                    Can't skip ahead to "{{ statusLabels[form.status] ?? form.status }}"
+                                </p>
+                                <p class="text-xs text-amber-800 mt-1 leading-relaxed">
+                                    This event is currently <strong>{{ statusLabels[event.status] ?? event.status }}</strong>.
+                                    Phases move one step at a time —
+                                    <template v-if="nextStepLabelList.length">
+                                        the next allowed step{{ nextStepLabelList.length > 1 ? 's are' : ' is' }}
+                                        <strong>{{ nextStepLabelList.join(' or ') }}</strong>.
+                                    </template>
+                                    <template v-else>this event has no further steps available.</template>
+                                </p>
+                                <button v-if="firstNextStatus" type="button"
+                                        class="btn-primary text-xs mt-2.5 !bg-amber-600 hover:!bg-amber-700 !border-transparent"
+                                        :disabled="form.processing" @click="applyNextStatus">
+                                    {{ form.processing ? 'Saving...' : `Set to ${statusLabels[firstNextStatus]} instead` }}
+                                </button>
+                            </template>
+                            <template v-else>
+                                <p class="text-sm font-bold text-rose-900">
+                                    Cannot change status to "{{ statusLabels[form.status] ?? form.status }}"
+                                </p>
+                                <p class="text-xs text-rose-800 mt-1 leading-relaxed font-semibold">
+                                    {{ statusError }}
+                                </p>
+                                <div v-if="String(statusError).toLowerCase().includes('item')" class="mt-2.5">
+                                    <Link :href="`${base}/items`" class="btn-primary text-xs !bg-rose-600 hover:!bg-rose-700 !border-transparent inline-flex items-center gap-1.5 shadow-sm">
+                                        <span>+ Add competition items now</span>
+                                        <span>→</span>
+                                    </Link>
+                                </div>
+                            </template>
                         </div>
                     </div>
                     <p v-else-if="form.hasErrors" class="text-sm text-red-600 font-medium">
@@ -397,8 +421,8 @@
 </template>
 
 <script setup>
-import { Link, useForm, router } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { Link, useForm, router, usePage } from '@inertiajs/vue3';
+import { computed, ref, watch } from 'vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import EventLifecyclePanel from '@/Components/sahodaya/EventLifecyclePanel.vue';
@@ -582,7 +606,30 @@ const form = useForm({
     conduct_levels: [...(props.event.conduct_levels ?? ['sahodaya'])],
 });
 
+const page = usePage();
+const statusError = computed(() => form.errors.status || page.props.errors?.status);
+
+const isTransitionMatrixError = computed(() => {
+    const err = String(statusError.value ?? '').toLowerCase();
+    return err.includes('cannot transition') || err.includes("can't skip");
+});
+
+watch(() => form.status, () => {
+    form.clearErrors('status');
+});
+
 function saveEvent() {
+    form.clearErrors('status');
+    if (['published', 'registration_open'].includes(form.status) && !['published', 'registration_open', 'ongoing', 'completed'].includes(props.event.status)) {
+        if (Number(props.stats?.items ?? 0) === 0) {
+            form.setError('status', 'Add at least one competition item before publishing this event.');
+            return;
+        }
+        if (!form.venue && !form.event_start) {
+            form.setError('status', 'Set a venue or event start date before publishing.');
+            return;
+        }
+    }
     form.put(base, { preserveScroll: true });
 }
 </script>
