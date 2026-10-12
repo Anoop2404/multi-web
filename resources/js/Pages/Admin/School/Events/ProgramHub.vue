@@ -237,14 +237,21 @@
                     <thead><tr><th>Event</th><th>Level</th><th>Entries</th><th></th></tr></thead>
                     <tbody>
                         <tr v-for="ev in events" :key="ev.id">
-                            <td class="font-medium">{{ ev.title }}</td>
+                            <td class="font-medium">
+                                {{ ev.title }}
+                                <span v-if="ev.is_partitioned && !ev.has_assigned_partition" class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                    Region-wise
+                                </span>
+                            </td>
                             <td class="text-xs">{{ ev.level_label }}</td>
                             <td>{{ ev.registrations_count }}</td>
                             <td class="text-right whitespace-nowrap">
                                 <Link :href="`/school-admin/${school.id}/fest/${ev.id}/food-order`" class="text-xs text-amber-700 hover:text-amber-800 font-semibold mr-3">
                                     🍱 Food menu →
                                 </Link>
-                                <Link :href="`${programBase}/events/${ev.id}/registration`" class="link-brand text-xs">Open event →</Link>
+                                <Link :href="`${programBase}/events/${ev.id}/registration`" class="link-brand text-xs font-semibold">
+                                    {{ (ev.is_partitioned && !ev.has_assigned_partition) ? 'Select region & register →' : 'Open event →' }}
+                                </Link>
                             </td>
                         </tr>
                     </tbody>

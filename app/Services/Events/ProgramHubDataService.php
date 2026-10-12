@@ -104,15 +104,23 @@ class ProgramHubDataService
                 'fees_paid'         => (float) $fees->where('status', 'approved')->sum('total_due'),
                 'fees_awaiting'     => $fees->where('status', 'proof_uploaded')->count(),
             ],
-            'events' => $openEvents->take(6)->map(fn (FestEvent $e) => [
-                'id'                  => $e->id,
-                'title'               => $e->title,
-                'status'              => $e->status,
-                'level_round'         => $e->level_round,
-                'level_label'         => config("fest_fees.level_labels.{$e->level_round}", $e->level_round),
-                'registrations_count' => $e->registrations_count,
-                'results_published'   => $e->results_published,
-            ])->values()->all(),
+            'events' => $openEvents->take(6)->map(function (FestEvent $e) use ($school) {
+                $partitionService = app(FestPartitionService::class);
+                $isHub = $partitionService->isPartitionedHub($e);
+                $assignedKey = $isHub ? app(FestSchoolPartitionService::class)->resolvePartitionKey($e, $school->id) : null;
+
+                return [
+                    'id'                     => $e->id,
+                    'title'                  => $e->title,
+                    'status'                 => $e->status,
+                    'level_round'            => $e->level_round,
+                    'level_label'            => config("fest_fees.level_labels.{$e->level_round}", $e->level_round),
+                    'registrations_count'    => $e->registrations_count,
+                    'results_published'      => $e->results_published,
+                    'is_partitioned'         => $isHub,
+                    'has_assigned_partition' => (bool) $assignedKey,
+                ];
+            })->values()->all(),
             'regionOptions' => $this->resolveRegionOptionsForSchool($school, $meta['eventType']),
             'feeSlabOptions' => $this->resolveFeeSlabOptionsForSchool($school, $meta['eventType']),
         ], $extra);

@@ -37,9 +37,22 @@ class FestSchoolPartitionService
         $resolvedChildIdByHub = [];
 
         return $events->reject(function (FestEvent $event) use ($schoolId, &$resolvedChildIdByHub) {
-            // Never show the main hub event itself to schools when it is partitioned
+            // For a partitioned hub event:
             if ($this->partitions->isPartitionedHub($event)) {
-                return true;
+                if (! array_key_exists($event->id, $resolvedChildIdByHub)) {
+                    $key = $this->resolvePartitionKey($event, $schoolId);
+                    $child = $key ? $this->partitions->partitionByKey($event, $key) : null;
+                    $resolvedChildIdByHub[$event->id] = $child?->id ?? false;
+                }
+
+                // If school belongs to a resolved region child, hide the hub (show child instead)
+                if ($resolvedChildIdByHub[$event->id] !== false) {
+                    return true;
+                }
+
+                // If school has NO partition assigned yet, keep the parent hub!
+                // Schools see the parent event first and can choose their region.
+                return false;
             }
 
             // Reject any orphaned child events whose source phase was deleted
@@ -81,26 +94,20 @@ class FestSchoolPartitionService
                     $hubId = $event->parent_event_id;
 
                     if (! array_key_exists($hubId, $resolvedChildIdByHub)) {
-                        $key = $hub ? $this->resolvePartitionKey($hub, $schoolId) : null;
-                        $child = ($hub && $key) ? $this->partitions->partitionByKey($hub, $key) : null;
+                        $hubModel = $hub ?: FestEvent::find($hubId);
+                        $key = $hubModel ? $this->resolvePartitionKey($hubModel, $schoolId) : null;
+                        $child = ($hubModel && $key) ? $this->partitions->partitionByKey($hubModel, $key) : null;
                         $resolvedChildIdByHub[$hubId] = $child?->id ?? false;
                     }
 
-                    // If school belongs to a resolved region child, reject all sibling region children
+                    // If school belongs to a resolved region child, keep only that child
                     if ($resolvedChildIdByHub[$hubId] !== false) {
                         return $resolvedChildIdByHub[$hubId] !== $event->id;
                     }
 
-                    // If no specific region key resolved for this school yet, keep only 1 representative child event
-                    // per (parent_event_id, source_phase_id) to avoid flooding the table with duplicate region clones
-                    static $seenUnassignedGroups = [];
-                    $groupKey = $hubId . ':' . ($event->source_phase_id ?? 'default');
-                    if (in_array($groupKey, $seenUnassignedGroups, true)) {
-                        return true;
-                    }
-                    $seenUnassignedGroups[] = $groupKey;
-
-                    return false;
+                    // If school has not resolved any partition yet, hide all partition child clones!
+                    // (They will see the parent hub event instead, where they can choose their region).
+                    return true;
                 }
             }
 

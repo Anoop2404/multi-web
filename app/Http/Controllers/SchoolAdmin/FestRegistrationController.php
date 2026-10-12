@@ -112,7 +112,9 @@ class FestRegistrationController extends SchoolAdminController
             ->when($eventType === 'sports', fn ($q) => $q->whereNotExists(
                 fn ($sub) => $sub->selectRaw('1')
                     ->from('fest_events as sports_children')
-                    ->whereColumn('sports_children.parent_event_id', 'fest_events.id'),
+                    ->whereColumn('sports_children.parent_event_id', 'fest_events.id')
+                    ->whereNull('sports_children.partition_key')
+                    ->whereNull('sports_children.cluster_key'),
             ))
             ->when($request->query('event'), fn ($q) => $q->where('id', $request->query('event')))
             ->when($view === 'results', fn ($q) => $q->where('results_published', true))
@@ -534,6 +536,10 @@ class FestRegistrationController extends SchoolAdminController
             return null;
         }
 
+        if ($request->boolean('change_region')) {
+            return null;
+        }
+
         $key = app(FestSchoolPartitionService::class)->resolvePartitionKey($event, $this->school->id);
         $child = $key ? app(FestPartitionService::class)->partitionByKey($event, $key) : null;
 
@@ -588,10 +594,6 @@ class FestRegistrationController extends SchoolAdminController
      */
     private function filterPartitionedEventsForSchool($events, string $eventType)
     {
-        if ($eventType === 'sports') {
-            return $events;
-        }
-
         return app(FestSchoolPartitionService::class)->filterVisibleToSchool($events, $this->school->id);
     }
 
@@ -1082,8 +1084,75 @@ class FestRegistrationController extends SchoolAdminController
         $event->setAttribute('class_group_scheme', FestClassGroupScheme::resolveForEvent($event, $schedule));
         $event->unsetRelation('items');
         $event->setAttribute('items', $enabledItems);
+        $partitionService = app(FestPartitionService::class);
+        $schoolPartitionService = app(FestSchoolPartitionService::class);
+        $isPartitionedHub = $partitionService->isPartitionedHub($event);
+        $schoolPartitionKey = $isPartitionedHub ? $schoolPartitionService->resolvePartitionKey($event, $this->school->id) : null;
+
+        $partitionOptions = [];
+        if ($isPartitionedHub) {
+            $partitionOptions = $partitionService->partitions($event)->map(fn (FestEvent $part) => [
+                'id' => $part->id,
+                'name' => $part->cluster_label ?: $part->title,
+                'partition_key' => $part->partition_key ?? $part->cluster_key,
+                'region_id' => $part->region_id,
+                'venue' => $part->venue,
+                'event_start' => $part->event_start?->format('d M Y'),
+                'event_end' => $part->event_end?->format('d M Y'),
+            ])->values()->all();
+        }
+
+        $event->setAttribute('is_partitioned_hub', $isPartitionedHub);
+        $event->setAttribute('school_partition_key', $schoolPartitionKey);
+        $event->setAttribute('partition_options', $partitionOptions);
+        $event->setAttribute('parent_hub_id', $event->parent_event_id);
+        $event->setAttribute('partition_key', $event->partition_key ?? $event->cluster_key);
 
         return $event;
+    }
+
+    public function selectPartition(Request $request, string $tenantId, FestEvent $event, string $program = 'kalotsav')
+    {
+        $meta = SchoolFestProgram::meta($program);
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+
+        $partitionService = app(FestPartitionService::class);
+        $schoolPartitionService = app(FestSchoolPartitionService::class);
+
+        $hub = $event->parent_event_id ? ($event->parentEvent ?: FestEvent::findOrFail($event->parent_event_id)) : $event;
+        abort_if($partitionService->conductMode($hub) !== 'partitioned', 422, 'This event is not partitioned.');
+
+        $data = $request->validate([
+            'partition_key' => ['required', 'string'],
+        ]);
+
+        $partition = $partitionService->partitionByKey($hub, $data['partition_key']);
+        abort_if(! $partition, 422, 'Selected region/partition does not exist.');
+
+        $schoolPartitionService->assign($hub, $this->school->id, $data['partition_key'], $request->user()?->id);
+
+        if ($partition->region_id) {
+            $year = AcademicYear::forSahodaya($hub->tenant_id);
+            SchoolRegionAssignment::updateOrCreate(
+                [
+                    'tenant_id' => $hub->tenant_id,
+                    'school_id' => $this->school->id,
+                    'academic_year' => $year,
+                    'partition_group' => null,
+                ],
+                [
+                    'region_id' => $partition->region_id,
+                ]
+            );
+
+            app(FestRegionPartitionService::class)->syncSchoolAcrossHubs($hub->tenant_id, $this->school->id);
+        }
+
+        $prefix = ProgramRouteMap::prefixFromSlug($meta['slug']);
+        $label = $partition->cluster_label ?: $partition->title;
+
+        return redirect("/school-admin/{$tenantId}/{$prefix}/events/{$partition->id}/registration")
+            ->with('success', "Region assigned to {$label}. You can now register for items.");
     }
 
     public function store(Request $request, string $tenantId, string $program)

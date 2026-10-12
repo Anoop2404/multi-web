@@ -49,7 +49,7 @@
             </div>
         </div>
 
-        <SchoolEventWorkflowStepper v-if="singleEventMode && focusEvent?.id"
+        <SchoolEventWorkflowStepper v-if="singleEventMode && focusEvent?.id && (!focusEvent.is_partitioned_hub || focusEvent.school_partition_key)"
                                     :school-id="school.id"
                                     :program-prefix="programPrefix"
                                     :event-id="focusEvent.id"
@@ -58,7 +58,7 @@
                                     @select-step="step => setTab(focusEvent.id, step.tab)" />
 
         <!-- Contingent Team Managers Banner -->
-        <div v-if="focusEvent?.id" class="mb-5 max-w-4xl card p-4 border-indigo-100 bg-white shadow-xs flex flex-wrap items-center justify-between gap-3 text-sm">
+        <div v-if="focusEvent?.id && (!focusEvent.is_partitioned_hub || focusEvent.school_partition_key)" class="mb-5 max-w-4xl card p-4 border-indigo-100 bg-white shadow-xs flex flex-wrap items-center justify-between gap-3 text-sm">
             <div class="flex items-center gap-3">
                 <div class="w-9 h-9 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg shrink-0">
                     👔
@@ -87,6 +87,58 @@
                 <button type="button" class="btn-secondary text-xs" @click="openTeamManagersModal">
                     {{ teamManagers?.manager_name_1 ? 'Edit Team Managers' : '+ Add Team Managers' }}
                 </button>
+            </div>
+        </div>
+
+        <!-- Partitioned Event: Region Selection Required Banner -->
+        <div v-if="focusEvent?.is_partitioned_hub && !focusEvent?.school_partition_key && focusEvent?.partition_options?.length"
+             class="card border-blue-300 bg-gradient-to-r from-blue-50 to-indigo-50/70 mb-6 max-w-4xl p-5 shadow-sm rounded-xl">
+            <div class="flex items-start gap-4">
+                <span class="text-3xl shrink-0 p-2 bg-blue-100 rounded-lg text-blue-700">📍</span>
+                <div class="flex-1">
+                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <h3 class="font-bold text-slate-900 text-base">
+                            Select Region for {{ focusEvent.title }}
+                        </h3>
+                        <span class="text-xs font-semibold text-blue-800 bg-blue-100 px-2.5 py-0.5 rounded-full border border-blue-200">
+                            Region Required
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-600 mt-1 max-w-2xl">
+                        This event is conducted region-wise. Please choose the region your school will participate in. Once selected, you can register students and view the schedule and venues for that region.
+                    </p>
+
+                    <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3 mt-4">
+                        <div v-for="part in focusEvent.partition_options" :key="part.id"
+                             class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-blue-300 hover:shadow transition flex flex-col justify-between">
+                            <div class="space-y-2">
+                                <div class="flex items-center justify-between gap-2">
+                                    <h4 class="font-bold text-sm text-slate-900 capitalize">{{ part.name }}</h4>
+                                    <span class="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded">Region</span>
+                                </div>
+
+                                <div class="text-xs text-slate-600 space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                    <p class="flex items-start gap-1.5">
+                                        <span class="shrink-0 text-slate-400">🏢</span>
+                                        <span class="font-medium text-slate-800">{{ part.venue || 'Venue to be announced' }}</span>
+                                    </p>
+                                    <p v-if="part.event_start" class="flex items-center gap-1.5 text-slate-500">
+                                        <span class="shrink-0 text-slate-400">📅</span>
+                                        <span>{{ part.event_start }}{{ part.event_end && part.event_end !== part.event_start ? ' – ' + part.event_end : '' }}</span>
+                                    </p>
+                                </div>
+                            </div>
+
+                            <button type="button"
+                                    @click="selectEventPartition(part.partition_key)"
+                                    :disabled="submittingPartitionKey !== null"
+                                    class="btn-primary text-xs w-full py-2 font-semibold mt-3 flex items-center justify-center gap-1.5">
+                                <span v-if="submittingPartitionKey === part.partition_key" class="animate-spin text-xs">⏳</span>
+                                <span>Select {{ part.name }} Region →</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -244,7 +296,15 @@
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div class="min-w-0">
                             <h3 class="text-lg font-bold text-slate-900">{{ event.title }}</h3>
-                            <p class="text-xs text-slate-500 mt-0.5">{{ event.payer_label }}</p>
+                            <p class="text-xs text-slate-500 mt-0.5">
+                                {{ event.payer_label }}
+                                <span v-if="event.parent_hub_id && event.partition_key" class="ml-2">
+                                    • Region: <strong class="text-slate-700 capitalize">{{ event.cluster_label || event.partition_key }}</strong>
+                                    <Link :href="`${programBase}/events/${event.parent_hub_id}/registration?change_region=1`" class="text-blue-600 hover:underline ml-1 font-medium">
+                                        (Change region)
+                                    </Link>
+                                </span>
+                            </p>
                         </div>
                         <div class="flex flex-wrap gap-2 shrink-0">
                             <span class="text-xs font-bold px-2.5 py-1 rounded-full capitalize"
@@ -312,6 +372,51 @@
                     </p>
                 </div>
 
+                <!-- Partitioned Hub: Region Selection Prompt (inside event card) -->
+                <div v-if="event.is_partitioned_hub && !event.school_partition_key && event.partition_options?.length"
+                     class="p-6 bg-slate-50/50">
+                    <div class="max-w-3xl mx-auto text-center py-4">
+                        <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto text-2xl mb-3 shadow-xs">
+                            📍
+                        </div>
+                        <h4 class="text-base font-bold text-slate-900">Please Choose Your Region to Continue</h4>
+                        <p class="text-xs text-slate-600 mt-1 max-w-lg mx-auto">
+                            This event is organized into regions. Select your region below to register participants, view items, and manage entries.
+                        </p>
+                    </div>
+
+                    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 max-w-4xl mx-auto mt-2">
+                        <div v-for="part in event.partition_options" :key="part.id"
+                             class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-blue-400 hover:shadow-md transition flex flex-col justify-between">
+                            <div class="space-y-2">
+                                <div class="flex items-center justify-between gap-2">
+                                    <h5 class="font-bold text-sm text-slate-900 capitalize">{{ part.name }}</h5>
+                                    <span class="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">Region</span>
+                                </div>
+                                <div class="text-xs text-slate-600 space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                    <p class="flex items-start gap-1.5">
+                                        <span class="shrink-0 text-slate-400">🏢</span>
+                                        <span class="font-medium text-slate-800">{{ part.venue || 'Venue to be announced' }}</span>
+                                    </p>
+                                    <p v-if="part.event_start" class="flex items-center gap-1.5 text-slate-500">
+                                        <span class="shrink-0 text-slate-400">📅</span>
+                                        <span>{{ part.event_start }}{{ part.event_end && part.event_end !== part.event_start ? ' – ' + part.event_end : '' }}</span>
+                                    </p>
+                                </div>
+                            </div>
+
+                            <button type="button"
+                                    @click="selectEventPartition(part.partition_key)"
+                                    :disabled="submittingPartitionKey !== null"
+                                    class="btn-primary text-xs w-full py-2 font-semibold mt-3 flex items-center justify-center gap-1.5">
+                                <span v-if="submittingPartitionKey === part.partition_key" class="animate-spin text-xs">⏳</span>
+                                <span>Select {{ part.name }} Region →</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <template v-else>
                 <!-- In-card navigation tabs (Option 2) -->
                 <div class="border-b border-slate-200 bg-slate-50/70 px-5 py-2.5 flex flex-wrap items-center gap-2 text-xs font-semibold">
                     <button type="button" @click="setTab(event.id, 'athletes')"
@@ -723,6 +828,7 @@
                 />
                 <p v-else-if="canRegister(event) && !event.fee_required" class="text-xs text-gray-400 mt-4 border-t border-gray-100 pt-4">No fee for this round</p>
                 </div>
+                </template>
             </div>
         </div>
 
@@ -989,6 +1095,24 @@ function formatDateStr(val) {
     const d = new Date(val);
     if (isNaN(d.getTime())) return val;
     return d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+const submittingPartitionKey = ref(null);
+
+function selectEventPartition(partitionKey) {
+    const hubId = focusEvent.value?.id || props.focusEventId || displayEvents.value?.[0]?.id;
+    if (!hubId || !partitionKey || submittingPartitionKey.value) return;
+    submittingPartitionKey.value = partitionKey;
+    router.post(
+        `${programBase.value}/events/${hubId}/select-partition`,
+        { partition_key: partitionKey },
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                submittingPartitionKey.value = null;
+            },
+        }
+    );
 }
 
 const displayEvents = computed(() => {
