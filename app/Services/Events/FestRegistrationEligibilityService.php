@@ -325,7 +325,7 @@ class FestRegistrationEligibilityService
             return 'date of birth is required for sports registration.';
         }
 
-        $itemAge = FestSportsAgeGroup::resolveForItem($item->age_group, $item->class_group, 'sports');
+        $itemAge = FestSportsAgeGroup::resolveForItem($item->age_group, $item->class_group, 'sports', $event->tenant_id);
         if ($itemAge === null || $itemAge === 'open') {
             return null;
         }

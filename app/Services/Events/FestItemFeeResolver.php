@@ -119,7 +119,7 @@ class FestItemFeeResolver
         }
 
         $eventType = $event?->event_type ?? 'kalolsavam';
-        $ageGroup = FestSportsAgeGroup::resolveForItem($item?->age_group, $item?->class_group, $eventType);
+        $ageGroup = FestSportsAgeGroup::resolveForItem($item?->age_group, $item?->class_group, $eventType, $event?->tenant_id);
         if ($ageGroup !== null) {
             $ageFees = $schedule['age_group_fees'] ?? [];
             if (isset($ageFees[$ageGroup]) && $ageFees[$ageGroup] !== '') {

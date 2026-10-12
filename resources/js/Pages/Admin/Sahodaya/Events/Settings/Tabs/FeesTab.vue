@@ -670,7 +670,7 @@
             <!-- Class Category Schemes — named, Sahodaya-wide category setups (e.g. "CBSE
                  Kerala", "English Fest") shared across every event, picked here by id.
                  Superseded the old fixed cbse/sahodaya/cluster/custom choices. -->
-            <section v-if="event.event_type !== 'sports'" class="card space-y-4">
+            <section class="card space-y-4">
                 <div class="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-3">
                     <div class="border-b border-indigo-100 pb-2.5">
                         <h4 class="font-bold text-slate-900 text-xs flex items-center gap-1.5">

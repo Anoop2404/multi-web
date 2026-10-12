@@ -825,7 +825,7 @@ class FestIdCardService
         $ageGroupLabel = null;
 
         if ($isSports && $itemModel) {
-            $ageKey = FestSportsAgeGroup::resolveForItem($itemModel->age_group, $itemModel->class_group, 'sports');
+            $ageKey = FestSportsAgeGroup::resolveForItem($itemModel->age_group, $itemModel->class_group, 'sports', $event->tenant_id);
             if ($ageKey && $ageKey !== 'open') {
                 $ageGroupLabel = FestSportsAgeGroup::labels($event->tenant_id)[$ageKey] ?? strtoupper($ageKey);
             }

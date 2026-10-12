@@ -76,10 +76,10 @@ class FestSportsAgeGroupTest extends TestCase
         $young = new Student(['dob' => '2020-06-01']);
 
         $this->assertSame('u14', FestSportsAgeGroup::assignedAgeGroupForStudent($u14Student, $event));
-        $this->assertEquals(['u14', 'u17', 'u19'], FestSportsAgeGroup::eligibleAgeGroupsForStudent($u14Student, $event));
+        $this->assertEquals(['u14', 'u16', 'u17', 'u18', 'u19'], FestSportsAgeGroup::eligibleAgeGroupsForStudent($u14Student, $event));
 
         $this->assertSame('u17', FestSportsAgeGroup::assignedAgeGroupForStudent($u17Student, $event));
-        $this->assertEquals(['u17', 'u19'], FestSportsAgeGroup::eligibleAgeGroupsForStudent($u17Student, $event));
+        $this->assertEquals(['u17', 'u18', 'u19'], FestSportsAgeGroup::eligibleAgeGroupsForStudent($u17Student, $event));
 
         $youngEligible = FestSportsAgeGroup::eligibleAgeGroupsForStudent($young, $event);
         $this->assertContains('u8', $youngEligible);
@@ -136,9 +136,9 @@ class FestSportsAgeGroupTest extends TestCase
         $chessAlreadyBoys = new FestEventItem(['title' => 'Chess U7 (Boys)', 'gender' => 'male']);
         $chessOpen = new FestEventItem(['title' => 'Chess U7', 'gender' => 'open']);
 
-        $this->assertSame('Chess U7 (Boys)', $chessBoys->formattedTitle());
-        $this->assertSame('Chess U7 (Girls)', $chessGirls->formattedTitle());
-        $this->assertSame('Chess U7 (Mixed)', $chessMixed->formattedTitle());
+        $this->assertSame('Chess U7 — Boys', $chessBoys->formattedTitle());
+        $this->assertSame('Chess U7 — Girls', $chessGirls->formattedTitle());
+        $this->assertSame('Chess U7 — Mixed', $chessMixed->formattedTitle());
         $this->assertSame('Chess U7 (Boys)', $chessAlreadyBoys->formattedTitle());
         $this->assertSame('Chess U7', $chessOpen->formattedTitle());
     }

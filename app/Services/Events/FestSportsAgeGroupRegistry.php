@@ -101,9 +101,18 @@ class FestSportsAgeGroupRegistry
     /** @return array<string, string> */
     public function labels(): array
     {
-        return $this->all()->mapWithKeys(fn ($row) => [
-            $row->group_key => $row->label,
-        ])->all();
+        $labels = [];
+        foreach (config('fest_co_curricular.sports.age_groups', []) as $key => $row) {
+            if (is_array($row) && isset($row['label'])) {
+                $labels[$key] = $row['label'];
+            }
+        }
+
+        foreach ($this->all() as $row) {
+            $labels[$row->group_key] = $row->label;
+        }
+
+        return $labels;
     }
 
     /** @return array<string, float> */
@@ -122,7 +131,9 @@ class FestSportsAgeGroupRegistry
             return false;
         }
 
-        return in_array($ageGroup, $this->activeKeys(), true);
+        return in_array($ageGroup, $this->activeKeys(), true)
+            || in_array($ageGroup, $this->keys(), true)
+            || in_array($ageGroup, \App\Support\FestSportsAgeGroup::KEYS, true);
     }
 
     public function underAge(string $ageGroup): ?int
@@ -133,7 +144,7 @@ class FestSportsAgeGroupRegistry
 
         $row = $this->all()->firstWhere('group_key', $ageGroup);
 
-        return $row?->under_age;
+        return $row?->under_age ?? config("fest_co_curricular.sports.age_groups.{$ageGroup}.under_age");
     }
 
     /** @return list<array<string, mixed>> */

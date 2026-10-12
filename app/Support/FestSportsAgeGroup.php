@@ -39,6 +39,8 @@ class FestSportsAgeGroup
     /** @return array<string, string> */
     public static function labels(?string $tenantId = null): array
     {
+        $tenantId ??= (function_exists('tenant') && tenant('id') ? (string) tenant('id') : null);
+
         if ($tenantId) {
             return self::registry($tenantId)->labels();
         }
@@ -53,6 +55,8 @@ class FestSportsAgeGroup
     /** @return array<string, float> */
     public static function defaultFees(?string $tenantId = null): array
     {
+        $tenantId ??= (function_exists('tenant') && tenant('id') ? (string) tenant('id') : null);
+
         if ($tenantId) {
             return self::registry($tenantId)->defaultFees();
         }
@@ -66,6 +70,8 @@ class FestSportsAgeGroup
             return false;
         }
 
+        $tenantId ??= (function_exists('tenant') && tenant('id') ? (string) tenant('id') : null);
+
         if ($tenantId) {
             return self::registry($tenantId)->isValid($ageGroup);
         }
@@ -73,7 +79,7 @@ class FestSportsAgeGroup
         return in_array($ageGroup, self::KEYS, true);
     }
 
-    public static function fromClassGroup(?string $classGroup): ?string
+    public static function fromClassGroup(?string $classGroup, ?string $tenantId = null): ?string
     {
         if (! filled($classGroup)) {
             return null;
@@ -81,20 +87,22 @@ class FestSportsAgeGroup
 
         $mapped = config("fest_sports_age_groups.class_group_map.{$classGroup}");
 
-        return self::isValid($mapped) ? $mapped : null;
+        return self::isValid($mapped, $tenantId) ? $mapped : null;
     }
 
-    public static function resolveForItem(?string $ageGroup, ?string $classGroup, string $eventType): ?string
+    public static function resolveForItem(?string $ageGroup, ?string $classGroup, string $eventType, ?string $tenantId = null): ?string
     {
         if ($eventType !== 'sports') {
             return null;
         }
 
-        if (self::isValid($ageGroup)) {
+        $tenantId ??= (function_exists('tenant') && tenant('id') ? (string) tenant('id') : null);
+
+        if (self::isValid($ageGroup, $tenantId)) {
             return $ageGroup;
         }
 
-        return self::fromClassGroup($classGroup);
+        return self::fromClassGroup($classGroup, $tenantId);
     }
 
     public static function genderLabel(?string $gender): ?string
@@ -264,6 +272,8 @@ class FestSportsAgeGroup
     /** @return list<string> */
     public static function orderedAgeGroups(?string $tenantId = null): array
     {
+        $tenantId ??= (function_exists('tenant') && tenant('id') ? (string) tenant('id') : null);
+
         if ($tenantId) {
             return self::registry($tenantId)->orderedAgeGroups();
         }
@@ -273,6 +283,8 @@ class FestSportsAgeGroup
 
     public static function underAge(string $ageGroup, ?string $tenantId = null): ?int
     {
+        $tenantId ??= (function_exists('tenant') && tenant('id') ? (string) tenant('id') : null);
+
         if ($tenantId) {
             return self::registry($tenantId)->underAge($ageGroup);
         }
@@ -347,7 +359,7 @@ class FestSportsAgeGroup
 
     public static function qualifiesForItem(Student $student, FestEventItem $item, FestEvent $event): bool
     {
-        $itemAge = self::resolveForItem($item->age_group, $item->class_group, 'sports');
+        $itemAge = self::resolveForItem($item->age_group, $item->class_group, 'sports', $event->tenant_id);
         if ($itemAge === null || $itemAge === 'open') {
             return (bool) $student->dob;
         }
@@ -360,7 +372,7 @@ class FestSportsAgeGroup
         $parts = [];
 
         if ($event->event_type === 'sports') {
-            $age = self::resolveForItem($item->age_group, $item->class_group, 'sports');
+            $age = self::resolveForItem($item->age_group, $item->class_group, 'sports', $event->tenant_id);
             if ($age && $age !== 'open') {
                 $parts[] = self::labels($event->tenant_id)[$age] ?? strtoupper($age);
             }
