@@ -938,7 +938,12 @@ class FestCertificateController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $schoolIds = FestRegistration::whereIn('event_id', $event->reportableEventIds())
-            ->where('status', 'approved')->select('school_id');
+            ->where('status', 'approved')
+            ->distinct()
+            ->pluck('school_id')
+            ->filter()
+            ->values()
+            ->all();
         $schools = Tenant::whereIn('id', $schoolIds)->orderBy('name')->get(['id', 'name']);
 
         return PdfGenerator::fromView('fest.reports.certificate-school-list', [

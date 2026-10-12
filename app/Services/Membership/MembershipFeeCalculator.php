@@ -28,10 +28,17 @@ class MembershipFeeCalculator
         // top-up difference — and if the revised total doesn't cross into a costlier slab,
         // outstanding is zero/negative and no new payment step is opened.
         $amountPaid = (float) ($registration->amount_paid ?? 0);
-        $outstanding = round($amount - $amountPaid, 2);
+        $schoolId = $school?->id ?? $registration->school_id;
+        $verifiedPaymentsSum = (float) \App\Models\MembershipPayment::where('school_id', $schoolId)
+            ->where('academic_year', $registration->academic_year)
+            ->where('status', 'verified')
+            ->sum('amount');
+        $effectiveAmountPaid = max($amountPaid, $verifiedPaymentsSum);
+        $outstanding = round($amount - $effectiveAmountPaid, 2);
 
         $registration->update([
             'membership_fee_amount' => $amount,
+            'amount_paid'           => $effectiveAmountPaid,
             'registration_status'   => $profile->requiresMembershipPaymentForSchool($school) && $outstanding > 0
                 ? 'payment_pending'
                 : 'completed',

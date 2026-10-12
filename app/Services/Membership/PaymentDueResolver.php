@@ -26,16 +26,25 @@ class PaymentDueResolver
             ->orderByDesc('updated_at')
             ->get();
 
+        $coveredSchoolIds = [];
+
         foreach ($registrations as $registration) {
             $school = $registration->school;
             if (! $school) {
                 continue;
             }
 
-            $items->push($this->mapRegistration($registration, $school, $academicYear));
+            $coveredSchoolIds[] = $school->id;
+            $mapped = $this->mapRegistration($registration, $school, $academicYear);
+
+            if (($mapped['membership_fee_amount'] ?? 0) <= 0) {
+                continue;
+            }
+
+            $items->push($mapped);
         }
 
-        $coveredSchoolIds = $items->pluck('school_id')->all();
+        $coveredSchoolIds = array_unique(array_merge($coveredSchoolIds, $items->pluck('school_id')->all()));
 
         $unpaidSchools = Tenant::query()
             ->where('parent_id', $sahodayaId)
@@ -191,7 +200,6 @@ class PaymentDueResolver
         }
 
         $amountPaid = (float) ($registration->amount_paid ?? 0);
-        $dueAmount = max(0.0, round($totalFee - $amountPaid, 2));
 
         $paymentsQuery = $registration->relationLoaded('payments')
             ? $registration->payments
@@ -200,6 +208,12 @@ class PaymentDueResolver
                 ->where('status', '!=', 'superseded')
                 ->orderByDesc('created_at')
                 ->get();
+
+        $verifiedPaid = (float) $paymentsQuery
+            ->where('status', 'verified')
+            ->sum('amount');
+        $effectivePaid = max($amountPaid, $verifiedPaid);
+        $dueAmount = max(0.0, round($totalFee - $effectivePaid, 2));
 
         $schoolPayments = $paymentsQuery->map(fn (MembershipPayment $p) => [
             'id'              => $p->id,
@@ -220,7 +234,7 @@ class PaymentDueResolver
             'registration_status'   => $registration->registration_status,
             'membership_fee_amount' => $dueAmount,
             'total_fee_amount'      => $totalFee,
-            'amount_paid'           => $amountPaid,
+            'amount_paid'           => $effectivePaid,
             'school_payments'       => $schoolPayments,
             'source'                => 'registration',
             'updated_at'            => $registration->updated_at?->toIso8601String(),

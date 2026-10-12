@@ -122,4 +122,57 @@ class FixMembershipRegistrationCacheCommandTest extends TestCase
         $this->assertSame('payment_pending', $registration->registration_status);
         $this->assertEquals(0.0, (float) $registration->amount_paid);
     }
+
+    public function test_command_bulk_repairs_all_registrations_for_sahodaya(): void
+    {
+        $sahodaya = Tenant::create([
+            'id'        => (string) Str::uuid(),
+            'type'      => 'sahodaya',
+            'name'      => 'Kannur Sahodaya',
+            'is_active' => true,
+        ]);
+
+        SahodayaProfile::create([
+            'tenant_id'         => $sahodaya->id,
+            'student_data_mode' => 'counts_only',
+        ]);
+
+        $schoolA = Tenant::create([
+            'id'                => (string) Str::uuid(),
+            'type'              => 'school',
+            'name'              => 'School A',
+            'parent_id'         => $sahodaya->id,
+            'school_prefix'     => 'SCA',
+            'membership_status' => 'approved',
+            'is_active'         => true,
+        ]);
+
+        $regA = Registration::create([
+            'school_id'             => $schoolA->id,
+            'academic_year'         => '2026-27',
+            'reg_no'                => 'KNR/27/01',
+            'membership_fee_amount' => 6500,
+            'amount_paid'           => 0,
+            'registration_status'   => 'payment_pending',
+        ]);
+
+        MembershipPayment::create([
+            'school_id'          => $schoolA->id,
+            'academic_year'      => '2026-27',
+            'registration_id'    => null,
+            'amount'             => 6500,
+            'payment_proof_path' => 'membership/payment_proofs/proof.pdf',
+            'status'             => 'verified',
+        ]);
+
+        $this->artisan('membership:fix-registration-cache', [
+            '--sahodaya'       => $sahodaya->id,
+            '--all'            => true,
+            '--no-interaction' => true,
+        ])->assertExitCode(0);
+
+        $regA->refresh();
+        $this->assertSame('completed', $regA->registration_status);
+        $this->assertEquals(6500.0, (float) $regA->amount_paid);
+    }
 }

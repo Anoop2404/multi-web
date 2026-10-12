@@ -220,6 +220,12 @@ class KannurLegacyMembershipImporter
                             $registration->update(['membership_fee_amount' => $feeAmount]);
                         }
                     }
+                    $verifiedPaidAmount = (float) MembershipPayment::query()
+                        ->where('school_id', $newSchool->id)
+                        ->where('academic_year', $academicYear)
+                        ->where('status', 'verified')
+                        ->sum('amount');
+
                     $paidAmount = (float) MembershipPayment::query()
                         ->where('school_id', $newSchool->id)
                         ->where('academic_year', $academicYear)
@@ -227,9 +233,10 @@ class KannurLegacyMembershipImporter
                         ->sum('amount');
 
                     $status = $this->resolveRegistrationStatus($registration, $payment, $feeAmount, $paidAmount, $verifyAllPayments);
-                    if ($registration->registration_status !== $status) {
-                        $registration->update(['registration_status' => $status]);
-                    }
+                    $registration->update([
+                        'amount_paid'         => $verifiedPaidAmount,
+                        'registration_status' => $status,
+                    ]);
 
                     if ($status === 'completed') {
                         $stats['completed']++;

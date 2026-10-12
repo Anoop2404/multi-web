@@ -16,11 +16,12 @@ use Illuminate\Console\Command;
 class FixMembershipRegistrationCache extends Command
 {
     protected $signature = 'membership:fix-registration-cache
-        {reg_no : The Registration.reg_no to repair, e.g. MALCS/27/13}
+        {reg_no? : The Registration.reg_no to repair, e.g. MALCS/27/13}
         {--sahodaya= : Sahodaya UUID or subdomain that owns this registration}
+        {--all : Scan and repair all registrations in the Sahodaya}
         {--dry-run : Show what would change without saving}';
 
-    protected $description = 'Re-link a verified MembershipPayment to its Registration and resync amount_paid/registration_status';
+    protected $description = 'Re-link verified MembershipPayments to Registrations and resync amount_paid/registration_status';
 
     public function handle(): int
     {
@@ -38,6 +39,89 @@ class FixMembershipRegistrationCache extends Command
                 : 'Pass --sahodaya=<uuid-or-subdomain> to select which Sahodaya database to look in.');
 
             return self::FAILURE;
+        }
+
+        if ($this->option('all') || ! $regNo) {
+            $repairs = $sahodaya->run(function () {
+                $registrations = Registration::with('school')->get();
+                $itemsToRepair = [];
+
+                foreach ($registrations as $registration) {
+                    $unlinked = MembershipPayment::where('school_id', $registration->school_id)
+                        ->where('academic_year', $registration->academic_year)
+                        ->where('status', 'verified')
+                        ->whereNull('registration_id')
+                        ->get();
+
+                    $verifiedTotal = (float) MembershipPayment::where('school_id', $registration->school_id)
+                        ->where('academic_year', $registration->academic_year)
+                        ->where('status', 'verified')
+                        ->where(fn ($q) => $q->where('registration_id', $registration->id)->orWhereNull('registration_id'))
+                        ->sum('amount');
+
+                    $newStatus = ($registration->membership_fee_amount !== null && $verifiedTotal < (float) $registration->membership_fee_amount)
+                        ? 'payment_pending'
+                        : 'completed';
+
+                    $needsSync = (float) $registration->amount_paid !== $verifiedTotal
+                        || $registration->registration_status !== $newStatus
+                        || $unlinked->isNotEmpty();
+
+                    if ($needsSync) {
+                        $itemsToRepair[] = [
+                            'registration'    => $registration,
+                            'unlinked_ids'    => $unlinked->pluck('id')->all(),
+                            'before'          => ['amount_paid' => (float) $registration->amount_paid, 'registration_status' => $registration->registration_status],
+                            'after'           => ['amount_paid' => $verifiedTotal, 'registration_status' => $newStatus],
+                        ];
+                    }
+                }
+
+                return $itemsToRepair;
+            });
+
+            if (empty($repairs)) {
+                $this->info("All registrations in {$sahodaya->name} are already in sync.");
+
+                return self::SUCCESS;
+            }
+
+            $this->info('Found '.count($repairs)." registration(s) requiring sync in {$sahodaya->name}:");
+            foreach ($repairs as $item) {
+                $reg = $item['registration'];
+                $schoolName = $reg->school?->name ?? $reg->school_id;
+                $this->line(" • [{$reg->reg_no}] {$schoolName}: paid {$item['before']['amount_paid']} -> {$item['after']['amount_paid']}, status {$item['before']['registration_status']} -> {$item['after']['registration_status']}");
+            }
+
+            if ($this->option('dry-run')) {
+                $this->comment('Dry run — nothing was saved.');
+
+                return self::SUCCESS;
+            }
+
+            if (! $this->option('no-interaction') && ! $this->confirm('Apply these changes?', true)) {
+                $this->comment('Aborted — nothing was saved.');
+
+                return self::SUCCESS;
+            }
+
+            $sahodaya->run(function () use ($repairs) {
+                foreach ($repairs as $item) {
+                    $reg = $item['registration'];
+                    if (! empty($item['unlinked_ids'])) {
+                        MembershipPayment::whereIn('id', $item['unlinked_ids'])
+                            ->update(['registration_id' => $reg->id]);
+                    }
+                    $reg->update([
+                        'amount_paid'         => $item['after']['amount_paid'],
+                        'registration_status' => $item['after']['registration_status'],
+                    ]);
+                }
+            });
+
+            $this->info('Successfully synchronized '.count($repairs).' registration(s).');
+
+            return self::SUCCESS;
         }
 
         $result = $sahodaya->run(function () use ($regNo) {

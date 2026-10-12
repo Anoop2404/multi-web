@@ -312,22 +312,29 @@ class FestPortalController extends Controller
             ];
         };
 
-        $payload = $isAdminPreview
-            ? $compute()
-            : $this->rememberPublicHotPath($cacheKey, 30, $compute);
+        $renderItemFinder = function () use ($tenant, $event, $selectedScope, $isAdminPreview, $compute) {
+            $payload = $compute();
 
-        return $this->renderPublic('public.fest.item-finder', $tenant, [
-            'event' => $event,
-            'eventContext' => $this->operationalEvents->publicContext($event),
-            'allItems' => $payload['allItems'],
-            'categoryLabels' => $payload['categoryLabels'],
-            'isAdminPreview' => $isAdminPreview,
-            'scopeSchedulePublished' => (bool) $selectedScope['schedule_published'],
-            'scheduledItemIds' => $payload['scheduledItemIds'],
-            'resultedItemIds' => $payload['resultedItemIds'],
-            'visibleResultItemIds' => $payload['visibleResultItemIds'],
-            'pageSeo' => ['title' => 'Item Finder — '.$event->title.' — '.$tenant->name],
-        ]);
+            return $this->renderPublic('public.fest.item-finder', $tenant, [
+                'event' => $event,
+                'eventContext' => $this->operationalEvents->publicContext($event),
+                'allItems' => $payload['allItems'],
+                'categoryLabels' => $payload['categoryLabels'],
+                'isAdminPreview' => $isAdminPreview,
+                'scopeSchedulePublished' => (bool) $selectedScope['schedule_published'],
+                'scheduledItemIds' => $payload['scheduledItemIds'],
+                'resultedItemIds' => $payload['resultedItemIds'],
+                'visibleResultItemIds' => $payload['visibleResultItemIds'],
+                'pageSeo' => ['title' => 'Item Finder — '.$event->title.' — '.$tenant->name],
+            ])->getContent();
+        };
+
+        $cacheKey = 'fest-item-finder-html:v3:'.$event->tenant_id.':'.$event->id.':'.$resultsVersion[0].':'.($isAdminPreview ? '1' : '0');
+        $html = $isAdminPreview
+            ? $renderItemFinder()
+            : $this->rememberPublicHotPath($cacheKey, 30, $renderItemFinder);
+
+        return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
     }
 
     public function results(Request $request, int $eventId)
@@ -2164,18 +2171,23 @@ public function tv(Request $request, int $eventId)
             return $results;
         };
 
-        $results = $isAdminPreview
-            ? $compute()
-            : $this->rememberPublicHotPath($cacheKey, 30, $compute);
+        $renderSearch = function () use ($tenant, $event, $q, $isAdminPreview, $compute) {
+            return $this->renderPublic('public.fest.search', $tenant, [
+                'event' => $event,
+                'q' => $q,
+                'results' => $compute(),
+                'searchHint' => $this->visibility->searchPlaceholder($event, $isAdminPreview),
+                'nameSearch' => $this->visibility->allowNameSearch($event, $isAdminPreview),
+                'isAdminPreview' => $isAdminPreview,
+            ])->getContent();
+        };
 
-        return $this->renderPublic('public.fest.search', $tenant, [
-            'event' => $event,
-            'q' => $q,
-            'results' => $results,
-            'searchHint' => $this->visibility->searchPlaceholder($event, $isAdminPreview),
-            'nameSearch' => $this->visibility->allowNameSearch($event, $isAdminPreview),
-            'isAdminPreview' => $isAdminPreview,
-        ]);
+        $cacheKey = 'fest-search-html:v2:'.$event->tenant_id.':'.$event->id.':'.md5($q).':'.$resultsVersion.':'.($isAdminPreview ? '1' : '0');
+        $html = $isAdminPreview
+            ? $renderSearch()
+            : $this->rememberPublicHotPath($cacheKey, 30, $renderSearch);
+
+        return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
     }
 
     public function participant(Request $request, int $eventId, string $ref)
@@ -2196,7 +2208,6 @@ public function tv(Request $request, int $eventId)
         $participant = $this->visibility->findParticipantByRef($event, $ref);
         abort_unless($participant, 404);
 
-        $cacheKey = 'fest-participant:v1:'.$event->tenant_id.':'.$event->id.':'.$participant->id.':'.($isAdminPreview ? '1' : '0');
         $compute = function () use ($event, $participant, $isAdminPreview) {
             $mark = FestMark::currentPerformers()->where('participant_id', $participant->id)->first();
             $schedule = FestSchedule::where('participant_id', $participant->id)->first();
@@ -2221,18 +2232,25 @@ public function tv(Request $request, int $eventId)
             ];
         };
 
-        $data = $isAdminPreview
-            ? $compute()
-            : $this->rememberPublicHotPath($cacheKey, 30, $compute);
+        $renderParticipant = function () use ($tenant, $event, $participant, $isAdminPreview, $compute) {
+            $data = $compute();
 
-        return $this->renderPublic('public.fest.participant', $tenant, compact(
-            'event', 'participant', 'isAdminPreview'
-        ) + [
-            'public' => $data['public'],
-            'mark' => $data['mark'],
-            'schedule' => $data['schedule'],
-            'items' => $data['items'],
-        ]);
+            return $this->renderPublic('public.fest.participant', $tenant, compact(
+                'event', 'participant', 'isAdminPreview'
+            ) + [
+                'public' => $data['public'],
+                'mark' => $data['mark'],
+                'schedule' => $data['schedule'],
+                'items' => $data['items'],
+            ])->getContent();
+        };
+
+        $cacheKey = 'fest-participant-html:v2:'.$event->tenant_id.':'.$event->id.':'.$participant->id.':'.($isAdminPreview ? '1' : '0');
+        $html = $isAdminPreview
+            ? $renderParticipant()
+            : $this->rememberPublicHotPath($cacheKey, 30, $renderParticipant);
+
+        return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
     }
 
     /** @return list<array<string, mixed>> */
