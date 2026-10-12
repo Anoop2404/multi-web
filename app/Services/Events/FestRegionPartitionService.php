@@ -145,10 +145,11 @@ class FestRegionPartitionService
             ? FestEvent::find($event->parent_event_id) ?? $event
             : $event;
 
-        // Sports uses a nested season -> discipline -> region topology. Running the
-        // generic one-level synchronizer here corrupts that shape by placing regions
-        // directly under the season.
         if ($hub->event_type === 'sports') {
+            return;
+        }
+
+        if (($hub->conduct_mode ?? 'standard') !== 'partitioned') {
             return;
         }
 

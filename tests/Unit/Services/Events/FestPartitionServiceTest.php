@@ -164,15 +164,12 @@ class FestPartitionServiceTest extends TestCase
             [$item->id, $regionItem->id],
             $hub->reportableItemIds([$item->id]),
         );
-        // A region's own edit to its copy of this item (e.g. correcting its class_group,
-        // exactly like a Sahodaya admin can via FestEventController::updateItem()) must
-        // survive a re-sync — copyItemToPartition() only creates genuinely missing child
-        // items now; it never overwrites one that already exists.
-        $regionItem->update(['class_group' => 'CATEGORY__II']);
+        // Region-specific overrides (like is_enabled, fee_amount) survive a re-sync
+        $regionItem->update(['is_enabled' => false]);
         $syncedItem = app(FestItemSyncService::class)
             ->copyItemToPartition($hub, $item->fresh(), $region, 'region');
         $this->assertSame($regionItem->id, $syncedItem?->id);
-        $this->assertSame('CATEGORY__II', $syncedItem?->class_group);
+        $this->assertFalse($syncedItem?->is_enabled);
         $this->assertSame('draft', $region->status);
         app(FestRegionPartitionService::class)->inheritRegistrationLifecycle($hub, $region);
         $this->assertSame('registration_open', $region->fresh()->status);
@@ -337,4 +334,34 @@ class FestPartitionServiceTest extends TestCase
         $this->expectException(HttpException::class);
         app(FestPartitionService::class)->assertSafeToActivatePhasedWorkflow($hub);
     }
+
+    public function test_explicit_standard_conduct_mode_overrides_existing_children(): void
+    {
+        $sahodaya = $this->sahodaya();
+        $hub = FestEvent::create([
+            'tenant_id' => $sahodaya->id,
+            'title' => 'Single Kalotsav',
+            'event_type' => 'kalolsavam',
+            'conduct_mode' => 'standard',
+            'level_round' => 'sahodaya',
+            'status' => 'registration_open',
+        ]);
+
+        // Even if old child partition rows linger in the database:
+        FestEvent::create([
+            'tenant_id' => $sahodaya->id,
+            'title' => 'Lingering Child Region',
+            'event_type' => 'kalolsavam',
+            'parent_event_id' => $hub->id,
+            'partition_key' => 'tirur',
+            'partition_role' => 'region',
+            'level_round' => 'sahodaya',
+            'status' => 'draft',
+        ]);
+
+        $service = app(FestPartitionService::class);
+        $this->assertSame('standard', $service->conductMode($hub));
+        $this->assertFalse($service->isPartitionedHub($hub));
+    }
 }
+

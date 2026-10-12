@@ -19,8 +19,8 @@ class FestPartitionService
 {
     public function conductMode(FestEvent $event): string
     {
-        if (($event->conduct_mode ?? 'standard') === 'partitioned') {
-            return 'partitioned';
+        if ($event->conduct_mode !== null) {
+            return $event->conduct_mode;
         }
 
         if (! $event->parent_event_id) {
