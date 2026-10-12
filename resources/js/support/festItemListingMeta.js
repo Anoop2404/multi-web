@@ -53,10 +53,12 @@ export function festItemListingDetails(item, { taxonomy = {}, eventType = 'custo
 
     if (isSports && item.age_group) {
         fields.push({ label: 'Age group', value: taxonomy.age_group?.[item.age_group] ?? item.age_group });
-    } else if (isKidsFest && item.kids_band) {
-        fields.push({ label: 'Kids band', value: taxonomy.kids_band?.[item.kids_band] ?? item.kids_band });
-    } else if (item.class_group) {
+    }
+    if (!isSports && item.class_group) {
         fields.push({ label: 'Class', value: taxonomy.class_group?.[item.class_group] ?? item.class_group });
+    }
+    if (isKidsFest && item.kids_band && item.kids_band !== 'open') {
+        fields.push({ label: 'Kids band', value: taxonomy.kids_band?.[item.kids_band] ?? item.kids_band });
     }
 
     fields.push({ label: 'Gender', value: festItemGenderLabel(item.gender, taxonomy) });

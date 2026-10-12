@@ -55,10 +55,13 @@ export function formatItemEligibility(item, event, { ageGroupLabels = {}, classG
     if (event?.event_type === 'sports') {
         const age = item.age_group && item.age_group !== 'open' ? item.age_group : null;
         if (age) parts.push(ageGroupLabel(age, ageGroupLabels));
-    } else if (event?.event_type === 'kalolsavam' && item.class_group && item.class_group !== 'open') {
-        parts.push(classGroupLabels[item.class_group] ?? item.class_group.toUpperCase());
-    } else if (event?.event_type === 'kids_fest' && item.kids_band && item.kids_band !== 'open') {
-        parts.push(kidsBandLabels[item.kids_band] ?? item.kids_band);
+    } else {
+        if (item.class_group && item.class_group !== 'open') {
+            parts.push(classGroupLabels[item.class_group] ?? item.class_group.toUpperCase());
+        }
+        if (event?.event_type === 'kids_fest' && item.kids_band && item.kids_band !== 'open') {
+            parts.push(kidsBandLabels[item.kids_band] ?? item.kids_band);
+        }
     }
 
     const g = genderLabel(item.gender);

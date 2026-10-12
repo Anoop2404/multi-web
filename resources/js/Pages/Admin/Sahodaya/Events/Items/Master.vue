@@ -306,13 +306,13 @@
                         <SearchableSelect v-model="itemForm.age_group" :options="ageGroupTaxonomyOptions"
                                           :all-option="true" all-label="Age group" />
                     </FormField>
-                    <FormField v-else-if="event.event_type === 'kids_fest'" label="Kids Fest Band">
-                        <SearchableSelect v-model="itemForm.kids_band" :options="kidsBandOptions"
-                                          :all-option="true" all-label="Kids Fest band" />
-                    </FormField>
-                    <FormField v-else label="Competition Category (Grade Level)">
+                    <FormField v-if="!isSports" label="Competition Category (Grade Level)">
                         <SearchableSelect v-model="itemForm.class_group" :options="classGroupOptions"
                                           :all-option="true" all-label="Select Category (Category I, II, III, IV)..." />
+                    </FormField>
+                    <FormField v-if="event.event_type === 'kids_fest'" label="Kids Fest Band">
+                        <SearchableSelect v-model="itemForm.kids_band" :options="kidsBandOptions"
+                                          :all-option="true" all-label="Kids Fest band" />
                     </FormField>
 
                     <FormField label="Gender">
@@ -411,14 +411,14 @@
                                               :all-option="true" all-label="None / Open" />
                         </FormField>
 
-                        <FormField v-else-if="event.event_type === 'kids_fest'" label="Kids Fest Band">
-                            <SearchableSelect v-model="editForm.kids_band" :options="kidsBandOptions"
-                                              :all-option="true" all-label="None / Open" />
-                        </FormField>
-
-                        <FormField v-else label="Class Category / Group">
+                        <FormField v-if="!isSports" label="Class Category / Group">
                             <SearchableSelect v-model="editForm.class_group" :options="classGroupOptions"
                                               :all-option="true" all-label="Open / All Classes" />
+                        </FormField>
+
+                        <FormField v-if="event.event_type === 'kids_fest'" label="Kids Fest Band">
+                            <SearchableSelect v-model="editForm.kids_band" :options="kidsBandOptions"
+                                              :all-option="true" all-label="None / Open" />
                         </FormField>
 
                         <FormField v-if="!isSports" label="Item Genre / Type">

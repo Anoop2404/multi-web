@@ -1682,6 +1682,9 @@ function studentMatchesItem(student, event, item, { skipVerification = false } =
     if (props.eventType === 'kids_fest') {
         if (!isItemOpenClass(item)) {
             if (!student.eligible_kids_fest) return false;
+            if (item.class_group && item.class_group !== 'open') {
+                if (!matchesClassGroup(student.kalolsav_class_group, item.class_group)) return false;
+            }
             if (item.kids_band && item.kids_band !== 'open' && student.kids_fest_band !== item.kids_band) return false;
         }
     }

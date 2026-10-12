@@ -166,7 +166,7 @@
                             <th class="min-w-[10rem]">Item</th>
                             <th class="whitespace-nowrap">Level</th>
                             <th class="whitespace-nowrap">Category</th>
-                            <th class="whitespace-nowrap">{{ event.event_type === 'kids_fest' ? 'Band' : 'Class' }}</th>
+                            <th class="whitespace-nowrap">{{ isSports ? 'Age Group' : (event.event_type === 'kids_fest' ? 'Category / Band' : 'Class') }}</th>
                             <th class="whitespace-nowrap">Gender</th>
                             <th class="whitespace-nowrap">Participant</th>
                             <th class="whitespace-nowrap text-center">Qualifiers</th>
@@ -252,13 +252,13 @@
                                           :options="artsCategoryOptions" :all-option="true" all-label="No category" />
                     </FormField>
 
+                    <FormField v-if="!isSports" label="Class category">
+                        <SearchableSelect v-model="addForm.class_group"
+                                          :options="classGroupOptions" :all-option="true" all-label="Class category" />
+                    </FormField>
                     <FormField v-if="event.event_type === 'kids_fest'" label="Kids Fest band">
                         <SearchableSelect v-model="addForm.kids_band"
                                           :options="kidsBandOptions" :all-option="true" all-label="Kids Fest band" />
-                    </FormField>
-                    <FormField v-else-if="!isSports" label="Class category">
-                        <SearchableSelect v-model="addForm.class_group"
-                                          :options="classGroupOptions" :all-option="true" all-label="Class category" />
                     </FormField>
 
                     <FormField label="Participant type">
@@ -330,13 +330,13 @@
                                           :options="artsCategoryOptions" :all-option="true" all-label="No category" />
                     </FormField>
 
+                    <FormField v-if="!isSports" label="Class category">
+                        <SearchableSelect v-model="editForm.class_group"
+                                          :options="classGroupOptions" :all-option="true" all-label="Class category" />
+                    </FormField>
                     <FormField v-if="event.event_type === 'kids_fest'" label="Kids Fest band">
                         <SearchableSelect v-model="editForm.kids_band"
                                           :options="kidsBandOptions" :all-option="true" all-label="Kids Fest band" />
-                    </FormField>
-                    <FormField v-else-if="!isSports" label="Class category">
-                        <SearchableSelect v-model="editForm.class_group"
-                                          :options="classGroupOptions" :all-option="true" all-label="Class category" />
                     </FormField>
 
                     <FormField label="Participant type">
@@ -557,13 +557,14 @@ function categoryLabel(item) {
     if (isSports.value && item.age_group) {
         return props.taxonomy?.age_group?.[item.age_group] ?? item.age_group;
     }
-    if (props.event.event_type === 'kids_fest' && item.kids_band) {
-        return props.taxonomy?.kids_band?.[item.kids_band] ?? item.kids_band;
-    }
+    const parts = [];
     if (item.class_group) {
-        return props.taxonomy?.class_group?.[item.class_group] ?? item.class_group;
+        parts.push(props.taxonomy?.class_group?.[item.class_group] ?? item.class_group);
     }
-    return '—';
+    if (props.event.event_type === 'kids_fest' && item.kids_band && item.kids_band !== 'open') {
+        parts.push(props.taxonomy?.kids_band?.[item.kids_band] ?? item.kids_band);
+    }
+    return parts.length ? parts.join(' · ') : '—';
 }
 
 // The arts_category taxonomy dimension — replaces per-event "Event Head" as the

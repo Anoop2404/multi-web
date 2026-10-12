@@ -143,7 +143,7 @@ class FestRegistrationEligibilityService
                 'verified_at' => $student->verified_at?->toIso8601String(),
                 'event_registered' => $eventRegNo !== null,
                 'event_registration_number' => $eventRegNo,
-                'kalolsav_class_group' => $isKalolsav ? FestStudentClassResolver::classGroupForStudent($student, $event) : null,
+                'kalolsav_class_group' => ($isKalolsav || $isKidsFest) ? FestStudentClassResolver::classGroupForStudent($student, $event) : null,
                 'kids_fest_band' => $isKidsFest ? FestStudentClassResolver::kidsFestBandForStudent($student) : null,
                 'sports_age_group' => $isSports ? FestSportsAgeGroup::primaryAgeGroupForStudent($student, $event) : null,
                 'eligible_sports_groups' => $isSports ? FestSportsAgeGroup::eligibleAgeGroupsForStudent($student, $event) : [],
@@ -225,7 +225,7 @@ class FestRegistrationEligibilityService
 
         return match ($eventType) {
             'kalolsavam', 'kalotsav', 'kalolsav' => $this->validateKalolsav($student, $item, $event),
-            'kids_fest' => $this->validateKidsFest($student, $item),
+            'kids_fest' => $this->validateKidsFest($student, $item, $event),
             'sports' => $this->validateSports($student, $event, $item),
             'custom', 'english_fest', 'science_fest' => $this->validateCustomClassGroup($student, $item, $event),
             default => null,
@@ -293,13 +293,20 @@ class FestRegistrationEligibilityService
         return null;
     }
 
-    private function validateKidsFest(Student $student, FestEventItem $item): ?string
+    private function validateKidsFest(Student $student, FestEventItem $item, FestEvent $event): ?string
     {
-        $studentBand = FestStudentClassResolver::kidsFestBandForStudent($student);
-        if ($studentBand === null) {
+        if (! FestStudentClassResolver::isKidsFestEligible($student)) {
             return 'not eligible for Kids Fest (Pre-KG through Class 2 only).';
         }
 
+        if (! $this->isItemOpenClass($item) && $item->class_group && $item->class_group !== 'open') {
+            $studentGroup = FestStudentClassResolver::classGroupForStudent($student, $event);
+            if ($studentGroup !== null && ($err = $this->validateItemClassGroup($studentGroup, $item, $event))) {
+                return $err;
+            }
+        }
+
+        $studentBand = FestStudentClassResolver::kidsFestBandForStudent($student);
         $itemBand = $item->kids_band ?? 'open';
         if ($itemBand === 'open' || $itemBand === null || $itemBand === '') {
             return null;
