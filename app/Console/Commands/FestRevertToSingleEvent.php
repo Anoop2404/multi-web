@@ -5,6 +5,8 @@ namespace App\Console\Commands;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestEventSchoolPartition;
+use App\Models\FestGroup;
+use App\Models\FestLevelRegistration;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
 use App\Models\Tenant;
@@ -59,57 +61,105 @@ class FestRevertToSingleEvent extends Command
 
             $childRegistrations = FestRegistration::whereIn('event_id', $childIds)->get();
 
+            // Build item map: child item id -> root parent item id
+            $rootItems = FestEventItem::where('event_id', $event->id)->get()->keyBy('item_code');
+            $childItems = FestEventItem::whereIn('event_id', $childIds)->get();
+            $itemMap = [];
+            foreach ($childItems as $cItem) {
+                if ($cItem->inherited_from_item_id) {
+                    $itemMap[$cItem->id] = $cItem->inherited_from_item_id;
+                } elseif ($rootItems->has($cItem->item_code)) {
+                    $itemMap[$cItem->id] = $rootItems->get($cItem->item_code)->id;
+                }
+            }
+
             if ($isDryRun) {
                 $this->comment('--- DRY RUN: No database changes will be made ---');
                 $this->line("Would update Event #{$event->id} conduct_mode to 'standard'.");
-                $this->line('Would relocate/merge '.count($childRegistrations).' child registration(s) to root Event #'.$event->id.'.');
-                $this->line('Would remove '.count($children).' child partition event(s) and their inherited items.');
+                $this->line('Would relocate/merge '.count($childRegistrations).' child registration(s) to root Event #'.$event->id.' (mapping child items to parent items).');
+                $this->line('Would consolidate student Fest IDs (fest_level_registrations) onto root Event #'.$event->id.'.');
+                $this->line('Would detach and archive '.count($children).' child partition event(s) and delete their copied items.');
                 $this->line("Would remove {$schoolPartitionsCount} school partition mapping(s).");
 
                 return self::SUCCESS;
             }
 
-            if (! $isForce && ! $this->confirm("Are you sure you want to revert Event #{$event->id} to Single ('standard') and remove its child partitions?", true)) {
+            if (! $isForce && ! $this->confirm("Are you sure you want to revert Event #{$event->id} to Single ('standard') and merge its child partitions?", true)) {
                 $this->comment('Aborted.');
 
                 return self::SUCCESS;
             }
 
-            DB::transaction(function () use ($event, $children, $childIds, $childRegistrations) {
-                // Relocate or merge child registrations
+            DB::transaction(function () use ($event, $children, $childIds, $childRegistrations, $itemMap) {
+                // 1. Relocate child registrations and remap items
                 foreach ($childRegistrations as $childReg) {
-                    $parentReg = FestRegistration::where('event_id', $event->id)
+                    $mappedItemId = $itemMap[$childReg->item_id] ?? null;
+
+                    $existing = FestRegistration::where('event_id', $event->id)
                         ->where('school_id', $childReg->school_id)
+                        ->where('item_id', $mappedItemId)
                         ->first();
 
-                    if ($parentReg) {
-                        // School is registered on both — move participants to parent reg
+                    if ($existing) {
+                        // Same school & same item already registered on root event: move participants to existing reg
                         FestParticipant::where('registration_id', $childReg->id)
                             ->update([
-                                'registration_id' => $parentReg->id,
+                                'registration_id' => $existing->id,
                                 'event_id'        => $event->id,
                             ]);
                         $childReg->delete();
                     } else {
-                        // Move registration directly to root event
-                        $childReg->update(['event_id' => $event->id]);
+                        // Move registration to root event with mapped item
+                        $childReg->update([
+                            'event_id' => $event->id,
+                            'item_id'  => $mappedItemId ?: $childReg->item_id,
+                        ]);
                         FestParticipant::where('registration_id', $childReg->id)
                             ->update(['event_id' => $event->id]);
                     }
                 }
 
-                if (! empty($childIds)) {
-                    // Remove items copied to child partitions
-                    FestEventItem::whereIn('event_id', $childIds)->delete();
+                // 2. Consolidate level registrations (student Fest IDs)
+                $rootLevels = FestLevelRegistration::where('event_id', $event->id)->get()->keyBy('student_id');
+                $childLevels = FestLevelRegistration::whereIn('event_id', $childIds)->get();
 
-                    // Remove child partitions
-                    FestEvent::whereIn('id', $childIds)->delete();
+                foreach ($childLevels as $cLevel) {
+                    if ($rootLevels->has($cLevel->student_id)) {
+                        $rLevel = $rootLevels->get($cLevel->student_id);
+                        FestParticipant::where('event_id', $event->id)
+                            ->where('student_id', $cLevel->student_id)
+                            ->update(['level_registration_number' => $rLevel->registration_number]);
+                        $cLevel->delete();
+                    } else {
+                        $cLevel->update(['event_id' => $event->id]);
+                        $rootLevels->put($cLevel->student_id, $cLevel);
+                    }
                 }
 
-                // Remove school partition assignments for this event
+                // 3. Move groups and user event scopes
+                FestGroup::whereIn('event_id', $childIds)->update(['event_id' => $event->id]);
+                DB::table('school_user_event_scopes')->whereIn('event_id', $childIds)->update(['event_id' => $event->id]);
+
+                // 4. Remove school partition assignments
                 FestEventSchoolPartition::where('event_id', $event->id)->delete();
 
-                // Set root event to standard
+                // 5. Delete child copied items
+                if (! empty($childIds)) {
+                    FestEventItem::whereIn('event_id', $childIds)->delete();
+
+                    // Detach and archive child partition events safely
+                    FestEvent::whereIn('id', $childIds)->update([
+                        'parent_event_id' => null,
+                        'conduct_mode'    => 'standard',
+                        'partition_key'   => null,
+                        'cluster_key'     => null,
+                        'region_id'       => null,
+                        'status'          => 'cancelled',
+                        'nav_hidden'      => true,
+                    ]);
+                }
+
+                // 6. Set root event to standard
                 $event->update([
                     'conduct_mode'              => 'standard',
                     'combine_regions_at_finale' => true,
@@ -117,7 +167,7 @@ class FestRevertToSingleEvent extends Command
             });
 
             $this->info("Event #{$event->id} ('{$event->title}') successfully reverted to Single ('standard').");
-            $this->info('Child partitions and redundant school partition mappings have been cleaned up.');
+            $this->info('Child registrations have been merged into the main event and partitions cleaned up.');
 
             return self::SUCCESS;
         };
