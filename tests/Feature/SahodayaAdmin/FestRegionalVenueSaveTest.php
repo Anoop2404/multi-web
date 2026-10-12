@@ -139,4 +139,32 @@ class FestRegionalVenueSaveTest extends TestCase
         $this->assertNotNull($venueRecord);
         $this->assertSame('MES Central School, Tirur', $venueRecord->name);
     }
+
+    public function test_can_delete_unwanted_partition(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        [$sahodaya, $event, $region] = $this->makeSetup();
+        $admin = $this->makeAdmin($event, $sahodaya);
+
+        $partition = FestEvent::create([
+            'tenant_id' => $sahodaya->id,
+            'parent_event_id' => $event->id,
+            'region_id' => $region->id,
+            'partition_key' => 'tirur',
+            'partition_role' => 'region',
+            'cluster_label' => 'Tirur Region',
+            'title' => 'Kalolsavam Hub - Tirur Region',
+            'event_type' => 'kalolsavam',
+            'status' => 'published',
+        ]);
+
+        $response = $this->actingAs($admin)->delete(
+            "/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/partitions/{$partition->id}"
+        );
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect();
+
+        $this->assertNull(FestEvent::find($partition->id));
+    }
 }

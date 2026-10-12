@@ -197,10 +197,15 @@
                                         <div v-if="c.cluster_label" class="text-[11px] text-slate-600 bg-slate-50 px-2 py-0.5 rounded border border-slate-100 truncate">
                                             <span class="font-medium text-slate-800">{{ c.cluster_label }}</span>
                                         </div>
-                                        <button type="button" @click="openEditVenueModal(c)" class="btn-secondary !py-1 !px-2.5 text-xs flex items-center gap-1 ml-auto hover:border-indigo-400">
-                                            <span>✏️</span>
-                                            <span>Edit Venue &amp; Dates</span>
-                                        </button>
+                                        <div class="flex items-center gap-1 ml-auto">
+                                            <button type="button" @click="openEditVenueModal(c)" class="btn-secondary !py-1 !px-2.5 text-xs flex items-center gap-1 hover:border-indigo-400">
+                                                <span>✏️</span>
+                                                <span>Edit Venue &amp; Dates</span>
+                                            </button>
+                                            <button v-if="c.id" type="button" @click="deletePartition(c)" class="btn-ghost !p-1 text-xs text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg flex items-center gap-1" title="Delete partition">
+                                                <span>🗑️</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -440,6 +445,18 @@ function openAddVenueModal() {
     isNewRegionVenue.value = true;
     editingRegionData.value = null;
     showEditVenueModal.value = true;
+}
+
+async function deletePartition(partition) {
+    if (!partition.id) return;
+    if (!await confirm({
+        title: 'Delete Regional Partition',
+        message: `Are you sure you want to delete the regional partition "${partition.cluster_label || partition.title}"? This will remove it from the event.`,
+        destructive: true,
+    })) {
+        return;
+    }
+    router.delete(`${base}/partitions/${partition.id}`, { preserveScroll: true });
 }
 // kids_fest/sports have their own bespoke cluster/season flows (spawnCluster(),
 // SportsSetupSubNav) that predate and don't map onto the generic "Region Split vs Phases

@@ -384,6 +384,9 @@
                                             <span>✏️</span>
                                             <span class="text-[11px] font-medium">Edit</span>
                                         </button>
+                                        <button v-if="r.partition_id" type="button" @click="deletePartition(r)" class="btn-ghost !p-1 text-xs text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg flex items-center gap-1" title="Delete regional partition">
+                                            <span>🗑️</span>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -564,6 +567,18 @@ function openAddVenueModal() {
     isNewRegionVenue.value = true;
     editingRegionData.value = null;
     showEditVenueModal.value = true;
+}
+
+async function deletePartition(region) {
+    if (!region.partition_id) return;
+    if (!await confirm({
+        title: 'Delete Regional Partition',
+        message: `Are you sure you want to delete the regional partition "${region.name}"? This will remove it from the event.`,
+        destructive: true,
+    })) {
+        return;
+    }
+    router.delete(`${base}/partitions/${region.partition_id}`, { preserveScroll: true });
 }
 
 const showShareModal = ref(false);

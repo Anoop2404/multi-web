@@ -1049,6 +1049,42 @@ class FestEventController extends SahodayaAdminController
         return back()->with('success', "Regional partition \"{$clusterLabel}\" created successfully.");
     }
 
+    public function destroyPartition(string $tenantId, FestEvent $event, FestEvent $partition, PlatformAuditLogger $audit)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if((int) $partition->parent_event_id !== (int) $event->id, 404);
+
+        $regCount = $partition->registrations()->whereIn('status', FestRegistration::ACTIVE_STATUSES)->count();
+        if ($regCount > 0) {
+            return back()->with('error', "Cannot delete partition \"{$partition->cluster_label}\" because it has {$regCount} active registration(s).");
+        }
+
+        $label = $partition->cluster_label ?: $partition->title;
+        $partitionKey = $partition->partition_key ?? $partition->cluster_key;
+
+        if ($partitionKey) {
+            \App\Models\FestEventSchoolPartition::where('event_id', $event->id)
+                ->where('partition_key', $partitionKey)
+                ->delete();
+        }
+
+        if ($partition->region_id) {
+            FestVenue::where('event_id', $event->id)
+                ->where('region_id', $partition->region_id)
+                ->delete();
+        }
+
+        $partition->items()->delete();
+        $partition->delete();
+
+        $audit->festEvent($event, FestPageActivity::LEVELS, 'fest.levels.partition_deleted', "Deleted partition: {$label}", [
+            'partition_id' => $partition->id,
+            'partition_key' => $partitionKey,
+        ]);
+
+        return back()->with('success', "Partition \"{$label}\" deleted successfully.");
+    }
+
     public function applyConductPreset(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

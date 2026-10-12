@@ -1091,15 +1091,17 @@ class FestRegistrationController extends SchoolAdminController
 
         $partitionOptions = [];
         if ($isPartitionedHub) {
-            $partitionOptions = $partitionService->partitions($event)->map(fn (FestEvent $part) => [
-                'id' => $part->id,
-                'name' => $part->cluster_label ?: $part->title,
-                'partition_key' => $part->partition_key ?? $part->cluster_key,
-                'region_id' => $part->region_id,
-                'venue' => $part->venue,
-                'event_start' => $part->event_start?->format('d M Y'),
-                'event_end' => $part->event_end?->format('d M Y'),
-            ])->values()->all();
+            $partitionOptions = $partitionService->partitions($event)
+                ->filter(fn (FestEvent $part) => ! in_array($part->status, ['draft', 'cancelled'], true))
+                ->map(fn (FestEvent $part) => [
+                    'id' => $part->id,
+                    'name' => $part->cluster_label ?: $part->title,
+                    'partition_key' => $part->partition_key ?? $part->cluster_key,
+                    'region_id' => $part->region_id,
+                    'venue' => $part->venue,
+                    'event_start' => $part->event_start?->format('d M Y'),
+                    'event_end' => $part->event_end?->format('d M Y'),
+                ])->values()->all();
         }
 
         $event->setAttribute('is_partitioned_hub', $isPartitionedHub);

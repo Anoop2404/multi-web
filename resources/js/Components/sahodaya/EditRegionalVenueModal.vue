@@ -82,13 +82,23 @@
                                       :all-option="false" />
                 </div>
 
-                <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                    <button type="button" class="btn-ghost text-xs !py-2" @click="closeModal" :disabled="saving">
-                        Cancel
-                    </button>
-                    <button type="submit" class="btn-primary text-xs !py-2 font-semibold" :disabled="saving">
-                        <span>{{ saving ? 'Saving…' : (isNew ? 'Create Regional Venue' : 'Save Changes') }}</span>
-                    </button>
+                <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+                    <div>
+                        <button v-if="!isNew && form.partition_id" type="button" @click="deletePartition"
+                                class="text-rose-600 hover:text-rose-800 text-xs font-semibold flex items-center gap-1 hover:bg-rose-50 px-2.5 py-1.5 rounded-lg transition"
+                                :disabled="saving || deleting">
+                            <span>🗑️</span>
+                            <span>{{ deleting ? 'Deleting…' : 'Delete Region Partition' }}</span>
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" class="btn-ghost text-xs !py-2" @click="closeModal" :disabled="saving || deleting">
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn-primary text-xs !py-2 font-semibold" :disabled="saving || deleting">
+                            <span>{{ saving ? 'Saving…' : (isNew ? 'Create Regional Venue' : 'Save Changes') }}</span>
+                        </button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -100,6 +110,7 @@ import { computed, ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import Modal from '@/Components/ui/Modal.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     show: { type: Boolean, default: false },
@@ -226,6 +237,39 @@ function submit() {
             },
             onFinish: () => {
                 saving.value = false;
+            },
+        }
+    );
+}
+
+const { confirm } = useConfirm();
+const deleting = ref(false);
+
+async function deletePartition() {
+    if (!form.value.partition_id) return;
+    if (!await confirm({
+        title: 'Delete Regional Partition',
+        message: `Are you sure you want to delete the regional partition "${form.value.cluster_label || 'this partition'}"? This will remove it from the event.`,
+        destructive: true,
+    })) {
+        return;
+    }
+
+    deleting.value = true;
+    router.delete(
+        `/sahodaya-admin/${effectiveTenantId.value}/events/${props.eventId}/partitions/${form.value.partition_id}`,
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                deleting.value = false;
+                emit('saved');
+                closeModal();
+            },
+            onError: () => {
+                deleting.value = false;
+            },
+            onFinish: () => {
+                deleting.value = false;
             },
         }
     );
