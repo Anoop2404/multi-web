@@ -206,4 +206,46 @@ class FestAutomaticEventAdminTest extends TestCase
         $this->assertSame($password, $rootAccount->user->fresh()->password);
         $this->assertSame(1, FestEventAdminAccount::where('event_id', $legacy->id)->count());
     }
+
+    public function test_user_rows_offer_a_whatsapp_template_for_manual_accounts_with_current_temporary_passwords(): void
+    {
+        [$tenant, $owner, $event] = $this->fixture();
+        $manual = User::factory()->create(['tenant_id' => $tenant->id, 'username' => 'tiruradmin']);
+        $manual->assignRole('region_admin');
+        $manual->forceFill(['password' => 'sharepw2345', 'plain_password' => 'sharepw2345', 'must_change_password' => true])->save();
+        \App\Models\FestEventStaff::create(['event_id' => $event->id, 'user_id' => $manual->id, 'duty' => 'region_admin']);
+        $this->actingAs($owner)->get('/sahodaya-admin/'.$tenant->id.'/users')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('users', fn ($users) => collect($users)->contains(fn ($row) =>
+                $row['id'] === $manual->id && $row['login_credentials']['password'] === 'sharepw2345'
+                && str_contains($row['login_credentials']['share_text'], '*Science Expo*')
+                && str_contains($row['login_credentials']['share_text'], 'Username: tiruradmin'))));
+
+        $manual->forceFill(['password' => 'my-private-new-password', 'must_change_password' => false])->save();
+        $this->get('/sahodaya-admin/'.$tenant->id.'/users')->assertInertia(fn (Assert $page) => $page
+            ->where('users', fn ($users) => collect($users)->contains(fn ($row) => $row['id'] === $manual->id
+                && $row['login_credentials']['username'] === 'tiruradmin' && $row['login_credentials']['share_text'] === null)));
+    }
+
+    public function test_generic_reset_pw_produces_copyable_credentials_for_an_automatic_event_account(): void
+    {
+        [$tenant, $owner, $event] = $this->fixture();
+        $account = FestEventAdminAccount::where('event_id', $event->id)->firstOrFail();
+        $this->actingAs($owner)->post('/sahodaya-admin/'.$tenant->id.'/users/'.$account->user_id.'/reset-password')->assertRedirect();
+        $newPassword = $account->user->fresh()->plain_password;
+        $this->assertNotNull($newPassword);
+        $this->get('/sahodaya-admin/'.$tenant->id.'/users')->assertInertia(fn (Assert $page) => $page
+            ->where('users', fn ($users) => collect($users)->contains(fn ($row) => $row['id'] === $account->user_id
+                && $row['login_credentials']['password'] === $newPassword
+                && str_contains($row['login_credentials']['share_text'], 'Password: '.$newPassword))));
+    }
+
+    public function test_event_admins_cannot_read_other_users_copyable_passwords(): void
+    {
+        [$tenant, , $event] = $this->fixture();
+        $user = FestEventAdminAccount::where('event_id', $event->id)->firstOrFail()->user;
+        $user->update(['must_change_password' => false]);
+        $this->actingAs($user)->get('/sahodaya-admin/'.$tenant->id.'/users')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('users', fn ($users) => collect($users)
+                ->every(fn ($row) => $row['login_credentials'] === null)));
+    }
 }

@@ -73,7 +73,8 @@
                         <td class="text-slate-600">
                             {{ u.email || '—' }}
                             <div class="text-xs text-slate-400 font-mono">{{ u.username }}</div>
-                            <EventAdminLoginCard v-if="u.event_admin_credentials" :credentials="u.event_admin_credentials" :tenant-id="sahodaya.id" compact />
+                            <p v-if="u.event_admin_credentials" class="mt-1 text-xs text-slate-500">Finance excluded</p>
+                            <PortalUserCopyActions v-if="u.login_credentials" :credentials="u.login_credentials" />
                         </td>
                         <td class="text-xs">
                             <div class="flex flex-wrap gap-1">
@@ -418,6 +419,7 @@ import { useForm, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import EventAdminLoginCard from '@/Components/sahodaya/EventAdminLoginCard.vue';
+import PortalUserCopyActions from '@/Components/sahodaya/PortalUserCopyActions.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({

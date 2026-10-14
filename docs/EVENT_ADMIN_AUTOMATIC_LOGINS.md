@@ -21,6 +21,8 @@ Login: https://your-domain/login
 
 Event staff also has separate username/password copy buttons. A manual-copy text box appears when clipboard access is unavailable. Once a user changes the temporary password, the original is no longer offered. **Reset temporary password** invalidates the current password and produces a new message.
 
+On **Portal users**, each user row has **Copy username**, **Copy password**, and **Copy login · WhatsApp** actions. This includes older manually provisioned event/region users when their current temporary password is available. After the user changes their password, only username copying remains available until **Reset PW** creates a fresh shareable password. A generic Reset PW also works for automatically provisioned event users. Password-copy data is never provided to event-admin users themselves or other non-owner staff.
+
 Existing events are not bulk-provisioned by the migration. Their administrators can use **Portal users → + Event admin login**, select an event or regional event without an automatic login, and create it. The new credentials appear immediately with the WhatsApp copy button. **Event staff → Create missing event logins** is also available. Both actions create accounts for the selected event and its descendants without changing existing generated logins.
 
 ## Deployment

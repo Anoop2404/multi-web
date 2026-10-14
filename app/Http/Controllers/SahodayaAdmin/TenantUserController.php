@@ -43,6 +43,7 @@ class TenantUserController extends SahodayaAdminController
                 'name'        => $u->name,
                 'email'       => $u->email,
                 'username'    => $u->username,
+                'login_credentials' => $canShareEventLogins ? $this->shareableLogin($u) : null,
                 'event_admin_credentials' => $canShareEventLogins
                     && Schema::hasTable('fest_event_admin_accounts')
                     && ($account = $u->automaticEventAdminAccount)
@@ -118,6 +119,32 @@ class TenantUserController extends SahodayaAdminController
             ])->values(),
             'newCredentials'  => session('newCredentials'),
         ]);
+    }
+
+    private function shareableLogin(User $user): array
+    {
+        $account = Schema::hasTable('fest_event_admin_accounts') ? $user->automaticEventAdminAccount : null;
+        $eventCredentials = $account
+            ? app(FestEventAdminAccountService::class)->credentials($account->setRelation('user', $user), $this->sahodaya)
+            : null;
+        $password = $eventCredentials['password'] ?? null;
+        // A reset through the existing Reset PW action stores a new temporary password
+        // on the user, even when the event account's original copy is now stale.
+        if ($password === null && $user->must_change_password && filled($user->plain_password)
+            && \Illuminate\Support\Facades\Hash::check($user->plain_password, $user->password)) {
+            $password = $user->plain_password;
+        }
+        $titles = FestEventStaff::where('user_id', $user->id)->with('event:id,title')->get()
+            ->map(fn ($assignment) => $assignment->event?->title)->filter()->unique()->values();
+        $heading = $titles->isNotEmpty() ? $titles->implode(' / ') : $user->name.' — Portal Login';
+        $loginUrl = rtrim(TenantDomainSync::publicUrl($this->sahodaya) ?: url('/'), '/').'/login';
+
+        return [
+            'username' => $user->username,
+            'password' => $password,
+            'share_text' => $password === null ? null
+                : "*{$heading}*\nUsername: {$user->username}\nPassword: {$password}\nLogin: {$loginUrl}",
+        ];
     }
 
     public function store(Request $request, TenantUserProvisioner $provisioner, PlatformAuditLogger $audit)
