@@ -21,7 +21,7 @@ Login: https://your-domain/login
 
 Event staff also has separate username/password copy buttons. A manual-copy text box appears when clipboard access is unavailable. Once a user changes the temporary password, the original is no longer offered. **Reset temporary password** invalidates the current password and produces a new message.
 
-Existing events are not bulk-provisioned by the migration. Their administrators can use **Event staff → Create missing event logins**, which creates accounts for the selected event and its descendants without changing existing generated logins.
+Existing events are not bulk-provisioned by the migration. Their administrators can use **Portal users → + Event admin login**, select an event or regional event without an automatic login, and create it. The new credentials appear immediately with the WhatsApp copy button. **Event staff → Create missing event logins** is also available. Both actions create accounts for the selected event and its descendants without changing existing generated logins.
 
 ## Deployment
 

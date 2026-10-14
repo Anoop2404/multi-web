@@ -176,4 +176,34 @@ class FestAutomaticEventAdminTest extends TestCase
             ->assertJsonMissingPath('data.fee_amount')->assertJsonMissingPath('data.fee_type');
         $this->getJson($base.$other->id)->assertForbidden();
     }
+
+    public function test_portal_users_can_create_missing_legacy_event_and_regional_logins_and_share_them(): void
+    {
+        [$tenant, $owner, $existing] = $this->fixture();
+        $legacy = FestEvent::withoutEvents(fn () => FestEvent::create([
+            'tenant_id' => $tenant->id, 'title' => 'Legacy Expo', 'event_type' => 'science_fest', 'status' => 'registration_open',
+        ]));
+        $region = FestEvent::withoutEvents(fn () => FestEvent::create([
+            'tenant_id' => $tenant->id, 'parent_event_id' => $legacy->id,
+            'title' => 'Legacy Expo — Region One', 'event_type' => 'science_fest', 'status' => 'registration_open',
+        ]));
+        $url = '/sahodaya-admin/'.$tenant->id.'/users';
+        $this->actingAs($owner)->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('canCreateEventLogins', true)->has('eventLoginOptions', 2)
+            ->where('eventLoginOptions', fn ($options) => ! collect($options)->pluck('id')->contains($existing->id)));
+
+        $endpoint = '/sahodaya-admin/'.$tenant->id.'/events/'.$legacy->id.'/event-admin-login';
+        $this->from($url)->post($endpoint)->assertRedirect($url);
+        $rootAccount = FestEventAdminAccount::where('event_id', $legacy->id)->firstOrFail();
+        $this->assertDatabaseHas('fest_event_admin_accounts', ['event_id' => $region->id]);
+        $this->assertFalse($rootAccount->user->can('fest.finance'));
+        $this->get($url)->assertInertia(fn (Assert $page) => $page->has('eventLoginOptions', 0)
+            ->where('newEventAdminCredentials.event_name', 'Legacy Expo')
+            ->where('newEventAdminCredentials.username', $rootAccount->user->username)
+            ->where('newEventAdminCredentials.password', $rootAccount->temporary_password));
+        $password = $rootAccount->user->password;
+        $this->from($url)->post($endpoint)->assertRedirect();
+        $this->assertSame($password, $rootAccount->user->fresh()->password);
+        $this->assertSame(1, FestEventAdminAccount::where('event_id', $legacy->id)->count());
+    }
 }

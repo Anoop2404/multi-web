@@ -108,7 +108,12 @@ class FestEventStaffController extends SahodayaAdminController
             $service->ensure($target);
         }
 
-        return back()->with('success', 'Event admin logins are ready.');
+        $account = $service->ensure($event);
+
+        return back()->with([
+            'success' => 'Event admin logins are ready.',
+            'eventAdminCredentials' => $account ? $service->credentials($account, $this->sahodaya) : null,
+        ]);
     }
 
     public function resetLogin(Request $request, string $tenantId, FestEvent $event)

@@ -6,6 +6,9 @@
             description="Create judges, exam staff, mark-entry coordinators, event ops, and view-only Sahodaya staff."
         >
             <template #actions>
+                <button v-if="canCreateEventLogins" type="button" class="btn-secondary text-sm" :disabled="!eventLoginOptions.length" @click="creatingEventLogin = !creatingEventLogin">
+                    + Event admin login
+                </button>
                 <button type="button" class="btn-secondary text-sm" @click="exportCredentials">
                     ↓ Export credentials
                 </button>
@@ -15,10 +18,24 @@
             </template>
         </PageHeader>
 
+        <p v-if="canCreateEventLogins && !eventLoginOptions.length" class="mb-4 text-xs text-slate-500">All available events already have automatic admin logins.</p>
+
         <div v-if="newCredentials" class="notice-banner notice-banner--success mb-4 text-sm">
             Account created. Username: <strong class="font-mono">{{ newCredentials.username }}</strong>
             · Temp password: <strong class="font-mono">{{ newCredentials.password }}</strong> (shown once — share this with the user, it won't be shown again)
         </div>
+
+        <form v-if="creatingEventLogin" class="card mb-4 space-y-3" @submit.prevent="createEventLogin">
+            <h3 class="section-title">Create event admin login</h3>
+            <p class="text-xs text-slate-500">Select an event without an automatic login. Regional child events also receive missing logins. Finance access is excluded.</p>
+            <SearchableSelect v-model="eventLoginForm.event_id" :options="eventLoginSelectOptions" :required="true" :all-option="true" all-label="Select event or regional event" />
+            <p v-if="eventLoginForm.errors.event_id" class="text-xs text-red-600">{{ eventLoginForm.errors.event_id }}</p>
+            <div class="flex gap-2">
+                <button type="submit" class="btn-primary text-sm" :disabled="!eventLoginForm.event_id || eventLoginForm.processing">{{ eventLoginForm.processing ? 'Creating…' : 'Create login' }}</button>
+                <button type="button" class="btn-secondary text-sm" @click="creatingEventLogin = false">Cancel</button>
+            </div>
+        </form>
+        <EventAdminLoginCard v-if="newEventAdminCredentials" class="mb-4" :credentials="newEventAdminCredentials" :tenant-id="sahodaya.id" />
 
         <div class="card mb-4 flex flex-wrap items-center gap-3 py-3">
             <label class="text-xs font-semibold text-slate-500" for="role-filter">Filter by role</label>
@@ -414,6 +431,9 @@ const props = defineProps({
     permissionRoles: { type: Array, default: () => [] },
     roleDefaultPermissions: { type: Object, default: () => ({}) },
     festEvents: Array,
+    canCreateEventLogins: Boolean,
+    eventLoginOptions: { type: Array, default: () => [] },
+    newEventAdminCredentials: Object,
     eventPhases: { type: Object, default: () => ({}) },
     mcqExams: Array,
     dutyOptions: Array,
@@ -422,6 +442,15 @@ const props = defineProps({
 });
 
 const creating = ref(false);
+const creatingEventLogin = ref(false);
+const eventLoginForm = useForm({ event_id: '' });
+const eventLoginSelectOptions = computed(() => props.eventLoginOptions.map(event => ({ value: event.id, label: event.title })));
+function createEventLogin() {
+    eventLoginForm.post(`/sahodaya-admin/${props.sahodaya.id}/events/${eventLoginForm.event_id}/event-admin-login`, {
+        preserveScroll: true,
+        onSuccess: () => { creatingEventLogin.value = false; eventLoginForm.reset(); roleFilter.value = 'all'; },
+    });
+}
 const roleFilter = ref('all');
 
 const form = useForm({

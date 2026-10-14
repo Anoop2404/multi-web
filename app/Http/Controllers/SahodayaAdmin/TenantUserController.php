@@ -98,6 +98,15 @@ class TenantUserController extends SahodayaAdminController
                     $role => TenantUserCatalog::defaultPermissionsForRole($role, 'sahodaya'),
                 ])->all(),
             'festEvents'      => $festEvents,
+            'canCreateEventLogins' => $canShareEventLogins && Schema::hasTable('fest_event_admin_accounts'),
+            'eventLoginOptions' => $canShareEventLogins && Schema::hasTable('fest_event_admin_accounts')
+                ? FestEvent::where('tenant_id', $this->sahodaya->id)
+                    ->whereNull('conducting_school_id')
+                    ->where('status', '!=', 'cancelled')
+                    ->whereNotIn('id', \App\Models\FestEventAdminAccount::pluck('event_id'))
+                    ->orderBy('title')->get(['id', 'title', 'parent_event_id'])
+                : collect(),
+            'newEventAdminCredentials' => $canShareEventLogins ? session('eventAdminCredentials') : null,
             'eventPhases'     => $this->eventPhaseOptions($festEvents),
             'mcqExams'        => McqExam::where('tenant_id', $this->sahodaya->id)
                 ->whereIn('status', ['draft', 'published', 'ongoing', 'completed'])
