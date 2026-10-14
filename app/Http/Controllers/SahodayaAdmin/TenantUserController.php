@@ -137,7 +137,7 @@ class TenantUserController extends SahodayaAdminController
         $titles = FestEventStaff::where('user_id', $user->id)->with('event:id,title')->get()
             ->map(fn ($assignment) => $assignment->event?->title)->filter()->unique()->values();
         $heading = $titles->isNotEmpty() ? $titles->implode(' / ') : $user->name.' — Portal Login';
-        $loginUrl = rtrim(TenantDomainSync::publicUrl($this->sahodaya) ?: url('/'), '/').'/login';
+        $loginUrl = rtrim(TenantDomainSync::publicUrl($this->sahodaya) ?: url('/'), '/').'/portal/login';
 
         return [
             'username' => $user->username,
@@ -363,7 +363,7 @@ class TenantUserController extends SahodayaAdminController
             ->get();
 
         $publicUrl = TenantDomainSync::publicUrl($this->sahodaya);
-        $portalUrl = $publicUrl ? rtrim($publicUrl, '/').'/login' : url('/login');
+        $portalUrl = $publicUrl ? rtrim($publicUrl, '/').'/portal/login' : url('/portal/login');
 
         $rows = [['Name', 'Username', 'Temporary password', 'Email', 'Portal URL', 'Roles', 'Status']];
         foreach ($users as $u) {

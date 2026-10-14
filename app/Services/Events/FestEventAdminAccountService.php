@@ -79,7 +79,7 @@ class FestEventAdminAccountService
         $temporary = $account->temporary_password;
         $password = $account->user->must_change_password && $temporary
             && hash_equals($account->password_fingerprint, hash('sha256', $account->user->password)) ? $temporary : null;
-        $loginUrl = rtrim(TenantDomainSync::publicUrl($tenant) ?: url('/'), '/').'/login';
+        $loginUrl = rtrim(TenantDomainSync::publicUrl($tenant) ?: url('/'), '/').'/portal/login';
 
         return [
             'event_id' => $account->event_id,

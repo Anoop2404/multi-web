@@ -88,7 +88,8 @@ class FestAutomaticEventAdminTest extends TestCase
             ->where('eventAdminAccounts.0.username', $account->user->username)
             ->where('eventAdminAccounts.0.password', $account->temporary_password)
             ->where('eventAdminAccounts.0.share_text', fn ($text) => str_contains($text, '*Science Expo*')
-                && str_contains($text, 'Username: ') && str_contains($text, 'Password: ')));
+                && str_contains($text, 'Username: ') && str_contains($text, 'Password: ')
+                && str_contains($text, '/portal/login')));
         $account->user->update(['must_change_password' => false]);
         $this->actingAs($account->user)->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page
             ->where('canManageEventLogins', false)->has('eventAdminAccounts', 0)->missing('pendingPaymentsCount'));
@@ -218,7 +219,8 @@ class FestAutomaticEventAdminTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->where('users', fn ($users) => collect($users)->contains(fn ($row) =>
                 $row['id'] === $manual->id && $row['login_credentials']['password'] === 'sharepw2345'
                 && str_contains($row['login_credentials']['share_text'], '*Science Expo*')
-                && str_contains($row['login_credentials']['share_text'], 'Username: tiruradmin'))));
+                && str_contains($row['login_credentials']['share_text'], 'Username: tiruradmin')
+                && str_contains($row['login_credentials']['share_text'], '/portal/login'))));
 
         $manual->forceFill(['password' => 'my-private-new-password', 'must_change_password' => false])->save();
         $this->get('/sahodaya-admin/'.$tenant->id.'/users')->assertInertia(fn (Assert $page) => $page
