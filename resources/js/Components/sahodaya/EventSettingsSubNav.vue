@@ -11,7 +11,7 @@
 </template>
 
 <script setup>
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import { settingsTabsForEvent } from '@/support/sahodayaEventCapabilities.js';
 
@@ -23,12 +23,15 @@ const props = defineProps({
 });
 
 const base = computed(() => `/sahodaya-admin/${props.sahodayaId}/events/${props.eventId}`);
-const tabs = computed(() => settingsTabsForEvent(props.event));
+const page = usePage();
+const tabs = computed(() => settingsTabsForEvent(props.event).map(tab =>
+    page.props.operationalEventAdmin && tab.id === 'fees'
+        ? { ...tab, id: 'registration', label: 'Registration & Rules' } : tab));
 
 // Map legacy sub-tab keys to one of the 4 primary group tabs
 const currentTab = computed(() => {
     const a = props.activeTab;
-    if (['fees', 'registration', 'participation'].includes(a)) return 'fees';
+    if (['fees', 'registration', 'participation'].includes(a)) return page.props.operationalEventAdmin ? 'registration' : 'fees';
     if (['points', 'eligibility', 'grades', 'combo', 'records'].includes(a)) return 'points';
     if (['venues', 'numbering', 'volunteers'].includes(a)) return 'venues';
     if (['lifecycle', 'locks', 'clone', 'public-overlays'].includes(a)) return 'lifecycle';

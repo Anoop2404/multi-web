@@ -4,6 +4,8 @@ namespace App\Http\Middleware;
 
 use App\Http\Middleware\Concerns\RedirectsUnauthenticated;
 use App\Http\Middleware\Concerns\ResolvesSahodayaAdminScope;
+use App\Models\Tenant;
+use App\Support\EventAdminFinancePolicy;
 use App\Support\TenantSubscriptionGate;
 use App\Support\TenantUserCatalog;
 use Closure;
@@ -27,6 +29,10 @@ class EnsureSahodayaAdmin
             return $next($request);
         }
 
+        if ($user->hasRestrictedEventFinance()) {
+            EventAdminFinancePolicy::assertRequestAllowed($request);
+        }
+
         if (! $user->hasAnyRole(TenantUserCatalog::sahodayaAdminPanelRoles())) {
             abort(403);
         }
@@ -37,7 +43,7 @@ class EnsureSahodayaAdmin
         }
 
         if ($tenantId) {
-            $sahodaya = \App\Models\Tenant::find($tenantId);
+            $sahodaya = Tenant::find($tenantId);
             if ($sahodaya && ! $sahodaya->is_active) {
                 abort(403, 'This organization is inactive.');
             }

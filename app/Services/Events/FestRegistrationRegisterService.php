@@ -2,12 +2,19 @@
 
 namespace App\Services\Events;
 
-use App\Support\CsvSafety;
 use App\Models\FestEvent;
+use App\Models\FestEventPhase;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
+use App\Models\FestRegistrationBatch;
 use App\Models\FestSchoolEventFee;
+use App\Models\Region;
 use App\Models\Tenant;
+use App\Models\User;
+use App\Support\CsvSafety;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FestRegistrationRegisterService
@@ -28,7 +35,6 @@ class FestRegistrationRegisterService
      *                           applied at query level (required once rows can be a
      *                           paginated slice — filtering post-hoc client-side would
      *                           only see the current page).
-     * @param  ?string  $itemId
      * @param  ?list<int>  $eventIds  Overrides $event->reportableEventIds() — pass the
      *                                phase+region-scoped leaf id(s) resolved by
      *                                FestReportScopeResolver so a scoped register only
@@ -40,7 +46,7 @@ class FestRegistrationRegisterService
      * @param  ?string  $registrationBatchId  Optional "Level" filter — filters by the
      *                                        registration batch behind the item's phase.
      * @return array{
-     *     rows: list<array<string, mixed>>|\Illuminate\Pagination\LengthAwarePaginator,
+     *     rows: list<array<string, mixed>>|LengthAwarePaginator,
      *     school_summaries: list<array<string, mixed>>,
      *     totals: array<string, mixed>
      * }
@@ -180,16 +186,16 @@ class FestRegistrationRegisterService
         ];
     }
 
-    private function paginateRows(array $rows, int $page, int $perPage): \Illuminate\Pagination\LengthAwarePaginator
+    private function paginateRows(array $rows, int $page, int $perPage): LengthAwarePaginator
     {
         $collection = collect($rows);
 
-        $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
+        $paginator = new LengthAwarePaginator(
             $collection->slice(($page - 1) * $perPage, $perPage)->values(),
             $collection->count(),
             $perPage,
             $page,
-            ['path' => \Illuminate\Pagination\Paginator::resolveCurrentPath(), 'pageName' => 'page'],
+            ['path' => Paginator::resolveCurrentPath(), 'pageName' => 'page'],
         );
 
         // Preserve head_id/item_id (and anything else) in the page links generated below —
@@ -213,7 +219,7 @@ class FestRegistrationRegisterService
     {
         $root = $event->rootEvent();
 
-        $phases = \App\Models\FestEventPhase::where('event_id', $root->id)
+        $phases = FestEventPhase::where('event_id', $root->id)
             ->orderBy('sort_order')
             ->get(['id', 'name', 'registration_batch_id'])
             ->map(fn ($phase) => [
@@ -223,7 +229,7 @@ class FestRegistrationRegisterService
             ])
             ->all();
 
-        $batches = \App\Models\FestRegistrationBatch::where('event_id', $root->id)
+        $batches = FestRegistrationBatch::where('event_id', $root->id)
             ->orderBy('sort_order')
             ->get(['id', 'code', 'name'])
             ->map(fn ($batch) => [
@@ -313,7 +319,7 @@ class FestRegistrationRegisterService
 
         $regionSuffix = '';
         if ($regionId) {
-            $regionCode = \App\Models\Region::find($regionId)?->code;
+            $regionCode = Region::find($regionId)?->code;
             $regionSuffix = '-region-'.str($regionCode ?: (string) $regionId)->slug('-');
         }
 
@@ -321,7 +327,9 @@ class FestRegistrationRegisterService
             ? "{$slug}-registration-register-{$schoolId}.csv"
             : "{$slug}-registration-register{$regionSuffix}.csv";
 
-        return response()->streamDownload(function () use ($data, $includeChestNo) {
+        $includeFinance = ! (request()->user() instanceof User && request()->user()->hasRestrictedEventFinance());
+
+        return response()->streamDownload(function () use ($data, $includeChestNo, $includeFinance) {
             $out = fopen('php://output', 'w');
             $header = ['School', 'Student', 'School reg no', 'Item', 'Phase', 'Level', 'Reg status', 'Role'];
             if ($includeChestNo) {
@@ -329,7 +337,7 @@ class FestRegistrationRegisterService
             }
             CsvSafety::fputcsv($out, ['Generated on', now()->format('d M Y, h:i A')]);
             CsvSafety::fputcsv($out, []);
-            CsvSafety::fputcsv($out, array_merge($header, ['Item fee', 'School total due', 'Fee status']));
+            CsvSafety::fputcsv($out, $includeFinance ? array_merge($header, ['Item fee', 'School total due', 'Fee status']) : $header);
             foreach ($data['rows'] as $row) {
                 $line = [
                     $row['school_name'],
@@ -344,7 +352,7 @@ class FestRegistrationRegisterService
                 if ($includeChestNo) {
                     $line[] = $row['chest_no'];
                 }
-                CsvSafety::fputcsv($out, array_merge($line, [$row['item_fee'], $row['school_total_due'], $row['school_fee_status']]));
+                CsvSafety::fputcsv($out, $includeFinance ? array_merge($line, [$row['item_fee'], $row['school_total_due'], $row['school_fee_status']]) : $line);
             }
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv']);
@@ -379,7 +387,7 @@ class FestRegistrationRegisterService
             return [[(int) $root->id], null];
         }
 
-        $batchIds = \App\Models\FestEventPhase::where('event_id', $root->id)
+        $batchIds = FestEventPhase::where('event_id', $root->id)
             ->whereIn('id', $phaseIds)
             ->pluck('registration_batch_id')
             ->filter()
@@ -391,12 +399,12 @@ class FestRegistrationRegisterService
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<string, array{total_due: float, status: string, receipt_no: ?string}>  $schoolFees
+     * @param  Collection<string, array{total_due: float, status: string, receipt_no: ?string}>  $schoolFees
      * @param  ?list<string>  $scopedSchoolIds  Region scope from build()'s $schoolIds param —
      *                                          named distinctly here to avoid colliding with
      *                                          this method's own local $schoolIds (the query
      *                                          result, a different collection).
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     * @return Collection<int, array<string, mixed>>
      */
     private function schoolSummaries(FestEvent $event, array $eventIds, $schoolFees, bool $feeRequired, ?string $schoolId, ?array $scopedSchoolIds = null)
     {

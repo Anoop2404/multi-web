@@ -56,6 +56,7 @@
                         <td class="text-slate-600">
                             {{ u.email || '—' }}
                             <div class="text-xs text-slate-400 font-mono">{{ u.username }}</div>
+                            <EventAdminLoginCard v-if="u.event_admin_credentials" :credentials="u.event_admin_credentials" :tenant-id="sahodaya.id" compact />
                         </td>
                         <td class="text-xs">
                             <div class="flex flex-wrap gap-1">
@@ -399,6 +400,7 @@ import { ref, watch, computed, nextTick } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
+import EventAdminLoginCard from '@/Components/sahodaya/EventAdminLoginCard.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({

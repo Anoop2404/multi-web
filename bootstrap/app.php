@@ -42,6 +42,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->web(append: [
             \App\Http\Middleware\RefreshAuthenticatedUser::class,
+            \App\Http\Middleware\RestrictAutomaticEventAdminFinance::class,
             \App\Http\Middleware\HandleInertiaRequests::class,
         ]);
 
@@ -49,6 +50,7 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\ResolveAuthenticationGuard::class,
             \App\Http\Middleware\InitializeTenancyByRouteTenant::class,
         ]);
+        $middleware->api(append: [\App\Http\Middleware\RestrictAutomaticEventAdminFinance::class]);
 
         $middleware->alias([
             'role'              => \Spatie\Permission\Middleware\RoleMiddleware::class,

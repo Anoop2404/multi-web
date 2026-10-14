@@ -2,16 +2,20 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
-use App\Support\FestPageActivity;
 use App\Models\FestEvent;
+use App\Models\FestEventAdminAccount;
 use App\Models\FestEventStaff;
 use App\Models\FestItemHead;
 use App\Models\FestStage;
 use App\Models\FestVenue;
+use App\Models\Region;
 use App\Models\User;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Events\FestEventAdminAccountService;
+use App\Support\FestPageActivity;
 use App\Support\TenantUserCatalog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
@@ -24,6 +28,13 @@ class FestEventStaffController extends SahodayaAdminController
         $assignments = FestEventStaff::where('event_id', $event->id)
             ->with(['stage:id,name', 'venue:id,name', 'head:id,name', 'region:id,name', 'sourcePhase:id,name'])
             ->get();
+
+        $canManageLogins = $this->canManageEventLogins(request());
+        $eventAdminAccounts = $canManageLogins && Schema::hasTable('fest_event_admin_accounts')
+            ? FestEventAdminAccount::whereIn('event_id', $event->reportableEventIds())
+                ->with(['user', 'event'])->get()
+                ->map(fn ($account) => app(FestEventAdminAccountService::class)->credentials($account, $this->sahodaya))
+            : collect();
 
         $userIds = $assignments->pluck('user_id')->unique();
         $usersById = User::whereIn('id', $userIds)->get(['id', 'name', 'email'])->keyBy('id');
@@ -38,7 +49,7 @@ class FestEventStaffController extends SahodayaAdminController
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
-        $regionOptions = \App\Models\Region::forTenant($this->sahodaya->id)
+        $regionOptions = Region::forTenant($this->sahodaya->id)
             ->active()
             ->globalOnly()
             ->orderBy('name')
@@ -46,6 +57,8 @@ class FestEventStaffController extends SahodayaAdminController
 
         return $this->inertia('Sahodaya/Events/EventStaff', $this->withEventActivity($event, FestPageActivity::EVENT_STAFF, [
             'event'       => $event->only('id', 'title', 'status', 'event_type', 'workflow_mode'),
+            'eventAdminAccounts' => $eventAdminAccounts,
+            'canManageEventLogins' => $canManageLogins,
             'assignments' => $assignments->map(fn (FestEventStaff $a) => [
                 'id'       => $a->id,
                 'duty'     => $a->duty,
@@ -86,7 +99,36 @@ class FestEventStaffController extends SahodayaAdminController
         ]));
     }
 
-    /** @return \Illuminate\Support\Collection<int, array{value: string, label: string}> */
+    public function provisionLogin(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_unless($event->tenant_id === $this->sahodaya->id && $this->canManageEventLogins($request), 403);
+        abort_unless(Schema::hasTable('fest_event_admin_accounts'), 503, 'Run the tenant migrations to enable event admin logins.');
+        $service = app(FestEventAdminAccountService::class);
+        foreach (FestEvent::whereIn('id', $event->reportableEventIds())->get() as $target) {
+            $service->ensure($target);
+        }
+
+        return back()->with('success', 'Event admin logins are ready.');
+    }
+
+    public function resetLogin(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_unless($event->tenant_id === $this->sahodaya->id && $this->canManageEventLogins($request), 403);
+        $account = FestEventAdminAccount::where('event_id', $event->id)->firstOrFail();
+        app(FestEventAdminAccountService::class)->reset($account);
+
+        return back()->with('success', 'A new temporary password is ready to share.');
+    }
+
+    private function canManageEventLogins(Request $request): bool
+    {
+        $user = $request->user();
+
+        return $user && ! ($user instanceof User && $user->hasRestrictedEventFinance())
+            && ($user->isSuperAdmin() || ($user->tenant_id === $this->sahodaya->id && $user->hasRole('sahodaya_admin')));
+    }
+
+    /** @return Collection<int, array{value: string, label: string}> */
     private function festDutiesForEvent(FestEvent $event)
     {
         $dutyKeys = $event->event_type === 'sports'
@@ -107,7 +149,7 @@ class FestEventStaffController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $regionIds = \App\Models\Region::forTenant($this->sahodaya->id)->globalOnly()->pluck('id')->all();
+        $regionIds = Region::forTenant($this->sahodaya->id)->globalOnly()->pluck('id')->all();
 
         $data = $request->validate([
             'user_id' => [

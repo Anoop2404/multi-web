@@ -9,14 +9,48 @@ use App\Services\Mail\SahodayaMailer;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
-    use HasApiTokens, HasFactory, Notifiable, HasRoles, UsesTenantConnectionWhenIsolated;
+    use HasApiTokens, HasFactory, Notifiable, UsesTenantConnectionWhenIsolated;
+    use HasRoles {
+        hasPermissionTo as private unrestrictedHasPermissionTo;
+        getAllPermissions as private unrestrictedGetAllPermissions;
+    }
+
+    public function automaticEventAdminAccount()
+    {
+        return $this->hasOne(FestEventAdminAccount::class);
+    }
+
+    public function hasRestrictedEventFinance(): bool
+    {
+        return (bool) $this->event_finance_restricted;
+    }
+
+    public function hasPermissionTo($permission, ?string $guardName = null): bool
+    {
+        $name = is_string($permission) ? $permission : ($permission->name ?? null);
+        if (in_array($name, ['fest.finance', 'finance.view'], true) && $this->hasRestrictedEventFinance()) {
+            return false;
+        }
+
+        return $this->unrestrictedHasPermissionTo($permission, $guardName);
+    }
+
+    public function getAllPermissions(): Collection
+    {
+        $permissions = $this->unrestrictedGetAllPermissions();
+
+        return $this->hasRestrictedEventFinance()
+            ? $permissions->reject(fn ($permission) => in_array($permission->name, ['fest.finance', 'finance.view'], true))->values()
+            : $permissions;
+    }
 
     protected $guard_name = 'web';
 
@@ -34,6 +68,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'last_login_at',
         'created_by_user_id',
         'group_classes',
+        'event_finance_restricted',
     ];
 
     protected $hidden = [
@@ -52,6 +87,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'portal_welcome_seen'    => 'boolean',
             'last_login_at'          => 'datetime',
             'group_classes'          => 'array',
+            'event_finance_restricted' => 'boolean',
         ];
     }
 

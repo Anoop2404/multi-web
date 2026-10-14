@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Http\Middleware\Concerns\ResolvesSahodayaAdminScope;
+use App\Support\EventAdminFinancePolicy;
 use App\Support\TenantUserCatalog;
 use Closure;
 use Illuminate\Http\Request;
@@ -22,6 +23,10 @@ class EnsureSahodayaAdminApi
 
         if ($user->isSuperAdmin()) {
             return $next($request);
+        }
+
+        if ($user->hasRestrictedEventFinance()) {
+            EventAdminFinancePolicy::assertRequestAllowed($request);
         }
 
         if (! $user->hasAnyRole(TenantUserCatalog::sahodayaAdminPanelRoles())) {

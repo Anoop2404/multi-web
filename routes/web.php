@@ -1591,6 +1591,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/judges', [FestJudgeAssignmentController::class, 'store'])->name('judges.store');
             Route::delete('/{event}/judges/{assignment}', [FestJudgeAssignmentController::class, 'destroy'])->name('judges.destroy');
             Route::get('/{event}/event-staff', [\App\Http\Controllers\SahodayaAdmin\FestEventStaffController::class, 'index'])->name('event-staff.index');
+            Route::post('/{event}/event-admin-login', [\App\Http\Controllers\SahodayaAdmin\FestEventStaffController::class, 'provisionLogin'])->name('event-admin-login.provision');
+            Route::post('/{event}/event-admin-login/reset', [\App\Http\Controllers\SahodayaAdmin\FestEventStaffController::class, 'resetLogin'])->name('event-admin-login.reset');
             Route::post('/{event}/event-staff', [\App\Http\Controllers\SahodayaAdmin\FestEventStaffController::class, 'store'])->name('event-staff.store');
             Route::delete('/{event}/event-staff/{assignment}', [\App\Http\Controllers\SahodayaAdmin\FestEventStaffController::class, 'destroy'])->name('event-staff.destroy');
             Route::get('/{event}/marks', [FestMarkEntryController::class, 'index'])->name('marks.index');

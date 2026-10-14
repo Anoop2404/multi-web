@@ -271,7 +271,7 @@
                     <FormField label="Max per school">
                         <input v-model.number="addForm.max_per_school" type="number" min="1" class="field">
                     </FormField>
-                    <FormField label="Fee override (₹)" class-extra="sm:col-span-2">
+                    <FormField v-if="!page.props.operationalEventAdmin" label="Fee override (₹)" class-extra="sm:col-span-2">
                         <input v-model.number="addForm.fee_amount" type="number" min="0" class="field" placeholder="Leave blank for default">
                     </FormField>
                 </FormGrid>
@@ -349,7 +349,7 @@
                     <FormField label="Max per school">
                         <input v-model.number="editForm.max_per_school" type="number" min="1" class="field">
                     </FormField>
-                    <FormField label="Fee override (₹)" class-extra="sm:col-span-2">
+                    <FormField v-if="!page.props.operationalEventAdmin" label="Fee override (₹)" class-extra="sm:col-span-2">
                         <input v-model.number="editForm.fee_amount" type="number" min="0" class="field" placeholder="Leave blank for default">
                     </FormField>
                 </FormGrid>
@@ -369,8 +369,10 @@
 </template>
 
 <script setup>
-import { Link, router, useForm } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
+import { useOperationalEventForm as useForm } from '@/composables/useOperationalEventForm.js';
 import { computed, ref } from 'vue';
+const page = usePage();
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';

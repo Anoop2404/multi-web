@@ -2,7 +2,11 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\PlatformAnnouncement;
+use App\Models\PlatformUser;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -25,6 +29,8 @@ class HandleInertiaRequests extends Middleware
     {
         return [
             ...parent::share($request),
+            'operationalEventAdmin' => fn () => $request->user() instanceof User
+                && $request->user()->hasRestrictedEventFinance(),
             'auth' => [
                 'user' => fn () => $request->user() ? array_merge(
                     $request->user()->only('id', 'name', 'email', 'email_verified_at'),
@@ -73,11 +79,11 @@ class HandleInertiaRequests extends Middleware
         $user = $request->user();
 
         return $user->tenant_id === null
-            ? \Illuminate\Support\Facades\DB::connection(config('tenancy.database.central_connection', 'central'))
+            ? DB::connection(config('tenancy.database.central_connection', 'central'))
                 ->table('model_has_roles')
                 ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
                 ->where('model_has_roles.model_id', $user->id)
-                ->whereIn('model_has_roles.model_type', [\App\Models\User::class, \App\Models\PlatformUser::class])
+                ->whereIn('model_has_roles.model_type', [User::class, PlatformUser::class])
                 ->pluck('roles.name')
                 ->unique()
                 ->values()
@@ -97,7 +103,7 @@ class HandleInertiaRequests extends Middleware
             ['superadmin', 'state_admin', 'sahodaya_admin', 'school_admin']
         ));
 
-        return \App\Models\PlatformAnnouncement::currentlyActive()
+        return PlatformAnnouncement::currentlyActive()
             ->forAudience($audiences)
             ->orderByDesc('id')
             ->get(['id', 'title', 'body', 'type'])

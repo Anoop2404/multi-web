@@ -4,10 +4,13 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToCentralTenant;
 use App\Services\Events\FestCompetitionTypeRegistry;
+use App\Services\Events\FestEventAdminAccountService;
+use App\Support\TenantStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 class FestEvent extends Model
 {
@@ -195,10 +198,10 @@ class FestEvent extends Model
     {
         $customQr = $this->fee_settings['payment_qr_code'] ?? null;
         $upi = $this->fee_settings['payment_upi'] ?? null;
-        $tenant = \App\Models\Tenant::find($this->tenant_id);
+        $tenant = Tenant::find($this->tenant_id);
 
         if (filled($customQr) || filled($upi)) {
-            $resolved = \App\Support\TenantStorage::resolvePaymentQrCode($tenant, $customQr ? (string) $customQr : null, $upi ? (string) $upi : null);
+            $resolved = TenantStorage::resolvePaymentQrCode($tenant, $customQr ? (string) $customQr : null, $upi ? (string) $upi : null);
             if ($resolved) {
                 return $resolved;
             }
@@ -216,9 +219,9 @@ class FestEvent extends Model
     {
         $customQr = $this->fee_settings['food_payment_qr_code'] ?? null;
         if (filled($customQr)) {
-            $tenant = \App\Models\Tenant::find($this->tenant_id);
+            $tenant = Tenant::find($this->tenant_id);
 
-            return \App\Support\TenantStorage::resolvePaymentQrCode($tenant, (string) $customQr);
+            return TenantStorage::resolvePaymentQrCode($tenant, (string) $customQr);
         }
 
         return null;
@@ -237,7 +240,7 @@ class FestEvent extends Model
         }
 
         // Generate base64 data URI first so browser displays without 404
-        $dataUri = \App\Support\TenantStorage::backgroundDataUri($sahodaya, $path);
+        $dataUri = TenantStorage::backgroundDataUri($sahodaya, $path);
         if ($dataUri) {
             return $dataUri;
         }
@@ -246,7 +249,7 @@ class FestEvent extends Model
             return $path;
         }
 
-        return \App\Support\TenantStorage::assetUrl($sahodaya, $path)
+        return TenantStorage::assetUrl($sahodaya, $path)
             ?? ('/storage/' . ltrim($path, '/'));
     }
 
@@ -257,7 +260,7 @@ class FestEvent extends Model
             return null;
         }
 
-        return \App\Support\TenantStorage::backgroundDataUri($sahodaya, $this->food_coupon_bg_image);
+        return TenantStorage::backgroundDataUri($sahodaya, $this->food_coupon_bg_image);
     }
 
     /** Default food coupon visual element coordinates (percentages of 96mm × 55mm coupon card) */
@@ -395,6 +398,10 @@ class FestEvent extends Model
 
     protected static function booted(): void
     {
+        static::created(function (self $event) {
+            app(FestEventAdminAccountService::class)->ensure($event);
+        });
+
         static::saving(function (self $event) {
             if ($event->fee_type === null) {
                 $event->fee_type = 'none';
@@ -730,7 +737,7 @@ class FestEvent extends Model
 
             if ($isHub) {
                 $displayTitle = "{$parentTitle} (Season Hub — All Regions)";
-                $shortTitle = "All Regions (Season Hub)";
+                $shortTitle = 'All Regions (Season Hub)';
             } else {
                 $displayTitle = $shortTitle;
             }
@@ -864,7 +871,7 @@ class FestEvent extends Model
      * FestEventReportAnalyticsService::itemFamiliesFor(), so that matching rule lives
      * in one place instead of being reimplemented per caller.
      *
-     * @return array{0: \Illuminate\Support\Collection<int, \Illuminate\Support\Collection<int, FestEventItem>>, 1: \Illuminate\Support\Collection<string, \Illuminate\Support\Collection<int, FestEventItem>>}
+     * @return array{0: Collection<int, Collection<int, FestEventItem>>, 1: Collection<string, Collection<int, FestEventItem>>}
      */
     public function itemFamilyGroups(): array
     {
@@ -931,8 +938,8 @@ class FestEvent extends Model
         return self::$rootEventCache[$this->id] = $event;
     }
 
-    /** @return \Illuminate\Support\Collection<int, self> Root-first ancestry, excluding $this. */
-    public function ancestors(): \Illuminate\Support\Collection
+    /** @return Collection<int, self> Root-first ancestry, excluding $this. */
+    public function ancestors(): Collection
     {
         $chain = [];
         $event = $this;

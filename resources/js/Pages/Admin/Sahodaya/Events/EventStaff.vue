@@ -6,6 +6,15 @@
             <Link :href="backHref" class="text-sm text-gray-500">{{ backLabel }}</Link>
         </div>
 
+        <section v-if="canManageEventLogins" class="card mb-4 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <h3 class="font-semibold">Event admin logins</h3>
+                <button type="button" class="btn-secondary text-xs" :disabled="provisioning" @click="provisionLogins">Create missing event logins</button>
+            </div>
+            <p class="text-xs text-slate-500">A separate account for each event and regional event, with event operations access and no finance access.</p>
+            <EventAdminLoginCard v-for="account in eventAdminAccounts" :key="account.event_id" :credentials="account" :tenant-id="sahodaya.id" />
+        </section>
+
         <form @submit.prevent="assign" class="card mb-4 flex flex-wrap gap-2 items-end">
             <div class="flex-1 min-w-[200px]">
                 <label class="text-xs text-gray-500">User</label>
@@ -73,7 +82,8 @@
 
 <script setup>
 import { Link, useForm, router } from '@inertiajs/vue3';
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+import EventAdminLoginCard from '@/Components/sahodaya/EventAdminLoginCard.vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
@@ -84,6 +94,8 @@ const props = defineProps({
     pendingPaymentsCount: Number,
     event: Object,
     assignments: Array,
+    eventAdminAccounts: { type: Array, default: () => [] },
+    canManageEventLogins: Boolean,
     staffPool: Array,
     stages: Array,
     heads: { type: Array, default: () => [] },
@@ -92,6 +104,15 @@ const props = defineProps({
     duties: Array,
     activityLogs: { type: Array, default: () => [] },
 });
+
+const provisioning = ref(false);
+function provisionLogins() {
+    provisioning.value = true;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/event-admin-login`, {}, {
+        preserveScroll: true,
+        onFinish: () => { provisioning.value = false; },
+    });
+}
 
 const isSports = computed(() => props.event.event_type === 'sports');
 const pageTitle = computed(() => (

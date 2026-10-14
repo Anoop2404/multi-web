@@ -1,0 +1,27 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class FestEventAdminAccount extends Model
+{
+    protected $fillable = ['event_id', 'user_id', 'temporary_password', 'password_fingerprint'];
+
+    protected $hidden = ['temporary_password', 'password_fingerprint'];
+
+    protected function casts(): array
+    {
+        return ['temporary_password' => 'encrypted'];
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function event()
+    {
+        return $this->belongsTo(FestEvent::class);
+    }
+}

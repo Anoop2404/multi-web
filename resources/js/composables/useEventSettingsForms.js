@@ -1,5 +1,6 @@
 import { computed, reactive, ref } from 'vue';
-import { router, useForm } from '@inertiajs/vue3';
+import { router } from '@inertiajs/vue3';
+import { useOperationalEventForm as useForm } from '@/composables/useOperationalEventForm.js';
 import { settingsDescriptionForEvent } from '@/support/sahodayaEventCapabilities.js';
 
 export function studentVerificationModeFromEvent(event) {

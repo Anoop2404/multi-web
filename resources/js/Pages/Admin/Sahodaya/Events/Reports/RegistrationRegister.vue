@@ -1,13 +1,13 @@
 <template>
     <SahodayaEventsLayout :title="`${event.title} — Registration Register`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="`${event.title} — Registration & Fees Register`" eyebrow="Reports"
+        <PageHeader :title="`${event.title} — ${showFinance ? 'Registration & Fees Register' : 'Registration Register'}`" eyebrow="Reports"
                     :description="event.event_type === 'sports'
                         ? 'Grouped by Sport Event — Fest ID, item reg, and chest numbers per item row.'
                         : 'Grouped by item head — Fest ID, item reg, and chest numbers per item row.'">
             <template #actions>
                 <a :href="exportUrl" class="btn-primary text-sm">Export CSV ↓</a>
-                <Link :href="feesUrl" class="btn-secondary text-sm">Event fees →</Link>
+                <Link v-if="showFinance" :href="feesUrl" class="btn-secondary text-sm">Event fees →</Link>
             </template>
         </PageHeader>
 
@@ -57,8 +57,8 @@
                     <thead class="bg-gray-50 text-left text-xs uppercase text-gray-500">
                         <tr>
                             <th class="p-3 w-12">Sl No</th>
-                            <th class="p-3">School</th><th class="p-3">Items</th><th class="p-3">Total due</th>
-                            <th class="p-3">Status</th><th class="p-3">Receipt</th>
+                            <th class="p-3">School</th><th class="p-3">Items</th><th v-if="showFinance" class="p-3">Total due</th>
+                            <th v-if="showFinance" class="p-3">Status</th><th v-if="showFinance" class="p-3">Receipt</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -66,9 +66,9 @@
                             <td class="p-3 text-slate-400">{{ idx + 1 }}</td>
                             <td class="p-3 font-medium">{{ (s.school_name || '').toUpperCase() }}</td>
                             <td class="p-3">{{ s.item_count }}</td>
-                            <td class="p-3 font-semibold">₹{{ s.total_due }}</td>
-                            <td class="p-3"><span :class="feeStatusClass(s.fee_status)" class="text-xs font-semibold px-2 py-0.5 rounded">{{ s.fee_status }}</span></td>
-                            <td class="p-3 text-xs font-mono">{{ s.receipt_no ?? '—' }}</td>
+                            <td v-if="showFinance" class="p-3 font-semibold">₹{{ s.total_due }}</td>
+                            <td v-if="showFinance" class="p-3"><span :class="feeStatusClass(s.fee_status)" class="text-xs font-semibold px-2 py-0.5 rounded">{{ s.fee_status }}</span></td>
+                            <td v-if="showFinance" class="p-3 text-xs font-mono">{{ s.receipt_no ?? '—' }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -88,13 +88,13 @@
                             <th class="p-3">Item reg</th>
                             <th class="p-3">Item</th>
                             <th class="p-3">Chest</th>
-                            <th class="p-3">Fee</th>
+                            <th v-if="showFinance" class="p-3">Fee</th>
                         </tr>
                     </thead>
                     <tbody>
                         <template v-for="(row, idx) in displayRows" :key="row.participant_id">
                             <tr v-if="idx === 0 || row.head_name !== displayRows[idx - 1]?.head_name" class="bg-slate-50/80">
-                                <td colspan="9" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                <td :colspan="showFinance ? 9 : 8" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
                                     {{ row.head_name ?? 'Other items' }}
                                 </td>
                             </tr>
@@ -126,7 +126,7 @@
                                      </div>
                                  </td>
                                 <td class="p-3 font-mono text-xs">{{ row.chest_no }}</td>
-                                <td class="p-3 text-xs">{{ row.item_fee != null ? `₹${row.item_fee}` : '—' }}</td>
+                                <td v-if="showFinance" class="p-3 text-xs">{{ row.item_fee != null ? `₹${row.item_fee}` : '—' }}</td>
                             </tr>
                         </template>
                         <tr v-if="!displayRows.length">
@@ -159,6 +159,7 @@ const props = defineProps({
 });
 
 const page = usePage();
+const showFinance = computed(() => !page.props.operationalEventAdmin);
 const headItemGroups = computed(() => page.props.headItemGroups ?? []);
 const headsForFilter = computed(() => page.props.headsForFilter ?? []);
 const hasItemHeads = computed(() => page.props.hasItemHeads ?? false);

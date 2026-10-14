@@ -22,7 +22,7 @@
             <div class="min-w-0 lg:col-span-2 space-y-6">
                 <!-- Group Tab 1: Fees & Windows -->
                 <template v-if="['fees', 'registration', 'participation'].includes(activeTab)">
-                    <div id="section-fees" class="scroll-mt-6"><FeesTab /></div>
+                    <div v-if="!page.props.operationalEventAdmin" id="section-fees" class="scroll-mt-6"><FeesTab /></div>
                     <div id="section-registration" class="scroll-mt-6"><RegistrationTab /></div>
                     <div id="section-participation" class="scroll-mt-6"><ParticipationTab /></div>
                 </template>
@@ -111,7 +111,8 @@
 
 <script setup>
 import { provide, computed, onMounted, watch, nextTick, toRefs } from 'vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
+const page = usePage();
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
@@ -194,12 +195,12 @@ const backLabel = computed(() => (isSports.value ? '← Setup hub' : '← Event 
 const activeCategory = computed(() => {
     const a = activeTab.value;
     if (['fees', 'registration', 'participation'].includes(a)) {
-        const sections = [
+        const sections = page.props.operationalEventAdmin ? [] : [
             { id: 'fees', label: isSports.value ? 'Sport Event Fees' : 'Fest Event Fees', href: `${base.value}/settings/fees` },
         ];
         sections.push({ id: 'registration', label: 'Registration Windows', href: `${base.value}/settings/registration` });
         sections.push({ id: 'participation', label: 'Participation Policies', href: `${base.value}/settings/participation` });
-        return { title: '💳 Fees & Windows', sections };
+        return { title: page.props.operationalEventAdmin ? 'Registration & Rules' : '💳 Fees & Windows', sections };
     }
 
     if (['eligibility', 'combo', 'records'].includes(a)) {

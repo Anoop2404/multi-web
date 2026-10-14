@@ -2,20 +2,23 @@
 
 namespace App\Http\Controllers\SahodayaAdmin;
 
-use App\Models\User;
 use App\Models\FestEvent;
 use App\Models\FestEventStaff;
 use App\Models\McqExam;
 use App\Models\McqExamStaff;
 use App\Models\Region;
 use App\Models\StaffRegionAssignment;
+use App\Models\User;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Auth\TenantUserProvisioner;
 use App\Services\Auth\UserCredentialService;
+use App\Services\Events\FestEventAdminAccountService;
 use App\Services\Spreadsheet\SpreadsheetWriter;
 use App\Support\TenantDomainSync;
 use App\Support\TenantUserCatalog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 class TenantUserController extends SahodayaAdminController
@@ -23,11 +26,16 @@ class TenantUserController extends SahodayaAdminController
     public function index()
     {
         $roles = TenantUserCatalog::sahodayaAssignableRoles();
+        $actor = request()->user();
+        $canShareEventLogins = $actor && ! ($actor instanceof User && $actor->hasRestrictedEventFinance())
+            && ($actor->isSuperAdmin() || $actor->hasRole('sahodaya_admin'));
 
         $users = User::query()
             ->where('tenant_id', $this->sahodaya->id)
             ->whereHas('roles', fn ($q) => $q->whereIn('name', $roles))
             ->with('roles', 'permissions')
+            ->when(Schema::hasTable('fest_event_admin_accounts'),
+                fn ($query) => $query->with('automaticEventAdminAccount.event'))
             ->orderBy('name')
             ->get()
             ->map(fn (User $u) => [
@@ -35,6 +43,11 @@ class TenantUserController extends SahodayaAdminController
                 'name'        => $u->name,
                 'email'       => $u->email,
                 'username'    => $u->username,
+                'event_admin_credentials' => $canShareEventLogins
+                    && Schema::hasTable('fest_event_admin_accounts')
+                    && ($account = $u->automaticEventAdminAccount)
+                        ? app(FestEventAdminAccountService::class)->credentials($account->setRelation('user', $u), $this->sahodaya)
+                        : null,
                 'roles'       => $u->getRoleNames()->values()->all(),
                 'permissions' => $u->getPermissionNames()->values()->all(),
                 'is_active'   => $u->is_active,
@@ -548,7 +561,7 @@ class TenantUserController extends SahodayaAdminController
      * regional billing have phases at all. Keyed by event id so the frontend can filter
      * the phase dropdown to whichever event the admin just picked.
      *
-     * @param  \Illuminate\Support\Collection<int, FestEvent>  $festEvents
+     * @param  Collection<int, FestEvent>  $festEvents
      * @return array<int, list<array{id: int, name: string}>>
      */
     private function eventPhaseOptions($festEvents): array
