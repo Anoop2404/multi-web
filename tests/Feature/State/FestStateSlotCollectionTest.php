@@ -581,4 +581,54 @@ class FestStateSlotCollectionTest extends TestCase
         $this->hubEvent->refresh();
         $this->assertFalse($this->hubEvent->state_slot_collection_open);
     }
+
+    public function test_group_entry_selections_match_by_registration_id_even_if_participant_differs(): void
+    {
+        $this->stateItem->update(['participant_type' => 'group', 'qualify_count' => 1]);
+        $this->item->update(['participant_type' => 'group']);
+
+        // Create a group entry with 2 students in the same registration
+        $class = SchoolClass::firstOrCreate(['tenant_id' => 'school-1', 'name' => 'Class 9']);
+        $studentA = Student::create(['name' => 'Member A', 'tenant_id' => 'school-1', 'school_class_id' => $class->id]);
+        $studentB = Student::create(['name' => 'Member B', 'tenant_id' => 'school-1', 'school_class_id' => $class->id]);
+
+        $reg = FestRegistration::create([
+            'event_id' => $this->hubEvent->id, 'item_id' => $this->item->id,
+            'school_id' => 'school-1', 'status' => 'approved',
+        ]);
+        $partA = FestParticipant::create(['registration_id' => $reg->id, 'student_id' => $studentA->id]);
+        $partB = FestParticipant::create(['registration_id' => $reg->id, 'student_id' => $studentB->id]);
+
+        $markA = FestMark::create([
+            'event_id' => $this->hubEvent->id, 'item_id' => $this->item->id,
+            'participant_id' => $partA->id, 'position' => 1, 'score' => 95, 'grade' => 'A',
+        ]);
+        $markB = FestMark::create([
+            'event_id' => $this->hubEvent->id, 'item_id' => $this->item->id,
+            'participant_id' => $partB->id, 'position' => 1, 'score' => 95, 'grade' => 'A',
+        ]);
+
+        $this->service()->open($this->program, $this->hubEvent, $this->user());
+        $selection = $this->primaries()->first();
+
+        // Simulate selection having member B's participant_id and mark_id
+        $selection->update([
+            'participant_id' => $partB->id,
+            'mark_id' => $markB->id,
+            'registration_id' => $reg->id,
+        ]);
+
+        $row = $this->service()->summary($this->program, $this->hubEvent)->first();
+        $this->assertSame('pending', $row['slot_status']);
+        $this->assertSame(0, $row['slot_progress']['invalid']);
+        $this->assertTrue($row['chosen'][0]['is_eligible']);
+
+        // Waiting list must not contain member A (the candidate pool must not consider the team unchosen)
+        $waiting = collect($row['candidates'])->filter(fn ($c) => ! $c['is_chosen'] && ! $c['is_declined']);
+        $this->assertCount(0, $waiting, 'Team should be marked chosen and not appear in waitlist');
+
+        // School must be able to respond and accept
+        $updated = $this->service()->respond($selection, 'accept', null, $this->user());
+        $this->assertSame('accepted', $updated->school_response);
+    }
 }

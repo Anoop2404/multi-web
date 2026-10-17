@@ -57,6 +57,17 @@ class FestStateWinnerSheetService
             : collect($this->nominations->candidatePool($program, $hubEvent));
         $selections = $batch->selections()->get();
 
+        $missingReg = $selections->whereNull('registration_id')->whereNotNull('participant_id');
+        if ($missingReg->isNotEmpty()) {
+            $regMap = \App\Models\FestParticipant::whereIn('id', $missingReg->pluck('participant_id'))->pluck('registration_id', 'id');
+            foreach ($missingReg as $s) {
+                if ($regId = $regMap->get($s->participant_id)) {
+                    $s->registration_id = $regId;
+                    $s->saveQuietly();
+                }
+            }
+        }
+
         $items = FestStateProgramItem::where('state_program_id', $program->id)
             ->when($filters['category'] ?? null, fn ($q, $v) => $q->where('category', $v))
             ->when($filters['class_group'] ?? null, fn ($q, $v) => $q->where('class_group', $v))
@@ -109,15 +120,21 @@ class FestStateWinnerSheetService
 
         $chosenMarkIds = $selections->where('status', 'selected')->pluck('mark_id')->filter()->all();
         $chosenParticipantIds = $selections->where('status', 'selected')->pluck('participant_id')->filter()->all();
+        $chosenRegistrationIds = $selections->where('status', 'selected')->pluck('registration_id')->filter()->all();
         $declinedParticipantIds = $declined->pluck('participant_id')->filter()->all();
         $declinedMarkIds = $declined->pluck('mark_id')->filter()->all();
+        $declinedRegistrationIds = $declined->pluck('registration_id')->filter()->all();
 
         $rows = $candidates
             ->sortBy(fn (array $c) => [$c['source_position'] ?? 99, -(float) ($c['score'] ?? 0)])
             ->values()
             ->map(fn (array $c) => $c + [
-                'is_chosen' => in_array($c['mark_id'] ?? null, $chosenMarkIds, true) || in_array($c['participant_id'] ?? null, $chosenParticipantIds, true),
-                'is_declined' => in_array($c['mark_id'] ?? null, $declinedMarkIds, true) || in_array($c['participant_id'] ?? null, $declinedParticipantIds, true),
+                'is_chosen' => in_array($c['mark_id'] ?? null, $chosenMarkIds, true)
+                    || in_array($c['participant_id'] ?? null, $chosenParticipantIds, true)
+                    || (! empty($c['registration_id']) && in_array($c['registration_id'], $chosenRegistrationIds, true)),
+                'is_declined' => in_array($c['mark_id'] ?? null, $declinedMarkIds, true)
+                    || in_array($c['participant_id'] ?? null, $declinedParticipantIds, true)
+                    || (! empty($c['registration_id']) && in_array($c['registration_id'], $declinedRegistrationIds, true)),
             ]);
 
         // Positions held by more than one candidate. The committee must pick; nothing here picks for
@@ -156,7 +173,14 @@ class FestStateWinnerSheetService
             'tied_positions' => $tiedPositions->all(),
             'unresolved_ties' => $unresolvedTies->all(),
             'candidates' => $rows->all(),
-            'chosen' => $chosen->map(fn ($s) => $this->selectionRow($s))->values()->all(),
+            'chosen' => $chosen->map(function ($s) use ($rows) {
+                $cRow = $this->selectionRow($s);
+                $cRow['is_eligible'] = $rows->contains(fn ($c) =>
+                    ($s->participant_id && $c['participant_id'] === $s->participant_id)
+                    || ($s->mark_id && $c['mark_id'] === $s->mark_id)
+                    || (! empty($s->registration_id) && ! empty($c['registration_id']) && $c['registration_id'] === $s->registration_id));
+                return $cRow;
+            })->values()->all(),
             'reserves' => $reserves->map(fn ($s) => $this->selectionRow($s))->values()->all(),
             'declined' => $declined->map(fn ($s) => $this->selectionRow($s))->values()->all(),
         ];
@@ -169,6 +193,7 @@ class FestStateWinnerSheetService
             'id' => $selection->id,
             'mark_id' => $selection->mark_id,
             'participant_id' => $selection->participant_id,
+            'registration_id' => $selection->registration_id,
             'student_name' => $selection->student_name,
             'school_name' => $selection->school_name,
             'class_name' => $selection->class_name,
@@ -270,7 +295,8 @@ class FestStateWinnerSheetService
                 foreach ($row['chosen'] as $chosen) {
                     $eligible = collect($row['candidates'])->contains(fn ($candidate) =>
                         ($chosen['participant_id'] && $candidate['participant_id'] === $chosen['participant_id'])
-                        || ($chosen['mark_id'] && $candidate['mark_id'] === $chosen['mark_id']));
+                        || ($chosen['mark_id'] && $candidate['mark_id'] === $chosen['mark_id'])
+                        || (! empty($chosen['registration_id']) && ! empty($candidate['registration_id']) && $candidate['registration_id'] === $chosen['registration_id']));
                     if (! $eligible) {
                         $blocking[] = "{$row['item_code']}: an offered entry is no longer eligible. Review the selection.";
                     }

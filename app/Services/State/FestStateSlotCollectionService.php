@@ -120,7 +120,9 @@ class FestStateSlotCollectionService
             if ($action === 'accept') {
                 $pool = app(FestStateCollectionCandidates::class)->pool(FestStateProgram::findOrFail($batch->state_program_id), $hubEvent);
                 abort_unless($pool->contains(fn ($candidate) => $candidate['item_id'] === $selection->item_id
-                    && ($candidate['participant_id'] === $selection->participant_id || ($selection->mark_id && $candidate['mark_id'] === $selection->mark_id))),
+                    && ($candidate['participant_id'] === $selection->participant_id
+                        || ($selection->mark_id && $candidate['mark_id'] === $selection->mark_id)
+                        || ($selection->registration_id && $candidate['registration_id'] === $selection->registration_id))),
                     422, 'This offer is no longer eligible. Ask the Sahodaya to review the entry.');
                 $selection->update([
                     'school_response' => 'accepted',
@@ -252,7 +254,8 @@ class FestStateSlotCollectionService
             $row['chosen'] = collect($row['chosen'])->map(function ($choice) use ($row) {
                 $choice['is_eligible'] = collect($row['candidates'])->contains(fn ($candidate) =>
                     ($choice['participant_id'] && $candidate['participant_id'] === $choice['participant_id'])
-                    || ($choice['mark_id'] && $candidate['mark_id'] === $choice['mark_id']));
+                    || ($choice['mark_id'] && $candidate['mark_id'] === $choice['mark_id'])
+                    || (! empty($choice['registration_id']) && ! empty($candidate['registration_id']) && $candidate['registration_id'] === $choice['registration_id']));
                 return $choice;
             })->all();
             $validOffers = collect($row['chosen'])->where('is_eligible', true);
@@ -304,6 +307,7 @@ class FestStateSlotCollectionService
                 'id' => $s->id,
                 'item_id' => $s->item_id,
                 'participant_id' => $s->participant_id,
+                'registration_id' => $s->registration_id,
                 'mark_id' => $s->mark_id,
                 'item_code' => $s->item_code,
                 'item_title' => $s->item_title,
@@ -326,7 +330,8 @@ class FestStateSlotCollectionService
             $offer['direct_entry'] = $row['direct_entry'] ?? false;
             $stillEligible = collect($row['candidates'] ?? [])->contains(fn ($candidate) =>
                 ($offer['participant_id'] && $candidate['participant_id'] === $offer['participant_id'])
-                || ($offer['mark_id'] && $candidate['mark_id'] === $offer['mark_id']));
+                || ($offer['mark_id'] && $candidate['mark_id'] === $offer['mark_id'])
+                || (! empty($offer['registration_id']) && ! empty($candidate['registration_id']) && $candidate['registration_id'] === $offer['registration_id']));
             $offer['can_respond'] = $stillEligible && $hubEvent->state_slot_collection_open && ! $hubEvent->state_slot_collection_approved_at
                 && $offer['status'] === 'selected' && $offer['school_response'] === 'pending';
         }
@@ -343,13 +348,14 @@ class FestStateSlotCollectionService
 
                 $queueIndex = $unofferedCandidates->search(fn ($c) =>
                     ($candidate['participant_id'] && $c['participant_id'] === $candidate['participant_id'])
-                    || ($candidate['mark_id'] && $c['mark_id'] === $candidate['mark_id']));
+                    || ($candidate['mark_id'] && $c['mark_id'] === $candidate['mark_id'])
+                    || (! empty($candidate['registration_id']) && ! empty($c['registration_id']) && $candidate['registration_id'] === $c['registration_id']));
 
                 $waitlistPosition = $queueIndex !== false ? $queueIndex + 1 : null;
                 $optOutsNeeded = $waitlistPosition ?: 1;
 
                 $offered[] = [
-                    'id' => null, 'key' => 'waiting-'.$candidate['participant_id'],
+                    'id' => null, 'key' => 'waiting-'.($candidate['participant_id'] ?? $candidate['registration_id'] ?? $candidate['mark_id']),
                     'item_id' => $row['item_id'], 'item_code' => $row['item_code'], 'item_title' => $row['title'],
                     'category_label' => $row['category_label'], 'gender_label' => $row['gender_label'],
                     'student_name' => $candidate['student_name'], 'class_name' => $candidate['class_name'],

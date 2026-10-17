@@ -18,6 +18,10 @@
 
                 <div class="mt-3 flex flex-wrap items-end gap-2">
                     <label class="text-xs">
+                        <span class="block text-gray-500 mb-0.5">Search</span>
+                        <input v-model="search" type="search" placeholder="Code, title, name, school…" class="field !py-1.5 !text-xs w-44 sm:w-56" />
+                    </label>
+                    <label class="text-xs">
                         <span class="block text-gray-500 mb-0.5">Category</span>
                         <select :value="filters.category || ''" class="field !py-1.5 !text-xs" @change="filter('category', $event.target.value)">
                             <option value="">All</option>
@@ -47,8 +51,13 @@
             <!-- What stops registration, said plainly and per item. -->
             <div v-if="readiness.blocking.length" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
                 <p class="text-xs font-semibold text-red-800">Cannot register yet</p>
-                <ul class="mt-1 space-y-0.5 text-xs text-red-700">
-                    <li v-for="(b, i) in readiness.blocking" :key="i">{{ b }}</li>
+                <ul class="mt-1.5 space-y-1 text-xs text-red-700">
+                    <li v-for="(b, i) in readiness.blocking" :key="i" class="flex flex-wrap items-center justify-between gap-2">
+                        <span>{{ b }}</span>
+                        <a v-if="parseBlockingCode(b)" :href="`#item-${parseBlockingCode(b)}`" class="inline-flex items-center gap-1 font-bold underline hover:text-red-950 text-[11px] bg-red-100/80 px-2 py-0.5 rounded">
+                            Jump to item {{ parseBlockingCode(b) }} ↓
+                        </a>
+                    </li>
                 </ul>
             </div>
             <div v-else-if="readiness.warnings.length" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
@@ -61,11 +70,11 @@
                 </ul>
             </div>
 
-            <p v-if="!sheet.length" class="card text-sm text-gray-400">
-                No State items have results from this event yet.
+            <p v-if="!filteredSheet.length" class="card text-sm text-gray-400">
+                {{ sheet.length ? 'No items match your search.' : 'No State items have results from this event yet.' }}
             </p>
 
-            <section v-for="row in sheet" :key="row.item_id" class="card">
+            <section v-for="row in filteredSheet" :key="row.item_id" :id="`item-${row.item_code}`" class="card scroll-mt-24 transition hover:border-slate-300">
                 <div class="flex flex-wrap items-start justify-between gap-2">
                     <div class="min-w-0">
                         <h4 class="font-semibold text-sm text-gray-800">
@@ -105,7 +114,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="c in row.candidates" :key="c.mark_id"
+                        <tr v-for="c in row.candidates" :key="c.mark_id || c.participant_id || c.registration_id"
                             class="border-b last:border-0"
                             :class="{ 'bg-emerald-50/60': c.is_chosen, 'opacity-60': c.is_declined }">
                             <td class="py-1.5">
@@ -133,11 +142,18 @@
                     </tbody>
                 </table>
 
-                <div v-if="row.chosen.length || row.reserves.length || row.declined.length" class="mt-2 space-y-1 border-t pt-2">
-                    <p v-for="s in row.chosen" :key="`c${s.id}`" class="text-[11px] text-emerald-800">
-                        <strong>Going:</strong> {{ s.student_name }} ({{ s.school_name }}) — position {{ s.source_position }}
-                        <button v-if="!isCertified" type="button" class="ml-1 text-gray-400 hover:text-red-600" @click="remove(s)">remove</button>
-                    </p>
+                <div v-if="row.chosen.length || row.reserves.length || row.declined.length" class="mt-2 space-y-1.5 border-t pt-2">
+                    <div v-for="s in row.chosen" :key="`c${s.id}`"
+                         class="text-[11px] rounded p-1.5 flex flex-wrap items-center justify-between gap-2"
+                         :class="s.is_eligible === false ? 'bg-rose-50 text-rose-900 border border-rose-200' : 'text-emerald-800'">
+                        <div>
+                            <strong>Going:</strong> {{ s.student_name }} ({{ s.school_name }}) — position {{ s.source_position }}
+                            <span v-if="s.is_eligible === false" class="ml-2 font-bold text-rose-700">⚠ Needs review: entry no longer matches certified results</span>
+                        </div>
+                        <button v-if="!isCertified" type="button" class="text-xs font-semibold hover:underline" :class="s.is_eligible === false ? 'text-rose-700 hover:text-rose-900 font-bold' : 'text-gray-400 hover:text-red-600'" @click="remove(s)">
+                            {{ s.is_eligible === false ? 'Remove invalid selection' : 'remove' }}
+                        </button>
+                    </div>
                     <p v-for="s in row.reserves" :key="`r${s.id}`" class="text-[11px] text-gray-600">
                         <strong>Reserve:</strong> {{ s.student_name }} ({{ s.school_name }})
                         <span v-if="s.note"> — {{ s.note }}</span>
@@ -154,7 +170,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 
@@ -164,7 +180,24 @@ const props = defineProps({
     currentUserId: Number, actionUrls: Object,
 });
 
+const search = ref('');
 const isCertified = computed(() => props.batch.status === 'certified');
+
+function parseBlockingCode(msg) {
+    const match = String(msg || '').match(/^([0-9A-Za-z_-]+):/);
+    return match ? match[1] : null;
+}
+
+const filteredSheet = computed(() => {
+    const q = search.value.trim().toLowerCase();
+    if (!q) return props.sheet;
+    return props.sheet.filter(row =>
+        String(row.item_code || '').toLowerCase().includes(q)
+        || String(row.title || '').toLowerCase().includes(q)
+        || (row.candidates && row.candidates.some(c => (c.student_name && c.student_name.toLowerCase().includes(q)) || (c.school_name && c.school_name.toLowerCase().includes(q))))
+        || (row.chosen && row.chosen.some(c => (c.student_name && c.student_name.toLowerCase().includes(q)) || (c.school_name && c.school_name.toLowerCase().includes(q))))
+    );
+});
 
 function filter(key, value) {
     const next = { ...props.filters, [key]: value || undefined };

@@ -179,7 +179,8 @@ class FestStateNominationService
                     : $this->collectionPool(FestStateProgram::findOrFail($batch->state_program_id), $hub);
                 $allowed = $pool->first(fn ($entry) => $entry['item_id'] === $itemId
                     && ((! empty($candidate['participant_id']) && $entry['participant_id'] === $candidate['participant_id'])
-                        || (! empty($candidate['mark_id']) && $entry['mark_id'] === $candidate['mark_id'])));
+                        || (! empty($candidate['mark_id']) && $entry['mark_id'] === $candidate['mark_id'])
+                        || (! empty($candidate['registration_id']) && $entry['registration_id'] === $candidate['registration_id'])));
                 abort_unless($allowed, 422, 'This entry is not eligible for State slot collection.');
                 $candidate = $allowed;
             }
@@ -207,6 +208,11 @@ class FestStateNominationService
 
             if (! empty($candidate['participant_id'])) {
                 abort_if($batch->selections()->where('participant_id', $candidate['participant_id'])->where('status', 'selected')->exists(),
+                    422, 'This candidate is already selected in this batch.');
+            }
+
+            if (! empty($candidate['registration_id'])) {
+                abort_if($batch->selections()->where('registration_id', $candidate['registration_id'])->where('status', 'selected')->exists(),
                     422, 'This candidate is already selected in this batch.');
             }
 
