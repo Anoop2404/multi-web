@@ -22,6 +22,18 @@
                         </p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
+                        <div v-if="actionUrls.exportZip" class="inline-flex rounded-xl border border-slate-200 bg-white shadow-2xs divide-x divide-slate-200">
+                            <a :href="actionUrls.exportZip" download
+                               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-indigo-600 hover:bg-slate-50 transition rounded-l-xl"
+                               title="Download complete nominations package: Excel sheet + student photos in a zip file">
+                                <span>📦 Package (.zip)</span>
+                            </a>
+                            <a :href="actionUrls.exportExcel" download
+                               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-emerald-700 hover:bg-slate-50 transition rounded-r-xl"
+                               title="Download Excel spreadsheet only">
+                                <span>📊 Excel (.xlsx)</span>
+                            </a>
+                        </div>
                         <button type="button" class="btn-secondary text-xs inline-flex items-center gap-1.5 shadow-2xs" :disabled="isCertified" @click="autoFill">
                             <svg class="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                             Fill from the top

@@ -559,6 +559,9 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
     Route::post('/dev-pass-token', [\App\Http\Controllers\Admin\DevPassTokenAdminController::class, 'update'])->name('dev-pass-token.update');
     Route::post('/dev-pass-token/regenerate', [\App\Http\Controllers\Admin\DevPassTokenAdminController::class, 'regenerate'])->name('dev-pass-token.regenerate');
 
+
+        // Online exam engine: platform-wide capacity bookings calendar.
+        require __DIR__.'/includes/exam_engine_platform.php';
     }); // end super.admin
 });
 
@@ -664,6 +667,9 @@ Route::prefix('school-admin/{tenantId}')
     Route::get('/fest/reports', [\App\Http\Controllers\SchoolAdmin\FestSchoolReportController::class, 'reportsHub'])->name('fest.reports.hub');
 
     require __DIR__.'/includes/school_event_programs.php';
+
+    // Online exam engine: school MCQ coordinator live view + first-line support actions.
+    require __DIR__.'/includes/exam_engine_school.php';
 
     // Recover from malformed links that used the school UUID as the program slug.
     Route::get('/programs/{badProgram}/{rest}', function (string $tenantId, string $rest) {
@@ -1423,6 +1429,9 @@ Route::prefix('sahodaya-admin/{tenantId}')
 
         require __DIR__.'/includes/sahodaya_event_programs.php';
 
+        // Online exam engine: arm/close, live monitor and actions for Sahodaya admins.
+        require __DIR__.'/includes/exam_engine_sahodaya.php';
+
         // Head-first permalink: always resolves to this sport's own Competition page,
         // regardless of which discipline event id it currently lives on.
         Route::get('/sports/heads/{head}', [\App\Http\Controllers\SahodayaAdmin\FestItemHeadController::class, 'showByHead'])->name('sports.heads.show');
@@ -1536,6 +1545,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
                 Route::post('/update-slots', [$slots, 'updateSlotQuotas'])->name('update-slots');
                 Route::post('/offer', [$slots, 'sendOffer'])->name('send-offer');
                 Route::post('/selections/{selection}/alter', [$slots, 'alterSelection'])->name('alter-selection');
+                Route::get('/export-zip', [$slots, 'exportZip'])->name('export-zip');
+                Route::get('/export-excel', [$slots, 'exportExcel'])->name('export-excel');
             });
             Route::post('/{event}/spawn-school-rounds', [FestEventController::class, 'spawnSchoolRounds'])->name('spawn-school-rounds');
             Route::post('/{event}/link-school-round', [FestEventController::class, 'linkSchoolRound'])->name('link-school-round');
@@ -2024,12 +2035,20 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{exam}/hall-tickets/halls', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'saveHalls'])->name('hall-tickets.halls');
             Route::post('/{exam}/hall-tickets/allocate-seats', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'allocateSeats'])->name('hall-tickets.allocate-seats');
             Route::get('/{exam}/hall-tickets/print-all', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'printAllHallTickets'])->name('hall-tickets.print-all');
+            Route::post('/{exam}/registrations/{registration}/passcode', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'reissuePasscode'])->name('registrations.passcode.reissue');
             Route::get('/{exam}/staff', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'staff'])->name('staff');
             Route::post('/{exam}/staff', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'storeStaff'])->name('staff.store');
             Route::delete('/{exam}/staff/{staff}', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'destroyStaff'])->name('staff.destroy');
             Route::get('/{exam}/question-banks', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'questionBanks'])->name('question-banks');
             Route::post('/{exam}/question-banks', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'attachBank'])->name('question-banks.attach');
             Route::delete('/{exam}/question-banks/{bank}', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'detachBank'])->name('question-banks.detach');
+            Route::put('/{exam}/question-banks/{bank}', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'updateSection'])->name('question-banks.update');
+            Route::post('/{exam}/question-banks/{bank}/move', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'moveSection'])->name('question-banks.move');
+            Route::put('/{exam}/paper-settings', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'updatePaperSettings'])->name('paper-settings.update');
+            Route::get('/{exam}/paper-preview', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'paperPreview'])->name('paper-preview');
+            Route::put('/{exam}/engine', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'updateEngineSettings'])->name('engine.update');
+            Route::post('/{exam}/engine/arm', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'armEngine'])->name('engine.arm');
+            Route::post('/{exam}/engine/disarm', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'disarmEngine'])->name('engine.disarm');
             Route::get('/{exam}/session', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'sessionMonitor'])->name('session');
             Route::get('/{exam}/activity', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'activity'])->name('activity');
             Route::post('/{exam}/marks/bulk-import', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'bulkImportMarks'])->name('marks.bulk-import');
@@ -2305,6 +2324,24 @@ Route::prefix('portal/exam/{tenantId}')
         Route::post('/exams/{exam}/registrations/{registration}/marks', [\App\Http\Controllers\Portal\ExamOpsController::class, 'storeMark'])->name('marks.store');
         Route::get('/exams/{exam}/supervision', [\App\Http\Controllers\Portal\ExamOpsController::class, 'supervision'])->name('supervision');
         Route::get('/exams/{exam}/results', [\App\Http\Controllers\Portal\ExamOpsController::class, 'results'])->name('results');
+
+        // Question bank authoring for exam controllers (same actions as Sahodaya admin → Talent Search → Question banks).
+        Route::get('/question-banks', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'index'])->name('question-banks');
+        Route::post('/question-banks', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'storeBank'])->name('question-banks.store');
+        Route::get('/question-banks/import-template', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'importTemplate'])->name('question-banks.import-template');
+        Route::get('/question-banks/{bank}', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'show'])->name('question-banks.show');
+        Route::put('/question-banks/{bank}', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'updateBank'])->name('question-banks.update');
+        Route::delete('/question-banks/{bank}', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'destroyBank'])->name('question-banks.destroy');
+        Route::post('/question-banks/{bank}/questions', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'storeQuestion'])->name('question-banks.questions.store');
+        Route::put('/question-banks/{bank}/questions/{question}', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'updateQuestion'])->name('question-banks.questions.update');
+        Route::delete('/question-banks/{bank}/questions/{question}', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'destroyQuestion'])->name('question-banks.questions.destroy');
+        Route::post('/question-banks/{bank}/questions/{question}/move', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'moveQuestion'])->name('question-banks.questions.move');
+        Route::get('/question-banks/{bank}/questions/{question}/image', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'questionImage'])->name('question-banks.questions.image');
+        Route::post('/question-banks/{bank}/import/preview', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'importPreview'])->name('question-banks.import.preview');
+        Route::post('/question-banks/{bank}/import/commit', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'importCommit'])->name('question-banks.import.commit');
+
+        // Online exam engine: live monitor and actions for exam controllers.
+        require __DIR__.'/includes/exam_engine_exam_portal.php';
     });
 
 Route::prefix('portal/house-admin/{tenantId}')
@@ -2348,6 +2385,7 @@ Route::prefix('portal/student/{tenantId}')
         Route::get('/mcq/{registration}/certificate', [\App\Http\Controllers\Portal\StudentMcqController::class, 'certificate'])->name('mcq.certificate');
         Route::get('/mcq/{registration}/invoice', [\App\Http\Controllers\Portal\StudentMcqController::class, 'invoice'])->name('mcq.invoice');
         Route::get('/mcq/{registration}/exam', [\App\Http\Controllers\Portal\StudentMcqController::class, 'showExam'])->name('mcq.exam');
+        Route::get('/mcq/{registration}/questions/{question}/image', [\App\Http\Controllers\Portal\StudentMcqController::class, 'questionImage'])->name('mcq.question-image');
         Route::post('/mcq/{registration}/start', [\App\Http\Controllers\Portal\StudentMcqController::class, 'startExam'])->name('mcq.start');
         Route::post('/mcq/{registration}/save-answers', [\App\Http\Controllers\Portal\StudentMcqController::class, 'saveAnswer'])->name('mcq.save-answers');
         Route::post('/mcq/{registration}/proctor-event', [\App\Http\Controllers\Portal\StudentMcqController::class, 'recordProctorEvent'])->middleware('throttle:30,1')->name('mcq.proctor-event');

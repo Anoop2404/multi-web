@@ -221,6 +221,8 @@ class FestStateWinnerRegistrationController extends SahodayaAdminController
             'autoFill' => "{$base}/auto-fill",
             'register' => "{$base}/register",
             'slotCollection' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/state-slot-collection",
+            'exportZip' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/state-slot-collection/export-zip",
+            'exportExcel' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/state-slot-collection/export-excel",
         ];
     }
 }

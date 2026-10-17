@@ -43,6 +43,22 @@
                         <span v-else class="text-xs text-emerald-700">School responses are complete. Review any unfilled slots before approval.</span>
                     </template>
                     <span v-else class="text-sm text-emerald-800">Approved {{ formatDate(event.state_slot_collection_approved_at) }}. Continue to the State winner registration sheet to submit.</span>
+
+                    <!-- Export Nominees Package & Excel -->
+                    <div class="sm:ml-auto flex items-center gap-2">
+                        <div class="inline-flex rounded-xl border border-slate-200 bg-white shadow-2xs divide-x divide-slate-200">
+                            <a :href="actionUrls.exportZip" download
+                               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-indigo-600 hover:bg-slate-50 transition rounded-l-xl"
+                               title="Download complete nominations package: Excel sheet + student photos in a zip file">
+                                <span>📦 Download Package (.zip)</span>
+                            </a>
+                            <a :href="actionUrls.exportExcel" download
+                               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-emerald-700 hover:bg-slate-50 transition rounded-r-xl"
+                               title="Download Excel spreadsheet only">
+                                <span>📊 Excel (.xlsx)</span>
+                            </a>
+                        </div>
+                    </div>
                 </div>
                 <p v-if="opening || savingSlots" role="status" class="mt-3 rounded-lg bg-indigo-50 p-3 text-xs text-indigo-800">
                     {{ opening ? 'Preparing offers and checking quotas. Keep this page open; one submission is enough.' : 'Updating slot counts and checking new offers…' }}

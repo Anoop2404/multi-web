@@ -6,6 +6,7 @@ use App\Models\FestEvent;
 use App\Models\FestStateNominationBatch;
 use App\Models\FestStateNominationSelection;
 use App\Models\FestStateProgram;
+use App\Services\State\FestStateExportService;
 use App\Services\State\FestStateSlotCollectionService;
 use Illuminate\Http\Request;
 
@@ -202,6 +203,37 @@ class FestStateSlotCollectionController extends SahodayaAdminController
         return back()->with('success', $message);
     }
 
+    public function exportZip(string $tenantId, FestEvent $event, FestStateExportService $export, Request $request)
+    {
+        $program = $this->context($event);
+        $confirmedOnly = $request->boolean('confirmed', false);
+
+        $zipPath = $export->generateZip($program, $event, $confirmedOnly);
+        $slug = \Illuminate\Support\Str::slug($event->title, '-');
+        $filename = "{$slug}-state-nominations-" . now()->format('Ymd-His') . ".zip";
+
+        return response()->download($zipPath, $filename, [
+            'Content-Type' => 'application/zip',
+            'Cache-Control' => 'no-cache, private',
+        ])->deleteFileAfterSend(true);
+    }
+
+    public function exportExcel(string $tenantId, FestEvent $event, FestStateExportService $export, Request $request)
+    {
+        $program = $this->context($event);
+        $confirmedOnly = $request->boolean('confirmed', false);
+
+        $xlsxBytes = $export->generateExcel($program, $event, $confirmedOnly);
+        $slug = \Illuminate\Support\Str::slug($event->title, '-');
+        $filename = "{$slug}-state-nominations-" . now()->format('Ymd-His') . ".xlsx";
+
+        return response($xlsxBytes, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Cache-Control' => 'no-cache, private',
+        ]);
+    }
+
     private function context(FestEvent $event): FestStateProgram
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
@@ -222,6 +254,8 @@ class FestStateSlotCollectionController extends SahodayaAdminController
             'updateSlots' => "{$base}/update-slots",
             'sendOffer' => "{$base}/offer",
             'alterSelection' => "{$base}/selections",
+            'exportZip' => "{$base}/export-zip",
+            'exportExcel' => "{$base}/export-excel",
             'overview' => "/sahodaya-admin/{$tenantId}/state-slot-collection",
             'winnerSheet' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/state-winners",
         ];
