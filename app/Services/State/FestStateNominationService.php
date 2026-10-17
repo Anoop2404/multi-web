@@ -9,6 +9,7 @@ use App\Models\FestStateNominationBatch;
 use App\Models\FestStateNominationSelection;
 use App\Models\FestStateProgram;
 use App\Models\FestStateProgramItem;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Events\FestPartitionService;
 use Illuminate\Support\Facades\DB;
@@ -67,7 +68,7 @@ class FestStateNominationService
                         'item_code'        => $item->item_code,
                         'item_title'       => $item->title,
                         'school_id'        => $participant->registration->school_id,
-                        'school_name'      => \App\Models\Tenant::find($participant->registration->school_id)?->name,
+                        'school_name' => Tenant::find($participant->registration->school_id)?->name,
                         'student_name'     => $participant->student?->name ?? 'Participant',
                         'roll_number'      => $participant->student?->roll_number ?? null,
                         'class_name'       => $participant->student?->class_name ?? null,
@@ -85,7 +86,7 @@ class FestStateNominationService
     }
 
     /** @return list<FestEvent> */
-    private function sourceEvents(FestEvent $hubEvent, FestPartitionService $partitions): array
+    public function sourceEvents(FestEvent $hubEvent, FestPartitionService $partitions): array
     {
         if ($partitions->isPartitionedHub($hubEvent)) {
             return $partitions->partitions($hubEvent)->all();

@@ -144,6 +144,15 @@ class StateResultService
             throw ValidationException::withMessages(['item' => 'Compute the result before publishing it.']);
         }
 
+        $eligibility = app(StateEligibilityService::class);
+        foreach (StateFestRegistration::where('state_event_id', $event->id)->where('item_id', $item->id)
+            ->whereNotIn('status', ['rejected', 'withdrawn'])->with('participants')->get() as $registration) {
+            $problems = $eligibility->blockingProblems($event, $eligibility->check($event, $registration, $item));
+            if ($problems !== []) {
+                throw ValidationException::withMessages(['eligibility' => implode(' ', array_column($problems, 'message'))]);
+            }
+        }
+
         $previous = $result->status;
         $result->forceFill(['status' => StateItemResult::PUBLISHED, 'published_at' => now()])->save();
 

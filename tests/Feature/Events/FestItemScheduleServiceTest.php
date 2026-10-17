@@ -66,6 +66,54 @@ class FestItemScheduleServiceTest extends TestCase
 
     // ── rowsForEvent(): phase leaf scoping ───────────────────────────────
 
+    public function test_day_participation_uses_individual_overrides_and_counts_group_members(): void
+    {
+        [$sahodaya, $admin] = $this->actingAdmin();
+        $event = $this->makeEvent($sahodaya->id);
+        $school = Tenant::create(['id' => (string) Str::uuid(), 'name' => 'Count School', 'type' => 'school', 'parent_id' => $sahodaya->id]);
+        $class = \App\Models\SchoolClass::create(['tenant_id' => $school->id, 'name' => 'Class 6']);
+        $student = \App\Models\Student::create(['tenant_id' => $school->id, 'school_class_id' => $class->id, 'name' => 'Same pupil']);
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $groupItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'Team', 'participant_type' => 'group', 'is_enabled' => true]);
+        $solo = \App\Models\FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+        $soloParticipant = \App\Models\FestParticipant::create(['registration_id' => $solo->id, 'student_id' => $student->id, 'participant_role' => 'performer']);
+        $team = \App\Models\FestRegistration::create(['event_id' => $event->id, 'item_id' => $groupItem->id, 'school_id' => $school->id, 'status' => 'submitted']);
+        $group = \App\Models\FestGroup::create(['event_id' => $event->id, 'registration_id' => $team->id, 'team_name' => 'Team']);
+        foreach ([$student, \App\Models\Student::create(['tenant_id' => $school->id, 'school_class_id' => $class->id, 'name' => 'Team member'])] as $member) {
+            \App\Models\FestParticipant::create(['registration_id' => $team->id, 'student_id' => $member->id, 'group_id' => $group->id, 'participant_role' => 'performer']);
+        }
+        $standby = \App\Models\Student::create(['tenant_id' => $school->id, 'school_class_id' => $class->id, 'name' => 'Standby']);
+        \App\Models\FestParticipant::create(['registration_id' => $team->id, 'student_id' => $standby->id, 'participant_role' => 'standby']);
+        foreach ([$item, $groupItem] as $scheduledItem) {
+            FestSchedule::create(['event_id' => $event->id, 'item_id' => $scheduledItem->id, 'scheduled_at' => '2026-10-20 09:00']);
+        }
+        FestSchedule::create(['event_id' => $event->id, 'item_id' => $item->id,
+            'participant_id' => $soloParticipant->id, 'scheduled_at' => '2026-10-21 09:00']);
+        $summary = app(\App\Services\Events\FestDayParticipationService::class)->sahodaya($event);
+        $this->assertSame([2, 1], array_column($summary['days'], 'unique_participants'));
+        $this->assertSame(2, $summary['overall']['unique_participants']);
+        $this->assertSame(3, $summary['overall']['participant_entries']);
+        $this->assertSame($school->name, $summary['overall']['schools'][0]['name']);
+        $this->assertSame(['Same pupil', 'Team member'], array_column($summary['overall']['schools'][0]['students'], 'name'));
+        $members = $group->participants()->get();
+        foreach ($members as $index => $member) {
+            FestSchedule::create(['event_id' => $event->id, 'item_id' => $groupItem->id,
+                'participant_id' => $member->id, 'scheduled_at' => '2026-10-'.(21 + $index).' 10:00']);
+        }
+        $third = \App\Models\Student::create(['tenant_id' => $school->id, 'school_class_id' => $class->id, 'name' => 'Unassigned team member']);
+        \App\Models\FestParticipant::create(['registration_id' => $team->id, 'student_id' => $third->id,
+            'group_id' => $group->id, 'participant_role' => 'performer']);
+        $conflicts = app(\App\Services\Events\FestDayParticipationService::class)->sahodaya($event);
+        $this->assertCount(1, $conflicts['warnings']);
+        $this->assertSame([1, 1, 1], array_column($conflicts['days'], 'unique_participants'));
+        $url = "/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/schedule/day-participants";
+        $this->actingAs($admin)->get($url.'?format=xlsx')->assertOk()
+            ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $this->get($url.'?format=pdf&scope=2026-12-31')->assertStatus(422);
+
+
+    }
+
     /**
      * Same bug/fix as FestHeadItemNavigationService::filterToOwnPhase() (Mark Entry,
      * Chest Numbers, Reports) — first found live on Wayanad Sahodaya: a phase leaf's own

@@ -7,6 +7,8 @@ use App\Models\FestStateProgramItem;
 use App\Models\State\StateQualifierEntry;
 use App\Models\State\StateQualifierIntake;
 use App\Models\Tenant;
+use App\Services\State\Fest\StateEligibilityService;
+use App\Services\State\Fest\StateSlotService;
 
 /**
  * Enforces the per-Sahodaya slot limit for an item against StateQualifierEntry approvals.
@@ -64,19 +66,19 @@ class StateParticipationLimitService
     {
         // Delegated so the three levels — Sahodaya override, item override, item default — are
         // resolved in exactly one place (Services\State\Fest\StateSlotService).
-        return app(\App\Services\State\Fest\StateSlotService::class)->slotsFor($item, $sahodayaId);
+        return app(StateSlotService::class)->slotsFor($item, $sahodayaId);
     }
 
     /** @return list<string> violation messages; empty means the approval is allowed */
     public function validateEntryApproval(StateQualifierEntry $entry): array
     {
         if (! $entry->item_id) {
-            return [];
+            return $this->entryEligibilityProblems($entry);
         }
 
         $item = FestStateProgramItem::find($entry->item_id);
         if (! $item) {
-            return [];
+            return $this->entryEligibilityProblems($entry);
         }
 
         // Canonical identity first, raw key as the fallback for intakes predating the directory.
@@ -93,7 +95,15 @@ class StateParticipationLimitService
             }
         }
 
-        return $errors;
+        return array_merge($errors, $this->entryEligibilityProblems($entry));
+    }
+
+    private function entryEligibilityProblems(StateQualifierEntry $entry): array
+    {
+        $event = app(StateQualifierMaterializationService::class)->stateEventFor($entry->intake);
+
+        return app(StateEligibilityService::class)
+            ->entryApprovalProblems($event, collect([$entry]));
     }
 
     /**
@@ -107,7 +117,6 @@ class StateParticipationLimitService
     {
         $pending = StateQualifierEntry::where('intake_id', $intake->id)
             ->where('status', 'pending')
-            ->whereNotNull('item_id')
             ->get()
             ->groupBy('item_id');
 
@@ -132,12 +141,16 @@ class StateParticipationLimitService
                 $existing = $this->sahodayaApprovedCount($itemId, $sahodayaId, $excludeIds);
                 if ($existing + $batchCount > $slots) {
                     $errors[] = "'{$item->title}' allows at most {$slots} per Sahodaya; ".
-                        "approving this intake would bring this Sahodaya to ".($existing + $batchCount).'.';
+                        'approving this intake would bring this Sahodaya to '.($existing + $batchCount).'.';
                 }
             }
         }
 
-        return $errors;
+        $event = app(StateQualifierMaterializationService::class)->stateEventFor($intake);
+        $entries = StateQualifierEntry::where('intake_id', $intake->id)->where('status', 'pending')->with('intake')->get();
+
+        return array_merge($errors, app(StateEligibilityService::class)
+            ->entryApprovalProblems($event, $entries));
     }
 
     /**

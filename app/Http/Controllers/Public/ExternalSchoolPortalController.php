@@ -92,6 +92,8 @@ class ExternalSchoolPortalController extends Controller
             'item_name'    => 'nullable|string|max:255',
             'student_name' => 'required|string|max:255',
             'class_name'   => 'nullable|string|max:40',
+            'gender' => 'nullable|in:male,female',
+            'roll_number' => 'nullable|string|max:32',
             'position'     => 'nullable|integer|min:1|max:3',
             'grade'        => 'nullable|string|max:8',
         ]);

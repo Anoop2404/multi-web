@@ -49,6 +49,8 @@ class FestScheduleController extends SahodayaAdminController
             'event'        => $event,
             'participants' => $participants,
             'schedules'    => $schedules,
+            'dayParticipation' => app(\App\Services\Events\FestDayParticipationService::class)->sahodaya($event),
+            'dayParticipationReportUrl' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/schedule/day-participants",
             'stages'       => FestStage::where('event_id', $event->id)
                 ->with('venue:id,name')
                 ->orderBy('sort_order')
@@ -60,6 +62,14 @@ class FestScheduleController extends SahodayaAdminController
             'classGroupLabels' => FestClassGroupScheme::labels(null, $event->rootEvent()),
             'ageGroupLabels'   => config('fest_item_taxonomy.age_group', []),
         ]));
+    }
+
+    public function dayParticipationReport(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        return app(\App\Services\Events\FestDayParticipationReport::class)->respond($request,
+            app(\App\Services\Events\FestDayParticipationService::class)->sahodaya($event), $event->title);
     }
 
     public function store(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
@@ -344,6 +354,8 @@ class FestScheduleController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Events/ItemSchedule', $this->withEventActivity($event, FestPageActivity::SCHEDULE, [
             'event'     => $event,
             'rows'      => $itemSchedule->rowsForEvent($event),
+            'dayParticipation' => app(\App\Services\Events\FestDayParticipationService::class)->sahodaya($event),
+            'dayParticipationReportUrl' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/schedule/day-participants",
             'summary'   => $itemSchedule->summary($event),
             'stages'    => FestStage::where('event_id', $event->id)
                 ->with('venue:id,name')

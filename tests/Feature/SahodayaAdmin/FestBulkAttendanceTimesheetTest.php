@@ -68,6 +68,34 @@ class FestBulkAttendanceTimesheetTest extends TestCase
         return [$sahodaya, $event, $admin, $items];
     }
 
+    public function test_timesheet_has_one_row_per_team_and_attendance_keeps_all_members(): void
+    {
+        [$sahodaya, $event, $admin, $items] = $this->fixture();
+        $registration = FestRegistration::where('item_id', $items[0]->id)->firstOrFail();
+        $original = $registration->participants()->firstOrFail();
+        $items[0]->update(['participant_type' => 'group']);
+        foreach ([41, 42] as $chest) {
+            $group = \App\Models\FestGroup::create(['event_id' => $event->id,
+                'registration_id' => $registration->id, 'team_name' => 'Shared Team Name', 'chest_no' => $chest]);
+            foreach ([1, 2] as $member) {
+                $student = Student::create(['tenant_id' => $registration->school_id,
+                    'school_class_id' => $original->student->school_class_id,
+                    'name' => "Member {$chest} {$member}", 'admission_number' => "T{$chest}{$member}"]);
+                FestParticipant::create(['registration_id' => $registration->id, 'group_id' => $group->id,
+                    'student_id' => $student->id, 'participant_role' => 'performer']);
+            }
+        }
+        // The existing member is a legacy team registration without a group ID.
+        $base = "/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reports/export/";
+        $response = $this->actingAs($admin)->get($base.'timesheet?preview=1')->assertOk();
+        $html = $response->getContent();
+        $this->assertSame(2, substr_count($html, 'Shared Team Name'));
+        $this->assertEquals(4, substr_count($html, '<td class="text-center"></td>') / 3);
+        $response->assertSee('Student 1')->assertDontSee('Member 41 1')->assertDontSee('Member 42 2');
+        $this->get($base.'attendance-sheet?preview=1')->assertOk()
+            ->assertSee('Member 41 1')->assertSee('Member 42 2')->assertSee('Student 0');
+    }
+
     public function test_attendance_sheet_item_ids_filters_to_only_the_selected_items(): void
     {
         [$sahodaya, $event, $admin, $items] = $this->fixture();

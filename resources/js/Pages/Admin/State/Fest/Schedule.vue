@@ -1,5 +1,7 @@
 <template>
     <StateEventWorkspace :event="event" :events="events" :sahodayas="sahodayas" :permissions="permissions">
+        <DayParticipationSummary :summary="dayParticipation" :report-url="dayParticipationReportUrl" />
+
         <section class="rounded-2xl border border-slate-200/80 bg-white p-5">
             <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -68,11 +70,14 @@
 </template>
 
 <script setup>
+import DayParticipationSummary from '@/Components/events/DayParticipationSummary.vue';
 import { computed, reactive, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import StateEventWorkspace from '@/Components/state/fest/StateEventWorkspace.vue';
 
 const props = defineProps({
+    dayParticipation: Object,
+    dayParticipationReportUrl: String,
     event: Object, events: Array, sahodayas: Array, permissions: Array,
     items: Array, scheduled: Number, venues: Array, actionUrls: Object,
 });

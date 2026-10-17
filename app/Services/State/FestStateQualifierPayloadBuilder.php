@@ -11,6 +11,7 @@ use App\Models\FestStateProgram;
 use App\Models\FestStateSubmissionOutbox;
 use App\Models\Tenant;
 use App\Services\Events\FestPartitionService;
+use App\Support\FestTeamSquadRules;
 
 class FestStateQualifierPayloadBuilder
 {
@@ -87,7 +88,7 @@ class FestStateQualifierPayloadBuilder
                 'partition_key' => $selection->partition_key,
                 'qualifier_type' => 'state_nominated',
                 'participant_type' => $registration?->item?->participant_type,
-                'participants' => $this->participantRoster($registration),
+                'participants' => $this->participantRoster($registration, $selection->participant_id),
             ];
         }
 
@@ -133,14 +134,23 @@ class FestStateQualifierPayloadBuilder
                 // A team/group has several participant rows but one competitive entry.
                 // Send one qualifier entry per registration and carry the full roster
                 // inside it for State attendance and identity checks.
-                foreach ($marks->unique(fn (FestMark $mark) => $mark->participant?->registration_id) as $mark) {
+                foreach ($marks->unique(function (FestMark $mark) use ($item) {
+                    $participant = $mark->participant;
+                    if ($participant?->group_id) {
+                        return 'group:'.$participant->group_id;
+                    }
+
+                    return FestTeamSquadRules::isMultiPerson($item->participant_type)
+                        ? 'registration:'.$participant?->registration_id
+                        : 'participant:'.$participant?->id;
+                }) as $mark) {
                     $participant = $mark->participant;
                     $registration = $participant?->registration;
                     if (! $participant || ! $registration) {
                         continue;
                     }
 
-                    $student = $registration->participants->first()?->student;
+                    $student = $participant->student;
 
                     $entries[] = [
                         'source_registration_id' => (string) $registration->id,
@@ -156,7 +166,9 @@ class FestStateQualifierPayloadBuilder
                         'item_name' => $item->title,
                         'student_name' => $student?->name ?? $participant->display_name ?? 'Participant',
                         'roll_number' => $student?->roll_number,
-                        'class_name' => $student?->class_name,
+                        'class_name' => $student?->schoolClass?->name,
+                        'gender' => $student?->gender,
+                        'source_student_id' => $student ? (string) $student->id : null,
                         'position' => $mark->position,
                         'grade' => $mark->grade,
                         'points' => (int) round($mark->score ?? 0),
@@ -167,7 +179,7 @@ class FestStateQualifierPayloadBuilder
                             default => 'sahodaya_winner',
                         },
                         'participant_type' => $item->participant_type,
-                        'participants' => $this->participantRoster($registration),
+                        'participants' => $this->participantRoster($registration, $participant->id),
                     ];
                 }
             }
@@ -265,8 +277,8 @@ class FestStateQualifierPayloadBuilder
             || ($criteria['state_eligible'] ?? true) === false;
     }
 
-    /** @return list<array{source_participant_id: string, student_name: string, roll_number: ?string, class_name: ?string}> */
-    private function participantRoster(?FestRegistration $registration): array
+    /** @return list<array<string, mixed>> */
+    private function participantRoster(?FestRegistration $registration, ?int $participantId = null): array
     {
         if (! $registration) {
             return [];
@@ -274,12 +286,24 @@ class FestStateQualifierPayloadBuilder
 
         $registration->loadMissing('participants.student');
 
-        return $registration->participants
+        $selected = $registration->participants->firstWhere('id', $participantId);
+        $members = $registration->participants;
+        if ($selected?->group_id) {
+            $members = $members->where('group_id', $selected->group_id);
+        } elseif (! FestTeamSquadRules::isMultiPerson($registration->item?->participant_type) && $selected) {
+            $members = $members->where('id', $selected->id);
+        }
+
+        return $members
             ->map(fn ($participant) => [
                 'source_participant_id' => (string) $participant->id,
                 'student_name' => $participant->student?->name ?? $participant->display_name ?? 'Participant',
                 'roll_number' => $participant->student?->roll_number,
-                'class_name' => $participant->student?->class_name,
+                'class_name' => $participant->student?->schoolClass?->name,
+                'gender' => $participant->student?->gender,
+                'source_student_id' => $participant->student_id ? (string) $participant->student_id : null,
+                'is_standby' => $participant->participant_role === 'standby',
+                'is_leader' => (bool) $participant->is_leader,
             ])
             ->values()
             ->all();

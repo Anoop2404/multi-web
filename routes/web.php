@@ -317,6 +317,7 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
                 Route::delete('/{event}/venues/{venue}', [$config, 'destroyVenue'])->name('venues.destroy');
 
                 Route::get('/{event}/schedule', [$sched, 'schedule'])->name('schedule');
+                Route::get('/{event}/schedule/day-participants', [$sched, 'dayParticipationReport'])->name('schedule.day-participants');
                 Route::post('/{event}/schedule', [$sched, 'saveSchedule'])->name('schedule.save');
                 Route::get('/{event}/clashes', [$sched, 'clashes'])->name('clashes');
                 Route::get('/{event}/green-room', [$sched, 'greenRoom'])->name('green-room');
@@ -686,6 +687,7 @@ Route::prefix('school-admin/{tenantId}')
     Route::post('/fest/{event}/catering', [FestEventPortalController::class, 'storeCatering'])->name('fest.catering.store');
     Route::get('/fest/{event}/appeals', [FestEventPortalController::class, 'appeals'])->name('fest.appeals.index');
     Route::post('/fest/{event}/appeals', [FestEventPortalController::class, 'storeAppeal'])->name('fest.appeals.store');
+    Route::get('/fest/{event}/appeals/wildcard/items', [FestEventPortalController::class, 'wildcardItems'])->name('fest.appeals.wildcard-items');
     Route::get('/fest/{event}/certificates/download-all', [FestEventPortalController::class, 'downloadCertificatesZip'])->name('fest.certificates.download-all');
     Route::get('/food-coupons', [\App\Http\Controllers\SchoolAdmin\FestFoodCouponController::class, 'index'])->name('food-coupons.index');
     Route::get('/fest/{event}/food-coupons/print', [\App\Http\Controllers\SchoolAdmin\FestFoodCouponController::class, 'print'])->name('food-coupons.print');
@@ -1573,6 +1575,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/attendance/import-template', [FestAttendanceController::class, 'importTemplate'])->name('attendance.import-template');
             Route::post('/{event}/attendance/import', [FestAttendanceController::class, 'importStore'])->name('attendance.import');
             Route::get('/{event}/schedule', [FestScheduleController::class, 'index'])->name('schedule.index');
+            Route::get('/{event}/schedule/day-participants', [FestScheduleController::class, 'dayParticipationReport'])->name('schedule.day-participants');
             Route::post('/{event}/schedule', [FestScheduleController::class, 'store'])->name('schedule.store');
             Route::post('/{event}/schedule/auto', [FestScheduleController::class, 'autoGenerate'])->name('schedule.auto');
             Route::post('/{event}/schedule/publish', [FestScheduleController::class, 'publishSchedule'])->name('schedule.publish');
@@ -1863,7 +1866,9 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::delete('/{event}/houses/{house}', [FestHouseController::class, 'destroyHouse'])->name('houses.destroy');
             Route::get('/{event}/appeals', [FestAppealController::class, 'index'])->name('appeals.index');
             Route::get('/{event}/appeals/wildcard/students', [FestAppealController::class, 'studentsForWildcard'])->name('appeals.wildcard-students');
+            Route::get('/{event}/appeals/wildcard/items', [FestAppealController::class, 'wildcardItems'])->name('appeals.wildcard-items');
             Route::post('/{event}/appeals/wildcard', [FestAppealController::class, 'storeWildcard'])->name('appeals.store-wildcard');
+            Route::post('/{event}/appeals/{appeal}/correct-item', [FestAppealController::class, 'correctItem'])->name('appeals.correct-item');
             Route::post('/{event}/appeals/{appeal}/resolve', [FestAppealController::class, 'resolve'])->name('appeals.resolve');
             Route::post('/{event}/appeals/{appeal}/mark-fee-paid', [FestAppealController::class, 'markFeePaid'])->name('appeals.mark-fee-paid');
             Route::post('/{event}/participants/{participant}/disqualify', [FestAppealController::class, 'disqualify'])->name('participants.disqualify');

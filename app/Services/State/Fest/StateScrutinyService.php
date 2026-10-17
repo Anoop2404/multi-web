@@ -7,6 +7,8 @@ use App\Models\State\StateFestEvent;
 use App\Models\State\StateQualifierEntry;
 use App\Models\State\StateQualifierIntake;
 use App\Services\State\StateParticipationLimitService;
+use App\Services\State\StateQualifierMaterializationService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -72,16 +74,15 @@ class StateScrutinyService
             $this->assertScrutinyWindowOpen($event);
         }
 
-        // Only approval consumes a slot, so only approval is checked against the allowance.
+        return DB::connection('state')->transaction(function () use ($entry, $decision, $context, $intake) {
         if ($decision === 'approved') {
+                $event = app(StateQualifierMaterializationService::class)->stateEventFor($intake);
+                StateFestEvent::whereKey($event->id)->lockForUpdate()->first();
             $violations = $this->limits->validateEntryApproval($entry);
-
             if ($violations !== []) {
-                throw ValidationException::withMessages(['decision' => $violations[0]]);
+                    throw ValidationException::withMessages(['decision' => implode(' ', $violations)]);
             }
         }
-
-        return DB::connection('state')->transaction(function () use ($entry, $decision, $context, $intake) {
             $previous = $entry->status;
 
             $entry->forceFill([
@@ -160,7 +161,13 @@ class StateScrutinyService
             ]);
         }
 
-        $approved = StateQualifierEntry::where('intake_id', $intake->id)->where('status', 'approved')->count();
+        $event = app(StateQualifierMaterializationService::class)->stateEventFor($intake);
+        $approvedEntries = StateQualifierEntry::where('intake_id', $intake->id)->where('status', 'approved')->with('intake')->get();
+        $violations = app(StateEligibilityService::class)->entryApprovalProblems($event, $approvedEntries);
+        if ($violations !== []) {
+            throw ValidationException::withMessages(['eligibility' => implode(' ', $violations)]);
+        }
+        $approved = $approvedEntries->count();
 
         $intake->forceFill([
             'status'       => $approved > 0 ? 'approved' : 'rejected',
@@ -212,7 +219,7 @@ class StateScrutinyService
         }
     }
 
-    /** @return \Illuminate\Support\Collection<int, StateEntryReview> */
+    /** @return Collection<int, StateEntryReview> */
     public function history(StateQualifierIntake $intake)
     {
         return StateEntryReview::where('intake_id', $intake->id)->orderByDesc('id')->get();

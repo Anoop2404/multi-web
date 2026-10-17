@@ -1853,7 +1853,30 @@ class FestReportService
         $isPreview = $this->preview && empty(config('services.pdf_converter.url'));
         $isDomPdf = empty(config('services.pdf_converter.url'));
 
+        // Time the performance once, even when its team has several performers.
+        // Legacy group entries without a FestGroup still share their registration.
+        $participants = $participants->unique(function ($participant) {
+            if ($participant->group_id) {
+                return 'group:'.$participant->group_id;
+            }
+            if (\App\Support\FestTeamSquadRules::isMultiPerson($participant->registration?->item?->participant_type)) {
+                return 'registration:'.$participant->registration_id;
+            }
+
+            return 'participant:'.$participant->id;
+        })->values();
         $rows = $this->participantReportRows($participants, $audience);
+        foreach ($rows as $index => &$row) {
+            $participant = $participants[$index];
+            $row['is_team'] = (bool) $participant->group_id
+                || \App\Support\FestTeamSquadRules::isMultiPerson($participant->registration?->item?->participant_type);
+            if ($row['is_team']) {
+                $row['name'] = $row['team_name'] ?: 'Team Entry';
+                $row['fest_id'] = null;
+                $row['roll_no'] = null;
+            }
+        }
+        unset($row);
 
         $rowsByItem = collect($rows)->groupBy(fn ($r) => $r['item'] ?? 'Item')->sortKeys();
 
@@ -1880,7 +1903,7 @@ class FestReportService
                 $catLabel = $firstItemRow['item_category'] ?? null;
                 $typeLabel = $firstItemRow['item_type'] ?? null;
                 $genderLabel = $firstItemRow['item_gender'] ?? null;
-                $participantCountLabel = count($rowsByItem->first()).' participant'.(count($rowsByItem->first()) === 1 ? '' : 's');
+                $participantCountLabel = count($rowsByItem->first()).' entr'.(count($rowsByItem->first()) === 1 ? 'y' : 'ies');
                 $singleItemMetaStr = implode(' · ', array_filter([$singleItemName, $catLabel, $typeLabel, $genderLabel, $participantCountLabel]));
             }
         }

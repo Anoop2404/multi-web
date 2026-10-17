@@ -18,6 +18,18 @@
                 </div>
             </section>
 
+            <section class="rounded-2xl border border-slate-200/80 bg-white p-5">
+                <h2 class="mb-3 text-sm font-bold text-slate-900">Eligibility and student limits</h2>
+                <p class="mb-3 text-xs text-slate-500">Confirmed category, gender, team size and participation violations block approval and result publication. Leave limits blank for no cap. Student IDs or school roll numbers identify students across items.</p>
+                <Toggle v-model="form.require_verified_eligibility" label="Require verified eligibility"
+                    hint="Also block when a required class, gender, category or student identity cannot be verified. Review the eligibility audit before enabling." />
+                <div class="mt-3 grid gap-3 sm:grid-cols-3">
+                    <Field label="Total items per student"><input v-model="form.max_items_per_student" type="number" min="1" max="100" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"></Field>
+                    <Field label="Individual items per student"><input v-model="form.max_individual_items_per_student" type="number" min="1" max="100" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"></Field>
+                    <Field label="Group items per student"><input v-model="form.max_group_items_per_student" type="number" min="1" max="100" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"></Field>
+                </div>
+            </section>
+
             <!-- The windows are the part that changes behaviour: closing qualifier submission
                  actually refuses submissions, rather than only documenting a deadline. -->
             <section class="rounded-2xl border border-slate-200/80 bg-white p-5">
@@ -119,6 +131,10 @@ const form = useForm({
     public_results_visible: !!s.public_results_visible,
     public_ranking_visible: !!s.public_ranking_visible,
     registrations_locked: !!s.registrations_locked,
+    require_verified_eligibility: !!s.require_verified_eligibility,
+    max_items_per_student: s.max_items_per_student ?? '',
+    max_individual_items_per_student: s.max_individual_items_per_student ?? '',
+    max_group_items_per_student: s.max_group_items_per_student ?? '',
     scoring_locked: !!props.event.scoring_locked,
     notify_on_submission: !!s.notify_on_submission,
     notify_on_approval: !!s.notify_on_approval,

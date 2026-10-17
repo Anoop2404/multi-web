@@ -103,7 +103,8 @@ class FestAppealWildcardServiceTest extends TestCase
         $appeal1 = $this->pendingAppeal($event, $item, $student, FestAppeal::TYPE_SAHODAYA_WILDCARD);
         $reg1 = $service->grantSahodayaSlot($appeal1);
 
-        $appeal2 = $this->pendingAppeal($event, $item, $student, FestAppeal::TYPE_SAHODAYA_WILDCARD);
+        $secondItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'Other item', 'item_code' => 'SS2', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $appeal2 = $this->pendingAppeal($event, $secondItem, $student, FestAppeal::TYPE_SAHODAYA_WILDCARD);
         $reg2 = $service->grantSahodayaSlot($appeal2);
 
         $this->assertSame($reg1->school_id, $reg2->school_id);
@@ -204,4 +205,19 @@ class FestAppealWildcardServiceTest extends TestCase
 
         Http::assertSent(fn ($request) => str_contains($request->url(), '/api/v1/state/qualifiers/intake'));
     }
+    public function test_approval_rechecks_category_and_rolls_back_an_invalid_pending_appeal(): void
+    {
+        ['event' => $event, 'item' => $item, 'student' => $student] = $this->fixture();
+        $appeal = $this->pendingAppeal($event, $item, $student, FestAppeal::TYPE_SAHODAYA_WILDCARD);
+        $item->update(['class_group' => 'category_2']);
+        try {
+            (new FestAppealWildcardService)->resolve($appeal, 'approved', null, 1);
+            $this->fail('Wrong-category appeal must not be granted.');
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->assertArrayHasKey('item_id', $exception->errors());
+        }
+        $this->assertSame('pending', $appeal->fresh()->status);
+        $this->assertNull($appeal->fresh()->granted_registration_id);
+    }
+
 }

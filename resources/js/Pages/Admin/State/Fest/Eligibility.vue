@@ -2,7 +2,7 @@
     <StateEventWorkspace :event="event" :events="events" :sahodayas="sahodayas" :permissions="permissions">
         <section v-if="unknownCategories.length" class="rounded-2xl border border-amber-300 bg-amber-50 p-4">
             <h2 class="text-sm font-bold text-amber-900">{{ unknownCategories.length }} item(s) are in a category this event does not have</h2>
-            <p class="mt-0.5 text-xs text-amber-800">Nothing checks their entries. Load the standard categories below, or add the missing ones.</p>
+            <p class="mt-0.5 text-xs text-amber-800">Their class eligibility cannot be verified. Load the standard categories below, or add the missing ones.</p>
             <ul class="mt-2 space-y-0.5 text-xs text-amber-900">
                 <li v-for="u in unknownCategories" :key="u.item_id">{{ u.item_code }} {{ u.title }} — <span class="font-mono">{{ u.class_group }}</span></li>
             </ul>
@@ -29,7 +29,7 @@
             </div>
 
             <p v-if="!categories.length" class="py-6 text-center text-sm text-slate-400">
-                No categories yet — load a standard scheme above. Until then nothing checks which class may enter which item.
+                No categories yet — load a standard scheme above. Until then class eligibility remains unverified.
             </p>
 
             <ul v-else class="space-y-1">
@@ -72,9 +72,9 @@
                 <div>
                     <h2 class="text-sm font-bold text-slate-900">Eligibility check</h2>
                     <p class="mt-0.5 text-xs text-slate-500">
-                        Entries whose class falls outside their item's category, or whose team is the
-                        wrong size. Reported, not refused — what to do about a Sahodaya that sent the
-                        wrong pupil is the State's decision.
+                        Class category, gender, team size and student participation checks.
+                        Confirmed violations block approval and result publication. Missing evidence
+                        also blocks when “Require verified eligibility” is enabled in event Settings.
                     </p>
                 </div>
                 <div class="flex gap-2 text-center">
@@ -136,6 +136,11 @@ const problemCount = computed(() => props.audit.length);
 const LABELS = {
     wrong_category: 'Wrong category',
     team_size: 'Team size',
+    wrong_gender: 'Wrong gender',
+    unknown_gender: 'Gender not recorded',
+    unknown_identity: 'Student identity missing',
+    student_limit: 'Student item limit',
+    duplicate_item: 'Duplicate item entry',
     unknown_class: 'Class not recorded',
     no_category: 'No category',
 };

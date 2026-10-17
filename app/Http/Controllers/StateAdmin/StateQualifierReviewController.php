@@ -3,16 +3,18 @@
 namespace App\Http\Controllers\StateAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ExternalSahodaya;
+use App\Models\FestStateProgram;
+use App\Models\FestStateProgramItem;
 use App\Models\State\StateQualifierEntry;
 use App\Models\State\StateQualifierIntake;
+use App\Models\Tenant;
 use App\Services\State\StateQualifierIntakeService;
 use App\Services\State\StateQualifierMaterializationService;
 use App\Services\State\StateRemittanceService;
-use App\Models\ExternalSahodaya;
-use App\Models\FestStateProgram;
-use App\Models\Tenant;
 use App\Support\StateScope;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class StateQualifierReviewController extends Controller
@@ -233,6 +235,8 @@ class StateQualifierReviewController extends Controller
             'student_name' => 'required|string|max:255',
             'school_name'  => 'required|string|max:255',
             'roll_number'  => 'nullable|string|max:32',
+            'class_name' => 'nullable|string|max:40',
+            'gender' => 'nullable|in:male,female',
             'item_code'    => 'nullable|string|max:20',
             'item_name'    => 'nullable|string|max:255',
             'position'     => 'required|integer|min:1',
@@ -240,18 +244,26 @@ class StateQualifierReviewController extends Controller
             'status'       => 'nullable|in:pending,approved,rejected',
         ]);
 
-        $intake->entries()->create([
+        abort_if(in_array($intake->status, ['approved', 'rejected'], true), 422, 'Reopen this intake before adding entries.');
+        DB::connection('state')->transaction(function () use ($intake, $data) {
+            $entry = $intake->entries()->create([
             'student_name' => $data['student_name'],
             'school_name'  => $data['school_name'],
             'roll_number'  => $data['roll_number'] ?? null,
+                'class_name' => $data['class_name'] ?? null,
+                'meta' => ['gender' => $data['gender'] ?? null],
             'school_id'    => str()->slug($data['school_name']),
-            'item_id'      => str()->uuid()->toString(),
+                'item_id' => FestStateProgramItem::where('state_program_id', $intake->state_program_id)->where('item_code', $data['item_code'] ?? '')->value('id'),
             'item_code'    => $data['item_code'] ?? 'AUTO',
             'item_name'    => $data['item_name'] ?? $data['item_code'] ?? 'General Item',
             'position'     => (int) $data['position'],
             'grade'        => $data['grade'] ?? 'A',
-            'status'       => $data['status'] ?? 'approved',
+                'status' => 'pending',
         ]);
+            if (($data['status'] ?? 'pending') !== 'pending') {
+                app(StateQualifierIntakeService::class)->reviewEntry($intake, $entry, $data['status']);
+            }
+        });
 
         return back()->with('success', 'Qualifier entry added to intake.');
     }
@@ -265,6 +277,8 @@ class StateQualifierReviewController extends Controller
             'student_name' => 'required|string|max:255',
             'school_name'  => 'required|string|max:255',
             'roll_number'  => 'nullable|string|max:32',
+            'class_name' => 'nullable|string|max:40',
+            'gender' => 'nullable|in:male,female',
             'item_code'    => 'nullable|string|max:20',
             'item_name'    => 'nullable|string|max:255',
             'position'     => 'required|integer|min:1',
@@ -272,7 +286,27 @@ class StateQualifierReviewController extends Controller
             'status'       => 'nullable|in:pending,approved,rejected',
         ]);
 
-        $entry->update($data);
+        abort_if(in_array($intake->status, ['approved', 'rejected'], true), 422, 'Reopen this intake before editing entries.');
+        DB::connection('state')->transaction(function () use ($entry, $data, $intake) {
+            $status = $data['status'] ?? $entry->status;
+            $changes = $data;
+            unset($changes['status'], $changes['gender']);
+            if (array_key_exists('item_code', $data) && $data['item_code'] !== $entry->item_code) {
+                $changes['item_id'] = FestStateProgramItem::where('state_program_id', $intake->state_program_id)
+                    ->where('item_code', $data['item_code'])->value('id');
+            }
+            $changes['meta'] = array_merge($entry->meta ?? [], ['gender' => $data['gender'] ?? $entry->meta['gender'] ?? null]);
+            if (count($changes['meta']['participants'] ?? []) === 1) {
+                $changes['meta']['participants'][0] = array_merge($changes['meta']['participants'][0],
+                    array_intersect_key($data, array_flip(['student_name', 'class_name', 'roll_number', 'gender'])));
+            }
+            $entry->update($changes);
+            if ($status === 'pending') {
+                $entry->update(['status' => 'pending']);
+            } else {
+                app(StateQualifierIntakeService::class)->reviewEntry($intake, $entry, $status);
+            }
+        });
 
         return back()->with('success', 'Qualifier entry updated.');
     }

@@ -118,4 +118,17 @@ class FestEventPortalWildcardAppealTest extends TestCase
             'reason'      => 'Not selected',
         ])->assertForbidden();
     }
+    public function test_school_wildcards_enforce_item_category_and_gender_server_side(): void
+    {
+        ['school' => $school, 'schoolAdmin' => $schoolAdmin, 'event' => $event, 'item' => $item, 'student' => $student] = $this->fixture();
+        $student->update(['gender' => 'female']);
+        $item->update(['class_group' => 'category_2', 'gender' => 'female']);
+        $url = route('school.fest.appeals.store', ['tenantId' => $school->id, 'event' => $event->id]);
+        $this->actingAs($schoolAdmin)->postJson($url, ['appeal_type' => 'sahodaya_wildcard', 'student_id' => $student->id,
+            'item_id' => $item->id, 'reason' => 'Wrong category'])->assertUnprocessable();
+        $item->update(['class_group' => 'category_3']);
+        $this->getJson(route('school.fest.appeals.wildcard-items', ['tenantId' => $school->id, 'event' => $event->id])
+            .'?student_id='.$student->id.'&appeal_type=sahodaya_wildcard')->assertOk()->assertJsonPath('items.0.id', $item->id);
+    }
+
 }

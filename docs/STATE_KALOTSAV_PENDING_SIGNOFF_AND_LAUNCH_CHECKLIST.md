@@ -31,9 +31,10 @@ stand but are narrower slices of the same picture. Legend: ✅ done, 🟡 partia
   isn't actually *mandatory* the way P-14 implies it should be end-state. Worth a decision:
   keep permissive (what let registration open without waiting on this feature) or make
   nomination a hard gate once every Sahodaya has adopted the workspace.
-- ⬜ State eligibility / per-student cap enforcement — only the per-item quota is enforced
-  today (`FestStateNominationService::select()`); a student nominated twice across different
-  items isn't caught.
+- ✅ Updated 2026-10-16: State approval, scrutiny finalisation, materialization and result publication
+  enforce confirmed category, gender, team-size and configured per-student limit violations.
+  Settings supports optional strict verification of incomplete evidence. Numeric caps and legacy
+  data reconciliation still require configuration. See `STATE_ELIGIBILITY_FIXES_2026_10_16.md`.
 - ⬜ Withdrawal/replacement/revision workflow — `unselect()` marks a row withdrawn but there's
   no "promote a reserve to primary" or "replace after certification" flow yet.
 

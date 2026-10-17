@@ -144,6 +144,16 @@
                             </div>
 
                             <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Class</label>
+                                <input v-model="entryForm.class_name" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Gender</label>
+                                <select v-model="entryForm.gender" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
+                                    <option value="">Not recorded</option><option value="male">Male</option><option value="female">Female</option>
+                                </select>
+                            </div>
+                            <div>
                                 <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Item Code</label>
                                 <input v-model="entryForm.item_code" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-medium" placeholder="e.g. 101">
                             </div>
@@ -211,11 +221,13 @@ const entryForm = useForm({
     student_name: '',
     school_name: '',
     roll_number: '',
+    class_name: '',
+    gender: '',
     item_code: '',
     item_name: '',
     position: 1,
     grade: 'A',
-    status: 'approved',
+    status: 'pending',
 });
 
 function openAddEntryModal() {
@@ -231,6 +243,8 @@ function openEditEntryModal(entry) {
     entryForm.student_name = entry.student_name ?? '';
     entryForm.school_name = entry.school_name ?? entry.school_id ?? '';
     entryForm.roll_number = entry.roll_number ?? '';
+    entryForm.class_name = entry.class_name ?? '';
+    entryForm.gender = entry.meta?.gender ?? '';
     entryForm.item_code = entry.item_code ?? '';
     entryForm.item_name = entry.item_name ?? '';
     entryForm.position = entry.position ?? 1;

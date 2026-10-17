@@ -3,6 +3,7 @@
 namespace Tests\Feature\State;
 
 use App\Models\FestStateProgram;
+use App\Models\FestStateProgramItem;
 use App\Models\PlatformState;
 use App\Models\PlatformUser;
 use App\Models\State\StateEventStaff;
@@ -98,6 +99,19 @@ class StateEventConfigTest extends TestCase
         $reason = $settings->windowClosedReason($this->event->fresh(), 'qualifier', CarbonImmutable::parse('2026-01-15 10:00:00'));
 
         $this->assertStringContainsString('opens on 01 Feb 2026', $reason);
+    }
+
+    public function test_student_limits_and_strict_eligibility_can_be_configured(): void
+    {
+        $this->actingAs($this->user(), 'platform')->post($this->url('/settings'), [
+            'require_verified_eligibility' => true, 'max_items_per_student' => 5,
+            'max_individual_items_per_student' => 3, 'max_group_items_per_student' => 2,
+        ])->assertRedirect();
+        $settings = $this->event->fresh()->settings;
+        $this->assertTrue($settings['require_verified_eligibility']);
+        $this->assertSame(5, $settings['max_items_per_student']);
+        $this->assertSame(3, $settings['max_individual_items_per_student']);
+        $this->assertSame(2, $settings['max_group_items_per_student']);
     }
 
     public function test_unknown_settings_keys_are_dropped_rather_than_stored(): void
@@ -226,7 +240,7 @@ class StateEventConfigTest extends TestCase
 
     public function test_the_items_tab_shows_the_effective_per_sahodaya_allowance(): void
     {
-        \App\Models\FestStateProgramItem::create([
+        FestStateProgramItem::create([
             'state_program_id' => $this->event->state_program_id, 'title' => 'Light Music',
             'item_code' => 'LM01', 'qualify_count' => 2, 'max_per_school' => 1,
         ]);

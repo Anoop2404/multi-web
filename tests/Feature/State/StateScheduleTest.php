@@ -93,6 +93,82 @@ class StateScheduleTest extends TestCase
         return $registration;
     }
 
+    public function test_day_counts_deduplicate_students_per_day_and_overall_with_school_names(): void
+    {
+        $one = $this->item('A');
+        $two = $this->item('B');
+        $three = $this->item('C');
+        $this->schedule($one, '2026-10-20', '09:00');
+        $this->schedule($two, '2026-10-20', '11:00');
+        $this->schedule($three, '2026-10-21', '09:00');
+        foreach ([$one, $two, $three] as $item) {
+            $registration = $this->registration($item, ['Same pupil', '*Standby']);
+            $registration->participants()->where('student_name', 'Same pupil')->update(['roll_number' => '123']);
+        }
+        $this->registration($one, ['Another pupil'])->participants()->update(['roll_number' => '456']);
+        $this->registration($one, ['Rejected'], ['status' => 'rejected']);
+        $this->registration($this->item('D'), ['Unscheduled'])->participants()->update(['roll_number' => '789']);
+        $summary = app(\App\Services\Events\FestDayParticipationService::class)->state($this->event);
+        $this->assertSame([2, 1], array_column($summary['days'], 'unique_participants'));
+        $this->assertSame(2, $summary['overall']['unique_participants']);
+        $this->assertSame(4, $summary['overall']['participant_entries']);
+        $this->assertSame(1, $summary['unscheduled']['unique_participants']);
+        $this->assertSame(3, $summary['event_total']['unique_participants']);
+        $school = $summary['overall']['schools'][0];
+        $this->assertSame('St Joseph HSS', $school['name']);
+        $this->assertSame(2, $school['count']);
+        $this->assertSame(['Another pupil', 'Same pupil'], array_column($school['students'], 'name'));
+    }
+
+    public function test_day_counts_flag_records_without_identity_instead_of_merging_names(): void
+    {
+        $item = $this->item('A');
+        $this->schedule($item, '2026-10-20', '09:00');
+        $this->registration($item, ['Same name', 'Same name']);
+        $summary = app(\App\Services\Events\FestDayParticipationService::class)->state($this->event);
+        $this->assertSame(2, $summary['overall']['unique_participants']);
+        $this->assertSame(2, $summary['overall']['unidentified_participants']);
+    }
+
+    public function test_legacy_roll_identity_is_reconciled_only_when_unambiguous(): void
+    {
+        $one = $this->item('A');
+        $two = $this->item('B');
+        $this->schedule($one, '2026-10-20', '09:00');
+        $this->schedule($two, '2026-10-20', '11:00');
+        $first = $this->registration($one, ['Pupil']);
+        $first->participants()->firstOrFail()->update(['roll_number' => '123', 'meta' => ['source_student_id' => '42']]);
+        $this->registration($two, ['Pupil'])->participants()->update(['roll_number' => '123']);
+        $service = app(\App\Services\Events\FestDayParticipationService::class);
+        $this->assertSame(1, $service->state($this->event)['overall']['unique_participants']);
+        $this->registration($two, ['Another pupil'])->participants()->firstOrFail()->update(['roll_number' => '123', 'meta' => ['source_student_id' => '43']]);
+        $summary = $service->state($this->event);
+        $this->assertSame(3, $summary['overall']['unique_participants']);
+        $this->assertSame(1, $summary['overall']['unidentified_participants']);
+    }
+
+    public function test_legacy_records_without_school_ids_keep_distinct_school_name_groups(): void
+    {
+        $item = $this->item('A');
+        $this->schedule($item, '2026-10-20', '09:00');
+        foreach (['Alpha School', 'Beta School'] as $school) {
+            $registration = $this->registration($item, ['Same name'], ['school_id' => '', 'school_name' => $school]);
+            $registration->participants()->firstOrFail()->update(['meta' => ['source_student_id' => '42']]);
+        }
+        $summary = app(\App\Services\Events\FestDayParticipationService::class)->state($this->event);
+        $this->assertSame(2, $summary['overall']['school_count']);
+        $this->assertSame(2, $summary['overall']['unidentified_participants']);
+        $this->assertSame(['Alpha School', 'Beta School'], array_column($summary['overall']['schools'], 'name'));
+    }
+
+    public function test_schedule_reports_require_schedule_permission(): void
+    {
+        $url = "http://superadmin.test/admin/state/fest/{$this->event->id}/schedule/day-participants";
+        $this->actingAs($this->user(), 'platform')->get($url.'?format=xlsx')->assertOk()
+            ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $this->actingAs($this->user('state_mark_operator'), 'platform')->get($url.'?format=xlsx')->assertForbidden();
+    }
+
     private function user(string $role = 'state_admin'): PlatformUser
     {
         if (isset($this->users[$role])) {

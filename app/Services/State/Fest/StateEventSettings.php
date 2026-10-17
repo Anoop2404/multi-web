@@ -47,6 +47,10 @@ class StateEventSettings
 
             // Locking. registrations_locked stops new registrations without touching scoring.
             'registrations_locked' => false,
+            'require_verified_eligibility' => false,
+            'max_items_per_student' => null,
+            'max_individual_items_per_student' => null,
+            'max_group_items_per_student' => null,
 
             'notify_on_submission' => true,
             'notify_on_approval'   => true,

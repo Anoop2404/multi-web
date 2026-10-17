@@ -60,6 +60,18 @@
                             <label class="portal-label" for="class_name">Class <span class="portal-optional">(optional)</span></label>
                             <input id="class_name" name="class_name" type="text" value="{{ old('class_name') }}" class="portal-input" placeholder="e.g. VIII">
                         </div>
+                        <div class="portal-field">
+                            <label for="roll_number">School roll number</label>
+                            <input id="roll_number" name="roll_number" value="{{ old('roll_number') }}" class="portal-input">
+                        </div>
+                        <div class="portal-field">
+                            <label for="gender">Gender</label>
+                            <select id="gender" name="gender" class="portal-input">
+                                <option value="">Not recorded</option>
+                                <option value="male" @selected(old('gender') === 'male')>Male</option>
+                                <option value="female" @selected(old('gender') === 'female')>Female</option>
+                            </select>
+                        </div>
                         <div>
                             <label class="portal-label" for="position">Sahodaya position <span class="portal-optional">(optional)</span></label>
                             <select id="position" name="position" class="portal-input portal-select">

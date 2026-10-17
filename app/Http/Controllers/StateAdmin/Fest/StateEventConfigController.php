@@ -7,8 +7,11 @@ use App\Models\FestStateProgram;
 use App\Models\FestStateProgramItem;
 use App\Models\State\StateEventStaff;
 use App\Models\State\StateFestEvent;
+use App\Models\State\StateItemResult;
+use App\Models\State\StateItemSchedule;
 use App\Models\State\StateVenue;
 use App\Services\State\Fest\StateEventSettings;
+use App\Services\State\Fest\StatePublicPortalService;
 use App\Support\StateScope;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -39,7 +42,7 @@ class StateEventConfigController extends Controller
      * cannot be taken back quietly, and it should not be one checkbox among thirty on a form whose
      * Save button also changes contact phone numbers.
      */
-    public function publicPortal(Request $request, StateFestEvent $event, \App\Services\State\Fest\StatePublicPortalService $portal)
+    public function publicPortal(Request $request, StateFestEvent $event, StatePublicPortalService $portal)
     {
         StateScope::assertOwns($event->state_id);
 
@@ -48,9 +51,9 @@ class StateEventConfigController extends Controller
         return Inertia::render('State/Fest/PublicPortal', $this->shell($request, $event) + [
             'visibility' => $visibility,
             'counts' => [
-                'scheduled_items' => \App\Models\State\StateItemSchedule::where('state_event_id', $event->id)->count(),
-                'published_items' => \App\Models\State\StateItemResult::where('state_event_id', $event->id)
-                    ->whereIn('status', [\App\Models\State\StateItemResult::PUBLISHED, \App\Models\State\StateItemResult::LOCKED])->count(),
+                'scheduled_items' => StateItemSchedule::where('state_event_id', $event->id)->count(),
+                'published_items' => StateItemResult::where('state_event_id', $event->id)
+                    ->whereIn('status', [StateItemResult::PUBLISHED, StateItemResult::LOCKED])->count(),
                 'public_results' => $visibility['results'] ? $portal->results($event)->count() : 0,
                 'ranked_sahodayas' => $visibility['ranking'] ? $portal->ranking($event)->count() : 0,
             ],
@@ -112,6 +115,10 @@ class StateEventConfigController extends Controller
             'public_results_visible'  => 'boolean',
             'public_ranking_visible'  => 'boolean',
             'registrations_locked'    => 'boolean',
+            'require_verified_eligibility' => 'boolean',
+            'max_items_per_student' => 'nullable|integer|min:1|max:100',
+            'max_individual_items_per_student' => 'nullable|integer|min:1|max:100',
+            'max_group_items_per_student' => 'nullable|integer|min:1|max:100',
             'scoring_locked'          => 'boolean',
             'notify_on_submission'    => 'boolean',
             'notify_on_approval'      => 'boolean',

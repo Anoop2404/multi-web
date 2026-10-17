@@ -14,8 +14,7 @@ class StateQualifierIntakeService
     public function __construct(
         private StateParticipationLimitService $limits,
         private StateQualifierMaterializationService $materializer,
-    ) {
-    }
+    ) {}
 
     /** @param array<string, mixed> $payload */
     public function receive(string $idempotencyKey, array $payload, string $sourceTenantId): StateQualifierIntake
@@ -96,13 +95,10 @@ class StateQualifierIntakeService
         DB::connection('state')->transaction(function () use ($intake, $reviewedBy, $notes) {
             $hasPendingItemEntries = StateQualifierEntry::where('intake_id', $intake->id)
                 ->where('status', 'pending')
-                ->whereNotNull('item_id')
                 ->exists();
 
-            // Only take the lock (which creates this program's StateFestEvent row if it
-            // doesn't exist yet) when there's actually something to check against a limit
-            // — an intake with nothing pending, or nothing tied to a real catalog item,
-            // shouldn't spawn an event row as a side effect of a no-op approval.
+            // Serialize approval checks for this program, including entries awaiting item mapping.
+            // A no-op approval with nothing pending does not need to create an event.
             if ($hasPendingItemEntries) {
                 $this->lockStateEventFor($intake);
                 $violations = $this->limits->validateBulkApproval($intake);
@@ -141,7 +137,7 @@ class StateQualifierIntakeService
         }
 
         DB::connection('state')->transaction(function () use ($intake, $entry, $status) {
-            if ($status === 'approved' && $entry->item_id) {
+            if ($status === 'approved') {
                 $this->lockStateEventFor($intake);
                 $violations = $this->limits->validateEntryApproval($entry);
                 abort_if($violations !== [], 422, implode(' ', $violations));

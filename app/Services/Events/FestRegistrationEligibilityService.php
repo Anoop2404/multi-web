@@ -17,6 +17,36 @@ use Illuminate\Support\Collection;
 
 class FestRegistrationEligibilityService
 {
+    /** Wildcards waive selection/qualification, not the student's category or gender. */
+    public function validateWildcardStudent(Student $student, FestEvent $event, FestEventItem $item): array
+    {
+        $errors = [];
+        if (! $item->is_enabled || $item->event_id !== $event->id) {
+            $errors[] = 'Choose an enabled item from this event.';
+        }
+        if ($student->status !== 'active') {
+            $errors[] = 'Choose an active student.';
+        }
+        if ($event->academic_year_id && $student->academic_year_id
+            && (int) $event->academic_year_id !== (int) $student->academic_year_id) {
+            $errors[] = 'Student is not enrolled in this event academic year.';
+        }
+        $normalize = fn ($gender) => match (strtolower(trim((string) $gender))) {
+            'male', 'boys', 'boy', 'm' => 'male',
+            'female', 'girls', 'girl', 'f' => 'female',
+            default => null,
+        };
+        $required = $normalize($item->gender);
+        if ($required && $normalize($student->gender) !== $required) {
+            $errors[] = "This item requires a {$required} student; check the student's recorded gender.";
+        }
+        if ($category = $this->validateCategory($student, $event, $item)) {
+            $errors[] = $category;
+        }
+
+        return $errors;
+    }
+
     /** @return list<string> */
     public function validateStudent(Student $student, FestEvent $event, FestEventItem $item): array
     {
@@ -217,10 +247,6 @@ class FestRegistrationEligibilityService
 
     private function validateCategory(Student $student, FestEvent $event, FestEventItem $item): ?string
     {
-        if ($this->isItemOpenClass($item)) {
-            return null;
-        }
-
         $eventType = strtolower((string) ($event->event_type ?? ''));
 
         return match ($eventType) {

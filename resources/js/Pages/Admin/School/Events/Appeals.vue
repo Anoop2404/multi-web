@@ -22,6 +22,10 @@
                     Appeal fee: ₹{{ event.appeal_fee_amount }} (pay Sahodaya before resolution).
                 </span>
             </p>
+            <p v-if="wildcardStudentContext" class="mb-2 text-xs text-slate-600">{{ wildcardStudentContext.class_name }} · {{ wildcardStudentContext.gender || 'Gender not recorded' }}</p>
+            <p v-if="wildcardItemsLoading" class="mb-2 text-xs text-slate-500">Loading eligible items…</p>
+            <p v-else-if="appealForm.student_id && appealForm.appeal_type !== 'dispute' && !itemOptions.length" class="mb-2 text-xs text-amber-700">No eligible items match this student's category and gender.</p>
+            <p v-if="wildcardItemsError" class="mb-2 text-xs text-red-600">{{ wildcardItemsError }}</p>
             <form @submit.prevent="submitAppeal" class="space-y-4 max-w-xl">
                 <FormField label="Appeal type" required>
                     <template #default="{ id }">
@@ -73,7 +77,7 @@
                             <SearchableSelect
                                 :id="id"
                                 v-model="appealForm.item_id"
-                                :options="itemOptions"
+                                :options="itemOptions" :disabled="!appealForm.student_id || wildcardItemsLoading"
                                 :all-option="true"
                                 all-label="Select item"
                                 :required="true"
@@ -116,7 +120,7 @@
                                 <p v-if="participantIdNumber(a)" class="text-xs font-mono text-[#0f3d7a]">{{ participantIdNumber(a) }}</p>
                                 <span v-if="wildcardLabel(a)" class="inline-block mt-1 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">{{ wildcardLabel(a) }}</span>
                             </td>
-                            <td class="p-3 text-xs">{{ a.participant?.registration?.item?.title ?? a.item?.title ?? '—' }}</td>
+                            <td class="p-3 text-xs">{{ appealItemLabel(a) }}</td>
                             <td class="p-3 text-xs max-w-xs">
                                 <p>{{ a.reason }}</p>
                                 <p v-if="a.resolution_note" class="text-slate-500 mt-1 italic">Note: {{ a.resolution_note }}</p>
@@ -142,6 +146,7 @@
 </template>
 
 <script setup>
+import { useWildcardItems } from '@/composables/useWildcardItems';
 import { computed } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
@@ -189,17 +194,14 @@ const studentOptions = computed(() =>
     props.students.map(s => ({ value: s.id, label: `${studentDisplayName(s)}${s.reg_no ? ' — ' + s.reg_no : ''}` }))
 );
 
-const itemOptions = computed(() =>
-    props.items.map(i => ({
-        value: i.id,
-        // Many items share the same title (e.g. "Bharatanatyam" run once per
-        // category/gender) — without these, the picker is a wall of identical
-        // names with no way to tell which one is meant.
-        label: [i.title, i.category_label, i.type_label, i.gender_label, i.item_code]
-            .filter(Boolean)
-            .join(' · '),
-    }))
-);
+const { options: itemOptions, student: wildcardStudentContext, loading: wildcardItemsLoading, error: wildcardItemsError } = useWildcardItems(appealForm, `/school-admin/${props.school.id}/fest/${props.event.id}/appeals/wildcard/items`);
+
+function appealItemLabel(appeal) {
+    const item = appeal.item ?? appeal.participant?.registration?.item;
+    if (!item) return '—';
+    const meta = props.items.find((candidate) => String(candidate.id) === String(item.id));
+    return [item.title, meta?.category_label ?? item.class_group, meta?.gender_label ?? item.gender, meta?.item_code ?? item.item_code].filter(Boolean).join(' · ');
+}
 
 function participantLabel(p) {
     return p.student ? studentDisplayName(p.student) : (p.teacher?.name ?? 'Participant');

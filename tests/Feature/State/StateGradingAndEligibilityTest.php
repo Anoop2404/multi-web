@@ -12,17 +12,21 @@ use App\Models\State\StateFestMark;
 use App\Models\State\StateFestParticipant;
 use App\Models\State\StateFestRegistration;
 use App\Models\State\StateGradeBand;
-use App\Models\State\StatePointRule;
+use App\Models\State\StateQualifierIntake;
 use App\Models\State\StateSahodaya;
 use App\Services\State\Fest\StateEligibilityService;
 use App\Services\State\Fest\StateGradingService;
 use App\Services\State\Fest\StateResultService;
 use App\Services\State\StateGradePointService;
+use App\Services\State\StateParticipationLimitService;
+use App\Services\State\StateQualifierIntakeService;
+use App\Services\State\StateQualifierMaterializationService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 /**
@@ -422,6 +426,162 @@ class StateGradingAndEligibilityTest extends TestCase
         $this->assertSame(2, $summary['checked']);
         $this->assertSame(1, $summary['ok']);
         $this->assertSame(1, $summary['problems'][StateEligibilityService::WRONG_CATEGORY]);
+    }
+
+    public function test_known_gender_mismatch_blocks_and_unknown_gender_requires_strict_mode(): void
+    {
+        $this->grading()->seedCategories($this->event);
+        $this->item->update(['gender' => 'male']);
+        $participant = $this->competitor('Wrong gender', 90);
+        $participant->update(['meta' => ['gender' => 'female']]);
+        $result = $this->eligibility()->check($this->event, $participant->registration);
+        $this->assertSame(StateEligibilityService::WRONG_GENDER, $result['status']);
+        $this->assertCount(1, $this->eligibility()->blockingProblems($this->event, $result));
+        $participant->update(['meta' => []]);
+        $result = $this->eligibility()->check($this->event, $participant->registration->fresh());
+        $this->assertSame(StateEligibilityService::UNKNOWN_GENDER, $result['status']);
+        $this->assertSame([], $this->eligibility()->blockingProblems($this->event, $result));
+        $this->event->update(['settings' => ['require_verified_eligibility' => true]]);
+        $this->assertCount(1, $this->eligibility()->blockingProblems($this->event, $result));
+    }
+
+    public function test_student_limits_match_stable_identity_across_items_and_ignore_standbys(): void
+    {
+        $this->grading()->seedCategories($this->event);
+        $this->event->update(['settings' => ['max_items_per_student' => 1]]);
+        $one = $this->competitor('Same pupil', 90);
+        $one->update(['meta' => ['source_student_id' => 'student-1']]);
+        $otherItem = $this->item->replicate();
+        $otherItem->item_code = 'LM02';
+        $otherItem->save();
+        $two = $this->competitor('Renamed pupil', 90, 'Class 6', $otherItem);
+        $two->update(['meta' => ['source_student_id' => 'student-1']]);
+        $result = $this->eligibility()->check($this->event, $two->registration);
+        $this->assertContains(StateEligibilityService::STUDENT_LIMIT, array_column($result['problems'], 'code'));
+        $one->update(['is_standby' => true]);
+        $this->assertSame('ok', $this->eligibility()->check($this->event, $two->registration)['status']);
+    }
+
+    public function test_duplicate_same_item_is_detected_but_same_roll_in_another_school_is_not(): void
+    {
+        $this->grading()->seedCategories($this->event);
+        $one = $this->competitor('First', 90);
+        $two = $this->competitor('Second', 90);
+        $one->update(['roll_number' => '123']);
+        $two->update(['roll_number' => '123']);
+        $this->assertSame(StateEligibilityService::DUPLICATE_ITEM,
+            $this->eligibility()->check($this->event, $two->registration)['status']);
+        $two->registration->update(['school_id' => 'another-school']);
+        $this->assertSame('ok', $this->eligibility()->check($this->event, $two->registration->fresh())['status']);
+    }
+
+    public function test_wrong_category_blocks_result_publication(): void
+    {
+        $this->grading()->seedCategories($this->event);
+        $this->competitor('Too old', 90, 'Class 10');
+        app(StateResultService::class)->computeItem($this->event, $this->item);
+        $this->expectException(ValidationException::class);
+        app(StateResultService::class)->publishItem($this->event, $this->item);
+    }
+
+    public function test_pending_batch_is_counted_together_before_approval(): void
+    {
+        $this->grading()->seedCategories($this->event);
+        $this->event->update(['settings' => ['max_items_per_student' => 1]]);
+        $intake = StateQualifierIntake::create([
+            'state_program_id' => $this->event->state_program_id, 'state_id' => $this->state->id,
+            'source_tenant_id' => $this->sahodaya->tenant_id, 'source_event_id' => '1',
+            'idempotency_key' => (string) Str::uuid(), 'status' => 'received', 'payload' => [],
+        ]);
+        $otherItem = $this->item->replicate();
+        $otherItem->item_code = 'LM02';
+        $otherItem->save();
+        foreach ([$this->item, $otherItem] as $item) {
+            $intake->entries()->create(['school_id' => 'school-1', 'item_id' => $item->id,
+                'student_name' => 'Pupil', 'class_name' => 'Class 6', 'roll_number' => '123', 'status' => 'pending']);
+        }
+        $violations = app(StateParticipationLimitService::class)->validateBulkApproval($intake);
+        $this->assertNotEmpty($violations);
+        $this->assertStringContainsString('max_items_per_student', implode(' ', $violations));
+        $this->assertSame(0, $intake->entries()->where('status', 'approved')->count());
+    }
+
+    public function test_intake_approval_checks_category_before_writing_status(): void
+    {
+        $this->grading()->seedCategories($this->event);
+        $intake = StateQualifierIntake::create([
+            'state_program_id' => $this->event->state_program_id, 'state_id' => $this->state->id,
+            'source_tenant_id' => $this->sahodaya->tenant_id, 'source_event_id' => '1',
+            'idempotency_key' => (string) Str::uuid(), 'status' => 'received', 'payload' => [],
+        ]);
+        $entry = $intake->entries()->create(['school_id' => 'school-1', 'item_id' => $this->item->id,
+            'student_name' => 'Too old', 'class_name' => 'Class 10', 'status' => 'pending']);
+        $violations = app(StateParticipationLimitService::class)->validateEntryApproval($entry);
+        $this->assertNotEmpty($violations);
+        $this->assertStringContainsString('outside', implode(' ', $violations));
+        $this->assertSame('pending', $entry->fresh()->status);
+    }
+
+    public function test_individual_and_group_limits_are_counted_separately(): void
+    {
+        $this->grading()->seedCategories($this->event);
+        $this->event->update(['settings' => ['max_individual_items_per_student' => 1, 'max_group_items_per_student' => 1]]);
+        $one = $this->competitor('Pupil', 90);
+        $one->update(['roll_number' => '123']);
+        $group = $this->item->replicate();
+        $group->fill(['item_code' => 'G1', 'participant_type' => 'group']);
+        $group->save();
+        $two = $this->competitor('Pupil', 90, 'Class 6', $group);
+        $two->update(['roll_number' => '123']);
+        $this->assertSame('ok', $this->eligibility()->check($this->event, $two->registration)['status']);
+        $another = $group->replicate();
+        $another->item_code = 'G2';
+        $another->save();
+        $three = $this->competitor('Pupil', 90, 'Class 6', $another);
+        $three->update(['roll_number' => '123']);
+        $this->assertSame(StateEligibilityService::STUDENT_LIMIT,
+            $this->eligibility()->check($this->event, $three->registration)['status']);
+    }
+
+    public function test_strict_mode_blocks_missing_category_on_intake_approval(): void
+    {
+        $this->event->update(['settings' => ['require_verified_eligibility' => true]]);
+        $service = app(StateQualifierIntakeService::class);
+        $intake = $service->receive((string) Str::uuid(), [
+            'state_program_id' => $this->event->state_program_id, 'source_event_id' => 1,
+            'entries' => [['school_id' => 'school-1', 'item_id' => $this->item->id,
+                'student_name' => 'Pupil', 'class_name' => 'Class 6']],
+        ], $this->sahodaya->tenant_id);
+        try {
+            $service->approve($intake);
+            $this->fail('Unverified entries must not be approved in strict mode.');
+        } catch (HttpException $exception) {
+            $this->assertSame(422, $exception->getStatusCode());
+        }
+        $this->assertSame('received', $intake->fresh()->status);
+        $this->assertSame('pending', $intake->entries()->first()->status);
+    }
+
+    public function test_materialization_preserves_gender_identity_and_standby_flags(): void
+    {
+        $this->grading()->seedCategories($this->event);
+        $service = app(StateQualifierIntakeService::class);
+        $intake = $service->receive((string) Str::uuid(), [
+            'state_program_id' => $this->event->state_program_id, 'source_event_id' => 1,
+            'entries' => [['school_id' => 'school-1', 'item_id' => $this->item->id,
+                'student_name' => 'Performer', 'class_name' => 'Class 6',
+                'participants' => [
+                    ['student_name' => 'Performer', 'class_name' => 'Class 6', 'gender' => 'female', 'source_student_id' => '42', 'is_leader' => true],
+                    ['student_name' => 'Standby', 'class_name' => 'Class 10', 'is_standby' => true],
+                ]]],
+        ], $this->sahodaya->tenant_id);
+        $service->approve($intake);
+        app(StateQualifierMaterializationService::class)->materializeApprovedIntake($intake);
+        $performer = StateFestParticipant::where('student_name', 'Performer')->firstOrFail();
+        $this->assertSame('female', $performer->meta['gender']);
+        $this->assertSame('42', $performer->meta['source_student_id']);
+        $this->assertTrue($performer->is_leader);
+        $this->assertFalse(StateFestParticipant::where('student_name', 'Standby')->firstOrFail()->isCompeting());
     }
 
     // ── Access ─────────────────────────────────────────────────────────────────────────────

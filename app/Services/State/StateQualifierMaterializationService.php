@@ -8,7 +8,9 @@ use App\Models\State\StateFestParticipant;
 use App\Models\State\StateFestRegistration;
 use App\Models\State\StateQualifierEntry;
 use App\Models\State\StateQualifierIntake;
+use App\Services\State\Fest\StateEligibilityService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class StateQualifierMaterializationService
 {
@@ -17,6 +19,12 @@ class StateQualifierMaterializationService
     {
         return DB::connection('state')->transaction(function () use ($intake) {
             $event = $this->stateEventFor($intake);
+            StateFestEvent::whereKey($event->id)->lockForUpdate()->first();
+            $approved = StateQualifierEntry::where('intake_id', $intake->id)->where('status', 'approved')->with('intake')->get();
+            $violations = app(StateEligibilityService::class)->entryApprovalProblems($event, $approved);
+            if ($violations !== []) {
+                throw ValidationException::withMessages(['eligibility' => implode(' ', $violations)]);
+            }
             $registrations = 0;
             $participants = 0;
 
@@ -58,6 +66,8 @@ class StateQualifierMaterializationService
                                 'student_name' => $entry->student_name,
                                 'roll_number' => $entry->roll_number,
                                 'class_name' => $entry->class_name,
+                                'gender' => $entry->meta['gender'] ?? null,
+                                'source_student_id' => $entry->meta['source_student_id'] ?? null,
                             ]]);
                         }
 
@@ -72,7 +82,12 @@ class StateQualifierMaterializationService
                                     'state_event_id' => $event->id,
                                     'roll_number' => $member['roll_number'] ?? $entry->roll_number,
                                     'class_name' => $member['class_name'] ?? $entry->class_name,
+                                    'is_standby' => (bool) ($member['is_standby'] ?? false),
+                                    'is_leader' => (bool) ($member['is_leader'] ?? false),
+                                    'withdrawn_at' => $member['withdrawn_at'] ?? null,
                                     'meta' => [
+                                        'gender' => $member['gender'] ?? null,
+                                        'source_student_id' => $member['source_student_id'] ?? null,
                                         'source_participant_id' => $sourceParticipantId,
                                         'qualifier_position' => $entry->position,
                                         'qualifier_grade' => $entry->grade,

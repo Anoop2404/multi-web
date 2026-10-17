@@ -89,6 +89,41 @@ class FestStateNominationTest extends TestCase
         $this->assertEquals('State Candidate', $pool[0]['student_name']);
     }
 
+    public function test_qualifier_payload_keeps_teams_separate_and_preserves_eligibility_data(): void
+    {
+        $sahodaya = Tenant::create(['id' => 'sahodaya-1', 'name' => 'Sahodaya', 'type' => 'sahodaya']);
+        $school = Tenant::create(['id' => 'school-1', 'name' => 'School', 'type' => 'school', 'parent_id' => $sahodaya->id]);
+        $program = FestStateProgram::create(['title' => 'State', 'event_type' => 'kalolsavam', 'status' => 'published']);
+        $event = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Fest', 'event_type' => 'kalolsavam', 'status' => 'published']);
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Dance', 'participant_type' => 'group',
+            'item_code' => 'D1', 'state_program_item_id' => (string) \Illuminate\Support\Str::uuid()]);
+        $class = SchoolClass::create(['tenant_id' => $school->id, 'name' => 'Class 6']);
+        $registration = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id,
+            'school_id' => $school->id, 'status' => 'approved']);
+        foreach ([1, 2] as $team) {
+            $group = \App\Models\FestGroup::create(['event_id' => $event->id,
+                'registration_id' => $registration->id, 'team_name' => 'Team '.$team]);
+            foreach ([1, 2] as $member) {
+                $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $class->id,
+                    'name' => "Pupil {$team} {$member}", 'gender' => 'female']);
+                $participant = FestParticipant::create(['registration_id' => $registration->id,
+                    'student_id' => $student->id, 'group_id' => $group->id, 'participant_role' => 'performer']);
+                FestMark::create(['event_id' => $event->id, 'item_id' => $item->id,
+                    'registration_id' => $registration->id, 'participant_id' => $participant->id,
+                    'score' => 90, 'position' => $team, 'grade' => 'A']);
+            }
+        }
+        $payload = app(\App\Services\State\FestStateQualifierPayloadBuilder::class)->build($program, $event, $sahodaya->id);
+        $this->assertCount(2, $payload['entries']);
+        foreach ($payload['entries'] as $index => $entry) {
+            $this->assertCount(2, $entry['participants']);
+            $this->assertSame('Pupil '.($index + 1).' 1', $entry['participants'][0]['student_name']);
+            $this->assertSame('Class 6', $entry['participants'][0]['class_name']);
+            $this->assertSame('female', $entry['participants'][0]['gender']);
+            $this->assertNotEmpty($entry['participants'][0]['source_student_id']);
+        }
+    }
+
     public function test_maker_checker_nomination_flow_enforces_user_separation(): void
     {
         $program = FestStateProgram::create([

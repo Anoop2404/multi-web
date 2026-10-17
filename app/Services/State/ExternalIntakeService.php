@@ -14,8 +14,8 @@ use App\Services\Auth\UserCredentialService;
 use App\Services\Notifications\NotificationService;
 use App\Support\ExcelImport;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
@@ -179,6 +179,8 @@ class ExternalIntakeService
             'item_name'      => $data['item_name'] ?? null,
             'student_name'   => $data['student_name'],
             'class_name'     => $data['class_name'] ?? null,
+            'roll_number' => $data['roll_number'] ?? null,
+            'meta' => ['gender' => $data['gender'] ?? null],
             'position'       => $data['position'] ?? null,
             'grade'          => $data['grade'] ?? null,
             'qualifier_type' => 'external_entry',
@@ -302,7 +304,7 @@ class ExternalIntakeService
     }
 
     /** Roster students not yet registered to any item, for the coordinator's "register to items" screen. */
-    public function unassignedRoster(ExternalSahodaya $sahodaya): \Illuminate\Support\Collection
+    public function unassignedRoster(ExternalSahodaya $sahodaya): Collection
     {
         $intake = $this->draftIntake($sahodaya);
         if (! $intake) {
@@ -357,7 +359,7 @@ class ExternalIntakeService
     }
 
     /** All entries across every school under this Sahodaya, for the coordinator's review screen. */
-    public function entriesForReview(ExternalSahodaya $sahodaya): \Illuminate\Support\Collection
+    public function entriesForReview(ExternalSahodaya $sahodaya): Collection
     {
         $intake = $this->draftIntake($sahodaya);
 
@@ -406,7 +408,7 @@ class ExternalIntakeService
 
         $count = $intake->entries()->count();
         $title = "Outside Sahodaya submitted qualifiers: {$sahodaya->name}";
-        $body = "{$sahodaya->name} submitted {$count} qualifier entr" . ($count === 1 ? 'y' : 'ies') . " for review.";
+        $body = "{$sahodaya->name} submitted {$count} qualifier entr".($count === 1 ? 'y' : 'ies').' for review.';
         $actionUrl = '/admin/state-programs'; // review queue lives off the state-programs area
 
         $notifier = app(NotificationService::class);

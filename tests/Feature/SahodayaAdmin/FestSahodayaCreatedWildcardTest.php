@@ -187,4 +187,105 @@ class FestSahodayaCreatedWildcardTest extends TestCase
         $names = collect($response->json())->pluck('name')->all();
         $this->assertSame([$student->name], $names, 'must only return the selected school\'s own students');
     }
+    private function createWildcard($admin, $sahodaya, $school, $event, $item, $student)
+    {
+        return $this->actingAs($admin)->postJson(route('sahodaya.events.appeals.store-wildcard', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]), ['school_id' => $school->id, 'appeal_type' => FestAppeal::TYPE_SAHODAYA_WILDCARD,
+            'student_id' => $student->id, 'item_id' => $item->id, 'reason' => 'Wildcard request']);
+    }
+
+    public function test_item_lookup_filters_category_gender_and_disabled_items(): void
+    {
+        [$admin, $sahodaya, , $event, $item, $student] = $this->fixture();
+        $student->update(['gender' => 'female']);
+        $item->update(['class_group' => 'category_3', 'gender' => 'female']);
+        foreach ([['category_2', 'female', true], ['category_3', 'male', true], ['category_3', 'female', false]] as [$category, $gender, $enabled]) {
+            FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song', 'class_group' => $category,
+                'gender' => $gender, 'participant_type' => 'individual', 'is_enabled' => $enabled]);
+        }
+        $open = FestEventItem::create(['event_id' => $event->id, 'title' => 'Open group', 'class_group' => 'category_5',
+            'gender' => 'mixed', 'participant_type' => 'group', 'is_enabled' => true]);
+        $response = $this->actingAs($admin)->getJson(route('sahodaya.events.appeals.wildcard-items', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]).'?student_id='.$student->id.'&appeal_type=sahodaya_wildcard')->assertOk();
+        $this->assertEqualsCanonicalizing([$item->id, $open->id], collect($response->json('items'))->pluck('id')->all());
+        $response->assertJsonPath('student.gender', 'female');
+    }
+
+    public function test_direct_submission_cannot_bypass_category_gender_or_disabled_item_checks(): void
+    {
+        [$admin, $sahodaya, $school, $event, $item, $student] = $this->fixture();
+        $student->update(['gender' => 'female']);
+        $item->update(['class_group' => 'category_2', 'gender' => 'female']);
+        $this->createWildcard($admin, $sahodaya, $school, $event, $item, $student)->assertUnprocessable()->assertJsonValidationErrors('item_id');
+        $item->update(['class_group' => 'category_3', 'gender' => 'male']);
+        $this->createWildcard($admin, $sahodaya, $school, $event, $item, $student)->assertUnprocessable();
+        $item->update(['gender' => 'female', 'is_enabled' => false]);
+        $this->createWildcard($admin, $sahodaya, $school, $event, $item, $student)->assertUnprocessable();
+        $this->assertSame(0, FestAppeal::count());
+    }
+
+    public function test_a_withdrawn_wildcard_can_be_requested_again_without_erasing_history(): void
+    {
+        [$admin, $sahodaya, $school, $event, $item, $student] = $this->fixture();
+        $this->createWildcard($admin, $sahodaya, $school, $event, $item, $student)->assertRedirect();
+        $original = FestAppeal::firstOrFail();
+        $this->createWildcard($admin, $sahodaya, $school, $event, $item, $student)->assertUnprocessable();
+        $original->grantedRegistration->update(['status' => 'withdrawn']);
+        $this->createWildcard($admin, $sahodaya, $school, $event, $item, $student)->assertRedirect();
+        $this->assertSame(2, FestAppeal::count());
+        $this->assertSame('withdrawn', $original->grantedRegistration->fresh()->status);
+        $this->assertSame(1, FestRegistration::where('item_id', $item->id)->active()->count());
+    }
+
+    public function test_a_withdrawn_normal_entry_does_not_block_a_wildcard(): void
+    {
+        [$admin, $sahodaya, $school, $event, $item, $student] = $this->fixture();
+        $old = FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'withdrawn']);
+        \App\Models\FestParticipant::create(['registration_id' => $old->id, 'student_id' => $student->id]);
+        $this->createWildcard($admin, $sahodaya, $school, $event, $item, $student)->assertRedirect();
+        $this->assertSame('withdrawn', $old->fresh()->status);
+        $this->assertSame(1, FestRegistration::where('item_id', $item->id)->active()->count());
+    }
+
+    public function test_admin_can_correct_an_existing_wildcard_item_and_preserve_participant_id(): void
+    {
+        [$admin, $sahodaya, $school, $event, $item, $student] = $this->fixture();
+        $this->createWildcard($admin, $sahodaya, $school, $event, $item, $student)->assertRedirect();
+        $appeal = FestAppeal::firstOrFail();
+        $participantId = $appeal->grantedRegistration->participants()->firstOrFail()->id;
+        $item->update(['class_group' => 'category_2']);
+        $correct = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song', 'class_group' => 'category_3',
+            'participant_type' => 'individual', 'is_enabled' => true]);
+        $url = route('sahodaya.events.appeals.correct-item', ['tenantId' => $sahodaya->id, 'event' => $event->id, 'appeal' => $appeal->id]);
+        $this->postJson($url, ['item_id' => $correct->id, 'reason' => 'Wrong category was selected'])->assertRedirect();
+        $appeal->refresh();
+        $this->assertSame($correct->id, $appeal->item_id);
+        $this->assertSame($correct->id, $appeal->grantedRegistration->item_id);
+        $this->assertSame($participantId, $appeal->grantedRegistration->participants()->firstOrFail()->id);
+        $this->assertStringContainsString('Wrong category was selected', $appeal->resolution_note);
+        $locked = FestEventItem::create(['event_id' => $event->id, 'title' => 'Published item',
+            'participant_type' => 'individual', 'is_enabled' => true, 'results_published_at' => now()]);
+        $this->postJson($url, ['item_id' => $locked->id, 'reason' => 'Cannot move now'])->assertUnprocessable();
+        $this->assertSame($correct->id, $appeal->fresh()->item_id);
+    }
+
+    public function test_correction_cannot_move_an_entry_with_marks_or_a_state_submission(): void
+    {
+        [$admin, $sahodaya, $school, $event, $item, $student] = $this->fixture();
+        $this->createWildcard($admin, $sahodaya, $school, $event, $item, $student)->assertRedirect();
+        $appeal = FestAppeal::firstOrFail();
+        $participant = $appeal->grantedRegistration->participants()->firstOrFail();
+        $other = FestEventItem::create(['event_id' => $event->id, 'title' => 'Other item', 'participant_type' => 'individual', 'is_enabled' => true]);
+        \App\Models\FestMark::create(['event_id' => $event->id, 'item_id' => $item->id,
+            'registration_id' => $appeal->granted_registration_id, 'participant_id' => $participant->id, 'score' => 90]);
+        $url = route('sahodaya.events.appeals.correct-item', ['tenantId' => $sahodaya->id, 'event' => $event->id, 'appeal' => $appeal->id]);
+        $this->postJson($url, ['item_id' => $other->id, 'reason' => 'Already scored'])->assertUnprocessable();
+        $this->assertSame($item->id, $appeal->fresh()->item_id);
+        $appeal->update(['appeal_type' => FestAppeal::TYPE_STATE_WILDCARD, 'granted_state_reference' => 'sent-to-state']);
+        $this->postJson($url, ['item_id' => $other->id, 'reason' => 'Already sent'])->assertUnprocessable();
+        $this->assertSame($item->id, $appeal->fresh()->item_id);
+    }
+
 }

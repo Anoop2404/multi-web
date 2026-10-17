@@ -98,6 +98,19 @@ class FestEventPortalController extends SchoolAdminController
         return back()->with('success', 'Meal request submitted.');
     }
 
+    public function wildcardItems(Request $request, string $tenantId, FestEvent $event)
+    {
+        $data = $request->validate(['student_id' => 'required|integer',
+            'appeal_type' => 'required|in:sahodaya_wildcard,state_wildcard']);
+        abort_if($event->tenant_id !== $this->school->parent_id, 403);
+        $student = Student::with('schoolClass')->where('tenant_id', $this->school->id)->findOrFail($data['student_id']);
+
+        return response()->json([
+            'items' => app(\App\Services\Events\FestAppealWildcardService::class)->eligibleItems($event, $student, $data['appeal_type']),
+            'student' => ['name' => $student->name, 'class_name' => $student->schoolClass?->name, 'gender' => $student->gender],
+        ]);
+    }
+
     public function storeAppeal(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
@@ -123,24 +136,24 @@ class FestEventPortalController extends SchoolAdminController
             abort_if($item->event_id !== $event->id, 422, 'Item does not belong to this event.');
             abort_if(! $event->appeals_open, 422, 'Appeals are not open for this event.');
 
-            $duplicate = FestAppeal::where('event_id', $event->id)
-                ->where('student_id', $student->id)
-                ->where('item_id', $item->id)
-                ->whereIn('appeal_type', FestAppeal::WILDCARD_TYPES)
-                ->whereIn('status', ['pending', 'approved'])
-                ->exists();
-            abort_if($duplicate, 422, 'An active wildcard appeal already exists for this student and item.');
+            $wildcardService = app(\App\Services\Events\FestAppealWildcardService::class);
+            $wildcardService->assertEligible($event, $item, $student);
+            abort_if($wildcardService->hasActiveRequest($event, $student, $item), 422, 'An active wildcard appeal already exists for this student and item.');
 
-            FestAppeal::create([
-                'event_id'             => $event->id,
-                'appeal_type'          => $appealType,
-                'student_id'           => $student->id,
-                'item_id'              => $item->id,
-                'reason'               => $data['reason'],
-                'fee_amount'           => $event->appeal_fee_amount,
-                'status'               => 'pending',
-                'submitted_by_user_id' => $request->user()->id,
-            ]);
+            \Illuminate\Support\Facades\DB::transaction(function () use ($event, $student, $item, $appealType, $data, $request, $wildcardService) {
+                Student::whereKey($student->id)->lockForUpdate()->firstOrFail();
+                abort_if($wildcardService->hasActiveRequest($event, $student, $item), 422, 'An active wildcard appeal already exists for this student and item.');
+                FestAppeal::create([
+                    'event_id'             => $event->id,
+                    'appeal_type'          => $appealType,
+                    'student_id'           => $student->id,
+                    'item_id'              => $item->id,
+                    'reason'               => $data['reason'],
+                    'fee_amount'           => $event->appeal_fee_amount,
+                    'status'               => 'pending',
+                    'submitted_by_user_id' => $request->user()->id,
+                ]);
+            });
 
             return back()->with('success', 'Appeal submitted.');
         }

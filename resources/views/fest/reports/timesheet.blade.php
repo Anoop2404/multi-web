@@ -216,17 +216,10 @@
         $serialOffset = $section['offset'];
         $cleanTitle = str_replace('_', ' ', $itemName);
 
-        $teamKeys = collect($allRows)->map(function ($r) {
-            if (!empty($r['group_id'])) {
-                return 'g_'.$r['group_id'];
-            }
-            if (!empty($r['team_name'])) {
-                return 't_'.$r['team_name'].'_'.($r['school'] ?? '');
-            }
-            return null;
-        })->filter()->unique();
-        $teamCount = $teamKeys->count();
-        $individualCount = collect($allRows)->filter(fn ($r) => empty($r['group_id']) && empty($r['team_name']))->count();
+        $teamCount = collect($allRows)->filter(fn ($r) => !empty($r['is_team']))->count();
+        $individualCount = count($allRows) - $teamCount;
+
+
 
         if ($teamCount > 0 && $individualCount === 0) {
             $countLabel = $teamCount.' '.($teamCount === 1 ? 'Team' : 'Teams');
@@ -267,38 +260,14 @@
                     <th style="width: 32px;" class="text-center">Sl.No.</th>
                     <th style="width: 60px;" class="text-center">Chest</th>
                     <th style="width: 60px;" class="text-center">Fest ID</th>
-                    <th>Name of Participant</th>
+                    <th>Participant / Team</th>
                     <th style="width: 90px;" class="text-center">Starting</th>
                     <th style="width: 90px;" class="text-center">Finishing</th>
                     <th style="width: 100px;" class="text-center">Signature</th>
                 </tr>
             </thead>
             <tbody>
-                @php
-                    $lastTeamKey = null;
-                @endphp
                 @foreach($rows as $i => $row)
-                    @php
-                        $teamName = $row['team_name'] ?? null;
-                        $school = $row['school'] ?? '';
-                        $groupId = $row['group_id'] ?? null;
-                        $currentTeamKey = $groupId
-                            ? 'g_'.$groupId
-                            : ($teamName ? 't_'.$teamName.'_'.$school : null);
-                    @endphp
-
-                    @if($currentTeamKey && $currentTeamKey !== $lastTeamKey)
-                        @php $lastTeamKey = $currentTeamKey; @endphp
-                        <tr class="team-divider">
-                            <td colspan="7">
-                                <strong>TEAM: {{ strtoupper($teamName ?? 'Team Entry') }}</strong>
-                                @if(!empty($school))
-                                    &bull; <span style="color: #475569;">{{ strtoupper($school) }}</span>
-                                @endif
-                            </td>
-                        </tr>
-                    @endif
-
                     <tr>
                         <td class="text-center">{{ $serialOffset + $i + 1 }}</td>
                         <td class="text-center chest-no">{{ ($blankChest ?? false) ? '' : (($row['reference'] ?? '') === '—' ? '' : ($row['reference'] ?? '')) }}</td>
@@ -308,8 +277,8 @@
                             @if(!empty($row['roll_no']) && ($row['roll_no'] !== '—'))
                                 <div class="roll-no-sub">Roll No: {{ $row['roll_no'] }}</div>
                             @endif
-                            @if(!empty($row['team_name']))
-                                <div><span class="team-tag">Team: {{ $row['team_name'] }}</span></div>
+                            @if(!empty($row['is_team']) && !empty($row['school']))
+                                <div>{{ $row['school'] }}</div>
                             @endif
                         </td>
                         <td class="text-center"></td>

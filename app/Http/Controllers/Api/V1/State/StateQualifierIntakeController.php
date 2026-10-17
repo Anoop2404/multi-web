@@ -30,7 +30,10 @@ class StateQualifierIntakeController extends Controller
             'payload.entries.*.item_code' => 'required|string|max:64',
             'payload.entries.*.item_name' => 'nullable|string|max:255',
             'payload.entries.*.student_name' => 'required|string|max:255',
+            'payload.entries.*.roll_number' => 'nullable|string|max:64',
             'payload.entries.*.class_name' => 'nullable|string|max:64',
+            'payload.entries.*.gender' => 'nullable|string|max:20',
+            'payload.entries.*.source_student_id' => 'nullable|string|max:128',
             'payload.entries.*.position' => 'required|integer|min:1|max:10',
             'payload.entries.*.grade' => 'nullable|string|max:8',
             'payload.entries.*.points' => 'nullable|numeric|min:0',
@@ -40,7 +43,12 @@ class StateQualifierIntakeController extends Controller
             'payload.entries.*.participants' => 'nullable|array|min:1',
             'payload.entries.*.participants.*.source_participant_id' => 'nullable|string|max:128',
             'payload.entries.*.participants.*.student_name' => 'required_with:payload.entries.*.participants|string|max:255',
+            'payload.entries.*.participants.*.roll_number' => 'nullable|string|max:64',
             'payload.entries.*.participants.*.class_name' => 'nullable|string|max:64',
+            'payload.entries.*.participants.*.gender' => 'nullable|string|max:20',
+            'payload.entries.*.participants.*.source_student_id' => 'nullable|string|max:128',
+            'payload.entries.*.participants.*.is_standby' => 'nullable|boolean',
+            'payload.entries.*.participants.*.is_leader' => 'nullable|boolean',
         ]);
 
         $program = FestStateProgram::find($data['payload']['state_program_id']);

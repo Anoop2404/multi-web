@@ -40,7 +40,7 @@
                                         <span v-if="wildcardLabel(a)" class="inline-block mt-1 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">{{ wildcardLabel(a) }}</span>
                                     </td>
                                     <td class="p-3 text-xs">
-                                        <p>{{ a.participant?.registration?.school?.name ?? a.grantedRegistration?.school?.name ?? '—' }}</p>
+                                        <p>{{ a.participant?.registration?.school?.name ?? a.student?.tenant?.name ?? a.granted_registration?.school?.name ?? '—' }}</p>
                                         <p class="text-slate-500">{{ a.participant?.registration?.item?.title ?? a.item?.title }}</p>
                                     </td>
                                     <td class="p-3 text-xs max-w-xs">
@@ -61,6 +61,8 @@
                                         <span :class="statusClass(a.status)" class="text-xs font-semibold px-2 py-0.5 rounded capitalize">{{ a.status }}</span>
                                     </td>
                                     <td class="p-3 text-right">
+                                        <button v-if="wildcardLabel(a) && ['pending', 'approved'].includes(a.status) && !a.granted_state_reference" type="button"
+                                            class="block ml-auto mb-2 text-indigo-700 text-xs font-semibold" @click="openItemCorrection(a)">Correct item</button>
                                         <button v-if="a.status === 'pending'" type="button"
                                                 class="text-green-700 text-xs font-semibold mr-2"
                                                 @click="openResolve(a, 'approved')">Approve</button>
@@ -97,8 +99,12 @@
                         <SearchableSelect v-model="wildcardForm.student_id" :options="wildcardStudentOptions"
                                           :all-option="true" :all-label="wildcardStudentsLoading ? 'Loading students…' : 'Select student'"
                                           :required="true" :disabled="!wildcardForm.school_id || wildcardStudentsLoading" />
-                        <SearchableSelect v-model="wildcardForm.item_id" :options="wildcardItemOptions"
+                        <SearchableSelect v-model="wildcardForm.item_id" :options="wildcardItemOptions" :disabled="!wildcardForm.student_id || wildcardItemsLoading"
                                           :all-option="true" all-label="Select item" :required="true" />
+                        <p v-if="wildcardStudentContext" class="text-xs text-slate-600">{{ wildcardStudentContext.class_name }} · {{ wildcardStudentContext.gender || 'Gender not recorded' }}</p>
+                        <p v-if="wildcardItemsLoading" class="text-xs text-slate-500">Loading eligible items…</p>
+                        <p v-else-if="wildcardForm.student_id && !wildcardItemOptions.length" class="text-xs text-amber-700">No eligible items match this student's category and gender.</p>
+                        <p v-if="wildcardItemsError" class="text-xs text-red-600">{{ wildcardItemsError }}</p>
                         <textarea v-model="wildcardForm.reason" class="field text-sm h-20" placeholder="Reason *" required></textarea>
                         <p v-if="wildcardError" class="text-xs text-red-600">{{ wildcardError }}</p>
                         <button type="submit" class="btn-primary w-full text-sm"
@@ -145,11 +151,28 @@
             </form>
         </div>
 
+        <div v-if="correctionAppeal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/40" @click="correctionAppeal = null"></div>
+            <form @submit.prevent="submitItemCorrection" class="relative modal-shell max-w-lg w-full p-6 space-y-4">
+                <h3 class="font-bold">Correct wildcard item</h3>
+                <p class="text-xs text-slate-600">{{ participantName(correctionAppeal) }} · {{ appealItemLabel(correctionAppeal) }}</p>
+                <SearchableSelect v-model="correctionForm.item_id" :options="correctionOptions" :all-option="true" all-label="Choose the correct item" :disabled="correctionLoading" required />
+                <p v-if="correctionLoading" class="text-xs text-slate-500">Loading eligible items…</p>
+                <p v-if="correctionLookupError || correctionError" class="text-xs text-red-600">{{ correctionLookupError || correctionError }}</p>
+                <textarea v-model="correctionForm.reason" class="field h-20 text-sm" placeholder="Reason for correction" required></textarea>
+                <div class="flex justify-end gap-2">
+                    <button type="button" class="btn-ghost text-sm" @click="correctionAppeal = null">Cancel</button>
+                    <button type="submit" class="btn-primary text-sm" :disabled="correctionLoading || correctionSubmitting || !correctionForm.item_id">Save correction</button>
+                </div>
+            </form>
+        </div>
+
         <EventPageActivityLog :logs="activityLogs" class="mt-8" />
     </SahodayaEventsLayout>
 </template>
 
 <script setup>
+import { useWildcardItems } from '@/composables/useWildcardItems';
 import { computed, reactive, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
@@ -168,6 +191,35 @@ const props = defineProps({
 });
 
 const base = `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}`;
+const correctionAppeal = ref(null);
+const correctionError = ref('');
+const correctionSubmitting = ref(false);
+const correctionForm = reactive({ student_id: '', appeal_type: 'sahodaya_wildcard', item_id: '', reason: '' });
+const { options: correctionOptions, loading: correctionLoading, error: correctionLookupError } = useWildcardItems(correctionForm, `${base}/appeals/wildcard/items`);
+function appealItemLabel(appeal) {
+    const item = appeal.item ?? appeal.participant?.registration?.item;
+    if (!item) return '—';
+    const meta = props.wildcardItems.find((candidate) => String(candidate.id) === String(item.id));
+    return [item.title, meta?.category_label ?? item.class_group, meta?.gender_label ?? item.gender, meta?.item_code ?? item.item_code].filter(Boolean).join(' · ');
+}
+function openItemCorrection(appeal) {
+    correctionAppeal.value = appeal;
+    correctionError.value = '';
+    correctionForm.student_id = appeal.student_id;
+    correctionForm.appeal_type = appeal.appeal_type;
+    correctionForm.item_id = '';
+    correctionForm.reason = '';
+}
+function submitItemCorrection() {
+    correctionSubmitting.value = true;
+    correctionError.value = '';
+    router.post(`${base}/appeals/${correctionAppeal.value.id}/correct-item`, { item_id: correctionForm.item_id, reason: correctionForm.reason }, {
+        preserveScroll: true, onSuccess: () => { correctionAppeal.value = null; },
+        onError: (errors) => { correctionError.value = Object.values(errors)[0] ?? 'Could not correct this entry.'; },
+        onFinish: () => { correctionSubmitting.value = false; },
+    });
+}
+
 const filterStatus = ref('');
 const resolveModal = ref(null);
 const resolveForm = reactive({ resolution_note: '' });
@@ -178,15 +230,8 @@ const wildcardTypeOptions = [
     { value: 'state_wildcard', label: 'Wildcard — State-level slot' },
 ];
 const schoolOptions = computed(() => props.wildcardSchools.map(s => ({ value: s.id, label: s.name })));
-const wildcardItemOptions = computed(() => props.wildcardItems.map(i => ({
-    value: i.id,
-    // Many items share the same title (e.g. "Bharatanatyam" run once per
-    // category/gender) — without these, the picker is a wall of identical names
-    // with no way to tell which one is meant.
-    label: [i.title, i.category_label, i.type_label, i.gender_label, i.item_code].filter(Boolean).join(' · '),
-})));
-
 const wildcardForm = reactive({ appeal_type: 'sahodaya_wildcard', school_id: '', student_id: '', item_id: '', reason: '' });
+const { options: wildcardItemOptions, student: wildcardStudentContext, loading: wildcardItemsLoading, error: wildcardItemsError } = useWildcardItems(wildcardForm, `${base}/appeals/wildcard/items`);
 const wildcardStudents = ref([]);
 const wildcardStudentsLoading = ref(false);
 const wildcardSubmitting = ref(false);
@@ -198,9 +243,13 @@ const wildcardStudentOptions = computed(() =>
 // Fetched per-school on demand rather than preloading every school's roster —
 // a Sahodaya can have hundreds of schools, so that list stays event-item-sized
 // (wildcardItems) but never school-roster-sized until a school is actually picked.
+let wildcardSchoolRequest = 0;
 async function onWildcardSchoolChange(schoolId) {
+    const requestId = ++wildcardSchoolRequest;
     wildcardForm.student_id = '';
     wildcardStudents.value = [];
+    wildcardStudentsLoading.value = false;
+    wildcardError.value = '';
     if (! schoolId) return;
 
     wildcardStudentsLoading.value = true;
@@ -209,9 +258,12 @@ async function onWildcardSchoolChange(schoolId) {
             headers: { Accept: 'application/json' },
             credentials: 'same-origin',
         });
-        wildcardStudents.value = response.ok ? await response.json() : [];
+        const students = response.ok ? await response.json() : [];
+        if (requestId === wildcardSchoolRequest) wildcardStudents.value = students;
+    } catch {
+        if (requestId === wildcardSchoolRequest) wildcardError.value = 'Could not load students. Select the school again to retry.';
     } finally {
-        wildcardStudentsLoading.value = false;
+        if (requestId === wildcardSchoolRequest) wildcardStudentsLoading.value = false;
     }
 }
 

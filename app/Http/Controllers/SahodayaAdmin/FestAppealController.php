@@ -21,7 +21,7 @@ class FestAppealController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $appeals = FestAppeal::where('event_id', $event->id)
-            ->with(['participant.student', 'participant.registration.item', 'participant.registration.school', 'student', 'item', 'grantedRegistration.school'])
+            ->with(['participant.student', 'participant.registration.item', 'participant.registration.school', 'student.tenant:id,name', 'item', 'grantedRegistration.school'])
             ->latest()
             ->get();
 
@@ -85,6 +85,20 @@ class FestAppealController extends SahodayaAdminController
      * same student fields the school-admin's own preloaded list already sends
      * (id/name/reg_no), just scoped per-school and fetched lazily.
      */
+    public function wildcardItems(Request $request, string $tenantId, FestEvent $event)
+    {
+        $data = $request->validate(['student_id' => 'required|integer',
+            'appeal_type' => 'required|in:sahodaya_wildcard,state_wildcard']);
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        $student = Student::with('schoolClass')->findOrFail($data['student_id']);
+        abort_unless(Tenant::whereKey($student->tenant_id)->where('parent_id', $this->sahodaya->id)->where('type', 'school')->exists(), 403);
+
+        return response()->json([
+            'items' => app(\App\Services\Events\FestAppealWildcardService::class)->eligibleItems($event, $student, $data['appeal_type']),
+            'student' => ['name' => $student->name, 'class_name' => $student->schoolClass?->name, 'gender' => $student->gender],
+        ]);
+    }
+
     public function studentsForWildcard(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
@@ -129,15 +143,13 @@ class FestAppealController extends SahodayaAdminController
         $item = FestEventItem::findOrFail($data['item_id']);
         abort_if($item->event_id !== $event->id, 422, 'Item does not belong to this event.');
 
-        $duplicate = FestAppeal::where('event_id', $event->id)
-            ->where('student_id', $student->id)
-            ->where('item_id', $item->id)
-            ->whereIn('appeal_type', FestAppeal::WILDCARD_TYPES)
-            ->whereIn('status', ['pending', 'approved'])
-            ->exists();
-        abort_if($duplicate, 422, 'An active wildcard appeal already exists for this student and item.');
+        $wildcardService = app(\App\Services\Events\FestAppealWildcardService::class);
+        $wildcardService->assertEligible($event, $item, $student);
+        abort_if($wildcardService->hasActiveRequest($event, $student, $item), 422, 'An active wildcard appeal already exists for this student and item.');
 
         $appeal = DB::transaction(function () use ($event, $data, $student, $item, $request, $wildcards) {
+            Student::whereKey($student->id)->lockForUpdate()->firstOrFail();
+            abort_if($wildcards->hasActiveRequest($event, $student, $item), 422, 'An active wildcard appeal already exists for this student and item.');
             $appeal = FestAppeal::create([
                 'event_id'             => $event->id,
                 'appeal_type'          => $data['appeal_type'],
@@ -155,6 +167,20 @@ class FestAppealController extends SahodayaAdminController
         $audit->festAppealResolved($appeal, 'approved');
 
         return back()->with('success', 'Wildcard entry created and approved for '.$student->name.'.');
+    }
+
+    public function correctItem(Request $request, string $tenantId, FestEvent $event, FestAppeal $appeal, PlatformAuditLogger $audit, FestAppealWildcardService $wildcards)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id || $appeal->event_id !== $event->id, 403);
+        $data = $request->validate(['item_id' => 'required|integer', 'reason' => 'required|string|max:1000']);
+        $previousItem = $appeal->item_id;
+        $appeal = $wildcards->correctItem($appeal, FestEventItem::findOrFail($data['item_id']), $data['reason']);
+        $audit->festEvent($event, FestPageActivity::APPEALS, 'fest.appeal.item_corrected', 'Wildcard item corrected', [
+            'appeal_id' => $appeal->id, 'previous_item_id' => $previousItem, 'item_id' => $appeal->item_id,
+            'reason' => $data['reason'],
+        ]);
+
+        return back()->with('success', 'Wildcard item corrected.');
     }
 
     public function resolve(Request $request, string $tenantId, FestEvent $event, FestAppeal $appeal, PlatformAuditLogger $audit, FestAppealWildcardService $wildcards)

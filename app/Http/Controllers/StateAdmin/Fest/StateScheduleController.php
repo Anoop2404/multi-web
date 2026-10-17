@@ -24,6 +24,8 @@ class StateScheduleController extends Controller
 
         return Inertia::render('State/Fest/Schedule', $this->shell($request, $event) + [
             'items' => $rows,
+            'dayParticipation' => app(\App\Services\Events\FestDayParticipationService::class)->state($event),
+            'dayParticipationReportUrl' => "/admin/state/fest/{$event->id}/schedule/day-participants",
             'scheduled' => $rows->where('is_scheduled', true)->count(),
             'venues' => StateVenue::where('state_event_id', $event->id)
                 ->orderBy('name')->get(['id', 'name', 'kind'])
@@ -31,6 +33,14 @@ class StateScheduleController extends Controller
                 ->filter(fn (StateVenue $v) => $v->canHostItems())->values(),
             'actionUrls' => ['save' => "/admin/state/fest/{$event->id}/schedule"],
         ]);
+    }
+
+    public function dayParticipationReport(Request $request, StateFestEvent $event)
+    {
+        StateScope::assertOwns($event->state_id);
+
+        return app(\App\Services\Events\FestDayParticipationReport::class)->respond($request,
+            app(\App\Services\Events\FestDayParticipationService::class)->state($event), $event->name);
     }
 
     public function saveSchedule(Request $request, StateFestEvent $event, StateScheduleService $schedule)
