@@ -116,6 +116,16 @@ class FestStateSlotCollectionTest extends TestCase
         ]);
     }
 
+    public function test_overview_uses_the_shared_public_url_without_an_undefined_property(): void
+    {
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $admin = $this->user('Admin');
+        $admin->assignRole('sahodaya_admin');
+        $this->actingAs($admin)->get('/sahodaya-admin/sahodaya-1/state-slot-collection')
+            ->assertOk()->assertInertia(fn ($page) => $page->component('Sahodaya/Events/StateSlotCollectionOverview', false)
+                ->has('publicUrl')->has('events', 1));
+    }
+
     public function test_opening_fills_the_top_ranks_and_marks_them_pending(): void
     {
         $this->winner('First', 1, 95, 'school-1');

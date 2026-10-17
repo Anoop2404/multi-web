@@ -71,6 +71,47 @@ class FestAppealWildcardServiceTest extends TestCase
         ]);
     }
 
+    public function test_migrated_index_allows_separate_wildcards_but_keeps_normal_school_uniqueness(): void
+    {
+        ['school' => $school, 'event' => $event, 'item' => $item, 'student' => $student] = $this->fixture();
+        $connection = \Illuminate\Support\Facades\Schema::getConnection();
+        $connection->statement('CREATE UNIQUE INDEX fest_reg_active_unique ON fest_registrations (event_id, school_id, item_id) WHERE status NOT IN (\'withdrawn\', \'rejected\')');
+        $service = new FestAppealWildcardService;
+        $first = $service->grantSahodayaSlot($this->pendingAppeal($event, $item, $student, FestAppeal::TYPE_SAHODAYA_WILDCARD));
+        $migration = require database_path('migrations/tenant/2026_11_27_000001_allow_separate_appeal_pool_registrations.php');
+        $migration->up();
+        $secondStudent = $student->replicate();
+        $secondStudent->name = 'Second wildcard';
+        $secondStudent->admission_number = 'ADM2';
+        $secondStudent->reg_no = 'REG2';
+        $secondStudent->save();
+        $second = $service->grantSahodayaSlot($this->pendingAppeal($event, $item, $secondStudent, FestAppeal::TYPE_SAHODAYA_WILDCARD));
+        $this->assertNotSame($first->id, $second->id);
+        $this->assertSame($first->school_id, $second->school_id);
+        $this->assertSame($school->id, $second->origin_school_id);
+        $this->assertSame($secondStudent->id, $second->participants->first()->student_id);
+
+        // A second wildcard for the same student/item is still blocked by the service.
+        try {
+            $service->grantSahodayaSlot($this->pendingAppeal($event, $item, $student, FestAppeal::TYPE_SAHODAYA_WILDCARD));
+            $this->fail('Duplicate student wildcard should be rejected.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            $this->assertSame(422, $exception->getStatusCode());
+        }
+        // Rollback must not silently remove the now-valid wildcard entries.
+        try {
+            $migration->down();
+            $this->fail('Unsafe rollback should be refused.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('Cannot restore the old index', $exception->getMessage());
+        }
+        FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
+        $this->expectException(\Illuminate\Database\QueryException::class);
+        $connection->transaction(fn () => FestRegistration::create([
+            'event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved',
+        ]));
+    }
+
     public function test_granting_a_sahodaya_slot_files_the_registration_under_a_placeholder_school_but_keeps_the_origin_school(): void
     {
         ['school' => $school, 'event' => $event, 'item' => $item, 'student' => $student] = $this->fixture();
