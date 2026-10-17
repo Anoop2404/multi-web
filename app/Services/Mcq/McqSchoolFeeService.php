@@ -115,6 +115,14 @@ class McqSchoolFeeService
             }
         }
 
+        // If the batch fee is already fully paid (e.g. school paid in full, cancelled a student,
+        // and added a replacement student), auto-approve any pending registrations so the
+        // replacement student tallies and receives their hall ticket automatically.
+        if ($fee->fresh()->isFullyPaid() && ! $exam->results_published && ! in_array($exam->status, ['completed', 'cancelled'], true)) {
+            $approverId = $cancelledByUserId ?? auth()->id() ?? 1;
+            app(McqRegistrationApprovalService::class)->approveSchoolBatch($fee->fresh(), (int) $approverId);
+        }
+
         return $fee->fresh();
     }
 

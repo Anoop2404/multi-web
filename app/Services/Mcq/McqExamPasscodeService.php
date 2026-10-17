@@ -6,6 +6,7 @@ use App\Models\McqExam;
 use App\Models\McqRegistration;
 use App\Services\Audit\PlatformAuditLogger;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Per-registration exam passcodes for the separate online exam login page
@@ -24,6 +25,10 @@ class McqExamPasscodeService
     /** The registration's passcode, created on first use. */
     public function ensure(McqRegistration $registration): string
     {
+        if (! Schema::hasColumn('mcq_registrations', 'exam_passcode')) {
+            return '';
+        }
+
         if (filled($registration->exam_passcode)) {
             return $registration->exam_passcode;
         }
@@ -34,6 +39,10 @@ class McqExamPasscodeService
     /** Replaces the passcode (lost hall ticket, suspected sharing). The old one stops working. */
     public function reissue(McqRegistration $registration): string
     {
+        if (! Schema::hasColumn('mcq_registrations', 'exam_passcode')) {
+            return '';
+        }
+
         $code = $this->assignNew($registration);
 
         app(PlatformAuditLogger::class)->mcqRegistration(
@@ -48,6 +57,10 @@ class McqExamPasscodeService
     /** Creates passcodes for every hall-ticketed registration of the exam that lacks one. */
     public function ensureForExam(McqExam $exam): int
     {
+        if (! Schema::hasColumn('mcq_registrations', 'exam_passcode')) {
+            return 0;
+        }
+
         $count = 0;
         McqRegistration::where('exam_id', $exam->id)
             ->whereNotNull('hall_ticket_no')
@@ -70,6 +83,10 @@ class McqExamPasscodeService
     /** Finds the registration a typed passcode belongs to (spaces, dashes and case ignored). */
     public function findRegistration(McqExam $exam, string $typed): ?McqRegistration
     {
+        if (! Schema::hasColumn('mcq_registrations', 'exam_passcode_lookup')) {
+            return null;
+        }
+
         $code = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $typed) ?? '');
         if (strlen($code) !== self::LENGTH) {
             return null;

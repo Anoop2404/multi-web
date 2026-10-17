@@ -342,4 +342,70 @@ class McqSahodayaCandidateManagementTest extends TestCase
         $this->assertSame('101', $reg2->hall_ticket_no);
         $this->assertSame('approved', $reg2->approval_status);
     }
+
+    public function test_replacement_student_auto_approved_and_tallies_when_school_fee_is_fully_paid(): void
+    {
+        $env = $this->setUpEnvironment(['fee_amount' => 150]);
+
+        // School registers student 1 and pays in full
+        $reg1 = McqRegistration::create([
+            'exam_id'         => $env['exam']->id,
+            'school_id'       => $env['school']->id,
+            'student_id'      => $env['student1']->id,
+            'status'          => 'registered',
+            'approval_status' => 'approved',
+            'hall_ticket_no'  => '100',
+        ]);
+
+        $receipt = \App\Models\FeeReceipt::create([
+            'feeable_type' => \App\Models\McqSchoolFee::class,
+            'feeable_id'   => 0, // will re-point after fee creation
+            'tenant_id'    => $env['sahodaya']->id,
+            'amount'       => 150.00,
+            'status'       => 'approved',
+            'file_path'    => 'proofs/dummy.pdf',
+        ]);
+
+        $fee = \App\Models\McqSchoolFee::create([
+            'exam_id'        => $env['exam']->id,
+            'school_id'      => $env['school']->id,
+            'student_count'  => 1,
+            'total_due'      => 150.00,
+            'amount_paid'    => 150.00,
+            'status'         => 'approved',
+            'fee_receipt_id' => $receipt->id,
+        ]);
+        $receipt->update(['feeable_id' => $fee->id]);
+
+        // Cancel student 1
+        $reg1->update(['status' => 'cancelled']);
+        app(\App\Services\Mcq\McqSchoolFeeService::class)->syncForSchool($env['exam'], $env['school'], 'Cancelled student 1');
+
+        $fee->refresh();
+        $this->assertSame(0, $fee->student_count);
+        $this->assertSame(0.0, (float) $fee->total_due);
+
+        // Add replacement student 2
+        $reg2 = McqRegistration::create([
+            'exam_id'         => $env['exam']->id,
+            'school_id'       => $env['school']->id,
+            'student_id'      => $env['student2']->id,
+            'status'          => 'registered',
+            'approval_status' => 'pending_payment',
+        ]);
+
+        // Sync runs when student 2 is added
+        app(\App\Services\Mcq\McqSchoolFeeService::class)->syncForSchool($env['exam'], $env['school']);
+
+        // Since payment (150) covers total_due (150), student 2 must be auto-approved and get a hall ticket
+        $reg2->refresh();
+        $this->assertSame('approved', $reg2->approval_status);
+        $this->assertNotNull($reg2->hall_ticket_no);
+        $this->assertSame('101', $reg2->hall_ticket_no);
+
+        $fee->refresh();
+        $this->assertSame('approved', $fee->status);
+        $this->assertTrue($fee->isFullyPaid());
+    }
 }
+
