@@ -8,6 +8,8 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Middleware;
+use Closure;
+use Symfony\Component\HttpFoundation\Response;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -22,7 +24,21 @@ class HandleInertiaRequests extends Middleware
 
     public function version(Request $request): ?string
     {
+        // The default implementation only hashes ASSET_URL when it is configured.
+        // Include the manifest so deployments at the same asset URL invalidate open tabs.
+        if (is_file($manifest = public_path('build/manifest.json'))) {
+            return hash('sha256', (string) config('app.asset_url').'|'.hash_file('sha256', $manifest));
+        }
+
         return parent::version($request);
+    }
+
+    public function handle(Request $request, Closure $next): Response
+    {
+        $response = parent::handle($request, $next);
+        $response->headers->set('Cache-Control', 'private, no-store');
+
+        return $response;
     }
 
     public function share(Request $request): array
