@@ -224,8 +224,21 @@
                                     <span v-if="row.tied_positions.includes(c.source_position)" class="block text-[9px] font-bold text-amber-600">tie</span>
                                 </td>
                                 <td class="py-2.5 px-4">
-                                    <span class="font-bold text-slate-900">{{ c.student_name }}</span>
-                                    <span v-if="c.class_name" class="ml-1 text-xs text-slate-400 font-medium">({{ c.class_name }})</span>
+                                    <div class="flex items-center gap-2.5">
+                                        <img v-if="c.sahodaya_photo_url || c.photo_url"
+                                             :src="c.sahodaya_photo_url || c.photo_url"
+                                             :alt="c.student_name"
+                                             class="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
+                                             @error="c.sahodaya_photo_url = null; c.photo_url = null" />
+                                        <div v-else
+                                             class="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                            {{ initials(c.student_name) }}
+                                        </div>
+                                        <div class="min-w-0">
+                                            <span class="font-bold text-slate-900 block truncate">{{ c.student_name }}</span>
+                                            <span v-if="c.class_name" class="text-xs text-slate-400 font-medium block truncate">Class: {{ c.class_name }}</span>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td class="py-2.5 px-4 text-xs font-medium text-slate-600">{{ c.school_name || '—' }}</td>
                                 <td class="py-2.5 px-3 text-center">
@@ -277,16 +290,27 @@
                         <div v-for="s in row.chosen" :key="`c${s.id}`"
                              class="rounded-xl p-2.5 flex items-center justify-between gap-2 border shadow-2xs"
                              :class="s.is_eligible === false ? 'bg-rose-50 border-rose-200 text-rose-900' : 'bg-white border-emerald-200 text-emerald-950'">
-                            <div class="min-w-0">
-                                <div class="flex items-center gap-1.5">
-                                    <span class="rounded px-1.5 py-0.2 text-[10px] font-bold"
-                                          :class="s.is_eligible === false ? 'bg-rose-200 text-rose-900' : 'bg-emerald-100 text-emerald-800'">
-                                        Going · Pos {{ s.source_position }}
-                                    </span>
-                                    <p class="text-xs font-bold truncate">{{ s.student_name }}</p>
+                            <div class="min-w-0 flex items-center gap-2.5">
+                                <img v-if="s.sahodaya_photo_url || s.photo_url"
+                                     :src="s.sahodaya_photo_url || s.photo_url"
+                                     :alt="s.student_name"
+                                     class="w-8 h-8 rounded-full object-cover border border-emerald-200 shrink-0"
+                                     @error="s.sahodaya_photo_url = null; s.photo_url = null" />
+                                <div v-else
+                                     class="w-8 h-8 rounded-full bg-emerald-100 border border-emerald-200 text-emerald-800 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                    {{ initials(s.student_name) }}
                                 </div>
-                                <p class="text-[11px] text-slate-500 truncate mt-0.5">{{ s.school_name }}</p>
-                                <p v-if="s.is_eligible === false" class="text-[10px] font-bold text-rose-700 mt-1">⚠ Result or squad changed since selection</p>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="rounded px-1.5 py-0.2 text-[10px] font-bold"
+                                              :class="s.is_eligible === false ? 'bg-rose-200 text-rose-900' : 'bg-emerald-100 text-emerald-800'">
+                                            Going · Pos {{ s.source_position }}
+                                        </span>
+                                        <p class="text-xs font-bold truncate">{{ s.student_name }}</p>
+                                    </div>
+                                    <p class="text-[11px] text-slate-500 truncate mt-0.5">{{ s.school_name }}</p>
+                                    <p v-if="s.is_eligible === false" class="text-[10px] font-bold text-rose-700 mt-1">⚠ Result or squad changed since selection</p>
+                                </div>
                             </div>
                             <button v-if="!isCertified" type="button"
                                     class="shrink-0 rounded px-2 py-1 text-xs font-semibold transition"
@@ -299,12 +323,23 @@
                         <!-- Reserves -->
                         <div v-for="s in row.reserves" :key="`r${s.id}`"
                              class="rounded-xl p-2.5 flex items-center justify-between gap-2 border border-slate-200 bg-white shadow-2xs">
-                            <div class="min-w-0">
-                                <div class="flex items-center gap-1.5">
-                                    <span class="rounded bg-sky-100 px-1.5 py-0.2 text-[10px] font-bold text-sky-800">Reserve</span>
-                                    <p class="text-xs font-bold text-slate-800 truncate">{{ s.student_name }}</p>
+                            <div class="min-w-0 flex items-center gap-2.5">
+                                <img v-if="s.sahodaya_photo_url || s.photo_url"
+                                     :src="s.sahodaya_photo_url || s.photo_url"
+                                     :alt="s.student_name"
+                                     class="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
+                                     @error="s.sahodaya_photo_url = null; s.photo_url = null" />
+                                <div v-else
+                                     class="w-8 h-8 rounded-full bg-sky-100 border border-sky-200 text-sky-800 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                    {{ initials(s.student_name) }}
                                 </div>
-                                <p class="text-[11px] text-slate-500 truncate mt-0.5">{{ s.school_name }}<span v-if="s.note"> — {{ s.note }}</span></p>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="rounded bg-sky-100 px-1.5 py-0.2 text-[10px] font-bold text-sky-800">Reserve</span>
+                                        <p class="text-xs font-bold text-slate-800 truncate">{{ s.student_name }}</p>
+                                    </div>
+                                    <p class="text-[11px] text-slate-500 truncate mt-0.5">{{ s.school_name }}<span v-if="s.note"> — {{ s.note }}</span></p>
+                                </div>
                             </div>
                             <button v-if="!isCertified" type="button" class="shrink-0 text-xs text-slate-400 hover:text-rose-600 hover:bg-rose-50 px-2 py-1 rounded transition" @click="remove(s)">
                                 remove
@@ -314,12 +349,23 @@
                         <!-- Declined -->
                         <div v-for="s in row.declined" :key="`d${s.id}`"
                              class="rounded-xl p-2.5 flex items-center justify-between gap-2 border border-amber-200 bg-amber-50/40 shadow-2xs">
-                            <div class="min-w-0">
-                                <div class="flex items-center gap-1.5">
-                                    <span class="rounded bg-amber-200 px-1.5 py-0.2 text-[10px] font-bold text-amber-900">Declined · Pos {{ s.source_position }}</span>
-                                    <p class="text-xs font-bold text-slate-800 truncate">{{ s.student_name }}</p>
+                            <div class="min-w-0 flex items-center gap-2.5">
+                                <img v-if="s.sahodaya_photo_url || s.photo_url"
+                                     :src="s.sahodaya_photo_url || s.photo_url"
+                                     :alt="s.student_name"
+                                     class="w-8 h-8 rounded-full object-cover border border-amber-200 shrink-0"
+                                     @error="s.sahodaya_photo_url = null; s.photo_url = null" />
+                                <div v-else
+                                     class="w-8 h-8 rounded-full bg-amber-100 border border-amber-200 text-amber-800 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                    {{ initials(s.student_name) }}
                                 </div>
-                                <p class="text-[11px] text-amber-800 truncate mt-0.5">{{ s.note || 'No reason recorded' }}</p>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="rounded bg-amber-200 px-1.5 py-0.2 text-[10px] font-bold text-amber-900">Declined · Pos {{ s.source_position }}</span>
+                                        <p class="text-xs font-bold text-slate-800 truncate">{{ s.student_name }}</p>
+                                    </div>
+                                    <p class="text-[11px] text-amber-800 truncate mt-0.5">{{ s.note || 'No reason recorded' }}</p>
+                                </div>
                             </div>
                             <button v-if="!isCertified" type="button" class="shrink-0 text-xs font-semibold text-slate-500 hover:text-slate-800 underline px-2 py-1 rounded transition" @click="withdrawDecline(s)">
                                 undo
@@ -432,5 +478,10 @@ function autoFill() {
 function register() {
     if (!confirm(`Register ${props.readiness.chosen} winner(s) with State? They enter the State's scrutiny queue.`)) return;
     router.post(props.actionUrls.register, {}, { preserveScroll: true });
+}
+
+function initials(name) {
+    if (!name) return '?';
+    return name.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
 </script>

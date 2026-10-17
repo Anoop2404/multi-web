@@ -412,10 +412,13 @@ class FestStateSlotCollectionService
             $offer['category_label'] = $row['category_label'] ?? null;
             $offer['gender_label'] = $row['gender_label'] ?? 'Open';
             $offer['direct_entry'] = $row['direct_entry'] ?? false;
-            $stillEligible = collect($row['candidates'] ?? [])->contains(fn ($candidate) =>
+            $matchedCandidate = collect($row['candidates'] ?? [])->first(fn ($candidate) =>
                 ($offer['participant_id'] && $candidate['participant_id'] === $offer['participant_id'])
                 || ($offer['mark_id'] && $candidate['mark_id'] === $offer['mark_id'])
                 || (! empty($offer['registration_id']) && ! empty($candidate['registration_id']) && $candidate['registration_id'] === $offer['registration_id']));
+            $matchedChosen = collect($row['chosen'] ?? [])->firstWhere('id', $offer['id']);
+            $offer['photo_url'] = $matchedCandidate['photo_url'] ?? $matchedChosen['photo_url'] ?? null;
+            $stillEligible = (bool) $matchedCandidate;
             $offer['can_respond'] = $stillEligible && $hubEvent->state_slot_collection_open && ! $hubEvent->state_slot_collection_approved_at
                 && $offer['status'] === 'selected' && $offer['school_response'] === 'pending';
             $offer['can_cancel_opt_out'] = $stillEligible && $hubEvent->state_slot_collection_open && ! $hubEvent->state_slot_collection_approved_at
@@ -447,6 +450,7 @@ class FestStateSlotCollectionService
                     'item_id' => $row['item_id'], 'item_code' => $row['item_code'], 'item_title' => $row['title'],
                     'category_label' => $row['category_label'], 'gender_label' => $row['gender_label'],
                     'student_name' => $candidate['student_name'], 'class_name' => $candidate['class_name'],
+                    'photo_url' => $candidate['photo_url'] ?? null,
                     'source_position' => $candidate['source_position'], 'direct_entry' => $candidate['direct_entry'],
                     'status' => 'waiting', 'school_response' => 'waiting', 'can_respond' => false,
                     'opt_out_reason' => null, 'responded_at' => null, 'responded_by_name' => null,

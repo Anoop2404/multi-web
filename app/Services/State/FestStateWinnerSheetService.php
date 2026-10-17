@@ -96,6 +96,7 @@ class FestStateWinnerSheetService
                     ? app(FestStateCollectionCandidates::class)->quota($byItem->get($item->id, collect()),
                         (int) ($eventItemQuotas[$item->id] ?? $item->qualify_count ?? 0))
                     : (isset($eventItemQuotas[$item->id]) ? (int) $eventItemQuotas[$item->id] : null),
+                $hubEvent->tenant_id,
             ))
             // An item this Sahodaya has no results for is not a decision to make. Kept out rather than
             // listed empty, so the page is the work remaining.
@@ -110,7 +111,7 @@ class FestStateWinnerSheetService
      * @param  Collection<int, FestStateNominationSelection>  $selections
      * @return array<string, mixed>
      */
-    private function itemSheet(FestStateProgramItem $item, Collection $candidates, Collection $selections, ?int $quotaOverride = null): array
+    private function itemSheet(FestStateProgramItem $item, Collection $candidates, Collection $selections, ?int $quotaOverride = null, ?string $sahodayaId = null): array
     {
         $quota = $quotaOverride !== null ? $quotaOverride : (int) ($item->qualify_count ?: 0);
 
@@ -154,6 +155,25 @@ class FestStateWinnerSheetService
                 return $slotsLeft > 0 && $group->where('is_chosen', true)->isEmpty() && $group->where('is_declined', false)->count() > $slotsLeft;
             })->values();
 
+        $resolvePhoto = function (array &$cRow, $s) use ($rows, $sahodayaId) {
+            $matched = $rows->first(fn ($c) =>
+                ($s->participant_id && $c['participant_id'] === $s->participant_id)
+                || ($s->mark_id && $c['mark_id'] === $s->mark_id)
+                || (! empty($s->registration_id) && ! empty($c['registration_id']) && $c['registration_id'] === $s->registration_id));
+            $cRow['photo_url'] = $matched['photo_url'] ?? null;
+            $cRow['sahodaya_photo_url'] = $matched['sahodaya_photo_url'] ?? null;
+            if (! $matched && $s->participant_id) {
+                $person = \App\Models\FestParticipant::with('student')->find($s->participant_id);
+                if ($person?->student) {
+                    $cRow['photo_url'] = $person->student->photoUrl();
+                    if ($sahodayaId) {
+                        $cRow['sahodaya_photo_url'] = $person->student->sahodayaPhotoUrl($sahodayaId);
+                    }
+                }
+            }
+            return (bool) $matched;
+        };
+
         return [
             'item_id' => $item->id,
             'item_code' => $item->item_code,
@@ -173,16 +193,21 @@ class FestStateWinnerSheetService
             'tied_positions' => $tiedPositions->all(),
             'unresolved_ties' => $unresolvedTies->all(),
             'candidates' => $rows->all(),
-            'chosen' => $chosen->map(function ($s) use ($rows) {
+            'chosen' => $chosen->map(function ($s) use ($resolvePhoto) {
                 $cRow = $this->selectionRow($s);
-                $cRow['is_eligible'] = $rows->contains(fn ($c) =>
-                    ($s->participant_id && $c['participant_id'] === $s->participant_id)
-                    || ($s->mark_id && $c['mark_id'] === $s->mark_id)
-                    || (! empty($s->registration_id) && ! empty($c['registration_id']) && $c['registration_id'] === $s->registration_id));
+                $cRow['is_eligible'] = $resolvePhoto($cRow, $s);
                 return $cRow;
             })->values()->all(),
-            'reserves' => $reserves->map(fn ($s) => $this->selectionRow($s))->values()->all(),
-            'declined' => $declined->map(fn ($s) => $this->selectionRow($s))->values()->all(),
+            'reserves' => $reserves->map(function ($s) use ($resolvePhoto) {
+                $cRow = $this->selectionRow($s);
+                $resolvePhoto($cRow, $s);
+                return $cRow;
+            })->values()->all(),
+            'declined' => $declined->map(function ($s) use ($resolvePhoto) {
+                $cRow = $this->selectionRow($s);
+                $resolvePhoto($cRow, $s);
+                return $cRow;
+            })->values()->all(),
         ];
     }
 

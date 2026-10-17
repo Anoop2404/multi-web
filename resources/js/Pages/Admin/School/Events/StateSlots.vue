@@ -182,17 +182,30 @@
                                 </span>
                             </div>
 
-                            <div class="flex flex-wrap items-baseline gap-2">
-                                <span class="text-sm font-bold text-slate-900">
-                                    👤 {{ s.student_name }}
-                                </span>
-                                <span v-if="s.class_name" class="text-xs text-slate-500 font-medium">
-                                    ({{ s.class_name }})
-                                </span>
-                                <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
-                                      :class="s.source_position <= 2 ? 'bg-amber-100 text-amber-900 border border-amber-200' : 'bg-slate-100 text-slate-700'">
-                                    {{ s.direct_entry ? 'Direct Qualifier' : 'Rank ' + s.source_position }}
-                                </span>
+                            <div class="flex items-center gap-3">
+                                <img v-if="s.photo_url"
+                                     :src="s.photo_url"
+                                     :alt="s.student_name"
+                                     class="w-11 h-11 rounded-full object-cover border-2 border-indigo-100 shadow-2xs shrink-0"
+                                     @error="s.photo_url = null" />
+                                <div v-else
+                                     class="w-11 h-11 rounded-full bg-indigo-50 border-2 border-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                                    {{ initials(s.student_name) }}
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="flex flex-wrap items-baseline gap-2">
+                                        <span class="text-sm font-bold text-slate-900">
+                                            {{ s.student_name }}
+                                        </span>
+                                        <span v-if="s.class_name" class="text-xs text-slate-500 font-medium">
+                                            ({{ s.class_name }})
+                                        </span>
+                                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                                              :class="s.source_position <= 2 ? 'bg-amber-100 text-amber-900 border border-amber-200' : 'bg-slate-100 text-slate-700'">
+                                            {{ s.direct_entry ? 'Direct Qualifier' : 'Rank ' + s.source_position }}
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Explanatory message based on status -->
@@ -295,15 +308,24 @@
                 </div>
             </template>
             <div class="space-y-4">
-                <p class="text-xs text-slate-600 leading-relaxed">
-                    You are confirming that <strong class="text-slate-900">{{ selectedSlot?.student_name }}</strong> will represent the Sahodaya at the State Kalotsavam in:
-                </p>
-                <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-                    <p class="text-xs font-bold text-slate-800">{{ selectedSlot?.item_code }} — {{ selectedSlot?.item_title }}</p>
-                    <p class="text-[11px] text-slate-500">{{ selectedSlot?.category_label }} · Rank {{ selectedSlot?.source_position }}</p>
+                <div class="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <img v-if="selectedSlot?.photo_url"
+                         :src="selectedSlot.photo_url"
+                         :alt="selectedSlot.student_name"
+                         class="w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0 shadow-2xs"
+                         @error="selectedSlot.photo_url = null" />
+                    <div v-else
+                         class="w-12 h-12 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                        {{ initials(selectedSlot?.student_name) }}
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-sm font-bold text-slate-900">{{ selectedSlot?.student_name }} <span v-if="selectedSlot?.class_name" class="font-normal text-xs text-slate-500">({{ selectedSlot.class_name }})</span></p>
+                        <p class="text-xs font-medium text-slate-600">{{ selectedSlot?.item_code }} — {{ selectedSlot?.item_title }}</p>
+                        <p class="text-[11px] text-slate-400">{{ selectedSlot?.category_label }} · Rank {{ selectedSlot?.source_position }}</p>
+                    </div>
                 </div>
-                <p class="text-xs text-slate-500">
-                    Once confirmed, the Sahodaya committee will register this student directly on the official State portal.
+                <p class="text-xs text-slate-600 leading-relaxed">
+                    You are confirming that <strong class="text-slate-900">{{ selectedSlot?.student_name }}</strong> will represent the Sahodaya at the State Kalotsavam. Once confirmed, the Sahodaya committee will register this student directly on the official State portal.
                 </p>
             </div>
             <template #footer>
@@ -327,6 +349,22 @@
                 </div>
             </template>
             <form @submit.prevent="confirmOptOut" class="space-y-4">
+                <div class="flex items-center gap-3 p-3 bg-rose-50/60 border border-rose-200 rounded-xl">
+                    <img v-if="selectedSlot?.photo_url"
+                         :src="selectedSlot.photo_url"
+                         :alt="selectedSlot.student_name"
+                         class="w-12 h-12 rounded-full object-cover border border-rose-200 shrink-0 shadow-2xs"
+                         @error="selectedSlot.photo_url = null" />
+                    <div v-else
+                         class="w-12 h-12 rounded-full bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                        {{ initials(selectedSlot?.student_name) }}
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-sm font-bold text-slate-900">{{ selectedSlot?.student_name }} <span v-if="selectedSlot?.class_name" class="font-normal text-xs text-slate-500">({{ selectedSlot.class_name }})</span></p>
+                        <p class="text-xs font-medium text-slate-600">{{ selectedSlot?.item_code }} — {{ selectedSlot?.item_title }}</p>
+                        <p class="text-[11px] text-slate-400">{{ selectedSlot?.category_label }} · Rank {{ selectedSlot?.source_position }}</p>
+                    </div>
+                </div>
                 <p class="text-xs text-slate-600 leading-relaxed">
                     If <strong class="text-slate-900">{{ selectedSlot?.student_name }}</strong> is unable to attend, opting out frees the slot so the <strong>next-ranked candidate in the waiting list (Rank 3–5)</strong> can be offered this opportunity.
                 </p>
@@ -359,15 +397,23 @@
                 </div>
             </template>
             <div class="space-y-4">
-                <p class="text-xs text-slate-600 leading-relaxed">
-                    Are you sure you want to cancel the previous opt-out for <strong class="text-slate-900">{{ selectedSlot?.student_name }}</strong>?
-                </p>
-                <div class="p-3 bg-indigo-50/60 border border-indigo-100 rounded-xl space-y-1 text-xs">
-                    <p class="font-bold text-indigo-950">{{ selectedSlot?.item_code }} — {{ selectedSlot?.item_title }}</p>
-                    <p class="text-indigo-700 text-[11px]">{{ selectedSlot?.category_label }} · Rank {{ selectedSlot?.source_position }}</p>
-                    <p v-if="selectedSlot?.opt_out_reason" class="text-slate-500 text-[11px] pt-1 italic">
-                        Previous opt-out reason: "{{ selectedSlot.opt_out_reason }}"
-                    </p>
+                <div class="flex items-center gap-3 p-3 bg-indigo-50/60 border border-indigo-100 rounded-xl">
+                    <img v-if="selectedSlot?.photo_url"
+                         :src="selectedSlot.photo_url"
+                         :alt="selectedSlot.student_name"
+                         class="w-12 h-12 rounded-full object-cover border border-indigo-200 shrink-0 shadow-2xs"
+                         @error="selectedSlot.photo_url = null" />
+                    <div v-else
+                         class="w-12 h-12 rounded-full bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                        {{ initials(selectedSlot?.student_name) }}
+                    </div>
+                    <div class="min-w-0 text-xs">
+                        <p class="font-bold text-indigo-950">{{ selectedSlot?.student_name }} <span v-if="selectedSlot?.class_name" class="font-normal text-slate-500">({{ selectedSlot.class_name }})</span></p>
+                        <p class="text-indigo-700 text-[11px]">{{ selectedSlot?.item_code }} — {{ selectedSlot?.item_title }} · Rank {{ selectedSlot?.source_position }}</p>
+                        <p v-if="selectedSlot?.opt_out_reason" class="text-slate-500 text-[11px] pt-1 italic">
+                            Previous opt-out reason: "{{ selectedSlot.opt_out_reason }}"
+                        </p>
+                    </div>
                 </div>
                 <p class="text-xs text-slate-500 leading-relaxed">
                     This will reclaim the State nomination slot and return it to <strong>Pending Confirmation</strong>, allowing your school to confirm participation.
@@ -440,6 +486,11 @@ const filteredSlots = computed(() => {
 function formatDate(v) {
     if (!v) return '';
     return new Date(v).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function initials(name) {
+    if (!name) return '?';
+    return name.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
 
 // Modal handling

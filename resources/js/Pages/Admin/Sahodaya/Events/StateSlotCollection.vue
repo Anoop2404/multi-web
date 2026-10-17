@@ -196,13 +196,27 @@
                             <div v-for="c in tiedCandidates(row)" :key="candidateKey(c)"
                                  class="rounded-xl border border-rose-200 bg-white p-3.5 flex flex-col justify-between shadow-2xs">
                                 <div>
-                                    <div class="flex items-center justify-between gap-1.5">
-                                        <span class="text-xs font-bold text-slate-900 truncate">{{ c.student_name }}</span>
-                                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div class="flex items-center gap-2.5 min-w-0">
+                                            <img v-if="c.sahodaya_photo_url || c.photo_url"
+                                                 :src="c.sahodaya_photo_url || c.photo_url"
+                                                 :alt="c.student_name"
+                                                 class="w-8 h-8 rounded-full object-cover border border-rose-200 shrink-0"
+                                                 @error="c.sahodaya_photo_url = null; c.photo_url = null" />
+                                            <div v-else
+                                                 class="w-8 h-8 rounded-full bg-rose-50 border border-rose-200 text-rose-700 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                                {{ initials(c.student_name) }}
+                                            </div>
+                                            <div class="min-w-0">
+                                                <span class="text-xs font-bold text-slate-900 truncate block">{{ c.student_name }}</span>
+                                                <span v-if="c.class_name" class="text-[10px] text-slate-400 block truncate">Class: {{ c.class_name }}</span>
+                                            </div>
+                                        </div>
+                                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200 shrink-0">
                                             Rank {{ c.source_position }} · {{ c.score ?? '—' }} pts
                                         </span>
                                     </div>
-                                    <p class="text-[11px] text-slate-500 truncate mt-1">{{ c.school_name }}</p>
+                                    <p class="text-[11px] text-slate-500 truncate mt-1.5">{{ c.school_name }}</p>
                                 </div>
                                 <div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
                                     <span class="text-[10px] text-slate-400">Position {{ c.source_position }} tie</span>
@@ -239,7 +253,21 @@
                         <tbody>
                             <tr v-for="selection in row.chosen" :key="selection.id" class="border-t border-slate-100 hover:bg-slate-50/50 transition">
                                 <td class="px-5 py-3 font-semibold text-slate-800">
-                                    {{ selection.student_name }}
+                                    <div class="flex items-center gap-2.5">
+                                        <img v-if="selection.sahodaya_photo_url || selection.photo_url"
+                                             :src="selection.sahodaya_photo_url || selection.photo_url"
+                                             :alt="selection.student_name"
+                                             class="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
+                                             @error="selection.sahodaya_photo_url = null; selection.photo_url = null" />
+                                        <div v-else
+                                             class="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0">
+                                            {{ initials(selection.student_name) }}
+                                        </div>
+                                        <div class="min-w-0">
+                                            <span class="block truncate">{{ selection.student_name }}</span>
+                                            <span v-if="selection.class_name" class="block text-[11px] font-normal text-slate-400">Class: {{ selection.class_name }}</span>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td class="px-4 py-3 text-xs text-slate-600 font-medium">
                                     {{ selection.school_name }}
@@ -304,14 +332,28 @@
                         <div v-for="(candidate, cIdx) in waitingFor(row)" :key="candidateKey(candidate)"
                              class="rounded-xl border border-slate-200 bg-white p-3.5 flex flex-col justify-between shadow-2xs hover:border-indigo-300 transition">
                             <div>
-                                <div class="flex items-center justify-between gap-1.5">
-                                    <span class="text-xs font-bold text-slate-900 truncate">{{ candidate.student_name }}</span>
-                                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="flex items-center gap-2.5 min-w-0">
+                                        <img v-if="candidate.sahodaya_photo_url || candidate.photo_url"
+                                             :src="candidate.sahodaya_photo_url || candidate.photo_url"
+                                             :alt="candidate.student_name"
+                                             class="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
+                                             @error="candidate.sahodaya_photo_url = null; candidate.photo_url = null" />
+                                        <div v-else
+                                             class="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 text-slate-600 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                            {{ initials(candidate.student_name) }}
+                                        </div>
+                                        <div class="min-w-0">
+                                            <span class="text-xs font-bold text-slate-900 truncate block">{{ candidate.student_name }}</span>
+                                            <span v-if="candidate.class_name" class="text-[10px] text-slate-400 block truncate">Class: {{ candidate.class_name }}</span>
+                                        </div>
+                                    </div>
+                                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0"
                                           :class="cIdx === 0 ? 'bg-amber-100 text-amber-900 border border-amber-200' : 'bg-slate-100 text-slate-600'">
                                         {{ candidate.direct_entry ? 'Direct' : 'Rank ' + candidate.source_position }}
                                     </span>
                                 </div>
-                                <p class="text-[11px] text-slate-500 truncate mt-1">{{ candidate.school_name }}</p>
+                                <p class="text-[11px] text-slate-500 truncate mt-1.5">{{ candidate.school_name }}</p>
                             </div>
                             <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px]">
                                 <div>
@@ -342,18 +384,30 @@
                     <div class="mt-3 space-y-2">
                         <div v-for="selection in row.declined" :key="selection.id"
                              class="rounded-xl bg-slate-50 p-3 text-xs border border-slate-200/60 flex flex-wrap items-center justify-between gap-3">
-                            <div class="min-w-0">
-                                <div class="flex items-center gap-2">
-                                    <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-900 border border-amber-200">
-                                        Opted out · {{ row.direct_entry ? 'Direct' : 'Rank ' + (selection.source_position || '—') }}
-                                    </span>
-                                    <p class="font-bold text-slate-800 truncate">{{ selection.student_name }}</p>
+                            <div class="min-w-0 flex items-start gap-2.5">
+                                <img v-if="selection.sahodaya_photo_url || selection.photo_url"
+                                     :src="selection.sahodaya_photo_url || selection.photo_url"
+                                     :alt="selection.student_name"
+                                     class="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0 mt-0.5"
+                                     @error="selection.sahodaya_photo_url = null; selection.photo_url = null" />
+                                <div v-else
+                                     class="w-8 h-8 rounded-full bg-slate-200 border border-slate-300 text-slate-600 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                                    {{ initials(selection.student_name) }}
                                 </div>
-                                <p class="text-[11px] text-slate-500 mt-0.5">{{ selection.school_name }}</p>
-                                <p class="mt-1 text-slate-600 font-medium">Reason: {{ selection.note || 'No reason recorded' }}</p>
-                                <p v-if="selection.school_responded_by_name" class="text-[10px] text-slate-400 mt-0.5">
-                                    Recorded by {{ selection.school_responded_by_name }} {{ selection.school_responded_at ? '· ' + formatDate(selection.school_responded_at) : '' }}
-                                </p>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-2">
+                                        <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-900 border border-amber-200">
+                                            Opted out · {{ row.direct_entry ? 'Direct' : 'Rank ' + (selection.source_position || '—') }}
+                                        </span>
+                                        <p class="font-bold text-slate-800 truncate">{{ selection.student_name }}</p>
+                                        <span v-if="selection.class_name" class="text-[10px] text-slate-400">({{ selection.class_name }})</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-500 mt-0.5">{{ selection.school_name }}</p>
+                                    <p class="mt-1 text-slate-600 font-medium">Reason: {{ selection.note || 'No reason recorded' }}</p>
+                                    <p v-if="selection.school_responded_by_name" class="text-[10px] text-slate-400 mt-0.5">
+                                        Recorded by {{ selection.school_responded_by_name }} {{ selection.school_responded_at ? '· ' + formatDate(selection.school_responded_at) : '' }}
+                                    </p>
+                                </div>
                             </div>
                             <div v-if="!event.state_slot_collection_approved_at" class="shrink-0 flex items-center gap-2">
                                 <button type="button"
@@ -375,11 +429,22 @@
         <div v-if="optOutModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
             <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl border border-slate-200 space-y-4">
                 <div class="flex items-start justify-between">
-                    <div>
-                        <h3 class="text-base font-bold text-slate-900">Record Winner Opt-Out</h3>
-                        <p class="text-xs text-slate-500 mt-0.5">
-                            {{ optOutTarget?.student_name }} · {{ optOutTarget?.school_name }}
-                        </p>
+                    <div class="flex items-center gap-3">
+                        <img v-if="optOutTarget?.sahodaya_photo_url || optOutTarget?.photo_url"
+                             :src="optOutTarget.sahodaya_photo_url || optOutTarget.photo_url"
+                             :alt="optOutTarget.student_name"
+                             class="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0"
+                             @error="optOutTarget.sahodaya_photo_url = null; optOutTarget.photo_url = null" />
+                        <div v-else
+                             class="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0">
+                            {{ initials(optOutTarget?.student_name) }}
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900">Record Winner Opt-Out</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">
+                                {{ optOutTarget?.student_name }} · {{ optOutTarget?.school_name }}
+                            </p>
+                        </div>
                     </div>
                     <button type="button" class="text-slate-400 hover:text-slate-600 text-lg leading-none" @click="optOutModalOpen = false">×</button>
                 </div>
@@ -863,6 +928,11 @@ async function copySchoolLink() {
 
 function formatDate(value) {
     return value ? new Date(value).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+}
+
+function initials(name) {
+    if (!name) return '?';
+    return name.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
 
 // Mail Modal handling

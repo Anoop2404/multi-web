@@ -47,7 +47,7 @@ class FestStateCollectionCandidates
                 return $person && $person->registration->item_id === $mark->item_id
                     && $published($items[$mark->item_id]);
             })->unique(fn ($mark) => $entryKey($participants[$mark->participant_id]))
-            ->map(function ($mark) use ($participants, $items, $events) {
+            ->map(function ($mark) use ($participants, $items, $events, $hub) {
                 $person = $participants[$mark->participant_id];
                 $registration = $person->registration;
                 $item = $items[$registration->item_id];
@@ -58,6 +58,8 @@ class FestStateCollectionCandidates
                     'school_id' => $registration->school_id, 'school_name' => $registration->school?->name,
                     'student_name' => $person->group?->team_name ?: ($person->student?->name ?? $person->display_name ?? 'Participant'),
                     'roll_number' => $person->student?->roll_number, 'class_name' => $person->student?->schoolClass?->name,
+                    'photo_url' => $person->student?->photoUrl(),
+                    'sahodaya_photo_url' => $person->student?->sahodayaPhotoUrl($hub->tenant_id),
                     'source_position' => $mark->position, 'grade' => $mark->grade, 'score' => $mark->score,
                     'partition_key' => app(FestPartitionService::class)->partitionKey($events->firstWhere('id', $item->event_id)),
                     'is_eligible' => true, 'direct_entry' => false,
@@ -69,7 +71,7 @@ class FestStateCollectionCandidates
             ->filter(fn ($entries) => $entries->count() <= 2)
             // A State item must not mix unpublished direct entries with published winners.
             ->reject(fn ($entries, $stateItemId) => $items->contains(fn ($item) => $item->state_program_item_id === $stateItemId && $published($item)))
-            ->flatMap(fn ($entries) => $entries->map(function ($person) use ($items, $events) {
+            ->flatMap(fn ($entries) => $entries->map(function ($person) use ($items, $events, $hub) {
                 $registration = $person->registration;
                 $item = $items[$registration->item_id];
                 return [
@@ -79,6 +81,8 @@ class FestStateCollectionCandidates
                     'school_id' => $registration->school_id, 'school_name' => $registration->school?->name,
                     'student_name' => $person->group?->team_name ?: ($person->student?->name ?? $person->display_name ?? 'Participant'),
                     'roll_number' => $person->student?->roll_number, 'class_name' => $person->student?->schoolClass?->name,
+                    'photo_url' => $person->student?->photoUrl(),
+                    'sahodaya_photo_url' => $person->student?->sahodayaPhotoUrl($hub->tenant_id),
                     'source_position' => null, 'grade' => null, 'score' => null,
                     'partition_key' => app(FestPartitionService::class)->partitionKey($events->firstWhere('id', $item->event_id)),
                     'is_eligible' => true, 'direct_entry' => true,
