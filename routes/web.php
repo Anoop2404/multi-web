@@ -561,7 +561,9 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
 
 
         // Online exam engine: platform-wide capacity bookings calendar.
-        require __DIR__.'/includes/exam_engine_platform.php';
+        if (file_exists(__DIR__.'/includes/exam_engine_platform.php')) {
+            require __DIR__.'/includes/exam_engine_platform.php';
+        }
     }); // end super.admin
 });
 
@@ -669,7 +671,9 @@ Route::prefix('school-admin/{tenantId}')
     require __DIR__.'/includes/school_event_programs.php';
 
     // Online exam engine: school MCQ coordinator live view + first-line support actions.
-    require __DIR__.'/includes/exam_engine_school.php';
+    if (file_exists(__DIR__.'/includes/exam_engine_school.php')) {
+        require __DIR__.'/includes/exam_engine_school.php';
+    }
 
     // Recover from malformed links that used the school UUID as the program slug.
     Route::get('/programs/{badProgram}/{rest}', function (string $tenantId, string $rest) {
@@ -1430,7 +1434,9 @@ Route::prefix('sahodaya-admin/{tenantId}')
         require __DIR__.'/includes/sahodaya_event_programs.php';
 
         // Online exam engine: arm/close, live monitor and actions for Sahodaya admins.
-        require __DIR__.'/includes/exam_engine_sahodaya.php';
+        if (file_exists(__DIR__.'/includes/exam_engine_sahodaya.php')) {
+            require __DIR__.'/includes/exam_engine_sahodaya.php';
+        }
 
         // Head-first permalink: always resolves to this sport's own Competition page,
         // regardless of which discipline event id it currently lives on.
@@ -2343,7 +2349,9 @@ Route::prefix('portal/exam/{tenantId}')
         Route::post('/question-banks/{bank}/import/commit', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'importCommit'])->name('question-banks.import.commit');
 
         // Online exam engine: live monitor and actions for exam controllers.
-        require __DIR__.'/includes/exam_engine_exam_portal.php';
+        if (file_exists(__DIR__.'/includes/exam_engine_exam_portal.php')) {
+            require __DIR__.'/includes/exam_engine_exam_portal.php';
+        }
     });
 
 Route::prefix('portal/house-admin/{tenantId}')
