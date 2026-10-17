@@ -8,6 +8,7 @@ use App\Models\McqQuestionBank;
 use App\Models\McqRegistration;
 use App\Models\User;
 use App\Services\Mcq\McqHallTicketService;
+use App\Services\Mcq\McqSeatingService;
 use App\Support\Mcq\McqExamPayload;
 use App\Support\Mcq\McqHallTicketDesign;
 use App\Support\TenantStorage;
@@ -431,29 +432,47 @@ class McqExamOpsController extends SahodayaAdminController
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
-        $count = $service->issueBulk($exam);
+        $count = $service->issueBulk($exam, true);
 
-        return back()->with('success', "{$count} hall ticket(s) generated.");
+        if ($count === 0) {
+            return back()->with('info', 'All active candidates already have a Reg. No. assigned.');
+        }
+
+        return back()->with('success', "Assigned Reg. No. to {$count} candidate(s).");
     }
 
-    /** Re-sort every issued reg. number into a fresh 1..N roll number per class (shared across schools). Blocked once tickets are published. */
-    public function renumberHallTickets(string $tenantId, McqExam $exam, McqHallTicketService $service)
+    /** Re-sort every active candidate into a fresh 1..N roll number per class (shared across schools). */
+    public function renumberHallTickets(string $tenantId, McqExam $exam, Request $request, McqHallTicketService $service)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
-        abort_if($exam->hall_tickets_published, 422, 'Hall tickets are already published to schools — renumbering is disabled to avoid invalidating numbers they have already seen.');
+        if ($exam->hall_tickets_published && ! $request->boolean('force')) {
+            abort(422, 'Hall tickets are already published to schools. Pass force=1 to confirm renumbering.');
+        }
 
         @ini_set('memory_limit', '1024M');
         @ini_set('max_execution_time', '300');
 
-        $result = $service->renumberByClass($exam);
+        $result = $service->renumberByClass($exam, true);
 
         if ($result['renumbered'] === 0) {
-            return back()->with('warning', 'No issued reg. numbers to renumber yet.');
+            return back()->with('warning', 'No active registrations found to renumber.');
         }
 
         $note = $result['cleared'] > 0 ? " {$result['cleared']} cancelled registration(s) had their number cleared." : '';
 
-        return back()->with('success', "Renumbered {$result['renumbered']} registration(s) across {$result['classes']} class(es), each starting at {$result['start']}.{$note}");
+        return back()->with('success', "Regenerated Reg. Nos. for {$result['renumbered']} candidate(s) across {$result['classes']} class(es), starting at {$result['start']}.{$note}");
+    }
+
+    public function issueSingleRegNo(string $tenantId, McqExam $exam, McqRegistration $registration, McqHallTicketService $service)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($registration->exam_id !== $exam->id, 403);
+        abort_if($registration->status === 'cancelled', 422, 'Cannot assign Reg. No. to a cancelled registration.');
+
+        $reg = $service->issueForRegistration($registration, true);
+        app(McqSeatingService::class)->recalculate($exam);
+
+        return back()->with('success', "Assigned Reg. No. {$reg->hall_ticket_no} to {$reg->participantName()}.");
     }
 
     /**

@@ -253,4 +253,93 @@ class McqSahodayaCandidateManagementTest extends TestCase
         $this->assertNull($readded->cancelled_by_user_id);
         $this->assertSame('100', $readded->hall_ticket_no);
     }
+
+    public function test_sahodaya_can_assign_missing_reg_nos_to_unapproved_school_registrations(): void
+    {
+        $env = $this->setUpEnvironment();
+
+        // Create a registration as if submitted by school with pending approval and no hall ticket
+        $reg = McqRegistration::create([
+            'exam_id'         => $env['exam']->id,
+            'school_id'       => $env['school']->id,
+            'student_id'      => $env['student1']->id,
+            'status'          => 'registered',
+            'approval_status' => 'pending_payment',
+            'hall_ticket_no'  => null,
+        ]);
+
+        $response = $this->actingAs($env['sahodayaAdmin'])
+            ->post("/sahodaya-admin/{$env['sahodaya']->id}/mcq-exams/{$env['exam']->id}/hall-tickets/generate");
+
+        $response->assertSessionHas('success');
+
+        $reg->refresh();
+        $this->assertSame('approved', $reg->approval_status);
+        $this->assertSame('100', $reg->hall_ticket_no);
+    }
+
+    public function test_sahodaya_can_assign_single_reg_no(): void
+    {
+        $env = $this->setUpEnvironment();
+
+        $reg = McqRegistration::create([
+            'exam_id'         => $env['exam']->id,
+            'school_id'       => $env['school']->id,
+            'student_id'      => $env['student1']->id,
+            'status'          => 'registered',
+            'approval_status' => 'pending_payment',
+            'hall_ticket_no'  => null,
+        ]);
+
+        $response = $this->actingAs($env['sahodayaAdmin'])
+            ->post("/sahodaya-admin/{$env['sahodaya']->id}/mcq-exams/{$env['exam']->id}/registrations/{$reg->id}/issue-reg-no");
+
+        $response->assertSessionHas('success');
+
+        $reg->refresh();
+        $this->assertSame('approved', $reg->approval_status);
+        $this->assertSame('100', $reg->hall_ticket_no);
+    }
+
+    public function test_sahodaya_can_regenerate_all_reg_nos_including_unassigned_even_when_published(): void
+    {
+        $env = $this->setUpEnvironment();
+
+        // Mark exam as published
+        $env['exam']->update(['hall_tickets_published' => true]);
+
+        // Student 1 has existing number
+        $reg1 = McqRegistration::create([
+            'exam_id'         => $env['exam']->id,
+            'school_id'       => $env['school']->id,
+            'student_id'      => $env['student1']->id,
+            'status'          => 'registered',
+            'approval_status' => 'approved',
+            'hall_ticket_no'  => '999',
+        ]);
+
+        // Student 2 is newly added from school, no number yet
+        $reg2 = McqRegistration::create([
+            'exam_id'         => $env['exam']->id,
+            'school_id'       => $env['school']->id,
+            'student_id'      => $env['student2']->id,
+            'status'          => 'registered',
+            'approval_status' => 'pending_payment',
+            'hall_ticket_no'  => null,
+        ]);
+
+        $response = $this->actingAs($env['sahodayaAdmin'])
+            ->post("/sahodaya-admin/{$env['sahodaya']->id}/mcq-exams/{$env['exam']->id}/hall-tickets/renumber", [
+                'force' => true,
+            ]);
+
+        $response->assertSessionHas('success');
+
+        $reg1->refresh();
+        $reg2->refresh();
+
+        $this->assertSame('100', $reg1->hall_ticket_no);
+        $this->assertSame('101', $reg2->hall_ticket_no);
+        $this->assertSame('approved', $reg2->approval_status);
+    }
 }

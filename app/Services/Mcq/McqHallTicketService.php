@@ -18,14 +18,22 @@ class McqHallTicketService
      * moving cursor — it is never incremented, only compared for equality when the admin
      * edits it (see McqExamController::update()'s "already issued" guard).
      */
-    public function issueForRegistration(McqRegistration $registration): McqRegistration
+    public function issueForRegistration(McqRegistration $registration, bool $autoApprove = false): McqRegistration
     {
         if ($registration->hall_ticket_no) {
             return $registration;
         }
 
         if ($registration->approval_status !== 'approved') {
-            throw new \InvalidArgumentException('Hall tickets are issued only after Sahodaya approves the registration.');
+            if ($autoApprove) {
+                $registration->update([
+                    'approval_status'     => 'approved',
+                    'approved_at'         => now(),
+                    'approved_by_user_id' => auth()->id(),
+                ]);
+            } else {
+                throw new \InvalidArgumentException('Hall tickets are issued only after Sahodaya approves the registration.');
+            }
         }
 
         return DB::transaction(function () use ($registration) {
@@ -46,49 +54,69 @@ class McqHallTicketService
         });
     }
 
-    public function issueBulk(McqExam $exam): int
+    public function issueBulk(McqExam $exam, bool $autoApprove = true): int
     {
         $count = 0;
 
-        McqRegistration::where('exam_id', $exam->id)
-            ->where('approval_status', 'approved')
-            ->whereNull('hall_ticket_no')
-            ->with(['school:id,name', 'student:id,name,school_class_id', 'student.schoolClass:id,name', 'teacher:id,name'])
+        $query = McqRegistration::where('exam_id', $exam->id)
+            ->where('status', '!=', 'cancelled')
+            ->whereNull('hall_ticket_no');
+
+        if (! $autoApprove) {
+            $query->where('approval_status', 'approved');
+        }
+
+        $unassigned = $query->with(['school:id,name', 'student:id,name,school_class_id', 'student.schoolClass:id,name', 'teacher:id,name'])
             ->get()
-            ->sort(fn ($a, $b) => self::sortKey($a) <=> self::sortKey($b))
-            ->each(function (McqRegistration $registration) use (&$count) {
-                $this->issueForRegistration($registration);
-                $count++;
-            });
+            ->sort(fn ($a, $b) => self::sortKey($a) <=> self::sortKey($b));
+
+        foreach ($unassigned as $registration) {
+            $this->issueForRegistration($registration, $autoApprove);
+            $count++;
+        }
+
+        if ($count > 0) {
+            app(McqSeatingService::class)->recalculate($exam);
+        }
 
         return $count;
     }
 
     /**
-     * Renumber every already-issued, non-cancelled registration into per-class roll
-     * numbers: one contiguous 1..N sequence per class bucket (school name, then
-     * participant name, within the bucket), each bucket restarting from the same
-     * starting digit this exam originally used. Cancelled registrations lose their
-     * number entirely.
+     * Renumber every active registration into per-class roll numbers:
+     * one contiguous 1..N sequence per class bucket (school name, then participant name),
+     * starting from the exam's next_hall_ticket_no setting. Cancelled registrations lose their number.
      *
      * @return array{renumbered: int, cleared: int, start: int, classes: int}
      */
-    public function renumberByClass(McqExam $exam): array
+    public function renumberByClass(McqExam $exam, bool $includeUnassigned = true): array
     {
-        return DB::transaction(function () use ($exam) {
+        return DB::transaction(function () use ($exam, $includeUnassigned) {
             $exam = McqExam::where('id', $exam->id)->lockForUpdate()->firstOrFail();
 
-            $issued = McqRegistration::where('exam_id', $exam->id)
-                ->whereNotNull('hall_ticket_no')
-                ->get(['id', 'hall_ticket_no', 'status']);
+            $query = McqRegistration::where('exam_id', $exam->id);
+            if (! $includeUnassigned) {
+                $query->whereNotNull('hall_ticket_no');
+            }
 
-            if ($issued->isEmpty()) {
+            $all = $query->get(['id', 'hall_ticket_no', 'status', 'approval_status']);
+
+            if ($all->isEmpty()) {
                 return ['renumbered' => 0, 'cleared' => 0, 'start' => (int) $exam->next_hall_ticket_no, 'classes' => 0];
             }
 
-            $startNumber = (int) $issued->min(fn ($r) => (int) $r->hall_ticket_no);
-            $cancelledIds = $issued->where('status', 'cancelled')->pluck('id');
-            $activeIds = $issued->where('status', '!=', 'cancelled')->pluck('id');
+            $startNumber = (int) $exam->next_hall_ticket_no;
+            $cancelledIds = $all->where('status', 'cancelled')->pluck('id');
+            $activeIds = $all->where('status', '!=', 'cancelled')->pluck('id');
+
+            // Auto-approve any active registrations being given a roll number
+            McqRegistration::whereIn('id', $activeIds)
+                ->where('approval_status', '!=', 'approved')
+                ->update([
+                    'approval_status'     => 'approved',
+                    'approved_at'         => now(),
+                    'approved_by_user_id' => auth()->id(),
+                ]);
 
             $active = McqRegistration::whereIn('id', $activeIds)
                 ->with(['school:id,name', 'student:id,name,school_class_id', 'student.schoolClass:id,name', 'teacher:id,name'])
@@ -112,7 +140,10 @@ class McqHallTicketService
 
                 $number = $startNumber;
                 foreach ($sorted as $registration) {
-                    DB::table('mcq_registrations')->where('id', $registration->id)->update(['hall_ticket_no' => (string) $number]);
+                    DB::table('mcq_registrations')->where('id', $registration->id)->update([
+                        'hall_ticket_no'  => (string) $number,
+                        'approval_status' => 'approved',
+                    ]);
                     $number++;
                     $renumbered++;
                 }
@@ -121,6 +152,10 @@ class McqHallTicketService
             if ($cancelledIds->isNotEmpty()) {
                 DB::table('mcq_registrations')->whereIn('id', $cancelledIds)->update(['hall_ticket_no' => null]);
             }
+
+            // Ensure passcodes and recalculate seating
+            app(McqExamPasscodeService::class)->ensureForExam($exam);
+            app(McqSeatingService::class)->recalculate($exam);
 
             return [
                 'renumbered' => $renumbered,

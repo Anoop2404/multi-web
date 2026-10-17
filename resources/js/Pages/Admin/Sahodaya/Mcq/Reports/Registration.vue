@@ -9,6 +9,18 @@
                     </svg>
                     Add Candidate
                 </button>
+                <button type="button" @click="generateMissing" class="btn-secondary text-sm flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                    </svg>
+                    Assign Missing Reg. Nos
+                </button>
+                <button type="button" @click="confirmRegenerateAll" class="btn-secondary text-sm flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Regenerate All Reg. Nos
+                </button>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/reports`" class="btn-secondary text-sm">← Reports</Link>
             </template>
         </PageHeader>
@@ -46,7 +58,19 @@
                     <tbody>
                         <tr v-for="(r, i) in registrations.data" :key="r.id">
                             <td class="text-xs font-bold text-slate-400">{{ (registrations.current_page - 1) * registrations.per_page + i + 1 }}</td>
-                            <td class="font-mono text-xs">{{ r.hall_ticket_no || '—' }}</td>
+                            <td class="font-mono text-xs">
+                                <span v-if="r.hall_ticket_no" class="font-bold text-slate-900">{{ r.hall_ticket_no }}</span>
+                                <button
+                                    v-else-if="r.status !== 'cancelled'"
+                                    type="button"
+                                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-sans font-semibold bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 transition"
+                                    title="Assign Reg. No to this student"
+                                    @click="assignSingle(r)"
+                                >
+                                    + Assign Reg. No
+                                </button>
+                                <span v-else class="text-slate-400">Cancelled</span>
+                            </td>
                             <td class="font-bold text-slate-900">{{ r.student?.name || r.teacher?.name || r.participant_name || '—' }}</td>
                             <td class="text-xs">{{ r.student?.school_class?.name || '—' }}</td>
                             <td class="text-xs">{{ r.school?.name || '—' }}</td>
@@ -55,15 +79,25 @@
                             <td class="text-xs">{{ r.mark?.score ?? '—' }}</td>
                             <td class="text-xs">{{ r.mark?.grade ?? '—' }}</td>
                             <td class="text-right text-xs">
-                                <button
-                                    v-if="!['started', 'submitted'].includes(r.status)"
-                                    type="button"
-                                    class="font-medium text-rose-600 hover:text-rose-800 hover:underline"
-                                    @click="cancelRegistration(r)"
-                                >
-                                    Remove
-                                </button>
-                                <span v-else class="text-slate-400">—</span>
+                                <div class="flex items-center justify-end gap-3">
+                                    <button
+                                        v-if="!r.hall_ticket_no && r.status !== 'cancelled'"
+                                        type="button"
+                                        class="font-semibold text-indigo-600 hover:text-indigo-800 hover:underline"
+                                        @click="assignSingle(r)"
+                                    >
+                                        Assign No.
+                                    </button>
+                                    <button
+                                        v-if="!['started', 'submitted'].includes(r.status)"
+                                        type="button"
+                                        class="font-medium text-rose-600 hover:text-rose-800 hover:underline"
+                                        @click="cancelRegistration(r)"
+                                    >
+                                        Remove
+                                    </button>
+                                    <span v-else class="text-slate-400">—</span>
+                                </div>
                             </td>
                         </tr>
                         <tr v-if="!registrations.data?.length">
@@ -108,9 +142,41 @@ const props = defineProps({
     classOptions: { type: Array, default: () => [] },
 });
 
-const { prompt } = useConfirm();
+const { prompt, confirm } = useConfirm();
 const showAddCandidateModal = ref(false);
 const schoolSelectOptions = computed(() => props.memberSchools?.length ? props.memberSchools : props.schoolOptions);
+
+function generateMissing() {
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/generate`,
+        {},
+        { preserveScroll: true }
+    );
+}
+
+async function confirmRegenerateAll() {
+    const ok = await confirm({
+        title: 'Regenerate All Reg. Nos?',
+        message: 'This will renumber ALL active candidates into fresh sequential roll numbers per class (1..N starting from the exam start number). Any newly registered or missing students will also receive a number. Proceed?',
+        destructive: true,
+        confirmLabel: 'Regenerate all numbers',
+    });
+    if (!ok) return;
+
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/renumber`,
+        { force: true },
+        { preserveScroll: true }
+    );
+}
+
+function assignSingle(registration) {
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/registrations/${registration.id}/issue-reg-no`,
+        {},
+        { preserveScroll: true }
+    );
+}
 
 const filterForm = reactive({
     search: props.filters?.search ?? '',

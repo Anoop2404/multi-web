@@ -13,8 +13,18 @@
                     </svg>
                     Add Candidate
                 </button>
-                <button type="button" @click="generate" class="btn-secondary text-sm">Issue missing (approved only)</button>
-                <button v-if="!hallTicketsPublished" type="button" @click="renumberByClass" class="btn-secondary text-sm">Renumber by class</button>
+                <button type="button" @click="generate" class="btn-secondary text-sm flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                    </svg>
+                    Assign missing Reg. Nos
+                </button>
+                <button type="button" @click="renumberByClass" class="btn-secondary text-sm flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Regenerate all Reg. Nos
+                </button>
                 <button type="button" @click="allocateSeats(false)" class="btn-secondary text-sm">Allocate seats</button>
                 <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/hall-tickets/print-all`"
                    target="_blank" rel="noopener" class="btn-secondary text-sm">Print all ↗</a>
@@ -188,7 +198,19 @@
                     <tbody>
                         <tr v-for="(r, i) in registrations.data" :key="r.id">
                             <td class="text-xs font-bold text-slate-400">{{ (registrations.current_page - 1) * registrations.per_page + i + 1 }}</td>
-                            <td class="font-mono text-xs font-bold text-indigo-700">{{ r.hall_ticket_no || '—' }}</td>
+                            <td class="font-mono text-xs font-bold text-indigo-700">
+                                <span v-if="r.hall_ticket_no">{{ r.hall_ticket_no }}</span>
+                                <button
+                                    v-else-if="r.status !== 'cancelled'"
+                                    type="button"
+                                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-sans font-semibold bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 transition"
+                                    title="Assign Reg. No to this candidate"
+                                    @click="assignSingleRegNo(r)"
+                                >
+                                    + Assign Reg. No
+                                </button>
+                                <span v-else class="text-slate-400 font-normal">Cancelled</span>
+                            </td>
                             <td class="font-bold text-slate-900">{{ r.student?.name || r.teacher?.name || r.participant_name || '—' }}</td>
                             <td class="text-xs">{{ r.school?.name || '—' }}</td>
                             <td class="text-xs capitalize">{{ (r.approval_status || 'pending').replaceAll('_', ' ') }}</td>
@@ -198,15 +220,25 @@
                                 <span v-else class="text-slate-400">—</span>
                             </td>
                             <td class="text-right text-xs">
-                                <button
-                                    v-if="!['started', 'submitted'].includes(r.status)"
-                                    type="button"
-                                    class="font-medium text-rose-600 hover:text-rose-800 hover:underline"
-                                    @click="cancelRegistration(r)"
-                                >
-                                    Remove
-                                </button>
-                                <span v-else class="text-slate-400">—</span>
+                                <div class="flex items-center justify-end gap-3">
+                                    <button
+                                        v-if="!r.hall_ticket_no && r.status !== 'cancelled'"
+                                        type="button"
+                                        class="font-semibold text-indigo-600 hover:text-indigo-800 hover:underline"
+                                        @click="assignSingleRegNo(r)"
+                                    >
+                                        Assign No.
+                                    </button>
+                                    <button
+                                        v-if="!['started', 'submitted'].includes(r.status)"
+                                        type="button"
+                                        class="font-medium text-rose-600 hover:text-rose-800 hover:underline"
+                                        @click="cancelRegistration(r)"
+                                    >
+                                        Remove
+                                    </button>
+                                    <span v-else class="text-slate-400">—</span>
+                                </div>
                             </td>
                         </tr>
                         <tr v-if="!registrations.data?.length">
@@ -422,12 +454,22 @@ function generate() {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/generate`, {}, { preserveScroll: true });
 }
 
+function assignSingleRegNo(registration) {
+    router.post(
+        `/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/registrations/${registration.id}/issue-reg-no`,
+        {},
+        { preserveScroll: true }
+    );
+}
+
 async function renumberByClass() {
     if (!(await confirm({
-        message: 'This changes every candidate\'s reg. number into a fresh roll number per class — each class (shared across every school) gets its own 1..N sequence starting from the same starting number, so different classes will show the same roll no. Numbers already shared or printed elsewhere will no longer match. Continue?',
+        title: 'Regenerate all Reg. Nos?',
+        message: 'This will renumber ALL active candidates into fresh sequential roll numbers per class starting from the starting number. Any newly registered or missing candidates will also receive a number. Proceed?',
         destructive: true,
+        confirmLabel: 'Regenerate all numbers',
     }))) return;
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/renumber`, {}, { preserveScroll: true });
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/renumber`, { force: true }, { preserveScroll: true });
 }
 
 function publish() {
