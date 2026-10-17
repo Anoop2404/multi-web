@@ -220,6 +220,7 @@ class FestStateWinnerRegistrationController extends SahodayaAdminController
             'withdrawDecline' => "{$base}/declines",
             'autoFill' => "{$base}/auto-fill",
             'register' => "{$base}/register",
+            'slotCollection' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/state-slot-collection",
         ];
     }
 }

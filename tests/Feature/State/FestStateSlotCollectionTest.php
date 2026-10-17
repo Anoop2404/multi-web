@@ -631,4 +631,171 @@ class FestStateSlotCollectionTest extends TestCase
         $updated = $this->service()->respond($selection, 'accept', null, $this->user());
         $this->assertSame('accepted', $updated->school_response);
     }
+
+    public function test_tie_with_one_first_and_two_seconds_allows_sahodaya_to_send_offer_to_chosen_second_rank(): void
+    {
+        // Quota = 2. 1 first rank, 2 second ranks (tied).
+        $this->winner('First Place', 1, 95, 'school-1');
+        $this->winner('Second Place A', 2, 90, 'school-2');
+        $this->winner('Second Place B', 2, 90, 'school-3');
+
+        // Open collection: First place is auto-offered (non-tied rank 1 < unresolved tie rank 2).
+        // Rank 2 is skipped by auto-fill because 2 candidates are tied for the remaining 1 slot.
+        $openResult = $this->service()->open($this->program, $this->hubEvent, $this->user());
+        $this->assertSame(1, $openResult['filled']);
+        $this->assertSame(['LM01 Light Music'], $openResult['skipped_ties']);
+
+        $summary = $this->service()->summary($this->program, $this->hubEvent)->first();
+        $this->assertSame('attention', $summary['slot_status']);
+        $this->assertSame([2], $summary['unresolved_ties']);
+        $this->assertSame(1, $summary['slots_left']);
+
+        // First place is offered and pending
+        $this->assertSame(['First Place'], collect($summary['chosen'])->pluck('student_name')->all());
+
+        // Sahodaya chooses Second Place B by sending an offer
+        $candB = collect($summary['candidates'])->firstWhere('student_name', 'Second Place B');
+        $selectionB = $this->service()->sendOffer($this->program, $this->hubEvent, $candB, $this->user());
+
+        $this->assertSame('pending', $selectionB->school_response);
+        $this->assertSame('selected', $selectionB->status);
+
+        // Now both slots are filled, tie is resolved!
+        $updatedSummary = $this->service()->summary($this->program, $this->hubEvent)->first();
+        $this->assertSame([], $updatedSummary['unresolved_ties']);
+        $this->assertSame(0, $updatedSummary['slots_left']);
+        $this->assertSame(2, $updatedSummary['chosen_count']);
+        $this->assertSame(['First Place', 'Second Place B'], collect($updatedSummary['chosen'])->pluck('student_name')->all());
+    }
+
+    public function test_when_first_rank_opts_out_both_second_ranks_can_go_without_tie_conflict_and_third_is_not_needed(): void
+    {
+        // Quota = 2. 1 first rank, 2 second ranks (tied), 1 third rank.
+        $this->winner('First Place', 1, 95, 'school-1');
+        $this->winner('Second Place A', 2, 90, 'school-2');
+        $this->winner('Second Place B', 2, 90, 'school-3');
+        $this->winner('Third Place', 3, 85, 'school-1');
+
+        $this->service()->open($this->program, $this->hubEvent, $this->user());
+        $firstSelection = $this->primaries()->firstWhere('student_name', 'First Place');
+
+        // First place opts out: frees 1 slot, now 2 slots are available for 2 second-rankers!
+        $this->service()->respond($firstSelection, 'opt_out', 'Cannot attend State', $this->user());
+
+        // Both Second Place A and Second Place B fit in the 2 slots (no tie conflict)!
+        // Third Place is NOT needed because Second Place fills both slots!
+        $summary = $this->service()->summary($this->program, $this->hubEvent)->first();
+        $this->assertSame([], $summary['unresolved_ties']);
+        $this->assertSame(0, $summary['slots_left']);
+        $this->assertSame(2, $summary['chosen_count']);
+
+        $chosenNames = collect($summary['chosen'])->pluck('student_name')->sort()->values()->all();
+        $this->assertSame(['Second Place A', 'Second Place B'], $chosenNames);
+
+        // Third Place remains in waiting list, NOT chosen
+        $waitingNames = collect($summary['candidates'])->filter(fn ($c) => ! $c['is_chosen'] && ! $c['is_declined'])->pluck('student_name')->all();
+        $this->assertSame(['Third Place'], $waitingNames);
+    }
+
+    public function test_when_first_and_second_opt_out_third_rank_with_two_candidates_both_go(): void
+    {
+        // Quota = 2.
+        // 1 first rank, 1 second rank, 2 third ranks (tied).
+        $this->winner('First Place', 1, 95, 'school-1');
+        $this->winner('Second Place', 2, 90, 'school-2');
+        $this->winner('Third Place A', 3, 85, 'school-1');
+        $this->winner('Third Place B', 3, 85, 'school-3');
+
+        $this->service()->open($this->program, $this->hubEvent, $this->user());
+
+        // First Place and Second Place both opt out
+        $first = $this->primaries()->firstWhere('student_name', 'First Place');
+        $second = $this->primaries()->firstWhere('student_name', 'Second Place');
+
+        $this->service()->respond($first, 'opt_out', 'Declined', $this->user());
+        // Reload second selection as autoFill may have touched item
+        $second = $this->batch()->selections()->where('student_name', 'Second Place')->where('status', 'selected')->first();
+        $this->service()->respond($second, 'opt_out', 'Declined', $this->user());
+
+        // 2 slots left, 2 third rankers: both fit, no tie!
+        $summary = $this->service()->summary($this->program, $this->hubEvent)->first();
+        $this->assertSame([], $summary['unresolved_ties']);
+        $this->assertSame(0, $summary['slots_left']);
+
+        $chosenNames = collect($summary['chosen'])->pluck('student_name')->sort()->values()->all();
+        $this->assertSame(['Third Place A', 'Third Place B'], $chosenNames);
+    }
+
+    public function test_when_first_and_second_opt_out_third_rank_with_three_candidates_creates_unresolved_tie_and_sahodaya_chooses(): void
+    {
+        // Quota = 2.
+        // 1 first rank, 1 second rank, 3 third ranks (tied).
+        $this->winner('First Place', 1, 95, 'school-1');
+        $this->winner('Second Place', 2, 90, 'school-2');
+        $this->winner('Third Place A', 3, 85, 'school-1');
+        $this->winner('Third Place B', 3, 85, 'school-2');
+        $this->winner('Third Place C', 3, 85, 'school-3');
+
+        $this->service()->open($this->program, $this->hubEvent, $this->user());
+
+        $first = $this->primaries()->firstWhere('student_name', 'First Place');
+        $second = $this->primaries()->firstWhere('student_name', 'Second Place');
+
+        $this->service()->respond($first, 'opt_out', 'Declined', $this->user());
+        $second = $this->batch()->selections()->where('student_name', 'Second Place')->where('status', 'selected')->first();
+        $this->service()->respond($second, 'opt_out', 'Declined', $this->user());
+
+        // 2 slots open, 3 third rankers -> unresolved tie at rank 3!
+        $summary = $this->service()->summary($this->program, $this->hubEvent)->first();
+        $this->assertSame([3], $summary['unresolved_ties']);
+        $this->assertSame(2, $summary['slots_left']);
+
+        // Sahodaya chooses Third Place A and Third Place C
+        $candA = collect($summary['candidates'])->firstWhere('student_name', 'Third Place A');
+        $candC = collect($summary['candidates'])->firstWhere('student_name', 'Third Place C');
+
+        $this->service()->sendOffer($this->program, $this->hubEvent, $candA, $this->user());
+        $this->service()->sendOffer($this->program, $this->hubEvent, $candC, $this->user());
+
+        // Now both slots filled, tie resolved!
+        $finalSummary = $this->service()->summary($this->program, $this->hubEvent)->first();
+        $this->assertSame([], $finalSummary['unresolved_ties']);
+        $this->assertSame(0, $finalSummary['slots_left']);
+        $chosenNames = collect($finalSummary['chosen'])->pluck('student_name')->sort()->values()->all();
+        $this->assertSame(['Third Place A', 'Third Place C'], $chosenNames);
+    }
+
+    public function test_sahodaya_can_alter_selections_via_reopen_accept_opt_out_and_revoke(): void
+    {
+        $this->winner('Winner One', 1, 95, 'school-1');
+        $this->winner('Winner Two', 2, 90, 'school-2');
+
+        $this->service()->open($this->program, $this->hubEvent, $this->user());
+        $selOne = $this->primaries()->firstWhere('student_name', 'Winner One');
+        $selTwo = $this->primaries()->firstWhere('student_name', 'Winner Two');
+
+        // 1. Sahodaya accepts on school's behalf
+        $accepted = $this->service()->alterSelection($this->program, $this->hubEvent, $selOne, 'accept', null, $this->user());
+        $this->assertSame('accepted', $accepted->school_response);
+        $this->assertStringContainsString('Sahodaya', $accepted->school_responded_by_name);
+
+        // 2. Sahodaya records opt-out on school's behalf for Winner One (who had accepted earlier)
+        $optedOut = $this->service()->alterSelection($this->program, $this->hubEvent, $selOne, 'opt_out', 'Family emergency', $this->user());
+        $this->assertSame('opted_out', $optedOut->school_response);
+        $this->assertSame('declined', $optedOut->status);
+        $this->assertSame('Family emergency', $optedOut->skip_reason);
+
+        // 3. Sahodaya reopens the offer for Winner One (since 1 slot is now open)
+        $reopened = $this->service()->alterSelection($this->program, $this->hubEvent, $optedOut, 'reopen', null, $this->user());
+        $this->assertSame('selected', $reopened->status);
+        $this->assertSame('pending', $reopened->school_response);
+        $this->assertNull($reopened->skip_reason);
+
+        // 4. Sahodaya revokes offer for Winner Two (slot becomes unfilled)
+        $this->service()->alterSelection($this->program, $this->hubEvent, $selTwo, 'revoke', null, $this->user());
+        $this->assertDatabaseMissing('fest_state_nomination_selections', ['id' => $selTwo->id]);
+
+        $summary = $this->service()->summary($this->program, $this->hubEvent)->first();
+        $this->assertSame(1, $summary['slots_left']);
+    }
 }

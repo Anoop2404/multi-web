@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SahodayaAdmin;
 
 use App\Models\FestEvent;
 use App\Models\FestStateNominationBatch;
+use App\Models\FestStateNominationSelection;
 use App\Models\FestStateProgram;
 use App\Services\State\FestStateSlotCollectionService;
 use Illuminate\Http\Request;
@@ -153,6 +154,54 @@ class FestStateSlotCollectionController extends SahodayaAdminController
         return back()->with('success', "Slot quotas updated successfully{$syncMsg}.");
     }
 
+    public function sendOffer(string $tenantId, FestEvent $event, FestStateSlotCollectionService $collection, Request $request)
+    {
+        $program = $this->context($event);
+
+        $data = $request->validate([
+            'candidate' => 'required|array',
+            'candidate.item_id' => 'required|string',
+            'candidate.item_code' => 'nullable|string',
+            'candidate.mark_id' => 'nullable|string',
+            'candidate.participant_id' => 'nullable|string',
+            'candidate.registration_id' => 'nullable|string',
+            'candidate.source_event_id' => 'nullable|string',
+            'candidate.school_id' => 'nullable|string',
+            'candidate.student_name' => 'nullable|string',
+            'candidate.school_name' => 'nullable|string',
+            'candidate.source_position' => 'nullable|integer',
+            'candidate.grade' => 'nullable|string',
+            'candidate.score' => 'nullable',
+            'candidate.partition_key' => 'nullable|string',
+            'candidate.direct_entry' => 'nullable|boolean',
+        ]);
+
+        $selection = $collection->sendOffer($program, $event, $data['candidate'], $request->user());
+
+        return back()->with('success', "Offer sent to {$selection->student_name} ({$selection->school_name}).");
+    }
+
+    public function alterSelection(string $tenantId, FestEvent $event, FestStateNominationSelection $selection, FestStateSlotCollectionService $collection, Request $request)
+    {
+        $program = $this->context($event);
+
+        $data = $request->validate([
+            'action' => 'required|in:reopen,accept,opt_out,revoke',
+            'reason' => 'nullable|string|max:1000',
+        ]);
+
+        $collection->alterSelection($program, $event, $selection, $data['action'], $data['reason'] ?? null, $request->user());
+
+        $message = match ($data['action']) {
+            'reopen' => "Offer reopened for {$selection->student_name}.",
+            'accept' => "Offer confirmed on behalf of {$selection->school_name}.",
+            'opt_out' => "Recorded opt-out for {$selection->student_name}. Next eligible candidate will be offered.",
+            'revoke' => "Offer revoked for {$selection->student_name}.",
+        };
+
+        return back()->with('success', $message);
+    }
+
     private function context(FestEvent $event): FestStateProgram
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
@@ -171,6 +220,8 @@ class FestStateSlotCollectionController extends SahodayaAdminController
             'open' => "{$base}/open",
             'approve' => "{$base}/approve",
             'updateSlots' => "{$base}/update-slots",
+            'sendOffer' => "{$base}/offer",
+            'alterSelection' => "{$base}/selections",
             'overview' => "/sahodaya-admin/{$tenantId}/state-slot-collection",
             'winnerSheet' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/state-winners",
         ];

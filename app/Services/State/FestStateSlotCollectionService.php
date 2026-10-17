@@ -6,6 +6,7 @@ use App\Models\FestEvent;
 use App\Models\FestStateNominationBatch;
 use App\Models\FestStateNominationSelection;
 use App\Models\FestStateProgram;
+use App\Models\FestStateProgramItem;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -371,5 +372,183 @@ class FestStateSlotCollectionService
         }
 
         return $offered;
+    }
+
+    /**
+     * Send an offer to a candidate (for resolving ties or manual offers).
+     */
+    public function sendOffer(FestStateProgram $program, FestEvent $hubEvent, array $candidate, User $by): FestStateNominationSelection
+    {
+        abort_unless($hubEvent->state_slot_collection_open, 422, 'State slot collection is not open for this event.');
+        abort_if($hubEvent->state_slot_collection_approved_at, 422, 'The State slot list is already approved.');
+
+        return DB::transaction(function () use ($program, $hubEvent, $candidate, $by) {
+            $batch = $this->nominations->openBatch($program, $hubEvent);
+            abort_if($batch->isCertified(), 422, 'This event is already registered with State.');
+
+            FestStateNominationBatch::whereKey($batch->id)->lockForUpdate()->first();
+
+            $item = FestStateProgramItem::findOrFail($candidate['item_id']);
+            $quota = $this->nominations->itemQuota($item->id, $candidate['item_code'] ?? null, (string) $hubEvent->id) ?? (int) ($item->qualify_count ?: 0);
+            $chosenCount = $batch->selections()
+                ->where('item_id', $candidate['item_id'])
+                ->where('nomination_type', 'primary')
+                ->where('status', 'selected')
+                ->count();
+
+            if ($quota !== null && $chosenCount >= $quota) {
+                throw ValidationException::withMessages([
+                    'slot' => "Cannot send offer. All {$quota} slot(s) for {$candidate['item_code']} are currently filled.",
+                ]);
+            }
+
+            // Check if there is an existing declined row for this candidate in the batch
+            $existingDeclined = $batch->selections()
+                ->where('item_id', $candidate['item_id'])
+                ->where('status', FestStateWinnerSheetService::DECLINED)
+                ->where(function ($q) use ($candidate) {
+                    $q->when(! empty($candidate['mark_id']), fn ($sq) => $sq->orWhere('mark_id', $candidate['mark_id']))
+                      ->when(! empty($candidate['participant_id']), fn ($sq) => $sq->orWhere('participant_id', $candidate['participant_id']))
+                      ->when(! empty($candidate['registration_id']), fn ($sq) => $sq->orWhere('registration_id', $candidate['registration_id']));
+                })
+                ->first();
+
+            if ($existingDeclined) {
+                $existingDeclined->update([
+                    'status' => 'selected',
+                    'nomination_type' => 'primary',
+                    'school_response' => 'pending',
+                    'skip_reason' => null,
+                    'priority_order' => $chosenCount + 1,
+                    'selected_by' => $by->id,
+                    'school_responded_by' => null,
+                    'school_responded_by_name' => null,
+                    'school_responded_at' => null,
+                ]);
+
+                return $existingDeclined->fresh();
+            }
+
+            $selection = $this->nominations->select($batch, $candidate, 'primary', $chosenCount + 1, $by);
+            $selection->update(['school_response' => 'pending']);
+
+            return $selection->fresh();
+        });
+    }
+
+    /**
+     * Alter an offer or selection: reopen an opted-out entry, accept on school's behalf,
+     * record opt-out with reason, or revoke the offer.
+     */
+    public function alterSelection(FestStateProgram $program, FestEvent $hubEvent, FestStateNominationSelection $selection, string $action, ?string $reason, User $by): ?FestStateNominationSelection
+    {
+        abort_unless(in_array($action, ['reopen', 'accept', 'opt_out', 'revoke'], true), 422, 'Unknown action.');
+        abort_unless($hubEvent->state_slot_collection_open, 422, 'State slot collection is not open for this event.');
+        abort_if($hubEvent->state_slot_collection_approved_at, 422, 'The State slot list is already approved.');
+
+        $batch = FestStateNominationBatch::findOrFail($selection->batch_id);
+        abort_if($batch->isCertified(), 422, 'This has already been registered with State and can no longer be changed here.');
+        abort_unless($batch->hub_event_id === $hubEvent->id, 404);
+
+        return DB::transaction(function () use ($selection, $action, $reason, $by, $batch, $program, $hubEvent) {
+            FestStateNominationBatch::whereKey($batch->id)->lockForUpdate()->first();
+            $selection->refresh();
+            $batch->refresh();
+
+            if ($action === 'revoke') {
+                abort_unless($selection->status === 'selected', 422, 'Can only revoke an active selection.');
+                $selection->delete();
+
+                return null;
+            }
+
+            if ($action === 'accept') {
+                abort_unless($selection->status === 'selected', 422, 'Can only accept an active selection.');
+                $pool = app(FestStateCollectionCandidates::class)->pool($program, $hubEvent);
+                $eligible = $pool->contains(fn ($candidate) => $candidate['item_id'] === $selection->item_id
+                    && (($selection->participant_id && $candidate['participant_id'] === $selection->participant_id)
+                        || ($selection->mark_id && $candidate['mark_id'] === $selection->mark_id)
+                        || ($selection->registration_id && $candidate['registration_id'] === $selection->registration_id)));
+                abort_unless($eligible, 422, 'This offer is no longer eligible. Review the entry.');
+
+                $selection->update([
+                    'school_response' => 'accepted',
+                    'school_responded_by' => $by->id,
+                    'school_responded_by_name' => $by->name.' (Sahodaya)',
+                    'school_responded_at' => now(),
+                ]);
+
+                return $selection->fresh();
+            }
+
+            if ($action === 'opt_out') {
+                abort_unless($selection->status === 'selected', 422, 'Can only opt out an active selection.');
+                if (trim((string) $reason) === '') {
+                    throw ValidationException::withMessages([
+                        'reason' => 'Say why this winner is not going. The reason is recorded for State submission.',
+                    ]);
+                }
+
+                $selection->update([
+                    'status' => FestStateWinnerSheetService::DECLINED,
+                    'skip_reason' => $reason,
+                    'school_response' => 'opted_out',
+                    'school_responded_by' => $by->id,
+                    'school_responded_by_name' => $by->name.' (Sahodaya)',
+                    'school_responded_at' => now(),
+                ]);
+
+                $this->sheets->autoFill($program, $hubEvent, $by, $selection->item_id);
+
+                $batch->selections()
+                    ->where('item_id', $selection->item_id)
+                    ->where('nomination_type', 'primary')
+                    ->where('status', 'selected')
+                    ->whereNull('school_response')
+                    ->update(['school_response' => 'pending', 'replaces_selection_id' => $selection->id]);
+
+                return $selection->fresh();
+            }
+
+            if ($action === 'reopen') {
+                abort_unless($selection->status === FestStateWinnerSheetService::DECLINED, 422, 'Only opted-out or declined entries can be reopened.');
+
+                $item = FestStateProgramItem::findOrFail($selection->item_id);
+                $quota = $this->nominations->itemQuota($item->id, $selection->item_code, (string) $hubEvent->id) ?? (int) ($item->qualify_count ?: 0);
+                $chosenCount = $batch->selections()
+                    ->where('item_id', $selection->item_id)
+                    ->where('nomination_type', 'primary')
+                    ->where('status', 'selected')
+                    ->count();
+
+                if ($quota !== null && $chosenCount >= $quota) {
+                    throw ValidationException::withMessages([
+                        'slot' => "Cannot reopen offer. All {$quota} slot(s) for this item are currently filled. Free a slot first to reopen this offer.",
+                    ]);
+                }
+
+                $pool = app(FestStateCollectionCandidates::class)->pool($program, $hubEvent);
+                $eligible = $pool->contains(fn ($candidate) => $candidate['item_id'] === $selection->item_id
+                    && (($selection->participant_id && $candidate['participant_id'] === $selection->participant_id)
+                        || ($selection->mark_id && $candidate['mark_id'] === $selection->mark_id)
+                        || ($selection->registration_id && $candidate['registration_id'] === $selection->registration_id)));
+
+                abort_unless($eligible, 422, 'This candidate is no longer eligible.');
+
+                $selection->update([
+                    'status' => 'selected',
+                    'school_response' => 'pending',
+                    'skip_reason' => null,
+                    'school_responded_by' => null,
+                    'school_responded_by_name' => null,
+                    'school_responded_at' => null,
+                    'priority_order' => $chosenCount + 1,
+                ]);
+
+                return $selection->fresh();
+            }
+
+            return null;
+        });
     }
 }

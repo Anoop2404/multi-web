@@ -348,10 +348,9 @@ class FestStateWinnerSheetService
         $skipped = [];
 
         foreach ($this->sheet($program, $hubEvent)->when($onlyItemId, fn ($rows) => $rows->where('item_id', $onlyItemId)) as $row) {
+            $minUnresolvedTie = ! empty($row['unresolved_ties']) ? min($row['unresolved_ties']) : null;
             if ($row['unresolved_ties'] !== []) {
                 $skipped[] = "{$row['item_code']} {$row['title']}";
-
-                continue;
             }
 
             $slots = $row['slots_left'];
@@ -363,6 +362,10 @@ class FestStateWinnerSheetService
             foreach ($row['candidates'] as $candidate) {
                 if ($slots <= 0) {
                     break;
+                }
+
+                if ($minUnresolvedTie !== null && ($candidate['source_position'] ?? 99) >= $minUnresolvedTie) {
+                    continue;
                 }
 
                 if ($hubEvent->state_slot_collection_open && ! ($candidate['direct_entry'] ?? false)

@@ -1534,6 +1534,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
                 Route::post('/open', [$slots, 'open'])->name('open');
                 Route::post('/approve', [$slots, 'approve'])->name('approve');
                 Route::post('/update-slots', [$slots, 'updateSlotQuotas'])->name('update-slots');
+                Route::post('/offer', [$slots, 'sendOffer'])->name('send-offer');
+                Route::post('/selections/{selection}/alter', [$slots, 'alterSelection'])->name('alter-selection');
             });
             Route::post('/{event}/spawn-school-rounds', [FestEventController::class, 'spawnSchoolRounds'])->name('spawn-school-rounds');
             Route::post('/{event}/link-school-round', [FestEventController::class, 'linkSchoolRound'])->name('link-school-round');
