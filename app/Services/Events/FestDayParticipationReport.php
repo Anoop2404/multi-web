@@ -2,7 +2,7 @@
 
 namespace App\Services\Events;
 
-use App\Support\PdfGenerator;
+use App\Support\PdfChromeHeaderFooter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use OpenSpout\Common\Entity\Cell;
@@ -16,10 +16,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 class FestDayParticipationReport
 {
-    public function respond(Request $request, array $summary, string $title): Response
+    public function respond(Request $request, array $summary, string $title, array $branding = []): Response
     {
         $data = $request->validate(['format' => 'required|in:xlsx,pdf,preview', 'scope' => 'nullable|string|max:20']);
-        $report = $this->build($summary, $title, $data['scope'] ?? 'all');
+        $report = $this->build($summary, $title, $data['scope'] ?? 'all', $branding);
         $filename = 'day-participants-'.Str::limit(Str::slug($title), 70, '');
         if ($data['format'] === 'xlsx') {
             return response($this->xlsx($report), 200, [
@@ -28,14 +28,14 @@ class FestDayParticipationReport
                 'Cache-Control' => 'private, no-store',
             ]);
         }
-        $response = PdfGenerator::fromView('fest.reports.day-participation', $report, $filename.'.pdf',
-            inline: $data['format'] === 'preview', isLandscape: true);
+        $response = PdfChromeHeaderFooter::download('fest.reports.day-participation', $report, $filename.'.pdf',
+            $data['format'] === 'preview', 'Day-wise participants', $title, true);
         $response->headers->set('Cache-Control', 'private, no-store');
 
         return $response;
     }
 
-    public function build(array $summary, string $title, string $scope = 'all'): array
+    public function build(array $summary, string $title, string $scope = 'all', array $branding = []): array
     {
         $summary = app(FestDayParticipationService::class)->countsOnly($summary);
         $summaryRows = [];
@@ -59,6 +59,8 @@ class FestDayParticipationReport
         $matrix = $this->matrix($columns, $overall);
 
         return [
+            'orgName' => $branding['orgName'] ?? 'Inter-School Competitions & Events',
+            'logoSrc' => $branding['logoSrc'] ?? null,
             'matrix' => $matrix,
             'title' => $title, 'basis' => $summary['basis'], 'scope' => $scope,
             'generated' => now()->format('d M Y, h:i A'), 'summaryRows' => $summaryRows,
@@ -128,7 +130,7 @@ class FestDayParticipationReport
             for ($column = 2; $column <= $lastColumn + 1; $column++) {
                 $sheet->setColumnWidth(16, $column);
             }
-            foreach ([[$report['title']], [$report['basis'].' - Generated '.$report['generated']],
+            foreach ([[$report['orgName'].' — '.$report['title']], ['Day-wise participants | '.$report['basis'].' | Generated '.$report['generated']],
                 ['Each date shows unique Male, Female and Total counts. Group members count individually. Unspecified includes missing or conflicting gender.'], []] as $note) {
                 $writer->addRow($this->row($note, $body));
             }

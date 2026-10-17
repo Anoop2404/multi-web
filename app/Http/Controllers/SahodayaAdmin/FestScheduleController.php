@@ -80,7 +80,8 @@ class FestScheduleController extends SahodayaAdminController
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         return app(\App\Services\Events\FestDayParticipationReport::class)->respond($request,
-            app(\App\Services\Events\FestDayParticipationService::class)->sahodaya($event), $event->title);
+            app(\App\Services\Events\FestDayParticipationService::class)->sahodaya($event), $event->title,
+            (new \App\Services\Events\FestReportService($event))->brandingData());
     }
 
     public function store(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)

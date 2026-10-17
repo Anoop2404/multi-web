@@ -101,6 +101,27 @@ class FestDayParticipationReportTest extends TestCase
         $this->assertStringNotContainsString('Overall unique', $html);
     }
 
+    public function test_report_uses_organisation_branding_in_pdf_and_excel(): void
+    {
+        $logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=';
+        $service = app(FestDayParticipationReport::class);
+        $report = $service->build($this->summary(), 'Test Fest', 'all', ['orgName' => 'Malabar Sahodaya', 'logoSrc' => $logo]);
+        $html = view('fest.reports.day-participation', $report + ['isDomPdf' => true])->render();
+        $this->assertStringContainsString('Malabar Sahodaya', $html);
+        $this->assertStringContainsString($logo, $html);
+        $this->assertStringContainsString('report-branding', $html);
+        $path = tempnam(sys_get_temp_dir(), 'brand-test-');
+        try {
+            file_put_contents($path, $service->xlsx($report));
+            $zip = new ZipArchive;
+            $zip->open($path);
+            $this->assertStringContainsString('Malabar Sahodaya', $zip->getFromName('xl/worksheets/sheet1.xml'));
+            $zip->close();
+        } finally {
+            @unlink($path);
+        }
+    }
+
     public function test_unassigned_date_cannot_be_exported_as_an_overall_list(): void
     {
         $this->expectException(HttpException::class);

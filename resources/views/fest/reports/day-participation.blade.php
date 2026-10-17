@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Day-wise participants</title>
 <style>
-@page { size: A4 landscape; margin: 14mm 12mm 16mm; }
-body { font-family: DejaVu Sans, sans-serif; font-size: 10px; color: #17324d; }
+@page { size: A4 landscape; margin: 36mm 10mm 16mm; }
+body { margin: 0; font-family: DejaVu Sans, sans-serif; font-size: 10px; color: #17324d; }
 h1 { font-size: 20px; margin: 0 0 5px; } h2 { font-size: 14px; margin: 18px 0 7px; }
 p { line-height: 1.5; } .muted { color: #536477; } .warning { background: #fff7dc; padding: 8px; }
 table { border-collapse: collapse; width: 100%; margin: 7px 0 16px; table-layout: fixed; }
@@ -12,11 +12,20 @@ th { padding: 7px 4px; }
 thead { display: table-header-group; } tr { page-break-inside: avoid; } h2 { page-break-after: avoid; }
 .center { text-align: center; }
 .school { background: #edf3f8; color: #17324d; font-size: 11px; } .num { text-align: right; }
+.report-branding { position: fixed; top: -31mm; left: 0; right: 0; }
+.report-branding table { margin: 0; table-layout: auto; }
+.report-branding td { border: 0; padding: 0; }
 .footer { position: fixed; bottom: -10mm; font-size: 8px; color: #64748b; } .page:after { content: counter(page); }
 </style></head><body>
-<div class="footer">Day-wise participants | Generated {{ $generated }} | Page <span class="page"></span></div>
-<h1>Day-wise participants</h1>
-<p><strong>{{ $title }}</strong><br><span class="muted">{{ $basis }} | Generated {{ $generated }}</span></p>
+@if($isDomPdf ?? true)
+<div class="report-branding">
+    @include('partials.pdf-report-heading', [
+        'orgName' => $orgName, 'logoSrc' => $logoSrc,
+        'docTitle' => 'Day-wise participants', 'eventTitle' => $title,
+    ])
+</div>
+<div class="footer">{{ $orgName }} | {{ $title }} | Generated {{ $generated }} | Page <span class="page"></span></div>
+@endif
 <p>Group members count individually. A participant counts once per day. Total under each date is that day’s unique participant count.</p>
 @if($unidentified)<p class="warning">{{ $unidentified }} record(s) do not have an unambiguous student identity. Unique counts may overcount those students. Names alone are not merged.</p>@endif
 @foreach($warnings as $warning)<p class="warning">{{ $warning }}</p>@endforeach

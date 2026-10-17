@@ -50,7 +50,9 @@ class StateScheduleController extends Controller
         StateScope::assertOwns($event->state_id);
 
         return app(\App\Services\Events\FestDayParticipationReport::class)->respond($request,
-            app(\App\Services\Events\FestDayParticipationService::class)->state($event), $event->name);
+            app(\App\Services\Events\FestDayParticipationService::class)->state($event), $event->name, [
+                'orgName' => \App\Models\PlatformState::find($event->state_id)?->name ?? 'State Inter-School Events',
+            ]);
     }
 
     public function saveSchedule(Request $request, StateFestEvent $event, StateScheduleService $schedule)

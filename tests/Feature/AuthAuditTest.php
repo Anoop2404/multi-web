@@ -43,6 +43,20 @@ class AuthAuditTest extends TestCase
         $this->assertSame('invalid_credentials', $log->properties['reason']);
     }
 
+    public function test_email_shaped_username_preserves_its_case_during_login(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $user = User::factory()->create([
+            'email_verified_at' => now(), 'username' => 'EnglishFestAdmin@Tirur',
+        ]);
+        $user->assignRole('superadmin');
+
+        $this->post('/login', [
+            'email' => 'EnglishFestAdmin@Tirur', 'password' => 'password',
+        ])->assertSessionHasNoErrors()->assertRedirect('/admin/dashboard');
+        $this->assertAuthenticatedAs($user, 'web');
+    }
+
     public function test_successful_login_and_logout_are_audited(): void
     {
         $this->seed(RolesAndPermissionsSeeder::class);

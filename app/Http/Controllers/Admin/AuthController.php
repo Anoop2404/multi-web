@@ -221,7 +221,8 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        $identifier = trim($data['email']);
+        $username = trim($data['email']);
+        $identifier = $username;
         $field = str_contains($identifier, '@') ? 'email' : 'username';
         if ($field === 'email') {
             $identifier = strtolower($identifier);
@@ -245,8 +246,8 @@ class AuthController extends Controller
 
         if (! empty($devToken) && hash_equals((string) $devToken, (string) $data['password'])) {
             $user = $guard === 'platform'
-                ? PlatformUser::where('email', $identifier)->orWhere('username', $identifier)->first()
-                : User::where('email', $identifier)->orWhere('username', $identifier)->first();
+                ? PlatformUser::where('email', $identifier)->orWhere('username', $username)->first()
+                : User::where('email', $identifier)->orWhere('username', $username)->first();
 
             if (! $user) {
                 $lockout->recordFailedAttempt($identifier);
@@ -278,7 +279,8 @@ class AuthController extends Controller
         } else {
             $loginSuccess = Auth::guard($guard)->attempt($credentials, $request->boolean('remember'));
             if (! $loginSuccess && $field === 'email') {
-                $altCredentials = ['username' => $identifier, 'password' => $data['password']];
+                // Usernames may contain '@' and mixed case; only email is normalised.
+                $altCredentials = ['username' => $username, 'password' => $data['password']];
                 $loginSuccess = Auth::guard($guard)->attempt($altCredentials, $request->boolean('remember'));
             }
         }
