@@ -1987,6 +1987,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{exam}/registrations/{registration}/approve', [McqExamController::class, 'approveRegistration'])->name('registrations.approve');
             Route::post('/{exam}/registrations/{registration}/reject', [McqExamController::class, 'rejectRegistration'])->name('registrations.reject');
             Route::post('/{exam}/registrations/{registration}/cancel', [McqExamController::class, 'cancelRegistration'])->name('registrations.cancel');
+            Route::get('/{exam}/eligible-candidates', [McqExamController::class, 'eligibleCandidates'])->name('eligible-candidates');
+            Route::post('/{exam}/registrations', [McqExamController::class, 'storeRegistration'])->name('registrations.store');
             Route::get('/{exam}/registrations/{registration}/fee/proof', [McqExamController::class, 'feeProof'])->name('registrations.fee.proof');
             Route::post('/{exam}/publish-results', [McqExamController::class, 'publishResults'])->name('results.publish');
             Route::post('/{exam}/unpublish-results', [McqExamController::class, 'unpublishResults'])->name('results.unpublish');

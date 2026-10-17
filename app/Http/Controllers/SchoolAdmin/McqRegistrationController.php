@@ -678,21 +678,27 @@ class McqRegistrationController extends SchoolAdminController
 
         app(SchoolDocumentDownloadGateService::class)->assertMcqExamFeeForDownloads($exam, $this->school);
 
+        // Online exams also list each student's exam passcode (for the separate exam login page).
+        $withPasscodes = $exam->isOnlineDelivery();
+        $passcodes = app(\App\Services\Mcq\McqExamPasscodeService::class);
+
         $rows = McqRegistration::where('exam_id', $exam->id)
             ->where('school_id', $this->school->id)
             ->with(['student.user:id,username'])
             ->orderBy('hall_ticket_no')
             ->get()
-            ->map(fn (McqRegistration $reg) => [
+            ->map(fn (McqRegistration $reg) => array_merge([
                 $reg->student?->name,
                 $reg->student?->reg_no,
                 $reg->student?->user?->username ?? $reg->student?->reg_no,
                 $reg->hall_ticket_no,
-            ]);
+            ], $withPasscodes ? [
+                $reg->hall_ticket_no ? \App\Services\Mcq\McqExamPasscodeService::format($passcodes->ensure($reg)) : '',
+            ] : []));
 
         return \App\Support\ExcelExport::download(
             'mcq-portal-logins-'.$exam->id,
-            ['Student', 'Reg. no', 'Portal username', 'Hall ticket'],
+            array_merge(['Student', 'Reg. no', 'Portal username', 'Hall ticket'], $withPasscodes ? ['Exam passcode'] : []),
             $rows,
         );
     }

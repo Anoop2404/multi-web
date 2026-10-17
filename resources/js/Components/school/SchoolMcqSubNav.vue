@@ -17,6 +17,7 @@ const props = defineProps({
     examId: { type: [String, Number], required: true },
     active: { type: String, required: true },
     resultsPublished: { type: Boolean, default: false },
+    usesEngine: { type: Boolean, default: false },
 });
 
 const base = computed(() => `/school-admin/${props.schoolId}/mcq/${props.examId}`);
@@ -30,6 +31,10 @@ const tabs = computed(() => {
         { key: 'attendance', label: 'Attendance', href: `${base.value}/attendance` },
         { key: 'reports', label: 'Reports', href: `${base.value}/reports` },
     ];
+
+    if (props.usesEngine) {
+        list.push({ key: 'live', label: 'Live monitor', href: `${base.value}/live` });
+    }
 
     if (props.resultsPublished) {
         list.push(

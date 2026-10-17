@@ -158,6 +158,12 @@ class McqExam extends Model
         return ! $this->isOnlineDelivery();
     }
 
+    /** How multiple-correct questions are marked: `all_or_nothing` (default) or `partial`. */
+    public function multiMarkingMode(): string
+    {
+        return ($this->settings_json['multi_marking'] ?? null) === 'partial' ? 'partial' : 'all_or_nothing';
+    }
+
     public function requiresHallTicket(): bool
     {
         return (bool) ($this->settings_json['requires_hall_ticket'] ?? false);
@@ -184,7 +190,10 @@ class McqExam extends Model
 
     public function questionBanks(): BelongsToMany
     {
-        return $this->belongsToMany(McqQuestionBank::class, 'mcq_exam_question_banks', 'exam_id', 'bank_id');
+        return $this->belongsToMany(McqQuestionBank::class, 'mcq_exam_question_banks', 'exam_id', 'bank_id')
+            ->withPivot(['section_title', 'pick_mode', 'pick_count', 'display_order'])
+            ->orderByPivot('display_order')
+            ->orderByPivot('id');
     }
 
     public function staff(): HasMany

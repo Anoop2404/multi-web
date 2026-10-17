@@ -50,6 +50,9 @@
         'academic_year'      => $participant['academic_year'] ?? null,
         'school_name'        => $schoolModel?->name,
         'hall_ticket_no'     => $registration->hall_ticket_no,
+        'exam_passcode'      => $exam->isOnlineDelivery() && $registration->hall_ticket_no
+            ? \App\Services\Mcq\McqExamPasscodeService::format(app(\App\Services\Mcq\McqExamPasscodeService::class)->ensure($registration))
+            : null,
         'hall_room'          => $registration->hall_room,
         'seat_no'            => $registration->seat_no,
         'venue'              => $exam->venue,

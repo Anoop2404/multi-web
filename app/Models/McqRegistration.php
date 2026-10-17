@@ -23,7 +23,12 @@ class McqRegistration extends Model
         'started_at', 'submitted_at', 'draft_answers',
         'cancelled_at', 'cancelled_by_user_id',
         'school_marked_paid_at', 'school_marked_paid_by_user_id', 'school_paid_note',
+        'exam_passcode', 'exam_passcode_lookup',
+        'checked_in_at', 'submit_mode', 'engine_receipt', 'extra_time_minutes', 'device_info', 'last_ip',
     ];
+
+    /** The exam passcode is a credential: only McqExamPasscodeService and printouts read it. */
+    protected $hidden = ['exam_passcode', 'exam_passcode_lookup'];
 
     protected $casts = [
         'started_at'            => 'datetime',
@@ -33,6 +38,10 @@ class McqRegistration extends Model
         'attendance_marked_at'  => 'datetime',
         'cancelled_at'          => 'datetime',
         'school_marked_paid_at' => 'datetime',
+        'exam_passcode'         => 'encrypted',
+        'checked_in_at'         => 'datetime',
+        'device_info'           => 'array',
+        'extra_time_minutes'    => 'integer',
     ];
 
     /** @param  \Illuminate\Database\Eloquent\Builder<McqRegistration>  $query */

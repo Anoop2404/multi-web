@@ -1,0 +1,131 @@
+# /etc/prometheus/prometheus.yml -- exam platform monitoring (runs on the monitor node, i.e. redis-exam-1
+# tagged exam-monitor, or a small separate droplet). Ubuntu 24.04: apt-get install prometheus prometheus-alertmanager
+#
+# Targets are discovered from DigitalOcean tags, so scale-out/in nodes appear and disappear by themselves.
+# /etc/prometheus/do_token: a DigitalOcean API token with READ access to droplets only
+# (custom scope "droplet:read"), mode 0640 root:prometheus.
+#
+# Metric names the dashboards/alerts expect from the engine are listed in deploy/README.md
+# ("Engine metrics contract").
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+  external_labels:
+    platform: sahodaya-exam
+    region: blr1
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["127.0.0.1:9093"]
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["127.0.0.1:9090"]
+
+  # Engine /metrics on every engine droplet (tag exam-engine-node), private IP :8090.
+  - job_name: exam-engine
+    scrape_interval: 10s
+    metrics_path: /metrics
+    digitalocean_sd_configs:
+      - authorization:
+          credentials_file: /etc/prometheus/do_token
+        port: 8090
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__meta_digitalocean_tags]
+        regex: ".*,exam-engine-node,.*"
+        action: keep
+      - source_labels: [__meta_digitalocean_private_ipv4]
+        regex: "(.+)"
+        target_label: __address__
+        replacement: "${1}:8090"
+      - source_labels: [__meta_digitalocean_droplet_name]
+        target_label: instance
+      - source_labels: [__meta_digitalocean_size]
+        target_label: size
+      # in_lb="yes" while the node carries the LB tag (alerts ignore draining nodes)
+      - source_labels: [__meta_digitalocean_tags]
+        regex: ".*,exam-engine,.*"
+        target_label: in_lb
+        replacement: "yes"
+      - source_labels: [__meta_digitalocean_tags]
+        regex: ".*,exam-engine-base,.*"
+        target_label: role
+        replacement: base
+      - source_labels: [__meta_digitalocean_tags]
+        regex: ".*,exam-engine-burst,.*"
+        target_label: role
+        replacement: burst
+
+  # node_exporter on engine and redis droplets (private IP :9100).
+  - job_name: node
+    digitalocean_sd_configs:
+      - authorization:
+          credentials_file: /etc/prometheus/do_token
+        port: 9100
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__meta_digitalocean_tags]
+        regex: ".*,(exam-engine-node|exam-redis),.*"
+        action: keep
+      - source_labels: [__meta_digitalocean_private_ipv4]
+        regex: "(.+)"
+        target_label: __address__
+        replacement: "${1}:9100"
+      - source_labels: [__meta_digitalocean_droplet_name]
+        target_label: instance
+      - source_labels: [__meta_digitalocean_tags]
+        regex: ".*,exam-engine-node,.*"
+        target_label: group
+        replacement: engine
+      - source_labels: [__meta_digitalocean_tags]
+        regex: ".*,exam-redis,.*"
+        target_label: group
+        replacement: redis
+
+  # redis_exporter on every redis droplet (private IP :9121), incl. ex:events stream/consumer-group info.
+  - job_name: redis
+    digitalocean_sd_configs:
+      - authorization:
+          credentials_file: /etc/prometheus/do_token
+        port: 9121
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__meta_digitalocean_tags]
+        regex: ".*,exam-redis,.*"
+        action: keep
+      - source_labels: [__meta_digitalocean_private_ipv4]
+        regex: "(.+)"
+        target_label: __address__
+        replacement: "${1}:9121"
+      - source_labels: [__meta_digitalocean_droplet_name]
+        target_label: instance
+
+  # Optional: HAProxy built-in exporter (LB_KIND=haproxy). Replace the address.
+  # - job_name: haproxy
+  #   static_configs:
+  #     - targets: ["10.122.0.9:8404"]
+
+  # Optional: public end-to-end probe through Cloudflare (needs prometheus-blackbox-exporter).
+  # - job_name: exam-public-health
+  #   metrics_path: /probe
+  #   params: { module: [http_2xx] }
+  #   static_configs: [{ targets: ["https://exam.example.org/health"] }]
+  #   relabel_configs:
+  #     - { source_labels: [__address__], target_label: __param_target }
+  #     - { source_labels: [__param_target], target_label: instance }
+  #     - { target_label: __address__, replacement: "127.0.0.1:9115" }
+
+# Grafana Cloud (free tier) instead of a local Grafana: uncomment and fill in.
+# remote_write:
+#   - url: https://prometheus-prod-XX-prod-ap-south-1.grafana.net/api/prom/push
+#     basic_auth:
+#       username: "CHANGE_ME_INSTANCE_ID"
+#       password_file: /etc/prometheus/grafana_cloud_token

@@ -7,7 +7,13 @@
                    target="_blank" rel="noopener" class="btn-secondary text-sm">Sample hall ticket ↗</a>
                 <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/certificates/preview`"
                    target="_blank" rel="noopener" class="btn-secondary text-sm">Sample certificate ↗</a>
-                <button type="button" @click="generate" class="btn-primary text-sm">Issue missing (approved only)</button>
+                <button type="button" @click="showAddCandidateModal = true" class="btn-primary text-sm flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Candidate
+                </button>
+                <button type="button" @click="generate" class="btn-secondary text-sm">Issue missing (approved only)</button>
                 <button v-if="!hallTicketsPublished" type="button" @click="renumberByClass" class="btn-secondary text-sm">Renumber by class</button>
                 <button type="button" @click="allocateSeats(false)" class="btn-secondary text-sm">Allocate seats</button>
                 <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/hall-tickets/print-all`"
@@ -91,6 +97,9 @@
                             <input v-model="designForm.show_school" type="checkbox"> School name
                         </label>
                         <label class="flex items-center gap-2 text-sm mr-4">
+                            <input v-model="designForm.show_exam_passcode" type="checkbox"> Online exam passcode <span class="text-xs text-slate-400">(online exams)</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-sm mr-4">
                             <input v-model="designForm.show_photo" type="checkbox"> Candidate photo
                         </label>
                         <label class="flex items-center gap-2 text-sm mr-4">
@@ -172,6 +181,8 @@
                             <th>School</th>
                             <th>Approval</th>
                             <th>Hall / seat</th>
+                            <th v-if="isOnline">Passcode</th>
+                            <th class="text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -182,15 +193,38 @@
                             <td class="text-xs">{{ r.school?.name || '—' }}</td>
                             <td class="text-xs capitalize">{{ (r.approval_status || 'pending').replaceAll('_', ' ') }}</td>
                             <td class="text-xs">{{ r.hall_room || '—' }} {{ r.seat_no ? `· Seat ${r.seat_no}` : '' }}</td>
+                            <td v-if="isOnline" class="text-xs">
+                                <button v-if="r.hall_ticket_no" type="button" class="font-semibold text-indigo-700 hover:underline" @click="reissuePasscode(r)">Reissue</button>
+                                <span v-else class="text-slate-400">—</span>
+                            </td>
+                            <td class="text-right text-xs">
+                                <button
+                                    v-if="!['started', 'submitted'].includes(r.status)"
+                                    type="button"
+                                    class="font-medium text-rose-600 hover:text-rose-800 hover:underline"
+                                    @click="cancelRegistration(r)"
+                                >
+                                    Remove
+                                </button>
+                                <span v-else class="text-slate-400">—</span>
+                            </td>
                         </tr>
                         <tr v-if="!registrations.data?.length">
-                            <td colspan="6" class="p-6 text-center text-slate-400">No matching registrations.</td>
+                            <td :colspan="isOnline ? 8 : 7" class="p-6 text-center text-slate-400">No matching registrations.</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
             <PaginationLinks :links="registrations.links" :meta="{ from: registrations.from, to: registrations.to, total: registrations.total, last_page: registrations.last_page }" />
         </div>
+
+        <McqAddCandidateModal
+            :show="showAddCandidateModal"
+            :sahodaya-id="sahodaya.id"
+            :exam="exam"
+            :schools="schoolSelectOptions"
+            @close="showAddCandidateModal = false"
+        />
     </SahodayaAdminLayout>
 </template>
 
@@ -201,6 +235,7 @@ import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 import McqHallTicketPreview from '@/Components/sahodaya/McqHallTicketPreview.vue';
 import McqRegNoStartField from '@/Components/sahodaya/McqRegNoStartField.vue';
+import McqAddCandidateModal from '@/Components/sahodaya/McqAddCandidateModal.vue';
 import FormField from '@/Components/ui/FormField.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import PaginationLinks from '@/Components/ui/PaginationLinks.vue';
@@ -223,10 +258,13 @@ const props = defineProps({
     hallTicketsPublishedAt: { type: String, default: null },
     filters: { type: Object, default: () => ({}) },
     schoolOptions: { type: Array, default: () => [] },
+    memberSchools: { type: Array, default: () => [] },
     classOptions: { type: Array, default: () => [] },
 });
 
-const { confirm } = useConfirm();
+const { confirm, prompt } = useConfirm();
+const showAddCandidateModal = ref(false);
+const schoolSelectOptions = computed(() => props.memberSchools?.length ? props.memberSchools : props.schoolOptions);
 const logoInput = ref(null);
 const localLogoPreview = ref(null);
 
@@ -276,6 +314,7 @@ const designForm = useForm({
     footer_note: props.hallTicketDesign?.footer_note ?? '',
     show_reg_no: props.hallTicketDesign?.show_reg_no ?? true,
     show_school: props.hallTicketDesign?.show_school ?? true,
+    show_exam_passcode: props.hallTicketDesign?.show_exam_passcode ?? true,
     primary_color: props.hallTicketDesign?.primary_color ?? '#1e3a8a',
     accent_color: props.hallTicketDesign?.accent_color ?? '#dc2626',
     layout: props.hallTicketDesign?.layout ?? 'standard',
@@ -341,6 +380,7 @@ function saveDesign() {
     fd.append('footer_note', designForm.footer_note || '');
     fd.append('show_reg_no', designForm.show_reg_no ? '1' : '0');
     fd.append('show_school', designForm.show_school ? '1' : '0');
+    fd.append('show_exam_passcode', designForm.show_exam_passcode ? '1' : '0');
     fd.append('primary_color', designForm.primary_color);
     fd.append('accent_color', designForm.accent_color);
     fd.append('layout', designForm.layout);
@@ -366,6 +406,18 @@ function saveDesign() {
     });
 }
 
+const isOnline = computed(() => (props.exam.delivery_mode || 'offline') === 'online');
+
+async function reissuePasscode(registration) {
+    const name = registration.student?.name || registration.teacher?.name || 'this candidate';
+    if (!(await confirm({
+        title: 'Reissue passcode?',
+        message: `${name} gets a new online exam passcode and the old one stops working. Reprint their hall ticket afterwards.`,
+        confirmLabel: 'Reissue',
+    }))) return;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/registrations/${registration.id}/passcode`, {}, { preserveScroll: true });
+}
+
 function generate() {
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/generate`, {}, { preserveScroll: true });
 }
@@ -385,5 +437,22 @@ function publish() {
 async function unpublish() {
     if (!(await confirm({ message: 'Hide hall tickets from schools and candidates again?', destructive: true }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/unpublish`, {}, { preserveScroll: true });
+}
+
+async function cancelRegistration(registration) {
+    const name = registration.student?.name || registration.teacher?.name || registration.participant_name || 'this candidate';
+    const reason = await prompt({
+        title: `Remove ${name}?`,
+        message: 'This will cancel the registration, release their hall ticket number & seat allocation, and adjust school fees.',
+        inputPlaceholder: 'Reason for removal (required)',
+        inputRequired: true,
+        destructive: true,
+        confirmLabel: 'Remove candidate',
+    });
+    if (!reason || !reason.trim()) return;
+
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/registrations/${registration.id}/cancel`, {
+        reason: reason.trim(),
+    }, { preserveScroll: true });
 }
 </script>

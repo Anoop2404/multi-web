@@ -12,6 +12,15 @@ class McqQuestionBank extends Model
 {
     use BelongsToCentralTenant;
 
+    /** `active` is shown as "Ready": only ready banks can be added to an exam paper. */
+    public const STATUSES = ['draft', 'active', 'archived'];
+
+    public const STATUS_LABELS = [
+        'draft'    => 'Draft',
+        'active'   => 'Ready',
+        'archived' => 'Archived',
+    ];
+
     protected $fillable = [
         'sahodaya_id', 'school_id', 'teacher_id', 'subject', 'class_group',
         'title', 'description', 'status', 'created_by_user_id',
@@ -35,5 +44,17 @@ class McqQuestionBank extends Model
     public function exams(): BelongsToMany
     {
         return $this->belongsToMany(McqExam::class, 'mcq_exam_question_banks', 'bank_id', 'exam_id');
+    }
+
+    /**
+     * True once any exam using this bank has a student who started writing it. From then on
+     * the questions are frozen so every candidate is graded against the same paper.
+     */
+    public function isLockedByExam(): bool
+    {
+        $examIds = $this->exams()->pluck('mcq_exams.id');
+
+        return $examIds->isNotEmpty()
+            && McqRegistration::whereIn('exam_id', $examIds)->whereNotNull('started_at')->exists();
     }
 }

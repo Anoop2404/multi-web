@@ -1,0 +1,35 @@
+#cloud-config
+# Burst engine node booted from the golden snapshot (scripts/snapshot-image.sh). Used by scale-out.sh.
+# The image already has packages, users, sysctl, the systemd unit and /usr/local/sbin/exam-engine-install;
+# this only adds the per-node config so the node is serving within ~1 minute of creation.
+# Template: rendered by scripts/render-cloud-init.sh (see engine-node.yaml).
+
+package_update: false
+package_upgrade: false
+
+write_files:
+  - path: /etc/exam-engine/engine.env
+    owner: root:exam
+    permissions: "0640"
+    defer: true
+    content: |
+      __BLOCK_ENGINE_ENV__
+
+  - path: /etc/exam-engine/install.env
+    permissions: "0600"
+    content: |
+      NODE_MODE='node'
+      ENGINE_RELEASE_URL='__ENGINE_RELEASE_URL__'
+      ENGINE_RELEASE_SHA256='__ENGINE_RELEASE_SHA256__'
+      INSTALL_NODE_EXPORTER='__INSTALL_NODE_EXPORTER__'
+
+runcmd:
+  # Refresh the operator keys from the ones DigitalOcean installed for root on this droplet.
+  - [bash, -c, 'if [ -s /root/.ssh/authorized_keys ]; then install -m 0600 -o ops -g ops /root/.ssh/authorized_keys /home/ops/.ssh/authorized_keys; fi']
+  # Optional: upgrade to the release the rest of the fleet runs (scale-out.sh can also push it over SSH).
+  - [bash, -c, 'set -a; . /etc/exam-engine/install.env; set +a; if [ -n "$ENGINE_RELEASE_URL" ]; then /usr/local/sbin/exam-engine-install "$ENGINE_RELEASE_URL" "$ENGINE_RELEASE_SHA256"; fi']
+  # node_exporter in the image listens on the golden droplet's old private IP: rebind it.
+  - [bash, -c, 'if [ -f /etc/default/prometheus-node-exporter ]; then ip=$(curl -fsS --max-time 5 http://169.254.169.254/metadata/v1/interfaces/private/0/ipv4/address) && echo "ARGS=\"--web.listen-address=${ip}:9100 --collector.systemd --collector.processes\"" > /etc/default/prometheus-node-exporter && systemctl restart prometheus-node-exporter; fi']
+  - [systemctl, restart, exam-engine]
+
+final_message: "exam engine burst node ready after $UPTIME s"

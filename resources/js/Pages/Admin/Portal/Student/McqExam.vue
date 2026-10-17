@@ -69,8 +69,10 @@
                                 {{ markedForReview.has(q.id) ? 'Marked for review' : 'Mark for review' }}
                             </button>
                         </div>
-                        <p v-if="q.body_text" class="text-sm text-gray-700 whitespace-pre-wrap">{{ q.body_text }}</p>
-                        <div v-if="q.options?.length" class="space-y-2">
+                        <McqRichText v-if="q.body_text" :text="q.body_text" tag="p" class="text-sm text-gray-700" />
+                        <img v-if="q.image_url" :src="q.image_url" alt="Question image" class="max-h-80 max-w-full rounded-lg border bg-white object-contain">
+                        <p v-if="q.type === 'true_false'" class="text-xs font-medium text-gray-500">True or false?</p>
+                        <div v-if="q.options?.length" class="grid gap-2" :class="q.options.some(o => o.image_url) ? 'sm:grid-cols-2' : ''">
                             <label
                                 v-for="opt in q.options"
                                 :key="opt.key"
@@ -85,7 +87,10 @@
                                     class="mt-1"
                                     @change="scheduleSave"
                                 >
-                                <span><strong class="uppercase">{{ opt.key }}.</strong> {{ opt.label }}</span>
+                                <span class="min-w-0 space-y-1.5">
+                                    <span class="flex gap-1"><strong class="uppercase">{{ opt.key }}.</strong> <McqRichText :text="opt.label" /></span>
+                                    <img v-if="opt.image_url" :src="opt.image_url" :alt="`Option ${opt.key.toUpperCase()}`" class="block max-h-40 max-w-full rounded border bg-white object-contain">
+                                </span>
                             </label>
                         </div>
                         <p v-else class="text-xs text-gray-400">Reference material — no online answer required.</p>
@@ -164,6 +169,7 @@
 </template>
 
 <script setup>
+import McqRichText from '@/Components/mcq/McqRichText.vue';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import QuestionNavGrid from '@/Components/portal/QuestionNavGrid.vue';
 import { studentPortalNavItems } from '@/support/studentPortalNav.js';

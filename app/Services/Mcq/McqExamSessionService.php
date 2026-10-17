@@ -13,25 +13,9 @@ use Illuminate\Validation\ValidationException;
 class McqExamSessionService
 {
     /** @return Collection<int, McqQuestion> */
-    public function questionsForExam(McqExam $exam, bool $shuffle = false): Collection
+    public function questionsForExam(McqExam $exam): Collection
     {
-        $exam->loadMissing('questionBanks.questions');
-
-        $questions = $exam->questionBanks
-            ->flatMap(fn ($bank) => $bank->questions)
-            ->sortBy('display_order')
-            ->values();
-
-        if ($shuffle) {
-            $questions = $questions->shuffle()->values();
-        }
-
-        $limit = (int) ($exam->total_questions ?: 0);
-        if ($limit > 0 && $questions->count() > $limit) {
-            $questions = $questions->take($limit);
-        }
-
-        return $questions;
+        return app(McqPaperService::class)->questionsForExam($exam);
     }
 
     public function canTakeOnline(McqRegistration $registration): bool
@@ -63,6 +47,12 @@ class McqExamSessionService
         if ($exam->isOfflineDelivery()) {
             throw ValidationException::withMessages([
                 'exam' => 'This is an offline exam. Take the exam at the scheduled venue with your hall ticket.',
+            ]);
+        }
+
+        if (\App\Services\ExamEngine\ExamEngineRun::usesEngine($exam)) {
+            throw ValidationException::withMessages([
+                'exam' => 'This exam is taken on the online exam site. Use "Enter exam" from your portal, or sign in there with your hall ticket and passcode.',
             ]);
         }
 
@@ -99,8 +89,15 @@ class McqExamSessionService
             throw ValidationException::withMessages(['exam' => 'Attendance must be marked present before starting.']);
         }
 
-        $gradable = $this->questionsForExam($exam)
-            ->filter(fn (McqQuestion $q) => $this->isGradable($q));
+        $paper = $this->questionsForExam($exam);
+
+        if (app(McqPaperService::class)->needsExamEngine($paper)) {
+            throw ValidationException::withMessages([
+                'exam' => 'This exam has multiple-correct or numeric questions, which need the new online exam engine. Ask the Sahodaya to use single-correct or true/false questions for this exam.',
+            ]);
+        }
+
+        $gradable = $paper->filter(fn (McqQuestion $q) => $q->isGradable());
 
         if ($gradable->isEmpty()) {
             throw ValidationException::withMessages([
@@ -123,21 +120,30 @@ class McqExamSessionService
         return $registration->fresh(['exam']);
     }
 
-    /** @return list<array<string, mixed>> */
+    /**
+     * The paper as sent to the student's browser: no answer keys, image paths swapped for
+     * the student image route, order fixed per registration.
+     *
+     * @return list<array<string, mixed>>
+     */
     public function paperForStudent(McqRegistration $registration): array
     {
-        $registration->loadMissing('exam');
-        $shuffle = (bool) ($registration->exam->settings_json['shuffle_questions'] ?? false);
+        $imageBase = "/portal/student/{$registration->school_id}/mcq/{$registration->id}/questions";
 
-        return $this->questionsForExam($registration->exam, $shuffle)
+        return app(McqPaperService::class)->questionsForRegistration($registration)
             ->map(fn (McqQuestion $q, int $index) => [
                 'id'            => $q->id,
                 'number'        => $index + 1,
+                'type'          => $q->typeValue(),
                 'title'         => $q->title,
                 'body_text'     => $q->body_text,
-                'document_path' => $q->document_path,
+                'image_url'     => $q->document_path ? "{$imageBase}/{$q->id}/image" : null,
                 'options'       => collect($q->options_json ?? [])
-                    ->map(fn ($opt) => ['key' => $opt['key'], 'label' => $opt['label']])
+                    ->map(fn ($opt) => [
+                        'key'       => $opt['key'],
+                        'label'     => $opt['label'] ?? '',
+                        'image_url' => filled($opt['image_path'] ?? null) ? "{$imageBase}/{$q->id}/image?option={$opt['key']}" : null,
+                    ])
                     ->values()
                     ->all(),
             ])
@@ -199,61 +205,32 @@ class McqExamSessionService
 
         $autoSubmitted = $expired;
 
-        $questions = $this->questionsForExam($registration->exam);
-        $gradable = $questions->filter(fn (McqQuestion $q) => $this->isGradable($q));
+        $result = app(McqGrader::class)->grade(
+            $this->questionsForExam($registration->exam),
+            $answers,
+            $registration->exam->multiMarkingMode(),
+        );
 
-        $normalizedAnswers = [];
-        foreach ($answers as $questionId => $optionKey) {
-            $normalizedAnswers[(string) $questionId] = (string) $optionKey;
-        }
+        $mark = $this->storeGradedResult($registration, $result);
 
-        $correct = 0;
-        $wrong = 0;
-        $storedAnswers = [];
-        $score = 0.0;
-        $maxScore = 0.0;
+        $registration->update([
+            'status'       => 'submitted',
+            'submitted_at' => now(),
+        ]);
 
-        /*
-         * Scoring formula (per gradable question):
-         *   marks          = question.marks (default 1) — awarded when correct
-         *   negative_mark  = question.negative_mark (default 0) — deducted when wrong (answered incorrectly)
-         *   unanswered     = 0 contribution
-         *   score          = Σ (correct ? marks : (wrong ? −negative_mark : 0))
-         *   max_score      = Σ marks
-         *   percentage     = max_score > 0 ? (score / max_score) × 100 : 0  (clamped ≥ 0 for grading)
-         * Bulk CSV/XLSX import without answer keys uses the same defaults (1 mark / 0 negative)
-         * when only correct/wrong/unanswered counts are supplied.
-         */
-        foreach ($gradable as $question) {
-            $chosen = $normalizedAnswers[(string) $question->id] ?? null;
-            $isCorrect = $chosen !== null && $chosen === (string) $question->correct_option_key;
-            $qMarks = $question->marksValue();
-            $qNeg = $question->negativeMarkValue();
-            $maxScore += $qMarks;
+        return $mark;
+    }
 
-            if ($isCorrect) {
-                $correct++;
-                $score += $qMarks;
-            } elseif ($chosen !== null) {
-                $wrong++;
-                $score -= $qNeg;
-            }
-
-            $storedAnswers[] = [
-                'question_id'   => $question->id,
-                'chosen'        => $chosen,
-                'correct'       => $question->correct_option_key,
-                'is_correct'    => $isCorrect,
-                'marks'         => $qMarks,
-                'negative_mark' => $qNeg,
-            ];
-        }
-
-        $totalGradable = $gradable->count();
-        $unanswered = max(0, $totalGradable - $correct - $wrong);
-        $score = round($score, 2);
-        $maxScore = round($maxScore, 2);
-        $percentage = $maxScore > 0 ? round((max(0, $score) / $maxScore) * 100, 2) : 0;
+    /**
+     * Saves a McqGrader result as the registration's mark, applying the exam's grade bands and
+     * pass mark. Shared by the in-app submit and the exam engine's result consumer.
+     *
+     * @param  array{correct: int, wrong: int, unanswered: int, score: float, percentage: float, answers: list<array<string, mixed>>}  $result
+     */
+    public function storeGradedResult(McqRegistration $registration, array $result): McqMark
+    {
+        $registration->loadMissing('exam');
+        $percentage = $result['percentage'];
         $passMark = (int) ($registration->exam->pass_mark ?? 0);
         $gradeService = app(\App\Services\Mcq\McqGradeService::class);
         $grade = $gradeService->gradeForPercentage($registration->exam, $percentage);
@@ -263,26 +240,19 @@ class McqExamSessionService
             $grade = $failBand['label'] ?? 'F';
         }
 
-        $mark = McqMark::updateOrCreate(
+        return McqMark::updateOrCreate(
             ['registration_id' => $registration->id],
             [
-                'correct_count'    => $correct,
-                'wrong_count'      => $wrong,
-                'unanswered_count' => $unanswered,
-                'score'            => $score,
+                'correct_count'    => $result['correct'],
+                'wrong_count'      => $result['wrong'],
+                'unanswered_count' => $result['unanswered'],
+                'score'            => $result['score'],
                 'percentage'       => $percentage,
                 'grade'            => $grade,
-                'answers_json'     => $storedAnswers,
+                'answers_json'     => $result['answers'],
                 'locked_at'        => now(),
             ],
         );
-
-        $registration->update([
-            'status'       => 'submitted',
-            'submitted_at' => now(),
-        ]);
-
-        return $mark;
     }
 
     /**
@@ -332,12 +302,5 @@ class McqExamSessionService
         if (! $allowExpired) {
             $this->assertCanStart($registration);
         }
-    }
-
-    private function isGradable(McqQuestion $question): bool
-    {
-        return filled($question->correct_option_key)
-            && is_array($question->options_json)
-            && count($question->options_json) >= 2;
     }
 }

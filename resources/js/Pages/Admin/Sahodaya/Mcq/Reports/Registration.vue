@@ -3,6 +3,12 @@
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="exam.title" eyebrow="Talent Search exam" description="All registrations with approval, attendance, and marks.">
             <template #actions>
+                <button type="button" @click="showAddCandidateModal = true" class="btn-primary text-sm flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Candidate
+                </button>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/reports`" class="btn-secondary text-sm">← Reports</Link>
             </template>
         </PageHeader>
@@ -34,6 +40,7 @@
                             <th>Attendance</th>
                             <th>Score</th>
                             <th>Grade</th>
+                            <th class="text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -47,25 +54,46 @@
                             <td class="text-xs capitalize">{{ r.attendance_status || 'pending' }}</td>
                             <td class="text-xs">{{ r.mark?.score ?? '—' }}</td>
                             <td class="text-xs">{{ r.mark?.grade ?? '—' }}</td>
+                            <td class="text-right text-xs">
+                                <button
+                                    v-if="!['started', 'submitted'].includes(r.status)"
+                                    type="button"
+                                    class="font-medium text-rose-600 hover:text-rose-800 hover:underline"
+                                    @click="cancelRegistration(r)"
+                                >
+                                    Remove
+                                </button>
+                                <span v-else class="text-slate-400">—</span>
+                            </td>
                         </tr>
                         <tr v-if="!registrations.data?.length">
-                            <td colspan="9" class="p-6 text-center text-slate-400">No matching registrations.</td>
+                            <td colspan="10" class="p-6 text-center text-slate-400">No matching registrations.</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
             <PaginationLinks :links="registrations.links" :meta="{ from: registrations.from, to: registrations.to, total: registrations.total, last_page: registrations.last_page }" />
         </div>
+
+        <McqAddCandidateModal
+            :show="showAddCandidateModal"
+            :sahodaya-id="sahodaya.id"
+            :exam="exam"
+            :schools="schoolSelectOptions"
+            @close="showAddCandidateModal = false"
+        />
     </SahodayaAdminLayout>
 </template>
 
 <script setup>
-import { computed, reactive } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
+import McqAddCandidateModal from '@/Components/sahodaya/McqAddCandidateModal.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import PaginationLinks from '@/Components/ui/PaginationLinks.vue';
+import { useConfirm } from '@/composables/useConfirm';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
 
 const props = defineProps({
@@ -76,8 +104,13 @@ const props = defineProps({
     registrations: Object,
     filters: { type: Object, default: () => ({}) },
     schoolOptions: { type: Array, default: () => [] },
+    memberSchools: { type: Array, default: () => [] },
     classOptions: { type: Array, default: () => [] },
 });
+
+const { prompt } = useConfirm();
+const showAddCandidateModal = ref(false);
+const schoolSelectOptions = computed(() => props.memberSchools?.length ? props.memberSchools : props.schoolOptions);
 
 const filterForm = reactive({
     search: props.filters?.search ?? '',
@@ -114,5 +147,22 @@ function reportUrl(baseUrl, inline = false) {
 
 function openPdfPreview(baseUrl) {
     window.open(reportUrl(baseUrl, true), '_blank');
+}
+
+async function cancelRegistration(registration) {
+    const name = registration.student?.name || registration.teacher?.name || registration.participant_name || 'this candidate';
+    const reason = await prompt({
+        title: `Remove ${name}?`,
+        message: 'This will cancel the registration, release their hall ticket number & seat allocation, and adjust school fees.',
+        inputPlaceholder: 'Reason for removal (required)',
+        inputRequired: true,
+        destructive: true,
+        confirmLabel: 'Remove candidate',
+    });
+    if (!reason || !reason.trim()) return;
+
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/registrations/${registration.id}/cancel`, {
+        reason: reason.trim(),
+    }, { preserveScroll: true });
 }
 </script>

@@ -18,14 +18,17 @@ const props = defineProps({
     active: { type: String, required: true },
     deliveryMode: { type: String, default: 'offline' },
     resultsPublished: { type: Boolean, default: false },
+    // true/false when the page knows whether the exam runs on the online exam engine; null = unknown
+    // (both "Live session" and "Live monitor" are shown; the monitor explains when it doesn't apply).
+    usesEngine: { type: [Boolean, null], default: null },
 });
 
 const base = computed(() => `/sahodaya-admin/${props.sahodayaId}/mcq-exams/${props.examId}`);
 
 const questionBankLabel = computed(() =>
     props.deliveryMode === 'online'
-        ? 'Question banks'
-        : 'Question banks (optional · online only)',
+        ? 'Paper'
+        : 'Paper (online only)',
 );
 
 const tabs = computed(() => {
@@ -42,7 +45,12 @@ const tabs = computed(() => {
     ];
 
     if (props.deliveryMode === 'online') {
-        list.push({ key: 'session', label: 'Live session', href: `${base.value}/session` });
+        if (props.usesEngine !== true) {
+            list.push({ key: 'session', label: 'Live session', href: `${base.value}/session` });
+        }
+        if (props.usesEngine !== false) {
+            list.push({ key: 'live', label: 'Live monitor', href: `${base.value}/live` });
+        }
     }
 
     if (props.resultsPublished) {

@@ -290,7 +290,11 @@ class StudentDashboardController extends Controller
                             && in_array($exam->status, ['published', 'ongoing'], true)
                             && $reg->status !== 'submitted'
                             && $reg->attendance_status !== 'absent'
-                            && app(\App\Services\Mcq\McqExamSessionService::class)->canTakeOnline($reg),
+                            && (\App\Services\ExamEngine\ExamEngineRun::usesEngine($exam)
+                                // Engine exams open on the exam site once armed (check-in window).
+                                ? \App\Services\ExamEngine\ExamEngineRun::state($exam) === 'armed' && $reg->isApproved() && ! $reg->blocksScoring()
+                                : app(\App\Services\Mcq\McqExamSessionService::class)->canTakeOnline($reg)),
+                        'uses_exam_engine' => \App\Services\ExamEngine\ExamEngineRun::usesEngine($exam),
                         'delivery_mode'         => $exam->delivery_mode ?? 'offline',
                         'registration_route_id' => $reg->id,
                     ]

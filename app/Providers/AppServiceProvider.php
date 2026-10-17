@@ -39,6 +39,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Online exam engine: push changed portal passwords to armed exam rosters.
+        \App\Models\User::updated(fn (\App\Models\User $user) => app(\App\Services\ExamEngine\ExamEnginePasswordSync::class)->handle($user));
+
         DB::listen(function (QueryExecuted $query): void {
             if ($this->app->runningInConsole()) {
                 return;

@@ -48,6 +48,7 @@
     $motherName = $sample['mother_name'] ?? null;
     $academicYear = $sample['academic_year'] ?? null;
     $examRegNo = $sample['hall_ticket_no'] ?? '10001';
+    $examPasscode = ($design['show_exam_passcode'] ?? true) ? ($sample['exam_passcode'] ?? null) : null;
 
     // Seating & Venue
     $venue = $sample['venue'] ?? null;
@@ -148,6 +149,15 @@
                     <td style="width:12px;text-align:center;font-weight:700;color:#64748b;">:</td>
                     <td style="padding:2.5px 0;font-size:{{ $isCompact ? '13px' : '15px' }};font-weight:900;color:{{ $accent }};letter-spacing:0.04em;">
                         {{ $examRegNo }}
+                    </td>
+                </tr>
+                @endif
+                @if(filled($examPasscode))
+                <tr>
+                    <td style="padding:2.5px 0;color:#475569;font-weight:600;">Online exam passcode</td>
+                    <td style="width:12px;text-align:center;font-weight:700;color:#64748b;">:</td>
+                    <td style="padding:2.5px 0;font-family:'Courier New',monospace;font-size:{{ $isCompact ? '13px' : '14px' }};font-weight:900;color:#0f172a;letter-spacing:0.12em;">
+                        {{ $examPasscode }}
                     </td>
                 </tr>
                 @endif

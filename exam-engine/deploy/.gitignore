@@ -1,0 +1,7 @@
+# Real configuration and secrets stay on the operator's machine / ops host.
+env/*
+!env/*.example
+# Script state: locks, rendered user-data (contains secrets), SSH known_hosts for the fleet.
+.state/
+# build-release.sh output
+dist/

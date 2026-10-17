@@ -1,0 +1,30 @@
+{
+    "name": "sahodaya-exam-client",
+    "private": true,
+    "version": "1.0.0",
+    "type": "module",
+    "description": "Student exam client (login, check-in, waiting room, exam, result) served by the Go exam engine.",
+    "scripts": {
+        "dev": "vite",
+        "dev:mock": "EXAM_MOCK=1 vite",
+        "build": "vite build",
+        "preview": "vite preview",
+        "typecheck": "vue-tsc --noEmit -p tsconfig.json",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "size": "node scripts/size.mjs"
+    },
+    "dependencies": {
+        "idb-keyval": "6.2.6",
+        "katex": "0.16.29",
+        "vue": "3.5.34"
+    },
+    "devDependencies": {
+        "@types/node": "24.19.2",
+        "@vitejs/plugin-vue": "6.0.7",
+        "typescript": "5.9.3",
+        "vite": "8.0.14",
+        "vitest": "5.0.3",
+        "vue-tsc": "3.3.12"
+    }
+}

@@ -37,6 +37,7 @@ class ExamOpsController extends Controller
             'sahodaya' => $sahodaya->only('id', 'name'),
             'exams'    => $exams,
             'canMark'  => $user->hasAnyRole(['exam_controller', 'mark_entry_admin', 'sahodaya_admin']),
+            'canManageQuestions' => $user->isSuperAdmin() || $user->hasAnyRole(['exam_controller', 'sahodaya_admin']),
         ]);
     }
 

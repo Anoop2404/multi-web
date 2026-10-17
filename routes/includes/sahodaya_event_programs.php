@@ -124,7 +124,20 @@ foreach ($sahodayaFestPrograms as $cfg) {
 
 Route::prefix('mcq')->name('mcq-hub.')->group(function () {
     Route::get('/', [McqDashboardController::class, 'index'])->name('dashboard');
-    Route::get('/question-banks', [McqDashboardController::class, 'questionBanks'])->name('question-banks');
+    // Question bank authoring (docs/ONLINE_EXAM_ENGINE_PLAN_2026_10_15.md §7). Same actions as the exam portal's.
+    Route::get('/question-banks', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'index'])->name('question-banks');
+    Route::post('/question-banks', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'storeBank'])->name('question-banks.store');
+    Route::get('/question-banks/import-template', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'importTemplate'])->name('question-banks.import-template');
+    Route::get('/question-banks/{bank}', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'show'])->name('question-banks.show');
+    Route::put('/question-banks/{bank}', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'updateBank'])->name('question-banks.update');
+    Route::delete('/question-banks/{bank}', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'destroyBank'])->name('question-banks.destroy');
+    Route::post('/question-banks/{bank}/questions', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'storeQuestion'])->name('question-banks.questions.store');
+    Route::put('/question-banks/{bank}/questions/{question}', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'updateQuestion'])->name('question-banks.questions.update');
+    Route::delete('/question-banks/{bank}/questions/{question}', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'destroyQuestion'])->name('question-banks.questions.destroy');
+    Route::post('/question-banks/{bank}/questions/{question}/move', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'moveQuestion'])->name('question-banks.questions.move');
+    Route::get('/question-banks/{bank}/questions/{question}/image', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'questionImage'])->name('question-banks.questions.image');
+    Route::post('/question-banks/{bank}/import/preview', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'importPreview'])->name('question-banks.import.preview');
+    Route::post('/question-banks/{bank}/import/commit', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'importCommit'])->name('question-banks.import.commit');
     Route::get('/payments', [\App\Http\Controllers\SahodayaAdmin\McqPaymentsController::class, 'index'])->name('payments');
     Route::post('/payments/{schoolFee}/approve', [\App\Http\Controllers\SahodayaAdmin\McqPaymentsController::class, 'approve'])->name('payments.approve');
     Route::post('/payments/{schoolFee}/reject', [\App\Http\Controllers\SahodayaAdmin\McqPaymentsController::class, 'reject'])->name('payments.reject');

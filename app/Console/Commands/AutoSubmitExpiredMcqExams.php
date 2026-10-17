@@ -34,8 +34,15 @@ class AutoSubmitExpiredMcqExams extends Command
                                 continue;
                             }
 
+                            // Engine exams are finalised by the exam engine's sweeper and graded
+                            // by exam-engine:consume — never from the in-app autosave here.
+                            if ($registration->exam && \App\Services\ExamEngine\ExamEngineRun::usesEngine($registration->exam)) {
+                                continue;
+                            }
+
                             try {
-                                $sessions->submit($registration, []);
+                                // Grade what the student had autosaved (previously an empty answer set).
+                                $sessions->submit($registration, $registration->draft_answers ?? []);
                                 $audit->mcqRegistration(
                                     $registration->fresh(['exam']),
                                     'mcq.exam.auto_submitted',

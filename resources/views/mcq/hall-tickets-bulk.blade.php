@@ -1,3 +1,7 @@
+@php
+    // Neither caller (Sahodaya print-all, school hall tickets PDF) passes a design; use the exam's own.
+    $design = $design ?? \App\Support\Mcq\McqHallTicketDesign::fromExam($exam);
+@endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -66,6 +70,9 @@
                     'academic_year'      => $participant['academic_year'] ?? null,
                     'school_name'        => $r->school?->name,
                     'hall_ticket_no'     => $r->hall_ticket_no ?? '—',
+                    'exam_passcode'      => $exam->isOnlineDelivery() && $r->hall_ticket_no
+                        ? \App\Services\Mcq\McqExamPasscodeService::format(app(\App\Services\Mcq\McqExamPasscodeService::class)->ensure($r))
+                        : null,
                     'hall_room'          => $r->hall_room,
                     'seat_no'            => $r->seat_no,
                     'venue'              => $exam->venue,
@@ -90,7 +97,7 @@
             <div class="ticket-item">
                 @include('mcq.partials.hall-ticket-card', [
                     'design'       => $design,
-                    'logoUrl'      => $logoUrl,
+                    'logoUrl'      => $logoUrl ?? \App\Support\Mcq\McqHallTicketDesign::logoUrl($r->school, $design),
                     'boardLogoUrl' => $boardLogoUrl,
                     'sample'       => $sampleData,
                 ])

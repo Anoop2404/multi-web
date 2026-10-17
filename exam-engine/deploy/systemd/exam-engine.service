@@ -1,0 +1,70 @@
+# /etc/systemd/system/exam-engine.service
+# Go exam engine (exam-engine/CONTRACT.md). One stateless process per node; all state is in Redis.
+# Installed by cloud-init/engine-node.yaml. Binary: /opt/exam-engine/current/exam-engine
+# (a symlink switched by /usr/local/sbin/exam-engine-install). Config: /etc/exam-engine/engine.env.
+
+[Unit]
+Description=Exam engine (live online exam API)
+Wants=network-online.target
+After=network-online.target chrony.service
+# A golden-image droplet has no env file: stay stopped instead of crash-looping.
+ConditionPathExists=/etc/exam-engine/engine.env
+# Never give up restarting on exam day.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=exam
+Group=exam
+EnvironmentFile=/etc/exam-engine/engine.env
+WorkingDirectory=/opt/exam-engine/current
+ExecStart=/opt/exam-engine/current/exam-engine
+Restart=always
+RestartSec=2
+
+# Graceful shutdown: SIGTERM, the engine stops accepting, finishes in-flight requests, exits.
+KillSignal=SIGTERM
+KillMode=mixed
+TimeoutStopSec=40
+
+# ~30,000 client connections per node (plus Redis pool, sentinels, scrapes) with headroom.
+# Pair with the sysctl values in cloud-init/engine-node.yaml (fs.file-max, somaxconn, ...).
+LimitNOFILE=200000
+LimitNPROC=65535
+TasksMax=infinity
+
+# Keep the kernel OOM killer away from the engine before anything else on the box.
+OOMScoreAdjust=-500
+
+# Logs: JSON (log/slog) to stdout -> journald. `journalctl -u exam-engine -f -o cat`
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=exam-engine
+
+# Hardening. The engine only needs outbound TCP (Redis, sentinels) and to listen on :8090.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+ReadOnlyPaths=/opt/exam-engine /etc/exam-engine
+StateDirectory=exam-engine
+StateDirectoryMode=0750
+
+[Install]
+WantedBy=multi-user.target

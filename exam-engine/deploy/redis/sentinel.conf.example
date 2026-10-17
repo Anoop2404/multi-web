@@ -1,0 +1,40 @@
+# Redis Sentinel for redis-exam (Stage B). Becomes /etc/redis/sentinel.conf.
+#
+# Where sentinels run (plan section 9: "Sentinel x3 on the redis and engine nodes"):
+#   1. redis-exam-1      (always on, redis base node)           -- cloud-init/redis-node.yaml
+#   2. exam-engine-1     (always on, engine base node)          -- scripts/resize-redis.sh sentinel-setup
+#   3. redis-exam-burst  (only while the burst replica exists)  -- created by resize-redis.sh up
+# Quorum 2. With the replica present any two sentinels can authorise a failover; without a replica
+# there is nothing to fail over to and the sentinels just report the primary to the engines.
+#
+# Tokens: REDIS_PASSWORD / REDIS_MASTER_NAME (double-underscore) are rendered on your machine; @PRIVATE_IP@
+# (this host's VPC IP) and @PRIMARY_IP@ (current primary's VPC IP) are filled on the node.
+# Sentinel rewrites this file itself (discovered replicas/sentinels, epochs): never hand-edit a
+# running sentinel's file; use SENTINEL SET / SENTINEL RESET instead.
+#
+# Engines: EXAM_ENGINE_REDIS_SENTINELS=<redis-exam-1 ip>:26379,<exam-engine-1 ip>:26379
+#          EXAM_ENGINE_REDIS_MASTER=exam   (REDIS_MASTER_NAME; password still from EXAM_ENGINE_REDIS_URL)
+
+port 26379
+bind 127.0.0.1 @PRIVATE_IP@
+protected-mode no
+daemonize no
+supervised systemd
+pidfile /run/sentinel/redis-sentinel.pid
+logfile /var/log/redis/redis-sentinel.log
+dir /var/lib/redis
+
+# Announce the VPC address (never 127.0.0.1) to the other sentinels and to clients.
+sentinel announce-ip @PRIVATE_IP@
+sentinel announce-port 26379
+sentinel resolve-hostnames no
+
+sentinel monitor __REDIS_MASTER_NAME__ @PRIMARY_IP@ 6379 2
+sentinel auth-pass __REDIS_MASTER_NAME__ __REDIS_PASSWORD__
+# Primary is considered down after 5 s without a valid reply (engines retry; clients resync).
+sentinel down-after-milliseconds __REDIS_MASTER_NAME__ 5000
+sentinel failover-timeout __REDIS_MASTER_NAME__ 60000
+sentinel parallel-syncs __REDIS_MASTER_NAME__ 1
+
+# Sentinel has no password here: it listens on the VPC only and the cloud firewall limits 26379 to
+# exam droplets. (The engine contract has no sentinel-password setting.)

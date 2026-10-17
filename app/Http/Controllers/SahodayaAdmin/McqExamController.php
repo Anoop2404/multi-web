@@ -17,6 +17,13 @@ use App\Services\Mcq\McqSchoolFeeService;
 use App\Services\Membership\EffectiveMasterDataResolver;
 use App\Services\Students\StudentVerificationGate;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Models\Student;
+use App\Models\Teacher;
+use App\Services\Mcq\McqEligibilityService;
+use App\Services\Mcq\McqHallTicketService;
+use App\Services\Mcq\McqExamPasscodeService;
+use App\Services\Mcq\McqSeatingService;
+use App\Services\Mcq\McqRegistrationPortalService;
 use App\Support\ExcelExport;
 use App\Support\FestClassGroupScheme;
 use App\Support\Mcq\McqExamEligibilityConfig;
@@ -24,6 +31,8 @@ use App\Support\Mcq\McqExamPayload;
 use App\Support\Mcq\McqExamLevelLabels;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class McqExamController extends SahodayaAdminController
 {
@@ -597,6 +606,233 @@ class McqExamController extends SahodayaAdminController
         }
 
         return back()->with('success', 'Registration cancelled.');
+    }
+
+    public function eligibleCandidates(Request $request, string $tenantId, McqExam $exam)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'school_id' => 'required|string|max:36',
+            'search'    => 'nullable|string|max:100',
+            'type'      => 'nullable|in:student,teacher',
+        ]);
+
+        $school = Tenant::where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->where('id', $data['school_id'])
+            ->firstOrFail();
+
+        $type = $data['type'] ?? 'student';
+        $search = trim((string) ($data['search'] ?? ''));
+        $eligibilityService = app(McqEligibilityService::class);
+
+        $results = [];
+
+        if ($type === 'student') {
+            $activeRegisteredIds = McqRegistration::where('exam_id', $exam->id)
+                ->whereNotNull('student_id')
+                ->active()
+                ->pluck('student_id')
+                ->all();
+
+            $cancelledIds = McqRegistration::where('exam_id', $exam->id)
+                ->whereNotNull('student_id')
+                ->where('status', 'cancelled')
+                ->pluck('student_id')
+                ->all();
+
+            $studentsQuery = Student::where('tenant_id', $school->id)
+                ->where('status', 'active')
+                ->with(['schoolClass:id,name,class_category_id']);
+
+            if ($search !== '') {
+                $term = '%'.mb_strtolower($search).'%';
+                $studentsQuery->where(function ($inner) use ($term, $search) {
+                    $inner->whereRaw('LOWER(name) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(admission_number) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(reg_no) LIKE ?', [$term]);
+                    if (is_numeric($search)) {
+                        $inner->orWhere('id', (int) $search);
+                    }
+                });
+            }
+
+            $students = $studentsQuery->orderBy('name')->limit(50)->get();
+
+            $eligibilityService->primeStudentEligibility($exam, $students);
+
+            $results = $students->map(function (Student $student) use ($exam, $eligibilityService, $activeRegisteredIds, $cancelledIds) {
+                $isEligible = $eligibilityService->isEligible($exam, $student);
+                $ineligibilityReason = $isEligible ? null : $eligibilityService->ineligibilityReason($exam, $student);
+
+                return [
+                    'id'                   => $student->id,
+                    'type'                 => 'student',
+                    'name'                 => $student->name,
+                    'admission_number'     => $student->admission_number,
+                    'reg_no'               => $student->reg_no,
+                    'class_name'           => $student->schoolClass?->name ?? '—',
+                    'is_eligible'          => $isEligible,
+                    'ineligibility_reason' => $ineligibilityReason,
+                    'is_registered'        => in_array($student->id, $activeRegisteredIds, true),
+                    'was_cancelled'        => in_array($student->id, $cancelledIds, true),
+                ];
+            })->values()->all();
+        } else {
+            $activeRegisteredIds = McqRegistration::where('exam_id', $exam->id)
+                ->whereNotNull('teacher_id')
+                ->active()
+                ->pluck('teacher_id')
+                ->all();
+
+            $cancelledIds = McqRegistration::where('exam_id', $exam->id)
+                ->whereNotNull('teacher_id')
+                ->where('status', 'cancelled')
+                ->pluck('teacher_id')
+                ->all();
+
+            $teachersQuery = Teacher::where('tenant_id', $school->id)
+                ->where('status', 'active');
+
+            if ($search !== '') {
+                $term = '%'.mb_strtolower($search).'%';
+                $teachersQuery->where(function ($inner) use ($term, $search) {
+                    $inner->whereRaw('LOWER(name) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(phone) LIKE ?', [$term])
+                        ->orWhereRaw('LOWER(email) LIKE ?', [$term]);
+                    if (is_numeric($search)) {
+                        $inner->orWhere('id', (int) $search);
+                    }
+                });
+            }
+
+            $teachers = $teachersQuery->orderBy('name')->limit(50)->get();
+
+            $results = $teachers->map(function (Teacher $teacher) use ($exam, $eligibilityService, $activeRegisteredIds, $cancelledIds) {
+                $isEligible = $eligibilityService->isTeacherEligible($exam, $teacher);
+                $ineligibilityReason = $isEligible ? null : $eligibilityService->teacherIneligibilityReason($exam, $teacher);
+
+                return [
+                    'id'                   => $teacher->id,
+                    'type'                 => 'teacher',
+                    'name'                 => $teacher->name,
+                    'admission_number'     => null,
+                    'reg_no'               => null,
+                    'class_name'           => 'Teacher',
+                    'is_eligible'          => $isEligible,
+                    'ineligibility_reason' => $ineligibilityReason,
+                    'is_registered'        => in_array($teacher->id, $activeRegisteredIds, true),
+                    'was_cancelled'        => in_array($teacher->id, $cancelledIds, true),
+                ];
+            })->values()->all();
+        }
+
+        $ticketsAlreadyIssued = McqRegistration::where('exam_id', $exam->id)->whereNotNull('hall_ticket_no')->exists();
+
+        return response()->json([
+            'candidates'             => $results,
+            'tickets_already_issued' => $ticketsAlreadyIssued,
+            'allows_teachers'        => McqExamEligibilityConfig::allowsTeachers($exam->eligibility_config),
+            'allows_students'        => McqExamEligibilityConfig::allowsStudents($exam->eligibility_config),
+            'window_active'          => $exam->registrationWindowActive(),
+        ]);
+    }
+
+    public function storeRegistration(Request $request, string $tenantId, McqExam $exam)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'school_id'         => 'required|string|max:36',
+            'candidate_type'    => 'required|in:student,teacher',
+            'student_id'        => 'required_if:candidate_type,student|nullable|integer',
+            'teacher_id'        => 'required_if:candidate_type,teacher|nullable|integer',
+            'issue_hall_ticket' => 'nullable|boolean',
+            'reason'            => 'nullable|string|max:500',
+        ]);
+
+        $school = Tenant::where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->where('id', $data['school_id'])
+            ->firstOrFail();
+
+        $student = null;
+        $teacher = null;
+
+        if ($data['candidate_type'] === 'student') {
+            $student = Student::where('tenant_id', $school->id)->findOrFail($data['student_id']);
+        } else {
+            $teacher = Teacher::where('tenant_id', $school->id)->findOrFail($data['teacher_id']);
+        }
+
+        $ticketsAlreadyIssued = McqRegistration::where('exam_id', $exam->id)->whereNotNull('hall_ticket_no')->exists();
+        $issueTicket = $request->has('issue_hall_ticket')
+            ? $request->boolean('issue_hall_ticket')
+            : $ticketsAlreadyIssued;
+
+        $registration = DB::transaction(function () use ($exam, $school, $student, $teacher, $data, $issueTicket, $request) {
+            $query = McqRegistration::where('exam_id', $exam->id);
+            if ($student) {
+                $query->where('student_id', $student->id);
+            } else {
+                $query->where('teacher_id', $teacher->id);
+            }
+            $existing = $query->lockForUpdate()->first();
+
+            if ($existing && ! $existing->isCancelled()) {
+                throw ValidationException::withMessages([
+                    'candidate' => 'Candidate is already actively registered for this exam.',
+                ]);
+            }
+
+            $attributes = [
+                'school_id'            => $school->id,
+                'status'               => 'registered',
+                'approval_status'      => 'approved',
+                'approved_at'          => now(),
+                'approved_by_user_id'  => $request->user()->id,
+                'cancelled_at'         => null,
+                'cancelled_by_user_id' => null,
+                'rejection_reason'     => null,
+            ];
+
+            if ($existing) {
+                $existing->update($attributes);
+                $reg = $existing->fresh();
+            } else {
+                $reg = McqRegistration::create(array_merge($attributes, [
+                    'exam_id'    => $exam->id,
+                    'student_id' => $student?->id,
+                    'teacher_id' => $teacher?->id,
+                ]));
+            }
+
+            if ($issueTicket) {
+                $reg = app(McqHallTicketService::class)->issueForRegistration($reg);
+                app(McqExamPasscodeService::class)->ensure($reg);
+                app(McqSeatingService::class)->recalculate($exam);
+            }
+
+            $reason = ! empty($data['reason']) ? ' Reason: '.$data['reason'] : '';
+            $syncNote = "MCQ registration manually added by Sahodaya for {$reg->participantName()} in {$exam->title}.{$reason}";
+            app(McqSchoolFeeService::class)->syncForSchool($exam, $school, $syncNote, $request->user()->id, $reg->id);
+
+            if ($student) {
+                app(McqRegistrationPortalService::class)->provisionForStudents(collect([$student]));
+            }
+
+            app(PlatformAuditLogger::class)->mcqRegistration(
+                $reg->fresh(['exam', 'student', 'teacher']),
+                'mcq.registration.added_by_sahodaya',
+                "Sahodaya manually registered {$reg->participantName()} in {$exam->title}.{$reason}" . ($issueTicket ? " (Hall ticket #{$reg->hall_ticket_no} issued)" : ''),
+            );
+
+            return $reg;
+        });
+
+        $ticketMsg = $registration->hall_ticket_no ? " (Hall ticket #{$registration->hall_ticket_no} issued)" : '';
+        return back()->with('success', "Candidate {$registration->participantName()} added successfully{$ticketMsg}.");
     }
 
     public function feeProof(string $tenantId, McqExam $exam, McqRegistration $registration)

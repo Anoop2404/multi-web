@@ -1,0 +1,4 @@
+# /etc/haproxy/trusted-ips.lst -- direct (non-Cloudflare) clients allowed to connect.
+# The aaPanel server only needs to be here if Laravel calls the LB directly instead of via Cloudflare.
+# Load-generator droplets: add for the load test, remove afterwards.
+# 203.0.113.10/32

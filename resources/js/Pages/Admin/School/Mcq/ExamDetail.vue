@@ -16,7 +16,7 @@
             <span v-if="exam.series_title" class="text-xs text-slate-500">{{ exam.series_title }}</span>
         </div>
 
-        <SchoolMcqSubNav :school-id="school.id" :exam-id="exam.id" :active="tab" :results-published="exam.results_published" />
+        <SchoolMcqSubNav :school-id="school.id" :exam-id="exam.id" :active="tab" :results-published="exam.results_published" :uses-engine="!!exam.uses_engine" />
 
         <McqSchoolWorkflowStepper
             :school-id="school.id"

@@ -4,38 +4,75 @@
     {
       "name": "multi-web-dev",
       "runtimeExecutable": "composer",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "autoPort": true
     },
     {
       "name": "vite",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 5173
     },
     {
       "name": "multi-web-serve-built",
       "runtimeExecutable": "php",
-      "runtimeArgs": ["artisan", "serve", "--host=0.0.0.0", "--port=$PORT"],
+      "runtimeArgs": [
+        "artisan",
+        "serve",
+        "--host=0.0.0.0",
+        "--port=$PORT"
+      ],
       "autoPort": true
     },
     {
       "name": "multi-web-serve-8010",
       "runtimeExecutable": "php",
-      "runtimeArgs": ["artisan", "serve", "--host=0.0.0.0", "--port=$PORT"],
+      "runtimeArgs": [
+        "artisan",
+        "serve",
+        "--host=0.0.0.0",
+        "--port=$PORT"
+      ],
       "autoPort": true
     },
     {
       "name": "multi-web-serve-8020",
       "runtimeExecutable": "php",
-      "runtimeArgs": ["artisan", "serve", "--host=0.0.0.0", "--port=$PORT"],
+      "runtimeArgs": [
+        "artisan",
+        "serve",
+        "--host=0.0.0.0",
+        "--port=$PORT"
+      ],
       "autoPort": true
     },
     {
       "name": "multi-web-serve-8033",
       "runtimeExecutable": "php",
-      "runtimeArgs": ["artisan", "serve", "--host=0.0.0.0", "--port=$PORT"],
+      "runtimeArgs": [
+        "artisan",
+        "serve",
+        "--host=0.0.0.0",
+        "--port=$PORT"
+      ],
       "autoPort": true
+    },
+    {
+      "name": "multi-web-serve-8000",
+      "runtimeExecutable": "php",
+      "runtimeArgs": [
+        "artisan",
+        "serve",
+        "--host=127.0.0.1",
+        "--port=8000"
+      ],
+      "port": 8000
     }
   ]
 }

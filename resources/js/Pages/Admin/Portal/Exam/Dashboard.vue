@@ -33,9 +33,9 @@ import PortalAssignmentsHub from '@/Components/portal/PortalAssignmentsHub.vue';
 import { examPortalNavItems } from '@/support/examPortalNav.js';
 import { computed, onMounted, onUnmounted, reactive } from 'vue';
 
-const props = defineProps({ sahodaya: Object, exams: Array, canMark: Boolean });
+const props = defineProps({ sahodaya: Object, exams: Array, canMark: Boolean, canManageQuestions: Boolean });
 
-const navItems = computed(() => examPortalNavItems(props.sahodaya.id));
+const navItems = computed(() => examPortalNavItems(props.sahodaya.id, null, { canManageQuestions: !!props.canManageQuestions }));
 
 const stats = computed(() => [
     { label: 'Exams', value: props.exams.length },

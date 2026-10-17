@@ -56,11 +56,20 @@ class McqReportController extends SahodayaAdminController
             ->paginate(50)
             ->withQueryString();
 
+        $memberSchools = \App\Models\Tenant::where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->where('membership_status', 'approved')
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($s) => ['value' => $s->id, 'label' => $s->name])
+            ->values();
+
         return $this->inertia('Sahodaya/Mcq/Reports/Registration', [
-            'exam'          => $exam->only('id', 'title', 'exam_level', 'status'),
+            'exam'          => $exam->only('id', 'title', 'exam_level', 'status', 'delivery_mode', 'results_published'),
             'registrations' => $registrations,
             'filters'       => $filters,
             'schoolOptions' => $reports->schoolFilterOptions($exam),
+            'memberSchools' => $memberSchools,
             'classOptions'  => $reports->classFilterOptions($exam),
         ]);
     }

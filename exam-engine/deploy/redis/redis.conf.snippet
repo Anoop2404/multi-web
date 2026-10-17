@@ -1,0 +1,92 @@
+# redis-exam settings (plan section 5.5 / 9). Redis 7 (Ubuntu 24.04 `redis-server` 7.0.x) or Valkey 7.2+.
+#
+# cloud-init/redis-node.yaml writes this as the COMPLETE /etc/redis/redis.conf (Redis defaults
+# cover everything not listed). We deliberately do not `include` it from the packaged file:
+# Sentinel persists role changes with CONFIG REWRITE, which only rewrites the main file and would
+# otherwise duplicate/shadow directives that live in included files.
+#
+# Tokens:
+#   REDIS_PASSWORD      (double-underscore token) rendered on your machine from env/redis.password
+#   @PRIVATE_IP@ @MAXMEMORY_MB@ @IO_THREADS@  filled on the node at first boot by
+#                       /usr/local/sbin/exam-redis-setup (VPC IP from droplet metadata,
+#                       60 % of RAM, half the vCPUs capped at 4)
+# After first boot Redis owns this file (CONFIG REWRITE). Change settings with
+#   sudo exam-redis-cli CONFIG SET <name> <value> && sudo exam-redis-cli CONFIG REWRITE
+
+# --- process (matches the Ubuntu redis-server.service unit) -----------------------------------
+daemonize no
+supervised systemd
+pidfile /run/redis/redis-server.pid
+logfile /var/log/redis/redis-server.log
+loglevel notice
+dir /var/lib/redis
+
+# --- network: VPC only. The DO cloud firewall additionally limits 6379 to exam droplets. --------
+bind 127.0.0.1 @PRIVATE_IP@
+port 6379
+protected-mode yes
+tcp-backlog 65535
+tcp-keepalive 60
+timeout 0
+maxclients 20000
+
+# --- auth (AUTH on every connection; replicas authenticate to whichever node is primary) ---------
+requirepass __REDIS_PASSWORD__
+masterauth __REDIS_PASSWORD__
+# Destructive admin commands are disabled in production.
+rename-command FLUSHALL ""
+rename-command FLUSHDB ""
+rename-command DEBUG ""
+
+# --- memory: NEVER evict exam state. At maxmemory, writes fail loudly instead (alert at 70 %). ---
+maxmemory @MAXMEMORY_MB@mb
+maxmemory-policy noeviction
+lazyfree-lazy-expire yes
+lazyfree-lazy-user-del yes
+lazyfree-lazy-server-del yes
+replica-lazy-flush yes
+
+# --- persistence: AOF every second (at most ~1 s of writes at risk; clients resync anyway) -------
+appendonly yes
+appendfsync everysec
+appendfilename "appendonly.aof"
+appenddirname "appendonlydir"
+aof-use-rdb-preamble yes
+no-appendfsync-on-rewrite no
+auto-aof-rewrite-percentage 100
+auto-aof-rewrite-min-size 256mb
+aof-load-truncated yes
+# No automatic RDB snapshots: the daily snapshot is a cron BGSAVE (/etc/cron.d/exam-redis-backup).
+save ""
+dbfilename dump.rdb
+rdbcompression yes
+# A failed backup BGSAVE must not stop exam writes (it alerts instead: RedisBackupFailing).
+stop-writes-on-bgsave-error no
+
+# --- replication (Stage B: one replica + Sentinel) -----------------------------------------------
+replica-announce-ip @PRIVATE_IP@
+replica-read-only yes
+replica-serve-stale-data yes
+repl-diskless-sync yes
+repl-diskless-sync-delay 2
+repl-backlog-size 256mb
+repl-backlog-ttl 3600
+repl-timeout 60
+
+# --- performance ---------------------------------------------------------------------------------
+io-threads @IO_THREADS@
+io-threads-do-reads yes
+hz 10
+dynamic-hz yes
+latency-monitor-threshold 25
+slowlog-log-slower-than 10000
+slowlog-max-len 512
+
+# --- optional TLS (traffic stays inside the VPC; enable if your policy requires it) --------------
+# Then use rediss://...:6380 in EXAM_ENGINE_REDIS_URL and allow 6380 in the firewall.
+# tls-port 6380
+# tls-cert-file /etc/redis/tls/redis.crt
+# tls-key-file /etc/redis/tls/redis.key
+# tls-ca-cert-file /etc/redis/tls/ca.crt
+# tls-auth-clients no
+# tls-replication yes

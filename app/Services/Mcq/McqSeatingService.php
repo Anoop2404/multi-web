@@ -20,6 +20,25 @@ class McqSeatingService
      *
      * @return array{allocated: int, halls_used: int}
      */
+    /**
+     * Recalculate seating for unallocated registrations if the exam already has active seating allocations.
+     *
+     * @return array{allocated: int, halls_used: int}
+     */
+    public function recalculate(McqExam $exam): array
+    {
+        $hasAllocations = McqRegistration::where('exam_id', $exam->id)
+            ->whereNotNull('seat_no')
+            ->where('seat_no', '!=', '')
+            ->exists();
+
+        if (! $hasAllocations) {
+            return ['allocated' => 0, 'halls_used' => 0];
+        }
+
+        return $this->allocateForExam($exam, false);
+    }
+
     public function allocateForExam(McqExam $exam, bool $reallocate = false): array
     {
         $halls = $this->normalizedHalls($exam);

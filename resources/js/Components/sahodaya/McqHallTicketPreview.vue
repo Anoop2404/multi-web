@@ -66,6 +66,11 @@
                                 {{ sample.hall_ticket_no || '10001' }}
                             </td>
                         </tr>
+                        <tr v-if="design.show_exam_passcode !== false && sample.exam_passcode">
+                            <td class="py-0.5 font-semibold text-slate-600">Online exam passcode</td>
+                            <td class="w-3 text-center font-bold text-slate-500">:</td>
+                            <td class="py-0.5 font-mono font-black tracking-widest text-slate-900">{{ sample.exam_passcode }}</td>
+                        </tr>
                         <tr v-if="design.show_reg_no !== false && (sample.secondary_value || sample.student_reg_no || sample.admission_no)">
                             <td class="py-0.5 font-semibold text-slate-600">{{ sample.secondary_label || 'Admission No' }}</td>
                             <td class="w-3 text-center font-bold text-slate-500">:</td>

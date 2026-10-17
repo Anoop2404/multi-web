@@ -39,6 +39,9 @@ class McqHallTicketService
                 'hall_room'      => $registration->hall_room,
             ]);
 
+            // Every hall ticket carries an online exam passcode (printed only for online exams).
+            app(McqExamPasscodeService::class)->ensure($registration);
+
             return $registration->fresh();
         });
     }

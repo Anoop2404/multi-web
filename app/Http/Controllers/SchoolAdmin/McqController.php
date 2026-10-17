@@ -294,6 +294,7 @@ class McqController extends SchoolAdminController
 
         return $this->inertia('School/Mcq/ExamDetail', [
             'exam' => array_merge($exam->toArray(), [
+                'uses_engine' => \App\Services\ExamEngine\ExamEngineRun::usesEngine($exam),
                 'fee_label'              => McqExamLevelLabels::feeLabel($exam->fee_type, $exam->fee_amount),
                 'student_fee_label'      => McqExamLevelLabels::rupeeLabel($exam->fee_amount),
                 'school_discount_label'  => McqExamLevelLabels::rupeeLabel($exam->schoolDiscountAmount()),

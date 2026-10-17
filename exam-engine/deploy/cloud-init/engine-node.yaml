@@ -1,0 +1,173 @@
+#cloud-config
+# Exam engine node -- Ubuntu 24.04 LTS (DigitalOcean BLR1, image ubuntu-24-04-x64).
+#
+# Template. Render it with scripts/render-cloud-init.sh (never paste secrets into this file):
+#   a line holding only a BLOCK token is replaced by a file (EXAM_ENGINE_SERVICE from
+#   systemd/exam-engine.service, ENGINE_ENV from env/engine.env); every other double-underscore
+#   token is replaced by a value from env/ops.env. Rendering fails if any value is missing.
+#
+# NODE_MODE=node  : a working engine node (the always-on exam-engine-1).
+# NODE_MODE=image : golden image for snapshot-image.sh (no env file, engine stays stopped).
+# Burst nodes boot from the snapshot with cloud-init/engine-node-from-snapshot.yaml instead.
+
+package_update: true
+package_upgrade: true
+packages:
+  - ca-certificates
+  - curl
+  - jq
+  - chrony
+  - redis-tools
+
+users:
+  - default
+  - name: ops
+    gecos: Exam platform operator
+    groups: [sudo, adm, systemd-journal]
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    lock_passwd: true
+  - name: exam
+    gecos: Exam engine service
+    system: true
+    shell: /usr/sbin/nologin
+    homedir: /var/lib/exam-engine
+    no_create_home: true
+
+ssh_pwauth: false
+
+write_files:
+  # Many concurrent connections: big accept queues, wide port range, fast TIME_WAIT reuse.
+  - path: /etc/sysctl.d/90-exam-engine.conf
+    permissions: "0644"
+    content: |
+      fs.file-max = 2097152
+      fs.nr_open = 2097152
+      net.core.somaxconn = 65535
+      net.core.netdev_max_backlog = 65535
+      net.ipv4.tcp_max_syn_backlog = 65535
+      net.ipv4.ip_local_port_range = 10240 65535
+      net.ipv4.tcp_tw_reuse = 1
+      net.ipv4.tcp_fin_timeout = 15
+      net.ipv4.tcp_keepalive_time = 300
+      net.ipv4.tcp_keepalive_intvl = 30
+      net.ipv4.tcp_keepalive_probes = 5
+      net.ipv4.tcp_slow_start_after_idle = 0
+      net.core.rmem_max = 16777216
+      net.core.wmem_max = 16777216
+      net.ipv4.tcp_rmem = 4096 87380 16777216
+      net.ipv4.tcp_wmem = 4096 65536 16777216
+      vm.swappiness = 1
+
+  # Interactive shells (load generators, debugging). The service itself uses LimitNOFILE.
+  - path: /etc/security/limits.d/90-exam.conf
+    permissions: "0644"
+    content: |
+      *    soft nofile 200000
+      *    hard nofile 200000
+      root soft nofile 200000
+      root hard nofile 200000
+
+  - path: /etc/systemd/journald.conf.d/90-exam.conf
+    permissions: "0644"
+    content: |
+      [Journal]
+      SystemMaxUse=2G
+      RateLimitIntervalSec=30s
+      RateLimitBurst=20000
+
+  # Unattended security upgrades must never restart the engine mid-exam (needrestart would).
+  - path: /etc/needrestart/conf.d/90-exam.conf
+    permissions: "0644"
+    content: |
+      $nrconf{override_rc}{qr(^exam-engine)} = 0;
+      $nrconf{override_rc}{qr(^redis)} = 0;
+
+  - path: /etc/ssh/sshd_config.d/90-exam.conf
+    permissions: "0644"
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin prohibit-password
+
+  - path: /etc/systemd/system/exam-engine.service
+    permissions: "0644"
+    content: |
+      __BLOCK_EXAM_ENGINE_SERVICE__
+
+  - path: /etc/exam-engine/engine.env
+    owner: root:exam
+    permissions: "0640"
+    defer: true
+    content: |
+      __BLOCK_ENGINE_ENV__
+
+  # Values for the release install step below. Single-quoted shell assignments.
+  - path: /etc/exam-engine/install.env
+    permissions: "0600"
+    content: |
+      NODE_MODE='__NODE_MODE__'
+      ENGINE_RELEASE_URL='__ENGINE_RELEASE_URL__'
+      ENGINE_RELEASE_SHA256='__ENGINE_RELEASE_SHA256__'
+      INSTALL_NODE_EXPORTER='__INSTALL_NODE_EXPORTER__'
+
+  # exam-engine-install <tarball-path-or-https-url> [sha256]
+  # Unpacks exam-engine-<version>-linux-<arch>.tar.gz into /opt/exam-engine/releases/<version>,
+  # switches /opt/exam-engine/current atomically, keeps the 3 newest releases, restarts the service
+  # if it is running. Used by cloud-init, scale-out.sh, snapshot-image.sh and rolling-update.sh.
+  - path: /usr/local/sbin/exam-engine-install
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      src=${1:?usage: exam-engine-install <tarball-path-or-url> [sha256]}
+      want=${2:-}
+      root=/opt/exam-engine
+      tmp=$(mktemp -d)
+      trap 'rm -rf "$tmp"' EXIT
+      if [[ $src == http://* || $src == https://* ]]; then
+        curl -fsSL --retry 5 --retry-delay 3 --connect-timeout 10 -o "$tmp/release.tgz" "$src"
+      else
+        cp "$src" "$tmp/release.tgz"
+      fi
+      if [[ -n $want ]]; then
+        echo "$want  $tmp/release.tgz" | sha256sum -c --quiet -
+      fi
+      tar -xzf "$tmp/release.tgz" -C "$tmp"
+      dir=$(find "$tmp" -mindepth 1 -maxdepth 1 -type d -name 'exam-engine-*' | head -n 1)
+      [[ -n $dir && -x $dir/exam-engine && -f $dir/VERSION ]] || { echo "not an exam-engine release" >&2; exit 1; }
+      ver=$(tr -cd 'A-Za-z0-9._-' < "$dir/VERSION")
+      arch=$(cat "$dir/ARCH" 2>/dev/null || echo amd64)
+      [[ $arch == "$(dpkg --print-architecture)" ]] || { echo "release is for $arch" >&2; exit 1; }
+      install -d -m 0755 "$root/releases"
+      rm -rf "$root/releases/$ver"
+      mv "$dir" "$root/releases/$ver"
+      chown -R root:root "$root/releases/$ver"
+      chmod -R go-w "$root/releases/$ver"
+      ln -sfn "$root/releases/$ver" "$root/current.new"
+      mv -Tf "$root/current.new" "$root/current"
+      # keep the 3 newest releases (current is always among them)
+      ls -1dt "$root"/releases/*/ | tail -n +4 | while read -r old; do
+        [[ $(readlink -f "$old") == "$(readlink -f "$root/current")" ]] || rm -rf "$old"
+      done
+      if systemctl is-active --quiet exam-engine; then systemctl restart exam-engine; fi
+      echo "installed exam-engine $ver"
+
+runcmd:
+  - [sysctl, --system]
+  - [systemctl, daemon-reload]
+  - [systemctl, restart, systemd-journald]
+  - [install, -d, -o, exam, -g, exam, -m, "0750", /var/lib/exam-engine]
+  - [install, -d, -m, "0755", /opt/exam-engine/releases]
+  # Operators log in as `ops` with the SSH keys DigitalOcean installed for root.
+  - [bash, -c, 'install -d -m 0700 -o ops -g ops /home/ops/.ssh && if [ -s /root/.ssh/authorized_keys ]; then install -m 0600 -o ops -g ops /root/.ssh/authorized_keys /home/ops/.ssh/authorized_keys; fi']
+  - [bash, -c, 'systemctl try-reload-or-restart ssh.service || true']
+  - [bash, -c, 'set -a; . /etc/exam-engine/install.env; set +a; if [ -n "$ENGINE_RELEASE_URL" ]; then /usr/local/sbin/exam-engine-install "$ENGINE_RELEASE_URL" "$ENGINE_RELEASE_SHA256"; fi']
+  # Optional node_exporter, listening on the private interface only (scraped by Prometheus).
+  - [bash, -c, '. /etc/exam-engine/install.env; if [ "$INSTALL_NODE_EXPORTER" = yes ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y prometheus-node-exporter && ip=$(curl -fsS --max-time 5 http://169.254.169.254/metadata/v1/interfaces/private/0/ipv4/address) && echo "ARGS=\"--web.listen-address=${ip}:9100 --collector.systemd --collector.processes\"" > /etc/default/prometheus-node-exporter && systemctl restart prometheus-node-exporter; fi']
+  - [systemctl, enable, chrony]
+  - [systemctl, enable, exam-engine]
+  # image mode: drop the env file so the snapshot carries no secrets; node mode: start the engine.
+  - [bash, -c, '. /etc/exam-engine/install.env; if [ "$NODE_MODE" = image ]; then systemctl stop exam-engine || true; rm -f /etc/exam-engine/engine.env; else systemctl restart exam-engine; fi']
+
+final_message: "exam engine node ready after $UPTIME s (cloud-init $VERSION)"

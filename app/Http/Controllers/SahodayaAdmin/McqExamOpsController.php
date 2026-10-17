@@ -12,6 +12,7 @@ use App\Support\Mcq\McqExamPayload;
 use App\Support\Mcq\McqHallTicketDesign;
 use App\Support\TenantStorage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class McqExamOpsController extends SahodayaAdminController
 {
@@ -252,6 +253,14 @@ class McqExamOpsController extends SahodayaAdminController
             ->orderBy('title')
             ->get(['id', 'title', 'is_default', 'design_json']);
 
+        $memberSchools = \App\Models\Tenant::where('parent_id', $this->sahodaya->id)
+            ->where('type', 'school')
+            ->where('membership_status', 'approved')
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($s) => ['value' => $s->id, 'label' => $s->name])
+            ->values();
+
         return $this->inertia('Sahodaya/Mcq/HallTickets', [
             'exam'            => $exam,
             'templates'       => $templates,
@@ -265,6 +274,7 @@ class McqExamOpsController extends SahodayaAdminController
             'hallTicketsPublishedAt' => $exam->hall_tickets_published_at?->format('d M Y, h:i A'),
             'filters'         => $filters,
             'schoolOptions'   => $reports->schoolFilterOptions($exam),
+            'memberSchools'   => $memberSchools,
             'classOptions'    => $reports->classFilterOptions($exam),
         ]);
     }
@@ -304,6 +314,7 @@ class McqExamOpsController extends SahodayaAdminController
             'footer_note'         => 'nullable|string|max:500',
             'show_reg_no'         => 'nullable|boolean',
             'show_school'         => 'nullable|boolean',
+            'show_exam_passcode'  => 'nullable|boolean',
             'primary_color'       => 'nullable|string|max:7',
             'accent_color'        => 'nullable|string|max:7',
             'layout'              => 'nullable|in:standard,compact',
@@ -348,6 +359,7 @@ class McqExamOpsController extends SahodayaAdminController
             'footer_note'   => $data['footer_note'] ?? $current['footer_note'],
             'show_reg_no'   => array_key_exists('show_reg_no', $data) ? (bool) $data['show_reg_no'] : $current['show_reg_no'],
             'show_school'   => array_key_exists('show_school', $data) ? (bool) $data['show_school'] : $current['show_school'],
+            'show_exam_passcode' => array_key_exists('show_exam_passcode', $data) ? (bool) $data['show_exam_passcode'] : $current['show_exam_passcode'],
             'primary_color' => $data['primary_color'] ?? $current['primary_color'],
             'accent_color'  => $data['accent_color'] ?? $current['accent_color'],
             'layout'        => $data['layout'] ?? $current['layout'],
@@ -373,6 +385,23 @@ class McqExamOpsController extends SahodayaAdminController
         $exam->update($updateFields);
 
         return back()->with('success', 'Hall ticket design saved.');
+    }
+
+    /** New online exam passcode for one candidate (lost hall ticket, suspected sharing). */
+    public function reissuePasscode(string $tenantId, McqExam $exam, McqRegistration $registration, \App\Services\Mcq\McqExamPasscodeService $passcodes)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id || $registration->exam_id !== $exam->id, 403);
+        $this->assertStaffCan('mcq.manage');
+
+        if (! $registration->hall_ticket_no) {
+            return back()->with('error', 'Issue the hall ticket first — the passcode is created with it.');
+        }
+
+        $registration->loadMissing(['student:id,name', 'teacher:id,name']);
+        $code = \App\Services\Mcq\McqExamPasscodeService::format($passcodes->reissue($registration));
+        $name = $registration->student?->name ?? $registration->teacher?->name ?? 'the candidate';
+
+        return back()->with('success', "New passcode for {$name}: {$code}. The old one no longer works — reprint their hall ticket.");
     }
 
     public function printAllHallTickets(string $tenantId, McqExam $exam)
@@ -574,38 +603,295 @@ class McqExamOpsController extends SahodayaAdminController
         return back()->with('success', 'Staff removed.');
     }
 
-    public function questionBanks(string $tenantId, McqExam $exam)
+    /**
+     * Paper builder: the exam's sections (one per linked bank, in order), each taking all,
+     * the first N or a random N of the bank's questions. See McqPaperService.
+     */
+    public function questionBanks(string $tenantId, McqExam $exam, \App\Services\Mcq\McqPaperService $papers)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        $this->assertStaffCan('mcq.manage');
 
-        $exam->load('questionBanks.questions');
+        $linkedIds = $exam->questionBanks()->pluck('mcq_question_banks.id');
         $available = McqQuestionBank::where('sahodaya_id', $this->sahodaya->id)
             ->where('status', 'active')
+            ->whereNotIn('id', $linkedIds)
             ->withCount('questions')
-            ->latest()
-            ->get();
+            ->orderBy('title')
+            ->get(['id', 'title', 'subject', 'class_group']);
 
-        return $this->inertia('Sahodaya/Mcq/QuestionBanks', compact('exam', 'available'));
+        return $this->inertia('Sahodaya/Mcq/QuestionBanks', [
+            'exam'      => $exam->only('id', 'title', 'delivery_mode', 'results_published', 'total_questions', 'status'),
+            'paper'     => $papers->summary($exam),
+            'available' => $available,
+            'settings'  => [
+                'shuffle_questions' => (bool) ($exam->settings_json['shuffle_questions'] ?? false),
+                'multi_marking'     => $exam->multiMarkingMode(),
+            ],
+            'banksUrl'  => "/sahodaya-admin/{$this->sahodaya->id}/mcq/question-banks",
+            'engine'    => $this->enginePanel($exam),
+        ]);
+    }
+
+    /** Online exam engine settings + arming state for the Paper tab. */
+    private function enginePanel(McqExam $exam): array
+    {
+        $bookings = app(\App\Services\ExamEngine\ExamEngineBookingService::class);
+        $window = $exam->scheduled_at && \App\Services\ExamEngine\ExamEngineRun::usesEngine($exam) ? $bookings->window($exam) : null;
+
+        return [
+            'enabled'          => \App\Services\ExamEngine\ExamEngineRun::usesEngine($exam),
+            'online'           => $exam->isOnlineDelivery(),
+            'state'            => \App\Services\ExamEngine\ExamEngineRun::state($exam),
+            'armed_at'         => $exam->settings_json['engine_armed_at'] ?? null,
+            'version'          => $exam->settings_json['engine_bundle_version'] ?? null,
+            'settings'         => \App\Services\ExamEngine\ExamEngineRun::settings($exam),
+            'configured'       => app(\App\Services\ExamEngine\ExamEngineClient::class)->isConfigured(),
+            'started'          => $exam->scheduled_at && now()->greaterThanOrEqualTo($exam->scheduled_at),
+            'scheduled_at'     => $exam->scheduled_at?->toIso8601String(),
+            'exam_site_url'    => \App\Services\ExamEngine\ExamEngineBridge::examSiteUrl($exam),
+            'capacity'         => [
+                'limit'          => (int) config('exam_engine.capacity'),
+                'expected'       => $bookings->expectedCount($exam),
+                'others_at_peak' => $window ? $bookings->peakLoad($window[0], $window[1], $exam->tenant_id, $exam->id) : 0,
+                'window_start'   => $window ? $window[0]->toIso8601String() : null,
+                'window_end'     => $window ? $window[1]->toIso8601String() : null,
+            ],
+        ];
+    }
+
+    public function updateEngineSettings(Request $request, string $tenantId, McqExam $exam, \App\Services\ExamEngine\ExamEngineBridge $bridge, \App\Services\ExamEngine\ExamEngineBookingService $bookings)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        $this->assertStaffCan('mcq.manage');
+
+        $data = $request->validate([
+            'enabled'                        => 'required|boolean',
+            'timing'                         => 'required|in:fixed,individual',
+            'entry_mode'                     => 'required|in:either,portal_password,exam_passcode',
+            'supervision'                    => 'required|in:open,supervised',
+            'start_pin'                      => 'nullable|required_if:supervision,supervised|regex:/^[0-9]{4,8}$/',
+            'checkin_hours'                  => 'required|integer|min:1|max:168',
+            'waiting_room_minutes'           => 'required|integer|min:10|max:240',
+            'late_entry_minutes'             => 'required|integer|min:0|max:120',
+            'grace_seconds'                  => 'required|integer|min:30|max:600',
+            'show_score_on_submit'           => 'required|boolean',
+            'device_idle_minutes'            => 'required|integer|min:1|max:30',
+            'coordinator_extend_cap_minutes' => 'required|integer|min:0|max:60',
+        ], ['start_pin.regex' => 'The start PIN must be 4 to 8 digits.']);
+
+        if ($data['enabled'] && ! $exam->isOnlineDelivery()) {
+            return back()->with('error', 'Switch the exam to online delivery (Overview tab) before using the exam engine.');
+        }
+
+        $state = \App\Services\ExamEngine\ExamEngineRun::state($exam);
+        $started = $exam->scheduled_at && now()->greaterThanOrEqualTo($exam->scheduled_at);
+        $current = \App\Services\ExamEngine\ExamEngineRun::settings($exam);
+        $settings = array_merge($current, \Illuminate\Support\Arr::except($data, ['enabled']), [
+            'start_pin' => $data['supervision'] === 'supervised' ? ($data['start_pin'] ?? null) : null,
+        ]);
+
+        if ($state === 'armed' && $started) {
+            $locked = array_diff_key($settings, array_flip(['start_pin', 'late_entry_minutes', 'show_score_on_submit', 'coordinator_extend_cap_minutes']));
+            if (! $data['enabled'] || $locked != array_diff_key($current, array_flip(['start_pin', 'late_entry_minutes', 'show_score_on_submit', 'coordinator_extend_cap_minutes']))) {
+                return back()->with('error', 'The exam has started: only the start PIN, late entry, score visibility and the coordinator extension cap can still change.');
+            }
+        }
+        if ($state === 'armed' && ! $data['enabled']) {
+            return back()->with('error', 'Disarm the exam on the engine before switching the engine off.');
+        }
+
+        $exam->update(['settings_json' => array_merge($exam->settings_json ?? [], [
+            'engine'          => $data['enabled'] ? 'engine' : 'laravel',
+            'engine_settings' => $settings,
+        ])]);
+        $exam->refresh();
+        $bookings->sync($exam);
+
+        if ($state === 'armed') {
+            try {
+                $started
+                    ? app(\App\Services\ExamEngine\ExamEngineClient::class)->putMeta(\App\Services\ExamEngine\ExamEngineRun::for($exam), $bridge->meta($exam, app(\App\Services\Mcq\McqPaperService::class)->questionsForExam($exam), (int) ($exam->settings_json['engine_bundle_version'] ?? 1)))
+                    : $bridge->arm($exam);
+            } catch (\App\Services\ExamEngine\ExamEngineException $e) {
+                return back()->with('error', 'Settings saved, but the exam engine was not updated: '.$e->getMessage());
+            }
+
+            return back()->with('success', 'Engine settings saved and sent to the exam engine.');
+        }
+
+        return back()->with('success', 'Engine settings saved.');
+    }
+
+    public function armEngine(string $tenantId, McqExam $exam, \App\Services\ExamEngine\ExamEngineBridge $bridge)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        $this->assertStaffCan('mcq.manage');
+
+        try {
+            $result = $bridge->arm($exam);
+        } catch (\App\Services\ExamEngine\ExamEngineException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', "Armed on the exam engine: {$result['candidates']} candidates, {$result['questions']} questions (paper version {$result['version']}).");
+    }
+
+    public function disarmEngine(string $tenantId, McqExam $exam, \App\Services\ExamEngine\ExamEngineBridge $bridge)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        $this->assertStaffCan('mcq.manage');
+
+        try {
+            $bridge->disarm($exam);
+        } catch (\App\Services\ExamEngine\ExamEngineException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Disarmed. Students can no longer check in until you arm it again.');
     }
 
     public function attachBank(Request $request, string $tenantId, McqExam $exam)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        $this->assertStaffCan('mcq.manage');
+        if ($response = $this->rejectIfPaperLocked($exam)) {
+            return $response;
+        }
 
-        $data = $request->validate(['bank_id' => 'required|exists:mcq_question_banks,id']);
+        $data = $request->validate(['bank_id' => 'required|integer']);
         $bank = McqQuestionBank::where('sahodaya_id', $this->sahodaya->id)->findOrFail($data['bank_id']);
+        if ($bank->status !== 'active') {
+            return back()->with('error', 'Only banks marked Ready can be added to a paper.');
+        }
 
-        $exam->questionBanks()->syncWithoutDetaching([$bank->id]);
+        $nextOrder = ((int) DB::table('mcq_exam_question_banks')->where('exam_id', $exam->id)->max('display_order')) + 1;
+        $exam->questionBanks()->syncWithoutDetaching([$bank->id => ['pick_mode' => 'all', 'display_order' => $nextOrder]]);
 
-        return back()->with('success', 'Question bank linked to exam.');
+        return back()->with('success', "Added \"{$bank->title}\" to the paper.");
+    }
+
+    public function updateSection(Request $request, string $tenantId, McqExam $exam, McqQuestionBank $bank)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        $this->assertStaffCan('mcq.manage');
+        if ($response = $this->rejectIfPaperLocked($exam)) {
+            return $response;
+        }
+        abort_unless($exam->questionBanks()->whereKey($bank->id)->exists(), 404);
+
+        $data = $request->validate([
+            'section_title' => 'nullable|string|max:120',
+            'pick_mode'     => 'required|in:'.implode(',', \App\Services\Mcq\McqPaperService::PICK_MODES),
+            'pick_count'    => 'nullable|required_unless:pick_mode,all|integer|min:1|max:1000',
+        ]);
+        if ($data['pick_mode'] === 'all') {
+            $data['pick_count'] = null;
+        }
+
+        $exam->questionBanks()->updateExistingPivot($bank->id, $data);
+
+        return back()->with('success', 'Section saved.');
+    }
+
+    public function moveSection(Request $request, string $tenantId, McqExam $exam, McqQuestionBank $bank)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        $this->assertStaffCan('mcq.manage');
+        if ($response = $this->rejectIfPaperLocked($exam)) {
+            return $response;
+        }
+
+        $direction = $request->validate(['direction' => 'required|in:up,down'])['direction'];
+        $ids = $exam->questionBanks()->pluck('mcq_question_banks.id')->values()->all();
+        $index = array_search($bank->id, $ids, true);
+        $swap = $direction === 'up' ? $index - 1 : $index + 1;
+
+        if ($index !== false && isset($ids[$swap])) {
+            [$ids[$index], $ids[$swap]] = [$ids[$swap], $ids[$index]];
+            DB::transaction(function () use ($exam, $ids) {
+                foreach ($ids as $position => $id) {
+                    $exam->questionBanks()->updateExistingPivot($id, ['display_order' => $position + 1]);
+                }
+            });
+        }
+
+        return back();
+    }
+
+    public function updatePaperSettings(Request $request, string $tenantId, McqExam $exam)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        $this->assertStaffCan('mcq.manage');
+        if ($response = $this->rejectIfPaperLocked($exam)) {
+            return $response;
+        }
+
+        $data = $request->validate([
+            'shuffle_questions' => 'required|boolean',
+            'multi_marking'     => 'required|in:all_or_nothing,partial',
+        ]);
+
+        $exam->update(['settings_json' => array_merge($exam->settings_json ?? [], [
+            'shuffle_questions' => (bool) $data['shuffle_questions'],
+            'multi_marking'     => $data['multi_marking'],
+        ])]);
+
+        return back()->with('success', 'Paper settings saved.');
+    }
+
+    /** The paper exactly as it will be delivered (unshuffled), with answer keys for checking. */
+    public function paperPreview(string $tenantId, McqExam $exam, \App\Services\Mcq\McqPaperService $papers)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        $this->assertStaffCan('mcq.manage');
+
+        $banksUrl = "/sahodaya-admin/{$this->sahodaya->id}/mcq/question-banks";
+        $questions = $papers->questionsForExam($exam)->values()->map(fn (\App\Models\McqQuestion $q, int $i) => [
+            'id'           => $q->id,
+            'number'       => $i + 1,
+            'type'         => $q->typeValue(),
+            'type_label'   => \App\Models\McqQuestion::TYPE_LABELS[$q->typeValue()],
+            'body_text'    => $q->body_text,
+            'image_url'    => $q->document_path ? "{$banksUrl}/{$q->bank_id}/questions/{$q->id}/image" : null,
+            'options'      => collect($q->options_json ?? [])->map(fn ($o) => [
+                'key'       => strtolower((string) ($o['key'] ?? '')),
+                'label'     => (string) ($o['label'] ?? ''),
+                'image_url' => filled($o['image_path'] ?? null) ? "{$banksUrl}/{$q->bank_id}/questions/{$q->id}/image?option=".strtolower((string) $o['key']) : null,
+            ])->values(),
+            'correct_keys' => $q->typeValue() === \App\Models\McqQuestion::TYPE_NUMERIC ? [] : $q->correctKeys(),
+            'show_count'   => $q->showsCorrectCount(),
+            'answer_label' => $q->answerKeyLabel(),
+            'explanation'  => $q->explanation,
+            'marks'        => $q->marksValue(),
+            'negative_mark'=> $q->negativeMarkValue(),
+            'gradable'     => $q->isGradable(),
+        ]);
+
+        return $this->inertia('Sahodaya/Mcq/PaperPreview', [
+            'exam'      => $exam->only('id', 'title', 'delivery_mode', 'results_published', 'duration_minutes'),
+            'questions' => $questions,
+            'paper'     => $papers->summary($exam),
+        ]);
     }
 
     public function detachBank(string $tenantId, McqExam $exam, McqQuestionBank $bank)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        $this->assertStaffCan('mcq.manage');
+        if ($response = $this->rejectIfPaperLocked($exam)) {
+            return $response;
+        }
         $exam->questionBanks()->detach($bank->id);
 
-        return back()->with('success', 'Question bank removed from exam.');
+        return back()->with('success', 'Section removed from the paper.');
+    }
+
+    private function rejectIfPaperLocked(McqExam $exam)
+    {
+        return McqRegistration::where('exam_id', $exam->id)->whereNotNull('started_at')->exists()
+            ? back()->with('error', 'Students have started this exam, so its paper can no longer be changed.')
+            : null;
     }
 
     public function sessionMonitor(string $tenantId, McqExam $exam)

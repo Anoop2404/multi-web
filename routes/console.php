@@ -18,6 +18,8 @@ Schedule::command('training:reminders --payment')->dailyAt('09:15')->withoutOver
 Schedule::command('training:session-reminders')->hourly()->withoutOverlapping();
 Schedule::command('mcq:auto-submit-expired')->everyFiveMinutes()->withoutOverlapping(5);
 Schedule::command('mcq:transition-exam-windows')->everyFifteenMinutes()->withoutOverlapping(10);
+Schedule::command('exam-engine:arm-due')->everyFiveMinutes()->withoutOverlapping(10)
+    ->when(fn () => filled(config('exam_engine.internal_url')));
 Schedule::command('mcq:exam-reminders')->hourly()->withoutOverlapping();
 Schedule::command('membership:update-renewal-status')->dailyAt('02:00')->withoutOverlapping();
 Schedule::command('subscriptions:process-lifecycle')->dailyAt('02:15')->withoutOverlapping();

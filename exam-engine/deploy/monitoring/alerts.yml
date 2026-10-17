@@ -1,0 +1,237 @@
+# /etc/prometheus/alerts.yml -- exam platform alerts. Validate with: promtool check rules alerts.yml
+# Thresholds follow the go-live gates (plan section 10): p95 sync < 300 ms, errors < 0.1 %,
+# Redis latency < 10 ms, consumer lag back to 0 within minutes, Redis memory alarm at 70 %.
+# Each alert names the runbook section (docs/ONLINE_EXAM_RUNBOOK.md) to open.
+
+groups:
+  - name: exam-engine
+    rules:
+      - alert: ExamEngineNodeDown
+        expr: up{job="exam-engine", in_lb="yes"} == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Engine node {{ $labels.instance }} is not answering on :8090"
+          description: "The LB should already have removed it (health check). Check capacity of the remaining nodes."
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i1-engine-node-lost"
+
+      - alert: ExamEngineNodesBelowPlan
+        expr: count(up{job="exam-engine", in_lb="yes"} == 1) < count(up{job="exam-engine", in_lb="yes"})
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Only {{ $value }} engine nodes are up in the LB pool"
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i1-engine-node-lost"
+
+      - alert: ExamSyncLatencyHigh
+        expr: histogram_quantile(0.95, sum by (le) (rate(exam_http_request_duration_seconds_bucket{route="sync"}[5m]))) > 0.3
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "p95 /api/sync latency {{ $value | humanizeDuration }} (gate: 300 ms)"
+          description: "Check engine CPU, Redis latency and pacing. Raising the pace (30-60 s) sheds load."
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i8-slow-or-overloaded-engine"
+
+      - alert: ExamSyncLatencyCritical
+        expr: histogram_quantile(0.95, sum by (le) (rate(exam_http_request_duration_seconds_bucket{route="sync"}[2m]))) > 1
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "p95 /api/sync latency {{ $value | humanizeDuration }}"
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i8-slow-or-overloaded-engine"
+
+      - alert: ExamApi5xxRate
+        expr: |
+          sum(rate(exam_http_requests_total{code=~"5..", route!="login"}[5m]))
+            / clamp_min(sum(rate(exam_http_requests_total{route!="login"}[5m])), 1e-9) > 0.001
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $value | humanizePercentage }} of exam API requests fail with 5xx (gate: < 0.1 %)"
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i8-slow-or-overloaded-engine"
+
+      - alert: ExamApi5xxRateCritical
+        expr: |
+          sum(rate(exam_http_requests_total{code=~"5..", route!="login"}[2m]))
+            / clamp_min(sum(rate(exam_http_requests_total{route!="login"}[2m])), 1e-9) > 0.01
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $value | humanizePercentage }} of exam API requests fail with 5xx"
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i8-slow-or-overloaded-engine"
+
+      # 503 busy on login is by design when the bcrypt queue is full; sustained, it means too few cores.
+      - alert: ExamLoginBusyRate
+        expr: |
+          sum(rate(exam_http_requests_total{route="login", code="503"}[5m]))
+            / clamp_min(sum(rate(exam_http_requests_total{route="login"}[5m])), 1e-9) > 0.05
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $value | humanizePercentage }} of logins answered 503 busy"
+          description: "Students see 'Signing you in... N ahead'. Add an engine node or ask schools to use passcodes."
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i9-login-queue-backlog"
+
+      - alert: ExamLoginBusyRateCritical
+        expr: |
+          sum(rate(exam_http_requests_total{route="login", code="503"}[5m]))
+            / clamp_min(sum(rate(exam_http_requests_total{route="login"}[5m])), 1e-9) > 0.25
+        for: 3m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $value | humanizePercentage }} of logins answered 503 busy"
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i9-login-queue-backlog"
+
+      - alert: ExamLoginQueueDeep
+        expr: sum(exam_login_queue_depth) > 500
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $value }} password logins waiting for a bcrypt slot"
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i9-login-queue-backlog"
+
+      - alert: ExamPacingRaised
+        expr: max(exam_pace_seconds) >= 30
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Sync pacing raised to {{ $value }} s (engine under load)"
+          description: "Expected briefly at T0 and at the deadline. Sustained = capacity problem."
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i8-slow-or-overloaded-engine"
+
+      - alert: ExamEngineCpuSaturated
+        expr: 1 - avg by (instance) (rate(node_cpu_seconds_total{group="engine", mode="idle"}[5m])) > 0.85
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Engine node {{ $labels.instance }} CPU {{ $value | humanizePercentage }}"
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i8-slow-or-overloaded-engine"
+
+  - name: exam-redis
+    rules:
+      - alert: RedisDown
+        expr: redis_up == 0 or up{job="redis"} == 0
+        for: 30s
+        labels: { severity: critical }
+        annotations:
+          summary: "Redis on {{ $labels.instance }} is down"
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i2-redis-primary-lost--failover"
+
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / (redis_memory_max_bytes > 0) > 0.70
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "Redis {{ $labels.instance }} at {{ $value | humanizePercentage }} of maxmemory (noeviction: writes fail at 100 %)"
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i10-redis-memory-high"
+
+      - alert: RedisMemoryCritical
+        expr: redis_memory_used_bytes / (redis_memory_max_bytes > 0) > 0.85
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Redis {{ $labels.instance }} at {{ $value | humanizePercentage }} of maxmemory"
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i10-redis-memory-high"
+
+      - alert: RedisReplicationBroken
+        expr: redis_master_link_up == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Redis replica {{ $labels.instance }} lost its link to the primary"
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i2-redis-primary-lost--failover"
+
+      - alert: RedisReplicaMissing
+        expr: (count(up{job="redis"} == 1) > 1) and on() (max(redis_connected_slaves) < 1)
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Two Redis nodes are up but the primary has no connected replica"
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i2-redis-primary-lost--failover"
+
+      - alert: RedisSplitBrain
+        expr: count(redis_instance_info{role="master"}) > 1
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "More than one Redis node reports role=master"
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i2-redis-primary-lost--failover"
+
+      - alert: RedisAofWriteFailing
+        expr: redis_aof_last_write_status == 0 or redis_aof_last_bgrewrite_status == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Redis {{ $labels.instance }} AOF write/rewrite failing (disk?)"
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i10-redis-memory-high"
+
+      - alert: RedisBackupFailing
+        expr: redis_rdb_last_bgsave_status == 0
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Daily Redis snapshot (BGSAVE) failed on {{ $labels.instance }}"
+
+      - alert: RedisSlowEval
+        expr: |
+          sum(rate(redis_commands_duration_seconds_total{cmd=~"evalsha|eval|fcall"}[5m]))
+            / clamp_min(sum(rate(redis_commands_total{cmd=~"evalsha|eval|fcall"}[5m])), 1e-9) > 0.005
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Average Lua call in Redis takes {{ $value | humanizeDuration }} (gate: Redis latency < 10 ms)"
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i8-slow-or-overloaded-engine"
+
+  - name: exam-pipeline
+    rules:
+      # redis_exporter --check-single-streams=db0=ex:events exports stream + consumer-group metrics.
+      - alert: ExamConsumerLagHigh
+        expr: max(redis_stream_group_lag{stream="ex:events"}) > 5000
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Laravel consumers are {{ $value }} events behind"
+          description: "Results and audit logs are delayed; the exam itself is unaffected. Gate: lag back to 0 within 5 min of the submit rush."
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i6-consumer-backlog"
+
+      - alert: ExamConsumerStalled
+        expr: |
+          (max(redis_stream_group_lag{stream="ex:events"}) > 0)
+            and on() (min(redis_stream_group_consumer_idle_seconds{stream="ex:events"}) > 120)
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Events are waiting but no Laravel consumer has claimed for > 2 min"
+          description: "Check supervisor program exam-engine-consumer on the aaPanel server and Laravel->engine reachability."
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i5-laravel-unreachable-engine-keeps-running"
+
+      - alert: ExamEventStreamNearCap
+        expr: max(redis_stream_length{stream="ex:events"}) > 400000
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "ex:events holds {{ $value }} entries; the engine trims at ~500,000 -- unconsumed events will be lost"
+          runbook: "ONLINE_EXAM_RUNBOOK.md#i6-consumer-backlog"
+
+  - name: exam-hosts
+    rules:
+      - alert: HostClockSkew
+        expr: abs(node_timex_offset_seconds) > 0.25 or node_timex_sync_status == 0
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.instance }} clock offset {{ $value }} s or NTP unsynchronised (the server owns the exam clock)"
+
+      - alert: HostDiskFilling
+        expr: 1 - node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} > 0.80
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.instance }} root disk {{ $value | humanizePercentage }} full (Redis AOF / journald)"
+
+      - alert: HostMemoryLow
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.10
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.instance }} has {{ $value | humanizePercentage }} memory available"

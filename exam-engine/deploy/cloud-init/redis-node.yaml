@@ -1,0 +1,218 @@
+#cloud-config
+# redis-exam node -- Ubuntu 24.04 LTS (DigitalOcean BLR1). Redis 7 from the Ubuntu archive.
+#
+# Template. Render with scripts/render-cloud-init.sh (it never needs hand edits). Tokens:
+#   BLOCK REDIS_CONF      redis/redis.conf.snippet    (password rendered in)
+#   BLOCK SENTINEL_CONF   redis/sentinel.conf.example (password rendered in)
+#   REDIS_ROLE            primary (redis-exam-1) | replica (burst replica, resize-redis.sh up)
+#   REDIS_PRIMARY_IP      VPC IP of the current primary (replica role only; empty for primary)
+#   ENABLE_SENTINEL       yes | no  (Stage A: no; Stage B: yes)
+#   INSTALL_REDIS_EXPORTER / INSTALL_NODE_EXPORTER  yes | no
+#
+# Valkey instead of Redis: install `valkey-server`/`valkey-sentinel` (paths /etc/valkey/*.conf,
+# services valkey-server/valkey-sentinel) and adjust the paths in exam-redis-setup; the config
+# directives are identical.
+
+package_update: true
+package_upgrade: true
+packages:
+  - redis-server
+  - redis-sentinel
+  - redis-tools
+  - chrony
+  - jq
+  - curl
+
+users:
+  - default
+  - name: ops
+    gecos: Exam platform operator
+    groups: [sudo, adm, systemd-journal]
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    lock_passwd: true
+
+ssh_pwauth: false
+
+write_files:
+  - path: /etc/sysctl.d/90-exam-redis.conf
+    permissions: "0644"
+    content: |
+      # Fork for AOF rewrite / BGSAVE must never fail for lack of overcommit.
+      vm.overcommit_memory = 1
+      vm.swappiness = 1
+      net.core.somaxconn = 65535
+      net.ipv4.tcp_max_syn_backlog = 65535
+      net.core.netdev_max_backlog = 65535
+      fs.file-max = 1048576
+
+  # Transparent huge pages cause latency spikes and fork copy-on-write blowups in Redis.
+  - path: /etc/systemd/system/disable-thp.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=Disable transparent huge pages (Redis)
+      DefaultDependencies=no
+      Before=redis-server.service redis-sentinel.service
+      After=sysinit.target local-fs.target
+      [Service]
+      Type=oneshot
+      ExecStart=/bin/sh -c 'echo never > /sys/kernel/mm/transparent_hugepage/enabled; echo never > /sys/kernel/mm/transparent_hugepage/defrag'
+      RemainAfterExit=yes
+      [Install]
+      WantedBy=basic.target
+
+  - path: /etc/systemd/system/redis-server.service.d/90-exam.conf
+    permissions: "0644"
+    content: |
+      [Service]
+      LimitNOFILE=100000
+      Restart=always
+      RestartSec=2
+      # Give a large AOF time to load and a clean shutdown time to fsync.
+      TimeoutStartSec=600
+      TimeoutStopSec=120
+      OOMScoreAdjust=-900
+
+  - path: /etc/systemd/system/redis-sentinel.service.d/90-exam.conf
+    permissions: "0644"
+    content: |
+      [Service]
+      Restart=always
+      RestartSec=2
+
+  - path: /etc/needrestart/conf.d/90-exam.conf
+    permissions: "0644"
+    content: |
+      $nrconf{override_rc}{qr(^redis)} = 0;
+      $nrconf{override_rc}{qr(^exam-engine)} = 0;
+
+  - path: /etc/ssh/sshd_config.d/90-exam.conf
+    permissions: "0644"
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin prohibit-password
+
+  - path: /etc/exam-redis/node.env
+    permissions: "0600"
+    content: |
+      REDIS_ROLE='__REDIS_ROLE__'
+      REDIS_PRIMARY_IP='__REDIS_PRIMARY_IP__'
+      ENABLE_SENTINEL='__ENABLE_SENTINEL__'
+      INSTALL_REDIS_EXPORTER='__INSTALL_REDIS_EXPORTER__'
+      INSTALL_NODE_EXPORTER='__INSTALL_NODE_EXPORTER__'
+      REDIS_MAXMEMORY_PERCENT='60'
+
+  - path: /etc/exam-redis/redis.conf.tpl
+    permissions: "0600"
+    content: |
+      __BLOCK_REDIS_CONF__
+
+  - path: /etc/exam-redis/sentinel.conf.tpl
+    permissions: "0600"
+    content: |
+      __BLOCK_SENTINEL_CONF__
+
+  # First-boot configuration: fill the node-specific tokens and install the configs.
+  # Refuses to run twice (afterwards Redis/Sentinel own their files); --force to redo.
+  - path: /usr/local/sbin/exam-redis-setup
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      marker=/etc/exam-redis/.configured
+      if [[ -e $marker && ${1:-} != --force ]]; then echo "already configured ($marker)"; exit 0; fi
+      . /etc/exam-redis/node.env
+      priv=$(curl -fsS --max-time 5 http://169.254.169.254/metadata/v1/interfaces/private/0/ipv4/address)
+      [[ $priv =~ ^[0-9.]+$ ]] || { echo "no VPC IP from metadata" >&2; exit 1; }
+      mem_kb=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
+      maxmem_mb=$(( mem_kb * ${REDIS_MAXMEMORY_PERCENT:-60} / 100 / 1024 ))
+      ncpu=$(nproc); io=$(( ncpu / 2 )); (( io < 1 )) && io=1; (( io > 4 )) && io=4
+      primary=$priv
+      if [[ $REDIS_ROLE == replica ]]; then
+        [[ $REDIS_PRIMARY_IP =~ ^[0-9.]+$ ]] || { echo "replica needs REDIS_PRIMARY_IP" >&2; exit 1; }
+        primary=$REDIS_PRIMARY_IP
+      fi
+      [[ -e /etc/redis/redis.conf.ubuntu ]] || cp -p /etc/redis/redis.conf /etc/redis/redis.conf.ubuntu
+      sed -e "s/@PRIVATE_IP@/$priv/g" -e "s/@MAXMEMORY_MB@/$maxmem_mb/g" -e "s/@IO_THREADS@/$io/g" \
+        /etc/exam-redis/redis.conf.tpl > /etc/redis/redis.conf.new
+      install -o redis -g redis -m 0640 /etc/redis/redis.conf.new /etc/redis/redis.conf
+      rm -f /etc/redis/redis.conf.new
+      [[ -e /etc/redis/sentinel.conf.ubuntu ]] || cp -p /etc/redis/sentinel.conf /etc/redis/sentinel.conf.ubuntu
+      sed -e "s/@PRIVATE_IP@/$priv/g" -e "s/@PRIMARY_IP@/$primary/g" \
+        /etc/exam-redis/sentinel.conf.tpl > /etc/redis/sentinel.conf.new
+      install -o redis -g redis -m 0640 /etc/redis/sentinel.conf.new /etc/redis/sentinel.conf
+      rm -f /etc/redis/sentinel.conf.new
+      echo "$priv" > /etc/exam-redis/private-ip
+      touch "$marker"
+      echo "redis configured: ip=$priv maxmemory=${maxmem_mb}mb io-threads=$io role=$REDIS_ROLE primary=$primary"
+
+  # After a power-cycle resize: re-derive maxmemory from the new RAM (io-threads needs a restart).
+  - path: /usr/local/sbin/exam-redis-tune
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      . /etc/exam-redis/node.env
+      mem_kb=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
+      maxmem_mb=$(( mem_kb * ${REDIS_MAXMEMORY_PERCENT:-60} / 100 / 1024 ))
+      exam-redis-cli CONFIG SET maxmemory "${maxmem_mb}mb" >/dev/null
+      exam-redis-cli CONFIG REWRITE >/dev/null
+      echo "maxmemory=${maxmem_mb}mb"
+
+  # redis-cli with the exam password (root only; reads it from redis.conf, never from argv).
+  - path: /usr/local/bin/exam-redis-cli
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      pass=$(awk '$1 == "requirepass" {print $2; exit}' /etc/redis/redis.conf)
+      pass=${pass#\"}; pass=${pass%\"}
+      REDISCLI_AUTH=$pass exec redis-cli "$@"
+
+  # Daily snapshot (plan: "AOF + daily snapshot"): BGSAVE, gzip copy, keep 7 days.
+  - path: /usr/local/sbin/exam-redis-backup
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      out=/var/backups/exam-redis
+      install -d -m 0700 "$out"
+      before=$(exam-redis-cli LASTSAVE)
+      exam-redis-cli BGSAVE >/dev/null
+      for _ in $(seq 1 600); do
+        sleep 2
+        [[ $(exam-redis-cli LASTSAVE) != "$before" ]] && break
+      done
+      [[ $(exam-redis-cli LASTSAVE) != "$before" ]] || { echo "BGSAVE did not finish" >&2; exit 1; }
+      gzip -c /var/lib/redis/dump.rdb > "$out/dump-$(date -u +%Y%m%dT%H%MZ).rdb.gz"
+      find "$out" -name 'dump-*.rdb.gz' -mtime +7 -delete
+
+  # 03:00 IST, outside exam hours. Replicas skip (the primary's copy is enough).
+  - path: /etc/cron.d/exam-redis-backup
+    permissions: "0644"
+    content: |
+      SHELL=/bin/bash
+      PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      30 21 * * * root exam-redis-cli ROLE | head -n1 | grep -q master && exam-redis-backup >> /var/log/exam-redis-backup.log 2>&1
+
+runcmd:
+  - [systemctl, daemon-reload]
+  - [systemctl, enable, --now, disable-thp.service]
+  - [sysctl, --system]
+  - [bash, -c, 'install -d -m 0700 -o ops -g ops /home/ops/.ssh && if [ -s /root/.ssh/authorized_keys ]; then install -m 0600 -o ops -g ops /root/.ssh/authorized_keys /home/ops/.ssh/authorized_keys; fi']
+  - [bash, -c, 'systemctl try-reload-or-restart ssh.service || true']
+  - [/usr/local/sbin/exam-redis-setup]
+  - [systemctl, enable, redis-server]
+  - [systemctl, restart, redis-server]
+  # A replica starts empty and follows the current primary. Set at runtime + CONFIG REWRITE so
+  # Sentinel can later change the role in the same file.
+  - [bash, -c, '. /etc/exam-redis/node.env; if [ "$REDIS_ROLE" = replica ]; then for i in $(seq 1 30); do exam-redis-cli PING | grep -q PONG && break; sleep 1; done; exam-redis-cli REPLICAOF "$REDIS_PRIMARY_IP" 6379 && exam-redis-cli CONFIG REWRITE; fi']
+  - [bash, -c, '. /etc/exam-redis/node.env; if [ "$ENABLE_SENTINEL" = yes ]; then systemctl enable redis-sentinel && systemctl restart redis-sentinel; else systemctl disable --now redis-sentinel; fi']
+  # redis_exporter (incl. the ex:events stream: length, consumer-group lag/pending) on the VPC IP.
+  - [bash, -c, '. /etc/exam-redis/node.env; if [ "$INSTALL_REDIS_EXPORTER" = yes ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y prometheus-redis-exporter && ip=$(cat /etc/exam-redis/private-ip) && pass=$(awk ''$1 == "requirepass" {print $2; exit}'' /etc/redis/redis.conf) && umask 077 && printf "ARGS=\"--web.listen-address=%s:9121 --check-single-streams=db0=ex:events --include-system-metrics\"\nREDIS_ADDR=redis://127.0.0.1:6379\nREDIS_PASSWORD=%s\n" "$ip" "$pass" > /etc/default/prometheus-redis-exporter && systemctl restart prometheus-redis-exporter; fi']
+  - [bash, -c, '. /etc/exam-redis/node.env; if [ "$INSTALL_NODE_EXPORTER" = yes ]; then DEBIAN_FRONTEND=noninteractive apt-get install -y prometheus-node-exporter && ip=$(cat /etc/exam-redis/private-ip) && echo "ARGS=\"--web.listen-address=${ip}:9100 --collector.systemd\"" > /etc/default/prometheus-node-exporter && systemctl restart prometheus-node-exporter; fi']
+  - [systemctl, enable, chrony]
+
+final_message: "redis-exam node ready after $UPTIME s"
