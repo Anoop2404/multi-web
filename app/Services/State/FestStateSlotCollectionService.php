@@ -49,6 +49,7 @@ class FestStateSlotCollectionService
             $batch = $this->nominations->openBatch($program, $hubEvent);
             abort_if($batch->isCertified(), 422, 'This event is already registered with State.');
 
+            $hubEvent->update(['state_slot_collection_open' => true, 'state_slot_collection_opened_at' => now()]);
             $result = $this->sheets->autoFill($program, $hubEvent, $by);
 
             // Only rows this call (or an earlier hand-pick that predates collection) actually
@@ -60,11 +61,6 @@ class FestStateSlotCollectionService
                 ->whereNull('school_response')
                 ->update(['school_response' => 'pending']);
 
-            $hubEvent->update([
-                'state_slot_collection_open' => true,
-                'state_slot_collection_opened_at' => now(),
-            ]);
-
             return $result;
         });
     }
@@ -75,6 +71,8 @@ class FestStateSlotCollectionService
      */
     public function syncAdditionalSlots(FestStateProgram $program, FestEvent $hubEvent, User $by): array
     {
+        abort_unless($hubEvent->state_slot_collection_open, 422, 'Open collection first.');
+        abort_if($hubEvent->state_slot_collection_approved_at, 422, 'This slot list is already approved.');
         return DB::transaction(function () use ($program, $hubEvent, $by) {
             $batch = $this->nominations->openBatch($program, $hubEvent);
             abort_if($batch->isCertified(), 422, 'This event is already registered with State.');
@@ -105,16 +103,25 @@ class FestStateSlotCollectionService
         $hubEvent = $batch->hubEvent;
         abort_unless($hubEvent, 404);
         abort_unless($hubEvent->state_slot_collection_open, 422, 'State slot collection is not open for this event.');
+        abort_if($hubEvent->state_slot_collection_approved_at, 422, 'The State slot list is already approved.');
         abort_if($batch->isCertified(), 422, 'This has already been registered with State and can no longer be changed here.');
 
         return DB::transaction(function () use ($selection, $action, $reason, $by, $batch, $hubEvent) {
             FestStateNominationBatch::whereKey($batch->id)->lockForUpdate()->first();
             $selection->refresh();
+            $batch->refresh();
+            abort_if($batch->isCertified(), 422, 'This has already been registered with State.');
 
             abort_unless($selection->status === 'selected' && $selection->nomination_type === 'primary', 422, 'This slot is no longer open to respond to.');
             abort_unless($selection->school_response === 'pending', 422, 'Already responded to.');
 
+            $hubEvent->refresh();
+            abort_if($hubEvent->state_slot_collection_approved_at, 422, 'The State slot list is already approved.');
             if ($action === 'accept') {
+                $pool = app(FestStateCollectionCandidates::class)->pool(FestStateProgram::findOrFail($batch->state_program_id), $hubEvent);
+                abort_unless($pool->contains(fn ($candidate) => $candidate['item_id'] === $selection->item_id
+                    && ($candidate['participant_id'] === $selection->participant_id || ($selection->mark_id && $candidate['mark_id'] === $selection->mark_id))),
+                    422, 'This offer is no longer eligible. Ask the Sahodaya to review the entry.');
                 $selection->update([
                     'school_response' => 'accepted',
                     'school_responded_by' => $by->id,
@@ -141,7 +148,7 @@ class FestStateSlotCollectionService
             ]);
 
             $program = FestStateProgram::findOrFail($batch->state_program_id);
-            $this->sheets->autoFill($program, $hubEvent, $by);
+            $this->sheets->autoFill($program, $hubEvent, $by, $selection->item_id);
 
             // Whichever row autoFill() just created for this item to fill the freed slot — tag it
             // as waiting on its own school, and note the chain for the admin's list.
@@ -177,7 +184,7 @@ class FestStateSlotCollectionService
         $pendingCount = $batch->selections()
             ->where('nomination_type', 'primary')
             ->where('status', 'selected')
-            ->where('school_response', 'pending')
+            ->where(fn ($query) => $query->whereNull('school_response')->orWhere('school_response', '!=', 'accepted'))
             ->count();
 
         $blocking = $readiness['blocking'];
@@ -203,14 +210,19 @@ class FestStateSlotCollectionService
      */
     public function summary(FestStateProgram $program, FestEvent $hubEvent): Collection
     {
-        $sheet = $this->sheets->sheet($program, $hubEvent);
+        $sheet = $this->sheets->sheet($program, $hubEvent, ['slot_collection' => true]);
         $batch = $this->nominations->openBatch($program, $hubEvent);
         $byItem = $batch->selections()
             ->where('nomination_type', 'primary')
             ->get()
             ->groupBy('item_id');
 
-        return $sheet->map(function (array $row) use ($byItem) {
+        $labels = \App\Support\FestClassGroupScheme::labels(null, $hubEvent->rootEvent());
+        return $sheet->map(function (array $row) use ($byItem, $labels) {
+            $displayItem = new \App\Models\FestEventItem($row);
+            $row['category_label'] = \App\Support\FestItemCategoryLabel::resolve($displayItem, $labels);
+            $row['gender_label'] = \App\Support\FestItemCategoryLabel::genderLabel($row['gender']) ?? 'Open';
+            $row['type_label'] = \App\Support\FestItemCategoryLabel::typeLabel($row['participant_type']);
             $rows = $byItem->get($row['item_id'], collect());
 
             $row['school_responses'] = [
@@ -252,7 +264,7 @@ class FestStateSlotCollectionService
     {
         $batch = $this->nominations->openBatch($program, $hubEvent);
 
-        return $batch->selections()
+        $offered = $batch->selections()
             ->where('nomination_type', 'primary')
             ->where('school_id', $schoolId)
             ->whereNotNull('school_response')
@@ -262,6 +274,8 @@ class FestStateSlotCollectionService
             ->map(fn (FestStateNominationSelection $s) => [
                 'id' => $s->id,
                 'item_id' => $s->item_id,
+                'participant_id' => $s->participant_id,
+                'mark_id' => $s->mark_id,
                 'item_code' => $s->item_code,
                 'item_title' => $s->item_title,
                 'student_name' => $s->student_name,
@@ -274,5 +288,37 @@ class FestStateSlotCollectionService
                 'responded_by_name' => $s->school_responded_by_name,
             ])
             ->all();
+
+        $sheet = $this->summary($program, $hubEvent);
+        foreach ($offered as &$offer) {
+            $row = $sheet->firstWhere('item_id', $offer['item_id']);
+            $offer['category_label'] = $row['category_label'] ?? null;
+            $offer['gender_label'] = $row['gender_label'] ?? 'Open';
+            $offer['direct_entry'] = $row['direct_entry'] ?? false;
+            $stillEligible = collect($row['candidates'] ?? [])->contains(fn ($candidate) =>
+                ($offer['participant_id'] && $candidate['participant_id'] === $offer['participant_id'])
+                || ($offer['mark_id'] && $candidate['mark_id'] === $offer['mark_id']));
+            $offer['can_respond'] = $stillEligible && $hubEvent->state_slot_collection_open && ! $hubEvent->state_slot_collection_approved_at
+                && $offer['status'] === 'selected' && $offer['school_response'] === 'pending';
+        }
+        unset($offer);
+        foreach ($sheet as $row) {
+            foreach ($row['candidates'] as $candidate) {
+                if ($candidate['school_id'] !== $schoolId || $candidate['is_chosen'] || $candidate['is_declined']) {
+                    continue;
+                }
+                $offered[] = [
+                    'id' => null, 'key' => 'waiting-'.$candidate['participant_id'],
+                    'item_id' => $row['item_id'], 'item_code' => $row['item_code'], 'item_title' => $row['title'],
+                    'category_label' => $row['category_label'], 'gender_label' => $row['gender_label'],
+                    'student_name' => $candidate['student_name'], 'class_name' => $candidate['class_name'],
+                    'source_position' => $candidate['source_position'], 'direct_entry' => $candidate['direct_entry'],
+                    'status' => 'waiting', 'school_response' => 'waiting', 'can_respond' => false,
+                    'opt_out_reason' => null, 'responded_at' => null, 'responded_by_name' => null,
+                ];
+            }
+        }
+
+        return $offered;
     }
 }

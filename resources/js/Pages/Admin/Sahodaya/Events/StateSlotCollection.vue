@@ -26,7 +26,7 @@
                         <div>
                             <p class="text-xs font-bold text-slate-800">Configure Slot Count per Item</p>
                             <p class="text-[11px] text-slate-500">
-                                How many top ranks qualify? (e.g. 1 = 1st Place only, 2 = 1st &amp; 2nd, 3 = 1st, 2nd &amp; 3rd)
+                                Up to two State slots. Ranks 3–5 wait for an opt-out; unpublished items with one/two entries receive direct offers.
                             </p>
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
@@ -36,9 +36,6 @@
                             </button>
                             <button type="button" @click="applyBatch(2)" class="px-2.5 py-1 text-xs font-medium rounded-lg border border-slate-300 bg-white hover:bg-slate-100 transition shadow-xs">
                                 🥈 Top 2
-                            </button>
-                            <button type="button" @click="applyBatch(3)" class="px-2.5 py-1 text-xs font-medium rounded-lg border border-slate-300 bg-white hover:bg-slate-100 transition shadow-xs">
-                                🥉 Top 3
                             </button>
                             <button type="button" :disabled="savingSlots" @click="saveSlotQuotas(false)" class="btn-secondary text-xs !py-1 ml-1">
                                 {{ savingSlots ? 'Saving...' : '💾 Save Slot Counts' }}
@@ -68,19 +65,16 @@
                     </span>
                 </div>
 
-                <div v-if="event.state_slot_collection_open" class="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <div class="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                     <p class="text-[11px] font-semibold text-slate-600">How schools respond</p>
-                    <p class="text-[11px] text-slate-600 mt-0.5">
-                        Ask schools to log into their own school panel, then go to
-                        <strong>Reports → this event → "State Slot Choices"</strong> — the offer shows up
-                        there for any winner they have. No separate link is needed since each school
-                        already signs into its own panel.
-                    </p>
+                    <p class="text-[11px] text-slate-600 mt-0.5">Share this link. Schools sign in with their existing school accounts and see only their own entries.</p>
+                    <div class="mt-2 flex flex-wrap gap-2"><input :value="schoolEntryUrl" readonly class="min-w-0 flex-1 rounded border px-2 py-1 text-xs" aria-label="School State slot submission URL"><button type="button" class="btn-secondary text-xs" @click="copySchoolLink">{{ copied ? 'Copied' : 'Copy school link' }}</button></div>
+
                 </div>
             </div>
 
             <p v-if="!summary.length" class="card text-sm text-gray-400">
-                No State items have results from this event yet.
+                No eligible State-quota entries yet. Published ranks 1–5 or one/two entries in an unpublished item are required.
             </p>
 
             <section v-for="row in summary" :key="row.item_id" class="card">
@@ -92,13 +86,12 @@
                                 {{ row.title }}
                             </h4>
                             <span v-if="row.quota" class="rounded-md px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                Quota: Top {{ row.quota }}
+                                {{ row.direct_entry ? 'Direct offers' : 'State quota' }}: {{ row.quota }}
                             </span>
                         </div>
                         <p class="text-[11px] text-gray-500">
-                            <span v-if="row.category">{{ row.category }} · </span>
-                            <span v-if="row.class_group">{{ row.class_group }} · </span>
-                            {{ row.participant_type || 'individual' }}
+                            <span v-if="row.category_label">{{ row.category_label }} · </span>
+                            {{ row.gender_label }} · {{ row.type_label }}
                         </p>
                     </div>
 
@@ -106,7 +99,7 @@
                         <!-- Per-item slot count control -->
                         <div v-if="!event.state_slot_collection_approved_at" class="flex items-center gap-1.5 mr-2">
                             <label class="text-[11px] text-slate-500 font-medium">Slots:</label>
-                            <input type="number" min="1" max="10"
+                            <input type="number" min="1" max="2"
                                    v-model.number="slotQuotas[row.item_id]"
                                    @change="hasChanges = true"
                                    class="w-14 rounded-lg border border-slate-300 px-2 py-1 text-xs text-center font-bold text-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
@@ -131,12 +124,15 @@
 
                 <div v-if="row.chosen.length" class="mt-2 space-y-1">
                     <p v-for="s in row.chosen" :key="`c${s.id}`" class="text-[11px] flex items-center gap-2">
-                        <span class="text-emerald-800"><strong>{{ s.student_name }}</strong> ({{ s.school_name }}) — position {{ s.source_position }}</span>
+                        <span class="text-emerald-800"><strong>{{ s.student_name }}</strong> ({{ s.school_name }}) — {{ row.direct_entry ? 'Direct qualification (no result required)' : 'Position ' + s.source_position }}</span>
                         <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="responseChipClass(s.school_response)">
                             {{ responseLabel(s.school_response) }}
                         </span>
                         <span v-if="s.school_responded_at" class="text-gray-400">{{ formatDate(s.school_responded_at) }}</span>
                     </p>
+                </div>
+                <div v-if="row.candidates.some(c => !c.is_chosen && !c.is_declined)" class="mt-3 border-t pt-2 text-xs text-slate-500">
+                    <p v-for="candidate in row.candidates.filter(c => !c.is_chosen && !c.is_declined)" :key="candidate.participant_id">{{ candidate.student_name }} ({{ candidate.school_name }}) — {{ candidate.source_position ? 'Rank ' + candidate.source_position : 'Direct entry' }} · Waiting, not offered</p>
                 </div>
                 <div v-if="row.declined.length" class="mt-2 space-y-1 border-t pt-2">
                     <p v-for="s in row.declined" :key="`d${s.id}`" class="text-[11px] text-gray-500">
@@ -155,9 +151,19 @@ import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 
 const props = defineProps({
     sahodaya: Object, publicUrl: { type: String, default: '' },
-    event: Object, program: Object, summary: Array, actionUrls: Object,
+    event: Object, program: Object, summary: Array, actionUrls: Object, schoolEntryUrl: String,
 });
 
+const copied = ref(false);
+async function copySchoolLink() {
+    try {
+        await navigator.clipboard.writeText(props.schoolEntryUrl);
+        copied.value = true;
+    } catch {
+        copied.value = false;
+        window.prompt('Copy the school submission link:', props.schoolEntryUrl);
+    }
+}
 const slotQuotas = reactive({});
 const savingSlots = ref(false);
 const hasChanges = ref(false);

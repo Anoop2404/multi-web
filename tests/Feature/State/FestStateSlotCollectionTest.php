@@ -136,6 +136,150 @@ class FestStateSlotCollectionTest extends TestCase
                 ->has('publicUrl')->where('event.id', $this->hubEvent->id));
     }
 
+    public function test_unpublished_items_with_one_or_two_entries_get_direct_school_offers_without_results(): void
+    {
+        $this->hubEvent->update(['results_published' => false]);
+        $this->winner('Direct one', 1, 0, 'school-1')->delete();
+        $this->winner('Direct two', 2, 0, 'school-2')->delete();
+        $result = $this->service()->open($this->program, $this->hubEvent, $this->user());
+        $this->assertSame(2, $result['filled']);
+        $this->assertSame(0, FestMark::count());
+        $this->assertSame([null, null], $this->primaries()->pluck('source_position')->all());
+        $slots = $this->service()->forSchool($this->program, $this->hubEvent, 'school-1');
+        $this->assertCount(1, $slots);
+        $this->assertTrue($slots[0]['direct_entry']);
+        $this->assertTrue($slots[0]['can_respond']);
+        foreach ($this->primaries() as $selection) $this->service()->respond($selection, 'accept', null, $this->user());
+        $this->assertSame(2, $this->service()->approve($this->program, $this->hubEvent, $this->user())['approved_count']);
+    }
+
+    public function test_three_entries_without_published_results_are_not_directly_offered(): void
+    {
+        $this->hubEvent->update(['results_published' => false]);
+        foreach (['school-1', 'school-2', 'school-3'] as $i => $school) $this->winner('Entry '.$i, $i + 1, 0, $school)->delete();
+        $this->assertSame(0, $this->service()->open($this->program, $this->hubEvent, $this->user())['filled']);
+        $this->assertCount(0, $this->primaries());
+        $this->assertSame([], $this->service()->forSchool($this->program, $this->hubEvent, 'school-1'));
+    }
+
+    public function test_group_members_are_one_direct_competitive_entry(): void
+    {
+        $this->hubEvent->update(['results_published' => false]);
+        $this->item->update(['participant_type' => 'group']);
+        $mark = $this->winner('Team leader', 1, 0);
+        $registration = $mark->participant->registration;
+        $mark->delete();
+        for ($i = 0; $i < 4; $i++) {
+            $student = Student::create(['name' => 'Team member '.$i, 'tenant_id' => 'school-1', 'school_class_id' => $registration->participants()->first()->student->school_class_id]);
+            FestParticipant::create(['registration_id' => $registration->id, 'student_id' => $student->id]);
+        }
+        $this->assertSame(1, $this->service()->open($this->program, $this->hubEvent, $this->user())['filled']);
+        $this->assertCount(1, $this->primaries());
+    }
+
+    public function test_rank_three_to_five_wait_and_promote_in_order_but_rank_six_never_appears(): void
+    {
+        for ($rank = 1; $rank <= 6; $rank++) $this->winner('Rank '.$rank, $rank, 100 - $rank, $rank < 3 ? 'school-'.$rank : 'school-3');
+        $this->service()->open($this->program, $this->hubEvent, $this->user());
+        $this->assertSame([1, 2], $this->primaries()->pluck('source_position')->map(fn ($v) => (int) $v)->sort()->values()->all());
+        $waiting = $this->service()->forSchool($this->program, $this->hubEvent, 'school-3');
+        $this->assertCount(3, $waiting);
+        $this->assertSame([3, 4, 5], array_column($waiting, 'source_position'));
+        $this->assertSame([false, false, false], array_column($waiting, 'can_respond'));
+        $this->assertSame(['waiting', 'waiting', 'waiting'], array_column($waiting, 'school_response'));
+        foreach ([1, 3, 4, 5] as $rank) {
+            $current = $this->primaries()->firstWhere('student_name', 'Rank '.$rank);
+            $this->assertNotNull($current);
+            $this->service()->respond($current, 'opt_out', 'Cannot attend', $this->user());
+        }
+        $this->assertSame(['Rank 2'], $this->primaries()->pluck('student_name')->all());
+    }
+
+    public function test_collection_excludes_non_state_quota_items_and_shows_category_gender_labels(): void
+    {
+        $this->stateItem->update(['gender' => 'female']);
+        $this->winner('Eligible', 1, 90);
+        $row = $this->service()->summary($this->program, $this->hubEvent)->first();
+        $this->assertSame('Girls', $row['gender_label']);
+        $this->assertNotSame('category_2', $row['category_label']);
+        $this->stateItem->update(['qualify_count' => 0]);
+        $this->assertCount(0, $this->service()->summary($this->program, $this->hubEvent));
+    }
+
+    public function test_shared_school_link_requires_login_and_routes_only_the_correct_school(): void
+    {
+        $tenant = Tenant::findOrFail('sahodaya-1');
+        $tenant->update(['domain' => 'slot-school.test']);
+        $url = "http://slot-school.test/state-slot-collection/{$this->hubEvent->id}";
+        $this->get($url)->assertRedirect('/school-login')->assertSessionHas('url.intended', $url);
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $schoolUser = User::create(['name' => 'School office', 'email' => 'office@example.test', 'username' => 'office', 'password' => 'password', 'tenant_id' => 'school-1', 'email_verified_at' => now()]);
+        $schoolUser->assignRole('school_admin');
+        $this->post('http://slot-school.test/login', ['email' => 'office', 'password' => 'password'])->assertRedirect($url);
+        $this->get($url)->assertRedirect('/school-admin/school-1/kalotsav/events/'.$this->hubEvent->id.'/state-slots');
+        $this->get('http://slot-school.test/school-admin/school-1/kalotsav/events/'.$this->hubEvent->id.'/state-slots')->assertOk();
+        $otherSchool = $this->get('http://slot-school.test/school-admin/school-2/kalotsav/events/'.$this->hubEvent->id.'/state-slots');
+        $this->assertSame(403, $otherSchool->getStatusCode(), (string) $otherSchool->headers->get('Location'));
+        $schoolUser->update(['tenant_id' => 'sahodaya-1']);
+        $this->actingAs($schoolUser->fresh())->get($url)->assertForbidden();
+    }
+
+    public function test_a_third_late_entry_blocks_confirmation_of_an_old_direct_offer(): void
+    {
+        $this->hubEvent->update(['results_published' => false]);
+        $this->winner('Direct one', 1, 0, 'school-1')->delete();
+        $this->winner('Direct two', 2, 0, 'school-2')->delete();
+        $this->service()->open($this->program, $this->hubEvent, $this->user());
+        $selection = $this->primaries()->first();
+        $this->winner('Late third', 3, 0, 'school-3')->delete();
+        $this->assertFalse($this->service()->forSchool($this->program, $this->hubEvent, 'school-1')[0]['can_respond']);
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        $this->service()->respond($selection, 'accept', null, $this->user());
+    }
+
+    public function test_approval_rechecks_direct_eligibility_after_school_acceptances(): void
+    {
+        $this->hubEvent->update(['results_published' => false]);
+        $this->winner('Direct one', 1, 0, 'school-1')->delete();
+        $this->winner('Direct two', 2, 0, 'school-2')->delete();
+        $this->service()->open($this->program, $this->hubEvent, $this->user());
+        foreach ($this->primaries() as $selection) $this->service()->respond($selection, 'accept', null, $this->user());
+        $this->winner('Late third', 3, 0, 'school-3')->delete();
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        $this->service()->approve($this->program, $this->hubEvent, $this->user());
+    }
+
+    public function test_a_lower_rank_is_not_initially_offered_when_top_two_are_missing(): void
+    {
+        $this->winner('Only third', 3, 80, 'school-3');
+        $this->assertSame(0, $this->service()->open($this->program, $this->hubEvent, $this->user())['filled']);
+        $slots = $this->service()->forSchool($this->program, $this->hubEvent, 'school-3');
+        $this->assertCount(1, $slots);
+        $this->assertFalse($slots[0]['can_respond']);
+    }
+
+    public function test_school_response_cannot_change_after_final_approval(): void
+    {
+        $this->winner('Winner', 1, 95);
+        $this->service()->open($this->program, $this->hubEvent, $this->user());
+        $selection = $this->primaries()->first();
+        $this->service()->respond($selection, 'accept', null, $this->user());
+        $this->service()->approve($this->program, $this->hubEvent, $this->user());
+        $selection->update(['school_response' => 'pending']);
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        $this->service()->respond($selection, 'opt_out', 'No longer available', $this->user());
+    }
+
+    public function test_an_opt_out_replaces_only_an_existing_offer_when_a_top_rank_is_missing(): void
+    {
+        $this->winner('Second', 2, 90, 'school-1');
+        $this->winner('Third', 3, 80, 'school-2');
+        $this->winner('Fourth', 4, 70, 'school-3');
+        $this->assertSame(1, $this->service()->open($this->program, $this->hubEvent, $this->user())['filled']);
+        $this->service()->respond($this->primaries()->first(), 'opt_out', 'Cannot attend', $this->user());
+        $this->assertSame(['Third'], $this->primaries()->pluck('student_name')->all());
+    }
+
     public function test_opening_fills_the_top_ranks_and_marks_them_pending(): void
     {
         $this->winner('First', 1, 95, 'school-1');

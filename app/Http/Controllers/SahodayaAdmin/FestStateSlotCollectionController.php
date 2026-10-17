@@ -77,6 +77,7 @@ class FestStateSlotCollectionController extends SahodayaAdminController
             ]),
             'program' => $program->only(['id', 'title']),
             'summary' => $collection->summary($program, $event),
+            'schoolEntryUrl' => rtrim(\App\Support\TenantDomainSync::publicUrl($this->sahodaya) ?: url('/'), '/').'/state-slot-collection/'.$event->id,
             'actionUrls' => $this->actionUrls($this->sahodaya->id, $event),
         ]);
     }
@@ -115,9 +116,9 @@ class FestStateSlotCollectionController extends SahodayaAdminController
         abort_if($event->state_slot_collection_approved_at, 422, 'Cannot change slots after the list has been approved.');
 
         $data = $request->validate([
-            'default_quota' => 'nullable|integer|min:1|max:10',
+            'default_quota' => 'nullable|integer|min:1|max:2',
             'slots' => 'nullable|array',
-            'slots.*' => 'nullable|integer|min:1|max:10',
+            'slots.*' => 'nullable|integer|min:1|max:2',
             'sync_now' => 'nullable|boolean',
         ]);
 

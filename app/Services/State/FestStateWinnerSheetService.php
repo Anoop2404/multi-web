@@ -51,7 +51,10 @@ class FestStateWinnerSheetService
     public function sheet(FestStateProgram $program, FestEvent $hubEvent, array $filters = []): Collection
     {
         $batch = $this->nominations->openBatch($program, $hubEvent);
-        $candidates = collect($this->nominations->candidatePool($program, $hubEvent));
+        $collectionMode = (bool) ($filters['slot_collection'] ?? $hubEvent->state_slot_collection_open);
+        $candidates = $collectionMode
+            ? app(FestStateCollectionCandidates::class)->pool($program, $hubEvent)
+            : collect($this->nominations->candidatePool($program, $hubEvent));
         $selections = $batch->selections()->get();
 
         $items = FestStateProgramItem::where('state_program_id', $program->id)
@@ -74,7 +77,10 @@ class FestStateWinnerSheetService
                 $item,
                 $byItem->get($item->id, collect()),
                 $selectionsByItem->get($item->id, collect()),
-                isset($eventItemQuotas[$item->id]) ? (int) $eventItemQuotas[$item->id] : null,
+                $collectionMode
+                    ? app(FestStateCollectionCandidates::class)->quota($byItem->get($item->id, collect()),
+                        (int) ($eventItemQuotas[$item->id] ?? $item->qualify_count ?? 0))
+                    : (isset($eventItemQuotas[$item->id]) ? (int) $eventItemQuotas[$item->id] : null),
             ))
             // An item this Sahodaya has no results for is not a decision to make. Kept out rather than
             // listed empty, so the page is the work remaining.
@@ -97,19 +103,21 @@ class FestStateWinnerSheetService
         $declined = $selections->where('status', self::DECLINED);
 
         $chosenMarkIds = $selections->where('status', 'selected')->pluck('mark_id')->filter()->all();
+        $chosenParticipantIds = $selections->where('status', 'selected')->pluck('participant_id')->filter()->all();
+        $declinedParticipantIds = $declined->pluck('participant_id')->filter()->all();
         $declinedMarkIds = $declined->pluck('mark_id')->filter()->all();
 
         $rows = $candidates
             ->sortBy(fn (array $c) => [$c['source_position'] ?? 99, -(float) ($c['score'] ?? 0)])
             ->values()
             ->map(fn (array $c) => $c + [
-                'is_chosen' => in_array($c['mark_id'] ?? null, $chosenMarkIds, true),
-                'is_declined' => in_array($c['mark_id'] ?? null, $declinedMarkIds, true),
+                'is_chosen' => in_array($c['mark_id'] ?? null, $chosenMarkIds, true) || in_array($c['participant_id'] ?? null, $chosenParticipantIds, true),
+                'is_declined' => in_array($c['mark_id'] ?? null, $declinedMarkIds, true) || in_array($c['participant_id'] ?? null, $declinedParticipantIds, true),
             ]);
 
         // Positions held by more than one candidate. The committee must pick; nothing here picks for
         // them, because a Sahodaya breaking its own tie is a decision with a reason behind it.
-        $tiedPositions = $rows->groupBy('source_position')
+        $tiedPositions = $rows->whereNotNull('source_position')->groupBy('source_position')
             ->filter(fn (Collection $group) => $group->count() > 1)
             ->keys()->map(fn ($p) => (int) $p)->values();
 
@@ -118,10 +126,10 @@ class FestStateWinnerSheetService
                 $group = $rows->where('source_position', $position);
 
                 // A tie only needs resolving when the slots cannot hold everyone tied.
-                $slotsLeft = $quota - $rows->where('is_chosen', true)
-                    ->where('source_position', '<', $position)->count();
+                $slotsLeft = $quota - $rows->where('is_declined', false)
+                    ->whereNotNull('source_position')->where('source_position', '<', $position)->count();
 
-                return $group->where('is_chosen', true)->isEmpty() && $group->count() > max(0, $slotsLeft);
+                return $slotsLeft > 0 && $group->where('is_chosen', true)->isEmpty() && $group->where('is_declined', false)->count() > $slotsLeft;
             })->values();
 
         return [
@@ -130,6 +138,10 @@ class FestStateWinnerSheetService
             'title' => $item->title,
             'category' => $item->category,
             'class_group' => $item->class_group,
+            'gender' => $item->gender,
+            'age_group' => $item->age_group,
+            'kids_band' => $item->kids_band,
+            'direct_entry' => $candidates->contains('direct_entry', true),
             'participant_type' => $item->participant_type,
             'quota' => $quota,
             'chosen_count' => $chosen->count(),
@@ -151,6 +163,7 @@ class FestStateWinnerSheetService
         return [
             'id' => $selection->id,
             'mark_id' => $selection->mark_id,
+            'participant_id' => $selection->participant_id,
             'student_name' => $selection->student_name,
             'school_name' => $selection->school_name,
             'class_name' => $selection->class_name,
@@ -248,6 +261,16 @@ class FestStateWinnerSheetService
         $warnings = [];
 
         foreach ($sheet as $row) {
+            if ($hubEvent->state_slot_collection_open) {
+                foreach ($row['chosen'] as $chosen) {
+                    $eligible = collect($row['candidates'])->contains(fn ($candidate) =>
+                        ($chosen['participant_id'] && $candidate['participant_id'] === $chosen['participant_id'])
+                        || ($chosen['mark_id'] && $candidate['mark_id'] === $chosen['mark_id']));
+                    if (! $eligible) {
+                        $blocking[] = "{$row['item_code']}: an offered entry is no longer eligible. Review the selection.";
+                    }
+                }
+            }
             if ($row['unresolved_ties'] !== []) {
                 $positions = implode(', ', $row['unresolved_ties']);
                 $blocking[] = "{$row['item_code']} {$row['title']}: position {$positions} is tied and the tie is unresolved — pick who goes.";
@@ -279,7 +302,7 @@ class FestStateWinnerSheetService
      *
      * @return array{filled: int, skipped_ties: list<string>}
      */
-    public function autoFill(FestStateProgram $program, FestEvent $hubEvent, ?User $by = null): array
+    public function autoFill(FestStateProgram $program, FestEvent $hubEvent, ?User $by = null, ?string $onlyItemId = null): array
     {
         $batch = $this->nominations->openBatch($program, $hubEvent);
         abort_if($batch->isCertified(), 422, 'This batch is already registered with State.');
@@ -287,7 +310,7 @@ class FestStateWinnerSheetService
         $filled = 0;
         $skipped = [];
 
-        foreach ($this->sheet($program, $hubEvent) as $row) {
+        foreach ($this->sheet($program, $hubEvent)->when($onlyItemId, fn ($rows) => $rows->where('item_id', $onlyItemId)) as $row) {
             if ($row['unresolved_ties'] !== []) {
                 $skipped[] = "{$row['item_code']} {$row['title']}";
 
@@ -295,12 +318,20 @@ class FestStateWinnerSheetService
             }
 
             $slots = $row['slots_left'];
+            if ($hubEvent->state_slot_collection_open && ! $row['direct_entry']) {
+                $initialOffers = min($row['quota'], collect($row['candidates'])->whereNotNull('source_position')->where('source_position', '<=', 2)->count());
+                $slots = min($slots, max(0, $initialOffers - $row['chosen_count']));
+            }
 
             foreach ($row['candidates'] as $candidate) {
                 if ($slots <= 0) {
                     break;
                 }
 
+                if ($hubEvent->state_slot_collection_open && ! ($candidate['direct_entry'] ?? false)
+                    && $candidate['source_position'] > 2 && $row['declined'] === []) {
+                    continue;
+                }
                 if ($candidate['is_chosen'] || $candidate['is_declined']) {
                     continue;
                 }

@@ -127,6 +127,15 @@ class FestStateNominationService
             FestStateNominationBatch::whereKey($batch->id)->lockForUpdate()->first();
 
             $itemId = $candidate['item_id'] ?? null;
+            $hub = $batch->hubEvent;
+            if ($hub?->state_slot_collection_open) {
+                $pool = app(FestStateCollectionCandidates::class)->pool(FestStateProgram::findOrFail($batch->state_program_id), $hub);
+                $allowed = $pool->first(fn ($entry) => $entry['item_id'] === $itemId
+                    && ((! empty($candidate['participant_id']) && $entry['participant_id'] === $candidate['participant_id'])
+                        || (! empty($candidate['mark_id']) && $entry['mark_id'] === $candidate['mark_id'])));
+                abort_unless($allowed, 422, 'This entry is not eligible for State slot collection.');
+                $candidate = $allowed;
+            }
 
             if ($nominationType === 'primary' && $itemId) {
                 $quota = $this->itemQuota($itemId, $candidate['item_code'] ?? null, $batch->hub_event_id);
@@ -147,6 +156,11 @@ class FestStateNominationService
                     ->where('status', 'selected')
                     ->exists();
                 abort_if($duplicate, 422, 'This candidate is already selected in this batch.');
+            }
+
+            if (! empty($candidate['participant_id'])) {
+                abort_if($batch->selections()->where('participant_id', $candidate['participant_id'])->where('status', 'selected')->exists(),
+                    422, 'This candidate is already selected in this batch.');
             }
 
             $selection = $batch->selections()->create([
@@ -190,6 +204,18 @@ class FestStateNominationService
 
     public function itemQuota(?string $itemId, ?string $itemCode, ?string $hubEventId = null): ?int
     {
+        if ($hubEventId && $itemId) {
+            $hub = FestEvent::find($hubEventId);
+            if ($hub?->state_slot_collection_open && $hub->state_program_id) {
+                $program = FestStateProgram::findOrFail($hub->state_program_id);
+                $pool = app(FestStateCollectionCandidates::class)->pool($program, $hub)->where('item_id', $itemId);
+                $sources = collect($this->sourceEvents($hub, app(FestPartitionService::class)))->pluck('id');
+                $configured = FestEventItem::whereIn('event_id', $sources)->where('state_program_item_id', $itemId)
+                    ->whereNotNull('qualify_count')->value('qualify_count');
+                $configured ??= FestStateProgramItem::find($itemId)?->qualify_count;
+                return app(FestStateCollectionCandidates::class)->quota($pool, (int) $configured);
+            }
+        }
         if ($hubEventId && $itemId) {
             $hubEvent = FestEvent::find($hubEventId);
             if ($hubEvent) {

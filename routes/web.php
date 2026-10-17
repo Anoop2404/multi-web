@@ -2161,6 +2161,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
 Route::middleware('web')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
     Route::get('/school-login', [AuthController::class, 'showSchoolLogin'])->name('school.login');
+    Route::get('/state-slot-collection/{event}', \App\Http\Controllers\Public\StateSlotEntryController::class)->name('state-slots.school-entry');
     Route::get('/portal/login', [AuthController::class, 'showPortalLogin'])->name('portal.login');
     Route::get('/portal/s/{schoolCode}/login', [\App\Http\Controllers\Portal\PortalLoginController::class, 'school'])->name('portal.login.school');
     Route::get('/portal/forgot-password', [AuthController::class, 'showForgotPassword'])->name('portal.password.request');

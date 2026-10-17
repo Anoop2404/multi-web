@@ -21,15 +21,17 @@
             No State slots have been offered to us for this event.
         </p>
 
-        <div v-for="s in slots" :key="s.id" class="card mb-3 flex flex-wrap items-start justify-between gap-3">
+        <div v-for="s in slots" :key="s.key || s.id" class="card mb-3 flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0">
                 <p class="text-sm font-semibold text-gray-800">
                     <span class="font-mono text-xs text-gray-400">{{ s.item_code }}</span>
                     {{ s.item_title }}
                 </p>
                 <p class="text-xs text-gray-500 mt-0.5">
-                    {{ s.student_name }}<span v-if="s.class_name"> · {{ s.class_name }}</span> — position {{ s.source_position }}
+                    {{ s.student_name }}<span v-if="s.class_name"> · {{ s.class_name }}</span> — {{ s.direct_entry ? 'Direct qualification (no result required)' : 'Rank ' + s.source_position }}
                 </p>
+                <p class="mt-1 text-xs text-slate-600">{{ s.category_label }} · {{ s.gender_label }}</p>
+                <p v-if="s.school_response === 'waiting'" class="mt-1 text-xs text-slate-500">{{ event.state_slot_collection_open ? 'Waiting list: available only if a higher-ranked entry opts out.' : 'Not offered yet: the Sahodaya must open collection first.' }}</p>
                 <p v-if="s.opt_out_reason" class="text-[11px] text-gray-500 mt-1">Reason given: {{ s.opt_out_reason }}</p>
                 <p v-if="s.responded_at" class="text-[11px] text-gray-400 mt-0.5">
                     {{ responseLabel(s.school_response) }} by {{ s.responded_by_name || 'you' }} on {{ formatDate(s.responded_at) }}
@@ -41,10 +43,11 @@
                       class="rounded-full px-3 py-1 text-[11px] font-semibold" :class="responseChipClass(s.school_response)">
                     {{ responseLabel(s.school_response) }}
                 </span>
-                <div v-else class="flex gap-2">
-                    <button type="button" class="btn-primary text-xs !py-1.5" @click="accept(s)">Accept</button>
+                <div v-else-if="s.can_respond" class="flex gap-2">
+                    <button type="button" class="btn-primary text-xs !py-1.5" @click="accept(s)">Confirm registration</button>
                     <button type="button" class="btn-secondary text-xs !py-1.5" @click="optOut(s)">Opt out</button>
                 </div>
+                <button v-else type="button" disabled class="btn-secondary text-xs opacity-50">Not available</button>
             </div>
         </div>
     </SchoolAdminLayout>
@@ -64,7 +67,7 @@ const props = defineProps({
 const { programLabel, programBase } = useSchoolProgramContext(props);
 
 function responseLabel(r) {
-    return { accepted: 'Accepted', pending: 'Awaiting your response', opted_out: 'Opted out' }[r] || '—';
+    return { accepted: 'Accepted', pending: 'Awaiting your response', opted_out: 'Opted out', waiting: 'Waiting — disabled' }[r] || '—';
 }
 function responseChipClass(r) {
     return {
