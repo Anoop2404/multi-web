@@ -1547,6 +1547,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
                 Route::post('/selections/{selection}/alter', [$slots, 'alterSelection'])->name('alter-selection');
                 Route::get('/export-zip', [$slots, 'exportZip'])->name('export-zip');
                 Route::get('/export-excel', [$slots, 'exportExcel'])->name('export-excel');
+                Route::post('/send-email', [$slots, 'sendEmail'])->name('send-email');
+                Route::post('/mail-settings', [$slots, 'updateMailSettings'])->name('mail-settings');
             });
             Route::post('/{event}/spawn-school-rounds', [FestEventController::class, 'spawnSchoolRounds'])->name('spawn-school-rounds');
             Route::post('/{event}/link-school-round', [FestEventController::class, 'linkSchoolRound'])->name('link-school-round');

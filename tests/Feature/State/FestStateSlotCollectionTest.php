@@ -798,4 +798,139 @@ class FestStateSlotCollectionTest extends TestCase
         $summary = $this->service()->summary($this->program, $this->hubEvent)->first();
         $this->assertSame(1, $summary['slots_left']);
     }
+
+    public function test_school_can_cancel_opt_out_and_reclaim_slot(): void
+    {
+        $this->winner('Winner One', 1, 95, 'school-1');
+        $this->winner('Winner Two', 2, 90, 'school-2');
+
+        $this->service()->open($this->program, $this->hubEvent, $this->user());
+        $selOne = $this->primaries()->firstWhere('student_name', 'Winner One');
+
+        // School-1 opts out
+        $this->service()->respond($selOne, 'opt_out', 'Unforeseen exam conflict', $this->user());
+        $selOne->refresh();
+        $this->assertSame('opted_out', $selOne->school_response);
+        $this->assertSame('declined', $selOne->status);
+
+        // School-1 cancels opt out
+        $restored = $this->service()->cancelOptOut($selOne, $this->user());
+        $this->assertSame('selected', $restored->status);
+        $this->assertSame('pending', $restored->school_response);
+        $this->assertNull($restored->skip_reason);
+    }
+
+    public function test_school_cancel_opt_out_revokes_pending_downstream_replacement(): void
+    {
+        $this->winner('Winner One', 1, 95, 'school-1');
+        $this->winner('Winner Two', 2, 90, 'school-2');
+        $this->winner('Winner Three', 3, 85, 'school-3');
+
+        $this->service()->open($this->program, $this->hubEvent, $this->user());
+        $selOne = $this->primaries()->firstWhere('student_name', 'Winner One');
+
+        // School-1 opts out -> Winner Three auto-fills as replacement
+        $this->service()->respond($selOne, 'opt_out', 'Conflict', $this->user());
+        $selThree = $this->primaries()->firstWhere('student_name', 'Winner Three');
+        $this->assertNotNull($selThree);
+        $this->assertSame('pending', $selThree->school_response);
+        $this->assertSame($selOne->id, $selThree->replaces_selection_id);
+
+        // School-1 cancels opt-out -> Winner Three should be deleted/revoked
+        $this->service()->cancelOptOut($selOne, $this->user());
+        $selOne->refresh();
+        $this->assertSame('pending', $selOne->school_response);
+        $this->assertSame('selected', $selOne->status);
+
+        $this->assertDatabaseMissing('fest_state_nomination_selections', ['id' => $selThree->id]);
+    }
+
+    public function test_school_cannot_cancel_opt_out_if_downstream_replacement_already_accepted(): void
+    {
+        $this->winner('Winner One', 1, 95, 'school-1');
+        $this->winner('Winner Two', 2, 90, 'school-2');
+        $this->winner('Winner Three', 3, 85, 'school-3');
+
+        $this->service()->open($this->program, $this->hubEvent, $this->user());
+        $selOne = $this->primaries()->firstWhere('student_name', 'Winner One');
+
+        // School-1 opts out -> Winner Three auto-fills
+        $this->service()->respond($selOne, 'opt_out', 'Conflict', $this->user());
+        $selThree = $this->primaries()->firstWhere('student_name', 'Winner Three');
+
+        // School-3 accepts the slot
+        $this->service()->respond($selThree, 'accept', null, $this->user());
+
+        // Now School-1 tries to cancel opt-out -> should fail
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $this->service()->cancelOptOut($selOne, $this->user());
+    }
+
+    public function test_admin_can_update_mail_settings(): void
+    {
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $admin = User::firstOrCreate(
+            ['email' => 'admin-mail-test@sahodaya.test'],
+            [
+                'name' => 'Admin Mail Tester',
+                'username' => 'admin_mail_tester',
+                'password' => 'password',
+                'tenant_id' => 'sahodaya-1',
+                'email_verified_at' => now(),
+            ]
+        );
+        $admin->syncRoles(['sahodaya_admin']);
+
+        $res = $this->actingAs($admin)->post("/sahodaya-admin/sahodaya-1/events/{$this->hubEvent->id}/state-slot-collection/mail-settings", [
+            'auto_notify_enabled' => false,
+            'subject_template' => 'Custom Subject for {school_name}',
+            'message_template' => 'Custom body with {action_url}',
+            'reply_to_email' => 'reply@sahodaya.test',
+        ]);
+
+        $res->assertSessionHas('success');
+
+        $this->hubEvent->refresh();
+        $mailSettings = $this->hubEvent->notification_settings['state_slot_mail'] ?? [];
+        $this->assertFalse($mailSettings['auto_notify_enabled']);
+        $this->assertSame('Custom Subject for {school_name}', $mailSettings['subject_template']);
+    }
+
+    public function test_admin_can_send_state_slot_notification_emails(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $admin = User::firstOrCreate(
+            ['email' => 'admin-mail-sender@sahodaya.test'],
+            [
+                'name' => 'Admin Mail Sender',
+                'username' => 'admin_mail_sender',
+                'password' => 'password',
+                'tenant_id' => 'sahodaya-1',
+                'email_verified_at' => now(),
+            ]
+        );
+        $admin->syncRoles(['sahodaya_admin']);
+
+        // Give school-1 a contact email in application_payload
+        Tenant::where('id', 'school-1')->update([
+            'application_payload' => ['school_email' => 'principal@school1.test'],
+        ]);
+
+        $this->winner('Winner One', 1, 95, 'school-1');
+        $this->service()->open($this->program, $this->hubEvent, $this->user());
+
+        $res = $this->actingAs($admin)->post("/sahodaya-admin/sahodaya-1/events/{$this->hubEvent->id}/state-slot-collection/send-email", [
+            'audience' => 'pending',
+            'subject' => 'Please confirm slots for {school_name}',
+            'message' => 'Your student qualified! Visit {action_url}',
+            'include_slot_details' => true,
+        ]);
+
+        $res->assertSessionHas('success');
+
+        $this->hubEvent->refresh();
+        $this->assertNotNull($this->hubEvent->notification_settings['state_slot_mail']['last_sent_at'] ?? null);
+    }
 }

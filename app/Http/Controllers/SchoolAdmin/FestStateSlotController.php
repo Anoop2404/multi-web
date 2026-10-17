@@ -66,6 +66,15 @@ class FestStateSlotController extends SchoolAdminController
         return back()->with('success', 'Recorded. The next rank will be offered this slot.');
     }
 
+    public function cancelOptOut(Request $request, string $tenantId, FestEvent $event, FestStateSlotCollectionService $collection)
+    {
+        $selection = $this->authorizeSelection($request, $event);
+
+        $collection->cancelOptOut($selection, $request->user());
+
+        return back()->with('success', "Opt-out cancelled for {$selection->student_name}. The slot has been restored.");
+    }
+
     private function authorizeSelection(Request $request, FestEvent $event): FestStateNominationSelection
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);

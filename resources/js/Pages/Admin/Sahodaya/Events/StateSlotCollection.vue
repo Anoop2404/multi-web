@@ -44,13 +44,30 @@
                     </template>
                     <span v-else class="text-sm text-emerald-800">Approved {{ formatDate(event.state_slot_collection_approved_at) }}. Continue to the State winner registration sheet to submit.</span>
 
-                    <!-- Export Nominees Package & Excel -->
-                    <div class="sm:ml-auto flex items-center gap-2">
+                    <!-- Export & Mail Tools -->
+                    <div class="sm:ml-auto flex flex-wrap items-center gap-2">
+                        <!-- Send Email Button -->
+                        <button type="button" @click="openSendEmailModal"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition shadow-2xs">
+                            <span>✉️</span> Send Email to Schools
+                            <span v-if="pendingSchoolsCount > 0" class="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-200 text-indigo-900 font-black">
+                                {{ pendingSchoolsCount }}
+                            </span>
+                        </button>
+
+                        <!-- Mail Settings Button -->
+                        <button type="button" @click="openMailSettingsModal"
+                                class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition shadow-2xs"
+                                title="Mail Settings & Auto-trigger Controls">
+                            <span>⚙️</span>
+                        </button>
+
+                        <!-- Export Nominees Package & Excel -->
                         <div class="inline-flex rounded-xl border border-slate-200 bg-white shadow-2xs divide-x divide-slate-200">
                             <a :href="actionUrls.exportZip" download
                                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-indigo-600 hover:bg-slate-50 transition rounded-l-xl"
                                title="Download complete nominations package: Excel sheet + student photos in a zip file">
-                                <span>📦 Download Package (.zip)</span>
+                                <span>📦 Package (.zip)</span>
                             </a>
                             <a :href="actionUrls.exportExcel" download
                                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-emerald-700 hover:bg-slate-50 transition rounded-r-xl"
@@ -387,6 +404,209 @@
                 </div>
             </div>
         </div>
+
+        <!-- Send Notification Email to Schools Modal -->
+        <Modal :show="showSendEmailModal" @close="showSendEmailModal = false" size="lg">
+            <template #header>
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">✉️</span>
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900">Send Notification Email to Schools</h3>
+                        <p class="text-xs text-slate-500">Notify schools to review and confirm their qualified student slots on the portal.</p>
+                    </div>
+                </div>
+            </template>
+            <div class="space-y-4 text-xs">
+                <!-- Target Audience Selection -->
+                <div>
+                    <label class="block font-bold text-slate-700 uppercase tracking-wider mb-2">Target Audience</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <label class="flex flex-col p-3 rounded-xl border cursor-pointer transition"
+                               :class="emailForm.audience === 'pending' ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-500/20' : 'border-slate-200 hover:border-slate-300'">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-slate-900">Pending Schools</span>
+                                <input type="radio" v-model="emailForm.audience" value="pending" class="text-indigo-600 focus:ring-indigo-500">
+                            </div>
+                            <span class="text-[11px] text-slate-500 mt-1">{{ pendingSchoolsCount }} school(s) with unconfirmed slots</span>
+                        </label>
+
+                        <label class="flex flex-col p-3 rounded-xl border cursor-pointer transition"
+                               :class="emailForm.audience === 'all' ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-500/20' : 'border-slate-200 hover:border-slate-300'">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-slate-900">All Nominated</span>
+                                <input type="radio" v-model="emailForm.audience" value="all" class="text-indigo-600 focus:ring-indigo-500">
+                            </div>
+                            <span class="text-[11px] text-slate-500 mt-1">{{ allSchoolsCount }} school(s) with any slots</span>
+                        </label>
+
+                        <label class="flex flex-col p-3 rounded-xl border cursor-pointer transition"
+                               :class="emailForm.audience === 'specific' ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-500/20' : 'border-slate-200 hover:border-slate-300'">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-slate-900">Specific School</span>
+                                <input type="radio" v-model="emailForm.audience" value="specific" class="text-indigo-600 focus:ring-indigo-500">
+                            </div>
+                            <span class="text-[11px] text-slate-500 mt-1">Select an individual school</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Specific School Selector (if specific chosen) -->
+                <div v-if="emailForm.audience === 'specific'">
+                    <label class="block font-semibold text-slate-700 mb-1">Select School <span class="text-rose-500">*</span></label>
+                    <select v-model="emailForm.school_id" class="w-full rounded-xl border border-slate-300 p-2 text-xs text-slate-800">
+                        <option value="">-- Choose School --</option>
+                        <option v-for="sch in schoolsSummary" :key="sch.school_id" :value="sch.school_id">
+                            {{ sch.school_name }} ({{ sch.pending_count }} pending / {{ sch.total_count }} total) - {{ sch.email || 'NO EMAIL' }}
+                        </option>
+                    </select>
+                </div>
+
+                <!-- Target Schools Summary Banner -->
+                <div class="p-3 rounded-xl border bg-slate-50 border-slate-200 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="font-semibold text-slate-800">
+                            Recipients: <strong class="text-indigo-600">{{ targetedWithEmailCount }}</strong> school(s) will receive this email
+                        </span>
+                        <button type="button" @click="showRecipientsList = !showRecipientsList" class="text-indigo-600 hover:underline text-[11px] font-semibold">
+                            {{ showRecipientsList ? 'Hide school list' : 'View school list' }}
+                        </button>
+                    </div>
+                    <p v-if="targetedMissingEmailCount > 0" class="text-[11px] text-amber-700 font-medium">
+                        ⚠️ {{ targetedMissingEmailCount }} school(s) do not have an email address configured and will be skipped.
+                    </p>
+
+                    <!-- Expandable recipient list -->
+                    <div v-if="showRecipientsList" class="max-h-36 overflow-y-auto pt-2 border-t border-slate-200 space-y-1">
+                        <div v-for="s in targetedSchools" :key="s.school_id" class="flex items-center justify-between text-[11px] py-0.5">
+                            <span class="text-slate-800 font-medium truncate max-w-[240px]">{{ s.school_name }}</span>
+                            <span v-if="s.has_email" class="text-emerald-700 font-mono text-[10px]">{{ s.email }}</span>
+                            <span v-else class="text-rose-600 font-bold text-[10px]">No email configured</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Subject -->
+                <div>
+                    <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Email Subject <span class="text-rose-500">*</span></label>
+                    <input v-model="emailForm.subject" type="text" required class="w-full rounded-xl border border-slate-300 p-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="e.g. [Event Title] State Kalotsavam Nomination - Confirm Student Slots">
+                </div>
+
+                <!-- Message Body -->
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="font-bold text-slate-700 uppercase tracking-wider">Message Content <span class="text-rose-500">*</span></label>
+                        <div class="flex items-center gap-1 text-[11px] text-slate-400">
+                            <span>Insert:</span>
+                            <button type="button" @click="insertPlaceholder('{school_name}')" class="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-mono text-[10px]">{school_name}</button>
+                            <button type="button" @click="insertPlaceholder('{action_url}')" class="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-mono text-[10px]">{action_url}</button>
+                            <button type="button" @click="insertPlaceholder('{pending_count}')" class="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-mono text-[10px]">{pending_count}</button>
+                        </div>
+                    </div>
+                    <textarea v-model="emailForm.message" rows="5" required class="w-full rounded-xl border border-slate-300 p-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"></textarea>
+                </div>
+
+                <!-- Include Qualified Students Table Option -->
+                <label class="flex items-center gap-2 cursor-pointer pt-1">
+                    <input type="checkbox" v-model="emailForm.include_slot_details" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                    <span class="text-xs text-slate-700 font-semibold">Include breakdown table of qualified students, ranks, and events in the email</span>
+                </label>
+
+                <!-- Test Email Section -->
+                <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center gap-2">
+                    <span class="text-[11px] text-slate-500 font-semibold">Send a test copy first:</span>
+                    <input v-model="testEmail" type="email" placeholder="your-email@example.com" class="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-800 flex-1 min-w-[180px]">
+                    <button type="button" @click="sendTestEmail" :disabled="sendingTestEmail || !testEmail.trim()" class="btn-secondary text-xs !py-1 !px-2.5">
+                        {{ sendingTestEmail ? 'Sending Test...' : 'Send Test' }}
+                    </button>
+                </div>
+            </div>
+            <template #footer>
+                <div class="flex items-center justify-end gap-2">
+                    <button type="button" @click="showSendEmailModal = false" class="btn-secondary text-xs">
+                        Cancel
+                    </button>
+                    <button type="button" @click="submitSendEmail" :disabled="sendingEmail || targetedWithEmailCount === 0 || !emailForm.subject.trim() || !emailForm.message.trim()" class="btn-primary text-xs !bg-indigo-600 hover:!bg-indigo-700 font-bold">
+                        {{ sendingEmail ? 'Dispatching Emails...' : `Send Email to ${targetedWithEmailCount} School(s)` }}
+                    </button>
+                </div>
+            </template>
+        </Modal>
+
+        <!-- Mail Settings Modal -->
+        <Modal :show="showMailSettingsModal" @close="showMailSettingsModal = false" size="md">
+            <template #header>
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">⚙️</span>
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900">State Slot Mail Settings</h3>
+                        <p class="text-xs text-slate-500">Configure email behavior, templates, and sender settings.</p>
+                    </div>
+                </div>
+            </template>
+            <form @submit.prevent="submitMailSettings" class="space-y-4 text-xs">
+                <!-- Auto-Trigger Banner -->
+                <div class="p-3 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-slate-900">Automatic Mail Triggers</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                              :class="mailSettingsForm.auto_notify_enabled ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-700'">
+                            {{ mailSettingsForm.auto_notify_enabled ? 'Active' : 'Disabled (Default)' }}
+                        </span>
+                    </div>
+                    <p class="text-[11px] text-slate-600 leading-relaxed">
+                        By default, automatic email dispatch is <strong>disabled</strong> so changes or offers made on the admin side don't spam schools. You have full manual control to send emails when ready using the <em>"Send Email to Schools"</em> button.
+                    </p>
+                    <label class="flex items-center gap-2 cursor-pointer pt-1">
+                        <input type="checkbox" v-model="mailSettingsForm.auto_notify_enabled" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                        <span class="text-[11px] font-semibold text-slate-700">Enable automatic background emails when new slots are offered</span>
+                    </label>
+                </div>
+
+                <!-- Mailer Status -->
+                <div class="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 bg-white">
+                    <div>
+                        <p class="font-bold text-slate-800">Email Gateway Status</p>
+                        <p class="text-[11px] text-slate-500">{{ mailConfig.from_address ? `From: ${mailConfig.from_name} <${mailConfig.from_address}>` : 'Using standard system mail transport' }}</p>
+                    </div>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold" :class="mailConfig.is_configured ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'">
+                        {{ mailConfig.is_configured ? 'Custom Configured' : 'System Default' }}
+                    </span>
+                </div>
+
+                <!-- Default Subject Template -->
+                <div>
+                    <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Default Subject Template</label>
+                    <input v-model="mailSettingsForm.subject_template" type="text" required class="w-full rounded-xl border border-slate-300 p-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                </div>
+
+                <!-- Default Message Template -->
+                <div>
+                    <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Default Message Template</label>
+                    <textarea v-model="mailSettingsForm.message_template" rows="4" required class="w-full rounded-xl border border-slate-300 p-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"></textarea>
+                    <p class="text-[10px] text-slate-400 mt-1">Available placeholders: {school_name}, {event_title}, {program_title}, {action_url}, {pending_count}</p>
+                </div>
+
+                <!-- Reply-To Email -->
+                <div>
+                    <label class="block font-bold text-slate-700 uppercase tracking-wider mb-1">Reply-To Email Address</label>
+                    <input v-model="mailSettingsForm.reply_to_email" type="email" placeholder="contact@sahodaya.org" class="w-full rounded-xl border border-slate-300 p-2.5 text-xs text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                </div>
+
+                <!-- Last Sent History -->
+                <div v-if="mailConfig.last_sent_at" class="text-[11px] text-slate-500 pt-1">
+                    Last sent: <strong>{{ formatDate(mailConfig.last_sent_at) }}</strong> to {{ mailConfig.last_sent_count }} schools.
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" @click="showMailSettingsModal = false" class="btn-secondary text-xs">
+                        Cancel
+                    </button>
+                    <button type="submit" :disabled="savingMailSettings" class="btn-primary text-xs !bg-indigo-600 hover:!bg-indigo-700 font-bold">
+                        {{ savingMailSettings ? 'Saving...' : 'Save Mail Settings' }}
+                    </button>
+                </div>
+            </form>
+        </Modal>
     </SahodayaEventsLayout>
 </template>
 
@@ -394,6 +614,7 @@
 import { ref, reactive, computed, watch } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import Modal from '@/Components/ui/Modal.vue';
 
 const props = defineProps({
     sahodaya: Object,
@@ -401,6 +622,8 @@ const props = defineProps({
     event: Object,
     program: Object,
     summary: { type: Array, default: () => [] },
+    schoolsSummary: { type: Array, default: () => [] },
+    mailConfig: { type: Object, default: () => ({}) },
     actionUrls: Object,
     schoolEntryUrl: String,
 });
@@ -640,5 +863,137 @@ async function copySchoolLink() {
 
 function formatDate(value) {
     return value ? new Date(value).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+}
+
+// Mail Modal handling
+const showSendEmailModal = ref(false);
+const showMailSettingsModal = ref(false);
+const sendingEmail = ref(false);
+const sendingTestEmail = ref(false);
+const savingMailSettings = ref(false);
+const showRecipientsList = ref(false);
+const testEmail = ref('');
+
+const emailForm = reactive({
+    audience: 'pending',
+    school_id: '',
+    subject: '',
+    message: '',
+    include_slot_details: true,
+});
+
+const mailSettingsForm = reactive({
+    auto_notify_enabled: false,
+    subject_template: '',
+    message_template: '',
+    reply_to_email: '',
+});
+
+const pendingSchoolsCount = computed(() => {
+    return (props.schoolsSummary || []).filter(s => s.pending_count > 0).length;
+});
+
+const allSchoolsCount = computed(() => {
+    return (props.schoolsSummary || []).length;
+});
+
+const targetedSchools = computed(() => {
+    const list = props.schoolsSummary || [];
+    if (emailForm.audience === 'pending') {
+        return list.filter(s => s.pending_count > 0);
+    }
+    if (emailForm.audience === 'specific') {
+        return list.filter(s => String(s.school_id) === String(emailForm.school_id));
+    }
+    return list;
+});
+
+const targetedWithEmailCount = computed(() => {
+    return targetedSchools.value.filter(s => s.has_email).length;
+});
+
+const targetedMissingEmailCount = computed(() => {
+    return targetedSchools.value.filter(s => !s.has_email).length;
+});
+
+function openSendEmailModal() {
+    emailForm.audience = 'pending';
+    emailForm.school_id = '';
+    emailForm.subject = props.mailConfig.subject_template || `[${props.event.title}] State Kalotsavam Nomination - Confirm Student Slots`;
+    emailForm.message = props.mailConfig.message_template || `Dear Principal / Sahodaya In-Charge,\n\nStudents from your school have qualified to represent our Sahodaya at the State Kalotsavam in ${props.event.title}.\n\nPlease review your qualified student slots on the Sahodaya portal to confirm attendance or opt out if a student is unable to attend, so waiting list candidates can be offered the slot in time.\n\nClick the link below to access your school's slot confirmation page:\n{action_url}\n\nWarm regards,\n${props.sahodaya.name}`;
+    emailForm.include_slot_details = true;
+    testEmail.value = '';
+    showRecipientsList.value = false;
+    showSendEmailModal.value = true;
+}
+
+function openMailSettingsModal() {
+    mailSettingsForm.auto_notify_enabled = Boolean(props.mailConfig.auto_notify_enabled);
+    mailSettingsForm.subject_template = props.mailConfig.subject_template || `[${props.event.title}] State Kalotsavam Nomination - Confirm Student Slots`;
+    mailSettingsForm.message_template = props.mailConfig.message_template || `Dear Principal / Sahodaya In-Charge,\n\nStudents from your school have qualified to represent our Sahodaya at the State Kalotsavam in ${props.event.title}.\n\nPlease review your qualified student slots on the Sahodaya portal to confirm attendance or opt out if a student is unable to attend, so waiting list candidates can be offered the slot in time.\n\nClick the link below to access your school's slot confirmation page:\n{action_url}\n\nWarm regards,\n${props.sahodaya.name}`;
+    mailSettingsForm.reply_to_email = props.mailConfig.reply_to_email || '';
+    showMailSettingsModal.value = true;
+}
+
+function insertPlaceholder(placeholder) {
+    emailForm.message += ` ${placeholder} `;
+}
+
+function sendTestEmail() {
+    if (!testEmail.value.trim() || sendingTestEmail.value) return;
+    sendingTestEmail.value = true;
+    router.post(props.actionUrls.sendEmail, {
+        audience: 'all',
+        subject: emailForm.subject,
+        message: emailForm.message,
+        include_slot_details: emailForm.include_slot_details,
+        test_email: testEmail.value.trim(),
+    }, {
+        preserveScroll: true,
+        onFinish: () => {
+            sendingTestEmail.value = false;
+        },
+    });
+}
+
+function submitSendEmail() {
+    if (sendingEmail.value || targetedWithEmailCount.value === 0) return;
+    if (!window.confirm(`Send notification email to ${targetedWithEmailCount.value} school(s)?`)) return;
+
+    sendingEmail.value = true;
+    router.post(props.actionUrls.sendEmail, {
+        audience: emailForm.audience,
+        school_id: emailForm.audience === 'specific' ? emailForm.school_id : null,
+        subject: emailForm.subject,
+        message: emailForm.message,
+        include_slot_details: emailForm.include_slot_details,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showSendEmailModal.value = false;
+        },
+        onFinish: () => {
+            sendingEmail.value = false;
+        },
+    });
+}
+
+function submitMailSettings() {
+    if (savingMailSettings.value) return;
+    savingMailSettings.value = true;
+    router.post(props.actionUrls.mailSettings, {
+        auto_notify_enabled: mailSettingsForm.auto_notify_enabled,
+        subject_template: mailSettingsForm.subject_template,
+        message_template: mailSettingsForm.message_template,
+        reply_to_email: mailSettingsForm.reply_to_email,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showMailSettingsModal.value = false;
+        },
+        onFinish: () => {
+            savingMailSettings.value = false;
+        },
+    });
 }
 </script>

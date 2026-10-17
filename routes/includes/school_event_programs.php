@@ -103,6 +103,9 @@ foreach ($festPrograms as $cfg) {
         Route::post('/events/{event}/state-slots/{selection}/opt-out', [FestStateSlotController::class, 'optOut'])
             ->defaults('program', $slug)
             ->name('event.state-slots.opt-out');
+        Route::post('/events/{event}/state-slots/{selection}/cancel-opt-out', [FestStateSlotController::class, 'cancelOptOut'])
+            ->defaults('program', $slug)
+            ->name('event.state-slots.cancel-opt-out');
         Route::get('/import-template', [FestRegistrationController::class, 'importTemplate'])
             ->defaults('program', $slug)
             ->name('import-template');

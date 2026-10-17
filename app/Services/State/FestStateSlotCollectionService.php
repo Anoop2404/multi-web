@@ -167,6 +167,89 @@ class FestStateSlotCollectionService
     }
 
     /**
+     * Cancel an earlier opt-out and reclaim the offered slot for the school.
+     * Revokes any pending downstream replacement that was auto-offered.
+     */
+    public function cancelOptOut(FestStateNominationSelection $selection, User $by): FestStateNominationSelection
+    {
+        $batch = FestStateNominationBatch::findOrFail($selection->batch_id);
+        $hubEvent = $batch->hubEvent;
+        abort_unless($hubEvent, 404);
+        abort_unless($hubEvent->state_slot_collection_open, 422, 'State slot collection is not open for this event.');
+        abort_if($hubEvent->state_slot_collection_approved_at, 422, 'The State slot list is already approved.');
+        abort_if($batch->isCertified(), 422, 'This event is already registered with State.');
+
+        abort_unless(
+            $selection->school_response === 'opted_out' || $selection->status === FestStateWinnerSheetService::DECLINED,
+            422,
+            'This slot is not opted out.'
+        );
+
+        return DB::transaction(function () use ($selection, $by, $batch, $hubEvent) {
+            FestStateNominationBatch::whereKey($batch->id)->lockForUpdate()->first();
+            $selection->refresh();
+            $batch->refresh();
+            $hubEvent->refresh();
+
+            abort_if($batch->isCertified(), 422, 'This event is already registered with State.');
+            abort_if($hubEvent->state_slot_collection_approved_at, 422, 'The State slot list is already approved.');
+            abort_unless($selection->school_response === 'opted_out' || $selection->status === FestStateWinnerSheetService::DECLINED, 422, 'This slot is not opted out.');
+
+            $program = FestStateProgram::findOrFail($batch->state_program_id);
+            $pool = app(FestStateCollectionCandidates::class)->pool($program, $hubEvent);
+            $eligible = $pool->contains(fn ($candidate) => $candidate['item_id'] === $selection->item_id
+                && (($selection->participant_id && $candidate['participant_id'] === $selection->participant_id)
+                    || ($selection->mark_id && $candidate['mark_id'] === $selection->mark_id)
+                    || ($selection->registration_id && $candidate['registration_id'] === $selection->registration_id)));
+
+            abort_unless($eligible, 422, 'This candidate is no longer eligible.');
+
+            // Check if there was a replacement selection generated from this opt-out
+            $replacement = $batch->selections()
+                ->where('replaces_selection_id', $selection->id)
+                ->where('status', 'selected')
+                ->first();
+
+            if ($replacement) {
+                if ($replacement->school_response === 'accepted') {
+                    throw ValidationException::withMessages([
+                        'slot' => "Cannot cancel opt-out because replacement candidate {$replacement->student_name} from {$replacement->school_name} has already accepted and confirmed this slot. Please contact Sahodaya admin to adjust.",
+                    ]);
+                }
+
+                // If replacement is still pending, delete it to free the slot
+                $replacement->delete();
+            } else {
+                // If no direct replaces_selection_id, check item quota
+                $item = FestStateProgramItem::findOrFail($selection->item_id);
+                $quota = $this->nominations->itemQuota($item->id, $selection->item_code, (string) $hubEvent->id) ?? (int) ($item->qualify_count ?: 0);
+                $chosenCount = $batch->selections()
+                    ->where('item_id', $selection->item_id)
+                    ->where('nomination_type', 'primary')
+                    ->where('status', 'selected')
+                    ->count();
+
+                if ($quota !== null && $chosenCount >= $quota) {
+                    throw ValidationException::withMessages([
+                        'slot' => "Cannot cancel opt-out. All {$quota} slot(s) for this item are currently filled. Please contact Sahodaya admin to adjust.",
+                    ]);
+                }
+            }
+
+            $selection->update([
+                'status' => 'selected',
+                'school_response' => 'pending',
+                'skip_reason' => null,
+                'school_responded_by' => null,
+                'school_responded_by_name' => null,
+                'school_responded_at' => null,
+            ]);
+
+            return $selection->fresh();
+        });
+    }
+
+    /**
      * Locks the list: every offered slot must have been answered (accepted, or opted out and its
      * replacement in turn resolved), and the sheet's usual tie/over-quota checks must be clear.
      * Approving does not itself certify or send anything — it only clears the way for the existing
@@ -335,6 +418,10 @@ class FestStateSlotCollectionService
                 || (! empty($offer['registration_id']) && ! empty($candidate['registration_id']) && $candidate['registration_id'] === $offer['registration_id']));
             $offer['can_respond'] = $stillEligible && $hubEvent->state_slot_collection_open && ! $hubEvent->state_slot_collection_approved_at
                 && $offer['status'] === 'selected' && $offer['school_response'] === 'pending';
+            $offer['can_cancel_opt_out'] = $stillEligible && $hubEvent->state_slot_collection_open && ! $hubEvent->state_slot_collection_approved_at
+                && ! $batch->isCertified()
+                && $offer['school_response'] === 'opted_out'
+                && $this->canCancelOptOut($batch, $offer['id'], $offer['item_id'], $row['quota'] ?? 2);
         }
         unset($offer);
         foreach ($sheet as $row) {
@@ -550,5 +637,29 @@ class FestStateSlotCollectionService
 
             return null;
         });
+    }
+
+    private function canCancelOptOut(FestStateNominationBatch $batch, ?int $selectionId, int|string $itemId, int $quota): bool
+    {
+        if (! $selectionId) {
+            return false;
+        }
+
+        $replacement = $batch->selections()
+            ->where('replaces_selection_id', $selectionId)
+            ->where('status', 'selected')
+            ->first();
+
+        if ($replacement) {
+            return $replacement->school_response !== 'accepted';
+        }
+
+        $chosenCount = $batch->selections()
+            ->where('item_id', $itemId)
+            ->where('nomination_type', 'primary')
+            ->where('status', 'selected')
+            ->count();
+
+        return $chosenCount < $quota;
     }
 }

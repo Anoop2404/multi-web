@@ -85,6 +85,14 @@
                     <p class="text-2xl font-black text-purple-600 mt-1">{{ waitingCount }}</p>
                     <p class="text-[11px] text-slate-400 mt-0.5">Eligible if top ranks opt out</p>
                 </button>
+
+                <button v-if="optedOutCount > 0" type="button" @click="activeTab = 'opted_out'"
+                        class="p-4 rounded-xl border text-left transition"
+                        :class="activeTab === 'opted_out' ? 'border-rose-500 bg-rose-50/50 ring-2 ring-rose-500/20' : 'border-slate-200 bg-white hover:border-slate-300'">
+                    <p class="text-xs font-semibold text-rose-700 uppercase tracking-wider">Opted Out</p>
+                    <p class="text-2xl font-black text-rose-600 mt-1">{{ optedOutCount }}</p>
+                    <p class="text-[11px] text-slate-400 mt-0.5">Can cancel &amp; reclaim</p>
+                </button>
             </div>
 
             <!-- How Waiting List Works Explanation Card -->
@@ -260,6 +268,14 @@
                                 </button>
                             </div>
 
+                            <!-- Cancel Opt-Out Button for Opted-Out Offers -->
+                            <div v-else-if="s.can_cancel_opt_out" class="flex items-center gap-2">
+                                <button type="button" @click="openCancelOptOutModal(s)"
+                                        class="btn-secondary text-xs !py-1.5 !px-3 text-indigo-700 hover:!bg-indigo-50 border-indigo-200 font-bold flex items-center gap-1.5 shadow-2xs transition">
+                                    <span>↺</span> Cancel Opt-Out &amp; Reclaim
+                                </button>
+                            </div>
+
                             <!-- Informative helper button for waiting entries -->
                             <div v-else-if="s.school_response === 'waiting'" class="text-[11px] text-right text-slate-400">
                                 <span>{{ s.is_next_in_line ? '1 opt-out gives this entry the slot' : `${s.opt_outs_needed} opt-outs needed` }}</span>
@@ -332,6 +348,41 @@
                     </button>
                 </div>
             </form>
+        </Modal>
+
+        <!-- Cancel Opt-Out Confirmation Modal -->
+        <Modal :show="showCancelOptOutModal" @close="showCancelOptOutModal = false" size="md">
+            <template #header>
+                <div class="flex items-center gap-2 text-indigo-600">
+                    <span class="text-xl">↺</span>
+                    <h3 class="text-base font-bold text-slate-900">Cancel Opt-Out &amp; Reclaim Slot</h3>
+                </div>
+            </template>
+            <div class="space-y-4">
+                <p class="text-xs text-slate-600 leading-relaxed">
+                    Are you sure you want to cancel the previous opt-out for <strong class="text-slate-900">{{ selectedSlot?.student_name }}</strong>?
+                </p>
+                <div class="p-3 bg-indigo-50/60 border border-indigo-100 rounded-xl space-y-1 text-xs">
+                    <p class="font-bold text-indigo-950">{{ selectedSlot?.item_code }} — {{ selectedSlot?.item_title }}</p>
+                    <p class="text-indigo-700 text-[11px]">{{ selectedSlot?.category_label }} · Rank {{ selectedSlot?.source_position }}</p>
+                    <p v-if="selectedSlot?.opt_out_reason" class="text-slate-500 text-[11px] pt-1 italic">
+                        Previous opt-out reason: "{{ selectedSlot.opt_out_reason }}"
+                    </p>
+                </div>
+                <p class="text-xs text-slate-500 leading-relaxed">
+                    This will reclaim the State nomination slot and return it to <strong>Pending Confirmation</strong>, allowing your school to confirm participation.
+                </p>
+            </div>
+            <template #footer>
+                <div class="flex items-center justify-end gap-2">
+                    <button type="button" @click="showCancelOptOutModal = false" class="btn-secondary text-xs">
+                        Keep Opted Out
+                    </button>
+                    <button type="button" @click="confirmCancelOptOut" :disabled="submitting" class="btn-primary text-xs !bg-indigo-600 hover:!bg-indigo-700 font-bold">
+                        {{ submitting ? 'Restoring...' : 'Yes, Cancel Opt-Out & Reclaim Slot' }}
+                    </button>
+                </div>
+            </template>
         </Modal>
     </SchoolAdminLayout>
 </template>
@@ -435,6 +486,28 @@ function confirmOptOut() {
             showOptOutModal.value = false;
             selectedSlot.value = null;
             optOutReason.value = '';
+        },
+        onFinish: () => {
+            submitting.value = false;
+        },
+    });
+}
+
+const showCancelOptOutModal = ref(false);
+
+function openCancelOptOutModal(slot) {
+    selectedSlot.value = slot;
+    showCancelOptOutModal.value = true;
+}
+
+function confirmCancelOptOut() {
+    if (!selectedSlot.value) return;
+    submitting.value = true;
+    router.post(`${props.actionUrlBase}/${selectedSlot.value.id}/cancel-opt-out`, {}, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showCancelOptOutModal.value = false;
+            selectedSlot.value = null;
         },
         onFinish: () => {
             submitting.value = false;
