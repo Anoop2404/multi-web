@@ -637,6 +637,10 @@ export function schoolNavItemActive(pageUrl, href, exact = false, matchQuery = n
         return true;
     }
 
+    if (target.endsWith('/state-slots') && path.includes('/state-slots')) {
+        return true;
+    }
+
     // Highlight program entry when anywhere in that program's routes.
     const dedicatedMatch = target.match(/\/(kalotsav|sports|kids-fest|teacher-fest|english-fest|science-fest)(?:\/|$)/);
     if (dedicatedMatch) {

@@ -75,6 +75,7 @@ export function schoolProgramWorkflowItems(schoolId, programSlug) {
     items.push(
         { label: 'Results', href: schoolProgramHref(schoolId, programSlug, 'results'), icon: 'bar-chart' },
         { label: 'Qualifiers', href: schoolProgramHref(schoolId, programSlug, 'qualifiers'), icon: 'star' },
+        { label: 'State Slots', href: schoolProgramHref(schoolId, programSlug, 'state-slots'), icon: 'award' },
         { label: 'Reports', href: schoolProgramHref(schoolId, programSlug, 'reports'), icon: 'file-text' },
     );
 

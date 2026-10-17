@@ -25,6 +25,46 @@ use Illuminate\Http\Request;
  */
 class FestStateSlotController extends SchoolAdminController
 {
+    public function hubRedirect(Request $request, string $tenantId)
+    {
+        $program = (string) $request->route('program');
+        $meta = SchoolFestProgram::meta($program);
+        $eventType = $meta['eventType'];
+        $sahodayaId = $this->school->parent_id;
+
+        $event = FestEvent::where('tenant_id', $sahodayaId)
+            ->where('event_type', $eventType)
+            ->whereNull('parent_event_id')
+            ->whereNotNull('state_program_id')
+            ->orderByDesc('event_start')
+            ->first();
+
+        if (! $event) {
+            $event = FestEvent::where('tenant_id', $sahodayaId)
+                ->where('event_type', $eventType)
+                ->whereNotNull('state_program_id')
+                ->orderByDesc('event_start')
+                ->first();
+        }
+
+        if (! $event) {
+            $event = FestEvent::where('tenant_id', $sahodayaId)
+                ->where('event_type', $eventType)
+                ->whereNull('parent_event_id')
+                ->orderByDesc('event_start')
+                ->first();
+        }
+
+        $prefix = \App\Support\ProgramRouteMap::prefixFromSlug($meta['slug']);
+        $base = \App\Support\ProgramRouteMap::schoolBase($this->school->id, $prefix);
+
+        if (! $event) {
+            return redirect($base)->with('error', 'No Sahodaya event found for state slot confirmation.');
+        }
+
+        return redirect("{$base}/events/{$event->id}/state-slots");
+    }
+
     public function index(Request $request, string $tenantId, FestEvent $event, FestStateSlotCollectionService $collection)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);

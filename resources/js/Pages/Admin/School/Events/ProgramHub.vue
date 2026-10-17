@@ -55,6 +55,7 @@
             <HubCard v-if="isSports" :href="`${programBase}/submit-winners`" icon="🏅" label="Submit winners" hint="Promote to Sahodaya meet" />
             <HubCard :href="`${programBase}/results`" icon="📊" label="Results" hint="Published scores" />
             <HubCard :href="`${programBase}/qualifiers`" icon="🎯" label="Qualifiers" hint="Promoted students" />
+            <HubCard :href="`${programBase}/state-slots`" icon="🏆" label="State Slots" hint="Confirm State representation" />
             <HubCard :href="`${programBase}/reports`" icon="📋" label="Reports" hint="Admit cards & exports" />
             <HubCard v-if="canManageCoordinators" :href="`/school-admin/${school.id}/users?coordinators=1`" icon="👥"
                      label="Assign coordinator" :hint="`Give a teacher access to ${programLabel} only`" />
@@ -246,6 +247,9 @@
                             <td class="text-xs">{{ ev.level_label }}</td>
                             <td>{{ ev.registrations_count }}</td>
                             <td class="text-right whitespace-nowrap">
+                                <Link v-if="ev.state_program_id && !ev.parent_event_id" :href="`${programBase}/events/${ev.id}/state-slots`" class="text-xs text-indigo-700 hover:text-indigo-800 font-semibold mr-3">
+                                    🏆 State Slots →
+                                </Link>
                                 <Link :href="`/school-admin/${school.id}/fest/${ev.id}/food-order`" class="text-xs text-amber-700 hover:text-amber-800 font-semibold mr-3">
                                     🍱 Food menu →
                                 </Link>

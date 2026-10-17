@@ -92,6 +92,9 @@ foreach ($festPrograms as $cfg) {
         Route::get('/qualifiers/export', [FestSchoolReportController::class, 'exportQualifiers'])
             ->defaults('program', $slug)
             ->name('qualifiers.export');
+        Route::get('/state-slots', [FestStateSlotController::class, 'hubRedirect'])
+            ->defaults('program', $slug)
+            ->name('state-slots.hub');
         // A school's own slots before the Sahodaya registers its winners with State — see
         // App\Services\State\FestStateSlotCollectionService.
         Route::get('/events/{event}/state-slots', [FestStateSlotController::class, 'index'])

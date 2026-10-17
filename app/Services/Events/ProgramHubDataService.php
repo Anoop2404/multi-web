@@ -119,6 +119,8 @@ class ProgramHubDataService
                     'results_published'      => $e->results_published,
                     'is_partitioned'         => $isHub,
                     'has_assigned_partition' => (bool) $assignedKey,
+                    'state_program_id'       => $e->state_program_id,
+                    'parent_event_id'        => $e->parent_event_id,
                 ];
             })->values()->all(),
             'regionOptions' => $this->resolveRegionOptionsForSchool($school, $meta['eventType']),

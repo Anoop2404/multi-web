@@ -933,4 +933,23 @@ class FestStateSlotCollectionTest extends TestCase
         $this->hubEvent->refresh();
         $this->assertNotNull($this->hubEvent->notification_settings['state_slot_mail']['last_sent_at'] ?? null);
     }
+
+    public function test_school_state_slots_hub_redirects_to_active_event_slots(): void
+    {
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $schoolUser = User::create([
+            'name' => 'School office',
+            'email' => 'office-hub@example.test',
+            'username' => 'office_hub',
+            'password' => 'password',
+            'tenant_id' => 'school-1',
+            'email_verified_at' => now(),
+        ]);
+        $schoolUser->assignRole('school_admin');
+
+        $res = $this->actingAs($schoolUser)->get('/school-admin/school-1/kalotsav/state-slots');
+
+        $res->assertRedirect("/school-admin/school-1/kalotsav/events/{$this->hubEvent->id}/state-slots");
+    }
 }
+
