@@ -17,3 +17,5 @@ Schools **Confirm registration** or opt out with a reason. Confirmations are rev
 No database migration is needed. Existing nomination records are preserved; records that no longer meet the rules require admin review rather than silent deletion.
 
 Validation covers the real school-login return path, school isolation, category/gender display, State-quota filtering, direct offers at one/two versus three entries, group counting, disabled waiting ranks, promotion cutoff, missing-rank replacements, stale direct offers and approval locks.
+
+Database isolation: school IDs are read from the central tenant registry first; the Sahodaya participant query filters registrations by those IDs. It must not embed a `tenants` subquery in the Sahodaya database. Regression coverage runs ranked and direct candidates against a separate database with no tenants table and verifies that a foreign cluster's school is excluded.

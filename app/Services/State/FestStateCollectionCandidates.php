@@ -7,6 +7,7 @@ use App\Models\FestEventItem;
 use App\Models\FestParticipant;
 use App\Models\FestStateProgram;
 use App\Models\FestStateProgramItem;
+use App\Models\Tenant;
 use App\Services\Events\FestHeadItemNavigationService;
 use App\Services\Events\FestPartitionService;
 use App\Support\FestTeamSquadRules;
@@ -24,8 +25,11 @@ class FestStateCollectionCandidates
             FestEventItem::where('event_id', $event->id)->where('is_enabled', true)->whereNotNull('state_program_item_id')->with('phase')->get(), $event
         ))->filter(fn ($item) => isset($stateItems[$item->state_program_item_id])
             && (int) ($item->qualify_count ?? $stateItems[$item->state_program_item_id]->qualify_count) > 0)->keyBy('id');
-        $participants = FestParticipant::whereHas('registration', fn ($q) => $q->whereIn('item_id', $items->keys())->active()
-            ->whereHas('school', fn ($school) => $school->where('type', 'school')->where('parent_id', $hub->tenant_id)))
+        // Tenant records live centrally. A whereHas('school') here would embed a
+        // tenants subquery in the isolated Sahodaya database, where it cannot run.
+        $schoolIds = Tenant::where('type', 'school')->where('parent_id', $hub->tenant_id)->pluck('id');
+        $participants = FestParticipant::whereHas('registration', fn ($q) => $q->whereIn('item_id', $items->keys())
+            ->whereIn('school_id', $schoolIds)->active())
             ->whereNull('disqualified_at')->where(fn ($q) => $q->whereNull('participant_role')->orWhere('participant_role', 'performer'))
             ->with(['registration.school', 'student.schoolClass', 'group'])->get()->keyBy('id');
         $entryKey = function ($participant) use ($items) {

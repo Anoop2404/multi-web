@@ -280,6 +280,45 @@ class FestStateSlotCollectionTest extends TestCase
         $this->assertSame(['Third'], $this->primaries()->pluck('student_name')->all());
     }
 
+    public function test_candidates_use_central_school_ids_when_tenant_database_has_no_tenants_table(): void
+    {
+        $this->winner('Eligible winner', 1, 95, 'school-1');
+        // A stray registration must not make a school from another cluster eligible.
+        Tenant::create(['id' => 'foreign-cluster', 'name' => 'Other Sahodaya', 'type' => 'sahodaya']);
+        Tenant::create(['id' => 'foreign-school', 'name' => 'Other School', 'type' => 'school', 'parent_id' => 'foreign-cluster']);
+        $this->winner('Foreign winner', 2, 90, 'foreign-school');
+        $db = \Illuminate\Support\Facades\DB::connection('central');
+        $previous = config('database.default');
+        config(['database.connections.slot_isolation_test' => [
+            'driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '', 'foreign_key_constraints' => false,
+        ]]);
+        $isolated = \Illuminate\Support\Facades\DB::connection('slot_isolation_test');
+        try {
+            foreach (['fest_events', 'fest_event_items', 'fest_event_phases', 'fest_participants', 'fest_registrations',
+                'students', 'school_classes', 'fest_groups', 'fest_marks'] as $table) {
+                $sql = $db->selectOne("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", [$table])->sql;
+                $isolated->statement($sql);
+                foreach ($db->table($table)->get() as $record) $isolated->table($table)->insert((array) $record);
+            }
+            \Illuminate\Support\Facades\DB::setDefaultConnection('slot_isolation_test');
+            $this->assertFalse(\Illuminate\Support\Facades\Schema::connection('slot_isolation_test')->hasTable('tenants'));
+            $pool = app(\App\Services\State\FestStateCollectionCandidates::class)->pool($this->program, $this->hubEvent);
+            $this->assertCount(1, $pool);
+            $this->assertSame('school-1', $pool->first()['school_id']);
+            $this->assertSame(Tenant::findOrFail('school-1')->name, $pool->first()['school_name']);
+            // The direct/unpublished path must use the same cross-database-safe filter.
+            $isolated->table('fest_events')->where('id', $this->hubEvent->id)->update(['results_published' => false]);
+            $hub = FestEvent::findOrFail($this->hubEvent->id);
+            $direct = app(\App\Services\State\FestStateCollectionCandidates::class)->pool($this->program, $hub);
+            $this->assertCount(1, $direct);
+            $this->assertTrue($direct->first()['direct_entry']);
+        } finally {
+            \Illuminate\Support\Facades\DB::setDefaultConnection($previous);
+            \Illuminate\Support\Facades\DB::purge('slot_isolation_test');
+            config(['database.connections.slot_isolation_test' => null]);
+        }
+    }
+
     public function test_opening_fills_the_top_ranks_and_marks_them_pending(): void
     {
         $this->winner('First', 1, 95, 'school-1');
