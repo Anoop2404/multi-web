@@ -210,7 +210,7 @@ class FestStateSlotCollectionService
      */
     public function summary(FestStateProgram $program, FestEvent $hubEvent): Collection
     {
-        $sheet = $this->sheets->sheet($program, $hubEvent, ['slot_collection' => true]);
+        $sheet = $this->sheets->sheet($program, $hubEvent, ['slot_collection' => true, 'include_pending_items' => true]);
         $batch = $this->nominations->openBatch($program, $hubEvent);
         $byItem = $batch->selections()
             ->where('nomination_type', 'primary')
@@ -218,7 +218,7 @@ class FestStateSlotCollectionService
             ->groupBy('item_id');
 
         $labels = \App\Support\FestClassGroupScheme::labels(null, $hubEvent->rootEvent());
-        return $sheet->map(function (array $row) use ($byItem, $labels) {
+        return $sheet->map(function (array $row) use ($byItem, $labels, $hubEvent) {
             $displayItem = new \App\Models\FestEventItem($row);
             $row['category_label'] = \App\Support\FestItemCategoryLabel::resolve($displayItem, $labels);
             $row['gender_label'] = \App\Support\FestItemCategoryLabel::genderLabel($row['gender']) ?? 'Open';
@@ -248,6 +248,35 @@ class FestStateSlotCollectionService
 
                 return $c;
             })->values()->all();
+
+            $row['chosen'] = collect($row['chosen'])->map(function ($choice) use ($row) {
+                $choice['is_eligible'] = collect($row['candidates'])->contains(fn ($candidate) =>
+                    ($choice['participant_id'] && $candidate['participant_id'] === $choice['participant_id'])
+                    || ($choice['mark_id'] && $candidate['mark_id'] === $choice['mark_id']));
+                return $choice;
+            })->all();
+            $validOffers = collect($row['chosen'])->where('is_eligible', true);
+            $accepted = $validOffers->where('school_response', 'accepted')->count();
+            $pending = $validOffers->filter(fn ($choice) => $choice['school_response'] !== 'accepted')->count();
+            $invalid = count($row['chosen']) - $validOffers->count();
+            $notOffered = collect($row['candidates'])->filter(fn ($candidate) => ! $candidate['is_chosen'] && ! $candidate['is_declined']
+                && ($candidate['direct_entry'] || $candidate['source_position'] <= 2 || $row['declined'] !== []))->count();
+            $status = match (true) {
+                $row['unresolved_ties'] !== [] || $row['is_over_quota'] || $invalid > 0 => 'attention',
+                $row['candidates'] === [] && $row['chosen'] === [] && $row['declined'] === [] => 'awaiting_eligibility',
+                ! $hubEvent->state_slot_collection_open => 'not_open',
+                $pending > 0 => 'pending',
+                $row['quota'] > 0 && $accepted >= $row['quota'] => 'complete',
+                $notOffered > 0 && $row['slots_left'] > 0 => 'not_offered',
+                default => 'unfilled',
+            };
+            $row['slot_status'] = $status;
+            $row['slot_progress'] = [
+                'accepted' => $accepted, 'pending' => $pending,
+                'unfilled' => max(0, $row['quota'] - $row['chosen_count']),
+                'not_offered' => min($notOffered, $row['slots_left']), 'invalid' => $invalid,
+                'percent' => $row['quota'] > 0 ? min(100, (int) round(100 * $accepted / $row['quota'])) : 0,
+            ];
 
             return $row;
         });
@@ -303,10 +332,22 @@ class FestStateSlotCollectionService
         }
         unset($offer);
         foreach ($sheet as $row) {
+            $unofferedCandidates = collect($row['candidates'] ?? [])
+                ->filter(fn ($c) => ! $c['is_chosen'] && ! $c['is_declined'])
+                ->values();
+
             foreach ($row['candidates'] as $candidate) {
                 if ($candidate['school_id'] !== $schoolId || $candidate['is_chosen'] || $candidate['is_declined']) {
                     continue;
                 }
+
+                $queueIndex = $unofferedCandidates->search(fn ($c) =>
+                    ($candidate['participant_id'] && $c['participant_id'] === $candidate['participant_id'])
+                    || ($candidate['mark_id'] && $c['mark_id'] === $candidate['mark_id']));
+
+                $waitlistPosition = $queueIndex !== false ? $queueIndex + 1 : null;
+                $optOutsNeeded = $waitlistPosition ?: 1;
+
                 $offered[] = [
                     'id' => null, 'key' => 'waiting-'.$candidate['participant_id'],
                     'item_id' => $row['item_id'], 'item_code' => $row['item_code'], 'item_title' => $row['title'],
@@ -315,6 +356,10 @@ class FestStateSlotCollectionService
                     'source_position' => $candidate['source_position'], 'direct_entry' => $candidate['direct_entry'],
                     'status' => 'waiting', 'school_response' => 'waiting', 'can_respond' => false,
                     'opt_out_reason' => null, 'responded_at' => null, 'responded_by_name' => null,
+                    'waitlist_position' => $waitlistPosition,
+                    'opt_outs_needed' => $optOutsNeeded,
+                    'quota' => $row['quota'] ?? 2,
+                    'is_next_in_line' => $waitlistPosition === 1,
                 ];
             }
         }

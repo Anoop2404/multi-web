@@ -53,7 +53,7 @@ class FestStateWinnerSheetService
         $batch = $this->nominations->openBatch($program, $hubEvent);
         $collectionMode = (bool) ($filters['slot_collection'] ?? $hubEvent->state_slot_collection_open);
         $candidates = $collectionMode
-            ? app(FestStateCollectionCandidates::class)->pool($program, $hubEvent)
+            ? $this->nominations->collectionPool($program, $hubEvent)
             : collect($this->nominations->candidatePool($program, $hubEvent));
         $selections = $batch->selections()->get();
 
@@ -64,10 +64,14 @@ class FestStateWinnerSheetService
 
         $sourceEvents = $this->nominations->sourceEvents($hubEvent, app(FestPartitionService::class));
         $sourceEventIds = collect($sourceEvents)->pluck('id');
-        $eventItemQuotas = FestEventItem::whereIn('event_id', $sourceEventIds)
-            ->whereNotNull('state_program_item_id')
-            ->whereNotNull('qualify_count')
-            ->pluck('qualify_count', 'state_program_item_id');
+        $sourceItems = FestEventItem::whereIn('event_id', $sourceEventIds)->where('is_enabled', true)
+            ->whereNotNull('state_program_item_id')->with('phase')->get();
+        if ($collectionMode) {
+            $sourceItems = collect($sourceEvents)->flatMap(fn ($event) =>
+                \App\Services\Events\FestHeadItemNavigationService::filterToOwnPhase($sourceItems->where('event_id', $event->id), $event));
+        }
+        $linkedStateItems = $sourceItems->pluck('state_program_item_id')->all();
+        $eventItemQuotas = $sourceItems->whereNotNull('qualify_count')->pluck('qualify_count', 'state_program_item_id');
 
         $byItem = $candidates->groupBy('item_id');
         $selectionsByItem = $selections->groupBy('item_id');
@@ -84,7 +88,8 @@ class FestStateWinnerSheetService
             ))
             // An item this Sahodaya has no results for is not a decision to make. Kept out rather than
             // listed empty, so the page is the work remaining.
-            ->filter(fn (array $row) => $row['candidates'] !== [] || $row['chosen'] !== [])
+            ->filter(fn (array $row) => $row['candidates'] !== [] || $row['chosen'] !== []
+                || (($filters['include_pending_items'] ?? false) && $row['quota'] > 0 && in_array($row['item_id'], $linkedStateItems, true)))
             ->when($filters['only_incomplete'] ?? false, fn (Collection $rows) => $rows->where('is_complete', false))
             ->values();
     }
@@ -303,6 +308,12 @@ class FestStateWinnerSheetService
      * @return array{filled: int, skipped_ties: list<string>}
      */
     public function autoFill(FestStateProgram $program, FestEvent $hubEvent, ?User $by = null, ?string $onlyItemId = null): array
+    {
+        return $this->nominations->withCollectionSnapshot($program, $hubEvent,
+            fn () => $this->fillFromSnapshot($program, $hubEvent, $by, $onlyItemId));
+    }
+
+    private function fillFromSnapshot(FestStateProgram $program, FestEvent $hubEvent, ?User $by, ?string $onlyItemId): array
     {
         $batch = $this->nominations->openBatch($program, $hubEvent);
         abort_if($batch->isCertified(), 422, 'This batch is already registered with State.');

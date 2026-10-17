@@ -245,6 +245,11 @@ class FestStateSlotCollectionTest extends TestCase
         $this->service()->open($this->program, $this->hubEvent, $this->user());
         foreach ($this->primaries() as $selection) $this->service()->respond($selection, 'accept', null, $this->user());
         $this->winner('Late third', 3, 0, 'school-3')->delete();
+        $row = $this->service()->summary($this->program, $this->hubEvent)->first();
+        $this->assertSame('attention', $row['slot_status']);
+        $this->assertSame(0, $row['slot_progress']['accepted']);
+        $this->assertSame(2, $row['slot_progress']['invalid']);
+        $this->assertSame(0, $row['slot_progress']['percent']);
         $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
         $this->service()->approve($this->program, $this->hubEvent, $this->user());
     }
@@ -317,6 +322,82 @@ class FestStateSlotCollectionTest extends TestCase
             \Illuminate\Support\Facades\DB::purge('slot_isolation_test');
             config(['database.connections.slot_isolation_test' => null]);
         }
+    }
+
+    public function test_open_builds_candidates_once_and_later_school_responses_recheck_fresh_data(): void
+    {
+        for ($index = 0; $index < 8; $index++) {
+            if ($index > 0) {
+                $stateItem = $this->stateItem->replicate();
+                $stateItem->item_code = 'PERF'.$index;
+                $stateItem->save();
+                $item = $this->item->replicate();
+                $item->state_program_item_id = $stateItem->id;
+                $item->item_code = 'PERF'.$index;
+                $item->save();
+                $this->item = $item;
+            }
+            $this->winner('First '.$index, 1, 95, 'school-1');
+            $this->winner('Second '.$index, 2, 90, 'school-2');
+        }
+        $tracker = new class extends \App\Services\State\FestStateCollectionCandidates {
+            public int $calls = 0;
+            public function pool(FestStateProgram $program, FestEvent $hub): \Illuminate\Support\Collection
+            {
+                $this->calls++;
+                return parent::pool($program, $hub);
+            }
+        };
+        $this->app->instance(\App\Services\State\FestStateCollectionCandidates::class, $tracker);
+        $result = $this->service()->open($this->program, $this->hubEvent, $this->user());
+        $this->assertSame(16, $result['filled']);
+        $this->assertSame(1, $tracker->calls, 'Opening must not rebuild the entire candidate pool per selected winner.');
+        $this->service()->respond($this->primaries()->first(), 'accept', null, $this->user());
+        $this->assertSame(2, $tracker->calls, 'School confirmation must load fresh eligibility after the opening transaction.');
+    }
+
+    public function test_item_status_tracks_not_open_pending_and_confirmed_completion(): void
+    {
+        $this->winner('First', 1, 95, 'school-1');
+        $this->winner('Second', 2, 90, 'school-2');
+        $this->assertSame('not_open', $this->service()->summary($this->program, $this->hubEvent)->first()['slot_status']);
+        $this->service()->open($this->program, $this->hubEvent, $this->user());
+        $row = $this->service()->summary($this->program, $this->hubEvent)->first();
+        $this->assertSame('pending', $row['slot_status']);
+        $this->assertSame(2, $row['slot_progress']['pending']);
+        $this->assertSame(0, $row['slot_progress']['percent']);
+        $this->service()->respond($this->primaries()->first(), 'accept', null, $this->user());
+        $row = $this->service()->summary($this->program, $this->hubEvent)->first();
+        $this->assertSame('pending', $row['slot_status']);
+        $this->assertSame(50, $row['slot_progress']['percent']);
+        $this->service()->respond($this->primaries()->firstWhere('school_response', 'pending'), 'accept', null, $this->user());
+        $row = $this->service()->summary($this->program, $this->hubEvent)->first();
+        $this->assertSame('complete', $row['slot_status']);
+        $this->assertSame(100, $row['slot_progress']['percent']);
+    }
+
+    public function test_linked_items_awaiting_results_remain_visible_as_pending_work(): void
+    {
+        $this->hubEvent->update(['results_published' => false]);
+        foreach (['school-1', 'school-2', 'school-3'] as $i => $school) $this->winner('Entry '.$i, $i + 1, 0, $school)->delete();
+        $rows = $this->service()->summary($this->program, $this->hubEvent);
+        $this->assertCount(1, $rows);
+        $this->assertSame('awaiting_eligibility', $rows->first()['slot_status']);
+        $this->assertSame(2, $rows->first()['slot_progress']['unfilled']);
+        $this->assertSame([], $rows->first()['candidates']);
+    }
+
+    public function test_status_distinguishes_unsent_offers_from_exhausted_unfilled_slots(): void
+    {
+        $this->winner('First', 1, 95, 'school-1');
+        $this->hubEvent->update(['state_slot_collection_open' => true]);
+        $this->assertSame('not_offered', $this->service()->summary($this->program, $this->hubEvent)->first()['slot_status']);
+        $this->service()->syncAdditionalSlots($this->program, $this->hubEvent, $this->user());
+        $this->service()->respond($this->primaries()->first(), 'opt_out', 'Cannot attend', $this->user());
+        $row = $this->service()->summary($this->program, $this->hubEvent)->first();
+        $this->assertSame('unfilled', $row['slot_status']);
+        $this->assertSame(2, $row['slot_progress']['unfilled']);
+        $this->assertSame(0, $row['slot_progress']['pending']);
     }
 
     public function test_opening_fills_the_top_ranks_and_marks_them_pending(): void

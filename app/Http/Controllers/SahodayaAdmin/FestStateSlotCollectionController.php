@@ -172,6 +172,7 @@ class FestStateSlotCollectionController extends SahodayaAdminController
             'approve' => "{$base}/approve",
             'updateSlots' => "{$base}/update-slots",
             'overview' => "/sahodaya-admin/{$tenantId}/state-slot-collection",
+            'winnerSheet' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/state-winners",
         ];
     }
 }

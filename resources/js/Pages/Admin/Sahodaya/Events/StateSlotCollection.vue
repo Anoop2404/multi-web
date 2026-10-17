@@ -1,144 +1,93 @@
 <template>
-    <SahodayaEventsLayout :title="`State slot collection — ${program.title}`"
-                          :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl">
-        <div class="max-w-6xl space-y-4">
-            <div class="card">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <Link :href="actionUrls.overview" class="text-xs text-gray-500 hover:text-gray-800">← All State events</Link>
-                        <h3 class="font-semibold mt-1">Get a confirmed list before State registration</h3>
-                        <p class="text-xs text-gray-500 mt-0.5 max-w-2xl">
-                            Configure how many winning positions (slots) are offered to schools per item.
-                            Opening this auto-fills each item's top ranks and asks each winning school to accept or opt out of their
-                            slot. If a school opts out, the next rank is offered the freed slot in their
-                            place. Once every offer is answered, approve the list — after that you
-                            register with State from the winner sheet exactly as before.
-                        </p>
-                    </div>
-                    <span class="shrink-0 rounded-full px-3 py-1 text-xs font-semibold" :class="statusClass">
-                        {{ statusLabel }}
-                    </span>
+    <SahodayaEventsLayout :title="`State slot collection — ${program.title}`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl" :show-header-title="false">
+        <div class="mx-auto max-w-7xl space-y-5 pb-8">
+            <header class="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+                <Link :href="actionUrls.overview" class="text-xs font-semibold text-slate-500 hover:text-slate-900">← All State events</Link>
+                <div class="mt-3 flex flex-wrap items-start justify-between gap-4">
+                    <div><p class="text-xs font-bold uppercase tracking-wider text-indigo-600">State registration · School confirmations</p><h1 class="mt-1 text-2xl font-bold text-slate-900">State slot collection</h1><p class="mt-1 text-sm text-slate-500">{{ event.title }} · {{ program.title }}</p></div>
+                    <span class="rounded-full px-3 py-1.5 text-xs font-bold" :class="event.state_slot_collection_approved_at ? 'bg-emerald-100 text-emerald-800' : event.state_slot_collection_open ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-100 text-slate-700'">{{ statusLabel }}</span>
                 </div>
-
-                <!-- Slot Quota Configuration Toolbar -->
-                <div v-if="!event.state_slot_collection_approved_at" class="mt-4 pt-4 border-t border-slate-100">
-                    <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                        <div>
-                            <p class="text-xs font-bold text-slate-800">Configure Slot Count per Item</p>
-                            <p class="text-[11px] text-slate-500">
-                                Up to two State slots. Ranks 3–5 wait for an opt-out; unpublished items with one/two entries receive direct offers.
-                            </p>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <span class="text-[11px] text-slate-500 font-medium">Quick set all:</span>
-                            <button type="button" @click="applyBatch(1)" class="px-2.5 py-1 text-xs font-medium rounded-lg border border-slate-300 bg-white hover:bg-slate-100 transition shadow-xs">
-                                🥇 Top 1 Only
-                            </button>
-                            <button type="button" @click="applyBatch(2)" class="px-2.5 py-1 text-xs font-medium rounded-lg border border-slate-300 bg-white hover:bg-slate-100 transition shadow-xs">
-                                🥈 Top 2
-                            </button>
-                            <button type="button" :disabled="savingSlots" @click="saveSlotQuotas(false)" class="btn-secondary text-xs !py-1 ml-1">
-                                {{ savingSlots ? 'Saving...' : '💾 Save Slot Counts' }}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mt-3 flex flex-wrap items-center gap-2">
-                    <button v-if="!event.state_slot_collection_open" type="button" class="btn-primary text-xs" :disabled="savingSlots" @click="open">
-                        Open slot collection
-                    </button>
+                <div class="mt-5 flex flex-wrap items-center justify-between gap-2 text-sm"><span><strong class="text-slate-900">{{ totals.accepted }} / {{ totals.quota }}</strong> slots confirmed by schools</span><span class="font-semibold text-slate-500">{{ completionPercent }}% confirmed</span></div>
+                <div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" :aria-valuenow="completionPercent" aria-valuemin="0" aria-valuemax="100" aria-label="School slot confirmation progress"><div class="h-full rounded-full bg-emerald-500 transition-all" :style="{ width: `${completionPercent}%` }" /></div>
+                <p class="mt-2 text-xs text-slate-500">An offer is complete only after the school confirms it. Ranks 3–5 remain on the waiting list until a higher rank opts out.</p>
+                <div class="mt-5 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
+                    <button v-if="!event.state_slot_collection_open" type="button" class="btn-primary text-sm" :disabled="busy || !summary.length" @click="open">{{ opening ? 'Opening slots…' : 'Open school confirmations' }}</button>
                     <template v-else-if="!event.state_slot_collection_approved_at">
-                        <span class="text-xs text-gray-500">
-                            {{ totals.accepted }} accepted · {{ totals.pending }} awaiting response · {{ totals.optedOut }} opted out
-                        </span>
-                        <button v-if="event.state_slot_collection_open" type="button" :disabled="savingSlots" @click="saveSlotQuotas(true)"
-                                class="px-2.5 py-1 text-xs font-medium rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition ml-2">
-                            🔄 Re-sync new slots with schools
-                        </button>
-                        <button type="button" class="btn-primary text-xs ml-auto" :disabled="totals.pending > 0" @click="approve">
-                            Approve list
-                        </button>
+                        <button type="button" class="btn-secondary text-sm" :disabled="busy" @click="saveSlotQuotas(true)">{{ savingSlots ? 'Updating offers…' : 'Sync available offers' }}</button>
+                        <button type="button" class="btn-primary text-sm" :disabled="!canApprove" @click="approve">{{ approving ? 'Approving…' : 'Approve confirmed list' }}</button>
+                        <span v-if="totals.pending" class="text-xs text-amber-800">{{ totals.pending }} school response(s) still required</span>
+                        <span v-else-if="counts.attention || counts.not_offered" class="text-xs text-rose-700">Resolve items needing attention or send available offers first.</span>
+                        <span v-else-if="hasChanges" class="text-xs text-amber-800">Save your slot changes first.</span>
+                        <span v-else class="text-xs text-emerald-700">School responses are complete. Review any unfilled slots before approval.</span>
                     </template>
-                    <span v-else class="text-xs text-emerald-700">
-                        Approved {{ formatDate(event.state_slot_collection_approved_at) }}. Register with State from the winner sheet.
-                    </span>
+                    <span v-else class="text-sm text-emerald-800">Approved {{ formatDate(event.state_slot_collection_approved_at) }}. Continue to the State winner registration sheet to submit.</span>
                 </div>
+                <p v-if="opening || savingSlots" role="status" class="mt-3 rounded-lg bg-indigo-50 p-3 text-xs text-indigo-800">{{ opening ? 'Preparing offers and checking quotas. Keep this page open; one submission is enough.' : 'Updating slot counts and checking new offers…' }}</p>
+                <p v-if="operationError" role="alert" class="mt-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{{ operationError }}</p>
+            </header>
 
-                <div class="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                    <p class="text-[11px] font-semibold text-slate-600">How schools respond</p>
-                    <p class="text-[11px] text-slate-600 mt-0.5">Share this link. Schools sign in with their existing school accounts and see only their own entries.</p>
-                    <div class="mt-2 flex flex-wrap gap-2"><input :value="schoolEntryUrl" readonly class="min-w-0 flex-1 rounded border px-2 py-1 text-xs" aria-label="School State slot submission URL"><button type="button" class="btn-secondary text-xs" @click="copySchoolLink">{{ copied ? 'Copied' : 'Copy school link' }}</button></div>
-
-                </div>
+            <div class="grid grid-cols-2 gap-3 lg:grid-cols-6">
+                <button v-for="card in statCards" :key="card.key" type="button" class="rounded-xl border bg-white p-4 text-left transition hover:border-indigo-300" :class="statusFilter === card.filter ? 'border-indigo-500 ring-1 ring-indigo-100' : 'border-slate-200'" @click="statusFilter = card.filter">
+                    <p class="text-xs font-semibold text-slate-500">{{ card.label }}</p><p class="mt-2 text-2xl font-bold" :class="card.color">{{ card.count }}</p><p class="mt-1 text-[11px] text-slate-500">{{ card.hint }}</p>
+                </button>
             </div>
 
-            <p v-if="!summary.length" class="card text-sm text-gray-400">
-                No eligible State-quota entries yet. Published ranks 1–5 or one/two entries in an unpublished item are required.
-            </p>
+            <div class="grid gap-4 lg:grid-cols-2">
+                <section class="rounded-xl border border-slate-200 bg-white p-4"><h2 class="text-sm font-bold text-slate-800">School submission link</h2><p class="mt-1 text-xs text-slate-500">Schools sign in with their existing accounts and see only their own entries.</p><div class="mt-3 flex gap-2"><input :value="schoolEntryUrl" readonly class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs" aria-label="School submission URL" @focus="$event.target.select()"><button type="button" class="btn-secondary text-xs" @click="copySchoolLink">{{ copied ? 'Copied' : 'Copy link' }}</button></div></section>
+                <section class="rounded-xl border border-slate-200 bg-white p-4"><h2 class="text-sm font-bold text-slate-800">Slot settings</h2><p class="mt-1 text-xs text-slate-500">Up to two State slots per item. Unpublished items with one or two entries can receive direct offers.</p><div v-if="!event.state_slot_collection_approved_at" class="mt-3 flex flex-wrap items-center gap-2"><span class="text-xs text-slate-500">Set all items:</span><button type="button" class="rounded-lg border px-3 py-1.5 text-xs font-semibold" :disabled="busy" @click="applyBatch(1)">1 slot</button><button type="button" class="rounded-lg border px-3 py-1.5 text-xs font-semibold" :disabled="busy" @click="applyBatch(2)">2 slots</button><button type="button" class="btn-secondary text-xs" :disabled="busy || !hasChanges" @click="saveSlotQuotas(false)">Save changes</button><span v-if="hasChanges" class="text-xs text-amber-700">Unsaved changes</span></div><p v-else class="mt-3 text-xs text-slate-500">Slot settings are locked after approval.</p></section>
+            </div>
 
-            <section v-for="row in summary" :key="row.item_id" class="card">
-                <div class="flex flex-wrap items-start justify-between gap-2">
-                    <div class="min-w-0">
+            <section class="rounded-xl border border-slate-200 bg-white p-4">
+                <div class="flex flex-wrap gap-3"><input v-model="search" type="search" placeholder="Search item, code, school or participant…" aria-label="Search State slots" class="min-w-[14rem] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"><select v-model="statusFilter" aria-label="Filter by slot status" class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="all">All statuses</option><option v-for="(label, key) in statusLabels" :key="key" :value="key">{{ label }}</option></select><select v-model="categoryFilter" aria-label="Filter by category" class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="all">All categories</option><option v-for="category in categories" :key="category" :value="category">{{ category }}</option></select><select v-model="sort" aria-label="Sort State items" class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="attention">Action needed first</option><option value="code">Item code</option></select><button type="button" class="text-xs font-semibold text-indigo-700" @click="resetFilters">Reset</button></div>
+                <p class="mt-3 text-xs text-slate-500">Showing {{ visibleRows.length }} of {{ summary.length }} State-quota items · {{ totals.pending }} pending responses · {{ totals.unfilled }} unfilled slots</p>
+            </section>
+
+            <section v-if="!visibleRows.length" class="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center"><h2 class="font-semibold text-slate-800">{{ summary.length ? 'No items match these filters' : 'No linked State-quota items' }}</h2><p class="mt-2 text-sm text-slate-500">{{ summary.length ? 'Try another status or clear the search.' : 'Link eligible event items to the State program to start collection.' }}</p></section>
+
+            <section v-for="row in visibleRows" :key="row.item_id" class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <header class="border-b border-slate-100 p-4 sm:p-5"><div class="flex flex-wrap items-start justify-between gap-3"><div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><span class="rounded bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-slate-600">{{ row.item_code || '—' }}</span><h2 class="text-base font-bold text-slate-900">{{ row.title }}</h2><span v-if="row.direct_entry" class="rounded-full bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700">Direct entry</span></div><p class="mt-2 text-xs text-slate-500">{{ [row.category_label, row.gender_label, row.type_label].filter(Boolean).join(' · ') }}</p></div><span class="rounded-full px-3 py-1.5 text-xs font-bold" :class="statusClasses[row.slot_status]">{{ statusLabels[row.slot_status] }}</span></div>
+                    <div class="mt-4 flex flex-wrap items-center justify-between gap-3"><div class="flex flex-wrap gap-2"><span v-for="(slot, index) in slotsFor(row)" :key="index" class="rounded-lg border px-3 py-2 text-xs font-semibold" :class="slot.class">Slot {{ index + 1 }} · {{ slot.label }}</span></div><label v-if="!event.state_slot_collection_approved_at && row.quota > 0" class="flex items-center gap-2 text-xs text-slate-500">State quota<input v-model.number="slotQuotas[row.item_id]" type="number" min="1" max="2" :disabled="busy" :aria-label="`State quota for ${row.title}`" class="w-16 rounded-lg border border-slate-300 px-2 py-1.5 text-center font-bold text-slate-800" @change="hasChanges = true"></label></div>
+                    <p class="mt-3 text-xs text-slate-500"><strong class="text-slate-800">{{ row.slot_progress.accepted }}/{{ row.quota }} confirmed</strong> · {{ row.slot_progress.pending }} awaiting response · {{ row.slot_progress.unfilled }} unfilled<span v-if="row.slot_progress.invalid" class="text-rose-700"> · {{ row.slot_progress.invalid }} need review</span><span v-if="row.school_responses.opted_out"> · {{ row.school_responses.opted_out }} opted out</span></p>
+                </header>
+                <div v-if="row.slot_status === 'attention'" class="border-b border-rose-100 bg-rose-50 px-5 py-3 text-xs text-rose-800"><span v-if="row.unresolved_ties.length">Rank {{ row.unresolved_ties.join(', ') }} has an unresolved tie. Choose the eligible entry on the winner sheet.</span><span v-if="row.slot_progress.invalid"> {{ row.slot_progress.invalid }} offered entry(s) no longer meet eligibility; review the selections.</span><span v-if="row.is_over_quota"> More offers exist than the allowed quota.</span><Link :href="actionUrls.winnerSheet" class="ml-2 font-semibold underline">Review winner sheet →</Link></div>
+                <p v-else-if="row.slot_status === 'not_open'" class="bg-slate-50 px-5 py-3 text-xs text-slate-600">Collection is not open. Eligible top ranks will be offered when you open school confirmations.</p>
+                <p v-else-if="row.slot_status === 'not_offered'" class="bg-indigo-50 px-5 py-3 text-xs text-indigo-800">Eligible entries are ready but not offered. Use “Sync available offers” to send them to schools.</p>
+                <p v-else-if="row.slot_status === 'awaiting_eligibility'" class="bg-slate-50 px-5 py-3 text-xs text-slate-600">No eligible candidates yet. Publish results, or verify that this unpublished item has one or two active entries.</p>
+                <p v-else-if="row.slot_status === 'unfilled'" class="bg-amber-50 px-5 py-3 text-xs text-amber-900">{{ row.slot_progress.unfilled }} slot(s) remain unfilled. No eligible replacement is currently available within ranks 1–5.</p>
+                <div v-if="row.chosen.length" class="overflow-x-auto"><table class="w-full text-left text-sm"><thead class="bg-slate-50 text-[11px] uppercase text-slate-500"><tr><th class="px-5 py-3">Offered entry</th><th class="px-4 py-3">School</th><th class="px-4 py-3">Rank</th><th class="px-5 py-3">School response</th></tr></thead><tbody><tr v-for="selection in row.chosen" :key="selection.id" class="border-t border-slate-100"><td class="px-5 py-3 font-semibold text-slate-800">{{ selection.student_name }}</td><td class="px-4 py-3 text-xs text-slate-600">{{ selection.school_name }}</td><td class="px-4 py-3 text-xs">{{ row.direct_entry ? 'Direct' : selection.source_position || '—' }}</td><td class="px-5 py-3"><span class="rounded-full px-2.5 py-1 text-[11px] font-semibold" :class="selection.is_eligible === false ? 'bg-rose-100 text-rose-800' : selection.school_response === 'accepted' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'">{{ selection.is_eligible === false ? 'Needs review' : selection.school_response === 'accepted' ? 'Confirmed' : 'Awaiting response' }}</span><p v-if="selection.school_responded_at" class="mt-1 text-[10px] text-slate-400">{{ formatDate(selection.school_responded_at) }}</p></td></tr></tbody></table></div>
+                <div v-if="waitingFor(row).length" class="border-t border-slate-100 bg-slate-50/60 p-4 sm:p-5">
+                    <div class="flex items-center justify-between mb-3">
                         <div class="flex items-center gap-2">
-                            <h4 class="font-semibold text-sm text-gray-800">
-                                <span class="font-mono text-xs text-gray-400">{{ row.item_code }}</span>
-                                {{ row.title }}
-                            </h4>
-                            <span v-if="row.quota" class="rounded-md px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                {{ row.direct_entry ? 'Direct offers' : 'State quota' }}: {{ row.quota }}
-                            </span>
+                            <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">⏳ Waiting List (Ranks 3–5)</span>
+                            <span class="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-700">{{ waitingFor(row).length }}</span>
                         </div>
-                        <p class="text-[11px] text-gray-500">
-                            <span v-if="row.category_label">{{ row.category_label }} · </span>
-                            {{ row.gender_label }} · {{ row.type_label }}
-                        </p>
+                        <span class="text-[11px] text-slate-500">Promoted automatically in merit order if a Top {{ row.quota || 2 }} qualifier opts out</span>
                     </div>
-
-                    <div class="flex flex-wrap items-center gap-2 shrink-0">
-                        <!-- Per-item slot count control -->
-                        <div v-if="!event.state_slot_collection_approved_at" class="flex items-center gap-1.5 mr-2">
-                            <label class="text-[11px] text-slate-500 font-medium">Slots:</label>
-                            <input type="number" min="1" max="2"
-                                   v-model.number="slotQuotas[row.item_id]"
-                                   @change="hasChanges = true"
-                                   class="w-14 rounded-lg border border-slate-300 px-2 py-1 text-xs text-center font-bold text-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
+                    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                        <div v-for="(candidate, cIdx) in waitingFor(row)" :key="candidate.participant_id"
+                             class="rounded-xl border border-slate-200 bg-white p-3 flex flex-col justify-between shadow-2xs hover:border-indigo-300 transition">
+                            <div>
+                                <div class="flex items-center justify-between gap-1.5">
+                                    <span class="text-xs font-bold text-slate-900 truncate">{{ candidate.student_name }}</span>
+                                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                                          :class="cIdx === 0 ? 'bg-amber-100 text-amber-900 border border-amber-200' : 'bg-slate-100 text-slate-600'">
+                                        {{ candidate.direct_entry ? 'Direct' : 'Rank ' + candidate.source_position }}
+                                    </span>
+                                </div>
+                                <p class="text-[11px] text-slate-500 truncate mt-0.5">{{ candidate.school_name }}</p>
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px]">
+                                <span class="font-medium" :class="cIdx === 0 ? 'text-indigo-600 font-bold' : 'text-slate-400'">
+                                    {{ cIdx === 0 ? '★ 1st in waitlist queue' : `Queue #${cIdx + 1}` }}
+                                </span>
+                                <span class="text-slate-500">
+                                    {{ cIdx === 0 ? 'Gets slot on 1st opt-out' : `Needs ${cIdx + 1} opt-outs` }}
+                                </span>
+                            </div>
                         </div>
-
-                        <span class="rounded-full px-2.5 py-1 text-[11px] font-semibold bg-emerald-100 text-emerald-700">
-                            {{ row.school_responses.accepted }} accepted
-                        </span>
-                        <span v-if="row.school_responses.pending" class="rounded-full px-2.5 py-1 text-[11px] font-semibold bg-amber-100 text-amber-800">
-                            {{ row.school_responses.pending }} pending
-                        </span>
-                        <span v-if="row.school_responses.opted_out" class="rounded-full px-2.5 py-1 text-[11px] font-semibold bg-gray-200 text-gray-700">
-                            {{ row.school_responses.opted_out }} opted out
-                        </span>
                     </div>
                 </div>
-
-                <p v-if="row.unresolved_ties.length" class="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
-                    Position {{ row.unresolved_ties.join(', ') }} is tied and more are tied than there are
-                    slots. Resolve this on the winner sheet before this item can be approved.
-                </p>
-
-                <div v-if="row.chosen.length" class="mt-2 space-y-1">
-                    <p v-for="s in row.chosen" :key="`c${s.id}`" class="text-[11px] flex items-center gap-2">
-                        <span class="text-emerald-800"><strong>{{ s.student_name }}</strong> ({{ s.school_name }}) — {{ row.direct_entry ? 'Direct qualification (no result required)' : 'Position ' + s.source_position }}</span>
-                        <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold" :class="responseChipClass(s.school_response)">
-                            {{ responseLabel(s.school_response) }}
-                        </span>
-                        <span v-if="s.school_responded_at" class="text-gray-400">{{ formatDate(s.school_responded_at) }}</span>
-                    </p>
-                </div>
-                <div v-if="row.candidates.some(c => !c.is_chosen && !c.is_declined)" class="mt-3 border-t pt-2 text-xs text-slate-500">
-                    <p v-for="candidate in row.candidates.filter(c => !c.is_chosen && !c.is_declined)" :key="candidate.participant_id">{{ candidate.student_name }} ({{ candidate.school_name }}) — {{ candidate.source_position ? 'Rank ' + candidate.source_position : 'Direct entry' }} · Waiting, not offered</p>
-                </div>
-                <div v-if="row.declined.length" class="mt-2 space-y-1 border-t pt-2">
-                    <p v-for="s in row.declined" :key="`d${s.id}`" class="text-[11px] text-gray-500">
-                        <strong>Opted out:</strong> {{ s.student_name }} ({{ s.school_name }}), position {{ s.source_position }} — {{ s.note }}
-                    </p>
-                </div>
+                <details v-if="row.declined.length" class="border-t border-slate-100 px-5 py-3"><summary class="cursor-pointer text-xs font-semibold text-slate-500">{{ row.declined.length }} opt-out record(s)</summary><div v-for="selection in row.declined" :key="selection.id" class="mt-3 rounded-lg bg-slate-50 p-3 text-xs"><p class="font-semibold text-slate-700">{{ selection.student_name }} · {{ selection.school_name }}</p><p class="mt-1 text-slate-500">{{ selection.note || 'No reason recorded' }}</p></div></details>
             </section>
         </div>
     </SahodayaEventsLayout>
@@ -148,108 +97,75 @@
 import { ref, reactive, computed, watch } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
-
-const props = defineProps({
-    sahodaya: Object, publicUrl: { type: String, default: '' },
-    event: Object, program: Object, summary: Array, actionUrls: Object, schoolEntryUrl: String,
-});
-
+const props = defineProps({ sahodaya: Object, publicUrl: { type: String, default: '' }, event: Object, program: Object, summary: { type: Array, default: () => [] }, actionUrls: Object, schoolEntryUrl: String });
+const statusLabels = { complete: 'Complete', pending: 'Awaiting school response', not_offered: 'Offers not sent', attention: 'Needs attention', unfilled: 'Unfilled slots', awaiting_eligibility: 'Awaiting results / entries', not_open: 'Not opened' };
+const statusClasses = { complete: 'bg-emerald-100 text-emerald-800', pending: 'bg-amber-100 text-amber-800', not_offered: 'bg-indigo-100 text-indigo-800', attention: 'bg-rose-100 text-rose-800', unfilled: 'bg-orange-100 text-orange-800', awaiting_eligibility: 'bg-slate-100 text-slate-600', not_open: 'bg-slate-100 text-slate-600' };
+const priority = { attention: 0, not_offered: 1, pending: 2, unfilled: 3, awaiting_eligibility: 4, not_open: 5, complete: 6 };
+const statusFilter = ref('all');
+const categoryFilter = ref('all');
+const search = ref('');
+const sort = ref('attention');
 const copied = ref(false);
-async function copySchoolLink() {
-    try {
-        await navigator.clipboard.writeText(props.schoolEntryUrl);
-        copied.value = true;
-    } catch {
-        copied.value = false;
-        window.prompt('Copy the school submission link:', props.schoolEntryUrl);
-    }
-}
 const slotQuotas = reactive({});
 const savingSlots = ref(false);
+const opening = ref(false);
+const approving = ref(false);
 const hasChanges = ref(false);
-
-function initQuotas() {
-    (props.summary || []).forEach(row => {
-        slotQuotas[row.item_id] = Number(row.quota) || 2;
-    });
+const operationError = ref('');
+const busy = computed(() => savingSlots.value || opening.value || approving.value);
+const counts = computed(() => props.summary.reduce((acc, row) => { acc[row.slot_status] = (acc[row.slot_status] || 0) + 1; return acc; }, Object.fromEntries(Object.keys(statusLabels).map(key => [key, 0]))));
+const totals = computed(() => props.summary.reduce((acc, row) => ({ quota: acc.quota + row.quota, accepted: acc.accepted + row.slot_progress.accepted, pending: acc.pending + row.slot_progress.pending, unfilled: acc.unfilled + row.slot_progress.unfilled }), { quota: 0, accepted: 0, pending: 0, unfilled: 0 }));
+const completionPercent = computed(() => totals.value.quota ? Math.min(100, Math.round(100 * totals.value.accepted / totals.value.quota)) : 0);
+const canApprove = computed(() => !busy.value && !hasChanges.value && props.summary.length > 0 && !totals.value.pending && !counts.value.attention && !counts.value.not_offered);
+const statCards = computed(() => [
+    { key: 'all', filter: 'all', label: 'State items', count: props.summary.length, hint: `${totals.value.quota} available slots`, color: 'text-slate-900' },
+    { key: 'complete', filter: 'complete', label: 'Complete', count: counts.value.complete, hint: 'All slots confirmed', color: 'text-emerald-700' },
+    { key: 'pending', filter: 'pending', label: 'Waiting for schools', count: counts.value.pending, hint: `${totals.value.pending} responses pending`, color: 'text-amber-700' },
+    { key: 'not_offered', filter: 'not_offered', label: 'Offers not sent', count: counts.value.not_offered, hint: 'Ready for sync', color: 'text-indigo-700' },
+    { key: 'attention', filter: 'attention', label: 'Needs attention', count: counts.value.attention, hint: 'Ties or eligibility issues', color: 'text-rose-700' },
+    { key: 'unfilled', filter: 'unfilled', label: 'Unfilled items', count: counts.value.unfilled, hint: `${counts.value.awaiting_eligibility} more awaiting results / entries`, color: 'text-orange-700' },
+]);
+const categories = computed(() => [...new Set(props.summary.map(row => row.category_label).filter(Boolean))].sort());
+const visibleRows = computed(() => props.summary.filter(row => {
+    if (statusFilter.value !== 'all' && row.slot_status !== statusFilter.value) return false;
+    if (categoryFilter.value !== 'all' && row.category_label !== categoryFilter.value) return false;
+    const needle = search.value.trim().toLowerCase();
+    return !needle || [row.title, row.item_code, row.category_label, row.gender_label, ...row.candidates.flatMap(c => [c.student_name, c.school_name]), ...row.chosen.flatMap(c => [c.student_name, c.school_name])].filter(Boolean).join(' ').toLowerCase().includes(needle);
+}).sort((a, b) => (sort.value === 'attention' ? (priority[a.slot_status] ?? 9) - (priority[b.slot_status] ?? 9) : 0) || String(a.item_code || '').localeCompare(String(b.item_code || ''), undefined, { numeric: true })));
+const statusLabel = computed(() => props.event.state_slot_collection_approved_at ? 'Approved' : props.event.state_slot_collection_open ? 'School confirmations open' : 'Not opened');
+const waitingFor = row => row.candidates.filter(c => !c.is_chosen && !c.is_declined);
+function slotsFor(row) {
+    return Array.from({ length: Math.max(0, row.quota) }, (_, index) => index < row.slot_progress.accepted
+        ? { label: 'Confirmed', class: 'border-emerald-200 bg-emerald-50 text-emerald-800' }
+        : index < row.slot_progress.accepted + row.slot_progress.pending
+            ? { label: 'Awaiting response', class: 'border-amber-200 bg-amber-50 text-amber-800' }
+            : index < row.slot_progress.accepted + row.slot_progress.pending + row.slot_progress.invalid
+                ? { label: 'Needs review', class: 'border-rose-200 bg-rose-50 text-rose-800' }
+                : { label: 'Unfilled', class: 'border-slate-200 bg-slate-50 text-slate-500' });
 }
+function resetFilters() { statusFilter.value = 'all'; categoryFilter.value = 'all'; search.value = ''; }
+function initQuotas() { props.summary.forEach(row => { slotQuotas[row.item_id] = Number(row.quota) || 2; }); }
 initQuotas();
-watch(() => props.summary, () => initQuotas(), { deep: true });
-
-function applyBatch(val) {
-    (props.summary || []).forEach(row => {
-        slotQuotas[row.item_id] = val;
-    });
-    hasChanges.value = true;
-}
-
+watch(() => props.summary, () => { initQuotas(); hasChanges.value = false; });
+function applyBatch(value) { props.summary.forEach(row => { if (row.quota > 0) slotQuotas[row.item_id] = value; }); hasChanges.value = true; }
+function showErrors(errors) { operationError.value = Object.values(errors || {}).flat().join(' '); }
 function saveSlotQuotas(syncNow = false) {
-    savingSlots.value = true;
-    router.post(props.actionUrls.updateSlots, {
-        slots: { ...slotQuotas },
-        sync_now: syncNow,
-    }, {
-        preserveScroll: true,
-        onFinish: () => {
-            savingSlots.value = false;
-            hasChanges.value = false;
-        },
-    });
+    if (busy.value) return;
+    savingSlots.value = true; operationError.value = '';
+    router.post(props.actionUrls.updateSlots, { slots: { ...slotQuotas }, sync_now: syncNow }, { preserveScroll: true, onError: showErrors, onSuccess: () => { hasChanges.value = false; }, onFinish: () => { savingSlots.value = false; } });
 }
-
-const totals = computed(() => props.summary.reduce((acc, row) => ({
-    accepted: acc.accepted + row.school_responses.accepted,
-    pending: acc.pending + row.school_responses.pending,
-    optedOut: acc.optedOut + row.school_responses.opted_out,
-}), { accepted: 0, pending: 0, optedOut: 0 }));
-
-const statusLabel = computed(() => {
-    if (props.event.state_slot_collection_approved_at) return 'Approved';
-    if (props.event.state_slot_collection_open) return 'Open — awaiting responses';
-    return 'Not opened yet';
-});
-const statusClass = computed(() => {
-    if (props.event.state_slot_collection_approved_at) return 'bg-emerald-100 text-emerald-700';
-    if (props.event.state_slot_collection_open) return 'bg-amber-100 text-amber-800';
-    return 'bg-gray-100 text-gray-600';
-});
-
-function responseLabel(r) {
-    return { accepted: 'Accepted', pending: 'Awaiting response', opted_out: 'Opted out' }[r] || '—';
-}
-function responseChipClass(r) {
-    return {
-        accepted: 'bg-emerald-100 text-emerald-700',
-        pending: 'bg-amber-100 text-amber-800',
-        opted_out: 'bg-gray-200 text-gray-700',
-    }[r] || 'bg-gray-100 text-gray-500';
-}
-function formatDate(v) {
-    if (!v) return '';
-    return new Date(v).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-}
-
 function open() {
-    if (!confirm('Open slot collection? This fills each item\'s top ranks matching the configured slot counts and sends the offers to schools.')) return;
-    if (hasChanges.value) {
-        // Save first then open
-        savingSlots.value = true;
-        router.post(props.actionUrls.updateSlots, { slots: { ...slotQuotas } }, {
-            preserveScroll: true,
-            onSuccess: () => {
-                router.post(props.actionUrls.open, {}, { preserveScroll: true });
-            },
-            onFinish: () => {
-                savingSlots.value = false;
-            },
-        });
-    } else {
-        router.post(props.actionUrls.open, {}, { preserveScroll: true });
-    }
+    if (busy.value || !window.confirm('Open school confirmations? Eligible entries will be offered within each item’s State quota.')) return;
+    opening.value = true; operationError.value = '';
+    const sendOffers = () => router.post(props.actionUrls.open, {}, { preserveScroll: true, onError: showErrors, onFinish: () => { opening.value = false; } });
+    if (hasChanges.value) router.post(props.actionUrls.updateSlots, { slots: { ...slotQuotas } }, { preserveScroll: true, onSuccess: sendOffers, onError: errors => { showErrors(errors); opening.value = false; }, onCancel: () => { opening.value = false; } });
+    else sendOffers();
 }
 function approve() {
-    if (!confirm('Approve this list? You can then register with State from the winner sheet.')) return;
-    router.post(props.actionUrls.approve, {}, { preserveScroll: true });
+    if (!canApprove.value || !window.confirm(`Approve the confirmed list? ${totals.value.unfilled} slot(s) remain unfilled. State submission is the next step.`)) return;
+    approving.value = true; operationError.value = '';
+    router.post(props.actionUrls.approve, {}, { preserveScroll: true, onError: showErrors, onFinish: () => { approving.value = false; } });
 }
+async function copySchoolLink() { try { await navigator.clipboard.writeText(props.schoolEntryUrl); copied.value = true; } catch { window.prompt('Copy the school submission link:', props.schoolEntryUrl); } }
+function formatDate(value) { return value ? new Date(value).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''; }
 </script>
-

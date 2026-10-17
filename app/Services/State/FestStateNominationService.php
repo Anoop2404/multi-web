@@ -21,6 +21,51 @@ use Illuminate\Support\Facades\DB;
  */
 class FestStateNominationService
 {
+    private ?array $collectionSnapshot = null;
+
+    /** One operation only: no cached eligibility survives into a school response. */
+    public function withCollectionSnapshot(FestStateProgram $program, FestEvent $hub, callable $callback): mixed
+    {
+        if (! $hub->state_slot_collection_open) {
+            return $callback();
+        }
+
+        return DB::transaction(function () use ($program, $hub, $callback) {
+            $batch = $this->openBatch($program, $hub);
+            $batch = FestStateNominationBatch::whereKey($batch->id)->lockForUpdate()->firstOrFail();
+            abort_if($batch->isCertified(), 422, 'This batch is already registered with State.');
+            $pool = app(FestStateCollectionCandidates::class)->pool($program, $hub);
+            $sources = collect($this->sourceEvents($hub, app(FestPartitionService::class)))->pluck('id');
+            $overrides = FestEventItem::whereIn('event_id', $sources)->whereNotNull('state_program_item_id')
+                ->whereNotNull('qualify_count')->get()->unique('state_program_item_id')->pluck('qualify_count', 'state_program_item_id');
+            $quotas = FestStateProgramItem::where('state_program_id', $program->id)->get()
+                ->mapWithKeys(fn ($item) => [$item->id => app(FestStateCollectionCandidates::class)->quota(
+                    $pool->where('item_id', $item->id), (int) ($overrides[$item->id] ?? $item->qualify_count ?? 0))])->all();
+            $previous = $this->collectionSnapshot;
+            $this->collectionSnapshot = ['hub_id' => (string) $hub->id, 'program_id' => $program->id,
+                'connection' => DB::getDefaultConnection(), 'pool' => $pool, 'quotas' => $quotas];
+            try {
+                return $callback();
+            } finally {
+                $this->collectionSnapshot = $previous;
+            }
+        });
+    }
+
+    private function hasCollectionSnapshot(string $hubId): bool
+    {
+        return $this->collectionSnapshot !== null && $this->collectionSnapshot['hub_id'] === $hubId
+            && $this->collectionSnapshot['connection'] === DB::getDefaultConnection();
+    }
+
+    public function collectionPool(FestStateProgram $program, FestEvent $hub): \Illuminate\Support\Collection
+    {
+        if ($this->hasCollectionSnapshot((string) $hub->id) && $this->collectionSnapshot['program_id'] === $program->id) {
+            return $this->collectionSnapshot['pool'];
+        }
+        return app(FestStateCollectionCandidates::class)->pool($program, $hub);
+    }
+
     /**
      * Build the eligible candidate pool from combined Region/Finale certified results.
      *
@@ -129,7 +174,9 @@ class FestStateNominationService
             $itemId = $candidate['item_id'] ?? null;
             $hub = $batch->hubEvent;
             if ($hub?->state_slot_collection_open) {
-                $pool = app(FestStateCollectionCandidates::class)->pool(FestStateProgram::findOrFail($batch->state_program_id), $hub);
+                $pool = $this->hasCollectionSnapshot((string) $hub->id)
+                    ? $this->collectionSnapshot['pool']
+                    : $this->collectionPool(FestStateProgram::findOrFail($batch->state_program_id), $hub);
                 $allowed = $pool->first(fn ($entry) => $entry['item_id'] === $itemId
                     && ((! empty($candidate['participant_id']) && $entry['participant_id'] === $candidate['participant_id'])
                         || (! empty($candidate['mark_id']) && $entry['mark_id'] === $candidate['mark_id'])));
@@ -204,6 +251,9 @@ class FestStateNominationService
 
     public function itemQuota(?string $itemId, ?string $itemCode, ?string $hubEventId = null): ?int
     {
+        if ($hubEventId && $itemId && $this->hasCollectionSnapshot($hubEventId)) {
+            return $this->collectionSnapshot['quotas'][$itemId] ?? 0;
+        }
         if ($hubEventId && $itemId) {
             $hub = FestEvent::find($hubEventId);
             if ($hub?->state_slot_collection_open && $hub->state_program_id) {
