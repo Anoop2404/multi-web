@@ -70,7 +70,6 @@ class FestStateSlotCollectionController extends SahodayaAdminController
 
         return $this->inertia('Sahodaya/Events/StateSlotCollection', [
             'sahodaya' => $this->sahodaya,
-            'publicUrl' => $this->publicUrl,
             'event' => $event->only([
                 'id', 'title', 'event_type', 'state_program_id',
                 'state_slot_collection_open', 'state_slot_collection_opened_at',
