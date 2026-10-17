@@ -72,14 +72,14 @@ class FestItemScheduleServiceTest extends TestCase
         $event = $this->makeEvent($sahodaya->id);
         $school = Tenant::create(['id' => (string) Str::uuid(), 'name' => 'Count School', 'type' => 'school', 'parent_id' => $sahodaya->id]);
         $class = \App\Models\SchoolClass::create(['tenant_id' => $school->id, 'name' => 'Class 6']);
-        $student = \App\Models\Student::create(['tenant_id' => $school->id, 'school_class_id' => $class->id, 'name' => 'Same pupil']);
+        $student = \App\Models\Student::create(['tenant_id' => $school->id, 'school_class_id' => $class->id, 'name' => 'Same pupil', 'gender' => 'female']);
         $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo', 'participant_type' => 'individual', 'is_enabled' => true]);
         $groupItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'Team', 'participant_type' => 'group', 'is_enabled' => true]);
         $solo = \App\Models\FestRegistration::create(['event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved']);
         $soloParticipant = \App\Models\FestParticipant::create(['registration_id' => $solo->id, 'student_id' => $student->id, 'participant_role' => 'performer']);
         $team = \App\Models\FestRegistration::create(['event_id' => $event->id, 'item_id' => $groupItem->id, 'school_id' => $school->id, 'status' => 'submitted']);
         $group = \App\Models\FestGroup::create(['event_id' => $event->id, 'registration_id' => $team->id, 'team_name' => 'Team']);
-        foreach ([$student, \App\Models\Student::create(['tenant_id' => $school->id, 'school_class_id' => $class->id, 'name' => 'Team member'])] as $member) {
+        foreach ([$student, \App\Models\Student::create(['tenant_id' => $school->id, 'school_class_id' => $class->id, 'name' => 'Team member', 'gender' => 'male'])] as $member) {
             \App\Models\FestParticipant::create(['registration_id' => $team->id, 'student_id' => $member->id, 'group_id' => $group->id, 'participant_role' => 'performer']);
         }
         $standby = \App\Models\Student::create(['tenant_id' => $school->id, 'school_class_id' => $class->id, 'name' => 'Standby']);
@@ -93,6 +93,7 @@ class FestItemScheduleServiceTest extends TestCase
         $this->assertSame([2, 1], array_column($summary['days'], 'unique_participants'));
         $this->assertSame(2, $summary['overall']['unique_participants']);
         $this->assertSame(3, $summary['overall']['participant_entries']);
+        $this->assertSame(['male' => 1, 'female' => 1, 'other' => 0, 'unspecified' => 0], $summary['overall']['schools'][0]['genders']);
         $this->assertSame($school->name, $summary['overall']['schools'][0]['name']);
         $this->assertSame(['Same pupil', 'Team member'], array_column($summary['overall']['schools'][0]['students'], 'name'));
         $members = $group->participants()->get();
@@ -110,6 +111,11 @@ class FestItemScheduleServiceTest extends TestCase
         $this->actingAs($admin)->get($url.'?format=xlsx')->assertOk()
             ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         $this->get($url.'?format=pdf&scope=2026-12-31')->assertStatus(422);
+        $this->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/day-participants")
+            ->assertOk()->assertInertia(fn ($page) => $page->component('Sahodaya/Events/DayParticipants', false)
+                ->has('dayParticipation.overall.schools.0.genders')
+                ->missing('dayParticipation.overall.schools.0.students'));
+
 
 
     }

@@ -1,100 +1,51 @@
 <template>
-    <section v-if="summary" class="mb-6 rounded-2xl border border-slate-200 bg-white p-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <h2 class="text-sm font-bold text-slate-900">Day-wise participants</h2>
-                <p class="mt-1 text-xs text-slate-500">{{ summary.basis }} · Group members count individually. A person counts once per day and once in the overall total.</p>
-            </div>
-            <div class="flex flex-wrap gap-2 text-xs">
-                <a v-if="reportUrl" :href="exportUrl('xlsx')" class="rounded-lg border px-3 py-2 font-semibold">Excel report</a>
-                <a v-if="reportUrl" :href="exportUrl('preview')" target="_blank" rel="noopener" class="rounded-lg border px-3 py-2 font-semibold">PDF preview</a>
-                <a v-if="reportUrl" :href="exportUrl('pdf')" class="rounded-lg border px-3 py-2 font-semibold">Download PDF</a>
-                <button type="button" class="rounded-lg border px-3 py-2 font-semibold" @click="downloadCounts">Download counts CSV</button>
-                <button type="button" class="rounded-lg border px-3 py-2 font-semibold" @click="downloadStudents">Download selected student list</button>
-            </div>
-        </div>
-        <p v-for="warning in summary.warnings || []" :key="warning" class="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">{{ warning }}</p>
-        <p v-if="summary.event_total.unidentified_participants" class="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
-            {{ summary.event_total.unidentified_participants }} participant record(s) do not have an unambiguous student identity.
-            Totals marked * may count the same person more than once. Correct those records to obtain verified unique totals; names alone are not merged.
-        </p>
-        <div class="mt-3 overflow-x-auto">
-            <table class="w-full text-left text-sm">
-                <thead class="text-xs text-slate-500"><tr><th class="p-2">Day</th><th class="p-2">Unique participants</th><th class="p-2">Participant entries</th><th class="p-2">Items with participants</th><th class="p-2">Schools</th></tr></thead>
-                <tbody>
-                    <tr v-for="day in summary.days" :key="day.date" class="border-t border-slate-100">
-                        <td class="p-2"><button type="button" class="font-semibold text-indigo-700 underline" @click="selected = day.date">{{ dateLabel(day.date) }}</button></td>
-                        <td class="p-2">{{ day.unique_participants }}{{ day.unidentified_participants ? '*' : '' }}</td><td class="p-2">{{ day.participant_entries }}</td><td class="p-2">{{ day.items }}</td><td class="p-2">{{ day.school_count }}</td>
-                    </tr>
-                    <tr class="border-t bg-slate-50 font-bold">
-                        <td class="p-2"><button type="button" class="underline" @click="selected = 'all'">Overall — all scheduled days</button></td>
-                        <td class="p-2">{{ summary.overall.unique_participants }}{{ summary.overall.unidentified_participants ? '*' : '' }}</td><td class="p-2">{{ summary.overall.participant_entries }}</td><td class="p-2">{{ summary.overall.items }}</td><td class="p-2">{{ summary.overall.school_count }}</td>
-                    </tr>
-                    <tr class="border-t font-semibold">
-                        <td class="p-2"><button type="button" class="underline" @click="selected = 'event'">Event total — including unscheduled</button></td>
-                        <td class="p-2">{{ summary.event_total.unique_participants }}{{ summary.event_total.unidentified_participants ? '*' : '' }}</td><td class="p-2">{{ summary.event_total.participant_entries }}</td><td class="p-2">{{ summary.event_total.items }}</td><td class="p-2">{{ summary.event_total.school_count }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        <p v-if="!summary.days.length" class="mt-3 text-xs text-slate-500">Assign schedule dates to see day-wise counts.</p>
-        <p class="mt-2 text-xs text-slate-500">{{ summary.unscheduled.unique_participants }} participant(s) have entries awaiting a date. They may also have other entries already scheduled.</p>
-        <div class="mt-4 border-t pt-4">
-            <label class="text-xs font-semibold">Student names by school
-                <select v-model="selected" class="ml-2 rounded-lg border border-slate-300 px-3 py-2 text-xs">
-                    <option value="all">All scheduled days — unique overall</option>
+    <section v-if="summary" class="rounded-2xl border border-slate-200 bg-white p-5">
+        <p class="mb-4 text-sm text-slate-600">{{ summary.basis }}. Each participant counts once per day and once overall. Group members count individually.</p>
+        <div class="mb-4 flex flex-wrap items-center gap-3">
+            <label class="text-sm font-semibold">Day / scope
+                <select v-model="selected" class="ml-2 rounded-lg border px-3 py-2">
+                    <option value="all">All days and overall</option>
                     <option v-for="day in summary.days" :key="day.date" :value="day.date">{{ dateLabel(day.date) }}</option>
-                    <option value="event">Whole event — including unscheduled</option>
-                    <option value="unscheduled">Entries awaiting a date</option>
+                    <option value="event">Whole event, including unscheduled</option>
+                    <option value="unscheduled">Awaiting a date</option>
                 </select>
             </label>
-            <p class="mt-2 text-xs text-slate-500">{{ scope.unique_participants }} participant(s) · {{ scope.school_count }} school(s). Open a school to view names.</p>
-            <details v-for="school in scope.schools" :key="selected + school.key" class="mt-2 rounded-lg border border-slate-200 p-3">
-                <summary class="cursor-pointer text-sm font-semibold">{{ school.name }} — {{ school.count }} participant(s)</summary>
-                <ol class="mt-2 list-inside list-decimal space-y-1 text-xs text-slate-700">
-                    <li v-for="student in school.students" :key="student.key">{{ student.name }}<span v-if="student.identifier" class="text-slate-500"> · {{ student.identifier }}</span><span v-if="student.class_name" class="text-slate-500"> · {{ student.class_name }}</span><span v-if="!student.identified" class="text-amber-700"> · identity unverified</span></li>
-                </ol>
-            </details>
+            <a :href="exportUrl('xlsx')" class="btn-secondary text-sm">Excel report</a>
+            <a :href="exportUrl('preview')" target="_blank" rel="noopener" class="btn-secondary text-sm">PDF preview</a>
+            <a :href="exportUrl('pdf')" class="btn-secondary text-sm">Download PDF</a>
         </div>
+        <p v-if="!summary.days.length" class="mb-3 text-sm text-slate-500">Assign schedule dates to see day-wise counts.</p>
+        <p v-for="warning in summary.warnings" :key="warning" class="mb-3 rounded bg-amber-50 p-3 text-sm">{{ warning }}</p>
+        <p v-if="summary.event_total.unidentified_participants" class="mb-3 rounded bg-amber-50 p-3 text-sm">{{ summary.event_total.unidentified_participants }} records lack a stable identity; unique counts may overcount those participants.</p>
+        <p class="mb-4 text-xs text-slate-500">Unspecified includes missing, unrecognised or conflicting gender records. Overall totals are deduplicated, not the sum of daily counts.</p>
+        <div class="overflow-x-auto"><table class="w-full border-collapse text-sm">
+            <thead class="bg-slate-100">
+                <tr><th rowspan="2" class="border p-3 text-left">School name</th><th v-for="day in columns" :key="day.label" :colspan="genderKeys.length" class="border p-3 text-center">{{ day.label }}</th><th rowspan="2" class="border p-3 text-right">Overall unique</th></tr>
+                <tr><template v-for="day in columns" :key="day.label"><th v-for="key in genderKeys" :key="key" class="border p-3 text-right">{{ genderLabels[key] }}</th></template></tr>
+            </thead>
+            <tbody><tr v-for="school in overall.schools" :key="school.key" class="border-b"><td class="border p-3">{{ school.name }}</td><template v-for="day in columns" :key="day.label"><td v-for="key in genderKeys" :key="key" class="border p-3 text-right">{{ schoolGender(day, school.key, key) }}</td></template><td class="border p-3 text-right font-bold">{{ school.count }}</td></tr>
+                <tr v-if="!overall.schools.length"><td :colspan="2 + columns.length * genderKeys.length" class="p-3 text-slate-500">No participants in this selection.</td></tr>
+            </tbody>
+            <tfoot class="bg-slate-100 font-bold"><tr><td class="border p-3 text-left">All schools</td><template v-for="day in columns" :key="day.label"><td v-for="key in genderKeys" :key="key" class="border p-3 text-right">{{ day.genders[key] }}</td></template><td class="border p-3 text-right">{{ overall.unique_participants }}</td></tr></tfoot>
+        </table></div>
     </section>
 </template>
-
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { formatCalendarDate } from '@/support/calendarDates.js';
 const props = defineProps({ summary: Object, reportUrl: String });
 const selected = ref('all');
-const exportUrl = (format) => props.reportUrl + '?' + new URLSearchParams({ format, scope: selected.value }).toString();
-watch(() => props.summary, (summary) => {
-    if (!['all', 'event', 'unscheduled'].includes(selected.value) && !summary?.days.some((day) => day.date === selected.value)) selected.value = 'all';
-});
-const scope = computed(() => selected.value === 'event' ? props.summary.event_total : selected.value === 'unscheduled' ? props.summary.unscheduled
-    : props.summary.days.find((day) => day.date === selected.value) ?? props.summary.overall);
+const genderLabels = { male: 'Male', female: 'Female', other: 'Other', unspecified: 'Unspecified' };
 const dateLabel = (date) => formatCalendarDate(date);
-function csvDownload(name, rows) {
-    const cell = (value) => {
-        let text = String(value ?? '');
-        if (/^[\s]*[=+@\-\t\r]/.test(text)) text = "'" + text;
-        return '"' + text.replaceAll('"', '""') + '"';
-    };
-    const url = URL.createObjectURL(new Blob(['\uFEFF' + rows.map((row) => row.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8;' }));
-    const anchor = document.createElement('a');
-    anchor.href = url; anchor.download = name; anchor.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-function downloadCounts() {
-    const rows = [['Day', 'Unique participants', 'Participant entries', 'Items', 'Schools', 'Records without stable identity']];
-    for (const day of props.summary.days) rows.push([day.date, day.unique_participants, day.participant_entries, day.items, day.school_count, day.unidentified_participants]);
-    const total = props.summary.overall;
-    rows.push(['Overall (deduplicated)', total.unique_participants, total.participant_entries, total.items, total.school_count, total.unidentified_participants]);
-    const event = props.summary.event_total;
-    rows.push(['Event total (including unscheduled)', event.unique_participants, event.participant_entries, event.items, event.school_count, event.unidentified_participants]);
-    csvDownload('day-wise-participant-counts.csv', rows);
-}
-function downloadStudents() {
-    const rows = [['Day / scope', 'School', 'Student / participant', 'Class', 'Stable ID available']];
-    for (const school of scope.value.schools) for (const student of school.students)
-        rows.push([selected.value, school.name, student.name, student.class_name, student.identified ? 'Yes' : 'No']);
-    csvDownload('school-wise-participants-' + selected.value + '.csv', rows);
-}
+const exportUrl = (format) => props.reportUrl + '?' + new URLSearchParams({ format, scope: selected.value });
+const columns = computed(() => {
+    const days = props.summary.days.map(day => ({ ...day, label: dateLabel(day.date) }));
+    if (selected.value === 'all') return days;
+    if (selected.value === 'event') return [{ ...props.summary.event_total, label: 'Whole event — including unscheduled' }];
+    if (selected.value === 'unscheduled') return [{ ...props.summary.unscheduled, label: 'Awaiting a date' }];
+    return days.filter(day => day.date === selected.value);
+});
+const overall = computed(() => selected.value === 'all' ? props.summary.overall : columns.value[0]);
+const genderKeys = computed(() => ['male', 'female', ...['other', 'unspecified'].filter(key => columns.value.some(day => day.genders[key] > 0))]);
+const schoolGender = (day, schoolKey, gender) => day.schools.find(school => school.key === schoolKey)?.genders[gender] ?? 0;
 </script>

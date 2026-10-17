@@ -24,7 +24,6 @@ class StateScheduleController extends Controller
 
         return Inertia::render('State/Fest/Schedule', $this->shell($request, $event) + [
             'items' => $rows,
-            'dayParticipation' => app(\App\Services\Events\FestDayParticipationService::class)->state($event),
             'dayParticipationReportUrl' => "/admin/state/fest/{$event->id}/schedule/day-participants",
             'scheduled' => $rows->where('is_scheduled', true)->count(),
             'venues' => StateVenue::where('state_event_id', $event->id)
@@ -32,6 +31,17 @@ class StateScheduleController extends Controller
                 // Only a stage or a room can hold an item; a venue is the building around them.
                 ->filter(fn (StateVenue $v) => $v->canHostItems())->values(),
             'actionUrls' => ['save' => "/admin/state/fest/{$event->id}/schedule"],
+        ]);
+    }
+
+    public function dayParticipants(Request $request, StateFestEvent $event)
+    {
+        StateScope::assertOwns($event->state_id);
+        $service = app(\App\Services\Events\FestDayParticipationService::class);
+
+        return Inertia::render('State/Fest/DayParticipants', $this->shell($request, $event) + [
+            'dayParticipation' => $service->countsOnly($service->state($event)),
+            'dayParticipationReportUrl' => "/admin/state/fest/{$event->id}/schedule/day-participants",
         ]);
     }
 

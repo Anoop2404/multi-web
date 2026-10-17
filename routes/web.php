@@ -317,6 +317,7 @@ Route::prefix('admin')->name('admin.')->middleware(['web', 'auth', 'password.cha
                 Route::delete('/{event}/venues/{venue}', [$config, 'destroyVenue'])->name('venues.destroy');
 
                 Route::get('/{event}/schedule', [$sched, 'schedule'])->name('schedule');
+                Route::get('/{event}/day-participants', [$sched, 'dayParticipants'])->name('day-participants');
                 Route::get('/{event}/schedule/day-participants', [$sched, 'dayParticipationReport'])->name('schedule.day-participants');
                 Route::post('/{event}/schedule', [$sched, 'saveSchedule'])->name('schedule.save');
                 Route::get('/{event}/clashes', [$sched, 'clashes'])->name('clashes');
@@ -1575,6 +1576,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/attendance/import-template', [FestAttendanceController::class, 'importTemplate'])->name('attendance.import-template');
             Route::post('/{event}/attendance/import', [FestAttendanceController::class, 'importStore'])->name('attendance.import');
             Route::get('/{event}/schedule', [FestScheduleController::class, 'index'])->name('schedule.index');
+            Route::get('/{event}/day-participants', [FestScheduleController::class, 'dayParticipants'])->name('day-participants');
             Route::get('/{event}/schedule/day-participants', [FestScheduleController::class, 'dayParticipationReport'])->name('schedule.day-participants');
             Route::post('/{event}/schedule', [FestScheduleController::class, 'store'])->name('schedule.store');
             Route::post('/{event}/schedule/auto', [FestScheduleController::class, 'autoGenerate'])->name('schedule.auto');

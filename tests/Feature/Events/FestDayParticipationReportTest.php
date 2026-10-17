@@ -13,16 +13,16 @@ class FestDayParticipationReportTest extends TestCase
     private function summary(): array
     {
         $counts = ['unique_participants' => 1, 'participant_entries' => 2, 'school_count' => 1,
-            'unidentified_participants' => 0, 'schools' => [['name' => 'School & Academy', 'count' => 1,
+            'unidentified_participants' => 0, 'genders' => ['male' => 0, 'female' => 1, 'other' => 0, 'unspecified' => 0], 'schools' => [['genders' => ['male' => 0, 'female' => 1, 'other' => 0, 'unspecified' => 0], 'name' => 'School & Academy', 'count' => 1,
                 'students' => [['name' => '=HYPERLINK("https://example.test")', 'class_name' => 'VI',
                     'identifier' => '00042', 'identified' => true]]]]];
 
         return ['days' => [['date' => '2026-10-20'] + $counts], 'overall' => $counts,
             'event_total' => $counts, 'unscheduled' => ['unique_participants' => 0, 'participant_entries' => 0,
-                'school_count' => 0, 'unidentified_participants' => 0, 'schools' => []], 'basis' => 'Approved registrations'];
+                'school_count' => 0, 'unidentified_participants' => 0, 'genders' => ['male' => 0, 'female' => 0, 'other' => 0, 'unspecified' => 0], 'schools' => []], 'basis' => 'Approved registrations'];
     }
 
-    public function test_excel_is_a_real_three_sheet_workbook_and_names_cannot_execute_as_formulas(): void
+    public function test_excel_contains_school_gender_counts_without_student_names(): void
     {
         $response = app(FestDayParticipationReport::class)->respond(
             Request::create('/', 'GET', ['format' => 'xlsx']), $this->summary(), 'Test Fest');
@@ -32,12 +32,15 @@ class FestDayParticipationReportTest extends TestCase
             file_put_contents($path, $response->getContent());
             $zip = new ZipArchive;
             $this->assertTrue($zip->open($path));
-            $this->assertStringContainsString('School counts', $zip->getFromName('xl/workbook.xml'));
-            $this->assertStringContainsString('Student names', $zip->getFromName('xl/workbook.xml'));
-            $students = $zip->getFromName('xl/worksheets/sheet3.xml');
-            $this->assertStringContainsString('HYPERLINK', $students);
-            $this->assertStringNotContainsString('<f', $students);
-            $this->assertStringContainsString('00042', $students);
+            $workbook = $zip->getFromName('xl/workbook.xml');
+            $this->assertStringContainsString('School gender counts', $workbook);
+            $this->assertStringNotContainsString('Student names', $workbook);
+            $sheet = $zip->getFromName('xl/worksheets/sheet1.xml');
+            $this->assertStringContainsString('School &amp; Academy', $sheet);
+            $this->assertStringContainsString('Female', $sheet);
+            $this->assertStringNotContainsString('HYPERLINK', $sheet);
+            $this->assertStringNotContainsString('00042', $sheet);
+            $this->assertFalse($zip->getFromName('xl/worksheets/sheet2.xml'));
             $zip->close();
         } finally {
             @unlink($path);
@@ -54,6 +57,47 @@ class FestDayParticipationReportTest extends TestCase
             $this->assertSame('application/pdf', $response->headers->get('Content-Type'));
             $this->assertStringStartsWith($disposition, $response->headers->get('Content-Disposition'));
         }
+    }
+
+    public function test_pdf_template_contains_school_gender_totals_and_no_student_identifiers(): void
+    {
+        $report = app(FestDayParticipationReport::class)->build($this->summary(), 'Test Fest');
+        $html = view('fest.reports.day-participation', $report)->render();
+        $this->assertStringContainsString('School &amp; Academy', $html);
+        $this->assertStringContainsString('Female', $html);
+        $this->assertStringContainsString('Unspecified', $html);
+        $this->assertStringNotContainsString('HYPERLINK', $html);
+        $this->assertStringNotContainsString('00042', $html);
+        $this->assertArrayNotHasKey('students', $report['sections'][0]['schools'][0]);
+    }
+
+    public function test_dates_are_grouped_across_school_rows_and_overall_is_not_the_sum_of_days(): void
+    {
+        $summary = $this->summary();
+        $summary['days'][] = ['date' => '2026-10-21'] + $summary['overall'];
+        $report = app(FestDayParticipationReport::class)->build($summary, 'Test Fest');
+        $this->assertSame(['2026-10-20', '2026-10-21'], $report['matrix']['dates']);
+        $this->assertSame(['male' => 'Male', 'female' => 'Female'], $report['matrix']['genders']);
+        $this->assertSame([[0, 1], [0, 1]], $report['matrix']['rows'][0]['days']);
+        $this->assertSame(1, $report['matrix']['rows'][0]['overall']);
+        $this->assertSame(1, $report['matrix']['totals']['overall']);
+        $path = tempnam(sys_get_temp_dir(), 'matrix-test-');
+        try {
+            file_put_contents($path, app(FestDayParticipationReport::class)->xlsx($report));
+            $zip = new ZipArchive;
+            $zip->open($path);
+            $sheet = $zip->getFromName('xl/worksheets/sheet1.xml');
+            $this->assertStringContainsString('ref="B5:C5"', $sheet);
+            $this->assertStringContainsString('ref="D5:E5"', $sheet);
+            $this->assertStringContainsString('ref="F5:F6"', $sheet);
+            $zip->close();
+        } finally {
+            @unlink($path);
+        }
+        $html = view('fest.reports.day-participation', $report)->render();
+        $this->assertStringContainsString('colspan="2"', $html);
+        $this->assertStringContainsString('rowspan="2"', $html);
+        $this->assertStringContainsString('Overall unique', $html);
     }
 
     public function test_unassigned_date_cannot_be_exported_as_an_overall_list(): void

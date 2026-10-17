@@ -49,7 +49,6 @@ class FestScheduleController extends SahodayaAdminController
             'event'        => $event,
             'participants' => $participants,
             'schedules'    => $schedules,
-            'dayParticipation' => app(\App\Services\Events\FestDayParticipationService::class)->sahodaya($event),
             'dayParticipationReportUrl' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/schedule/day-participants",
             'stages'       => FestStage::where('event_id', $event->id)
                 ->with('venue:id,name')
@@ -62,6 +61,18 @@ class FestScheduleController extends SahodayaAdminController
             'classGroupLabels' => FestClassGroupScheme::labels(null, $event->rootEvent()),
             'ageGroupLabels'   => config('fest_item_taxonomy.age_group', []),
         ]));
+    }
+
+    public function dayParticipants(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        $service = app(\App\Services\Events\FestDayParticipationService::class);
+
+        return $this->inertia('Sahodaya/Events/DayParticipants', [
+            'event' => $event,
+            'dayParticipation' => $service->countsOnly($service->sahodaya($event)),
+            'dayParticipationReportUrl' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/schedule/day-participants",
+        ]);
     }
 
     public function dayParticipationReport(Request $request, string $tenantId, FestEvent $event)
@@ -354,7 +365,6 @@ class FestScheduleController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Events/ItemSchedule', $this->withEventActivity($event, FestPageActivity::SCHEDULE, [
             'event'     => $event,
             'rows'      => $itemSchedule->rowsForEvent($event),
-            'dayParticipation' => app(\App\Services\Events\FestDayParticipationService::class)->sahodaya($event),
             'dayParticipationReportUrl' => "/sahodaya-admin/{$tenantId}/events/{$event->id}/schedule/day-participants",
             'summary'   => $itemSchedule->summary($event),
             'stages'    => FestStage::where('event_id', $event->id)

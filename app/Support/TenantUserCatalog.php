@@ -502,7 +502,7 @@ class TenantUserCatalog
             if (str_contains($path, '/finance') || str_contains($path, '/school-fees') || str_contains($path, '/fees') || str_contains($path, '/ledger')) {
                 return 'fest.finance';
             }
-            if (str_contains($path, '/schedule')) {
+            if (str_contains($path, '/schedule') || str_contains($path, '/day-participants')) {
                 return 'fest.schedule';
             }
             if (str_contains($path, '/certificates')) {
@@ -602,7 +602,7 @@ class TenantUserCatalog
         if (str_contains($path, '/finance') || str_contains($path, '/school-fees') || str_contains($path, '/fees') || str_contains($path, '/ledger')) {
             return ['fest.finance'];
         }
-        if (str_contains($path, '/schedule')) {
+        if (str_contains($path, '/schedule') || str_contains($path, '/day-participants')) {
             return ['fest.schedule', 'fest.manage'];
         }
         if (str_contains($path, '/certificates')) {

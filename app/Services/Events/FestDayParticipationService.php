@@ -46,6 +46,7 @@ class FestDayParticipationService
                 'school' => $registration->school_id, 'school_name' => $registration->school?->name ?? 'Unknown school',
                 'name' => $participant->student?->name ?? $participant->teacher?->name ?? $participant->display_name ?? 'Participant',
                 'class_name' => $participant->student?->schoolClass?->name,
+                'gender' => $participant->student?->gender ?? $participant->teacher?->gender,
                 'identifier' => $participant->student?->reg_no ?: $participant->student?->roll_number,
             ];
         })->all();
@@ -97,6 +98,7 @@ class FestDayParticipationService
                     'identified' => $identity !== null, 'entry' => $participant->id, 'item' => $registration->item_id,
                     'school' => $schoolKey, 'school_name' => $registration->school_name ?: 'Unknown school',
                     'name' => $participant->student_name, 'class_name' => $participant->class_name,
+                    'gender' => $participant->meta['gender'] ?? null,
                     'identifier' => $roll !== '' ? $roll : ($sourceId !== '' ? $sourceId : null),
                 ];
             }
@@ -125,9 +127,17 @@ class FestDayParticipationService
     private function counts(array $records): array
     {
         $records = collect($records);
-        $people = $records->unique('person');
+        $people = $records->groupBy('person')->map(function ($entries) {
+            $row = $entries->first();
+            $genders = $entries->map(fn ($entry) => $this->gender($entry['gender'] ?? null))->unique();
+            $known = $genders->reject(fn ($gender) => $gender === 'unspecified')->values();
+            $row['gender'] = $known->count() === 1 ? $known->first() : 'unspecified';
+
+            return $row;
+        })->values();
         $schools = $people->groupBy('school')->map(fn ($members, $key) => [
             'key' => $key, 'name' => $members->first()['school_name'], 'count' => $members->count(),
+            'genders' => $this->genderCounts($members),
             'students' => $members->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->map(fn ($row) => [
                 'key' => $row['person'], 'name' => $row['name'], 'class_name' => $row['class_name'],
                 'identified' => $row['identified'], 'identifier' => $row['identifier'] ?? null,
@@ -135,9 +145,45 @@ class FestDayParticipationService
         ])->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values()->all();
 
         return [
+            'genders' => $this->genderCounts($people),
             'unique_participants' => $people->count(), 'participant_entries' => $records->unique('entry')->count(),
             'items' => $records->pluck('item')->unique()->count(), 'school_count' => count($schools),
             'unidentified_participants' => $people->where('identified', false)->count(), 'schools' => $schools,
         ];
+    }
+
+    private function gender(mixed $value): string
+    {
+        return match (strtolower(trim((string) $value))) {
+            'm', 'male', 'boy', 'boys' => 'male',
+            'f', 'female', 'girl', 'girls' => 'female',
+            'other', 'non-binary', 'nonbinary', 'transgender' => 'other',
+            default => 'unspecified',
+        };
+    }
+
+    private function genderCounts($people): array
+    {
+        return collect(['male', 'female', 'other', 'unspecified'])
+            ->mapWithKeys(fn ($gender) => [$gender => $people->where('gender', $gender)->count()])->all();
+    }
+
+    public function countsOnly(array $summary): array
+    {
+        $strip = function ($counts) {
+            $counts['schools'] = array_map(function ($school) {
+                unset($school['students']);
+
+                return $school;
+            }, $counts['schools']);
+
+            return $counts;
+        };
+        $summary['days'] = array_map($strip, $summary['days']);
+        foreach (['overall', 'event_total', 'unscheduled'] as $key) {
+            $summary[$key] = $strip($summary[$key]);
+        }
+
+        return $summary;
     }
 }

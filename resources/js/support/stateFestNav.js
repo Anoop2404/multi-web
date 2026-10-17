@@ -109,6 +109,7 @@ export function stateEventWorkspaceNav(eventId) {
         {
             section: 'Scheduling',
             items: [
+                { label: 'Day-wise participants', href: `${base}/day-participants`, icon: 'users', permission: STATE_FEST.SCHEDULE },
                 { label: 'Item Schedule', href: `${base}/schedule`, icon: 'calendar', permission: STATE_FEST.SCHEDULE },
                 { label: 'Performance Order', href: `${base}/performance-order`, icon: 'list', permission: STATE_FEST.SCHEDULE },
                 { label: 'Schedule Clashes', href: `${base}/clashes`, icon: 'alert-triangle', permission: STATE_FEST.SCHEDULE },

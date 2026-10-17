@@ -5,7 +5,7 @@
                     description="Build performance order, resolve clashes, and publish to the public portal." />
 
         <SportsSetupSubNav v-if="event.event_type === 'sports'" :sahodaya-id="sahodaya.id" :event-id="event.id" active="schedule" :event="event" />
-        <DayParticipationSummary :summary="dayParticipation" :report-url="dayParticipationReportUrl" />
+        <a :href="dayParticipationReportUrl.replace('/schedule/day-participants', '/day-participants')" class="btn-secondary mb-4 inline-block text-sm">Day-wise participants →</a>
         <div class="flex flex-wrap gap-2 mb-4 items-center">
             <button type="button" @click="autoGenerate"
                     class="btn-primary px-4 py-2 rounded-lg text-sm">Auto-order by chest no.</button>
@@ -114,7 +114,6 @@
 </template>
 
 <script setup>
-import DayParticipationSummary from '@/Components/events/DayParticipationSummary.vue';
 import { computed, ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
@@ -124,7 +123,6 @@ import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
-    dayParticipation: Object,
     dayParticipationReportUrl: String,
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, participants: Array, schedules: Array, stages: Array,

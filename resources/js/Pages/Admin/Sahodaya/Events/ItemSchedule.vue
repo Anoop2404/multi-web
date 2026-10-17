@@ -12,7 +12,7 @@
                 <button type="button" class="btn-secondary text-sm !text-red-600" @click="clearAllSchedules">Clear all schedules</button>
             </template>
         </PageHeader>
-        <DayParticipationSummary :summary="dayParticipation" :report-url="dayParticipationReportUrl" />
+        <a :href="dayParticipationReportUrl.replace('/schedule/day-participants', '/day-participants')" class="btn-secondary mb-4 inline-block text-sm">Day-wise participants →</a>
 
 
         <div class="grid grid-cols-3 gap-4 mb-6">
@@ -202,7 +202,6 @@
 </template>
 
 <script setup>
-import DayParticipationSummary from '@/Components/events/DayParticipationSummary.vue';
 import { computed, reactive, ref, watch } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
@@ -212,7 +211,6 @@ import { formatCalendarDate } from '@/support/calendarDates.js';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
-    dayParticipation: Object,
     dayParticipationReportUrl: String,
     sahodaya: Object,
     publicUrl: String,

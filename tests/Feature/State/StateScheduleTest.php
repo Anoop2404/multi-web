@@ -161,12 +161,39 @@ class StateScheduleTest extends TestCase
         $this->assertSame(['Alpha School', 'Beta School'], array_column($summary['overall']['schools'], 'name'));
     }
 
+    public function test_gender_counts_deduplicate_aliases_and_flag_conflicts_and_missing_values(): void
+    {
+        $one = $this->item('G1');
+        $two = $this->item('G2');
+        $this->schedule($one, '2026-10-20', '09:00');
+        $this->schedule($two, '2026-10-21', '09:00');
+        foreach ([[$one, 'F'], [$two, 'female']] as [$item, $gender]) {
+            $this->registration($item, ['Repeated student'])->participants()->firstOrFail()
+                ->update(['roll_number' => '123', 'meta' => ['gender' => $gender]]);
+        }
+        $this->registration($one, ['Unknown'])->participants()->firstOrFail()->update(['roll_number' => '456']);
+        $this->registration($one, ['Other'])->participants()->firstOrFail()->update(['roll_number' => '789', 'meta' => ['gender' => 'other']]);
+        $service = app(\App\Services\Events\FestDayParticipationService::class);
+        $summary = $service->state($this->event);
+        $this->assertSame(['male' => 0, 'female' => 1, 'other' => 1, 'unspecified' => 1], $summary['overall']['genders']);
+        $this->assertSame(1, $summary['days'][1]['genders']['female']);
+        $this->assertSame(3, array_sum($summary['overall']['schools'][0]['genders']));
+        $twoRegistration = StateFestRegistration::where('item_id', $two->id)->firstOrFail();
+        $twoRegistration->participants()->firstOrFail()->update(['meta' => ['gender' => 'male']]);
+        $conflict = $service->state($this->event);
+        $this->assertSame(2, $conflict['overall']['genders']['unspecified']);
+        $this->assertSame(0, $conflict['overall']['genders']['female']);
+    }
+
     public function test_schedule_reports_require_schedule_permission(): void
     {
         $url = "http://superadmin.test/admin/state/fest/{$this->event->id}/schedule/day-participants";
         $this->actingAs($this->user(), 'platform')->get($url.'?format=xlsx')->assertOk()
             ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $pageUrl = "http://superadmin.test/admin/state/fest/{$this->event->id}/day-participants";
+        $this->get($pageUrl)->assertOk()->assertInertia(fn ($page) => $page->component('State/Fest/DayParticipants', false)->has('dayParticipation.overall.genders'));
         $this->actingAs($this->user('state_mark_operator'), 'platform')->get($url.'?format=xlsx')->assertForbidden();
+        $this->get($pageUrl)->assertForbidden();
     }
 
     private function user(string $role = 'state_admin'): PlatformUser

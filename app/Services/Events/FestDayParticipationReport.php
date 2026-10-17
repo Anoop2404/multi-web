@@ -29,7 +29,7 @@ class FestDayParticipationReport
             ]);
         }
         $response = PdfGenerator::fromView('fest.reports.day-participation', $report, $filename.'.pdf',
-            inline: $data['format'] === 'preview');
+            inline: $data['format'] === 'preview', isLandscape: true);
         $response->headers->set('Cache-Control', 'private, no-store');
 
         return $response;
@@ -37,6 +37,7 @@ class FestDayParticipationReport
 
     public function build(array $summary, string $title, string $scope = 'all'): array
     {
+        $summary = app(FestDayParticipationService::class)->countsOnly($summary);
         $summaryRows = [];
         foreach ($summary['days'] as $day) {
             $summaryRows[] = $this->countRow($day['date'], $day);
@@ -53,7 +54,12 @@ class FestDayParticipationReport
         };
         abort_if($sections === [], 422, 'Choose an assigned schedule date or an overall report.');
 
+        $columns = $scope === 'all' ? array_values(array_slice($sections, 0, -1)) : array_values($sections);
+        $overall = $scope === 'all' ? $summary['overall'] : $sections[array_key_first($sections)];
+        $matrix = $this->matrix($columns, $overall);
+
         return [
+            'matrix' => $matrix,
             'title' => $title, 'basis' => $summary['basis'], 'scope' => $scope,
             'generated' => now()->format('d M Y, h:i A'), 'summaryRows' => $summaryRows,
             'sections' => array_values($sections), 'warnings' => $summary['warnings'] ?? [],
@@ -67,55 +73,82 @@ class FestDayParticipationReport
             $counts['school_count'], $counts['unidentified_participants']];
     }
 
-    public function xlsx(array $report): string
+    private function matrix(array $days, array $overall): array
     {
-        $schoolRows = [];
-        $studentRows = [];
-        foreach ($report['sections'] as $section) {
-            foreach ($section['schools'] as $school) {
-                $schoolRows[] = [$section['label'], $school['name'], $school['count']];
-                foreach ($school['students'] as $i => $student) {
-                    $studentRows[] = [$section['label'], $school['name'], $i + 1, $student['name'],
-                        $student['class_name'], $student['identifier'] ?? '', $student['identified'] ? 'Yes' : 'No'];
-                }
+        $genders = ['male' => 'Male', 'female' => 'Female'];
+        foreach (['other' => 'Other', 'unspecified' => 'Unspecified'] as $key => $label) {
+            if (collect($days)->sum(fn ($day) => $day['genders'][$key] ?? 0) > 0) {
+                $genders[$key] = $label;
             }
         }
-        $sheets = [
-            'Counts' => [['Day or scope', 'Unique participants', 'Participant entries', 'Schools', 'Unverified records'], $report['summaryRows']],
-            'School counts' => [['Day or scope', 'School', 'Unique participants'], $schoolRows],
-            'Student names' => [['Day or scope', 'School', 'No.', 'Participant', 'Class', 'Student ID or roll', 'Stable ID available'], $studentRows],
+        $rows = [];
+        foreach ($overall['schools'] as $school) {
+            $key = $school['key'] ?? $school['name'];
+            $cells = [];
+            foreach ($days as $day) {
+                $match = collect($day['schools'])->first(fn ($entry) => ($entry['key'] ?? $entry['name']) === $key);
+                $cells[] = array_map(fn ($gender) => (int) ($match['genders'][$gender] ?? 0), array_keys($genders));
+            }
+            $rows[] = ['school' => $school['name'], 'days' => $cells, 'overall' => $school['count']];
+        }
+
+        return [
+            'dates' => array_column($days, 'label'), 'genders' => $genders, 'rows' => $rows,
+            'totals' => ['school' => 'All schools', 'days' => array_map(fn ($day) =>
+                array_map(fn ($gender) => (int) ($day['genders'][$gender] ?? 0), array_keys($genders)), $days),
+                'overall' => $overall['unique_participants']],
         ];
+    }
+
+    public function xlsx(array $report): string
+    {
+        $matrix = $report['matrix'];
+        $width = count($matrix['genders']);
+        $lastColumn = count($matrix['dates']) * $width + 1;
         $path = tempnam(sys_get_temp_dir(), 'day-participants-');
         $options = new Options;
-        foreach (array_values($sheets) as $index => [$headers]) {
-            foreach ([1, 2, 3] as $row) {
-                $options->mergeCells(0, $row, count($headers) - 1, $row, $index);
-            }
+        foreach ([1, 2, 3] as $row) {
+            $options->mergeCells(0, $row, $lastColumn, $row);
+        }
+        $options->mergeCells(0, 5, 0, 6);
+        $options->mergeCells($lastColumn, 5, $lastColumn, 6);
+        foreach ($matrix['dates'] as $index => $date) {
+            $options->mergeCells(1 + $index * $width, 5, ($index + 1) * $width, 5);
         }
         $writer = new Writer($options);
         try {
             $writer->openToFile($path);
             $header = (new Style)->setFontBold()->setFontColor('FFFFFF')->setBackgroundColor('17324D')->setShouldWrapText();
             $body = (new Style)->setShouldWrapText()->setFontSize(11);
-            foreach ($sheets as $name => [$headers, $rows]) {
-                $sheet = $name === 'Counts' ? $writer->getCurrentSheet() : $writer->addNewSheetAndMakeItCurrent();
-                $sheet->setName($name);
-                $sheet->setSheetView((new SheetView)->setFreezeRow(6));
-                $sheet->setColumnWidth(28, 1);
-                $sheet->setColumnWidth(42, 2);
-                $sheet->setColumnWidth(22, 3, 4, 5, 6, 7);
-                if ($name === 'Student names') {
-                    $sheet->setColumnWidth(8, 3);
-                    $sheet->setColumnWidth(36, 4);
+            $total = (new Style)->setFontBold()->setBackgroundColor('EDF3F8')->setShouldWrapText();
+            $sheet = $writer->getCurrentSheet();
+            $sheet->setName('School gender counts');
+            $sheet->setSheetView((new SheetView)->setFreezeRow(7)->setFreezeColumn('B'));
+            $sheet->setColumnWidth(48, 1);
+            for ($column = 2; $column <= $lastColumn + 1; $column++) {
+                $sheet->setColumnWidth(16, $column);
+            }
+            foreach ([[$report['title']], [$report['basis'].' - Generated '.$report['generated']],
+                ['Overall unique counts are deduplicated across the selected days, not added. Unspecified includes missing or conflicting gender.'], []] as $note) {
+                $writer->addRow($this->row($note, $body));
+            }
+            $dates = ['School name'];
+            $genders = [''];
+            foreach ($matrix['dates'] as $date) {
+                array_push($dates, $date, ...array_fill(0, $width - 1, ''));
+                array_push($genders, ...array_values($matrix['genders']));
+            }
+            $dates[] = 'Overall unique';
+            $genders[] = '';
+            $writer->addRow($this->row($dates, $header));
+            $writer->addRow($this->row($genders, $header));
+            foreach ([...$matrix['rows'], $matrix['totals']] as $index => $row) {
+                $values = [$row['school']];
+                foreach ($row['days'] as $day) {
+                    array_push($values, ...$day);
                 }
-                foreach ([[$report['title']], [$report['basis'].' - Generated '.$report['generated']],
-                    ['Unique counts are not sums of daily counts. Unverified records may overcount a person.'], []] as $note) {
-                    $writer->addRow($this->row($note, $body));
-                }
-                $writer->addRow($this->row($headers, $header));
-                foreach ($rows as $values) {
-                    $writer->addRow($this->row($values, $body));
-                }
+                $values[] = $row['overall'];
+                $writer->addRow($this->row($values, $index === count($matrix['rows']) ? $total : $body));
             }
             $writer->close();
 
