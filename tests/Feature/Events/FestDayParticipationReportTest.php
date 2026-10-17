@@ -77,8 +77,8 @@ class FestDayParticipationReportTest extends TestCase
         $summary['days'][] = ['date' => '2026-10-21'] + $summary['overall'];
         $report = app(FestDayParticipationReport::class)->build($summary, 'Test Fest');
         $this->assertSame(['2026-10-20', '2026-10-21'], $report['matrix']['dates']);
-        $this->assertSame(['male' => 'Male', 'female' => 'Female'], $report['matrix']['genders']);
-        $this->assertSame([[0, 1], [0, 1]], $report['matrix']['rows'][0]['days']);
+        $this->assertSame(['male' => 'Male', 'female' => 'Female', 'total' => 'Total'], $report['matrix']['genders']);
+        $this->assertSame([[0, 1, 1], [0, 1, 1]], $report['matrix']['rows'][0]['days']);
         $this->assertSame(1, $report['matrix']['rows'][0]['overall']);
         $this->assertSame(1, $report['matrix']['totals']['overall']);
         $path = tempnam(sys_get_temp_dir(), 'matrix-test-');
@@ -87,17 +87,18 @@ class FestDayParticipationReportTest extends TestCase
             $zip = new ZipArchive;
             $zip->open($path);
             $sheet = $zip->getFromName('xl/worksheets/sheet1.xml');
-            $this->assertStringContainsString('ref="B5:C5"', $sheet);
-            $this->assertStringContainsString('ref="D5:E5"', $sheet);
-            $this->assertStringContainsString('ref="F5:F6"', $sheet);
+            $this->assertStringContainsString('ref="B5:D5"', $sheet);
+            $this->assertStringContainsString('ref="E5:G5"', $sheet);
+            $this->assertStringNotContainsString('Overall unique', $sheet);
             $zip->close();
         } finally {
             @unlink($path);
         }
         $html = view('fest.reports.day-participation', $report)->render();
-        $this->assertStringContainsString('colspan="2"', $html);
+        $this->assertStringContainsString('colspan="3"', $html);
         $this->assertStringContainsString('rowspan="2"', $html);
-        $this->assertStringContainsString('Overall unique', $html);
+        $this->assertStringContainsString('Total', $html);
+        $this->assertStringNotContainsString('Overall unique', $html);
     }
 
     public function test_unassigned_date_cannot_be_exported_as_an_overall_list(): void

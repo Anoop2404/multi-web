@@ -81,13 +81,14 @@ class FestDayParticipationReport
                 $genders[$key] = $label;
             }
         }
+        $genders['total'] = 'Total';
         $rows = [];
         foreach ($overall['schools'] as $school) {
             $key = $school['key'] ?? $school['name'];
             $cells = [];
             foreach ($days as $day) {
                 $match = collect($day['schools'])->first(fn ($entry) => ($entry['key'] ?? $entry['name']) === $key);
-                $cells[] = array_map(fn ($gender) => (int) ($match['genders'][$gender] ?? 0), array_keys($genders));
+                $cells[] = array_map(fn ($gender) => (int) ($gender === 'total' ? ($match['count'] ?? 0) : ($match['genders'][$gender] ?? 0)), array_keys($genders));
             }
             $rows[] = ['school' => $school['name'], 'days' => $cells, 'overall' => $school['count']];
         }
@@ -95,7 +96,7 @@ class FestDayParticipationReport
         return [
             'dates' => array_column($days, 'label'), 'genders' => $genders, 'rows' => $rows,
             'totals' => ['school' => 'All schools', 'days' => array_map(fn ($day) =>
-                array_map(fn ($gender) => (int) ($day['genders'][$gender] ?? 0), array_keys($genders)), $days),
+                array_map(fn ($gender) => (int) ($gender === 'total' ? $day['unique_participants'] : ($day['genders'][$gender] ?? 0)), array_keys($genders)), $days),
                 'overall' => $overall['unique_participants']],
         ];
     }
@@ -104,14 +105,13 @@ class FestDayParticipationReport
     {
         $matrix = $report['matrix'];
         $width = count($matrix['genders']);
-        $lastColumn = count($matrix['dates']) * $width + 1;
+        $lastColumn = count($matrix['dates']) * $width;
         $path = tempnam(sys_get_temp_dir(), 'day-participants-');
         $options = new Options;
         foreach ([1, 2, 3] as $row) {
             $options->mergeCells(0, $row, $lastColumn, $row);
         }
         $options->mergeCells(0, 5, 0, 6);
-        $options->mergeCells($lastColumn, 5, $lastColumn, 6);
         foreach ($matrix['dates'] as $index => $date) {
             $options->mergeCells(1 + $index * $width, 5, ($index + 1) * $width, 5);
         }
@@ -129,7 +129,7 @@ class FestDayParticipationReport
                 $sheet->setColumnWidth(16, $column);
             }
             foreach ([[$report['title']], [$report['basis'].' - Generated '.$report['generated']],
-                ['Overall unique counts are deduplicated across the selected days, not added. Unspecified includes missing or conflicting gender.'], []] as $note) {
+                ['Each date shows unique Male, Female and Total counts. Group members count individually. Unspecified includes missing or conflicting gender.'], []] as $note) {
                 $writer->addRow($this->row($note, $body));
             }
             $dates = ['School name'];
@@ -138,8 +138,6 @@ class FestDayParticipationReport
                 array_push($dates, $date, ...array_fill(0, $width - 1, ''));
                 array_push($genders, ...array_values($matrix['genders']));
             }
-            $dates[] = 'Overall unique';
-            $genders[] = '';
             $writer->addRow($this->row($dates, $header));
             $writer->addRow($this->row($genders, $header));
             foreach ([...$matrix['rows'], $matrix['totals']] as $index => $row) {
@@ -147,7 +145,6 @@ class FestDayParticipationReport
                 foreach ($row['days'] as $day) {
                     array_push($values, ...$day);
                 }
-                $values[] = $row['overall'];
                 $writer->addRow($this->row($values, $index === count($matrix['rows']) ? $total : $body));
             }
             $writer->close();
