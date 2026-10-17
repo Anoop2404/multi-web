@@ -102,6 +102,7 @@ class McqSahodayaCandidateManagementTest extends TestCase
             'candidates' => [
                 '*' => ['id', 'name', 'admission_number', 'class_name', 'is_eligible', 'is_registered', 'was_cancelled'],
             ],
+            'classes',
             'tickets_already_issued',
             'allows_students',
             'window_active',

@@ -19,6 +19,7 @@ use App\Services\Students\StudentVerificationGate;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Models\Student;
 use App\Models\Teacher;
+use App\Models\SchoolClass;
 use App\Services\Mcq\McqEligibilityService;
 use App\Services\Mcq\McqHallTicketService;
 use App\Services\Mcq\McqExamPasscodeService;
@@ -616,6 +617,7 @@ class McqExamController extends SahodayaAdminController
             'school_id' => 'required|string|max:36',
             'search'    => 'nullable|string|max:100',
             'type'      => 'nullable|in:student,teacher',
+            'class_id'  => 'nullable|integer',
         ]);
 
         $school = Tenant::where('parent_id', $this->sahodaya->id)
@@ -625,11 +627,22 @@ class McqExamController extends SahodayaAdminController
 
         $type = $data['type'] ?? 'student';
         $search = trim((string) ($data['search'] ?? ''));
+        $classId = ! empty($data['class_id']) ? (int) $data['class_id'] : null;
         $eligibilityService = app(McqEligibilityService::class);
 
         $results = [];
+        $classes = [];
 
         if ($type === 'student') {
+            $classes = SchoolClass::where('tenant_id', $school->id)
+                ->active()
+                ->orderBy('display_order')
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])
+                ->values()
+                ->all();
+
             $activeRegisteredIds = McqRegistration::where('exam_id', $exam->id)
                 ->whereNotNull('student_id')
                 ->active()
@@ -646,19 +659,26 @@ class McqExamController extends SahodayaAdminController
                 ->where('status', 'active')
                 ->with(['schoolClass:id,name,class_category_id']);
 
+            if ($classId) {
+                $studentsQuery->where('school_class_id', $classId);
+            }
+
             if ($search !== '') {
                 $term = '%'.mb_strtolower($search).'%';
                 $studentsQuery->where(function ($inner) use ($term, $search) {
                     $inner->whereRaw('LOWER(name) LIKE ?', [$term])
                         ->orWhereRaw('LOWER(admission_number) LIKE ?', [$term])
-                        ->orWhereRaw('LOWER(reg_no) LIKE ?', [$term]);
+                        ->orWhereRaw('LOWER(reg_no) LIKE ?', [$term])
+                        ->orWhereHas('schoolClass', function ($cq) use ($term) {
+                            $cq->whereRaw('LOWER(name) LIKE ?', [$term]);
+                        });
                     if (is_numeric($search)) {
                         $inner->orWhere('id', (int) $search);
                     }
                 });
             }
 
-            $students = $studentsQuery->orderBy('name')->limit(50)->get();
+            $students = $studentsQuery->orderBy('name')->limit(60)->get();
 
             $eligibilityService->primeStudentEligibility($exam, $students);
 
@@ -672,6 +692,7 @@ class McqExamController extends SahodayaAdminController
                     'name'                 => $student->name,
                     'admission_number'     => $student->admission_number,
                     'reg_no'               => $student->reg_no,
+                    'class_id'             => $student->school_class_id,
                     'class_name'           => $student->schoolClass?->name ?? '—',
                     'is_eligible'          => $isEligible,
                     'ineligibility_reason' => $ineligibilityReason,
@@ -707,7 +728,7 @@ class McqExamController extends SahodayaAdminController
                 });
             }
 
-            $teachers = $teachersQuery->orderBy('name')->limit(50)->get();
+            $teachers = $teachersQuery->orderBy('name')->limit(60)->get();
 
             $results = $teachers->map(function (Teacher $teacher) use ($exam, $eligibilityService, $activeRegisteredIds, $cancelledIds) {
                 $isEligible = $eligibilityService->isTeacherEligible($exam, $teacher);
@@ -719,6 +740,7 @@ class McqExamController extends SahodayaAdminController
                     'name'                 => $teacher->name,
                     'admission_number'     => null,
                     'reg_no'               => null,
+                    'class_id'             => null,
                     'class_name'           => 'Teacher',
                     'is_eligible'          => $isEligible,
                     'ineligibility_reason' => $ineligibilityReason,
@@ -732,6 +754,7 @@ class McqExamController extends SahodayaAdminController
 
         return response()->json([
             'candidates'             => $results,
+            'classes'                => $classes,
             'tickets_already_issued' => $ticketsAlreadyIssued,
             'allows_teachers'        => McqExamEligibilityConfig::allowsTeachers($exam->eligibility_config),
             'allows_students'        => McqExamEligibilityConfig::allowsStudents($exam->eligibility_config),
@@ -809,24 +832,40 @@ class McqExamController extends SahodayaAdminController
             }
 
             if ($issueTicket) {
-                $reg = app(McqHallTicketService::class)->issueForRegistration($reg);
-                app(McqExamPasscodeService::class)->ensure($reg);
-                app(McqSeatingService::class)->recalculate($exam);
+                try {
+                    $reg = app(McqHallTicketService::class)->issueForRegistration($reg);
+                    app(McqExamPasscodeService::class)->ensure($reg);
+                    app(McqSeatingService::class)->recalculate($exam);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning("Could not auto-issue hall ticket/seating for candidate {$reg->id}: {$e->getMessage()}");
+                }
             }
 
             $reason = ! empty($data['reason']) ? ' Reason: '.$data['reason'] : '';
             $syncNote = "MCQ registration manually added by Sahodaya for {$reg->participantName()} in {$exam->title}.{$reason}";
-            app(McqSchoolFeeService::class)->syncForSchool($exam, $school, $syncNote, $request->user()->id, $reg->id);
-
-            if ($student) {
-                app(McqRegistrationPortalService::class)->provisionForStudents(collect([$student]));
+            try {
+                app(McqSchoolFeeService::class)->syncForSchool($exam, $school, $syncNote, $request->user()->id, $reg->id);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Could not sync school fee for candidate {$reg->id}: {$e->getMessage()}");
             }
 
-            app(PlatformAuditLogger::class)->mcqRegistration(
-                $reg->fresh(['exam', 'student', 'teacher']),
-                'mcq.registration.added_by_sahodaya',
-                "Sahodaya manually registered {$reg->participantName()} in {$exam->title}.{$reason}" . ($issueTicket ? " (Hall ticket #{$reg->hall_ticket_no} issued)" : ''),
-            );
+            if ($student) {
+                try {
+                    app(McqRegistrationPortalService::class)->provisionForStudents(collect([$student]));
+                } catch (\Throwable) {
+                    // Non-blocking
+                }
+            }
+
+            try {
+                app(PlatformAuditLogger::class)->mcqRegistration(
+                    $reg->fresh(['exam', 'student', 'teacher']),
+                    'mcq.registration.added_by_sahodaya',
+                    "Sahodaya manually registered {$reg->participantName()} in {$exam->title}.{$reason}" . ($reg->hall_ticket_no ? " (Hall ticket #{$reg->hall_ticket_no} issued)" : ''),
+                );
+            } catch (\Throwable) {
+                // Non-blocking
+            }
 
             return $reg;
         });
