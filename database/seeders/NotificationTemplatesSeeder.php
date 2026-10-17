@@ -266,6 +266,16 @@ class NotificationTemplatesSeeder extends Seeder
                 'body_template' => 'Fee proof for {{student_name}} ({{exam_title}}) was rejected. {{reason}}',
             ],
             [
+                'slug'          => 'mcq.registration.cancelled_admin',
+                'title'         => 'MCQ registration cancelled by Sahodaya',
+                'body_template' => 'Registration for {{student_name}} in {{exam_title}} was cancelled by Sahodaya. Reason: {{rejection_reason}}',
+            ],
+            [
+                'slug'          => 'mcq.registration.cancelled_by_school',
+                'title'         => 'MCQ registration cancelled by school',
+                'body_template' => 'Registration for {{student_name}} in {{exam_title}} was cancelled by the school.',
+            ],
+            [
                 'slug'          => 'training.pending_school.linked',
                 'title'         => 'Training school linked',
                 'body_template' => 'Your pending school "{{pending_school_name}}" was linked to {{school_name}} for {{program_title}}.',

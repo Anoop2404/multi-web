@@ -20,9 +20,18 @@ class McqPaymentsController extends SahodayaAdminController
             ->with(['exam:id,title,exam_level,scheduled_at', 'school:id,name', 'feeReceipt', 'receipts' => fn ($q) => $q->latest('id')->with(['reviewedBy:id,name', 'attachments'])]);
 
         if ($search !== '') {
-            $base->where(function ($q) use ($search) {
-                $q->whereHas('exam', fn ($eq) => $eq->where('title', 'like', "%{$search}%"))
-                    ->orWhereHas('school', fn ($sq) => $sq->where('name', 'like', "%{$search}%"));
+            $matchingSchoolIds = \App\Models\Tenant::where('parent_id', $this->sahodaya->id)
+                ->where('type', 'school')
+                ->whereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower($search).'%'])
+                ->pluck('id')
+                ->all();
+
+            $base->where(function ($q) use ($search, $matchingSchoolIds) {
+                $q->whereHas('exam', fn ($eq) => $eq->where('title', 'like', "%{$search}%"));
+
+                if (! empty($matchingSchoolIds)) {
+                    $q->orWhereIn('school_id', $matchingSchoolIds);
+                }
             });
         }
 

@@ -159,15 +159,26 @@ class McqReportController extends SahodayaAdminController
         }
 
         if (! empty($filters['search'])) {
-            $term = '%'.mb_strtolower(trim((string) $filters['search'])).'%';
-            $query->where(function ($q) use ($term) {
+            $rawTerm = trim((string) $filters['search']);
+            $term = '%'.mb_strtolower($rawTerm).'%';
+
+            $matchingSchoolIds = \App\Models\Tenant::where('parent_id', $this->sahodaya->id)
+                ->where('type', 'school')
+                ->whereRaw('LOWER(name) LIKE ?', [$term])
+                ->pluck('id')
+                ->all();
+
+            $query->where(function ($q) use ($term, $matchingSchoolIds) {
                 $q->whereRaw('LOWER(hall_ticket_no) LIKE ?', [$term])
                     ->orWhereHas('student', fn ($s) => $s->whereRaw('LOWER(name) LIKE ?', [$term])
                         ->orWhereRaw('LOWER(admission_number) LIKE ?', [$term])
                         ->orWhereRaw('LOWER(reg_no) LIKE ?', [$term]))
                     ->orWhereHas('teacher', fn ($t) => $t->whereRaw('LOWER(name) LIKE ?', [$term])
-                        ->orWhereRaw('LOWER(employee_code) LIKE ?', [$term]))
-                    ->orWhereHas('school', fn ($s) => $s->whereRaw('LOWER(name) LIKE ?', [$term]));
+                        ->orWhereRaw('LOWER(employee_code) LIKE ?', [$term]));
+
+                if (! empty($matchingSchoolIds)) {
+                    $q->orWhereIn('school_id', $matchingSchoolIds);
+                }
             });
         }
     }
