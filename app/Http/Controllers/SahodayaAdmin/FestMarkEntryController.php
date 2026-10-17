@@ -150,9 +150,15 @@ class FestMarkEntryController extends SahodayaAdminController
             ->with(['item', 'school', 'participants.student', 'participants.teacher', 'participants.group'])
             ->get();
 
-        $marks = FestMark::whereIn('event_id', $eventIds)->get()->keyBy('participant_id');
+        $marks = FestMark::whereIn('event_id', $eventIds)
+            ->when($itemIds !== [], fn ($q) => $q->whereIn('item_id', $itemIds))
+            ->when($itemIds === [], fn ($q) => $q->whereRaw('1 = 0'))
+            ->get()
+            ->keyBy('participant_id');
 
         $attendance = FestAttendance::whereIn('event_id', $eventIds)
+            ->when($itemIds !== [], fn ($q) => $q->whereIn('item_id', $itemIds))
+            ->when($itemIds === [], fn ($q) => $q->whereRaw('1 = 0'))
             ->get()
             ->mapWithKeys(fn (FestAttendance $row) => [
                 "{$row->item_id}-{$row->participant_id}" => ['status' => $row->status],
@@ -175,11 +181,9 @@ class FestMarkEntryController extends SahodayaAdminController
         $childEvents = $this->scopedChildEventOptions($event);
 
         // Real marks-entered progress per item, so the item picker can show it across
-        // 140+ items without opening each one. Previously this counted items with at
-        // least one FestMarkCriterion (scoring columns configured) instead — that only
-        // reflects setup, not whether any marks were actually entered, so "87/141 items
-        // configured" could be true with zero marks entered anywhere.
-        $markProgressByItemId = collect(app(\App\Services\Events\FestReportService::class, ['event' => $event])->markEntryStatusRows())
+        // 140+ items without opening each one. Evaluated lazily in a closure so partial
+        // reloads (like saving an order number) never waste 10+ seconds computing this.
+        $markProgressByItemId = fn () => collect(app(\App\Services\Events\FestReportService::class, ['event' => $event])->markEntryStatusRows())
             ->keyBy('item_id')
             ->map(fn (array $row) => ['marked' => $row['marked'], 'participants' => $row['participants'], 'complete' => $row['complete']])
             ->all();
@@ -2022,10 +2026,11 @@ class FestMarkEntryController extends SahodayaAdminController
             $group = $participant->group;
 
             if ($orderNo !== null) {
-                $conflict = FestGroup::whereHas('registration', fn ($q) => $q->where('item_id', $item->id))
-                    ->where('event_id', $event->id)
-                    ->where('order_no', $orderNo)
-                    ->where('id', '!=', $group->id)
+                $conflict = FestGroup::join('fest_registrations', 'fest_registrations.id', '=', 'fest_groups.registration_id')
+                    ->where('fest_registrations.item_id', $item->id)
+                    ->where('fest_groups.event_id', $event->id)
+                    ->where('fest_groups.order_no', $orderNo)
+                    ->where('fest_groups.id', '!=', $group->id)
                     ->exists();
 
                 if ($conflict) {
@@ -2033,14 +2038,16 @@ class FestMarkEntryController extends SahodayaAdminController
                 }
             }
 
-            $group->update(['order_no' => $orderNo]);
+            if ($group->order_no !== $orderNo) {
+                $group->update(['order_no' => $orderNo]);
+            }
         } else {
             if ($orderNo !== null) {
-                $conflict = FestParticipant::whereHas('registration', fn ($q) => $q
-                        ->where('event_id', $event->id)
-                        ->where('item_id', $item->id))
-                    ->where('order_no', $orderNo)
-                    ->where('id', '!=', $participant->id)
+                $conflict = FestParticipant::join('fest_registrations', 'fest_registrations.id', '=', 'fest_participants.registration_id')
+                    ->where('fest_registrations.event_id', $event->id)
+                    ->where('fest_registrations.item_id', $item->id)
+                    ->where('fest_participants.order_no', $orderNo)
+                    ->where('fest_participants.id', '!=', $participant->id)
                     ->exists();
 
                 if ($conflict) {
@@ -2048,7 +2055,9 @@ class FestMarkEntryController extends SahodayaAdminController
                 }
             }
 
-            $participant->update(['order_no' => $orderNo]);
+            if ($participant->order_no !== $orderNo) {
+                $participant->update(['order_no' => $orderNo]);
+            }
         }
 
         $audit->festEvent($event, FestPageActivity::MARKS, 'fest.order_no.set', 'Mark entry order number updated', [

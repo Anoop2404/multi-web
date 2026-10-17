@@ -850,7 +850,18 @@ function orderOptionsFor(section, currentParticipantId) {
 
 function saveOrderNo(participant, value) {
     const orderNo = value === '' || value === null || value === undefined ? null : Number(value);
-    router.post(`${marksBaseUrl.value}/${participant.id}/order-no`, { order_no: orderNo }, { preserveScroll: true, preserveState: true });
+    if (participant) {
+        participant.order_no = orderNo;
+    }
+    router.post(
+        `${marksBaseUrl.value}/${participant.id}/order-no`,
+        { order_no: orderNo },
+        {
+            preserveScroll: true,
+            preserveState: true,
+            only: ['registrations', 'flash', 'errors'],
+        }
+    );
 }
 
 function payloadFor(participant, item) {

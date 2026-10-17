@@ -63,23 +63,7 @@ class FestChestNumberController extends SahodayaAdminController
             default => null,
         };
 
-        $childEvents = $this->scopedChildEventOptions($event);
-
-        $schools = Tenant::where('parent_id', $this->sahodaya->id)
-            ->where('type', 'school')
-            ->where('membership_status', 'approved')
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
         $selectedSchoolId = $request->query('school_id');
-        if ($selectedSchoolId) {
-            abort_unless($schools->contains('id', $selectedSchoolId), 404);
-        }
-        $schoolStudents = $selectedSchoolId ? $this->schoolStudentRows($event, $selectedSchoolId) : [];
-
-        $schoolChestRanges = FestSchoolChestRange::where('event_id', $event->id)
-            ->get(['school_id', 'chest_no_start', 'chest_no_end'])
-            ->keyBy('school_id');
 
         return $this->inertia('Sahodaya/Events/ChestNumbers', $this->withEventActivity($event, FestPageActivity::CHEST_NUMBERS, array_merge($nav, [
             'event'          => $event->only('id', 'title', 'status', 'event_type', 'chest_reveal_mode', 'results_published', 'numbering_settings'),
@@ -87,16 +71,26 @@ class FestChestNumberController extends SahodayaAdminController
             'selectedItemId' => $itemId,
             'selectedItem'   => $selectedItem,
             'participants'   => $participants,
-            'greenRoom'      => $greenRoom,
+            'greenRoom'      => fn () => $itemId ? $this->greenRoomRows($event, $itemId) : [],
             'includePending' => $includePending,
             'view'           => $request->query('view') === 'green-room' ? 'green-room' : null,
-            'childEvents'    => $childEvents,
-            'schools'        => $schools,
-            'schoolChestRanges' => $schoolChestRanges,
+            'childEvents'    => fn () => $this->scopedChildEventOptions($event),
+            'schools'        => fn () => Tenant::where('parent_id', $this->sahodaya->id)
+                ->where('type', 'school')
+                ->where('membership_status', 'approved')
+                ->orderBy('name')
+                ->get(['id', 'name']),
+            'schoolChestRanges' => fn () => FestSchoolChestRange::where('event_id', $event->id)
+                ->get(['school_id', 'chest_no_start', 'chest_no_end'])
+                ->keyBy('school_id'),
             'selectedSchoolId' => $selectedSchoolId,
-            'schoolStudents' => $schoolStudents,
-            'itemHasMarksOrAttendance'  => $itemHasMarksOrAttendance,
-            'eventHasMarksOrAttendance' => $eventHasMarksOrAttendance,
+            'schoolStudents' => fn () => $selectedSchoolId ? $this->schoolStudentRows($event, $selectedSchoolId) : [],
+            'itemHasMarksOrAttendance'  => fn () => $itemId
+                ? (\App\Models\FestMark::where('event_id', $event->id)->where('item_id', $itemId)->exists()
+                    || \App\Models\FestAttendance::where('event_id', $event->id)->where('item_id', $itemId)->exists())
+                : false,
+            'eventHasMarksOrAttendance' => fn () => \App\Models\FestMark::where('event_id', $event->id)->exists()
+                || \App\Models\FestAttendance::where('event_id', $event->id)->exists(),
         ])));
     }
 
@@ -325,15 +319,19 @@ class FestChestNumberController extends SahodayaAdminController
                 if (! $p) continue;
 
                 $newChest = !empty($u['chest_no']) ? (int) $u['chest_no'] : null;
-                if ($newChest !== null) {
+                $currentChest = $isGroup && $p->group ? $p->group->chest_no : $p->chest_no;
+                if ($newChest !== null && $newChest !== $currentChest) {
                     $service->setChest($p, $newChest);
                 }
 
                 $newOrder = !empty($u['order_no']) ? (int) $u['order_no'] : null;
-                if ($isGroup && $p->group) {
-                    $p->group->update(['order_no' => $newOrder]);
-                } else {
-                    $p->update(['order_no' => $newOrder]);
+                $currentOrder = $isGroup && $p->group ? $p->group->order_no : $p->order_no;
+                if ($newOrder !== $currentOrder) {
+                    if ($isGroup && $p->group) {
+                        $p->group->update(['order_no' => $newOrder]);
+                    } else {
+                        $p->update(['order_no' => $newOrder]);
+                    }
                 }
             }
         });

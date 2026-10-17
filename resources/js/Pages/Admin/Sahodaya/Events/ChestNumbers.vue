@@ -596,10 +596,18 @@ function orderOptionsFor(currentParticipantId) {
 
 function saveOrderNo(id, value) {
     const orderNo = value === '' || value === null || value === undefined ? null : Number(value);
+    const p = props.participants?.find((x) => x.id === id);
+    if (p) {
+        p.order_no = orderNo;
+    }
     router.post(
         `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/marks/${id}/order-no`,
         { order_no: orderNo },
-        { preserveScroll: true, preserveState: true },
+        {
+            preserveScroll: true,
+            preserveState: true,
+            only: ['participants', 'flash', 'errors'],
+        },
     );
 }
 
@@ -832,6 +840,7 @@ function saveBulkChanges() {
         {
             preserveScroll: true,
             preserveState: true,
+            only: ['participants', 'flash', 'errors'],
             onSuccess: () => {
                 isBulkEditing.value = false;
                 isSavingBulk.value = false;
