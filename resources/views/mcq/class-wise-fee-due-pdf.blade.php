@@ -29,6 +29,7 @@
         .text-right { text-align: right; }
         .font-bold { font-weight: bold; }
         .status-paid { color: #15803d; font-weight: bold; }
+        .status-partial { color: #b45309; font-weight: bold; }
         .status-unpaid { color: #b91c1c; font-weight: bold; }
         .class-subtotal td { background-color: #f1f5f9; font-weight: bold; }
         .grand-total { width: 100%; border-collapse: collapse; margin-top: 14px; page-break-inside: avoid; break-inside: avoid; }
@@ -96,9 +97,7 @@
                     @php($classPaid = 0)
                     @foreach($rows as $i => $row)
                         @php($classFee += $row['fee_amount'])
-                        @if($row['payment_status'] === 'Paid')
-                            @php($classPaid += $row['fee_amount'])
-                        @endif
+                        @php($classPaid += ($row['paid_amount'] ?? ($row['payment_status'] === 'Paid' ? $row['fee_amount'] : 0)))
                         <tr>
                             <td class="text-center">{{ $i + 1 }}</td>
                             <td class="font-bold">{{ $row['student_name'] }}</td>
@@ -107,14 +106,22 @@
                                 <td>{{ $row['school_name'] }}</td>
                             @endif
                             <td class="text-right">₹{{ number_format($row['fee_amount'], 2) }}</td>
-                            <td class="text-center {{ $row['payment_status'] === 'Paid' ? 'status-paid' : 'status-unpaid' }}">{{ $row['payment_status'] }}</td>
+                            <td class="text-center {{ $row['payment_status'] === 'Paid' ? 'status-paid' : ($row['payment_status'] === 'Partial' ? 'status-partial' : 'status-unpaid') }}">{{ $row['payment_status'] }}</td>
                             <td>{{ $row['receipt_no'] }}</td>
                         </tr>
                     @endforeach
                     <tr class="class-subtotal">
                         <td colspan="{{ $school ? 3 : 4 }}" class="text-right">Class Total</td>
                         <td class="text-right">₹{{ number_format($classFee, 2) }}</td>
-                        <td class="text-center">{{ number_format($classPaid, 2) === number_format($classFee, 2) ? 'All Paid' : '' }}</td>
+                        <td class="text-center">
+                            @if($classFee <= 0 || number_format($classPaid, 2) === number_format($classFee, 2))
+                                All Paid
+                            @elseif($classPaid > 0)
+                                ₹{{ number_format($classPaid, 2) }} Paid
+                            @else
+                                Unpaid
+                            @endif
+                        </td>
                         <td></td>
                     </tr>
                 </tbody>

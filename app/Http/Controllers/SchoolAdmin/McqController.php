@@ -61,10 +61,22 @@ class McqController extends SchoolAdminController
             ->orderBy('hall_ticket_no')
             ->get();
 
+        $feeService = app(McqSchoolFeeService::class);
+        $schoolFee = McqSchoolFee::where('exam_id', $exam->id)
+            ->where('school_id', $this->school->id)
+            ->with(['feeReceipt', 'receipts' => fn ($q) => $q->latest('id')->with(['reviewedBy:id,name', 'attachments'])])
+            ->first();
+
+        $activeRegCount = $rawRegistrations->count();
+        if (($schoolFee === null && $activeRegCount > 0) || ($schoolFee !== null && (int) $schoolFee->student_count !== $activeRegCount)) {
+            $schoolFee = $feeService->syncForSchool($exam, $this->school);
+            $schoolFee->load(['feeReceipt', 'receipts' => fn ($q) => $q->latest('id')->with(['reviewedBy:id,name', 'attachments'])]);
+        }
+
         $studentDupCounts = $rawRegistrations->whereNotNull('student_id')->groupBy('student_id')->map->count();
         $teacherDupCounts = $rawRegistrations->whereNotNull('teacher_id')->groupBy('teacher_id')->map->count();
 
-        $registrations = $rawRegistrations->map(function (McqRegistration $reg) use ($exam, $studentDupCounts, $teacherDupCounts) {
+        $registrations = $rawRegistrations->map(function (McqRegistration $reg) use ($exam, $studentDupCounts, $teacherDupCounts, $schoolFee) {
                 $row = $reg->toArray();
                 $isStudentDup = $reg->student_id && ($studentDupCounts->get($reg->student_id, 0) > 1);
                 $isTeacherDup = $reg->teacher_id && ($teacherDupCounts->get($reg->teacher_id, 0) > 1);
@@ -85,7 +97,7 @@ class McqController extends SchoolAdminController
                 $row['is_teacher'] = $reg->isTeacherRegistration();
                 $row['portal_username'] = $reg->student?->user?->username;
                 $row['approval_status_label'] = $reg->approvalStatusLabel();
-                $row['lifecycle_status'] = McqRegistrationStatusPresenter::forRegistration($reg, $exam);
+                $row['lifecycle_status'] = McqRegistrationStatusPresenter::forRegistration($reg, $exam, $schoolFee);
                 $row['can_cancel'] = $reg->canBeCancelledBySchool();
                 // School-internal payment checklist (independent of Sahodaya fee approval) —
                 // lets the school cross-verify a physical/offline collection per class.
@@ -130,12 +142,6 @@ class McqController extends SchoolAdminController
             ->filter()
             ->flip();
 
-        $schoolFee = McqSchoolFee::where('exam_id', $exam->id)
-            ->where('school_id', $this->school->id)
-            ->with(['feeReceipt', 'receipts' => fn ($q) => $q->latest('id')->with(['reviewedBy:id,name', 'attachments'])])
-            ->first();
-
-        $feeService = app(McqSchoolFeeService::class);
         $feeBreakdown = $feeService->breakdownForSchool($exam, $this->school);
 
         $eligibilityService = app(McqEligibilityService::class);
@@ -382,11 +388,14 @@ class McqController extends SchoolAdminController
                     ? null
                     : $students->where('eligible', true)->where('registered', false)->count()
                         + $teachers->where('eligible', true)->where('registered', false)->count(),
-                'registered'  => $registrations->count(),
-                'batch_due'   => (float) ($schoolFee?->total_due ?? 0),
-                'can_register'=> $canRegister,
-                'allows_students' => $allowsStudents,
-                'allows_teachers' => $allowsTeachers,
+                'registered'        => $registrations->count(),
+                'batch_due'         => (float) ($schoolFee ? $schoolFee->outstandingBalance() : 0),
+                'batch_total_due'   => (float) ($schoolFee?->total_due ?? 0),
+                'batch_amount_paid' => (float) ($schoolFee?->amount_paid ?? 0),
+                'is_batch_settled'  => (bool) ($schoolFee ? ($schoolFee->isFullyPaid() || in_array($schoolFee->status, ['approved', 'waived'], true)) : ! $exam->hasFee()),
+                'can_register'      => $canRegister,
+                'allows_students'   => $allowsStudents,
+                'allows_teachers'   => $allowsTeachers,
             ],
             'registrationGate'       => $gate,
             'downloadGate'           => $downloadGate,

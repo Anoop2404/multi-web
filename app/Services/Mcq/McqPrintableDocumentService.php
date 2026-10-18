@@ -238,9 +238,28 @@ class McqPrintableDocumentService
             }
 
             $schoolFee = $schoolFees->get($reg->school_id);
-            $isPaid = $reg->feeReceipt?->status === 'approved'
-                || $schoolFee?->status === 'approved'
-                || $schoolFee?->feeReceipt?->status === 'approved';
+            $isPaid = ! $exam->hasFee()
+                || $feeRate <= 0
+                || $reg->feeReceipt?->status === 'approved'
+                || $schoolFee?->isFullyPaid()
+                || in_array($schoolFee?->status, ['approved', 'waived'], true);
+
+            $isPartial = ! $isPaid && $schoolFee && ($schoolFee->status === 'partial' || (float) $schoolFee->amount_paid > 0);
+
+            $paidAmount = 0.0;
+            if ($isPaid) {
+                $paidAmount = $feeRate;
+                $paymentStatus = 'Paid';
+            } elseif ($isPartial && (float) $schoolFee->total_due > 0) {
+                $ratio = min(1.0, max(0.0, (float) $schoolFee->amount_paid / (float) $schoolFee->total_due));
+                $paidAmount = round($feeRate * $ratio, 2);
+                $paymentStatus = 'Partial';
+            } else {
+                $paidAmount = 0.0;
+                $paymentStatus = 'Unpaid';
+            }
+
+            $unpaidAmount = max(0.0, round($feeRate - $paidAmount, 2));
 
             $grouped[$className][] = [
                 'student_name'     => $reg->participantName(),
@@ -249,7 +268,9 @@ class McqPrintableDocumentService
                 'class_name'       => $className,
                 'school_name'      => $reg->school?->name ?: '—',
                 'fee_amount'       => $feeRate,
-                'payment_status'   => $isPaid ? 'Paid' : 'Unpaid',
+                'paid_amount'      => $paidAmount,
+                'unpaid_amount'    => $unpaidAmount,
+                'payment_status'   => $paymentStatus,
                 'receipt_no'       => $reg->feeReceipt?->transaction_ref ?: ($schoolFee?->feeReceipt?->transaction_ref ?: '—'),
             ];
         }
@@ -276,11 +297,8 @@ class McqPrintableDocumentService
             foreach ($grouped[$cName] as $row) {
                 $totalCount++;
                 $totalFee += $row['fee_amount'];
-                if ($row['payment_status'] === 'Paid') {
-                    $totalPaid += $row['fee_amount'];
-                } else {
-                    $totalUnpaid += $row['fee_amount'];
-                }
+                $totalPaid += $row['paid_amount'];
+                $totalUnpaid += $row['unpaid_amount'];
             }
         }
 

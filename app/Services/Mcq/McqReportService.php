@@ -151,9 +151,13 @@ class McqReportService
             ->orderBy('school_id')
             ->get()
             ->map(fn (McqSchoolFee $fee) => [
+                'id'             => $fee->id,
+                'school_id'      => $fee->school_id,
                 'school_name'    => $fee->school?->name,
                 'student_count'  => $fee->student_count,
                 'total_due'      => (float) $fee->total_due,
+                'amount_paid'    => (float) $fee->amount_paid,
+                'outstanding'    => $fee->outstandingBalance(),
                 'status'         => $fee->status,
                 'receipt_status' => $fee->feeReceipt?->status,
                 'payment_date'   => $fee->feeReceipt?->payment_date?->format('Y-m-d'),
@@ -221,11 +225,13 @@ class McqReportService
 
         return ExcelExport::download(
             'mcq-fee-summary-'.$exam->id,
-            ['School', 'Students', 'Amount due', 'Status', 'Receipt status', 'Payment date', 'Transaction ref'],
+            ['School', 'Students', 'Total Due (₹)', 'Paid (₹)', 'Balance Due (₹)', 'Status', 'Receipt status', 'Payment date', 'Transaction ref'],
             collect($rows)->map(fn ($r) => [
                 $r['school_name'],
                 $r['student_count'],
                 $r['total_due'],
+                $r['amount_paid'],
+                $r['outstanding'],
                 $r['status'],
                 $r['receipt_status'],
                 $r['payment_date'],
@@ -419,15 +425,17 @@ class McqReportService
     public function exportPendingFees(McqExam $exam): StreamedResponse
     {
         $rows = collect($this->feeSummaryRows($exam))
-            ->filter(fn ($r) => in_array($r['status'] ?? '', ['pending', 'proof_uploaded'], true));
+            ->filter(fn ($r) => ($r['outstanding'] ?? 0) > 0 || in_array($r['status'] ?? '', ['pending', 'proof_uploaded', 'partial'], true));
 
         return ExcelExport::download(
             'mcq-fees-pending-'.$exam->id,
-            ['School', 'Students', 'Amount due', 'Status', 'Receipt status'],
+            ['School', 'Students', 'Total Due (₹)', 'Paid (₹)', 'Pending Balance (₹)', 'Status', 'Receipt status'],
             $rows->map(fn ($r) => [
                 $r['school_name'],
                 $r['student_count'],
                 $r['total_due'],
+                $r['amount_paid'],
+                $r['outstanding'],
                 $r['status'],
                 $r['receipt_status'],
             ]),
@@ -808,6 +816,11 @@ class McqReportService
         $registrations = $query->get();
         $feeRate = (float) $exam->schoolPayablePerStudent();
 
+        $schoolFees = McqSchoolFee::where('exam_id', $exam->id)
+            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
+            ->get()
+            ->keyBy('school_id');
+
         $byClass = [];
         foreach ($registrations as $reg) {
             $className = $reg->student?->schoolClass?->name;
@@ -819,10 +832,32 @@ class McqReportService
                 $byClass[$className] = [
                     'class_name' => $className,
                     'count'      => 0,
+                    'paid'       => 0.0,
+                    'due'        => 0.0,
                 ];
             }
 
             $byClass[$className]['count']++;
+
+            if (! $exam->hasFee() || $feeRate <= 0) {
+                continue;
+            }
+
+            $sFee = $schoolFees->get($reg->school_id);
+            if ($sFee) {
+                if ($sFee->isFullyPaid() || in_array($sFee->status, ['approved', 'waived'], true)) {
+                    $byClass[$className]['paid'] += $feeRate;
+                } elseif ((float) $sFee->amount_paid > 0 && (float) $sFee->total_due > 0) {
+                    $ratio = min(1.0, max(0.0, (float) $sFee->amount_paid / (float) $sFee->total_due));
+                    $studentPaid = round($feeRate * $ratio, 2);
+                    $byClass[$className]['paid'] += $studentPaid;
+                    $byClass[$className]['due'] += round($feeRate - $studentPaid, 2);
+                } else {
+                    $byClass[$className]['due'] += $feeRate;
+                }
+            } else {
+                $byClass[$className]['due'] += $feeRate;
+            }
         }
 
         $classNames = array_keys($byClass);
@@ -837,11 +872,6 @@ class McqReportService
             return strnatcasecmp($a, $b);
         });
 
-        $schoolFees = McqSchoolFee::where('exam_id', $exam->id)
-            ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
-            ->get()
-            ->keyBy('school_id');
-
         $rows = [];
         $grandCount = 0;
         $grandTotalFee = 0;
@@ -850,19 +880,9 @@ class McqReportService
 
         foreach ($classNames as $cName) {
             $cCount = $byClass[$cName]['count'];
-            $cTotalFee = $cCount * $feeRate;
-
-            $schoolFee = $schoolId ? $schoolFees->get($schoolId) : null;
-            $isPaid = $schoolFee?->status === 'approved';
-            $paidProportion = $isPaid ? 1.0 : 0.0;
-
-            if ($schoolFee && ! $isPaid && (float) ($schoolFee->total_due + ($schoolFee->amount_paid ?: 0)) > 0) {
-                $paidRatio = min(1.0, (float) ($schoolFee->amount_paid ?: 0) / (float) ($schoolFee->total_due + ($schoolFee->amount_paid ?: 0)));
-                $paidProportion = $paidRatio;
-            }
-
-            $cPaid = round($cTotalFee * $paidProportion, 2);
-            $cDue = round($cTotalFee - $cPaid, 2);
+            $cTotalFee = round($cCount * $feeRate, 2);
+            $cPaid = round($byClass[$cName]['paid'], 2);
+            $cDue = round($byClass[$cName]['due'], 2);
 
             $rows[] = [
                 'class_name' => $cName,

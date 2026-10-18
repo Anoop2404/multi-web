@@ -44,7 +44,7 @@
                     <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Registered</p>
                 </div>
                 <div class="card card--muted !py-3 text-center">
-                    <p class="text-lg font-bold">{{ batchDueLabel }}</p>
+                    <p class="text-lg font-bold" :class="isBatchFeeSettled ? 'text-emerald-700' : 'text-amber-700'">{{ batchDueLabel }}</p>
                     <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Batch fee due</p>
                 </div>
             </div>
@@ -353,10 +353,13 @@
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h3 class="section-title !mb-0">Registered students</h3>
-                    <p class="text-xs text-slate-500 mt-1">
-                        {{ filteredRegisteredStudents.length }} student(s) registered for this exam ·
-                        <span class="text-emerald-600 font-semibold">{{ schoolPaidCount }} paid</span> ·
-                        <span class="text-amber-600 font-semibold">{{ schoolUnpaidCount }} unpaid</span>
+                    <p class="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-1.5">
+                        <span>{{ filteredRegisteredStudents.length }} student(s) registered for this exam</span> ·
+                        <span class="text-emerald-600 font-semibold">{{ schoolPaidCount }} marked paid</span> ·
+                        <span class="text-amber-600 font-semibold">{{ schoolUnpaidCount }} unmarked</span>
+                        <span v-if="isBatchFeeSettled" class="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 ml-1">
+                            ✓ Sahodaya batch fee settled
+                        </span>
                         <template v-if="duplicateRegistrationsCount > 0"> ·
                             <span class="text-amber-700 font-semibold">⚠️ {{ duplicateRegistrationsCount }} duplicate(s)</span>
                         </template>
@@ -494,7 +497,7 @@
                     <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Students</p>
                 </div>
                 <div class="card card--muted !py-3 text-center">
-                    <p class="text-lg font-bold">{{ batchDueLabel }}</p>
+                    <p class="text-lg font-bold">{{ formatRupee(totalBatchPayable) }}</p>
                     <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Total payable</p>
                 </div>
             </div>
@@ -1718,15 +1721,32 @@ const availableStudentCountLabel = computed(() =>
         : props.registerStats.available,
 );
 
-const batchDueLabel = computed(() => {
-    const due = props.feeBreakdown?.payable_total ?? props.registerStats?.batch_due ?? props.schoolFee?.total_due ?? 0;
-    return formatRupee(due);
+const totalBatchPayable = computed(() => {
+    return Number(props.feeBreakdown?.payable_total ?? props.schoolFee?.total_due ?? props.registerStats?.batch_total_due ?? 0);
 });
 
 const feeBalance = computed(() => {
-    const due = Number(props.schoolFee?.total_due ?? props.registerStats?.batch_due ?? 0);
-    const paid = Number(props.schoolFee?.amount_paid ?? 0);
+    if (props.schoolFee?.outstanding !== undefined && props.schoolFee?.outstanding !== null) {
+        return Number(props.schoolFee.outstanding);
+    }
+    const due = Number(props.schoolFee?.total_due ?? props.registerStats?.batch_total_due ?? props.feeBreakdown?.payable_total ?? 0);
+    const paid = Number(props.schoolFee?.amount_paid ?? props.registerStats?.batch_amount_paid ?? 0);
     return Math.max(0, Math.round((due - paid) * 100) / 100);
+});
+
+const isBatchFeeSettled = computed(() => {
+    if (!examHasFee.value) return true;
+    if (props.schoolFee?.is_fully_paid) return true;
+    if (['approved', 'waived'].includes(props.schoolFee?.status)) return true;
+    if (props.registerStats?.is_batch_settled) return true;
+    if (props.schoolFee && feeBalance.value <= 0 && Number(props.schoolFee?.amount_paid || 0) > 0) return true;
+    return false;
+});
+
+const batchDueLabel = computed(() => {
+    if (!examHasFee.value) return '₹0 (Free)';
+    if (isBatchFeeSettled.value) return '₹0 (Paid)';
+    return formatRupee(feeBalance.value);
 });
 // Unclaimed by any approved OR already-pending receipt — a school may submit several
 // installments as separate receipts (e.g. ₹1000 now, ₹500 later), so this can be lower

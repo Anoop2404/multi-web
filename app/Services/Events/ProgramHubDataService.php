@@ -413,8 +413,9 @@ class ProgramHubDataService
 
         $mcqFees = McqSchoolFee::where('school_id', $school->id)
             ->whereIn('exam_id', $examIds)
-            ->whereIn('status', ['pending', 'proof_uploaded'])
-            ->sum('total_due');
+            ->whereIn('status', ['pending', 'proof_uploaded', 'partial'])
+            ->get()
+            ->sum(fn ($f) => $f->outstandingBalance());
 
         $upcoming = collect()
             ->merge(
@@ -465,7 +466,7 @@ class ProgramHubDataService
 
         return [
             'teacherCount'    => Teacher::where('tenant_id', $school->id)->count(),
-            'mcqRegistered'   => McqRegistration::where('school_id', $school->id)->whereIn('exam_id', $examIds)->count(),
+            'mcqRegistered'   => McqRegistration::where('school_id', $school->id)->whereIn('exam_id', $examIds)->active()->count(),
             'trainingRegistered' => TrainingRegistration::where('school_id', $school->id)->whereIn('program_id', $programIds)->count(),
             'pendingPayments' => [
                 'fest'     => (float) $pendingFees,
@@ -683,7 +684,7 @@ class ProgramHubDataService
             ->whereIn('status', ['published', 'ongoing'])
             ->whereIn('id', $examIds)
             ->count();
-        if ($openMcq > 0 && McqRegistration::where('school_id', $school->id)->whereIn('exam_id', $examIds)->count() === 0) {
+        if ($openMcq > 0 && McqRegistration::where('school_id', $school->id)->whereIn('exam_id', $examIds)->active()->count() === 0) {
             $actions[] = [
                 'type'     => 'mcq_register',
                 'priority' => 1,

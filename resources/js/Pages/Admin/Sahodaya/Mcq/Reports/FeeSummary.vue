@@ -21,13 +21,17 @@
 
         <div class="form-section overflow-hidden !p-0">
             <table class="data-table">
-                <thead><tr><th>Sl No</th><th>School</th><th>Students</th><th>Due</th><th>Status</th><th>Payment</th></tr></thead>
+                <thead><tr><th>Sl No</th><th>School</th><th>Students</th><th>Total Due</th><th>Paid</th><th>Balance</th><th>Status</th><th>Payment</th></tr></thead>
                 <tbody>
                     <tr v-for="(row, i) in feeSummary" :key="i">
                         <td>{{ i + 1 }}</td>
                         <td class="font-medium">{{ (row.school_name || '').toUpperCase() }}</td>
                         <td>{{ row.student_count }}</td>
-                        <td>₹{{ row.total_due }}</td>
+                        <td>₹{{ Number(row.total_due || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 }) }}</td>
+                        <td class="text-emerald-700">₹{{ Number(row.amount_paid || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 }) }}</td>
+                        <td class="font-semibold" :class="Number(row.outstanding || 0) > 0 ? 'text-amber-700' : 'text-emerald-700'">
+                            ₹{{ Number(row.outstanding || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 }) }}
+                        </td>
                         <td class="text-xs capitalize">{{ row.status?.replace('_', ' ') }}</td>
                         <td class="text-xs">
                             <template v-if="row.payment_date">
@@ -37,7 +41,7 @@
                             <span v-else class="text-slate-400">Not uploaded</span>
                         </td>
                     </tr>
-                    <tr v-if="!feeSummary.length"><td colspan="6" class="p-6 text-center text-slate-400">No matching schools.</td></tr>
+                    <tr v-if="!feeSummary.length"><td colspan="8" class="p-6 text-center text-slate-400">No matching schools.</td></tr>
                 </tbody>
             </table>
         </div>

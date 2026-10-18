@@ -8,7 +8,7 @@ use App\Models\McqRegistration;
 class McqRegistrationStatusPresenter
 {
     /** @return array{key: string, label: string, tone: string} */
-    public static function forRegistration(McqRegistration $reg, McqExam $exam): array
+    public static function forRegistration(McqRegistration $reg, McqExam $exam, ?\App\Models\McqSchoolFee $schoolFee = null): array
     {
         if ($reg->attendance_status === 'absent') {
             return ['key' => 'absent', 'label' => 'Absent', 'tone' => 'danger'];
@@ -31,6 +31,18 @@ class McqRegistrationStatusPresenter
         }
 
         if ($reg->approval_status === 'pending_payment') {
+            if ($reg->feeReceipt?->status === 'uploaded' || $schoolFee?->status === 'proof_uploaded') {
+                return ['key' => 'payment_uploaded', 'label' => 'Payment under review', 'tone' => 'info'];
+            }
+
+            if ($schoolFee?->status === 'partial') {
+                return ['key' => 'partial_payment', 'label' => 'Partial payment received', 'tone' => 'warning'];
+            }
+
+            if ($reg->feeReceipt?->status === 'rejected' || ($schoolFee?->feeReceipt?->status === 'rejected' && $schoolFee?->status !== 'approved')) {
+                return ['key' => 'payment_rejected', 'label' => 'Payment proof rejected', 'tone' => 'danger'];
+            }
+
             return ['key' => 'fee_pending', 'label' => 'Fee pending', 'tone' => 'warning'];
         }
 

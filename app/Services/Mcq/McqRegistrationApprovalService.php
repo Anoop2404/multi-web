@@ -18,14 +18,23 @@ class McqRegistrationApprovalService
 
     public function feeVerified(McqRegistration $registration): bool
     {
+        if (! $registration->exam?->hasFee()) {
+            return true;
+        }
+
         if ($registration->feeReceipt?->status === 'approved') {
             return true;
         }
 
-        return McqSchoolFee::where('exam_id', $registration->exam_id)
+        $fee = McqSchoolFee::where('exam_id', $registration->exam_id)
             ->where('school_id', $registration->school_id)
-            ->where('status', 'approved')
-            ->exists();
+            ->first();
+
+        if (! $fee) {
+            return false;
+        }
+
+        return $fee->isFullyPaid() || in_array($fee->status, ['approved', 'waived'], true);
     }
 
     public function canApprove(McqRegistration $registration): bool
@@ -105,7 +114,7 @@ class McqRegistrationApprovalService
 
         McqRegistration::where('exam_id', $schoolFee->exam_id)
             ->where('school_id', $schoolFee->school_id)
-            ->where('approval_status', 'pending_payment')
+            ->whereIn('approval_status', ['pending_payment', 'pending_approval'])
             ->where('status', '!=', 'cancelled')
             ->orderBy('id')
             ->each(function (McqRegistration $registration) use ($userId, &$count) {
