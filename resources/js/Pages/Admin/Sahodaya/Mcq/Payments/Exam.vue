@@ -143,7 +143,7 @@
                             <th class="w-12 text-center">#</th>
                             <th>School</th>
                             <th class="text-center">Students</th>
-                            <th>Amount Due / Paid</th>
+                            <th>Paid / Total Due</th>
                             <th>Payment Status</th>
                             <th>Proof & Reference</th>
                             <th class="text-right">Actions</th>
