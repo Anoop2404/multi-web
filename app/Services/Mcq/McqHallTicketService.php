@@ -141,8 +141,7 @@ class McqHallTicketService
                 $number = $startNumber;
                 foreach ($sorted as $registration) {
                     DB::table('mcq_registrations')->where('id', $registration->id)->update([
-                        'hall_ticket_no'  => (string) $number,
-                        'approval_status' => 'approved',
+                        'hall_ticket_no' => (string) $number,
                     ]);
                     $number++;
                     $renumbered++;

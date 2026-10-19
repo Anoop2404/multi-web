@@ -43,6 +43,7 @@
             <div class="card card--muted !py-4 text-center">
                 <p class="text-xl font-bold text-amber-700">{{ registrationCounts.pending_approval }}</p>
                 <p class="text-xs text-slate-500 mt-1">Pending payment</p>
+                <p v-if="registrationCounts.approved > 0" class="text-[11px] text-emerald-700 font-medium mt-0.5">({{ registrationCounts.approved }} confirmed)</p>
             </div>
             <div class="card card--muted !py-4 text-center">
                 <p class="text-xl font-bold text-emerald-700">{{ registrationCounts.present }}</p>

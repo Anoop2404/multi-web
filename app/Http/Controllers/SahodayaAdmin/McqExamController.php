@@ -153,12 +153,21 @@ class McqExamController extends SahodayaAdminController
 
         $exam->load(['series:id,title', 'parentExam:id,title,exam_level']);
 
+        app(\App\Services\Mcq\McqRegistrationApprovalService::class)->syncExamApprovalStatuses($exam);
+
+        $totalActive = McqRegistration::where('exam_id', $exam->id)->active()->count();
+        $approvedCount = McqRegistration::where('exam_id', $exam->id)->active()->where('approval_status', 'approved')->count();
+        $pendingPaymentCount = ! $exam->hasFee()
+            ? 0
+            : McqRegistration::where('exam_id', $exam->id)->active()->whereIn('approval_status', ['pending_payment', 'pending_approval'])->count();
+
         // Active = excludes cancelled registrations, matching the Reports page's "Registrations" stat.
         $registrationCounts = [
-            'total'            => McqRegistration::where('exam_id', $exam->id)->active()->count(),
+            'total'            => $totalActive,
             'present'          => McqRegistration::where('exam_id', $exam->id)->active()->where('attendance_status', 'present')->count(),
             'marked'           => McqRegistration::where('exam_id', $exam->id)->active()->whereHas('mark', fn ($q) => $q->whereNotNull('score'))->count(),
-            'pending_approval' => McqRegistration::where('exam_id', $exam->id)->active()->where('approval_status', 'pending_payment')->count(),
+            'approved'         => $approvedCount,
+            'pending_approval' => $pendingPaymentCount,
         ];
 
         $schoolFees = McqSchoolFee::where('exam_id', $exam->id)
