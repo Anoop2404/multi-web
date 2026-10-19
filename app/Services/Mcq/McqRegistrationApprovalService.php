@@ -40,16 +40,27 @@ class McqRegistrationApprovalService
             return ['approved' => $updated, 'pending_payment' => 0];
         }
 
-        // Settled schools: batch fee status is 'approved' or 'waived', or amount_paid >= total_due
-        $settledSchoolIds = McqSchoolFee::where('exam_id', $exam->id)
-            ->where(function ($query) {
-                $query->whereIn('status', ['approved', 'waived'])
-                    ->orWhereRaw('total_due > 0 AND amount_paid >= total_due');
-            })
-            ->pluck('school_id')
-            ->all();
+        $fees = McqSchoolFee::where('exam_id', $exam->id)->get();
+        $payablePerStudent = $exam->schoolPayablePerStudent();
+
+        $settledSchoolIds = [];
+        $partialFees = [];
+
+        foreach ($fees as $fee) {
+            $totalDue = (float) $fee->total_due;
+            $amountPaid = (float) $fee->amount_paid;
+
+            if (in_array($fee->status, ['approved', 'waived'], true) || ($totalDue > 0 && $amountPaid >= $totalDue)) {
+                $settledSchoolIds[] = $fee->school_id;
+            } elseif ($payablePerStudent > 0 && $amountPaid > 0) {
+                $partialFees[] = $fee;
+            }
+        }
 
         $approvedCount = 0;
+        $revertedCount = 0;
+
+        // 1. Fully settled schools: all active registrations become approved
         if (! empty($settledSchoolIds)) {
             $approvedCount += McqRegistration::where('exam_id', $exam->id)
                 ->where('status', '!=', 'cancelled')
@@ -61,6 +72,63 @@ class McqRegistrationApprovalService
                 ]);
         }
 
+        // 2. Unsettled schools with 0 paid: revert any unverified registrations back to pending_payment
+        $unpaidQuery = McqRegistration::where('exam_id', $exam->id)
+            ->where('status', '!=', 'cancelled')
+            ->where('approval_status', 'approved')
+            ->whereDoesntHave('feeReceipt', fn ($q) => $q->where('status', 'approved'));
+
+        if (! empty($settledSchoolIds)) {
+            $unpaidQuery->whereNotIn('school_id', $settledSchoolIds);
+        }
+        $partialSchoolIds = array_map(fn ($f) => $f->school_id, $partialFees);
+        if (! empty($partialSchoolIds)) {
+            $unpaidQuery->whereNotIn('school_id', $partialSchoolIds);
+        }
+
+        $revertedCount += $unpaidQuery->update([
+            'approval_status'     => 'pending_payment',
+            'approved_at'         => null,
+            'approved_by_user_id' => null,
+        ]);
+
+        // 3. Partially paid schools:
+        // Cover first N active registrations according to amount_paid / payablePerStudent; the rest remain pending_payment
+        foreach ($partialFees as $fee) {
+            $amountPaid = (float) $fee->amount_paid;
+            $coveredStudents = (int) floor($amountPaid / $payablePerStudent);
+
+            $registrations = McqRegistration::where('exam_id', $exam->id)
+                ->where('school_id', $fee->school_id)
+                ->where('status', '!=', 'cancelled')
+                ->orderBy('id')
+                ->get(['id', 'approval_status']);
+
+            $coveredIds = $registrations->take($coveredStudents)->pluck('id')->all();
+            $dueIds = $registrations->slice($coveredStudents)->pluck('id')->all();
+
+            if (! empty($coveredIds)) {
+                $approvedCount += McqRegistration::whereIn('id', $coveredIds)
+                    ->where('approval_status', '!=', 'approved')
+                    ->update([
+                        'approval_status' => 'approved',
+                        'approved_at'     => now(),
+                    ]);
+            }
+
+            if (! empty($dueIds)) {
+                $revertedCount += McqRegistration::whereIn('id', $dueIds)
+                    ->where('approval_status', 'approved')
+                    ->whereDoesntHave('feeReceipt', fn ($q) => $q->where('status', 'approved'))
+                    ->update([
+                        'approval_status'     => 'pending_payment',
+                        'approved_at'         => null,
+                        'approved_by_user_id' => null,
+                    ]);
+            }
+        }
+
+        // 4. Any active registration with an approved individual receipt is guaranteed approved
         $approvedCount += McqRegistration::where('exam_id', $exam->id)
             ->where('status', '!=', 'cancelled')
             ->where('approval_status', '!=', 'approved')
@@ -69,24 +137,6 @@ class McqRegistrationApprovalService
                 'approval_status' => 'approved',
                 'approved_at'     => now(),
             ]);
-
-        // Candidates who were falsely marked 'approved' (e.g. by renumberByClass) but whose
-        // school has NOT settled the batch fee and who have no individual approved receipt,
-        // are reverted back to 'pending_payment'.
-        $revertQuery = McqRegistration::where('exam_id', $exam->id)
-            ->where('status', '!=', 'cancelled')
-            ->where('approval_status', 'approved')
-            ->whereDoesntHave('feeReceipt', fn ($q) => $q->where('status', 'approved'));
-
-        if (! empty($settledSchoolIds)) {
-            $revertQuery->whereNotIn('school_id', $settledSchoolIds);
-        }
-
-        $revertedCount = $revertQuery->update([
-            'approval_status'     => 'pending_payment',
-            'approved_at'         => null,
-            'approved_by_user_id' => null,
-        ]);
 
         return ['approved' => $approvedCount, 'pending_payment' => $revertedCount];
     }
@@ -110,7 +160,27 @@ class McqRegistrationApprovalService
             return false;
         }
 
-        return $fee->isFullyPaid() || in_array($fee->status, ['approved', 'waived'], true);
+        if ($fee->isFullyPaid() || in_array($fee->status, ['approved', 'waived'], true)) {
+            return true;
+        }
+
+        $payablePerStudent = $registration->exam?->schoolPayablePerStudent() ?? 0.0;
+        if ($payablePerStudent > 0 && (float) $fee->amount_paid > 0) {
+            $coveredStudents = (int) floor((float) $fee->amount_paid / $payablePerStudent);
+            if ($coveredStudents <= 0) {
+                return false;
+            }
+
+            $rank = McqRegistration::where('exam_id', $registration->exam_id)
+                ->where('school_id', $registration->school_id)
+                ->where('status', '!=', 'cancelled')
+                ->where('id', '<=', $registration->id)
+                ->count();
+
+            return $rank <= $coveredStudents;
+        }
+
+        return false;
     }
 
     public function canApprove(McqRegistration $registration): bool

@@ -62,11 +62,14 @@
 
             <div class="card card--muted !p-4">
                 <div class="flex items-center justify-between text-xs text-slate-500 mb-1.5">
-                    <span class="font-medium">Registered Students</span>
+                    <span class="font-medium">Candidate Registrations</span>
                     <span class="text-xs text-slate-400">Total</span>
                 </div>
                 <p class="text-2xl font-bold tracking-tight text-slate-900">{{ metrics.totalStudents.toLocaleString() }}</p>
-                <p class="text-[11px] text-slate-500 mt-2">across {{ schoolFees.length }} school batches</p>
+                <p class="text-[11px] text-slate-500 mt-2">
+                    <span class="font-semibold text-emerald-700">{{ metrics.paidStudents.toLocaleString() }} confirmed</span>
+                    <span v-if="metrics.dueStudents > 0" class="text-amber-700 font-semibold"> · {{ metrics.dueStudents.toLocaleString() }} pending</span>
+                </p>
             </div>
         </div>
 
@@ -166,9 +169,18 @@
                                 </div>
                             </td>
                             <td class="text-center">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-800">
+                                <div class="font-bold text-slate-900 text-sm">
                                     {{ sf.student_count }}
-                                </span>
+                                </div>
+                                <div v-if="sf.due_student_count > 0 && sf.paid_student_count > 0" class="text-[11px] font-medium text-amber-700 mt-0.5 whitespace-nowrap">
+                                    {{ sf.paid_student_count }} paid · <span class="font-bold text-rose-600">{{ sf.due_student_count }} due</span>
+                                </div>
+                                <div v-else-if="sf.due_student_count > 0" class="text-[11px] font-medium text-rose-600 mt-0.5 whitespace-nowrap">
+                                    {{ sf.due_student_count }} due
+                                </div>
+                                <div v-else class="text-[11px] font-medium text-emerald-600 mt-0.5 whitespace-nowrap">
+                                    All paid
+                                </div>
                             </td>
                             <td>
                                 <div class="text-sm font-bold text-slate-900">
@@ -330,6 +342,9 @@ const metrics = computed(() => {
     let partialCount = 0;
     let unpaidCount = 0;
 
+    let paidStudents = 0;
+    let dueStudents = 0;
+
     for (const sf of props.schoolFees) {
         const due = Number(sf.total_due) || 0;
         const paid = Number(sf.amount_paid) || 0;
@@ -338,6 +353,8 @@ const metrics = computed(() => {
         totalDue += due;
         totalPaid += paid;
         totalStudents += students;
+        paidStudents += Number(sf.paid_student_count) || 0;
+        dueStudents += Number(sf.due_student_count) || 0;
 
         const isUploaded = (sf.fee_receipt?.status === 'uploaded') || (sf.status === 'proof_uploaded') || (sf.pending_count > 0);
         if (isUploaded) {
@@ -360,6 +377,8 @@ const metrics = computed(() => {
         totalDue,
         totalPaid,
         totalStudents,
+        paidStudents,
+        dueStudents,
         pendingReviewCount,
         pendingReviewAmount,
         settledCount,

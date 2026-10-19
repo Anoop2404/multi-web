@@ -75,6 +75,7 @@ class McqPaymentsController extends SahodayaAdminController
             ->with(['school', 'feeReceipt', 'receipts' => fn ($q) => $q->latest('id')->with(['reviewedBy:id,name', 'attachments'])])
             ->orderBy('school_id')
             ->get()
+            ->each(fn (McqSchoolFee $sf) => $sf->setRelation('exam', $exam))
             ->map(fn (McqSchoolFee $sf) => $this->mapFeeRow($sf));
 
         $pendingCount = $schoolFees->filter(
@@ -153,6 +154,22 @@ class McqPaymentsController extends SahodayaAdminController
     /** @return array<string, mixed> */
     private function mapFeeRow(McqSchoolFee $sf): array
     {
+        $payablePerStudent = $sf->exam ? (float) $sf->exam->schoolPayablePerStudent() : 0.0;
+        $studentCount = (int) ($sf->student_count ?? 0);
+        $totalDue = (float) $sf->total_due;
+        $amountPaid = (float) $sf->amount_paid;
+
+        if (in_array($sf->status, ['approved', 'waived'], true) || ($totalDue > 0 && $amountPaid >= $totalDue)) {
+            $paidStudentCount = $studentCount;
+            $dueStudentCount = 0;
+        } elseif ($payablePerStudent > 0 && $amountPaid > 0) {
+            $paidStudentCount = min($studentCount, (int) floor($amountPaid / $payablePerStudent));
+            $dueStudentCount = max(0, $studentCount - $paidStudentCount);
+        } else {
+            $paidStudentCount = 0;
+            $dueStudentCount = $studentCount;
+        }
+
         return [
             'id'             => $sf->id,
             'exam_id'        => $sf->exam_id,
@@ -161,6 +178,8 @@ class McqPaymentsController extends SahodayaAdminController
             'school_id'      => $sf->school_id,
             'school_name'    => $sf->school?->name,
             'student_count'  => $sf->student_count,
+            'paid_student_count' => $paidStudentCount,
+            'due_student_count'  => $dueStudentCount,
             'total_due'      => (float) $sf->total_due,
             'amount_paid'    => (float) $sf->amount_paid,
             'status'         => $sf->status,

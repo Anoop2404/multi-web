@@ -199,4 +199,49 @@ class McqRegistrationApprovalServiceTest extends TestCase
         app(McqRegistrationApprovalService::class)->syncExamApprovalStatuses($this->paidExam);
         $this->assertEquals('pending_payment', $reg->fresh()->approval_status);
     }
+
+    public function test_sync_approves_exact_student_count_for_partially_paid_school(): void
+    {
+        // Fee is 100 per student. School registers 5 students (total due 500).
+        // School paid 300 (covers 3 students, 2 students due).
+        $class = SchoolClass::create(['tenant_id' => $this->schoolUnpaid->id, 'name' => 'Class 8', 'is_active' => true]);
+
+        $registrations = [];
+        for ($i = 1; $i <= 5; $i++) {
+            $student = Student::create([
+                'tenant_id'       => $this->schoolUnpaid->id,
+                'school_class_id' => $class->id,
+                'name'            => "Student {$i}",
+                'status'          => 'active',
+            ]);
+
+            // Assume all were falsely approved previously e.g. via renumber
+            $registrations[] = McqRegistration::create([
+                'exam_id'         => $this->paidExam->id,
+                'student_id'      => $student->id,
+                'school_id'       => $this->schoolUnpaid->id,
+                'status'          => 'registered',
+                'approval_status' => 'approved',
+            ]);
+        }
+
+        McqSchoolFee::create([
+            'tenant_id'     => $this->sahodaya->id,
+            'exam_id'       => $this->paidExam->id,
+            'school_id'     => $this->schoolUnpaid->id,
+            'student_count' => 5,
+            'total_due'     => 500,
+            'amount_paid'   => 300,
+            'status'        => 'partial',
+        ]);
+
+        app(McqRegistrationApprovalService::class)->syncExamApprovalStatuses($this->paidExam);
+
+        // First 3 should be approved, remaining 2 should be pending_payment
+        $this->assertEquals('approved', $registrations[0]->fresh()->approval_status);
+        $this->assertEquals('approved', $registrations[1]->fresh()->approval_status);
+        $this->assertEquals('approved', $registrations[2]->fresh()->approval_status);
+        $this->assertEquals('pending_payment', $registrations[3]->fresh()->approval_status);
+        $this->assertEquals('pending_payment', $registrations[4]->fresh()->approval_status);
+    }
 }
