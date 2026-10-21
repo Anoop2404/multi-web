@@ -2041,6 +2041,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{exam}/hall-tickets/preview', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'previewHallTicket'])->name('hall-tickets.preview');
             Route::post('/{exam}/hall-tickets/design', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'updateHallTicketDesign'])->name('hall-tickets.design');
             Route::post('/{exam}/hall-tickets/generate', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'generateHallTickets'])->name('hall-tickets.generate');
+            Route::get('/{exam}/centre-codes', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'schoolCentreCodes'])->name('centre-codes');
+            Route::post('/{exam}/centre-codes/assign', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'assignSchoolCentreCodes'])->name('centre-codes.assign');
             Route::post('/{exam}/school-centre-code', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'saveSchoolCentreCode'])->name('school-centre-code');
             Route::post('/{exam}/registration-numbers/reset', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'resetRegistrationNumbers'])->name('registration-numbers.reset');
             Route::post('/{exam}/hall-tickets/renumber', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'renumberHallTickets'])->name('hall-tickets.renumber');

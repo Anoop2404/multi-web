@@ -37,6 +37,7 @@ const tabs = computed(() => {
         { key: 'payments', label: 'Payments', href: `${base.value}/payments` },
         { key: 'ledger', label: 'Ledger', href: `${base.value}/ledger` },
         { key: 'question-banks', label: questionBankLabel.value, href: `${base.value}/question-banks` },
+        { key: 'centre-codes', label: 'Centre codes', href: `${base.value}/centre-codes` },
         { key: 'hall-tickets', label: 'Hall tickets', href: `${base.value}/hall-tickets` },
         { key: 'attendance', label: 'Attendance', href: `${base.value}/attendance` },
         { key: 'attendance-corrections', label: 'Corrections', href: `${base.value}/attendance-corrections` },

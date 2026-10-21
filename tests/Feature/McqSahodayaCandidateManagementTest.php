@@ -90,6 +90,29 @@ class McqSahodayaCandidateManagementTest extends TestCase
         return compact('sahodaya', 'sahodayaAdmin', 'school', 'class', 'student1', 'student2', 'exam');
     }
 
+    public function test_centre_code_auto_assignment_lists_schools_and_preserves_existing_codes(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        $env = $this->setUpEnvironment();
+        $other = Tenant::create(['id' => (string) Str::uuid(), 'type' => 'school', 'name' => 'AAA New School', 'parent_id' => $env['sahodaya']->id]);
+        $env['exam']->update(['settings_json' => ['school_centre_codes' => [$env['school']->id => 'STSE-010']]]);
+        $service = app(\App\Services\Mcq\McqSchoolCentreCodeService::class);
+        $input = ['prefix' => 'STSE-', 'start' => 10, 'digits' => 3, 'scope' => 'all', 'replace' => false];
+        $plan = collect($service->plan($env['exam']->fresh(), $input))->keyBy('id');
+        $this->assertSame('STSE-010', $plan[$env['school']->id]['proposed']);
+        $this->assertSame('STSE-011', $plan[$other->id]['proposed']);
+        $this->assertArrayNotHasKey($other->id, $env['exam']->fresh()->settings_json['school_centre_codes']);
+        $url = "/sahodaya-admin/{$env['sahodaya']->id}/mcq-exams/{$env['exam']->id}/centre-codes";
+        $this->actingAs($env['sahodayaAdmin'])->get($url.'?'.http_build_query($input + ['preview' => 1]))
+            ->assertOk()->assertInertia(fn ($page) => $page->component('Sahodaya/Mcq/CentreCodes', false)->has('assignmentPreview'));
+        $this->actingAs($env['sahodayaAdmin'])->post($url.'/assign', $input)->assertRedirect($url)->assertSessionHasNoErrors();
+        $this->assertSame('STSE-011', $env['exam']->fresh()->settings_json['school_centre_codes'][$other->id]);
+        $service->assign($env['exam']->fresh(), $input);
+        $this->assertSame('STSE-011', $env['exam']->fresh()->settings_json['school_centre_codes'][$other->id]);
+        $service->assign($env['exam']->fresh(), array_merge($input, ['start' => 100, 'replace' => true]));
+        $this->assertSame('STSE-100', $env['exam']->fresh()->settings_json['school_centre_codes'][$other->id]);
+    }
+
     public function test_admin_assigns_unique_school_centre_codes_per_exam(): void
     {
         $env = $this->setUpEnvironment();

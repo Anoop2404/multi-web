@@ -506,6 +506,39 @@ class McqExamOpsController extends SahodayaAdminController
         return back()->with('success', "Assigned Reg. No. to {$count} candidate(s).");
     }
 
+    private function centreCodeInput(Request $request): array
+    {
+        $data = $request->validate([
+            'prefix' => 'nullable|string|max:16|regex:/^[A-Za-z0-9 _\/-]*$/',
+            'start' => 'required|integer|min:0|max:999999999',
+            'digits' => 'required|integer|min:0|max:8',
+            'scope' => 'required|in:registered,all',
+            'replace' => 'required|boolean',
+        ]);
+        $data['replace'] = $request->boolean('replace');
+        return $data;
+    }
+
+    public function schoolCentreCodes(string $tenantId, McqExam $exam, Request $request, \App\Services\Mcq\McqSchoolCentreCodeService $service)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        $input = $request->boolean('preview') ? $this->centreCodeInput($request) : null;
+        return $this->inertia('Sahodaya/Mcq/CentreCodes', [
+            'exam' => $exam,
+            'schools' => $service->schools($exam),
+            'numbering' => $input ?? array_merge(['prefix' => '', 'start' => 1, 'digits' => 3, 'scope' => 'registered'], $exam->settings_json['centre_code_numbering'] ?? [], ['replace' => false]),
+            'assignmentPreview' => $input ? $service->plan($exam, $input) : null,
+        ]);
+    }
+
+    public function assignSchoolCentreCodes(string $tenantId, McqExam $exam, Request $request, \App\Services\Mcq\McqSchoolCentreCodeService $service)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        $count = $service->assign($exam, $this->centreCodeInput($request));
+        return redirect()->route('sahodaya.mcq.centre-codes', [$tenantId, $exam->id])
+            ->with('success', "Assigned centre codes to {$count} schools. Previous assignments backed up.");
+    }
+
     public function saveSchoolCentreCode(string $tenantId, McqExam $exam, Request $request)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);

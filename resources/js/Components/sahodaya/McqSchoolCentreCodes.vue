@@ -1,6 +1,6 @@
 <template>
     <section class="card mb-6">
-        <h3 class="section-title">School examination centre codes</h3>
+        <div class="flex flex-wrap items-center justify-between gap-3"><h3 class="section-title">School examination centre codes</h3><a :href="`/sahodaya-admin/${sahodayaId}/mcq-exams/${examId}/centre-codes`" class="btn-secondary text-sm">Centre code list &amp; auto-assign →</a></div>
         <p class="section-desc">Assign each school a code for this exam. The Centre code field on hall tickets fills automatically.</p>
         <form @submit.prevent="save" class="flex flex-wrap items-end gap-3 mt-4">
             <label class="text-sm">School<select v-model="form.school_id" required class="field block mt-1" @change="loadCode"><option value="" disabled>Select school</option><option v-for="school in schools" :key="school.id" :value="school.id">{{ school.name }}{{ school.code ? ` — ${school.code}` : '' }}</option></select></label>
