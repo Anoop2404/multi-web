@@ -22,7 +22,11 @@
                 </div>
             </template>
             </div>
-            <div v-if="remarksArea > 0" ref="remarksElement" class="admit-remarks" :style="{height:`${remarksArea * 96 / 25.4}px`}"><strong>Remarks / Instructions</strong><div class="admit-remarks__text">{{ design.remarks_text }}</div></div>
+            <div v-if="remarksArea > 0" ref="remarksElement" class="admit-remarks" :style="{height:`${remarksArea * 96 / 25.4}px`,fontSize:`${design.remarks_font_size || 11}px`}">
+                <strong v-if="design.remarks_title !== ''">{{ design.remarks_title || 'Remarks / Instructions' }}</strong>
+                <component v-if="['numbered','bullets'].includes(design.remarks_format)" :is="design.remarks_format==='numbered'?'ol':'ul'" class="admit-instruction-list" :style="{listStyleType:design.remarks_format==='numbered'?'decimal':'disc'}"><li v-for="(point,index) in instructionPoints" :key="index">{{ point }}</li></component>
+                <div v-else class="admit-remarks__text">{{ design.remarks_text }}</div>
+            </div>
         </div>
     </div>
 </template>
@@ -31,10 +35,11 @@ import { computed, onMounted, onUpdated, onBeforeUnmount, ref } from 'vue';
 import { overlayPositions, customFieldValue } from '@/support/mcqAdmitFields';
 import { printGeometry, artworkBox, remarksHeight } from '@/support/mcqAdmitGeometry';
 const props = defineProps({ design: Object, sample: { type: Object, default: () => ({}) }, background: String, editable: Boolean, selected: String });
-const emit = defineEmits(['select', 'move', 'remarks-overflow']);
+const emit = defineEmits(['select', 'move', 'remarks-overflow','remarks-required-height']);
 const remarksElement=ref(null);
-function checkRemarks(){const element=remarksElement.value;emit('remarks-overflow', Boolean(element && element.scrollHeight > element.clientHeight + 1));}
+function checkRemarks(){const element=remarksElement.value;emit('remarks-overflow', Boolean(element && element.scrollHeight > element.clientHeight + 1));emit('remarks-required-height',element?Math.ceil((element.scrollHeight+2)*25.4/96):0);}
 onUpdated(checkRemarks);
+const instructionPoints=computed(()=>String(props.design.remarks_text||'').split(/\r\n|\r|\n/).map(line=>line.trim()).filter(Boolean));
 const remarksArea=computed(()=>remarksHeight(props.design));
 const geometry = computed(()=>printGeometry(props.design));
 const box = computed(()=>artworkBox(props.design));
@@ -84,5 +89,5 @@ onMounted(() => { observer = new ResizeObserver(([entry]) => { wrapperWidth.valu
 onBeforeUnmount(() => observer?.disconnect());
 </script>
 <style scoped>
-.admit-canvas{position:relative;width:100%;margin:auto;overflow:hidden;background:white}.admit-canvas__page{position:absolute;inset:0;transform-origin:top left}.admit-canvas__background{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.admit-canvas__empty{position:absolute;inset:0;display:grid;place-items:center;background:#f8fafc;border:1px dashed #cbd5e1;color:#64748b;font-size:12px}.admit-canvas__field{outline:1px solid transparent}.is-editable{cursor:move;touch-action:none;user-select:none}.is-editable:hover{outline:1px dashed #818cf8}.is-selected{outline:1px solid #4f46e5;background:#eef2ff66}.admit-remarks{position:absolute;bottom:0;left:0;width:100%;box-sizing:border-box;padding:8px 12px;border-top:1px solid #cbd5e1;font:11px/1.4 Arial,Helvetica,sans-serif;color:#111;overflow:hidden}.admit-remarks__text{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px}
+.admit-canvas{position:relative;width:100%;margin:auto;overflow:hidden;background:white}.admit-canvas__page{position:absolute;inset:0;transform-origin:top left}.admit-canvas__background{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.admit-canvas__empty{position:absolute;inset:0;display:grid;place-items:center;background:#f8fafc;border:1px dashed #cbd5e1;color:#64748b;font-size:12px}.admit-canvas__field{outline:1px solid transparent}.is-editable{cursor:move;touch-action:none;user-select:none}.is-editable:hover{outline:1px dashed #818cf8}.is-selected{outline:1px solid #4f46e5;background:#eef2ff66}.admit-remarks{position:absolute;bottom:0;left:0;width:100%;box-sizing:border-box;padding:8px 12px;border-top:1px solid #cbd5e1;font:11px/1.4 Arial,Helvetica,sans-serif;color:#111;overflow:hidden}.admit-instruction-list{margin:4px 0 0;padding-left:20px;list-style-position:outside}.admit-instruction-list li{padding-left:2px;margin:0 0 2px;overflow-wrap:anywhere}.admit-remarks__text{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px}
 </style>

@@ -29,6 +29,20 @@ class StseAdmitCardTest extends TestCase
         $this->assertNull(McqHallTicketDesign::centreForSchool($exam, $school));
     }
 
+    public function test_twelve_instruction_points_render_as_numbered_or_bulleted_lists(): void
+    {
+        $text = implode("\n", array_map(fn ($number) => "Rule {$number}: follow the exam instructions.", range(1,12)));
+        foreach (['numbered'=>'decimal','bullets'=>'disc'] as $format=>$listStyle) {
+            $design = McqHallTicketDesign::normalize(['layout'=>'stse_three_up','remarks_text'=>$text,"remarks_format"=>$format,'remarks_title'=>'Examination Rules','remarks_height_mm'=>80]);
+            $html = view('mcq.partials.hall-ticket-card', ['design'=>$design,'sample'=>[]])->render();
+            $this->assertSame(12, substr_count($html, '<li '));
+            $this->assertStringContainsString("list-style-type:{$listStyle}", $html);
+            $this->assertStringContainsString('Examination Rules', $html);
+            $this->assertStringContainsString('Rule 12:', $html);
+        }
+        $this->assertSame(['First rule','Second rule'], McqHallTicketDesign::instructionPoints("First rule\r\n\r\nSecond rule\n"));
+    }
+
     public function test_remarks_have_no_empty_space_and_can_extend_full_page_or_two_card_designs(): void
     {
         foreach ([[277,1],[136,2]] as [$height,$count]) {

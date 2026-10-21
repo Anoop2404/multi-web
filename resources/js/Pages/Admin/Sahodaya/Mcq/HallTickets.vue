@@ -358,6 +358,9 @@ function saveDesign() {
     fd.append('show_student_photo', designForm.show_student_photo ? '1' : '0');
     fd.append('remarks_text', designForm.remarks_text || '');
     fd.append('remarks_height_mm', String(designForm.remarks_height_mm || 35));
+    fd.append('remarks_format', designForm.remarks_format || 'paragraph');
+    fd.append('remarks_title', designForm.remarks_title ?? 'Remarks / Instructions');
+    fd.append('remarks_font_size', String(designForm.remarks_font_size || 11));
     for (const [index, field] of (designForm.custom_fields || []).entries()) {
         for (const [key, value] of Object.entries(field)) fd.append(`custom_fields[${index}][${key}]`, String(value));
     }

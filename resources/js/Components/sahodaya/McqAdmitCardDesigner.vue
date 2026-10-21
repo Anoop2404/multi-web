@@ -23,8 +23,13 @@
                 <div v-if="isArtwork" class="border-t pt-4 space-y-3">
                     <h3 class="text-xs font-bold uppercase tracking-wide text-slate-500">Remarks / Instructions</h3>
                     <div class="flex gap-2"><button type="button" class="btn-secondary text-xs" @click="applyPreset('one')">Full A4 page</button><button type="button" class="btn-secondary text-xs" @click="applyPreset('two')">2 per page</button></div>
-                    <label class="block text-xs text-slate-600">Extra content<textarea v-model="design.remarks_text" class="field mt-1" rows="4" maxlength="3000" placeholder="Add remarks or exam instructions if needed"></textarea></label>
-                    <label v-if="(design.remarks_text || '').trim()" class="block text-xs text-slate-600">Remarks area height (mm)<input v-model.number="design.remarks_height_mm" class="field mt-1" type="number" min="15" :max="Math.min(150,geometry.height-20)"></label>
+                    <label class="block text-xs text-slate-600">Section heading<input v-model="design.remarks_title" class="field mt-1" maxlength="100" placeholder="Rules & Instructions"></label>
+                    <label class="block text-xs text-slate-600">Instruction format<select v-model="design.remarks_format" class="field mt-1"><option value="paragraph">Paragraph</option><option value="numbered">Numbered points</option><option value="bullets">Bullet points</option></select></label>
+                    <label class="block text-xs text-slate-600">Instruction font size<input v-model.number="design.remarks_font_size" class="field mt-1" type="number" min="8" max="18" step="0.5"></label>
+                    <label class="block text-xs text-slate-600">Extra content<textarea v-model="design.remarks_text" class="field mt-1" rows="8" maxlength="3000" placeholder="Write one rule per line. Add 10 or more points as needed."></textarea></label>
+                    <label v-if="(design.remarks_text || '').trim()" class="block text-xs text-slate-600">Remarks area height (mm)<input v-model.number="design.remarks_height_mm" class="field mt-1" type="number" min="15" :max="Math.min(257,geometry.height-20)"></label>
+                    <p v-if="['numbered','bullets'].includes(design.remarks_format)" class="text-xs text-slate-500">{{ instructionCount }} points · one non-empty line per point · numbering is automatic.</p>
+                    <button v-if="(design.remarks_text || '').trim()" type="button" class="btn-secondary text-xs" @click="fitInstructions">Fit all points in this card</button>
                     <p class="text-xs text-slate-500">A separate area appears only when you add content. Choose a full page or two per page for longer instructions.</p><p v-if="remarksOverflow" role="alert" class="text-xs text-red-600">The remarks do not fit in this area. Increase its height, shorten the text, or choose a full A4 page before saving.</p>
                 </div>
                 <slot name="settings" />
@@ -32,8 +37,8 @@
             <div class="bg-slate-100/80 p-5 sm:p-8 min-w-0">
                 <div class="flex items-center justify-between text-xs text-slate-500 mb-5"><strong class="font-semibold">{{ isArtwork ? (viewMode==='sheet'?'A4 sheet preview':'Live card canvas') : 'Live preview' }}</strong><span>{{ isArtwork ? `${geometry.width.toFixed(1)} × ${geometry.height.toFixed(1)} mm` : 'A4 layout' }}</span></div>
                 <div v-if="isArtwork" class="flex justify-center gap-1 mb-4"><button v-for="view in ['card','sheet']" :key="view" type="button" class="px-3 py-1.5 rounded-lg text-xs font-semibold" :class="viewMode===view?'bg-white shadow-sm text-indigo-700':'text-slate-500'" @click="viewMode=view">{{ view==='card'?'Edit card':'Preview A4 sheet' }}</button></div>
-                <McqAdmitSheetPreview v-if="isArtwork && viewMode==='sheet'" :design="design" :sample="sample" :background="background" @remarks-overflow="remarksOverflow=$event" />
-                <div v-else-if="isArtwork" class="mx-auto max-w-[540px] shadow-lg"><McqAdmitCardCanvas :design="design" :sample="sample" :background="background" editable :selected="selected" @select="selected=$event" @move="moveField" @remarks-overflow="remarksOverflow=$event" /></div>
+                <McqAdmitSheetPreview v-if="isArtwork && viewMode==='sheet'" :design="design" :sample="sample" :background="background" @remarks-overflow="remarksOverflow=$event" @remarks-required-height="requiredRemarksHeight=$event" />
+                <div v-else-if="isArtwork" class="mx-auto max-w-[540px] shadow-lg"><McqAdmitCardCanvas :design="design" :sample="sample" :background="background" editable :selected="selected" @select="selected=$event" @move="moveField" @remarks-overflow="remarksOverflow=$event" @remarks-required-height="requiredRemarksHeight=$event" /></div>
                 <McqHallTicketPreview v-else :design="design" :sample="sample" :logo-url="logoUrl" />
                 <p v-if="isArtwork" class="text-center text-xs text-slate-500 mt-5">{{ viewMode==='sheet'?'Dashed lines show die boundaries. The image stays inside each card.':'Select a field to position it. Drag to move; arrow keys fine-tune.' }}</p>
                 <div class="mt-6 rounded-xl border border-slate-200 bg-white px-4 py-3 flex items-center justify-between gap-3 text-xs"><div><strong class="block text-slate-700">{{ isArtwork ? `${geometry.perPage} ${geometry.perPage===1?'card':'cards'} per sheet` : design.layout === 'compact' ? 'Compact cards' : 'One card per sheet' }}</strong><span class="text-slate-500">{{ isArtwork ? `${design.page_orientation === 'portrait' ? 'Portrait' : 'Landscape'} A4 · print at 100%` : 'Portrait A4' }}</span></div><div v-if="isArtwork" :style="{display:'grid',gridTemplateColumns:`repeat(${Math.min(geometry.columns,6)},1fr)`,gap:'2px'}" aria-label="Cards on the A4 sheet"><span v-for="n in Math.min(geometry.perPage,12)" :key="n" class="h-8 w-5 rounded-sm border border-indigo-300 bg-indigo-50"></span></div></div>
@@ -72,6 +77,12 @@ const preset=computed(()=>Object.entries(presets).find(([,v])=>Math.abs(props.de
 function applyPreset(key){viewMode.value='sheet';const p=presets[key];if(p)Object.assign(props.design,{card_width_mm:p[0],card_height_mm:p[1],page_orientation:p[2],card_gap_mm:3});}
 const fontFamilies=['Arial','Times New Roman','Georgia','Verdana','Tahoma','Courier New'];
 const remarksOverflow=ref(false);
+const requiredRemarksHeight=ref(35);
+const instructionCount=computed(()=>String(props.design.remarks_text||'').split(/\r\n|\r|\n/).filter(line=>line.trim()).length);
+function fitInstructions(){props.design.remarks_height_mm=Math.min(257,geometry.value.height-20,Math.max(15,requiredRemarksHeight.value));}
+if(!props.design.remarks_format)props.design.remarks_format='paragraph';
+if(props.design.remarks_title===undefined)props.design.remarks_title='Remarks / Instructions';
+if(!props.design.remarks_font_size)props.design.remarks_font_size=11;
 const viewMode=ref('sheet');
 const selected=ref('name'),uploadError=ref(''),localBackground=ref(null);
 const labels=computed(()=>({registration:'Registration number',name:'Student name',class:'Class',date:'Examination date',centre:'Examination centre',principal_signature:'Principal signature',...(props.design.show_student_photo?{student_photo:'Student photo'}:{}),...Object.fromEntries((props.design.custom_fields||[]).map(field=>[field.id,field.label||'Custom field']))}));

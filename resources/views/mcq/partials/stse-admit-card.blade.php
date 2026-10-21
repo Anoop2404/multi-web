@@ -29,6 +29,18 @@
     @endif
     </div>
     @if($remarksHeight > 0)
-        <div style="position:absolute;bottom:0;left:0;width:100%;height:{{ $remarksHeight }}mm;box-sizing:border-box;padding:8px 12px;border-top:1px solid #cbd5e1;font:11px/1.4 Arial,Helvetica,sans-serif;color:#111;overflow:hidden;"><strong>Remarks / Instructions</strong><div style="white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px;">{{ $design['remarks_text'] }}</div></div>
+        <div style="position:absolute;bottom:0;left:0;width:100%;height:{{ $remarksHeight }}mm;box-sizing:border-box;padding:8px 12px;border-top:1px solid #cbd5e1;font:{{ $design['remarks_font_size'] ?? 11 }}px/1.4 Arial,Helvetica,sans-serif;color:#111;overflow:hidden;">
+            @if(($design['remarks_title'] ?? 'Remarks / Instructions') !== '')<strong>{{ $design['remarks_title'] ?? 'Remarks / Instructions' }}</strong>@endif
+            @if(in_array($design['remarks_format'] ?? 'paragraph', ['numbered','bullets'], true))
+                @php $listTag = $design['remarks_format'] === 'numbered' ? 'ol' : 'ul'; @endphp
+                <{{ $listTag }} style="margin:4px 0 0;padding-left:20px;list-style-type:{{ $listTag === 'ol' ? 'decimal' : 'disc' }};list-style-position:outside;">
+                    @foreach(\App\Support\Mcq\McqHallTicketDesign::instructionPoints($design['remarks_text']) as $point)
+                        <li style="padding-left:2px;margin:0 0 2px;overflow-wrap:anywhere;">{{ $point }}</li>
+                    @endforeach
+                </{{ $listTag }}>
+            @else
+                <div style="white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px;">{{ $design['remarks_text'] }}</div>
+            @endif
+        </div>
     @endif
 </div>

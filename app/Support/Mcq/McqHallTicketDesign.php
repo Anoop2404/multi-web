@@ -33,6 +33,9 @@ class McqHallTicketDesign
             'custom_fields' => [],
             'remarks_text' => '',
             'remarks_height_mm' => 35,
+            'remarks_format' => 'paragraph',
+            'remarks_title' => 'Remarks / Instructions',
+            'remarks_font_size' => 11,
             'field_positions' => [
                 'registration' => ['x' => 41, 'y' => 48, 'size' => 11, 'width' => 52],
                 'name' => ['x' => 41, 'y' => 54, 'size' => 11, 'width' => 52],
@@ -135,7 +138,10 @@ class McqHallTicketDesign
             'show_student_photo' => (bool) ($settings['show_student_photo'] ?? false),
             'custom_fields' => array_values($customFields),
             'remarks_text' => mb_substr(trim((string) ($settings['remarks_text'] ?? '')), 0, 3000),
-            'remarks_height_mm' => max(15, min(150, (float) ($settings['remarks_height_mm'] ?? 35))),
+            'remarks_format' => in_array($settings['remarks_format'] ?? '', ['paragraph','numbered','bullets'], true) ? $settings['remarks_format'] : 'paragraph',
+            'remarks_title' => mb_substr((string) ($settings['remarks_title'] ?? 'Remarks / Instructions'), 0, 100),
+            'remarks_font_size' => max(8, min(18, (float) ($settings['remarks_font_size'] ?? 11))),
+            'remarks_height_mm' => max(15, min(257, (float) ($settings['remarks_height_mm'] ?? 35))),
             'card_width_mm' => max(20, min(277, (float) ($settings['card_width_mm'] ?? 90))),
             'card_height_mm' => max(20, min(277, (float) ($settings['card_height_mm'] ?? 121.384615))),
             'page_orientation' => ($settings['page_orientation'] ?? 'landscape') === 'portrait' ? 'portrait' : 'landscape',
@@ -301,6 +307,12 @@ class McqHallTicketDesign
         $rows = max(1, (int) floor(($availableHeight + $gap + 0.00001) / ($height + $gap)));
 
         return ['width' => $width, 'height' => $height, 'gap' => $gap, 'columns' => $columns, 'rows' => $rows, 'per_page' => $columns * $rows];
+    }
+
+    /** One non-empty line is one rule; list numbering is supplied by the renderer. */
+    public static function instructionPoints(string $text): array
+    {
+        return array_values(array_filter(array_map('trim', preg_split('/\R/u', $text) ?: []), fn ($line) => $line !== ''));
     }
 
     public static function remarksHeight(array $design): float
