@@ -27,6 +27,7 @@ class McqHallTicketDesign
             'card_height_mm' => 121.384615,
             'page_orientation' => 'landscape',
             'card_gap_mm' => 3,
+            'page_margin_mm' => 10,
             'background_fit' => 'contain',
             'background_aspect_ratio' => 780 / 1052,
             'show_student_photo' => false,
@@ -152,6 +153,7 @@ class McqHallTicketDesign
             'remarks_height_mm' => max(15, min(257, (float) ($settings['remarks_height_mm'] ?? 35))),
             'card_width_mm' => max(20, min(277, (float) ($settings['card_width_mm'] ?? 90))),
             'card_height_mm' => max(20, min(277, (float) ($settings['card_height_mm'] ?? 121.384615))),
+            'page_margin_mm' => max(0, min(20, (float) ($settings['page_margin_mm'] ?? 10))),
             'page_orientation' => ($settings['page_orientation'] ?? 'landscape') === 'portrait' ? 'portrait' : 'landscape',
             'card_gap_mm' => max(0, min(15, (float) ($settings['card_gap_mm'] ?? 3))),
             'background_fit' => ($settings['background_fit'] ?? 'contain') === 'stretch' ? 'stretch' : 'contain',
@@ -307,19 +309,20 @@ class McqHallTicketDesign
         return trim(($field['label'] ?? '') . (filled($field['label'] ?? '') ? ': ' : '') . $value);
     }
 
-    /** A4 with 10 mm printer-safe margins; derive capacity from the selected die. */
+    /** Derive A4 capacity from the selected die and page margins. */
     public static function printGeometry(array $design): array
     {
         $landscape = ($design['page_orientation'] ?? 'landscape') === 'landscape';
-        $availableWidth = $landscape ? 277 : 190;
-        $availableHeight = $landscape ? 190 : 277;
+        $margin = max(0, min(20, (float) ($design['page_margin_mm'] ?? 10)));
+        $availableWidth = ($landscape ? 297 : 210) - 2 * $margin;
+        $availableHeight = ($landscape ? 210 : 297) - 2 * $margin;
         $width = min($availableWidth, max(20, (float) ($design['card_width_mm'] ?? 90)));
         $height = min($availableHeight, max(20, (float) ($design['card_height_mm'] ?? 121.384615)));
         $gap = max(0, min(15, (float) ($design['card_gap_mm'] ?? 3)));
         $columns = max(1, (int) floor(($availableWidth + $gap + 0.00001) / ($width + $gap)));
         $rows = max(1, (int) floor(($availableHeight + $gap + 0.00001) / ($height + $gap)));
 
-        return ['width' => $width, 'height' => $height, 'gap' => $gap, 'columns' => $columns, 'rows' => $rows, 'per_page' => $columns * $rows];
+        return ['margin' => $margin, 'width' => $width, 'height' => $height, 'gap' => $gap, 'columns' => $columns, 'rows' => $rows, 'per_page' => $columns * $rows];
     }
 
     /** One non-empty line is one rule; list numbering is supplied by the renderer. */

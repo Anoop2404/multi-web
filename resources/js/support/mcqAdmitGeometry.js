@@ -1,12 +1,13 @@
 export function printGeometry(design) {
     const landscape = (design.page_orientation || 'landscape') === 'landscape';
-    const availableWidth = landscape ? 277 : 190, availableHeight = landscape ? 190 : 277;
+    const margin = Math.max(0, Math.min(20, Number(design.page_margin_mm ?? 10)));
+    const availableWidth = (landscape ? 297 : 210) - 2 * margin, availableHeight = (landscape ? 210 : 297) - 2 * margin;
     const width = Math.min(availableWidth, Math.max(20, Number(design.card_width_mm) || 90));
     const height = Math.min(availableHeight, Math.max(20, Number(design.card_height_mm) || 121.384615));
     const gap = Math.max(0, Math.min(15, Number(design.card_gap_mm ?? 3)));
     const columns = Math.max(1, Math.floor((availableWidth + gap + .00001) / (width + gap)));
     const rows = Math.max(1, Math.floor((availableHeight + gap + .00001) / (height + gap)));
-    return { width, height, gap, columns, rows, perPage: columns * rows, pageWidth:landscape ? 297 : 210, pageHeight:landscape ? 210 : 297 };
+    return { margin, width, height, gap, columns, rows, perPage: columns * rows, pageWidth:landscape ? 297 : 210, pageHeight:landscape ? 210 : 297 };
 }
 export function artworkBox(design) {
     const {width,height:dieHeight}=printGeometry(design);

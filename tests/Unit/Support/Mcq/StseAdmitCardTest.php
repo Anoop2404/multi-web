@@ -7,6 +7,25 @@ use Tests\TestCase;
 
 class StseAdmitCardTest extends TestCase
 {
+    public function test_two_borderless_cards_fill_landscape_a4_in_preview_and_print(): void
+    {
+        $design = McqHallTicketDesign::normalize([
+            'layout' => 'stse_three_up', 'page_orientation' => 'landscape',
+            'card_width_mm' => 148.5, 'card_height_mm' => 210,
+            'card_gap_mm' => 0, 'page_margin_mm' => 0, 'background_fit' => 'stretch',
+        ]);
+        $geometry = McqHallTicketDesign::printGeometry($design);
+        $this->assertSame(2, $geometry['per_page']);
+        $this->assertEquals(0, $geometry['margin']);
+        $this->assertEquals(297, 2 * $geometry['width']);
+        $this->assertEquals(210, $geometry['height']);
+        $box = McqHallTicketDesign::artworkBox($design);
+        $this->assertEquals(0, $box['x']);
+        $this->assertEquals(0, $box['y']);
+        $this->assertEquals(148.5, $box['width']);
+        $this->assertEquals(210, $box['height']);
+    }
+
     public function test_school_centre_is_exam_specific_and_overrides_the_sahodaya_venue(): void
     {
         $exam = new \App\Models\McqExam(['venue' => 'Sahodaya Central Hall']);

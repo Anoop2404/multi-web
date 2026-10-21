@@ -368,7 +368,7 @@ function saveDesign() {
     for (const [index, field] of (designForm.custom_fields || []).entries()) {
         for (const [key, value] of Object.entries(field)) fd.append(`custom_fields[${index}][${key}]`, String(value));
     }
-    for (const key of ['card_width_mm','card_height_mm','page_orientation','card_gap_mm','background_fit']) fd.append(key, String(designForm[key]));
+    for (const key of ['card_width_mm','card_height_mm','page_orientation','card_gap_mm','page_margin_mm','background_fit']) fd.append(key, String(designForm[key]));
     for (const [key, position] of Object.entries(designForm.field_positions)) {
         for (const [axis, value] of Object.entries(position)) fd.append(`field_positions[${key}][${axis}]`, String(value));
     }

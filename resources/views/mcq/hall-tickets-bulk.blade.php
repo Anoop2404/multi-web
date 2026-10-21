@@ -36,7 +36,7 @@
                 .ticket-item { margin-bottom: 0; }
             @endif
         }
-        @page { size: A4 {{ $isArtwork ? ($design['page_orientation'] ?? 'landscape') : 'portrait' }}; margin: {{ $isArtwork ? '10mm' : '8mm 10mm' }}; }
+        @page { size: A4 {{ $isArtwork ? ($design['page_orientation'] ?? 'landscape') : 'portrait' }}; margin: {{ $isArtwork ? ($die['margin'].'mm') : '8mm 10mm' }}; }
     </style>
 </head>
 <body>

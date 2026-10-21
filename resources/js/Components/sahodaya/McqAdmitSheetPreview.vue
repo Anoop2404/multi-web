@@ -1,6 +1,6 @@
 <template>
     <div ref="wrapper" class="relative w-full overflow-hidden bg-white shadow-md" :style="{aspectRatio:`${geometry.pageWidth}/${geometry.pageHeight}`}">
-        <div class="absolute top-0 left-0 origin-top-left bg-white" :style="{width:`${geometry.pageWidth*px}px`,height:`${geometry.pageHeight*px}px`,padding:`${10*px}px`,transform:`scale(${scale})`}">
+        <div class="absolute top-0 left-0 origin-top-left bg-white" :style="{width:`${geometry.pageWidth*px}px`,height:`${geometry.pageHeight*px}px`,padding:`${geometry.margin*px}px`,transform:`scale(${scale})`}">
             <div :style="{display:'grid',gridTemplateColumns:`repeat(${geometry.columns},${geometry.width*px}px)`,gap:`${geometry.gap*px}px`}">
                 <div v-for="n in geometry.perPage" :key="n" :style="{width:`${geometry.width*px}px`,height:`${geometry.height*px}px`,outline:'1px dashed #cbd5e1'}"><McqAdmitCardCanvas :design="design" :sample="sample" :background="background" @remarks-overflow="$emit('remarks-overflow',$event)" @remarks-required-height="$emit('remarks-required-height',$event)" /></div>
             </div>

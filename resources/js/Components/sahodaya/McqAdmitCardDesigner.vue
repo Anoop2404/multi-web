@@ -13,12 +13,13 @@
                 <div class="rounded-xl bg-slate-50 p-3 text-xs space-y-2"><strong class="block text-slate-700">Data on each card</strong><p>Date: {{ sample.exam_date || 'Set the exam schedule' }} <span class="text-slate-400">· Sahodaya schedule</span></p><p>Centre: Sahodaya venue or the school's centre for this exam.</p><p>Signature: uploaded by the school.</p></div>
                 <div v-if="isArtwork" class="border-t pt-4 space-y-3">
                     <h3 class="text-xs font-bold uppercase tracking-wide text-slate-500">A4 sheet &amp; die size</h3>
-                    <label class="block text-xs text-slate-600">Sheet preset<select class="field mt-1" :value="preset" @change="applyPreset($event.target.value)"><option value="custom">Custom die size</option><option value="one">1 card · full sheet</option><option value="two">2 stacked cards</option><option value="three">3 stacked cards</option><option value="four">4 cards · 2 × 2</option><option value="six">6 cards · 2 × 3</option><option value="columns">3 portrait cards side by side</option></select></label>
+                    <label class="block text-xs text-slate-600">Sheet preset<select class="field mt-1" :value="preset" @change="applyPreset($event.target.value)"><option value="edgeTwo">2 cards · fill A4 edge to edge</option><option value="custom">Custom die size</option><option value="one">1 card · full sheet</option><option value="two">2 stacked cards</option><option value="three">3 stacked cards</option><option value="four">4 cards · 2 × 2</option><option value="six">6 cards · 2 × 3</option><option value="columns">3 portrait cards side by side</option></select></label>
                     <label class="block text-xs text-slate-600">A4 orientation<select v-model="design.page_orientation" class="field mt-1"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></label>
                     <div class="grid grid-cols-2 gap-2"><label class="text-xs text-slate-600">Die width (mm)<input v-model.number="design.card_width_mm" type="number" min="20" :max="geometry.pageWidth-20" step="0.5" class="field mt-1"></label><label class="text-xs text-slate-600">Die height (mm)<input v-model.number="design.card_height_mm" type="number" min="20" :max="geometry.pageHeight-20" step="0.5" class="field mt-1"></label></div>
                     <label class="block text-xs text-slate-600">Gap between cards (mm)<input v-model.number="design.card_gap_mm" class="field mt-1" type="number" min="0" max="15" step="0.5"></label>
+                    <label class="block text-xs text-slate-600">Page margins (mm)<input v-model.number="design.page_margin_mm" class="field mt-1" type="number" min="0" max="20" step="0.5"></label>
                     <label class="block text-xs text-slate-600">Background fit<select v-model="design.background_fit" class="field mt-1"><option value="contain">Full image · keep proportions</option><option value="stretch">Fill the die · stretch image</option></select></label>
-                    <p class="text-xs text-slate-500">{{ geometry.columns }} across × {{ geometry.rows }} down = <strong>{{ geometry.perPage }} {{ geometry.perPage===1 ? 'card' : 'cards' }} per A4</strong>. 10 mm page margins.</p>
+                    <p class="text-xs text-slate-500">{{ geometry.columns }} across × {{ geometry.rows }} down = <strong>{{ geometry.perPage }} {{ geometry.perPage===1 ? 'card' : 'cards' }} per A4</strong>. {{ geometry.margin }} mm page margins.</p>
                 </div>
                 <div v-if="isArtwork" class="border-t pt-4 space-y-3">
                     <h3 class="text-xs font-bold uppercase tracking-wide text-slate-500">Remarks / Instructions</h3>
@@ -81,9 +82,9 @@ import McqHallTicketPreview from './McqHallTicketPreview.vue';
 const props=defineProps({design:Object,defaults:Object,exam:Object,sample:Object,backgroundUrl:String,logoUrl:String,previewUrl:String,saving:Boolean,saved:Boolean,saveLabel:{type:String,default:'Save exam design'},errors:{type:Object,default:()=>({})}});
 const emit=defineEmits(['save','background']);
 const geometry=computed(()=>printGeometry(props.design));
-const presets={one:[190,277,'portrait'],two:[190,136,'portrait'],three:[190,90,'portrait'],four:[93,136,'portrait'],six:[93,90,'portrait'],columns:[90,121.384615,'landscape']};
+const presets={edgeTwo:[148.5,210,'landscape'],one:[190,277,'portrait'],two:[190,136,'portrait'],three:[190,90,'portrait'],four:[93,136,'portrait'],six:[93,90,'portrait'],columns:[90,121.384615,'landscape']};
 const preset=computed(()=>Object.entries(presets).find(([,v])=>Math.abs(props.design.card_width_mm-v[0])<.01&&Math.abs(props.design.card_height_mm-v[1])<.01&&props.design.page_orientation===v[2])?.[0]||'custom');
-function applyPreset(key){viewMode.value='sheet';const p=presets[key];if(p)Object.assign(props.design,{card_width_mm:p[0],card_height_mm:p[1],page_orientation:p[2],card_gap_mm:3});}
+function applyPreset(key){viewMode.value='sheet';const p=presets[key];if(p)Object.assign(props.design,{card_width_mm:p[0],card_height_mm:p[1],page_orientation:p[2],card_gap_mm:key==='edgeTwo'?0:3,page_margin_mm:key==='edgeTwo'?0:10,...(key==='edgeTwo'?{background_fit:'stretch'}:{})});}
 const fontFamilies=['Arial','Times New Roman','Georgia','Verdana','Tahoma','Courier New'];
 const remarksOverflow=ref(false);
 const requiredRemarksHeight=ref(35);
