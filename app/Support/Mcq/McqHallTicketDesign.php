@@ -450,6 +450,11 @@ class McqHallTicketDesign
     }
 
     /** @return array<string, mixed> */
+    private static function samplePhotoDataUri(): string
+    {
+        return 'data:image/svg+xml;base64,'.base64_encode(file_get_contents(resource_path('images/mcq/sample-student.svg')));
+    }
+
     public static function previewSample(McqExam $exam): array
     {
         $design = self::fromExam($exam);
@@ -495,7 +500,7 @@ class McqHallTicketDesign
             'hall_instructions'  => $exam->hall_instructions,
             'generated_at'       => now()->format('d-m-Y H:i:s'),
             'security_ref'       => 'SEC-' . strtoupper(substr(md5((string) $exam->id), 0, 8)),
-            'photo_src'          => null,
+            'photo_src'          => self::samplePhotoDataUri(),
             'qr_src'             => $qrService->dataUri('MCQHT|SAMPLE|10001'),
         ];
     }
@@ -544,7 +549,7 @@ class McqHallTicketDesign
             'hall_instructions'  => null,
             'generated_at'       => now()->format('d-m-Y H:i:s'),
             'security_ref'       => 'SEC-DEMO789',
-            'photo_src'          => null,
+            'photo_src'          => self::samplePhotoDataUri(),
             'qr_src'             => $qrService->dataUri('MCQHT|SAMPLE|10001'),
         ];
     }
