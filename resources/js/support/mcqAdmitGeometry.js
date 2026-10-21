@@ -21,3 +21,9 @@ export function remarksHeight(design){
     if(!String(design.remarks_text || '').trim())return 0;
     return Math.min(Math.max(15,Number(design.remarks_height_mm)||35),printGeometry(design).height-20);
 }
+
+export function instructionBox(design){
+    const die=printGeometry(design),stse=design.layout==='stse_three_up';
+    const bottom=stse?die.height*28/1052:3,top=stse?die.height*20/1052:0,inset=stse?30/780:0;
+    return {frameX:0,frameY:0,frameWidth:die.width,frameHeight:die.height,paperX:die.width*inset,paperY:top,paperWidth:die.width*(stse?712/780:1),paperHeight:Math.max(0,die.height-top-bottom),x:die.width*.10,width:die.width*.80,bottom,height:Math.max(0,remarksHeight(design)-bottom)};
+}

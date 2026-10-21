@@ -39,6 +39,50 @@
                 </div>
             </div>
 
+            <!-- Inter-House Championship Standings -->
+            <div v-if="houseStandings && houseStandings.length" class="card overflow-hidden p-0 border border-slate-200">
+                <div class="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                    <div>
+                        <h3 class="font-semibold text-slate-900 text-sm">Inter-House Championship Standings</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Cumulative points tallied across all sports items in this meet</p>
+                    </div>
+                    <span class="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                        {{ houseStandings.length }} Houses
+                    </span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="w-16">Rank</th>
+                                <th>House</th>
+                                <th class="text-center w-28">Scored Athletes</th>
+                                <th class="text-right w-28">Total Points</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="h in houseStandings" :key="h.house_id" class="hover:bg-slate-50/60">
+                                <td class="font-bold">
+                                    <span v-if="h.rank === 1" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-800 text-xs font-black">1</span>
+                                    <span v-else-if="h.rank === 2" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-200 text-slate-700 text-xs font-black">2</span>
+                                    <span v-else-if="h.rank === 3" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-700/10 text-amber-900 text-xs font-black">3</span>
+                                    <span v-else class="text-slate-500 pl-2">#{{ h.rank }}</span>
+                                </td>
+                                <td>
+                                    <div class="flex items-center gap-2">
+                                        <span class="inline-block w-3 h-3 rounded-full shrink-0 border border-black/10"
+                                              :style="{ backgroundColor: h.color || '#94a3b8' }"></span>
+                                        <span class="font-semibold text-slate-800">{{ h.house_name }}</span>
+                                    </div>
+                                </td>
+                                <td class="text-center text-slate-600">{{ h.participants }}</td>
+                                <td class="text-right font-black text-indigo-700">{{ h.total_points }} pts</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <div class="card text-sm space-y-2">
                 <p><span class="text-slate-500">Status:</span> <span class="capitalize font-medium">{{ event.status }}</span></p>
                 <p>
@@ -70,13 +114,37 @@
                     </div>
                     <div v-if="resultsByItem[reg.item?.id]?.length" class="overflow-x-auto">
                         <table class="data-table">
-                            <thead><tr><th>Place</th><th>Athlete</th><th>Measurement</th></tr></thead>
+                            <thead><tr><th>Place</th><th>Athlete</th><th>House / Class</th><th>Measurement</th><th>Points</th></tr></thead>
                             <tbody>
                                 <tr v-for="(row, idx) in resultsByItem[reg.item.id]" :key="idx">
-                                    <td class="font-semibold">{{ row.position }}</td>
-                                    <td>{{ row.name }}</td>
-                                    <td>{{ row.measurement || '—' }}</td>
-
+                                    <td class="font-semibold">
+                                        <span v-if="row.position === 1" class="badge badge--success">1st</span>
+                                        <span v-else-if="row.position === 2" class="badge badge--info">2nd</span>
+                                        <span v-else-if="row.position === 3" class="badge badge--warning">3rd</span>
+                                        <span v-else class="text-slate-600 font-medium">{{ row.position }}th</span>
+                                    </td>
+                                    <td>
+                                        <span class="font-medium text-slate-800">{{ row.name }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="flex items-center gap-2">
+                                            <span v-if="row.house"
+                                                  class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold"
+                                                  :style="{
+                                                      backgroundColor: row.house.color ? `${row.house.color}15` : '#f1f5f9',
+                                                      color: row.house.color || '#334155'
+                                                  }">
+                                                <span class="w-2 h-2 rounded-full shrink-0"
+                                                      :style="{ backgroundColor: row.house.color || '#64748b' }"></span>
+                                                {{ row.house.name }}
+                                            </span>
+                                            <span v-if="row.class" class="text-xs text-slate-500">
+                                                Class {{ row.class }}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td class="font-mono text-slate-700">{{ row.measurement || '—' }}</td>
+                                    <td class="font-semibold text-indigo-700">{{ row.score ?? 0 }} pts</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -131,6 +199,7 @@ const props = defineProps({
     registrations: { type: Array, default: () => [] },
     marks: { type: Object, default: () => ({}) },
     resultsByItem: { type: Object, default: () => ({}) },
+    houseStandings: { type: Array, default: () => [] },
     stats: { type: Object, default: () => ({}) },
 });
 

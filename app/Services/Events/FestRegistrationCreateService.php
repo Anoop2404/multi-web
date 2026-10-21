@@ -259,7 +259,7 @@ class FestRegistrationCreateService
                     'event_id' => $event->id,
                     'item_id' => $item->id,
                     'school_id' => $school->id,
-                    'status' => 'submitted',
+                    'status' => $event->level_round === 'school' ? 'approved' : 'submitted',
                     'submitted_at' => $waitlisted ? null : now(),
                 ]);
 
@@ -662,7 +662,7 @@ class FestRegistrationCreateService
             } elseif ($registration->status === 'rejected') {
                 // Same resubmit-on-edit handling as the student path above.
                 $registration->update([
-                    'status' => 'submitted', 'submitted_at' => now(),
+                    'status' => $event->level_round === 'school' ? 'approved' : 'submitted', 'submitted_at' => now(),
                     'rejection_reason' => null, 'rejected_at' => null, 'rejected_by_user_id' => null,
                 ]);
             }

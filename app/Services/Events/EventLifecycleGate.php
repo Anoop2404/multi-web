@@ -221,6 +221,13 @@ class EventLifecycleGate
         // published is handled separately by allowMarkEntryForItem()'s
         // results_published_at check below, which fires first regardless of this method.
         if (! in_array($event->status, ['ongoing', 'registration_open', 'published'], true)) {
+            // For school-level rounds (internal sports meets/rounds), schools record marks
+            // directly without requiring cluster publication state machines, as long as
+            // the event is not completed, archived, or cancelled.
+            if ($event->level_round === 'school' && ! in_array($event->status, ['completed', 'cancelled', 'archived'], true)) {
+                return;
+            }
+
             throw new HttpException(422, 'Mark entry is not allowed in the current event phase.');
         }
     }

@@ -29,6 +29,21 @@ class StseAdmitCardTest extends TestCase
         $this->assertNull(McqHallTicketDesign::centreForSchool($exam, $school));
     }
 
+    public function test_instructions_share_the_artwork_paper_and_use_safe_theme_colours(): void
+    {
+        $design = McqHallTicketDesign::normalize(['layout'=>'stse_three_up','card_width_mm'=>190,'card_height_mm'=>277,'page_orientation'=>'portrait','remarks_text'=>'Rule one','remarks_height_mm'=>75,'remarks_theme_color'=>'#164575','remarks_paper_color'=>'#fff8eb']);
+        $box = McqHallTicketDesign::instructionBox($design);
+        $this->assertGreaterThanOrEqual($box['paper_x'], $box['x']);
+        $this->assertLessThanOrEqual($box['paper_x']+$box['paper_width'], $box['x']+$box['width']);
+        $html = view('mcq.partials.hall-ticket-card', ['design'=>$design,'sample'=>[]])->render();
+        $this->assertStringContainsString('color:#164575', $html);
+        $this->assertStringContainsString('background:#fff8eb', $html);
+        $this->assertStringNotContainsString('border-top:1px solid #cbd5e1', $html);
+        $this->assertStringContainsString('clip-path:inset(3% 5% 3% 4%)', $html);
+        $invalid = McqHallTicketDesign::normalize(['remarks_theme_color'=>'red;background:url(bad)']);
+        $this->assertSame('#101b6f', $invalid['remarks_theme_color']);
+    }
+
     public function test_twelve_instruction_points_render_as_numbered_or_bulleted_lists(): void
     {
         $text = implode("\n", array_map(fn ($number) => "Rule {$number}: follow the exam instructions.", range(1,12)));

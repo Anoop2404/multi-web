@@ -6,6 +6,7 @@ use App\Models\FestAttendance;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestMark;
+use App\Support\FestSportsMeasurementHelper;
 use Illuminate\Validation\ValidationException;
 
 class FestSportsAutoRankService
@@ -51,17 +52,18 @@ class FestSportsAutoRankService
 
         if ($measurementMarks->isNotEmpty()) {
             $lowerIsBetter = $this->lowerIsBetter($item);
+            $method = (string) $item->result_method;
 
             $sorted = $measurementMarks->sort(fn ($a, $b) => $this->compareNumeric(
-                $this->parseNumeric((string) $a->measurement_value),
-                $this->parseNumeric((string) $b->measurement_value),
+                FestSportsMeasurementHelper::parseMeasurement((string) $a->measurement_value, $method, (string) $a->measurement_unit),
+                FestSportsMeasurementHelper::parseMeasurement((string) $b->measurement_value, $method, (string) $b->measurement_unit),
                 $lowerIsBetter,
             ))->values();
 
             $rankPointService = app(FestRankPointService::class);
             $participantType = $item->participant_type;
 
-            $this->assignDenseRanks($sorted, fn ($mark) => $this->parseNumeric((string) $mark->measurement_value), function ($mark, int $rank) use ($event, $rankPointService, $participantType) {
+            $this->assignDenseRanks($sorted, fn ($mark) => FestSportsMeasurementHelper::parseMeasurement((string) $mark->measurement_value, $method, (string) $mark->measurement_unit), function ($mark, int $rank) use ($event, $rankPointService, $participantType) {
                 $points = $rankPointService->pointsForRank($event, $rank, $participantType);
                 $mark->update(['position' => $rank, 'score' => $points > 0 ? $points : null]);
             });

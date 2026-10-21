@@ -50,14 +50,14 @@ class SportsMeetController extends SchoolAdminController
 
         $registrations = FestRegistration::where('event_id', $event->id)
             ->where('school_id', $this->school->id)
-            ->with(['item', 'participants.student', 'participants.teacher'])
+            ->with(['item', 'participants.student.schoolHouse', 'participants.student.schoolClass', 'participants.teacher'])
             ->get();
 
         $marks = FestMark::where('event_id', $event->id)->get()->keyBy('participant_id');
 
         $resultsByItem = FestMark::where('event_id', $event->id)
             ->whereNotNull('position')
-            ->with(['participant.student', 'participant.teacher', 'item'])
+            ->with(['participant.student.schoolHouse', 'participant.student.schoolClass', 'participant.teacher', 'item'])
             ->orderBy('item_id')
             ->orderBy('position')
             ->get()
@@ -65,6 +65,8 @@ class SportsMeetController extends SchoolAdminController
             ->map(fn ($group) => $group->map(fn (FestMark $m) => [
                 'position'         => $m->position,
                 'name'             => $m->participant?->student?->name ?? $m->participant?->teacher?->name,
+                'house'            => $m->participant?->student?->schoolHouse?->only('id', 'name', 'color'),
+                'class'            => $m->participant?->student?->schoolClass?->name,
                 'measurement'      => trim("{$m->measurement_value} {$m->measurement_unit}"),
                 'score'            => $m->score,
             ])->values());
@@ -82,14 +84,17 @@ class SportsMeetController extends SchoolAdminController
             ->orderByDesc('event_start')
             ->get(['id', 'title', 'level_round', 'status']);
 
+        $houseStandings = app(\App\Services\Events\SchoolHouseFestPointsService::class)->rankingForSchool($this->school->id, $event->id);
+
         return $this->inertia('School/Sports/MyEvent', [
-            'tab'           => $tab,
-            'event'         => $event,
-            'parentEvents'  => $parentEvents,
-            'registrations' => $registrations,
-            'marks'         => $marks,
-            'resultsByItem' => $resultsByItem,
-            'stats'         => [
+            'tab'            => $tab,
+            'event'          => $event,
+            'parentEvents'   => $parentEvents,
+            'registrations'  => $registrations,
+            'marks'          => $marks,
+            'resultsByItem'  => $resultsByItem,
+            'houseStandings' => $houseStandings,
+            'stats'          => [
                 'items'          => $event->items->count(),
                 'registrations'  => $registrations->count(),
                 'marks_entered'  => $marks->count(),
@@ -118,6 +123,13 @@ class SportsMeetController extends SchoolAdminController
         // through the school marks flow — results-only rounds simply use it to enter
         // their winners' ranks instead of the sports measurement/auto-rank pair.
         return app(FestProgramController::class)->storeMark($request, $tenantId, $event, $markSave, $audit);
+    }
+
+    public function bulkStoreMarks(Request $request, string $tenantId, FestEvent $event, \App\Services\Events\FestMarkSaveService $markSave, PlatformAuditLogger $audit)
+    {
+        $this->assertSchoolMeetEvent($event);
+
+        return app(FestProgramController::class)->bulkStoreMarks($request, $tenantId, $event, $markSave, $audit);
     }
 
     public function autoRankItem(string $tenantId, FestEvent $event, FestEventItem $item, FestSportsAutoRankService $ranker)

@@ -71,6 +71,9 @@
                 <Link :href="`/school-admin/${school.id}/fest-programs/${event.id}/marks`" class="btn-primary text-sm">
                     Enter marks
                 </Link>
+                <Link :href="`/school-admin/${school.id}/sports/submit-winners`" class="btn-secondary text-sm">
+                    Submit winners →
+                </Link>
             </div>
 
             <Link :href="`/school-admin/${school.id}/fest-programs`" class="text-indigo-600 text-sm">← School events</Link>

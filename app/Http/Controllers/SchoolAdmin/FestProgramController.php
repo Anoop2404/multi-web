@@ -239,18 +239,23 @@ class FestProgramController extends SchoolAdminController
 
         $registrations = \App\Models\FestRegistration::where('event_id', $festProgram->id)
             ->where('status', 'approved')
-            ->with(['item', 'participants.student', 'participants.teacher'])
+            ->with(['item', 'participants.student.schoolHouse', 'participants.student.schoolClass', 'participants.teacher'])
             ->get();
 
         $marks = \App\Models\FestMark::where('event_id', $festProgram->id)
             ->get()
             ->keyBy('participant_id');
 
+        $gradeOptions = $festProgram->event_type !== 'sports'
+            ? app(\App\Services\Events\FestGradePointService::class)->validGradesForEvent($festProgram)
+            : [];
+
         return $this->inertia('School/Events/ProgramMarks', [
             'school'        => $this->school->only('id', 'name'),
             'event'         => $festProgram->only('id', 'title', 'event_type', 'status', 'level_round'),
             'registrations' => $registrations,
             'marks'         => $marks,
+            'gradeOptions'  => $gradeOptions,
         ]);
     }
 
@@ -291,6 +296,61 @@ class FestProgramController extends SchoolAdminController
         ]);
 
         return back()->with('success', $result['message']);
+    }
+
+    public function bulkStoreMarks(Request $request, string $tenantId, FestEvent $festProgram, \App\Services\Events\FestMarkSaveService $markSave, PlatformAuditLogger $audit)
+    {
+        abort_unless($festProgram->conducting_school_id === $this->school->id, 403, 'Only the school conducting this program can manage it.');
+        abort_if($festProgram->level_round !== 'school', 422, 'Marks can only be entered for a school-level round — this is a cluster/state round.');
+
+        $data = $request->validate([
+            'rows'                     => 'required|array|min:1|max:500',
+            'rows.*.participant_id'    => 'required|integer|exists:fest_participants,id',
+            'rows.*.item_id'           => 'required|integer|exists:fest_event_items,id',
+            'rows.*.grade'             => ['nullable', app(\App\Services\Events\FestGradePointService::class)->gradeValidationRule($festProgram)],
+            'rows.*.position'          => 'nullable|integer|min:1|max:255',
+            'rows.*.score'             => 'nullable|numeric|min:0',
+            'rows.*.measurement_value' => 'nullable|string|max:50',
+            'rows.*.measurement_unit'  => 'nullable|string|max:20',
+            'auto_rank_item_id'        => 'nullable|integer|exists:fest_event_items,id',
+        ]);
+
+        $items = FestEventItem::where('event_id', $festProgram->id)
+            ->whereIn('id', collect($data['rows'])->pluck('item_id')->unique())
+            ->get()
+            ->keyBy('id');
+
+        $saved = 0;
+        \Illuminate\Support\Facades\DB::transaction(function () use ($festProgram, $data, $items, $markSave, $request, &$saved) {
+            foreach ($data['rows'] as $row) {
+                $item = $items->get($row['item_id']);
+                if ($item) {
+                    \App\Services\Events\EventLifecycleGate::allowMarkEntryForItem($festProgram, $item);
+                }
+                $markSave->save($festProgram, $row, $request->user()->id, recalculate: false, item: $item);
+                $saved++;
+            }
+        });
+
+        $markSave->recalculate($festProgram);
+
+        $audit->festEvent($festProgram, 'marks', 'fest.mark.bulk_saved', "Bulk saved {$saved} mark(s)", [
+            'count' => $saved,
+        ]);
+
+        $message = "Saved {$saved} result(s).";
+
+        if (! empty($data['auto_rank_item_id']) && ! $festProgram->isSchoolResultsOnly()) {
+            $rankItem = $items->get($data['auto_rank_item_id']) ?? FestEventItem::where('event_id', $festProgram->id)->find($data['auto_rank_item_id']);
+            if ($rankItem) {
+                \App\Services\Events\EventLifecycleGate::allowMarkEntryForItem($festProgram, $rankItem);
+                $ranker = app(\App\Services\Events\FestSportsAutoRankService::class);
+                $rankResult = $ranker->rankItem($festProgram, $rankItem);
+                $message .= " Auto-ranked {$rankResult['ranked']} athlete(s).";
+            }
+        }
+
+        return back()->with('success', $message);
     }
 
     private function eventTypes(): array

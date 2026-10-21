@@ -360,6 +360,7 @@ Route::prefix('sports')->name('sports.')->group(function () {
     Route::get('/sahodaya-event/{event}', [SportsMeetController::class, 'sahodayaEvent'])->name('sahodaya-event');
     Route::post('/my-event/{event}/link-parent', [SportsMeetController::class, 'linkParent'])->name('my-event.link-parent');
     Route::post('/my-event/{event}/marks', [SportsMeetController::class, 'storeMark'])->name('my-event.marks.store');
+    Route::post('/my-event/{event}/marks/bulk', [SportsMeetController::class, 'bulkStoreMarks'])->name('my-event.marks.bulk');
     Route::post('/my-event/{event}/items/{item}/auto-rank', [SportsMeetController::class, 'autoRankItem'])->name('my-event.auto-rank');
     Route::get('/submit-winners', [SportsMeetController::class, 'submitWinners'])->name('submit-winners');
     Route::post('/submit-winners', [SportsMeetController::class, 'storeWinners'])->name('submit-winners.store');

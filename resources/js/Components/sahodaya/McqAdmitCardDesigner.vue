@@ -25,12 +25,14 @@
                     <div class="flex gap-2"><button type="button" class="btn-secondary text-xs" @click="applyPreset('one')">Full A4 page</button><button type="button" class="btn-secondary text-xs" @click="applyPreset('two')">2 per page</button></div>
                     <label class="block text-xs text-slate-600">Section heading<input v-model="design.remarks_title" class="field mt-1" maxlength="100" placeholder="Rules & Instructions"></label>
                     <label class="block text-xs text-slate-600">Instruction format<select v-model="design.remarks_format" class="field mt-1"><option value="paragraph">Paragraph</option><option value="numbered">Numbered points</option><option value="bullets">Bullet points</option></select></label>
+                    <div class="grid grid-cols-3 gap-2"><label class="text-xs text-slate-600">Theme colour<input v-model="design.remarks_theme_color" type="color" class="block w-full h-9 mt-1 rounded border border-slate-200"></label><label class="text-xs text-slate-600">Paper colour<input v-model="design.remarks_paper_color" type="color" class="block w-full h-9 mt-1 rounded border border-slate-200"></label><label class="text-xs text-slate-600">Text colour<input v-model="design.remarks_text_color" type="color" class="block w-full h-9 mt-1 rounded border border-slate-200"></label></div>
+                    <p class="text-xs text-slate-500">Instructions blend into the artwork's paper area. Match these colours to a custom background.</p>
                     <label class="block text-xs text-slate-600">Instruction font size<input v-model.number="design.remarks_font_size" class="field mt-1" type="number" min="8" max="18" step="0.5"></label>
                     <label class="block text-xs text-slate-600">Extra content<textarea v-model="design.remarks_text" class="field mt-1" rows="8" maxlength="3000" placeholder="Write one rule per line. Add 10 or more points as needed."></textarea></label>
                     <label v-if="(design.remarks_text || '').trim()" class="block text-xs text-slate-600">Remarks area height (mm)<input v-model.number="design.remarks_height_mm" class="field mt-1" type="number" min="15" :max="Math.min(257,geometry.height-20)"></label>
                     <p v-if="['numbered','bullets'].includes(design.remarks_format)" class="text-xs text-slate-500">{{ instructionCount }} points · one non-empty line per point · numbering is automatic.</p>
                     <button v-if="(design.remarks_text || '').trim()" type="button" class="btn-secondary text-xs" @click="fitInstructions">Fit all points in this card</button>
-                    <p class="text-xs text-slate-500">A separate area appears only when you add content. Choose a full page or two per page for longer instructions.</p><p v-if="remarksOverflow" role="alert" class="text-xs text-red-600">The remarks do not fit in this area. Increase its height, shorten the text, or choose a full A4 page before saving.</p>
+                    <p class="text-xs text-slate-500">The artwork and instructions share one continuous paper background. Choose a full page or two per page for longer instructions.</p><p v-if="remarksOverflow" role="alert" class="text-xs text-red-600">The remarks do not fit in this area. Increase its height, shorten the text, or choose a full A4 page before saving.</p>
                 </div>
                 <slot name="settings" />
             </aside>
@@ -83,6 +85,7 @@ function fitInstructions(){props.design.remarks_height_mm=Math.min(257,geometry.
 if(!props.design.remarks_format)props.design.remarks_format='paragraph';
 if(props.design.remarks_title===undefined)props.design.remarks_title='Remarks / Instructions';
 if(!props.design.remarks_font_size)props.design.remarks_font_size=11;
+for(const [key,value] of Object.entries({remarks_theme_color:'#101b6f',remarks_paper_color:'#ffffff',remarks_text_color:'#111111'}))if(!props.design[key])props.design[key]=value;
 const viewMode=ref('sheet');
 const selected=ref('name'),uploadError=ref(''),localBackground=ref(null);
 const labels=computed(()=>({registration:'Registration number',name:'Student name',class:'Class',date:'Examination date',centre:'Examination centre',principal_signature:'Principal signature',...(props.design.show_student_photo?{student_photo:'Student photo'}:{}),...Object.fromEntries((props.design.custom_fields||[]).map(field=>[field.id,field.label||'Custom field']))}));

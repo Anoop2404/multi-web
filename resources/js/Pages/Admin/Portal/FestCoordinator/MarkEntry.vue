@@ -13,6 +13,13 @@
                                 search-placeholder="Search by item name or code…"
                                 @select="onItemSelect" />
 
+        <div v-if="$page.props.flash?.success" class="notice-banner notice-banner--success text-sm mb-3">
+            {{ $page.props.flash.success }}
+        </div>
+        <div v-if="$page.props.flash?.error || $page.props.errors?.measurement" class="notice-banner notice-banner--error text-sm mb-3">
+            {{ $page.props.flash?.error || $page.props.errors?.measurement }}
+        </div>
+
         <p v-if="isSports && event.record_tracking_enabled" class="text-xs text-amber-800 bg-amber-50 border rounded-lg px-3 py-2 mb-3">
             Record tracking is on — new records may trigger prize labels when marks are saved.
         </p>
@@ -39,8 +46,9 @@
                     <template v-if="section.item?.id && !rankEntryOnly(section.item)">
                         <button type="button"
                                 class="btn-secondary text-xs !min-h-0"
+                                :disabled="autoRankingItem === section.item.id"
                                 @click="autoRank(section.item)">
-                            Auto-rank
+                            {{ autoRankingItem === section.item.id ? 'Ranking…' : 'Auto-rank' }}
                         </button>
                     </template>
                     <span v-else-if="section.item?.id" class="text-[11px] text-slate-400">Rank-only — enter ranks directly</span>
@@ -112,13 +120,17 @@
                                            placeholder="#"
                                            >
                                 </td>
-                                <td class="p-2 text-right align-middle">
-                                    <button type="button"
-                                            class="btn-primary text-xs !min-h-0 !px-2 !py-1"
-                                            :disabled="isAbsent(participant, item)"
-                                            @click="saveMark(participant, item)">
-                                        Save
-                                    </button>
+                                <td class="p-2 text-right align-middle whitespace-nowrap">
+                                    <div class="flex items-center justify-end gap-1.5">
+                                        <span v-if="savedIds.has(participant.id)" class="text-xs font-bold text-emerald-600">Saved ✓</span>
+                                        <span v-else-if="failedIds.has(participant.id)" class="text-xs font-bold text-rose-600" title="Not saved — see message above">Failed ✕</span>
+                                        <button type="button"
+                                                class="btn-primary text-xs !min-h-0 !px-2.5 !py-1"
+                                                :disabled="isAbsent(participant, item) || savingIds.has(participant.id)"
+                                                @click="saveMark(participant, item)">
+                                            {{ savingIds.has(participant.id) ? '…' : 'Save' }}
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         </tbody>
@@ -155,6 +167,11 @@ const props = defineProps({
 });
 
 const { confirm } = useConfirm();
+
+const savingIds = reactive(new Set());
+const savedIds = reactive(new Set());
+const failedIds = reactive(new Set());
+const autoRankingItem = ref(null);
 
 const portalPaths = computed(() =>
     festMarkPortalPaths(props.sahodaya.id, props.event.id, props.festOpsBase),
@@ -231,7 +248,22 @@ function markAttendance(participant, item, status) {
 }
 
 function saveMark(participant, item) {
-    router.post(portalPaths.value.marksPostUrl, buildMarkPayload(participant, item, markForms), { preserveScroll: true });
+    const id = participant.id;
+    savingIds.add(id);
+    router.post(portalPaths.value.marksPostUrl, buildMarkPayload(participant, item, markForms), {
+        preserveScroll: true,
+        onSuccess: () => {
+            savedIds.add(id);
+            failedIds.delete(id);
+        },
+        onError: () => {
+            failedIds.add(id);
+            savedIds.delete(id);
+        },
+        onFinish: () => {
+            savingIds.delete(id);
+        },
+    });
 }
 
 async function autoRank(item) {
@@ -239,6 +271,13 @@ async function autoRank(item) {
         return;
     }
 
-    router.post(portalPaths.value.autoRankUrl(item.id), {}, { preserveScroll: true, preserveState: false });
+    autoRankingItem.value = item.id;
+    router.post(portalPaths.value.autoRankUrl(item.id), {}, {
+        preserveScroll: true,
+        preserveState: false,
+        onFinish: () => {
+            autoRankingItem.value = null;
+        },
+    });
 }
 </script>

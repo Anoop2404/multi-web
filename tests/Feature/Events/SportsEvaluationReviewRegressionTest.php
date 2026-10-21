@@ -170,4 +170,65 @@ class SportsEvaluationReviewRegressionTest extends TestCase
         $this->get(route('portal.judge.dashboard', ['tenantId' => $tenant->id]))->assertInertia(fn ($page) => $page->where('itemProgress.0.marked', 1));
     }
 
+    public function test_school_sports_draft_round_allows_mark_entry_and_auto_rank(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        extract($this->fixture('time'));
+        SahodayaProfile::create(['tenant_id' => $tenant->id, 'prefix' => 'REV', 'student_data_mode' => 'counts_only']);
+        $user->update(['tenant_id' => $school->id]);
+        $user->assignRole('school_admin');
+
+        // School round created in draft
+        $event->update([
+            'level_round'          => 'school',
+            'conducting_school_id' => $school->id,
+            'status'               => 'draft',
+        ]);
+
+        $url = route('school.sports.my-event.marks.store', ['tenantId' => $school->id, 'event' => $event->id]);
+        $this->actingAs($user)->post($url, [
+            'participant_id'    => $participant->id,
+            'item_id'           => $item->id,
+            'position'          => null,
+            'measurement_value' => '11.8',
+            'measurement_unit'  => 's',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('fest_marks', ['participant_id' => $participant->id, 'measurement_value' => '11.8']);
+
+        $rankUrl = route('school.sports.my-event.auto-rank', ['tenantId' => $school->id, 'event' => $event->id, 'item' => $item->id]);
+        $this->actingAs($user)->post($rankUrl)->assertRedirect()->assertSessionHas('success');
+        $this->assertSame(1, FestMark::where('participant_id', $participant->id)->first()->position);
+    }
+
+    public function test_school_sports_bulk_save_and_auto_rank(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        extract($this->fixture('time'));
+        SahodayaProfile::create(['tenant_id' => $tenant->id, 'prefix' => 'REV', 'student_data_mode' => 'counts_only']);
+        $user->update(['tenant_id' => $school->id]);
+        $user->assignRole('school_admin');
+
+        $event->update([
+            'level_round'          => 'school',
+            'conducting_school_id' => $school->id,
+            'status'               => 'draft',
+        ]);
+
+        $p2 = $participant->replicate();
+        $p2->save();
+
+        $bulkUrl = route('school.sports.my-event.marks.bulk', ['tenantId' => $school->id, 'event' => $event->id]);
+        $this->actingAs($user)->post($bulkUrl, [
+            'rows' => [
+                ['participant_id' => $participant->id, 'item_id' => $item->id, 'measurement_value' => '12.4', 'measurement_unit' => 's'],
+                ['participant_id' => $p2->id, 'item_id' => $item->id, 'measurement_value' => '11.2', 'measurement_unit' => 's'],
+            ],
+            'auto_rank_item_id' => $item->id,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        // 11.2 is faster, so p2 should be rank 1, participant rank 2
+        $this->assertSame(2, FestMark::where('participant_id', $participant->id)->first()->position);
+        $this->assertSame(1, FestMark::where('participant_id', $p2->id)->first()->position);
+    }
 }

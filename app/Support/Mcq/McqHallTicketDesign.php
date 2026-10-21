@@ -36,6 +36,9 @@ class McqHallTicketDesign
             'remarks_format' => 'paragraph',
             'remarks_title' => 'Remarks / Instructions',
             'remarks_font_size' => 11,
+            'remarks_theme_color' => '#101b6f',
+            'remarks_paper_color' => '#ffffff',
+            'remarks_text_color' => '#111111',
             'field_positions' => [
                 'registration' => ['x' => 41, 'y' => 48, 'size' => 11, 'width' => 52],
                 'name' => ['x' => 41, 'y' => 54, 'size' => 11, 'width' => 52],
@@ -141,6 +144,9 @@ class McqHallTicketDesign
             'remarks_format' => in_array($settings['remarks_format'] ?? '', ['paragraph','numbered','bullets'], true) ? $settings['remarks_format'] : 'paragraph',
             'remarks_title' => mb_substr((string) ($settings['remarks_title'] ?? 'Remarks / Instructions'), 0, 100),
             'remarks_font_size' => max(8, min(18, (float) ($settings['remarks_font_size'] ?? 11))),
+            'remarks_theme_color' => self::normalizeColor($settings['remarks_theme_color'] ?? null, '#101b6f'),
+            'remarks_paper_color' => self::normalizeColor($settings['remarks_paper_color'] ?? null, '#ffffff'),
+            'remarks_text_color' => self::normalizeColor($settings['remarks_text_color'] ?? null, '#111111'),
             'remarks_height_mm' => max(15, min(257, (float) ($settings['remarks_height_mm'] ?? 35))),
             'card_width_mm' => max(20, min(277, (float) ($settings['card_width_mm'] ?? 90))),
             'card_height_mm' => max(20, min(277, (float) ($settings['card_height_mm'] ?? 121.384615))),
@@ -321,6 +327,23 @@ class McqHallTicketDesign
             return 0;
         }
         return min(max(15, (float) ($design['remarks_height_mm'] ?? 35)), self::printGeometry($design)['height'] - 20);
+    }
+
+    /** Extend the artwork's own paper edges, keeping instructions inside the same frame. */
+    public static function instructionBox(array $design): array
+    {
+        $die = self::printGeometry($design);
+        $stse = ($design['layout'] ?? '') === 'stse_three_up';
+        $inset = $stse ? 30 / 780 : 0;
+        $bottom = $stse ? $die['height'] * 28 / 1052 : 3;
+        $top = $stse ? $die['height'] * 20 / 1052 : 0;
+        return [
+            'frame_x' => 0, 'frame_y' => 0, 'frame_width' => $die['width'], 'frame_height' => $die['height'],
+            'paper_x' => $die['width'] * $inset, 'paper_y' => $top,
+            'paper_width' => $die['width'] * ($stse ? 712 / 780 : 1), 'paper_height' => max(0, $die['height'] - $top - $bottom),
+            'x' => $die['width'] * 0.10, 'width' => $die['width'] * 0.80,
+            'bottom' => $bottom, 'height' => max(0, self::remarksHeight($design) - $bottom),
+        ];
     }
 
     /** Artwork bounds inside a die; text uses the same coordinate space as its labels. */

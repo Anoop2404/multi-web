@@ -49,7 +49,11 @@ class FestMarkSaveService
         $participant->loadMissing('registration');
         abort_if($participant->registration->event_id !== $event->id, 403);
         abort_if($participant->registration->item_id !== $item->id, 422, 'The participant is not registered for this item.');
-        abort_if($participant->registration->status !== 'approved', 422, 'Marks can only be entered for approved registrations.');
+        if ($event->level_round === 'school') {
+            abort_if(in_array($participant->registration->status, ['withdrawn', 'rejected', 'cancelled'], true), 422, 'Cancelled or rejected registrations cannot receive marks.');
+        } else {
+            abort_if($participant->registration->status !== 'approved', 422, 'Marks can only be entered for approved registrations.');
+        }
         abort_if($participant->participant_role === 'standby', 422, 'Standby participants cannot receive marks.');
         abort_if($participant->disqualified_at !== null, 422, 'Disqualified participants cannot receive marks.');
 
@@ -105,6 +109,23 @@ class FestMarkSaveService
                         ? 'This item is time-based — record a time (e.g. 12.5 s or 1:02.5) before saving.'
                         : 'This item is distance-based — record a distance (e.g. 4.2 m) before saving.',
                 ]);
+            }
+
+            if ($resultMethod === 'time' && $measurement !== '') {
+                $parsedTime = \App\Support\FestSportsMeasurementHelper::parseTimeInSeconds($measurement);
+                if ($parsedTime === null || $parsedTime <= 0) {
+                    throw ValidationException::withMessages([
+                        'measurement_value' => 'Invalid time format. Enter seconds (e.g. 12.45) or minutes:seconds (e.g. 1:02.50).',
+                    ]);
+                }
+            } elseif ($resultMethod === 'distance' && $measurement !== '') {
+                $unit = $data['measurement_unit'] ?? $existingMark?->measurement_unit ?? 'm';
+                $parsedDist = \App\Support\FestSportsMeasurementHelper::parseDistanceInMeters($measurement, $unit);
+                if ($parsedDist === null || $parsedDist <= 0) {
+                    throw ValidationException::withMessages([
+                        'measurement_value' => 'Invalid distance format. Enter a valid distance (e.g. 5.45 or 12.30 m).',
+                    ]);
+                }
             }
         }
 

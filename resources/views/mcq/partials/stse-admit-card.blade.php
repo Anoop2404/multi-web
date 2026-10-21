@@ -2,10 +2,15 @@
     $die = \App\Support\Mcq\McqHallTicketDesign::printGeometry($design);
     $artwork = \App\Support\Mcq\McqHallTicketDesign::artworkBox($design);
     $remarksHeight = \App\Support\Mcq\McqHallTicketDesign::remarksHeight($design);
+    $instruction = \App\Support\Mcq\McqHallTicketDesign::instructionBox($design);
 @endphp
 <div style="position:relative;width:{{ $die['width'] }}mm;height:{{ $die['height'] }}mm;break-inside:avoid;page-break-inside:avoid;overflow:hidden;font-family:Arial,Helvetica,sans-serif;color:#111;background:white;">
+    @if($remarksHeight > 0)
+        <div style="position:absolute;inset:0;background:{{ ($design['layout'] ?? '') === 'stse_three_up' ? '#f1f2f5' : ($design['remarks_paper_color'] ?? '#ffffff') }};"></div>
+        <div style="position:absolute;left:{{ $instruction['paper_x'] }}mm;top:{{ $instruction['paper_y'] }}mm;width:{{ $instruction['paper_width'] }}mm;height:{{ $instruction['paper_height'] }}mm;background:{{ $design['remarks_paper_color'] ?? '#ffffff' }};"></div>
+    @endif
     <div style="position:absolute;left:{{ $artwork['x'] }}mm;top:{{ $artwork['y'] }}mm;width:{{ $artwork['width'] }}mm;height:{{ $artwork['height'] }}mm;">
-    <img src="{{ ($design['layout'] ?? '') === 'custom_background' ? \App\Support\TenantStorage::logoUrl($tenant ?? null, $design['background_path'] ?? null) : asset('images/mcq/stse-preliminary-background.png') }}" alt="STSE Preliminary admit card" style="position:absolute;inset:0;width:100%;height:100%;">
+    <img src="{{ ($design['layout'] ?? '') === 'custom_background' ? \App\Support\TenantStorage::logoUrl($tenant ?? null, $design['background_path'] ?? null) : asset('images/mcq/stse-preliminary-background.png') }}" alt="STSE Preliminary admit card" style="position:absolute;inset:0;width:100%;height:100%;{{ $remarksHeight > 0 && ($design['layout'] ?? '') === 'stse_three_up' ? 'clip-path:inset(3% 5% 3% 4%);' : '' }}">
     @foreach([
         'registration' => $sample['hall_ticket_no'] ?? '',
         'name' => $sample['participant_name'] ?? $sample['student_name'] ?? '',
@@ -29,13 +34,13 @@
     @endif
     </div>
     @if($remarksHeight > 0)
-        <div style="position:absolute;bottom:0;left:0;width:100%;height:{{ $remarksHeight }}mm;box-sizing:border-box;padding:8px 12px;border-top:1px solid #cbd5e1;font:{{ $design['remarks_font_size'] ?? 11 }}px/1.4 Arial,Helvetica,sans-serif;color:#111;overflow:hidden;">
-            @if(($design['remarks_title'] ?? 'Remarks / Instructions') !== '')<strong>{{ $design['remarks_title'] ?? 'Remarks / Instructions' }}</strong>@endif
+        <div style="position:absolute;bottom:{{ $instruction['bottom'] }}mm;left:{{ $instruction['x'] }}mm;width:{{ $instruction['width'] }}mm;height:{{ $instruction['height'] }}mm;box-sizing:border-box;padding:8px 0;font:{{ $design['remarks_font_size'] ?? 11 }}px/1.4 Arial,Helvetica,sans-serif;color:{{ $design['remarks_text_color'] ?? '#111111' }};overflow:hidden;">
+            @if(($design['remarks_title'] ?? 'Remarks / Instructions') !== '')<strong style="display:block;color:{{ $design['remarks_theme_color'] ?? '#101b6f' }};font-size:1.05em;letter-spacing:.045em;text-transform:uppercase;padding-bottom:5px;border-bottom:1px solid {{ $design['remarks_theme_color'] ?? '#101b6f' }};">{{ $design['remarks_title'] ?? 'Remarks / Instructions' }}</strong>@endif
             @if(in_array($design['remarks_format'] ?? 'paragraph', ['numbered','bullets'], true))
                 @php $listTag = $design['remarks_format'] === 'numbered' ? 'ol' : 'ul'; @endphp
                 <{{ $listTag }} style="margin:4px 0 0;padding-left:20px;list-style-type:{{ $listTag === 'ol' ? 'decimal' : 'disc' }};list-style-position:outside;">
                     @foreach(\App\Support\Mcq\McqHallTicketDesign::instructionPoints($design['remarks_text']) as $point)
-                        <li style="padding-left:2px;margin:0 0 2px;overflow-wrap:anywhere;">{{ $point }}</li>
+                        <li style="padding-left:2px;margin:0 0 2px;overflow-wrap:anywhere;color:{{ $design['remarks_theme_color'] ?? '#101b6f' }};"><span style="color:{{ $design['remarks_text_color'] ?? '#111111' }};">{{ $point }}</span></li>
                     @endforeach
                 </{{ $listTag }}>
             @else

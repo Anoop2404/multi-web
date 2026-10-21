@@ -693,6 +693,7 @@ Route::prefix('school-admin/{tenantId}')
     Route::delete('/fest-programs/{festProgram}/items/{item}', [FestProgramController::class, 'destroyItem'])->name('fest-programs.items.destroy');
     Route::get('/fest-programs/{festProgram}/marks', [FestProgramController::class, 'marks'])->name('fest-programs.marks');
     Route::post('/fest-programs/{festProgram}/marks', [FestProgramController::class, 'storeMark'])->name('fest-programs.marks.store');
+    Route::post('/fest-programs/{festProgram}/marks/bulk', [FestProgramController::class, 'bulkStoreMarks'])->name('fest-programs.marks.bulk');
     Route::get('/fest/{event}/house', [FestEventPortalController::class, 'house'])->name('fest.house');
     Route::get('/fest/{event}/catering', [FestEventPortalController::class, 'catering'])->name('fest.catering');
     Route::post('/fest/{event}/catering', [FestEventPortalController::class, 'storeCatering'])->name('fest.catering.store');
