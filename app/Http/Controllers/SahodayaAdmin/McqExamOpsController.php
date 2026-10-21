@@ -247,7 +247,7 @@ class McqExamOpsController extends SahodayaAdminController
 
         $query = McqRegistration::where('exam_id', $exam->id)
             ->active()
-            ->with(['student', 'teacher', 'school']);
+            ->with(['student.schoolClass', 'teacher', 'school']);
 
         $this->applyRegistrationFilters($query, $filters);
 

@@ -132,6 +132,7 @@
                             <th class="w-12">#</th>
                             <th>Reg. no.</th>
                             <th>Candidate</th>
+                            <th>Class</th>
                             <th>School</th>
                             <th>Approval</th>
                             <th>Hall / seat</th>
@@ -156,6 +157,7 @@
                                 <span v-else class="text-slate-400 font-normal">Cancelled</span>
                             </td>
                             <td class="font-bold text-slate-900">{{ r.student?.name || r.teacher?.name || r.participant_name || '—' }}</td>
+                            <td class="text-xs">{{ r.student?.school_class?.name || (r.teacher_id ? 'Teacher' : '—') }}</td>
                             <td class="text-xs">{{ r.school?.name || '—' }}</td>
                             <td class="text-xs capitalize">{{ (r.approval_status || 'pending').replaceAll('_', ' ') }}</td>
                             <td class="text-xs">{{ r.hall_room || '—' }} {{ r.seat_no ? `· Seat ${r.seat_no}` : '' }}</td>
@@ -186,7 +188,7 @@
                             </td>
                         </tr>
                         <tr v-if="!registrations.data?.length">
-                            <td :colspan="isOnline ? 8 : 7" class="p-6 text-center text-slate-400">No matching registrations.</td>
+                            <td :colspan="isOnline ? 9 : 8" class="p-6 text-center text-slate-400">No matching registrations.</td>
                         </tr>
                     </tbody>
                 </table>
