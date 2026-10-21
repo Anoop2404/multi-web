@@ -35,10 +35,10 @@ class StseAdmitCardTest extends TestCase
         $this->assertEquals(297, 2 * $geometry['width']);
         $this->assertEquals(210, $geometry['height']);
         $box = McqHallTicketDesign::artworkBox($design);
-        $this->assertEquals(0, $box['x']);
-        $this->assertEquals(0, $box['y']);
-        $this->assertEquals(148.5, $box['width']);
-        $this->assertEquals(210, $box['height']);
+        $this->assertEqualsWithDelta(0, $box['x'] + $box['width'] * 30 / 780, 0.00001);
+        $this->assertEqualsWithDelta(0, $box['y'] + $box['height'] * 20 / 1052, 0.00001);
+        $this->assertEqualsWithDelta(148.5, $box['width'] * 712 / 780, 0.00001);
+        $this->assertEqualsWithDelta(210, $box['height'] * 1004 / 1052, 0.00001);
     }
 
     public function test_school_centre_is_exam_specific_and_overrides_the_sahodaya_venue(): void

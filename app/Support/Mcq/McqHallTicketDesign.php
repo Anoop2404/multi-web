@@ -362,6 +362,15 @@ class McqHallTicketDesign
         $geometry = self::printGeometry($design);
         $width = $geometry['width'];
         $height = $geometry['height'] - self::remarksHeight($design);
+        // The supplied STSE bitmap includes a grey outer frame. In borderless fill
+        // mode enlarge the entire artwork coordinate space, including its fields,
+        // so only the white card (30,20)-(742,1024) occupies the die.
+        if (($design['layout'] ?? '') === 'stse_three_up'
+            && ($design['background_fit'] ?? '') === 'stretch'
+            && $geometry['margin'] == 0 && self::remarksHeight($design) == 0) {
+            return ['x' => -$width * 30 / 712, 'y' => -$height * 20 / 1004,
+                'width' => $width * 780 / 712, 'height' => $height * 1052 / 1004];
+        }
         if (($design['background_fit'] ?? 'contain') === 'stretch') {
             return ['x' => 0, 'y' => 0, 'width' => $width, 'height' => $height];
         }

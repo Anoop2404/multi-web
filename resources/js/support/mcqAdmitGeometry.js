@@ -12,6 +12,7 @@ export function printGeometry(design) {
 export function artworkBox(design) {
     const {width,height:dieHeight}=printGeometry(design);
     const height=dieHeight-remarksHeight(design);
+    if(design.layout==='stse_three_up' && design.background_fit==='stretch' && printGeometry(design).margin===0 && remarksHeight(design)===0) return {x:-width*30/712,y:-height*20/1004,width:width*780/712,height:height*1052/1004};
     if(design.background_fit==='stretch')return {x:0,y:0,width,height};
     const aspect=design.layout==='stse_three_up'?780/1052:Number(design.background_aspect_ratio)||780/1052;
     const artWidth=Math.min(width,height*aspect),artHeight=artWidth/aspect;
