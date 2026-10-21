@@ -361,6 +361,7 @@ function saveDesign() {
     fd.append('remarks_format', designForm.remarks_format || 'paragraph');
     fd.append('remarks_title', designForm.remarks_title ?? 'Remarks / Instructions');
     fd.append('remarks_font_size', String(designForm.remarks_font_size || 11));
+    for (const [key,value] of Object.entries(designForm.remarks_text_style || {})) fd.append(`remarks_text_style[${key}]`,String(value));
     for(const key of ['remarks_theme_color','remarks_paper_color','remarks_text_color']) fd.append(key,designForm[key] || (key==='remarks_theme_color'?'#101b6f':key==='remarks_paper_color'?'#ffffff':'#111111'));
     for (const [index, field] of (designForm.custom_fields || []).entries()) {
         for (const [key, value] of Object.entries(field)) fd.append(`custom_fields[${index}][${key}]`, String(value));

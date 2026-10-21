@@ -7,9 +7,60 @@
             {{ $page.props.flash?.error || $page.props.errors?.measurement || $page.props.errors?.measurement_value }}
         </div>
 
-        <p class="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-            Save each result before auto-ranking. Equal results share the same rank. Results contribute directly to House standings.
-        </p>
+        <div class="rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50/80 to-indigo-50/50 p-4 text-sm text-slate-800 shadow-xs">
+            <div class="flex items-start justify-between gap-3">
+                <div class="flex items-start gap-2.5">
+                    <span class="text-lg">📋</span>
+                    <div>
+                        <h4 class="font-semibold text-slate-900 text-sm">Evaluation & Measurement Instructions</h4>
+                        <p class="text-xs text-slate-600 mt-0.5">Quick guide for recording accurate marks, time, distances, and ranks.</p>
+                    </div>
+                </div>
+                <button type="button" class="text-xs text-indigo-700 hover:text-indigo-900 font-medium underline shrink-0" @click="showInstructions = !showInstructions">
+                    {{ showInstructions ? 'Hide instructions ▲' : 'Show full instructions ▼' }}
+                </button>
+            </div>
+
+            <!-- Quick badges (always visible) -->
+            <div class="mt-3 flex flex-wrap gap-2 text-xs">
+                <span class="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 border border-slate-200 text-slate-700 shadow-xs">
+                    ⏱️ <strong>Sprints / Time:</strong> <code class="font-mono text-indigo-700">11.45</code> or <code class="font-mono text-indigo-700">1:02.50</code>
+                </span>
+                <span class="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 border border-slate-200 text-slate-700 shadow-xs">
+                    📏 <strong>Distance:</strong> <code class="font-mono text-indigo-700">5.45</code> (meters)
+                </span>
+                <span class="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 border border-slate-200 text-slate-700 shadow-xs">
+                    🏅 <strong>Auto-rank:</strong> Lowest time or highest distance ranks 1st
+                </span>
+                <span class="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 border border-slate-200 text-slate-700 shadow-xs">
+                    🛡️ <strong>Inter-House:</strong> Results automatically update House Standings
+                </span>
+            </div>
+
+            <!-- Detailed instructions (collapsible) -->
+            <div v-show="showInstructions" class="mt-3 pt-3 border-t border-blue-200/60 grid sm:grid-cols-2 gap-4 text-xs leading-relaxed text-slate-700">
+                <div>
+                    <h5 class="font-semibold text-slate-900 mb-1 flex items-center gap-1.5">
+                        <span>⏱️</span> Timing & Distance Formats
+                    </h5>
+                    <ul class="list-disc pl-4 space-y-1">
+                        <li><strong>Track / Sprints:</strong> Enter decimal seconds (<code class="font-mono text-indigo-600">12.45</code>), minutes & seconds (<code class="font-mono text-indigo-600">1:02.50</code>), or hours & minutes (<code class="font-mono text-indigo-600">1:05:20</code>). Natural input like <code class="font-mono text-indigo-600">1m 23s</code> is also accepted.</li>
+                        <li><strong>Field / Distance:</strong> Enter distance in meters (e.g. <code class="font-mono text-indigo-600">5.45</code>). Units like <code class="font-mono text-indigo-600">m</code> or <code class="font-mono text-indigo-600">cm</code> are recognized.</li>
+                        <li><strong>Live preview:</strong> An emerald preview badge will show the parsed format under the field while typing. Invalid formats show a red warning.</li>
+                    </ul>
+                </div>
+                <div>
+                    <h5 class="font-semibold text-slate-900 mb-1 flex items-center gap-1.5">
+                        <span>🏅</span> Auto-Ranking & House Championship
+                    </h5>
+                    <ul class="list-disc pl-4 space-y-1">
+                        <li><strong>Auto-rank:</strong> Click <em>"Save & Auto-rank"</em> to automatically assign 1st, 2nd, and 3rd places based on best performances. Ties share equal ranks.</li>
+                        <li><strong>House Standings:</strong> Points are automatically computed and reflected in the Inter-House Championship Standings on the Overview tab.</li>
+                        <li><strong>Cluster Meets:</strong> After completing school rounds, switch to the <em>"Winners"</em> tab to promote your top qualifiers to the Sahodaya cluster meet.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
 
         <EmptyState v-if="!sections.length" title="No approved participants" description="Approve registrations before entering results." icon="📊" />
 
@@ -132,6 +183,8 @@ const props = defineProps({
     saveUrl: String,
     gradeOptions: { type: Array, default: () => [] },
 });
+
+const showInstructions = ref(false);
 
 // School endpoints save individual participants, including every member of a group.
 const groupedProps = computed(() => ({

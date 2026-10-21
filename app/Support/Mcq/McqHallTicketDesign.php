@@ -39,6 +39,7 @@ class McqHallTicketDesign
             'remarks_theme_color' => '#101b6f',
             'remarks_paper_color' => '#ffffff',
             'remarks_text_color' => '#111111',
+            'remarks_text_style' => [],
             'field_positions' => [
                 'registration' => ['x' => 41, 'y' => 48, 'size' => 11, 'width' => 52],
                 'name' => ['x' => 41, 'y' => 54, 'size' => 11, 'width' => 52],
@@ -147,6 +148,7 @@ class McqHallTicketDesign
             'remarks_theme_color' => self::normalizeColor($settings['remarks_theme_color'] ?? null, '#101b6f'),
             'remarks_paper_color' => self::normalizeColor($settings['remarks_paper_color'] ?? null, '#ffffff'),
             'remarks_text_color' => self::normalizeColor($settings['remarks_text_color'] ?? null, '#111111'),
+            'remarks_text_style' => self::textStyle(array_merge(['line_height'=>1.4], is_array($settings['remarks_text_style'] ?? null) ? $settings['remarks_text_style'] : [])),
             'remarks_height_mm' => max(15, min(257, (float) ($settings['remarks_height_mm'] ?? 35))),
             'card_width_mm' => max(20, min(277, (float) ($settings['card_width_mm'] ?? 90))),
             'card_height_mm' => max(20, min(277, (float) ($settings['card_height_mm'] ?? 121.384615))),
@@ -287,7 +289,12 @@ class McqHallTicketDesign
             'font_family' => in_array($field['font_family'] ?? '', $families, true) ? $field['font_family'] : 'Arial',
             'font_weight' => ($field['font_weight'] ?? '') === 'bold' ? 'bold' : 'normal',
             'font_style' => ($field['font_style'] ?? '') === 'italic' ? 'italic' : 'normal',
-            'text_align' => in_array($field['text_align'] ?? '', ['left','center','right'], true) ? $field['text_align'] : 'left',
+            'text_decoration' => ($field['text_decoration'] ?? '') === 'underline' ? 'underline' : 'none',
+            'text_color' => self::normalizeColor(is_string($field['text_color'] ?? null) ? $field['text_color'] : null, '#111111'),
+            'line_height' => max(1, min(2.5, is_numeric($field['line_height'] ?? null) ? (float) $field['line_height'] : 1.25)),
+            'letter_spacing' => max(-1, min(5, is_numeric($field['letter_spacing'] ?? null) ? (float) $field['letter_spacing'] : 0)),
+            'layer' => max(1, min(50, (int) ($field['layer'] ?? 2))),
+            'text_align' => in_array($field['text_align'] ?? '', ['left','center','right','justify'], true) ? $field['text_align'] : 'left',
         ];
     }
 

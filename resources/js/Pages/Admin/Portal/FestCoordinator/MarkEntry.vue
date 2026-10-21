@@ -20,17 +20,59 @@
             {{ $page.props.flash?.error || $page.props.errors?.measurement }}
         </div>
 
-        <p v-if="isSports && event.record_tracking_enabled" class="text-xs text-amber-800 bg-amber-50 border rounded-lg px-3 py-2 mb-3">
-            Record tracking is on — new records may trigger prize labels when marks are saved.
+        <p v-if="isSports && event.record_tracking_enabled" class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+            🏆 <strong>Record tracking is on:</strong> Breaking existing records will trigger special recognition when marks are saved.
         </p>
-        <p class="text-xs text-slate-600 bg-slate-50 border rounded-lg px-3 py-2 mb-3">
-            <template v-if="isSports">
-                Mark attendance, enter time/distance, pick rank or use Auto-rank.
-            </template>
-            <template v-else>
-                Position / rank: same number can be assigned to multiple participants (ties).
-            </template>
-        </p>
+
+        <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 text-xs text-slate-700 mb-4 shadow-xs">
+            <div class="flex items-start justify-between gap-2">
+                <div class="flex items-center gap-2">
+                    <span class="text-base">📋</span>
+                    <div>
+                        <strong class="text-slate-900 text-xs">Evaluator & Coordinator Entry Guide</strong>
+                        <p class="text-[11px] text-slate-500">Quick format guidelines for attendance, time, distance, and auto-ranking.</p>
+                    </div>
+                </div>
+                <button type="button" class="text-indigo-700 hover:text-indigo-900 font-medium underline shrink-0" @click="showInstructions = !showInstructions">
+                    {{ showInstructions ? 'Hide guide ▲' : 'Show full guide ▼' }}
+                </button>
+            </div>
+
+            <!-- Quick pills -->
+            <div class="mt-2.5 flex flex-wrap gap-2 text-[11px]">
+                <span v-if="isSports" class="inline-flex items-center gap-1 rounded bg-white px-2 py-1 border border-slate-200 shadow-2xs">
+                    ⏱️ <strong>Time:</strong> <code class="font-mono text-indigo-700">11.45</code> or <code class="font-mono text-indigo-700">1:02.50</code>
+                </span>
+                <span v-if="isSports" class="inline-flex items-center gap-1 rounded bg-white px-2 py-1 border border-slate-200 shadow-2xs">
+                    📏 <strong>Distance:</strong> <code class="font-mono text-indigo-700">5.45</code> (m)
+                </span>
+                <span class="inline-flex items-center gap-1 rounded bg-white px-2 py-1 border border-slate-200 shadow-2xs">
+                    🏅 <strong>Auto-rank:</strong> Lower time or higher score/distance ranks 1st
+                </span>
+                <span class="inline-flex items-center gap-1 rounded bg-white px-2 py-1 border border-slate-200 shadow-2xs">
+                    🤝 <strong>Ties:</strong> Same position number can be assigned to ties
+                </span>
+            </div>
+
+            <!-- Collapsible full guide -->
+            <div v-show="showInstructions" class="mt-3 pt-2.5 border-t border-slate-200/80 grid sm:grid-cols-2 gap-3 text-slate-600 leading-relaxed">
+                <div>
+                    <h5 class="font-semibold text-slate-800 mb-1">⏱️ Measurement Formats</h5>
+                    <ul class="list-disc pl-4 space-y-1">
+                        <li><strong>Sprints / Track:</strong> Enter decimal seconds (<code class="font-mono">11.45</code>), minutes & seconds (<code class="font-mono">1:02.50</code>), or natural (<code class="font-mono">1m 23s</code>).</li>
+                        <li><strong>Field / Distance:</strong> Enter meters (<code class="font-mono">5.45</code>). Distance auto-ranks in descending order (highest wins).</li>
+                        <li><strong>Attendance:</strong> Mark 'Absent' to exclude a participant from ranking and results.</li>
+                    </ul>
+                </div>
+                <div>
+                    <h5 class="font-semibold text-slate-800 mb-1">🏅 Auto-Rank & Verification</h5>
+                    <ul class="list-disc pl-4 space-y-1">
+                        <li><strong>Auto-rank:</strong> Computes standard positions (1st, 2nd, 3rd) according to official competition rules.</li>
+                        <li><strong>Manual Overrides:</strong> You can edit any rank directly and click <em>Save</em> to preserve specific judge rulings or disqualifications.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
 
         <p v-if="!sections.length" class="text-sm text-slate-500 py-6 text-center">
             No participants in this section. Pick another Event Head above.
@@ -142,7 +184,7 @@
 </template>
 
 <script setup>
-import { reactive, computed } from 'vue';
+import { reactive, computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
@@ -172,6 +214,7 @@ const savingIds = reactive(new Set());
 const savedIds = reactive(new Set());
 const failedIds = reactive(new Set());
 const autoRankingItem = ref(null);
+const showInstructions = ref(false);
 
 const portalPaths = computed(() =>
     festMarkPortalPaths(props.sahodaya.id, props.event.id, props.festOpsBase),

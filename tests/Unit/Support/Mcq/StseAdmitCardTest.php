@@ -29,6 +29,24 @@ class StseAdmitCardTest extends TestCase
         $this->assertNull(McqHallTicketDesign::centreForSchool($exam, $school));
     }
 
+    public function test_builder_alignment_spacing_colour_and_layers_match_printed_fields(): void
+    {
+        $design = McqHallTicketDesign::normalize(['layout'=>'stse_three_up','field_positions'=>[
+            'name'=>['text_align'=>'justify','text_decoration'=>'underline','text_color'=>'#123456','line_height'=>1.8,'letter_spacing'=>0.5,'layer'=>7],
+        ],'remarks_text'=>'Instruction text','remarks_text_style'=>['text_align'=>'right','font_family'=>'Georgia','line_height'=>1.7]]);
+        $html = view('mcq.partials.hall-ticket-card', ['design'=>$design,'sample'=>['participant_name'=>'Test Student']])->render();
+        $this->assertStringContainsString('text-align:justify;text-decoration:underline', $html);
+        $this->assertStringContainsString('color:#123456;z-index:7', $html);
+        $this->assertStringContainsString('line-height:1.8', $html);
+        $this->assertStringContainsString('font-family:Georgia', $html);
+        $this->assertStringContainsString('text-align:right', $html);
+        $style = McqHallTicketDesign::textStyle(['line_height'=>99,'letter_spacing'=>-100,'layer'=>1000,'text_color'=>'red;bad']);
+        $this->assertEquals(2.5, $style['line_height']);
+        $this->assertEquals(-1, $style['letter_spacing']);
+        $this->assertSame(50, $style['layer']);
+        $this->assertSame('#111111', $style['text_color']);
+    }
+
     public function test_instructions_share_the_artwork_paper_and_use_safe_theme_colours(): void
     {
         $design = McqHallTicketDesign::normalize(['layout'=>'stse_three_up','card_width_mm'=>190,'card_height_mm'=>277,'page_orientation'=>'portrait','remarks_text'=>'Rule one','remarks_height_mm'=>75,'remarks_theme_color'=>'#164575','remarks_paper_color'=>'#fff8eb']);
