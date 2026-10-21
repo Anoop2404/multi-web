@@ -211,7 +211,7 @@ function rankSelectOptions(item) {
 }
 
 function showScore(item) {
-    return !rankEntryOnly(item) && !['time', 'distance'].includes((item?.result_method || '').toLowerCase());
+    return !isSports.value && !rankEntryOnly(item) && !['time', 'distance'].includes((item?.result_method || '').toLowerCase());
 }
 
 function measurementPlaceholder(item) {

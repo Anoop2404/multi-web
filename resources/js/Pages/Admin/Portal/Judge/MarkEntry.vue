@@ -47,7 +47,7 @@
                 </div>
                 <SearchableSelect v-if="!isSports && !rankEntryOnly(reg.item)" v-model="forms[p.id].grade" :options="gradeOptions" :all-option="true" all-label="Grade" />
                 <input :aria-label="`Rank for ${participantRegNo(p) || p.id}`" v-model.number="forms[p.id].position" type="number" min="1" placeholder="Rank (ties OK)" class="field" title="Same rank allowed for ties">
-                <input v-if="!rankEntryOnly(reg.item)" v-model.number="forms[p.id].score" type="number" min="0" step="0.01" placeholder="Score" class="field">
+                <input v-if="!isSports && !rankEntryOnly(reg.item)" v-model.number="forms[p.id].score" type="number" min="0" step="0.01" placeholder="Score" class="field">
                 <template v-if="showMeasurement(reg.item)">
                     <input v-model="forms[p.id].measurement_value" :placeholder="measurementPlaceholder(reg.item)" class="field">
                     <input v-model="forms[p.id].measurement_unit" :placeholder="unitHint(reg.item)" class="field">

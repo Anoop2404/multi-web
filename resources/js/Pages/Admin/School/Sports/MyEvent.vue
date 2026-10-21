@@ -70,13 +70,13 @@
                     </div>
                     <div v-if="resultsByItem[reg.item?.id]?.length" class="overflow-x-auto">
                         <table class="data-table">
-                            <thead><tr><th>Place</th><th>Athlete</th><th>Measurement</th><th>Score</th></tr></thead>
+                            <thead><tr><th>Place</th><th>Athlete</th><th>Measurement</th></tr></thead>
                             <tbody>
                                 <tr v-for="(row, idx) in resultsByItem[reg.item.id]" :key="idx">
                                     <td class="font-semibold">{{ row.position }}</td>
                                     <td>{{ row.name }}</td>
                                     <td>{{ row.measurement || '—' }}</td>
-                                    <td>{{ row.score ?? '—' }}</td>
+
                                 </tr>
                             </tbody>
                         </table>

@@ -2,6 +2,11 @@
     <SahodayaEventsLayout title="Mark entry" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
                           :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         
+        <div v-if="validationMessages.length" role="alert" class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+            <p class="font-semibold">Result not saved. Please correct the following:</p>
+            <ul class="mt-1 list-disc pl-5"><li v-for="message in validationMessages" :key="message">{{ message }}</li></ul>
+        </div>
+
         <!-- Header Actions -->
         <PageHeader :title="`${event.title} — Mark entry`" eyebrow="Mark entry"
                     :description="filterDescription">
@@ -232,14 +237,14 @@
                                 <th class="px-2.5 py-3 min-w-[6.5rem] w-28">Attendance</th>
                                 <th v-if="showMeasurement(section.item)" class="px-2.5 py-3 min-w-[7.5rem] w-32">{{ measurementUnitHint(section.item) === 'm' ? 'Distance (m)' : 'Time / Distance' }}</th>
                                 <th v-if="showRankColumn(section.item)" class="px-2.5 py-3 min-w-[6.5rem] w-28">Rank</th>
-                                <template v-if="hasJudgePanel && !rankEntryOnly(section.item)">
+                                <template v-if="hasJudgePanel && !isSports && !rankEntryOnly(section.item)">
                                     <th v-for="j in judgeNumbers" :key="j" class="px-2.5 py-3 min-w-[5.5rem] w-24 text-center">
                                         Judge {{ j }}
                                         <span v-if="perJudgeMax" class="block font-normal text-slate-400 normal-case text-[9px]">/ {{ perJudgeMax }}</span>
                                     </th>
                                     <th class="px-2.5 py-3 min-w-[5rem] w-20 text-center">Grand Total</th>
                                 </template>
-                                <th v-else-if="!rankEntryOnly(section.item)" class="px-2.5 py-3 min-w-[6rem] w-24 text-center">Marks / Score</th>
+                                <th v-else-if="!isSports && !rankEntryOnly(section.item)" class="px-2.5 py-3 min-w-[6rem] w-24 text-center">Marks / Score</th>
                                 <th v-if="showGradeColumn && !rankEntryOnly(section.item)" class="px-2.5 py-3 min-w-[5rem] w-20 text-center">Grade</th>
                                 <th class="px-3 py-3 text-right min-w-[5.5rem] w-24">Actions</th>
                             </tr>
@@ -313,7 +318,7 @@
                                 </td>
 
                                 <!-- Per-judge subtotal columns + computed Grand Total -->
-                                <template v-if="hasJudgePanel && !rankEntryOnly(section.item)">
+                                <template v-if="hasJudgePanel && !isSports && !rankEntryOnly(section.item)">
                                     <td v-for="j in judgeNumbers" :key="j" class="px-2.5 py-2 text-center">
                                         <input v-model.number="judgeForms[participant.id][j]" type="number" min="0" step="0.5"
                                                :max="perJudgeMax"
@@ -327,7 +332,7 @@
                                 </template>
 
                                 <!-- Marks / Score (Optional) -->
-                                <td v-else-if="!rankEntryOnly(section.item)" class="px-2.5 py-2 text-center">
+                                <td v-else-if="!isSports && !rankEntryOnly(section.item)" class="px-2.5 py-2 text-center">
                                     <input v-model.number="markForms[participant.id].score" type="number" min="0" step="0.5"
                                            class="field text-sm font-bold tabular-nums w-20 !py-1.5 !px-2 text-center" placeholder="Optional"
                                            :disabled="isAbsent(participant, item) || itemLocked"
@@ -648,7 +653,7 @@ for (const reg of props.registrations ?? []) {
 
 // Judge-panel scoring: one input column per judge (that judge's paper
 // subtotal), plus a computed Grand Total (sum across judges).
-const hasJudgePanel = computed(() => (props.judgeCount ?? 1) > 1);
+const hasJudgePanel = computed(() => !isSports.value && (props.judgeCount ?? 1) > 1);
 const judgeNumbers = computed(() => {
     const n = props.judgeCount ?? 1;
     return Array.from({ length: n }, (_, i) => i + 1);
@@ -814,6 +819,8 @@ function markAttendance(participant, item, status) {
 const savedIds = ref(new Set());
 const savingIds = ref(new Set());
 const failedIds = ref(new Set());
+const entryPage = usePage();
+const validationMessages = computed(() => Object.values(entryPage.props.errors ?? {}).flat());
 
 // A rejected save (e.g. "Marks can only be entered for approved registrations.") is
 // rendered by the app-wide exception handler (bootstrap/app.php) as a normal redirect
@@ -905,6 +912,12 @@ function saveMark(participant, item) {
         preserveScroll: true,
         onSuccess: () => {
             markSaveOutcome(participant.id);
+        },
+        onError: () => {
+            failedIds.value = new Set([...failedIds.value, participant.id]);
+            const saved = new Set(savedIds.value);
+            saved.delete(participant.id);
+            savedIds.value = saved;
         },
         onFinish: () => {
             const next = new Set(savingIds.value);

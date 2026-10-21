@@ -76,7 +76,7 @@ const busy = computed(() => savingId.value !== null || rankingItem.value !== nul
 function payload(p, item) {
     const form = forms[p.id];
     return { participant_id: p.id, item_id: item.id, position: form.position || null,
-        score: showScore(item) ? form.score ?? null : null,
+        ...(props.event.event_type !== 'sports' ? { score: showScore(item) ? form.score ?? null : null } : {}),
         measurement_value: showMeasurement(item) ? form.measurement_value.trim() || null : null,
         measurement_unit: showMeasurement(item) ? form.measurement_unit.trim() || null : null };
 }
@@ -89,12 +89,12 @@ watch(() => props.registrations, () => {
     }
 }, { immediate: true });
 
-function showScore(item) { return !rankEntryOnly(item) && !['time', 'distance'].includes(resultMethod(item)) && !(props.event.level_round === 'school' && props.event.event_type !== 'sports'); }
+function showScore(item) { return props.event.event_type !== 'sports' && !rankEntryOnly(item) && !['time', 'distance'].includes(resultMethod(item)) && !(props.event.level_round === 'school' && props.event.event_type !== 'sports'); }
 function canAutoRank(item) { return props.event.event_type === 'sports' && !rankEntryOnly(item); }
 function participantName(p) { return p.student ? studentDisplayName(p.student) : p.teacher?.name ?? 'Participant'; }
 function dirty(p, item) { return JSON.stringify(payload(p, item)) !== originals[p.id]; }
 function sectionDirty(section) { return section.rows.some(({ participant, item }) => dirty(participant, item)); }
-function entryHint(item) { return rankEntryOnly(item) ? 'Enter ranks directly; ties are allowed' : showMeasurement(item) ? `${resultMethod(item) === 'time' ? 'Seconds or minutes:seconds' : 'Record the measured result'} · ${directionLabel(item)}` : 'Enter scores and ranks'; }
+function entryHint(item) { return rankEntryOnly(item) ? 'Enter ranks directly; ties are allowed' : showMeasurement(item) ? `${resultMethod(item) === 'time' ? 'Seconds or minutes:seconds' : 'Record the measured result'} · ${directionLabel(item)}` : props.event.event_type === 'sports' ? 'Enter the measured result and rank' : 'Enter scores and ranks'; }
 function save(p, item) {
     if (busy.value) return;
     savingId.value = p.id;
