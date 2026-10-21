@@ -7,6 +7,21 @@ use Tests\TestCase;
 
 class StseAdmitCardTest extends TestCase
 {
+    public function test_saved_preview_renders_every_card_in_the_a4_layout(): void
+    {
+        $design = McqHallTicketDesign::normalize([
+            'layout' => 'stse_three_up', 'page_orientation' => 'landscape',
+            'card_width_mm' => 148.5, 'card_height_mm' => 210,
+            'card_gap_mm' => 0, 'page_margin_mm' => 0, 'background_fit' => 'stretch',
+        ]);
+        $html = view('mcq.hall-ticket-preview', [
+            'design' => $design, 'logoUrl' => null, 'sample' => [], 'tenant' => null,
+        ])->render();
+        $this->assertSame(2, substr_count($html, 'STSE Preliminary admit card'));
+        $this->assertStringContainsString('padding:0mm', $html);
+        $this->assertStringContainsString('Saved A4 sheet preview', $html);
+    }
+
     public function test_two_borderless_cards_fill_landscape_a4_in_preview_and_print(): void
     {
         $design = McqHallTicketDesign::normalize([
