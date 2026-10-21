@@ -90,6 +90,31 @@ class McqSahodayaCandidateManagementTest extends TestCase
         return compact('sahodaya', 'sahodayaAdmin', 'school', 'class', 'student1', 'student2', 'exam');
     }
 
+    public function test_frontend_resets_exam_registration_numbers_without_approving_pending_payments(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        $env = $this->setUpEnvironment();
+        $registration = McqRegistration::create([
+            'exam_id' => $env['exam']->id, 'school_id' => $env['school']->id,
+            'student_id' => $env['student1']->id, 'status' => 'registered',
+            'approval_status' => 'pending_payment', 'hall_ticket_no' => '999',
+        ]);
+        $class = $env['student1']->schoolClass->name;
+        $url = "/sahodaya-admin/{$env['sahodaya']->id}/mcq-exams/{$env['exam']->id}/registration-numbers/reset";
+        $this->actingAs($env['sahodayaAdmin'])->post($url, ['ranges' => [['class' => $class, 'start' => 12000]]])
+            ->assertSessionHasNoErrors()->assertSessionHas('success');
+        $this->assertSame('12000', $registration->fresh()->hall_ticket_no);
+        $this->assertSame('pending_payment', $registration->fresh()->approval_status);
+        $this->assertSame(12000, $env['exam']->fresh()->settings_json['hall_ticket_class_starts'][$class]);
+
+        $this->actingAs($env['sahodayaAdmin'])->post($url, ['ranges' => [['class' => $class, 'start' => 0]]])
+            ->assertSessionHasErrors('ranges.0.start');
+        $this->assertSame('12000', $registration->fresh()->hall_ticket_no);
+        $this->actingAs($env['sahodayaAdmin'])->post($url, ['ranges' => [['class' => 'wrong class', 'start' => 10000]]])
+            ->assertSessionHasErrors('ranges');
+        $this->assertSame('12000', $registration->fresh()->hall_ticket_no);
+    }
+
     public function test_sahodaya_can_fetch_eligible_candidates_with_window_closed(): void
     {
         $env = $this->setUpEnvironment();

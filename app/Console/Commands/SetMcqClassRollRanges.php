@@ -8,7 +8,6 @@ use App\Models\Tenant;
 use App\Support\TenancyDatabase;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 
 class SetMcqClassRollRanges extends Command
 {
@@ -42,28 +41,8 @@ class SetMcqClassRollRanges extends Command
                     $this->info('Preview only. Add --apply to save. Class + roll identifies a candidate.');
                     return self::SUCCESS;
                 }
-                $backup = 'mcq-roll-backups/'.$tenant->id.'-'.$exam->id.'-'.now()->format('Ymd-His-u').'.json';
-                if (! Storage::disk('local')->put($backup, json_encode([
-                    'exam_id' => $exam->id,
-                    'previous_class_starts' => $exam->settings_json['hall_ticket_class_starts'] ?? null,
-                    'numbers' => $rows->pluck('hall_ticket_no', 'id')->all(),
-                ], JSON_THROW_ON_ERROR))) {
-                    throw new \RuntimeException('Could not save roll-number backup. No changes made.');
-                }
-                foreach ($groups as $class => $group) {
-                    $sorted = $group->sort(function ($a, $b) {
-                        return strcasecmp($a->school?->name ?? '', $b->school?->name ?? '')
-                            ?: strcasecmp($a->student?->name ?? '', $b->student?->name ?? '')
-                            ?: ($a->id <=> $b->id);
-                    })->values();
-                    foreach ($sorted as $index => $registration) {
-                        DB::table('mcq_registrations')->where('id', $registration->id)
-                            ->update(['hall_ticket_no' => (string) ($starts[$class] + $index)]);
-                    }
-                }
-                $settings = $exam->settings_json ?? [];
-                $settings['hall_ticket_class_starts'] = $starts;
-                $exam->update(['settings_json' => $settings]);
+                $result = app(\App\Services\Mcq\McqClassRollRangeService::class)->apply($exam, $starts);
+                $backup = $result['backup'];
                 $this->info('Saved '.$rows->count().' roll numbers. Registration IDs, payment and approval statuses unchanged. Backup: '.$backup);
                 return self::SUCCESS;
             });
@@ -72,10 +51,6 @@ class SetMcqClassRollRanges extends Command
 
     public static function startForClass(string $class): ?int
     {
-        $key = strtoupper(trim(preg_replace('/^CLASS\s*/i', '', trim($class))));
-        if ($key === 'LKG') return 10000;
-        if ($key === 'UKG') return 11000;
-        return ctype_digit($key) && (int) $key >= 1 && (int) $key <= 10
-            ? 11000 + (int) $key * 1000 : null;
+        return \App\Services\Mcq\McqClassRollRangeService::startForClass($class);
     }
 }

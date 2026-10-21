@@ -503,6 +503,22 @@ class McqExamOpsController extends SahodayaAdminController
         return back()->with('success', "Assigned Reg. No. to {$count} candidate(s).");
     }
 
+    public function resetRegistrationNumbers(string $tenantId, McqExam $exam, Request $request)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        $data = $request->validate([
+            'ranges' => 'required|array|min:1|max:100',
+            'ranges.*.class' => 'required|string|max:100|distinct',
+            'ranges.*.start' => 'required|integer|min:1|max:999999999',
+        ]);
+        @ini_set('memory_limit', '1024M');
+        @ini_set('max_execution_time', '300');
+        $starts = collect($data['ranges'])->pluck('start', 'class')->all();
+        $result = app(\App\Services\Mcq\McqClassRollRangeService::class)->apply($exam, $starts);
+
+        return back()->with('success', "Reset and applied exam registration numbers for {$result['renumbered']} candidates. Previous numbers backed up. School admission numbers, payment and approval statuses unchanged.");
+    }
+
     /** Re-sort every active candidate into a fresh 1..N roll number per class (shared across schools). */
     public function renumberHallTickets(string $tenantId, McqExam $exam, Request $request, McqHallTicketService $service)
     {

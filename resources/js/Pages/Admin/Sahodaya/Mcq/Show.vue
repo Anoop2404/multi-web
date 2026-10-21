@@ -61,6 +61,8 @@
             </div>
         </div>
 
+        <McqRegistrationNumbering :sahodaya-id="sahodaya.id" :exam-id="exam.id" :ranges="classRollRanges" />
+
         <p class="text-sm text-slate-600 mb-4">
             <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/results`" class="link-brand">
                 Manage marks and publish results → Results & marks
@@ -312,6 +314,7 @@
 import { computed, ref } from 'vue';
 import { router, useForm, Link } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import McqRegistrationNumbering from '@/Components/sahodaya/McqRegistrationNumbering.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 import McqEligibilityPicker from '@/Components/sahodaya/McqEligibilityPicker.vue';
 import McqRegNoStartField from '@/Components/sahodaya/McqRegNoStartField.vue';
@@ -336,6 +339,7 @@ const props = defineProps({
     certificateTemplates: { type: Array, default: () => [] },
     gradeBands: { type: Array, default: () => [] },
     clusterRequireStudentVerification: { type: Boolean, default: true },
+    classRollRanges: { type: Array, default: () => [] },
     classOptions: { type: Array, default: () => [] },
 });
 

@@ -25,6 +25,9 @@ class McqClassRollRangesTest extends TestCase
             $student = Student::create(['tenant_id' => $school->id, 'school_class_id' => $class->id, 'name' => 'Student', 'status' => 'active']);
             $rows[] = McqRegistration::create(['exam_id' => $exam->id, 'school_id' => $school->id, 'student_id' => $student->id, 'hall_ticket_no' => '999', 'status' => 'registered', 'approval_status' => 'pending_payment']);
         }
+        $preview = app(\App\Services\Mcq\McqClassRollRangeService::class)->preview($exam);
+        $this->assertSame([10000, 11000, 12000, 21000], array_column($preview, 'start'));
+        $this->assertSame([1, 1, 1, 1], array_column($preview, 'count'));
         $args = ['tenant' => $tenant->id, 'exam' => $exam->id];
         $this->artisan('mcq:set-class-roll-ranges', $args)->assertSuccessful();
         $this->assertSame('999', $rows[0]->fresh()->hall_ticket_no);
