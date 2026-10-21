@@ -30,7 +30,13 @@ class McqTemplateController extends SahodayaAdminController
         $samplePreview = \App\Support\Mcq\McqHallTicketDesign::previewSampleData($defaultDesign);
 
         return $this->inertia('Sahodaya/Mcq/Templates/HallTickets', [
-            'templates'     => $templates,
+            'templates'     => $templates->map(function ($template) {
+                $data = $template->toArray();
+                $data['design_json']['background_url'] = \App\Support\TenantStorage::logoUrl(
+                    $this->sahodaya, $template->design_json['background_path'] ?? null,
+                );
+                return $data;
+            }),
             'defaultDesign' => $defaultDesign,
             'samplePreview' => $samplePreview,
             'logoUrl'       => \App\Support\TenantStorage::logoUrl($this->sahodaya, null),
@@ -43,13 +49,25 @@ class McqTemplateController extends SahodayaAdminController
             'title'        => 'required|string|max:120',
             'is_default'   => 'nullable|boolean',
             'design_json'  => 'nullable|array',
+            'background' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:2048',
         ]);
+
+        if (($data['design_json']['layout'] ?? '') === 'custom_background') {
+            $request->validate(['background' => 'required|image|mimes:png,jpg,jpeg,webp|max:2048']);
+        }
 
         if ($request->boolean('is_default')) {
             McqHallTicketTemplate::where('tenant_id', $this->sahodaya->id)->update(['is_default' => false]);
         }
 
         $normalizedDesign = \App\Support\Mcq\McqHallTicketDesign::normalize($data['design_json'] ?? null);
+        $normalizedDesign['background_path'] = $request->hasFile('background')
+            ? \App\Support\TenantStorage::storeUploadedFile($request->file('background'), 'mcq-backgrounds/'.$this->sahodaya->id)
+            : null;
+        if ($request->hasFile('background')) {
+            $size = getimagesize($request->file('background')->getRealPath());
+            $normalizedDesign['background_aspect_ratio'] = $size[0] / $size[1];
+        }
 
         McqHallTicketTemplate::create([
             'tenant_id'   => $this->sahodaya->id,
@@ -70,7 +88,12 @@ class McqTemplateController extends SahodayaAdminController
             'title'        => 'required|string|max:120',
             'is_default'   => 'nullable|boolean',
             'design_json'  => 'nullable|array',
+            'background' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:2048',
         ]);
+
+        if (($data['design_json']['layout'] ?? '') === 'custom_background' && empty($template->design_json['background_path'])) {
+            $request->validate(['background' => 'required|image|mimes:png,jpg,jpeg,webp|max:2048']);
+        }
 
         if ($request->boolean('is_default')) {
             McqHallTicketTemplate::where('tenant_id', $this->sahodaya->id)
@@ -79,6 +102,13 @@ class McqTemplateController extends SahodayaAdminController
         }
 
         $normalizedDesign = \App\Support\Mcq\McqHallTicketDesign::normalize($data['design_json'] ?? $template->design_json);
+        $normalizedDesign['background_path'] = $request->hasFile('background')
+            ? \App\Support\TenantStorage::storeUploadedFile($request->file('background'), 'mcq-backgrounds/'.$this->sahodaya->id)
+            : ($template->design_json['background_path'] ?? null);
+        if ($request->hasFile('background')) {
+            $size = getimagesize($request->file('background')->getRealPath());
+            $normalizedDesign['background_aspect_ratio'] = $size[0] / $size[1];
+        }
 
         $template->update([
             'title'       => $data['title'],

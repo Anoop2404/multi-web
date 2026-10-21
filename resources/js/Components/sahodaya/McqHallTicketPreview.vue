@@ -1,5 +1,7 @@
 <template>
-    <div
+    <McqAdmitCardCanvas v-if="['stse_three_up','custom_background'].includes(design.layout)" :design="design" :sample="sample"
+        :background="design.layout === 'custom_background' ? design.background_url : '/images/mcq/stse-preliminary-background.png'" />
+    <div v-else
         class="mcq-hall-ticket-preview select-none"
         :style="{
             border: `1.5px solid ${currentPrimary}`,
@@ -255,6 +257,7 @@
 </template>
 
 <script setup>
+import McqAdmitCardCanvas from './McqAdmitCardCanvas.vue';
 import { computed } from 'vue';
 
 const props = defineProps({

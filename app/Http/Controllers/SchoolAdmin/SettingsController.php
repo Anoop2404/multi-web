@@ -15,6 +15,7 @@ class SettingsController extends SchoolAdminController
         return $this->inertia('School/Settings/Index', [
             'settings' => $settings,
             'logoUrl' => TenantStorage::logoUrl($this->school, $settings['logo'] ?? null),
+            'principalSignatureUrl' => TenantStorage::logoUrl($this->school, $settings['principal_signature'] ?? null),
             'publicWebsiteEnabled' => TenantPublicSite::isEnabled($this->school),
             'paymentDetails' => $this->school->paymentDetails(),
             'paymentQrCodeUrl' => $this->school->paymentQrCodeUrl(),
@@ -40,6 +41,8 @@ class SettingsController extends SchoolAdminController
             'cbse_affiliation_number' => 'nullable|string|max:50',
             'cbse_badge_show' => 'nullable|boolean',
             'logo' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:2048',
+            'principal_signature' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:2048',
+            'remove_principal_signature' => 'nullable|boolean',
             'seo_title' => 'nullable|string|max:70',
             'seo_description' => 'nullable|string|max:160',
             'seo_keywords' => 'nullable|string|max:500',
@@ -58,6 +61,16 @@ class SettingsController extends SchoolAdminController
         if ($request->hasFile('logo')) {
             $path = TenantStorage::storeLogo($request->file('logo'), $this->school->id);
             $this->school->setSetting('logo', $path);
+        }
+
+        if ($request->hasFile('principal_signature')) {
+            $path = TenantStorage::storeUploadedFile(
+                $request->file('principal_signature'),
+                'school-signatures/'.$this->school->id,
+            );
+            $this->school->setSetting('principal_signature', $path);
+        } elseif ($request->boolean('remove_principal_signature')) {
+            $this->school->setSetting('principal_signature', null);
         }
 
         // Save contact info

@@ -44,6 +44,15 @@
                     <p class="text-xs text-gray-500">Shown in the website navbar, footer, login page, and school identity areas.</p>
                 </div>
 
+                <div class="card space-y-4">
+                    <h3 class="font-bold text-gray-800">Principal signature for admit cards</h3>
+                    <ImageUploadField :model-value="form.principal_signature" @update:model-value="onSignatureChange"
+                        label="Principal signature" :preview-url="form.remove_principal_signature ? '' : (principalSignatureUrl || '')"
+                        :max-size-mb="2" :error="form.errors.principal_signature"
+                        accept="image/jpeg,image/png,image/webp"
+                        help="PNG, JPG or WebP, up to 2 MB. A transparent PNG works best. Used on this school's MCQ admit cards." />
+                </div>
+
                 <!-- Contact Information -->
                 <div class="card space-y-4">
                     <h3 class="font-bold text-gray-800">Contact Information</h3>
@@ -224,6 +233,7 @@ const props = defineProps({
     school:   Object,
     settings: { type: Object, default: () => ({}) },
     logoUrl: { type: String, default: '' },
+    principalSignatureUrl: { type: String, default: null },
     publicWebsiteEnabled: { type: Boolean, default: true },
     paymentDetails: { type: Object, default: () => ({}) },
     paymentQrCodeUrl: { type: String, default: null },
@@ -248,6 +258,8 @@ const form = useForm({
     cbse_affiliation_number: props.settings.widgets?.cbse_affiliation_number ?? '',
     cbse_badge_show: props.settings.widgets?.cbse_badge_show ?? true,
     logo:            null,
+    principal_signature: null,
+    remove_principal_signature: false,
     seo_title:       seo.title ?? '',
     seo_description: seo.description ?? '',
     seo_tagline:     seo.tagline ?? '',
@@ -259,6 +271,11 @@ const form = useForm({
     payment_upi:         props.paymentDetails.upi ?? '',
     payment_qr_code:     null,
 });
+
+function onSignatureChange(value) {
+    form.principal_signature = value instanceof File ? value : null;
+    form.remove_principal_signature = !(value instanceof File) && Boolean(props.principalSignatureUrl);
+}
 
 function submit() {
     form.transform((data) => ({

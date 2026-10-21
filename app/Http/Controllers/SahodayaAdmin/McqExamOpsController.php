@@ -278,6 +278,8 @@ class McqExamOpsController extends SahodayaAdminController
             'templates'       => $templates,
             'registrations'   => $registrations,
             'hallTicketDesign'=> $design,
+            'backgroundUrl' => TenantStorage::logoUrl($this->sahodaya, $design['background_path'] ?? null),
+            'defaultHallTicketDesign' => McqHallTicketDesign::defaults(),
             'logoUrl'         => $logoUrl,
             'previewSample'   => McqHallTicketDesign::previewSample($exam),
             'ticketsIssued'   => $ticketsIssued,
@@ -314,6 +316,7 @@ class McqExamOpsController extends SahodayaAdminController
             'design'  => $design,
             'logoUrl' => McqHallTicketDesign::logoUrl($this->sahodaya, $design),
             'sample'  => McqHallTicketDesign::previewSample($exam),
+            'tenant' => $this->sahodaya,
         ]);
     }
 
@@ -329,7 +332,29 @@ class McqExamOpsController extends SahodayaAdminController
             'show_exam_passcode'  => 'nullable|boolean',
             'primary_color'       => 'nullable|string|max:7',
             'accent_color'        => 'nullable|string|max:7',
-            'layout'              => 'nullable|in:standard,compact',
+            'layout'              => 'nullable|in:standard,compact,stse_three_up,custom_background',
+            'background' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:2048',
+            'field_positions' => 'nullable|array',
+            'show_student_photo' => 'nullable|boolean',
+            'custom_fields' => 'nullable|array|max:20',
+            'custom_fields.*' => 'array',
+            'custom_fields.*.id' => 'required|string|regex:/^custom_[a-zA-Z0-9_-]{1,64}$/',
+            'custom_fields.*.label' => 'nullable|string|max:80',
+            'custom_fields.*.text' => 'nullable|string|max:500',
+            'custom_fields.*.source' => 'required|in:text,school_name,hall_room,seat_no,exam_title,admission_no,academic_year',
+            'custom_fields.*.x' => 'required|numeric|min:0|max:95',
+            'custom_fields.*.y' => 'required|numeric|min:0|max:95',
+            'custom_fields.*.width' => 'required|numeric|min:1|max:100',
+            'custom_fields.*.size' => 'required|numeric|min:6|max:72',
+            'custom_fields.*.font_family' => 'nullable|in:Arial,Times New Roman,Georgia,Verdana,Tahoma,Courier New',
+            'custom_fields.*.font_weight' => 'nullable|in:normal,bold',
+            'custom_fields.*.font_style' => 'nullable|in:normal,italic',
+            'custom_fields.*.text_align' => 'nullable|in:left,center,right',
+            'card_width_mm' => 'nullable|numeric|min:20|max:277',
+            'card_height_mm' => 'nullable|numeric|min:20|max:277',
+            'page_orientation' => 'nullable|in:portrait,landscape',
+            'card_gap_mm' => 'nullable|numeric|min:0|max:15',
+            'background_fit' => 'nullable|in:contain,stretch',
             'next_hall_ticket_no' => 'nullable|integer|min:1|max:99999999',
             'hall_instructions'   => 'nullable|string|max:2000',
             'logo'                => 'nullable|file|mimes:jpg,jpeg,png,webp,svg|max:2048',
@@ -355,6 +380,17 @@ class McqExamOpsController extends SahodayaAdminController
 
         $current = McqHallTicketDesign::fromExam($exam);
 
+        if (($data['layout'] ?? '') === 'custom_background' && empty($current['background_path'])) {
+            $request->validate(['background' => 'required|image|mimes:png,jpg,jpeg,webp|max:2048']);
+        }
+        if ($request->hasFile('background')) {
+            $imageSize = getimagesize($request->file('background')->getRealPath());
+            $current['background_aspect_ratio'] = $imageSize[0] / $imageSize[1];
+            $current['background_path'] = TenantStorage::storeUploadedFile(
+                $request->file('background'), "mcq-hall-tickets/{$this->sahodaya->id}/{$exam->id}/backgrounds",
+            );
+        }
+
         if ($request->boolean('remove_logo')) {
             $current['logo_path'] = null;
         }
@@ -375,6 +411,10 @@ class McqExamOpsController extends SahodayaAdminController
             'primary_color' => $data['primary_color'] ?? $current['primary_color'],
             'accent_color'  => $data['accent_color'] ?? $current['accent_color'],
             'layout'        => $data['layout'] ?? $current['layout'],
+            'field_positions' => $data['field_positions'] ?? $current['field_positions'],
+            'show_student_photo' => $request->boolean('show_student_photo'),
+            'custom_fields' => $data['custom_fields'] ?? [],
+            ...array_intersect_key($data, array_flip(['card_width_mm', 'card_height_mm', 'page_orientation', 'card_gap_mm', 'background_fit'])),
             'show_photo'     => array_key_exists('show_photo', $data) ? (bool) $data['show_photo'] : $current['show_photo'],
             'show_qr'        => array_key_exists('show_qr', $data) ? (bool) $data['show_qr'] : $current['show_qr'],
             'show_signature' => array_key_exists('show_signature', $data) ? (bool) $data['show_signature'] : $current['show_signature'],
@@ -383,16 +423,15 @@ class McqExamOpsController extends SahodayaAdminController
         ]));
 
         $settings = McqHallTicketDesign::mergeIntoSettings($exam->settings_json ?? [], $design);
+        $settings['hall_ticket_design_scope'] = 'exam';
 
         $updateFields = [
             'settings_json'       => $settings,
+            'hall_ticket_template_id' => null,
             'hall_instructions'   => $data['hall_instructions'] ?? $exam->hall_instructions,
             'next_hall_ticket_no' => $data['next_hall_ticket_no'] ?? $exam->next_hall_ticket_no,
         ];
 
-        if (array_key_exists('hall_ticket_template_id', $data)) {
-            $updateFields['hall_ticket_template_id'] = $data['hall_ticket_template_id'] ?: null;
-        }
 
         $exam->update($updateFields);
 

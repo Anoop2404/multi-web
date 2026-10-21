@@ -131,8 +131,23 @@
                                 <select v-model="design.layout" class="field">
                                     <option value="standard">Standard (Full Page A4)</option>
                                     <option value="compact">Compact (2-up Print)</option>
+                                    <option value="custom_background">Custom background (3 on landscape A4)</option>
+                                    <option value="stse_three_up">STSE Preliminary — original artwork (3 on landscape A4)</option>
                                 </select>
                             </FormField>
+                        </div>
+                        <div v-if="design.layout === 'custom_background'" class="space-y-2">
+                            <label class="block text-sm font-semibold">Background image file</label>
+                            <input type="file" accept="image/png,image/jpeg,image/webp" @change="chooseBackground">
+                            <p class="text-xs text-slate-500">PNG, JPG or WebP, up to 2 MB. Portrait artwork, printed three cards on landscape A4.</p>
+                            <p v-if="backgroundError" class="text-xs text-red-600">{{ backgroundError }}</p>
+                            <p class="text-xs text-slate-500">Place each field over your background. X and Y are percentages from the left and top edges.</p>
+                            <div v-for="(position, field) in design.field_positions" :key="field" class="grid grid-cols-4 gap-2 items-center text-xs">
+                                <strong class="capitalize">{{ field }}</strong>
+                                <label>X % <input v-model.number="position.x" type="number" min="0" max="95" step="0.5" class="field"></label>
+                                <label>Y % <input v-model.number="position.y" type="number" min="0" max="95" step="0.5" class="field"></label>
+                                <label>Size <input v-model.number="position.size" type="number" min="6" max="24" class="field"></label>
+                            </div>
                         </div>
                     </div>
 
@@ -357,6 +372,8 @@ const tabs = [
 
 const activeTab = ref('branding');
 const saving = ref(false);
+const backgroundFile = ref(null);
+const backgroundError = ref('');
 const savedNotice = ref(false);
 
 const initialTemplate = props.templates.find(t => t.is_default) || props.templates[0] || null;
@@ -376,6 +393,8 @@ const design = reactive({
         : [...(props.defaultDesign.instructions || [])],
 });
 
+design.field_positions = JSON.parse(JSON.stringify(design.field_positions || {}));
+
 const samplePreviewData = computed(() => {
     return {
         ...props.samplePreview,
@@ -386,6 +405,8 @@ const samplePreviewData = computed(() => {
 });
 
 function selectTemplate(t) {
+    backgroundFile.value = null;
+    backgroundError.value = '';
     selectedTemplate.value = t;
     editingId.value = t.id;
     form.title = t.title;
@@ -393,6 +414,7 @@ function selectTemplate(t) {
 
     const merged = { ...props.defaultDesign, ...(t.design_json || {}) };
     Object.assign(design, merged);
+    design.field_positions = JSON.parse(JSON.stringify(merged.field_positions || {}));
     if (Array.isArray(t.design_json?.instructions)) {
         design.instructions = [...t.design_json.instructions];
     } else {
@@ -405,13 +427,19 @@ function startNewTemplate() {
     editingId.value = null;
     form.title = 'New MCQ Hall Ticket Template';
     form.is_default = false;
+    backgroundFile.value = null;
+    design.background_url = null;
     Object.assign(design, props.defaultDesign);
+    design.field_positions = JSON.parse(JSON.stringify(props.defaultDesign.field_positions || {}));
     design.instructions = [...(props.defaultDesign.instructions || [])];
     activeTab.value = 'branding';
 }
 
 function resetToDefault() {
+    backgroundFile.value = null;
+    design.background_url = null;
     Object.assign(design, props.defaultDesign);
+    design.field_positions = JSON.parse(JSON.stringify(props.defaultDesign.field_positions || {}));
     design.instructions = [...(props.defaultDesign.instructions || [])];
 }
 
@@ -427,6 +455,21 @@ function removeInstruction(idx) {
     design.instructions.splice(idx, 1);
 }
 
+function chooseBackground(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
+        backgroundError.value = 'Choose PNG, JPG or WebP up to 2 MB.';
+        event.target.value = '';
+        return;
+    }
+    backgroundError.value = '';
+    backgroundFile.value = file;
+    const reader = new FileReader();
+    reader.onload = () => { design.background_url = reader.result; };
+    reader.readAsDataURL(file);
+}
+
 function saveTemplate() {
     saving.value = true;
     savedNotice.value = false;
@@ -434,24 +477,26 @@ function saveTemplate() {
     const payload = {
         title: form.title,
         is_default: form.is_default,
-        design_json: { ...design },
+        design_json: { ...design, background_url: undefined },
+        background: backgroundFile.value,
+        ...(editingId.value ? { _method: 'put' } : {}),
     };
 
     const url = editingId.value
         ? `/sahodaya-admin/${props.sahodaya.id}/mcq/templates/hall-tickets/${editingId.value}`
         : `/sahodaya-admin/${props.sahodaya.id}/mcq/templates/hall-tickets`;
 
-    const method = editingId.value ? 'put' : 'post';
-
-    router[method](url, payload, {
+    router.post(url, payload, {
+        forceFormData: true,
         preserveScroll: true,
         onSuccess: () => {
             saving.value = false;
             savedNotice.value = true;
             setTimeout(() => { savedNotice.value = false; }, 3000);
         },
-        onError: () => {
+        onError: (errors) => {
             saving.value = false;
+            backgroundError.value = errors.background || Object.values(errors)[0] || '';
         },
     });
 }
@@ -470,4 +515,3 @@ function deleteTemplate(templateId) {
     });
 }
 </script>
-

@@ -1,10 +1,11 @@
+@php $printDesign = \App\Support\Mcq\McqHallTicketDesign::fromExam($registration->exam); @endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <title>Hall Ticket {{ $registration->hall_ticket_no }} — {{ $registration->exam->title }}</title>
     <style>
-        @page { size: A4 portrait; margin: 10mm; }
+        @page { size: A4 {{ in_array($printDesign['layout'] ?? '', ['stse_three_up','custom_background'], true) ? ($printDesign['page_orientation'] ?? 'landscape') : 'portrait' }}; margin: 10mm; }
         * { box-sizing: border-box; }
         body { font-family: Arial, Helvetica, sans-serif; padding: 20px; color: #1e293b; background: #f8fafc; }
         .wrapper { max-width: 195mm; margin: 0 auto; }
@@ -24,7 +25,8 @@
     $logoUrl = \App\Support\Mcq\McqHallTicketDesign::logoUrl($schoolModel, $design);
     $boardLogoUrl = \App\Support\Mcq\McqHallTicketDesign::boardLogoUrl($tenant, $design);
     $participant = \App\Support\Mcq\McqHallTicketDesign::participantFields($registration);
-    
+    $examCentre = \App\Support\Mcq\McqHallTicketDesign::centreForSchool($exam, $schoolModel);
+
     $student = $registration->student;
     $scheduledAt = $exam->scheduled_at;
     $timingLabel = \App\Support\Mcq\McqHallTicketDesign::examTimingLabel($scheduledAt, $exam->duration_minutes) ?? 'TBA';
@@ -41,6 +43,7 @@
         'participant_name'   => $participant['name'],
         'secondary_label'    => $participant['secondary_label'],
         'secondary_value'    => $participant['secondary_value'],
+                    'admission_no' => $participant['secondary_value'],
         'tertiary_label'     => $participant['tertiary_label'],
         'tertiary_value'     => $participant['tertiary_value'],
         'class_name'         => $participant['class_name'] ?? 'Class',
@@ -55,10 +58,10 @@
             : null,
         'hall_room'          => $registration->hall_room,
         'seat_no'            => $registration->seat_no,
-        'venue'              => $exam->venue,
+        'venue'              => $examCentre,
         'center_code'        => 'CEN-' . str_pad((string) ($exam->id * 17 + 101), 4, '0', STR_PAD_LEFT),
-        'center_name'        => $exam->venue ?: 'Designated Examination Centre',
-        'center_address'     => $exam->venue,
+        'center_name'        => $examCentre ?: 'Designated Examination Centre',
+        'center_address'     => $examCentre,
         'exam_date'          => $scheduledAt ? $scheduledAt->format('l, d F Y') : 'TBA',
         'exam_time'          => $timingLabel,
         'scheduled_at_label' => $timingLabel,
@@ -71,6 +74,7 @@
         'generated_at'       => now()->format('d-m-Y H:i:s'),
         'security_ref'       => 'SEC-' . strtoupper(substr(md5("{$exam->id}-{$registration->id}-{$registration->hall_ticket_no}"), 0, 8)),
         'photo_src'          => $participant['photo'],
+                    'principal_signature_src' => \App\Support\TenantStorage::logoUrl($schoolModel, $schoolModel?->getSetting('principal_signature')),
         'qr_src'             => app(\App\Services\Events\FestIdCardQrService::class)->dataUri("MCQHT|{$exam->id}|{$registration->id}|{$registration->hall_ticket_no}"),
     ];
 @endphp

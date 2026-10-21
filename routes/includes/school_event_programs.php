@@ -378,6 +378,7 @@ Route::prefix('mcq')->name('mcq.')->group(function () {
     Route::get('/{exam}/reports/fee-due/pdf', [McqReportController::class, 'exportClassWiseFeeDuePdf'])->name('reports.fee-due.pdf');
     Route::get('/{exam}/eligible-students', [McqController::class, 'eligibleStudents'])->name('eligible-students');
     Route::get('/{exam}/{tab?}', [McqController::class, 'exam'])->name('exam')->where('tab', 'register|students|hall-tickets|fee|results|toppers|reports|attendance');
+    Route::post('/{exam}/exam-centre', [McqController::class, 'saveExamCentre'])->name('exam-centre.save');
     Route::post('/{exam}/attendance', [McqController::class, 'storeAttendance'])->name('attendance.store');
     Route::post('/{exam}/register', [McqController::class, 'register']);
     Route::post('/{exam}/cancel', [McqController::class, 'cancelRegistration'])->name('cancel');

@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>Hall Ticket Preview</title>
-    <style>body { padding: 16px; background: #f8fafc; }</style>
+    <style>@page { size: A4 {{ in_array($design['layout'] ?? '', ['stse_three_up','custom_background'], true) ? ($design['page_orientation'] ?? 'landscape') : 'portrait' }}; margin:10mm; } body { padding: 16px; background: #f8fafc; }</style>
 </head>
 <body>
 @if(!empty($isSample))

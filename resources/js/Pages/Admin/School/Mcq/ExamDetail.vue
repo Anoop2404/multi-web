@@ -435,6 +435,17 @@
 
         <!-- Hall tickets tab -->
         <div v-else-if="tab === 'hall-tickets'" class="space-y-4">
+            <form v-if="!$page.props.isStaff" @submit.prevent="saveExamCentre" class="card space-y-3">
+                <h3 class="font-semibold">Examination date and centre</h3>
+                <p class="text-sm">Date set by Sahodaya: <strong>{{ exam.scheduled_at_label || 'To be announced' }}</strong></p>
+                <p class="text-sm">Sahodaya centre: {{ exam.venue || 'To be announced' }}</p>
+                <label class="block text-sm font-semibold" for="school-exam-centre">School examination centre</label>
+                <textarea id="school-exam-centre" v-model="centreForm.exam_centre" class="field" rows="2" maxlength="500" placeholder="Leave empty to use the Sahodaya centre"></textarea>
+                <p class="text-xs text-slate-500">Applies only to this school's students for this exam. Leave blank to use the centre supplied by Sahodaya.</p>
+                <p v-if="centreForm.errors.exam_centre" class="text-sm text-red-600">{{ centreForm.errors.exam_centre }}</p>
+                <p class="text-sm">Centre on cards: <strong>{{ effectiveExamCentre || 'To be announced' }}</strong></p>
+                <button type="submit" class="btn-primary" :disabled="centreForm.processing">Save centre</button>
+            </form>
             <div v-if="!hallTicketsPublished" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 <p class="font-semibold">Hall tickets have not been released yet</p>
                 <p class="text-xs mt-1">
@@ -1245,7 +1256,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
-import { Link, router, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage, useForm } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import SchoolMcqSubNav from '@/Components/school/SchoolMcqSubNav.vue';
 import McqSchoolWorkflowStepper from '@/Components/school/McqSchoolWorkflowStepper.vue';
@@ -1269,6 +1280,8 @@ function openGallery(images) {
 
 const props = defineProps({
     school: Object,
+    schoolExamCentre: { type: String, default: null },
+    effectiveExamCentre: { type: String, default: null },
     exam: Object,
     tab: { type: String, default: 'register' },
     registrations: { type: Array, default: () => [] },
@@ -1509,6 +1522,11 @@ const proofInput = ref(null);
 const transactionRef = ref('');
 const feeAmount = ref('');
 const base = computed(() => `/school-admin/${props.school.id}/mcq/${props.exam.id}`);
+const centreForm = useForm({ exam_centre: props.schoolExamCentre || '' });
+function saveExamCentre() {
+    centreForm.post(`${base.value}/exam-centre`, { preserveScroll: true });
+}
+
 const pdfUrl = computed(() => `${base.value}/hall-tickets/pdf`);
 const canDownloadDocuments = computed(() => !props.downloadGate?.blocked);
 const hallTicketsPublished = computed(() => !!props.exam?.hall_tickets_published);

@@ -5,8 +5,7 @@
             <template #actions>
                 <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/hall-tickets/preview`"
                    target="_blank" rel="noopener" class="btn-secondary text-sm">Sample hall ticket ↗</a>
-                <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/certificates/preview`"
-                   target="_blank" rel="noopener" class="btn-secondary text-sm">Sample certificate ↗</a>
+                <template v-if="workspaceTab === 'operations'">
                 <button type="button" @click="showAddCandidateModal = true" class="btn-primary text-sm flex items-center gap-1.5">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -28,11 +27,15 @@
                 <button type="button" @click="allocateSeats(false)" class="btn-secondary text-sm">Allocate seats</button>
                 <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/hall-tickets/print-all`"
                    target="_blank" rel="noopener" class="btn-secondary text-sm">Print all ↗</a>
+                </template>
             </template>
         </PageHeader>
         <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" active="hall-tickets" />
 
-        <div class="notice-banner mb-6 flex flex-wrap items-center justify-between gap-3"
+        <div class="flex gap-1 rounded-xl bg-slate-100 p-1 mb-5 w-fit" role="tablist" aria-label="Hall ticket workspace">
+            <button v-for="tab in [{id:'design',label:'Design admit cards'},{id:'operations',label:'Issue & print'}]" :key="tab.id" type="button" role="tab" :aria-selected="workspaceTab===tab.id" @click="workspaceTab=tab.id" class="rounded-lg px-4 py-2 text-sm font-semibold" :class="workspaceTab===tab.id ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'">{{ tab.label }}</button>
+        </div>
+        <div v-if="workspaceTab === 'operations'" class="notice-banner mb-6 flex flex-wrap items-center justify-between gap-3"
              :class="hallTicketsPublished ? 'notice-banner--success' : 'notice-banner--warning'">
             <div>
                 <p class="font-semibold">
@@ -56,96 +59,37 @@
             </button>
         </div>
 
-        <div class="grid lg:grid-cols-2 gap-6 mb-6">
-            <form @submit.prevent="saveDesign" class="card space-y-4">
-                <div>
-                    <h3 class="section-title">Hall ticket design</h3>
-                    <p class="section-desc">Logo, colors, and layout apply to printed and student portal tickets.</p>
-                </div>
-
-                <FormGrid>
-                    <FormField label="Assigned Hall Ticket Template" class-extra="sm:col-span-2" hint="Select a reusable template from the Hall Ticket Builder, or customize per-exam below.">
-                        <div class="flex items-center gap-2">
-                            <select v-model="designForm.hall_ticket_template_id" class="field flex-1" @change="onTemplateSelect">
-                                <option :value="null">Default template / Per-exam custom design</option>
-                                <option v-for="t in templates" :key="t.id" :value="t.id">
-                                    {{ t.title }} {{ t.is_default ? '(Default)' : '' }}
-                                </option>
-                            </select>
-                            <a :href="`/sahodaya-admin/${sahodaya.id}/mcq/templates/hall-tickets`" target="_blank" class="btn-secondary text-xs shrink-0">
-                                Template Builder ↗
-                            </a>
-                        </div>
-                    </FormField>
-
-                    <FormField label="Ticket header title" class-extra="sm:col-span-2">
-                        <input v-model="designForm.header_title" class="field" placeholder="Talent Search Examination — Hall Ticket">
-                    </FormField>
-                    <FormField label="Footer note" class-extra="sm:col-span-2">
-                        <input v-model="designForm.footer_note" class="field" placeholder="Optional note on admit card">
-                    </FormField>
-                    <FormField label="Primary color (border / title)">
-                        <input v-model="designForm.primary_color" type="color" class="field h-10 p-1">
-                    </FormField>
-                    <FormField label="Accent color (reg. no.)">
-                        <input v-model="designForm.accent_color" type="color" class="field h-10 p-1">
-                    </FormField>
-                    <FormField label="Layout">
-                        <SearchableSelect v-model="designForm.layout" :options="[{ value: 'standard', label: 'Standard' }, { value: 'compact', label: 'Compact (2-up print)' }]" :all-option="false" />
-                    </FormField>
-                    <FormField label="Logo">
-                        <input ref="logoInput" type="file" accept=".jpg,.jpeg,.png,.webp,.svg" class="text-sm">
-                        <label v-if="logoUrl && !designForm.remove_logo" class="flex items-center gap-2 text-xs mt-2">
-                            <input v-model="designForm.remove_logo" type="checkbox"> Remove current logo
-                        </label>
-                    </FormField>
-                    <FormField label="Show on ticket" class-extra="sm:col-span-2">
-                        <label class="flex items-center gap-2 text-sm mr-4">
-                            <input v-model="designForm.show_reg_no" type="checkbox"> School admission no.
-                        </label>
-                        <label class="flex items-center gap-2 text-sm mr-4">
-                            <input v-model="designForm.show_school" type="checkbox"> School name
-                        </label>
-                        <label class="flex items-center gap-2 text-sm mr-4">
-                            <input v-model="designForm.show_exam_passcode" type="checkbox"> Online exam passcode <span class="text-xs text-slate-400">(online exams)</span>
-                        </label>
-                        <label class="flex items-center gap-2 text-sm mr-4">
-                            <input v-model="designForm.show_photo" type="checkbox"> Candidate photo
-                        </label>
-                        <label class="flex items-center gap-2 text-sm mr-4">
-                            <input v-model="designForm.show_qr" type="checkbox"> Verification QR code
-                        </label>
-                        <label class="flex items-center gap-2 text-sm">
-                            <input v-model="designForm.show_signature" type="checkbox"> Signature lines
-                        </label>
-                    </FormField>
-                    <FormField label="Reg. no. starts at" hint="Any whole number from 1. Quick presets below, or type your own (e.g. 10001).">
+        <McqAdmitCardDesigner v-if="workspaceTab === 'design'" :design="designForm" :defaults="defaultHallTicketDesign" :exam="exam"
+            :sample="previewSampleData" :background-url="backgroundUrl" :logo-url="logoUrl"
+            :preview-url="previewUrl" :saving="designSaving" :saved="designSaved" :errors="designErrors"
+            @background="backgroundFile = $event" @save="saveDesign">
+            <template #settings>
+                <details class="border-t border-slate-200 pt-3 text-xs">
+                    <summary class="font-semibold cursor-pointer text-slate-700">Exam card settings</summary>
+                    <div class="space-y-3 mt-3">
+                        <FormField label="Ticket heading"><input v-model="designForm.header_title" class="field"></FormField>
+                        <FormField label="Footer note"><input v-model="designForm.footer_note" class="field"></FormField>
+                        <FormField label="Reporting lead time (minutes)"><input v-model.number="designForm.report_before_minutes" class="field" type="number" min="0" max="240"></FormField>
+                        <FormField label="Gate closure grace (minutes)"><input v-model.number="designForm.gate_closure_after_minutes" class="field" type="number" min="0" max="240"></FormField>
                         <McqRegNoStartField v-model="designForm.next_hall_ticket_no" :disabled="ticketsIssued" />
-                    </FormField>
-                    <FormField label="Reporting time" hint="Minutes before exam start candidates should arrive.">
-                        <input v-model.number="designForm.report_before_minutes" type="number" min="0" max="240" class="field">
-                    </FormField>
-                    <FormField label="Gate closure" hint="Minutes after exam start when late entry is no longer allowed (0 = at start).">
-                        <input v-model.number="designForm.gate_closure_after_minutes" type="number" min="0" max="240" class="field">
-                    </FormField>
-                    <FormField label="Hall instructions" class-extra="sm:col-span-2">
-                        <textarea v-model="designForm.hall_instructions" class="field" rows="2" placeholder="Shown on admit card"></textarea>
-                    </FormField>
-                </FormGrid>
+                        <FormField label="Exam instructions"><textarea v-model="designForm.hall_instructions" class="field" rows="3"></textarea></FormField>
+                        <template v-if="['standard','compact'].includes(designForm.layout)">
+                            <label class="block">Primary colour<input v-model="designForm.primary_color" type="color" class="block mt-1"></label>
+                            <label class="block">Accent colour<input v-model="designForm.accent_color" type="color" class="block mt-1"></label>
+                            <label class="block">Logo<input ref="logoInput" type="file" accept="image/png,image/jpeg,image/webp" class="block mt-1 w-full"></label>
+                            <label class="flex gap-2"><input v-model="designForm.show_school" type="checkbox">School name</label>
+                            <label class="flex gap-2"><input v-model="designForm.show_reg_no" type="checkbox">School admission number</label>
+                            <label class="flex gap-2"><input v-model="designForm.show_photo" type="checkbox">Candidate photo</label>
+                            <label class="flex gap-2"><input v-model="designForm.show_qr" type="checkbox">Verification QR</label>
+                            <label class="flex gap-2"><input v-model="designForm.show_signature" type="checkbox">Signature blocks</label>
+                            <label v-if="isOnline" class="flex gap-2"><input v-model="designForm.show_exam_passcode" type="checkbox">Online exam passcode</label>
+                        </template>
+                    </div>
+                </details>
+            </template>
+        </McqAdmitCardDesigner>
 
-                <FormActions>
-                    <button type="submit" class="btn-primary" :disabled="designForm.processing">Save design</button>
-                    <a :href="previewUrl" target="_blank" rel="noopener" class="btn-secondary text-sm">Open print preview ↗</a>
-                </FormActions>
-            </form>
-
-            <div class="card">
-                <h3 class="section-title">Live preview</h3>
-                <p class="section-desc mb-4">Sample ticket — updates as you edit (logo preview after save unless file selected).</p>
-                <McqHallTicketPreview :design="designForm" :sample="previewSampleData" :logo-url="logoUrl" :logo-preview="localLogoPreview" />
-            </div>
-        </div>
-
+        <div v-show="workspaceTab === 'operations'">
         <div class="card mb-6 space-y-3">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -257,6 +201,7 @@
             :schools="schoolSelectOptions"
             @close="showAddCandidateModal = false"
         />
+        </div>
     </SahodayaAdminLayout>
 </template>
 
@@ -265,7 +210,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
-import McqHallTicketPreview from '@/Components/sahodaya/McqHallTicketPreview.vue';
+import McqAdmitCardDesigner from '@/Components/sahodaya/McqAdmitCardDesigner.vue';
 import McqRegNoStartField from '@/Components/sahodaya/McqRegNoStartField.vue';
 import McqAddCandidateModal from '@/Components/sahodaya/McqAddCandidateModal.vue';
 import FormField from '@/Components/ui/FormField.vue';
@@ -282,6 +227,8 @@ const props = defineProps({
     templates: { type: Array, default: () => [] },
     registrations: Object,
     hallTicketDesign: Object,
+    defaultHallTicketDesign: Object,
+    backgroundUrl: String,
     logoUrl: String,
     previewSample: Object,
     ticketsIssued: Boolean,
@@ -296,6 +243,7 @@ const props = defineProps({
 
 const { confirm, prompt } = useConfirm();
 const showAddCandidateModal = ref(false);
+const workspaceTab = ref('design');
 const schoolSelectOptions = computed(() => props.memberSchools?.length ? props.memberSchools : props.schoolOptions);
 const logoInput = ref(null);
 const localLogoPreview = ref(null);
@@ -340,7 +288,13 @@ function allocateSeats(reallocate = false) {
     }, { preserveScroll: true });
 }
 
+const backgroundFile = ref(null);
+const designSaving = ref(false);
+const designSaved = ref(false);
+const designErrors = ref({});
 const designForm = useForm({
+    ...JSON.parse(JSON.stringify(props.hallTicketDesign || {})),
+    field_positions: JSON.parse(JSON.stringify(props.hallTicketDesign?.field_positions || props.defaultHallTicketDesign?.field_positions || {})),
     hall_ticket_template_id: props.exam.hall_ticket_template_id ?? null,
     header_title: props.hallTicketDesign?.header_title ?? '',
     footer_note: props.hallTicketDesign?.footer_note ?? '',
@@ -360,26 +314,6 @@ const designForm = useForm({
     gate_closure_after_minutes: props.hallTicketDesign?.gate_closure_after_minutes ?? 0,
 });
 
-function onTemplateSelect() {
-    if (!designForm.hall_ticket_template_id) return;
-    const selected = props.templates.find(t => t.id === designForm.hall_ticket_template_id);
-    if (selected?.design_json) {
-        const d = selected.design_json;
-        if (d.header_title) designForm.header_title = d.header_title;
-        if (d.primary_color) designForm.primary_color = d.primary_color;
-        if (d.accent_color) designForm.accent_color = d.accent_color;
-        if (d.layout) designForm.layout = d.layout;
-        if (d.show_reg_no !== undefined) designForm.show_reg_no = d.show_reg_no;
-        if (d.show_school !== undefined) designForm.show_school = d.show_school;
-        if (d.show_photo !== undefined) designForm.show_photo = d.show_photo;
-        if (d.show_qr !== undefined) designForm.show_qr = d.show_qr;
-        if (d.show_signature !== undefined) designForm.show_signature = d.show_signature;
-        if (d.footer_note) designForm.footer_note = d.footer_note;
-        if (d.report_before_minutes !== undefined) designForm.report_before_minutes = d.report_before_minutes;
-        if (d.gate_closure_after_minutes !== undefined) designForm.gate_closure_after_minutes = d.gate_closure_after_minutes;
-    }
-}
-
 watch(() => logoInput.value?.files?.[0], (file) => {
     if (!file) {
         localLogoPreview.value = null;
@@ -393,20 +327,14 @@ const previewSampleData = computed(() => ({
     hall_instructions: designForm.hall_instructions || props.previewSample?.hall_instructions,
 }));
 
-const previewUrl = computed(() => {
-    const params = new URLSearchParams({
-        header_title: designForm.header_title || '',
-        footer_note: designForm.footer_note || '',
-        show_reg_no: designForm.show_reg_no ? '1' : '0',
-        show_school: designForm.show_school ? '1' : '0',
-        primary_color: designForm.primary_color,
-        accent_color: designForm.accent_color,
-        layout: designForm.layout,
-    });
-    return `/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/preview?${params}`;
-});
+const previewUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/preview`);
+watch(() => designForm.data(), () => { designSaved.value = false; }, { deep: true });
+watch(backgroundFile, () => { designSaved.value = false; });
 
 function saveDesign() {
+    designSaving.value = true;
+    designSaved.value = false;
+    designErrors.value = {};
     const fd = new FormData();
     fd.append('header_title', designForm.header_title || '');
     fd.append('footer_note', designForm.footer_note || '');
@@ -426,11 +354,24 @@ function saveDesign() {
     fd.append('gate_closure_after_minutes', String(designForm.gate_closure_after_minutes));
     const file = logoInput.value?.files?.[0];
     if (file) fd.append('logo', file);
+    if (backgroundFile.value) fd.append('background', backgroundFile.value);
+    fd.append('show_student_photo', designForm.show_student_photo ? '1' : '0');
+    for (const [index, field] of (designForm.custom_fields || []).entries()) {
+        for (const [key, value] of Object.entries(field)) fd.append(`custom_fields[${index}][${key}]`, String(value));
+    }
+    for (const key of ['card_width_mm','card_height_mm','page_orientation','card_gap_mm','background_fit']) fd.append(key, String(designForm[key]));
+    for (const [key, position] of Object.entries(designForm.field_positions)) {
+        for (const [axis, value] of Object.entries(position)) fd.append(`field_positions[${key}][${axis}]`, String(value));
+    }
 
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/design`, fd, {
         preserveScroll: true,
         forceFormData: true,
+        onError: errors => { designErrors.value = errors; },
+        onFinish: () => { designSaving.value = false; },
         onSuccess: () => {
+            designSaved.value = true;
+            backgroundFile.value = null;
             designForm.remove_logo = false;
             if (logoInput.value) logoInput.value.value = '';
             localLogoPreview.value = null;

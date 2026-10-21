@@ -1,3 +1,6 @@
+@if(in_array($design['layout'] ?? '', ['stse_three_up', 'custom_background'], true))
+    @include('mcq.partials.stse-admit-card')
+@else
 @php
     $design = \App\Support\Mcq\McqHallTicketDesign::normalize($design ?? null);
     $sample = $sample ?? [];
@@ -354,8 +357,14 @@
     =================================== -->
     @if($showSignature)
     <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:{{ $isCompact ? '10px' : '16px' }};padding-top:6px;border-top:1px dashed #94a3b8;">
+        @if(!empty($sample['principal_signature_src']))
+        <div style="width:23%;text-align:center;">
+            <img src="{{ $sample['principal_signature_src'] }}" alt="Principal signature" style="width:100%;height:30px;object-fit:contain;">
+            <div style="border-top:1px solid #334155;padding-top:3px;font-size:9px;font-weight:700;">Signature of Principal</div>
+        </div>
+        @endif
         @if($showCandidateSig)
-        <div style="width:31%;text-align:center;">
+        <div style="width:{{ !empty($sample['principal_signature_src']) ? '23%' : '31%' }};text-align:center;">
             <div style="border-top:1.2px solid #334155;margin-top:{{ $isCompact ? '24px' : '30px' }};padding-top:3px;font-size:9.5px;font-weight:700;color:#334155;text-transform:uppercase;">
                 Candidate's Signature
             </div>
@@ -364,7 +373,7 @@
         @endif
 
         @if($showInvigilatorSig)
-        <div style="width:31%;text-align:center;">
+        <div style="width:{{ !empty($sample['principal_signature_src']) ? '23%' : '31%' }};text-align:center;">
             <div style="border-top:1.2px solid #334155;margin-top:{{ $isCompact ? '24px' : '30px' }};padding-top:3px;font-size:9.5px;font-weight:700;color:#334155;text-transform:uppercase;">
                 Invigilator's Signature
             </div>
@@ -373,7 +382,7 @@
         @endif
 
         @if($showControllerSig)
-        <div style="width:31%;text-align:center;">
+        <div style="width:{{ !empty($sample['principal_signature_src']) ? '23%' : '31%' }};text-align:center;">
             <div style="border-top:1.2px solid #334155;margin-top:{{ $isCompact ? '24px' : '30px' }};padding-top:3px;font-size:9.5px;font-weight:700;color:#334155;text-transform:uppercase;">
                 {{ $signatoryTitle }}
             </div>
@@ -399,3 +408,5 @@
     @endif
 
 </div>
+
+@endif

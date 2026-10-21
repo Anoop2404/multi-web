@@ -22,6 +22,24 @@ class McqHallTicketDesign
             'primary_color'     => '#1e3a8a',
             'accent_color'      => '#b91c1c',
             'layout'            => 'standard',
+            'background_path'   => null,
+            'card_width_mm' => 90,
+            'card_height_mm' => 121.384615,
+            'page_orientation' => 'landscape',
+            'card_gap_mm' => 3,
+            'background_fit' => 'contain',
+            'background_aspect_ratio' => 780 / 1052,
+            'show_student_photo' => false,
+            'custom_fields' => [],
+            'field_positions' => [
+                'registration' => ['x' => 41, 'y' => 48, 'size' => 11, 'width' => 52],
+                'name' => ['x' => 41, 'y' => 54, 'size' => 11, 'width' => 52],
+                'class' => ['x' => 24, 'y' => 66, 'size' => 11, 'width' => 68],
+                'date' => ['x' => 49, 'y' => 71.5, 'size' => 10, 'width' => 44],
+                'centre' => ['x' => 37, 'y' => 76, 'size' => 10, 'width' => 56],
+                'principal_signature' => ['x' => 10, 'y' => 81.7, 'size' => 11, 'width' => 30],
+                'student_photo' => ['x' => 75, 'y' => 31, 'size' => 11, 'width' => 16, 'height' => 15],
+            ],
             'logo_path'         => null,
             'board_logo_path'   => null,
             'show_school'       => true,
@@ -63,7 +81,7 @@ class McqHallTicketDesign
 
         $primary = self::normalizeColor($settings['primary_color'] ?? null, $defaults['primary_color']);
         $accent = self::normalizeColor($settings['accent_color'] ?? null, $defaults['accent_color']);
-        $layout = in_array($settings['layout'] ?? 'standard', ['standard', 'compact'], true)
+        $layout = in_array($settings['layout'] ?? 'standard', ['standard', 'compact', 'stse_three_up', 'custom_background'], true)
             ? ($settings['layout'] ?? 'standard')
             : 'standard';
 
@@ -75,7 +93,51 @@ class McqHallTicketDesign
             $instructions = $defaults['instructions'];
         }
 
+        $positions = $defaults['field_positions'];
+        foreach ($positions as $field => &$position) {
+            foreach ($position as $axis => &$value) {
+                $candidate = $settings['field_positions'][$field][$axis] ?? $value;
+                $value = is_numeric($candidate)
+                    ? max($axis === 'size' ? 6 : 0, min($axis === 'size' ? 72 : 95, (float) $candidate))
+                    : $value;
+            }
+            unset($value);
+            $position['width'] = min(max(1, $position['width']), 100 - $position['x']);
+            if (isset($position['height'])) $position['height'] = min(max(1, $position['height']), 100 - $position['y']);
+            $position = array_merge($position, self::textStyle($settings['field_positions'][$field] ?? []));
+        }
+        unset($position);
+
+        $customFields = [];
+        $sources = ['text', 'school_name', 'hall_room', 'seat_no', 'exam_title', 'admission_no', 'academic_year'];
+        foreach (array_slice(is_array($settings['custom_fields'] ?? null) ? $settings['custom_fields'] : [], 0, 20) as $field) {
+            if (!is_array($field) || !is_string($field['id'] ?? null) || !preg_match('/^custom_[a-zA-Z0-9_-]{1,64}$/', $field['id'] ?? '')) {
+                continue;
+            }
+            $number = fn (string $key, float $fallback): float => is_numeric($field[$key] ?? null) ? (float) $field[$key] : $fallback;
+            $x = max(0, min(95, $number('x', 10)));
+            $customFields[$field['id']] = [
+                'id' => $field['id'],
+                'label' => mb_substr(trim((is_scalar($field['label'] ?? null) ? (string) $field['label'] : 'Custom field')), 0, 80),
+                'source' => in_array($field['source'] ?? '', $sources, true) ? $field['source'] : 'text',
+                'text' => mb_substr((is_scalar($field['text'] ?? null) ? (string) $field['text'] : ''), 0, 500),
+                'x' => $x, 'y' => max(0, min(95, $number('y', 35))),
+                'width' => max(1, min(100 - $x, $number('width', 60))),
+                'size' => max(6, min(72, $number('size', 10))),
+                ...self::textStyle($field),
+            ];
+        }
+
         return [
+            'field_positions' => $positions,
+            'show_student_photo' => (bool) ($settings['show_student_photo'] ?? false),
+            'custom_fields' => array_values($customFields),
+            'card_width_mm' => max(20, min(277, (float) ($settings['card_width_mm'] ?? 90))),
+            'card_height_mm' => max(20, min(277, (float) ($settings['card_height_mm'] ?? 121.384615))),
+            'page_orientation' => ($settings['page_orientation'] ?? 'landscape') === 'portrait' ? 'portrait' : 'landscape',
+            'card_gap_mm' => max(0, min(15, (float) ($settings['card_gap_mm'] ?? 3))),
+            'background_fit' => ($settings['background_fit'] ?? 'contain') === 'stretch' ? 'stretch' : 'contain',
+            'background_aspect_ratio' => max(0.1, min(10, (float) ($settings['background_aspect_ratio'] ?? (780 / 1052)))),
             'organization_name' => trim((string) ($settings['organization_name'] ?? $defaults['organization_name'])) ?: $defaults['organization_name'],
             'sub_heading'       => trim((string) ($settings['sub_heading'] ?? $defaults['sub_heading'])),
             'sub_title'         => trim((string) ($settings['sub_title'] ?? $defaults['sub_title'])),
@@ -90,6 +152,7 @@ class McqHallTicketDesign
             'primary_color'     => $primary,
             'accent_color'      => $accent,
             'layout'            => $layout,
+            'background_path'   => filled($settings['background_path'] ?? null) ? (string) $settings['background_path'] : null,
             'logo_path'         => filled($settings['logo_path'] ?? null) ? (string) $settings['logo_path'] : null,
             'board_logo_path'   => filled($settings['board_logo_path'] ?? null) ? (string) $settings['board_logo_path'] : null,
             'show_photo'        => (bool) ($settings['show_photo'] ?? $defaults['show_photo']),
@@ -201,8 +264,79 @@ class McqHallTicketDesign
         ];
     }
 
+    public static function textStyle(array $field): array
+    {
+        $families = ['Arial', 'Times New Roman', 'Georgia', 'Verdana', 'Tahoma', 'Courier New'];
+        return [
+            'font_family' => in_array($field['font_family'] ?? '', $families, true) ? $field['font_family'] : 'Arial',
+            'font_weight' => ($field['font_weight'] ?? '') === 'bold' ? 'bold' : 'normal',
+            'font_style' => ($field['font_style'] ?? '') === 'italic' ? 'italic' : 'normal',
+            'text_align' => in_array($field['text_align'] ?? '', ['left','center','right'], true) ? $field['text_align'] : 'left',
+        ];
+    }
+
+    public static function customFieldValue(array $field, array $sample): string
+    {
+        if (($field['source'] ?? 'text') === 'text') {
+            return (string) ($field['text'] ?? '');
+        }
+        $value = $sample[$field['source']] ?? '';
+        return trim(($field['label'] ?? '') . (filled($field['label'] ?? '') ? ': ' : '') . $value);
+    }
+
+    /** A4 with 10 mm printer-safe margins; derive capacity from the selected die. */
+    public static function printGeometry(array $design): array
+    {
+        $landscape = ($design['page_orientation'] ?? 'landscape') === 'landscape';
+        $availableWidth = $landscape ? 277 : 190;
+        $availableHeight = $landscape ? 190 : 277;
+        $width = min($availableWidth, max(20, (float) ($design['card_width_mm'] ?? 90)));
+        $height = min($availableHeight, max(20, (float) ($design['card_height_mm'] ?? 121.384615)));
+        $gap = max(0, min(15, (float) ($design['card_gap_mm'] ?? 3)));
+        $columns = max(1, (int) floor(($availableWidth + $gap + 0.00001) / ($width + $gap)));
+        $rows = max(1, (int) floor(($availableHeight + $gap + 0.00001) / ($height + $gap)));
+
+        return ['width' => $width, 'height' => $height, 'gap' => $gap, 'columns' => $columns, 'rows' => $rows, 'per_page' => $columns * $rows];
+    }
+
+    /** Artwork bounds inside a die; text uses the same coordinate space as its labels. */
+    public static function artworkBox(array $design): array
+    {
+        $geometry = self::printGeometry($design);
+        $width = $geometry['width'];
+        $height = $geometry['height'];
+        if (($design['background_fit'] ?? 'contain') === 'stretch') {
+            return ['x' => 0, 'y' => 0, 'width' => $width, 'height' => $height];
+        }
+        $aspect = ($design['layout'] ?? '') === 'stse_three_up' ? 780 / 1052 : ($design['background_aspect_ratio'] ?? 780 / 1052);
+        $artWidth = min($width, $height * $aspect);
+        $artHeight = $artWidth / $aspect;
+
+        return ['x' => ($width - $artWidth) / 2, 'y' => ($height - $artHeight) / 2, 'width' => $artWidth, 'height' => $artHeight];
+    }
+
+    public static function schoolCentreSettingKey(McqExam $exam): string
+    {
+        return 'mcq_exam_centre_'.$exam->id;
+    }
+
+    /** A school-specific centre overrides the Sahodaya's exam-wide venue. */
+    public static function centreForSchool(McqExam $exam, ?Tenant $school): ?string
+    {
+        $centre = $school?->getSetting(self::schoolCentreSettingKey($exam));
+        if (is_string($centre) && trim($centre) !== '') {
+            return trim($centre);
+        }
+
+        return filled($exam->venue) ? $exam->venue : null;
+    }
+
     public static function fromExam(McqExam $exam): array
     {
+        if (($exam->settings_json['hall_ticket_design_scope'] ?? null) === 'exam') {
+            return self::normalize($exam->settings_json['hall_ticket'] ?? null);
+        }
+
         if ($exam->hall_ticket_template_id) {
             $template = \App\Models\McqHallTicketTemplate::find($exam->hall_ticket_template_id);
             if ($template?->design_json) {
@@ -250,6 +384,7 @@ class McqHallTicketDesign
         $qrService = app(\App\Services\Events\FestIdCardQrService::class);
 
         return [
+            'is_preview' => true,
             'participant_type'   => 'student',
             'participant_name'   => 'Sample Student',
             'student_name'       => 'Sample Student',
@@ -299,6 +434,7 @@ class McqHallTicketDesign
         $qrService = app(\App\Services\Events\FestIdCardQrService::class);
 
         return [
+            'is_preview' => true,
             'participant_type'   => 'student',
             'participant_name'   => 'Sample Student',
             'student_name'       => 'Sample Student',

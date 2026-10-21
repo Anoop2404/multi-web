@@ -299,6 +299,8 @@ class McqController extends SchoolAdminController
         ];
 
         return $this->inertia('School/Mcq/ExamDetail', [
+            'schoolExamCentre' => $this->school->getSetting(\App\Support\Mcq\McqHallTicketDesign::schoolCentreSettingKey($exam)),
+            'effectiveExamCentre' => \App\Support\Mcq\McqHallTicketDesign::centreForSchool($exam, $this->school),
             'exam' => array_merge($exam->toArray(), [
                 'uses_engine' => \App\Services\ExamEngine\ExamEngineRun::usesEngine($exam),
                 'fee_label'              => McqExamLevelLabels::feeLabel($exam->fee_type, $exam->fee_amount),
@@ -681,6 +683,20 @@ class McqController extends SchoolAdminController
         }
 
         return back()->with('success', $message);
+    }
+
+    public function saveExamCentre(Request $request, string $tenantId, McqExam $exam)
+    {
+        abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+        abort_if($this->isStaff, 403, 'Only the school administrator can set the examination centre.');
+        $data = $request->validate(['exam_centre' => 'nullable|string|max:500']);
+        $centre = trim($data['exam_centre'] ?? '');
+        $this->school->setSetting(
+            \App\Support\Mcq\McqHallTicketDesign::schoolCentreSettingKey($exam),
+            $centre !== '' ? $centre : null,
+        );
+
+        return back()->with('success', 'Examination centre saved.');
     }
 
     public function hallTicketsPdf(string $tenantId, McqExam $exam)
