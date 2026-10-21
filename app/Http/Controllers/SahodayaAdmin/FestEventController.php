@@ -1190,8 +1190,16 @@ class FestEventController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        // A full in-platform school meet needs marks entry, auto-rank and judge sheets
+        // that only exist for sports today — so a non-sports event (Kalotsav, kids fest,
+        // …) can't run the platform-conduct path. Its school round is a results-submission
+        // round instead: schools record winners themselves and submit them to this parent,
+        // and FestStateProgramService::spawnChildEvent() creates a results-only child for
+        // anything that isn't sports.
+        $conductsInPlatform = $event->event_type === 'sports';
+
         $created = app(\App\Services\Events\FestStateProgramService::class)
-            ->spawnSchoolRounds($event);
+            ->spawnSchoolRounds($event, conductInPlatform: $conductsInPlatform);
 
         $count = count($created);
 
@@ -1288,6 +1296,7 @@ class FestEventController extends SahodayaAdminController
             'tiebreak_mode'        => 'nullable|in:none,include_all_ties,exclude_ties,lot_draw,manual,secondary_score',
             'tiebreak_secondary'   => 'nullable|string|max:40',
             'quota_eligible'       => 'nullable|boolean',
+            'ranking_direction'    => 'nullable|in:asc,desc',
         ], $this->taxonomyValidationRules($registry, $event)));
 
         $data['participant_type'] = $data['participant_type'] ?? 'individual';
@@ -1369,6 +1378,7 @@ class FestEventController extends SahodayaAdminController
             'max_squad'      => 'nullable|integer|min:1',
             'min_squad'      => 'nullable|integer|min:1',
             'standbys'       => 'nullable|integer|min:0',
+            'ranking_direction'  => 'nullable|in:asc,desc',
         ], $this->taxonomyValidationRules($registry, $event)));
 
         $participantType = $data['participant_type'] ?? $item->participant_type;

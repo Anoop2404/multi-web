@@ -192,10 +192,13 @@
                         <span class="px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold text-[11px]">
                             {{ section.rows.length }} participant(s)
                         </span>
+                        <span v-if="directionLabel(section.item)" class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-semibold">
+                            {{ directionLabel(section.item) }}
+                        </span>
                     </div>
 
                     <div class="flex flex-nowrap items-center gap-2 text-xs overflow-x-auto pb-1 -mb-1 sm:flex-wrap sm:overflow-visible sm:pb-0 sm:mb-0">
-                        <div v-if="section.rows.length > 1" class="flex items-center gap-1.5 shrink-0">
+                        <div v-if="section.rows.length > 1 && showRankColumn(section.item)" class="flex items-center gap-1.5 shrink-0">
                             <span class="text-slate-500 font-medium text-[11px] whitespace-nowrap">Same rank for all:</span>
                             <SearchableSelect v-model="bulkRank[section.bulkKey]"
                                               :options="[{ value: null, label: '—' }, ...rankOptionsFor(section).map((opt) => ({ value: opt.rank, label: opt.label }))]"
@@ -207,9 +210,10 @@
                             </button>
                         </div>
 
-                        <button v-if="section.item?.id" type="button" class="btn-secondary text-xs !py-1 !px-2.5 shrink-0 whitespace-nowrap" :disabled="itemLocked" @click="autoRankAndGrade(section)">
-                            Auto-rank &amp; Grade
+                        <button v-if="section.item?.id && !rankEntryOnly(section.item)" type="button" class="btn-secondary text-xs !py-1 !px-2.5 shrink-0 whitespace-nowrap" :disabled="itemLocked" @click="autoRankAndGrade(section)">
+                            {{ isSports ? 'Auto-rank saved results' : 'Auto-rank & Grade' }}
                         </button>
+                        <span v-else-if="section.item?.id" class="text-[11px] text-slate-400 whitespace-nowrap">Rank-only item — enter ranks directly</span>
                         <button v-if="section.item?.id" type="button" class="text-xs !py-1 !px-2.5 shrink-0 whitespace-nowrap rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 font-medium" :disabled="itemLocked" @click="clearAllMarks(section)">
                             Clear All Marks
                         </button>
@@ -226,17 +230,17 @@
                                 <th class="px-2.5 py-3 min-w-[4.5rem] w-20">Order</th>
                                 <th class="px-2.5 py-3 min-w-[5.5rem] w-24">Fest ID</th>
                                 <th class="px-2.5 py-3 min-w-[6.5rem] w-28">Attendance</th>
-                                <th v-if="showMeasurement(section.item)" class="px-2.5 py-3 min-w-[7.5rem] w-32">Time / Distance</th>
-                                <th class="px-2.5 py-3 min-w-[6.5rem] w-28">Rank</th>
-                                <template v-if="hasJudgePanel">
+                                <th v-if="showMeasurement(section.item)" class="px-2.5 py-3 min-w-[7.5rem] w-32">{{ measurementUnitHint(section.item) === 'm' ? 'Distance (m)' : 'Time / Distance' }}</th>
+                                <th v-if="showRankColumn(section.item)" class="px-2.5 py-3 min-w-[6.5rem] w-28">Rank</th>
+                                <template v-if="hasJudgePanel && !rankEntryOnly(section.item)">
                                     <th v-for="j in judgeNumbers" :key="j" class="px-2.5 py-3 min-w-[5.5rem] w-24 text-center">
                                         Judge {{ j }}
                                         <span v-if="perJudgeMax" class="block font-normal text-slate-400 normal-case text-[9px]">/ {{ perJudgeMax }}</span>
                                     </th>
                                     <th class="px-2.5 py-3 min-w-[5rem] w-20 text-center">Grand Total</th>
                                 </template>
-                                <th v-else class="px-2.5 py-3 min-w-[6rem] w-24 text-center">Marks / Score</th>
-                                <th v-if="showGradeColumn" class="px-2.5 py-3 min-w-[5rem] w-20 text-center">Grade</th>
+                                <th v-else-if="!rankEntryOnly(section.item)" class="px-2.5 py-3 min-w-[6rem] w-24 text-center">Marks / Score</th>
+                                <th v-if="showGradeColumn && !rankEntryOnly(section.item)" class="px-2.5 py-3 min-w-[5rem] w-20 text-center">Grade</th>
                                 <th class="px-3 py-3 text-right min-w-[5.5rem] w-24">Actions</th>
                             </tr>
                         </thead>
@@ -285,7 +289,7 @@
                                             @update:model-value="(value) => markAttendance(participant, item, value)" />
                                 </td>
 
-                                <!-- Time / Distance (if applicable) -->
+                                <!-- Time / Distance (when the item is measured, per result_method) -->
                                 <td v-if="showMeasurement(section.item)" class="px-2.5 py-2">
                                     <div class="flex items-center gap-1">
                                         <input v-model="markForms[participant.id].measurement_value"
@@ -294,13 +298,13 @@
                                                :disabled="isAbsent(participant, item) || itemLocked">
                                         <input v-model="markForms[participant.id].measurement_unit"
                                                class="field text-sm w-14 !py-1.5 !px-1.5"
-                                               placeholder="s/m"
+                                               :placeholder="measurementUnitHint(section.item)"
                                                :disabled="isAbsent(participant, item) || itemLocked">
                                     </div>
                                 </td>
 
                                 <!-- Rank Dropdown -->
-                                <td class="px-2.5 py-2">
+                                <td v-if="showRankColumn(section.item)" class="px-2.5 py-2">
                                     <SearchableSelect :model-value="markForms[participant.id].position ?? ''"
                                             :disabled="isAbsent(participant, item) || itemLocked"
                                             :options="rankOptionsFor(section).map((opt) => ({ value: opt.rank, label: opt.label }))"
@@ -309,7 +313,7 @@
                                 </td>
 
                                 <!-- Per-judge subtotal columns + computed Grand Total -->
-                                <template v-if="hasJudgePanel">
+                                <template v-if="hasJudgePanel && !rankEntryOnly(section.item)">
                                     <td v-for="j in judgeNumbers" :key="j" class="px-2.5 py-2 text-center">
                                         <input v-model.number="judgeForms[participant.id][j]" type="number" min="0" step="0.5"
                                                :max="perJudgeMax"
@@ -323,7 +327,7 @@
                                 </template>
 
                                 <!-- Marks / Score (Optional) -->
-                                <td v-else class="px-2.5 py-2 text-center">
+                                <td v-else-if="!rankEntryOnly(section.item)" class="px-2.5 py-2 text-center">
                                     <input v-model.number="markForms[participant.id].score" type="number" min="0" step="0.5"
                                            class="field text-sm font-bold tabular-nums w-20 !py-1.5 !px-2 text-center" placeholder="Optional"
                                            :disabled="isAbsent(participant, item) || itemLocked"
@@ -331,7 +335,7 @@
                                 </td>
 
                                 <!-- Grade (Optional for Kalolsavam / Fest) -->
-                                <td v-if="showGradeColumn" class="px-2.5 py-2">
+                                <td v-if="showGradeColumn && !rankEntryOnly(section.item)" class="px-2.5 py-2">
                                     <SearchableSelect v-model="markForms[participant.id].grade"
                                             :disabled="isAbsent(participant, item) || itemLocked"
                                             :options="gradeOptions" :all-option="true" all-label="—" escape-overflow
@@ -528,6 +532,10 @@ const {
     attendanceStatus,
     isAbsent,
     showMeasurement,
+    rankEntryOnly,
+    showRankColumn,
+    directionLabel,
+    measurementUnitHint,
     setRank,
     applyBulkRank,
     buildMarkPayload,
@@ -734,6 +742,10 @@ function autoGrade(section) {
 // Combined single-click version — auto-rank always applies, grade only
 // when this event actually shows a grade column (sports events, etc. don't).
 function autoRankAndGrade(section) {
+    if (isSports.value || ['time', 'distance'].includes(section.item?.result_method)) {
+        autoRank(section.item);
+        return;
+    }
     autoRankSection(section);
     if (showGradeColumn.value) {
         autoGrade(section);
@@ -879,7 +891,7 @@ function payloadFor(participant, item) {
         }
     }
     const payload = buildMarkPayload(participant, item, markForms);
-    if (hasJudgePanel.value) {
+    if (hasJudgePanel.value && !rankEntryOnly(item)) {
         payload.judge_scores = judgeScoresPayload(participant.id);
     }
     return payload;
@@ -958,6 +970,10 @@ async function saveAll() {
 }
 
 function autoRankSection(section) {
+    // Rank-only items get their rank entered directly — there is no measurement or judged
+    // total to rank from, so the button itself is hidden for them (see section bar).
+    if (rankEntryOnly(section.item)) return;
+
     const scoredRows = [];
     for (const { participant, item } of section.rows) {
         if (isAbsent(participant, item)) continue;
@@ -1003,7 +1019,7 @@ function autoRankSection(section) {
 }
 
 function autoRank(item) {
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${item.id}/auto-rank`, {}, { preserveScroll: true });
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${item.id}/auto-rank`, {}, { preserveScroll: true, preserveState: false });
 }
 
 function clearAllMarks(section) {

@@ -342,7 +342,14 @@ class EventLifecycleGate
 
         app(FestJudgeGateService::class)->assertCanPublish($event);
 
-        if ($event->require_all_marks_before_publish) {
+        // Results-only school rounds (non-sports, see FestEvent::isSchoolResultsOnly())
+        // are the school's own winner records submitted to the parent — they have no
+        // full in-platform marks to complete, so the "every participant marked/ranked"
+        // check would block them forever. Only platform-conducted rounds need the
+        // completeness check, whether or not the Sahodaya chose to require it.
+        if ($event->isSchoolResultsOnly()) {
+            self::assertSchoolWinnersRecorded($event);
+        } elseif ($event->require_all_marks_before_publish) {
             self::assertAllParticipantsMarked($event);
         }
     }
@@ -408,6 +415,29 @@ class EventLifecycleGate
 
         if ($participantCount > 0 && $rankedCount < $participantCount) {
             throw new HttpException(422, "Rank assignment incomplete ({$rankedCount}/{$participantCount}). Assign ranks for all participants before publishing.");
+        }
+    }
+
+    /**
+     * A results-only school round's own gate: it publishes its winners, not full marks —
+     * so it must have at least one recorded position, and that position must belong to
+     * a participant of THIS round (an unlinked stray mark on an unrelated participant
+     * would otherwise publish as a phantom winner).
+     */
+    private static function assertSchoolWinnersRecorded(FestEvent $event): void
+    {
+        $recorded = FestMark::where('event_id', $event->id)->whereNotNull('position')->count();
+        if ($recorded < 1) {
+            throw new HttpException(422, 'Record at least one school winner (rank) before publishing this school round.');
+        }
+
+        $ownParties = FestParticipant::where('event_id', $event->id)->pluck('id');
+        $ownWinners = FestMark::where('event_id', $event->id)
+            ->whereNotNull('position')
+            ->whereIn('participant_id', $ownParties->all())
+            ->count();
+        if ($ownWinners < 1) {
+            throw new HttpException(422, 'No winner in this round belongs to a participant of this event — record ranks for this school\'s own participants before publishing.');
         }
     }
 }

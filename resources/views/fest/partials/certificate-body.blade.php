@@ -74,7 +74,7 @@
                  (scrollHeight can never report less than the box's own height), breaking
                  the script's overflow check. Auto-height + a plain data value keeps
                  scrollHeight meaningful while still telling the script where the zone ends. --}}
-            <div class="overlay-field body" data-zone-bottom="{{ $b['bottom'] ?? '' }}" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($b, ['top' => 48, 'left' => 12, 'width' => 76, 'font_size' => 12.5, 'font_family' => 'Montserrat']) }}">
+            <div class="overlay-field body" data-zone-bottom="{{ $b['bottom'] ?? '' }}" data-min-font-size="{{ $b['min_font_size'] ?? '' }}" style="{{ \App\Models\CertificateTemplate::overlayFieldStyle($b, ['top' => 48, 'left' => 12, 'width' => 76, 'font_size' => 12.5, 'font_family' => 'Montserrat']) }}">
                 @foreach($paragraphs as $paragraph)
                     <div style="margin-bottom:8px;">{!! $paragraph !!}</div>
                 @endforeach

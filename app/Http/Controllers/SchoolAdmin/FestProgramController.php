@@ -248,7 +248,7 @@ class FestProgramController extends SchoolAdminController
 
         return $this->inertia('School/Events/ProgramMarks', [
             'school'        => $this->school->only('id', 'name'),
-            'event'         => $festProgram->only('id', 'title', 'event_type', 'status'),
+            'event'         => $festProgram->only('id', 'title', 'event_type', 'status', 'level_round'),
             'registrations' => $registrations,
             'marks'         => $marks,
         ]);
@@ -256,7 +256,17 @@ class FestProgramController extends SchoolAdminController
 
     public function storeMark(Request $request, string $tenantId, FestEvent $festProgram, \App\Services\Events\FestMarkSaveService $markSave, PlatformAuditLogger $audit)
     {
+        // A school may only enter marks for a round it conducts itself. Its own
+        // school-level round (whatever the event type — non-sports types are
+        // results-only rounds, see FestEvent::isSchoolResultsOnly()) is the only
+        // legitimate target; submitting winners of someone else's round, or a
+        // Sahodaya round, is not allowed through this path.
         abort_unless($festProgram->conducting_school_id === $this->school->id, 403, 'Only the school conducting this program can manage it.');
+        abort_if($festProgram->level_round !== 'school', 422, 'Marks can only be entered for a school-level round — this is a cluster/state round.');
+        if ($festProgram->parent_event_id) {
+            $parent = FestEvent::find($festProgram->parent_event_id);
+            abort_if($parent && $parent->event_type !== $festProgram->event_type, 422, 'Parent event must be the same program type.');
+        }
 
         $data = $request->validate([
             'participant_id'    => 'required|exists:fest_participants,id',

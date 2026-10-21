@@ -189,4 +189,98 @@ class FestCertificateAbsenceAndDateTest extends TestCase
 
         $this->assertNull($f['event']->fresh()->certificate_date);
     }
+    public function test_item_conduct_overrides_only_merit_details_and_marks_existing_merits_stale(): void
+    {
+        $f = $this->fixture(['event_start' => '2026-10-24', 'event_end' => '2026-10-25', 'venue' => 'Main Venue']);
+        $item = FestEventItem::create(['event_id' => $f['event']->id, 'title' => 'Solo Song', 'item_code' => 'PH1']);
+        $participant = $this->registerParticipant($f['event'], $item, $f['school']->id, 900);
+        $certificates = [];
+        foreach (['winner', 'participation'] as $type) {
+            $certificates[$type] = Certificate::create([
+                'entity_type' => FestParticipant::class, 'entity_id' => $participant->id,
+                'cert_type' => $type, 'verification_uuid' => (string) Str::uuid(), 'generated_at' => now(), 'is_stale' => false,
+            ]);
+        }
+        $url = route('sahodaya.events.certificates.phases', ['tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id]);
+        $this->actingAs($f['admin'])->post($url, [
+            'item_ids' => [$item->id], 'name' => 'Phase 1', 'venue' => 'Phase School, Kozhikode', 'date_start' => '2026-10-17',
+        ])->assertSessionHasNoErrors()->assertRedirect();
+        $service = app(FestCertificateService::class);
+        $merit = $service->renderContext($certificates['winner'])['fieldValues'];
+        $participation = $service->renderContext($certificates['participation'])['fieldValues'];
+        $this->assertSame('Phase School, Kozhikode', $merit['conduct_location']);
+        $this->assertSame('Phase School, Kozhikode', $merit['venue']);
+        $this->assertSame('17th October 2026', $merit['event_dates']);
+        $this->assertSame($f['school']->name, $merit['school_name']);
+        $this->assertSame('Main Venue', $participation['venue']);
+        $this->assertSame('24th - 25th October 2026', $participation['event_dates']);
+        $this->assertSame($participation['certificate_date'], $merit['certificate_date']);
+        $this->assertTrue($certificates['winner']->fresh()->is_stale);
+        $this->assertFalse($certificates['participation']->fresh()->is_stale);
+        $phase = \App\Models\FestCertificatePhase::where('event_id', $f['event']->id)->firstOrFail();
+        $this->actingAs($f['admin'])->post($url, [
+            'phase_id' => $phase->id, 'name' => 'Phase 1', 'venue' => 'Phase School, Kozhikode',
+            'date_start' => '2026-10-17', 'item_ids' => [],
+        ])->assertSessionHasNoErrors();
+        $this->assertNull($item->fresh()->certificate_phase_id);
+        $this->assertSame('Main Venue', $service->renderContext($certificates['winner'])['fieldValues']['venue']);
+    }
+
+    public function test_item_conduct_rejects_foreign_items_and_invalid_date_ranges(): void
+    {
+        $f = $this->fixture();
+        $item = FestEventItem::create(['event_id' => $f['event']->id, 'title' => 'Solo Song', 'item_code' => 'PH2']);
+        $otherEvent = FestEvent::create(['tenant_id' => $f['sahodaya']->id, 'title' => 'Other Event', 'event_type' => 'kalolsavam']);
+        $other = FestEventItem::create(['event_id' => $otherEvent->id, 'title' => 'Other Song', 'item_code' => 'PH3']);
+        $url = route('sahodaya.events.certificates.phases', ['tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id]);
+        $this->actingAs($f['admin'])->post($url, ['name' => 'Phase', 'date_start' => '2026-10-17', 'item_ids' => [$item->id, $other->id], 'venue' => 'Wrong'])->assertStatus(422);
+        $this->assertNull($item->fresh()->certificate_phase_id);
+        $this->actingAs($f['admin'])->post($url, ['name' => 'Phase', 'venue' => 'Venue', 'item_ids' => [$item->id], 'date_start' => '2026-10-20', 'date_end' => '2026-10-17'])->assertSessionHasErrors('date_end');
+    }
+    public function test_certificate_phase_updates_all_assigned_items_without_changing_event_phases(): void
+    {
+        $f = $this->fixture(['venue' => 'Main Venue']);
+        $items = collect(['A', 'B'])->map(fn ($code) => FestEventItem::create([
+            'event_id' => $f['event']->id, 'title' => 'Item '.$code, 'item_code' => 'CP'.$code,
+        ]));
+        $url = route('sahodaya.events.certificates.phases', ['tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id]);
+        $data = ['name' => 'Phase 1', 'venue' => 'Early Venue', 'date_start' => '2026-10-17', 'item_ids' => $items->pluck('id')->all()];
+        $this->actingAs($f['admin'])->post($url, $data)->assertSessionHasNoErrors();
+        $phase = \App\Models\FestCertificatePhase::where('event_id', $f['event']->id)->firstOrFail();
+        foreach ($items as $item) {
+            $this->assertSame($phase->id, $item->fresh()->certificate_phase_id);
+            $this->assertNull($item->fresh()->phase_id);
+        }
+        $this->actingAs($f['admin'])->post($url, array_merge($data, [
+            'phase_id' => $phase->id, 'venue' => 'Revised Venue', 'date_start' => '2026-10-18',
+        ]))->assertSessionHasNoErrors();
+        foreach ($items as $item) {
+            $this->assertSame('Revised Venue', $item->fresh()->certificatePhase->conductDetails()['venue']);
+            $this->assertSame('2026-10-18', $item->fresh()->certificatePhase->conductDetails()['date_start']);
+        }
+        $this->assertSame('Main Venue', $f['event']->fresh()->venue);
+        $otherEvent = FestEvent::create(['tenant_id' => $f['sahodaya']->id, 'title' => 'Other', 'event_type' => 'kalolsavam']);
+        $otherPhase = \App\Models\FestCertificatePhase::create(['event_id' => $otherEvent->id, 'name' => 'Other', 'venue' => 'Other', 'date_start' => '2026-10-19']);
+        $this->actingAs($f['admin'])->post($url, array_merge($data, ['phase_id' => $otherPhase->id]))->assertNotFound();
+    }
+
+    public function test_moving_item_between_certificate_phases_changes_render_values_and_hash(): void
+    {
+        $f = $this->fixture(['event_start' => '2026-10-24', 'event_end' => '2026-10-25', 'venue' => 'Default Venue']);
+        $item = FestEventItem::create(['event_id' => $f['event']->id, 'title' => 'Anchoring', 'item_code' => 'CP-MOVE']);
+        $participant = $this->registerParticipant($f['event'], $item, $f['school']->id, 901);
+        $certificate = Certificate::create(['entity_type' => FestParticipant::class, 'entity_id' => $participant->id, 'cert_type' => 'winner', 'verification_uuid' => (string) Str::uuid(), 'generated_at' => now()]);
+        $service = app(FestCertificateService::class);
+        $before = $service->renderContext($certificate);
+        $url = route('sahodaya.events.certificates.phases', ['tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id]);
+        foreach (['First Venue', 'Second Venue'] as $venue) {
+            $this->actingAs($f['admin'])->post($url, ['name' => $venue, 'venue' => $venue, 'date_start' => '2026-10-17', 'date_end' => '2026-10-18', 'item_ids' => [$item->id]])->assertSessionHasNoErrors();
+            $context = $service->renderContext($certificate);
+            $this->assertSame($venue, $context['fieldValues']['venue']);
+            $this->assertSame('17th - 18th October 2026', $context['fieldValues']['event_dates']);
+            $this->assertSame($f['school']->name, $context['fieldValues']['school_name']);
+            $this->assertNotSame($service->contentHash($before), $service->contentHash($context));
+        }
+    }
+
 }

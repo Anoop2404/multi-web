@@ -342,6 +342,16 @@
                     <FormField label="Result Method">
                         <SearchableSelect v-model="itemForm.result_method" :options="resultMethodOptions"
                                           :all-option="true" all-label="Default" />
+                        <p class="mt-1 text-[11px] text-slate-50">
+                            Time / Distance items show a measurement column at mark entry and auto-rank from the recorded values;
+                            Rank-only items skip auto-rank and take the rank straight from the judges' table.
+                        </p>
+                    </FormField>
+
+                    <FormField v-if="['time', 'distance'].includes(itemForm.result_method)" label="Ranking Direction">
+                        <SearchableSelect v-model="itemForm.ranking_direction"
+                                          :options="[{ value: 'asc', label: 'Lower is better (e.g. race time)' }, { value: 'desc', label: 'Higher is better (e.g. jump / throw distance)' }]"
+                                          :all-option="true" all-label="Auto (guess from item name)" />
                     </FormField>
 
                     <FormField v-if="!isSports && competitionAreas.length" label="Competition Area">
@@ -472,6 +482,12 @@
                         <FormField label="Result Method">
                             <SearchableSelect v-model="editForm.result_method" :options="resultMethodOptions"
                                               :all-option="true" all-label="Default" />
+                        </FormField>
+
+                        <FormField v-if="['time', 'distance'].includes(editForm.result_method)" label="Ranking Direction">
+                            <SearchableSelect v-model="editForm.ranking_direction"
+                                              :options="[{ value: 'asc', label: 'Lower is better (e.g. race time)' }, { value: 'desc', label: 'Higher is better (e.g. jump / throw distance)' }]"
+                                              :all-option="true" all-label="Auto (guess from item name)" />
                         </FormField>
 
                         <FormField label="Fee Override (₹)" class-extra="sm:col-span-2">
@@ -740,7 +756,7 @@ async function deleteItem(item) {
 }
 
 const itemForm = useForm({
-    title: '', item_code: '', exclusive_group_key: '', participant_type: 'individual', result_method: '', stage_type: '', venue_type: '',
+    title: '', item_code: '', exclusive_group_key: '', participant_type: 'individual', result_method: '', ranking_direction: '', stage_type: '', venue_type: '',
     competition_format: '', sport_discipline: '', class_group: '', age_group: '', kids_band: '', gender: 'open',
     category: '', area_id: '', tiebreak_mode: 'none',
     max_per_school: null, qualify_count: null, duration_minutes: null, total_marks: null,
@@ -761,7 +777,7 @@ function addItem() {
 const editingItem = ref(null);
 const editForm = useForm({
     title: '', item_code: '', exclusive_group_key: '', is_enabled: true, gender: 'open', class_group: '', age_group: '', kids_band: '',
-    stage_type: '', venue_type: '', sport_discipline: '', competition_format: '', participant_type: 'individual', result_method: '',
+    stage_type: '', venue_type: '', sport_discipline: '', competition_format: '', participant_type: 'individual', result_method: '', ranking_direction: '',
     category: '', area_id: '', tiebreak_mode: 'none',
     max_per_school: null, qualify_count: null, duration_minutes: null, total_marks: null,
     min_group_size: null, max_group_size: null, standbys: null,
@@ -782,6 +798,7 @@ function startEditItem(item) {
     editForm.area_id = item.area_id ?? '';
     editForm.participant_type = item.participant_type ?? 'individual';
     editForm.result_method = item.result_method ?? '';
+    editForm.ranking_direction = item.ranking_direction ?? '';
     editForm.max_per_school = item.max_per_school ?? null;
     editForm.min_group_size = item.min_group_size ?? null;
     editForm.max_group_size = item.max_group_size ?? null;

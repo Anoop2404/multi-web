@@ -208,6 +208,22 @@ class FestQualificationService
     $roundsSkipped = 0;
 
     foreach ($schoolRounds as $round) {
+      // Results-only school rounds (non-sports — FestEvent::isSchoolResultsOnly()) can't
+      // be bulk-promoted: they have no in-platform published marks to copy; their winners
+      // travel through the school's submit flow (submitSchoolSportsWinners), which records
+      // a FestQualification row. Counting them as skipped here would keep bulk promotion
+      // spinning its wheels on rounds that will never publish in-platform.
+      if ($round->isSchoolResultsOnly()) {
+        if (FestQualification::where('event_id', $round->id)->exists()) {
+          $roundsProcessed++;
+        } else {
+          $roundsSkipped++;
+          $skipped++;
+        }
+
+        continue;
+      }
+
       if (! $round->results_published) {
         $roundsSkipped++;
 
@@ -536,9 +552,11 @@ class FestQualificationService
   /** @return list<array<string, mixed>> */
   public function schoolSportsWinnerCandidates(\App\Models\Tenant $school): array
   {
+    // Non-sports school rounds are results-only (see FestEvent::isSchoolResultsOnly()):
+    // the school records its own winners and submits them here — the marks table is
+    // the single winner channel for every event type, so no type filter.
     $schoolEvents = FestEvent::query()
       ->where('conducting_school_id', $school->id)
-      ->where('event_type', 'sports')
       ->where('level_round', 'school')
       ->whereNotNull('parent_event_id')
       ->with(['parentEvent', 'items'])
@@ -608,11 +626,14 @@ class FestQualificationService
   public function submitSchoolSportsWinners(\App\Models\Tenant $school, FestEvent $schoolEvent, array $markIds): array
   {
     abort_if($schoolEvent->conducting_school_id !== $school->id, 403);
-    abort_if($schoolEvent->event_type !== 'sports' || $schoolEvent->level_round !== 'school', 422);
+    // Any school-level round may submit its recorded winners — sports are conducted in the
+    // platform, non-sports types are results-only rounds (FestEvent::isSchoolResultsOnly()).
+    abort_if($schoolEvent->level_round !== 'school', 422);
     abort_unless($schoolEvent->parent_event_id, 422, 'Link this school event to a Sahodaya parent event first.');
 
     $target = FestEvent::findOrFail($schoolEvent->parent_event_id);
     abort_if($target->tenant_id !== $school->parent_id, 403);
+    abort_if($target->event_type !== $schoolEvent->event_type, 422, 'Parent event must be the same program type.');
 
     $submitted = 0;
     $skipped = 0;

@@ -36,12 +36,14 @@
                         <span v-if="section.item?.head?.name" class="text-xs font-normal text-slate-500 mr-2">{{ section.item.head.name }}</span>
                         {{ section.item?.title }}
                     </p>
-                    <button v-if="section.item?.id"
-                            type="button"
-                            class="btn-secondary text-xs !min-h-0"
-                            @click="autoRank(section.item)">
-                        Auto-rank
-                    </button>
+                    <template v-if="section.item?.id && !rankEntryOnly(section.item)">
+                        <button type="button"
+                                class="btn-secondary text-xs !min-h-0"
+                                @click="autoRank(section.item)">
+                            Auto-rank
+                        </button>
+                    </template>
+                    <span v-else-if="section.item?.id" class="text-[11px] text-slate-400">Rank-only — enter ranks directly</span>
                 </div>
 
                 <div class="overflow-x-auto">
@@ -50,9 +52,10 @@
                             <tr>
                                 <th class="p-2">Participant</th>
                                 <th v-if="isSports" class="p-2 min-w-[6.5rem]">Attendance</th>
-                                <th v-if="showMeasurement(section.item)" class="p-2 min-w-[7rem]">Time / dist</th>
+                                <th v-if="showMeasurement(section.item)" class="p-2 min-w-[7rem]">{{ measurementUnitHint(section.item) === 'm' ? 'Distance (m)' : 'Time / dist' }}</th>
                                 <th v-if="showMeasurement(section.item)" class="p-2 min-w-[4rem]">Unit</th>
-                                <th class="p-2 min-w-[11rem]">Rank</th>
+                                <th v-if="showScore(section.item)" class="p-2 min-w-[7rem]">Score</th>
+                                <th v-if="showRankColumn(section.item)" class="p-2 min-w-[11rem]">Rank</th>
                                 <th class="p-2 w-20"></th>
                             </tr>
                         </thead>
@@ -80,16 +83,19 @@
                                 <td v-if="showMeasurement(section.item)" class="p-2 align-middle">
                                     <input v-model="markForms[participant.id].measurement_value"
                                            class="field !py-2 text-sm min-w-[7rem] w-full"
-                                           placeholder="Time/dist"
+                                           :placeholder="measurementPlaceholder(item)"
                                            :disabled="isAbsent(participant, item)">
                                 </td>
                                 <td v-if="showMeasurement(section.item)" class="p-2 align-middle">
                                     <input v-model="markForms[participant.id].measurement_unit"
                                            class="field !py-2 text-sm min-w-[4rem] w-full"
-                                           placeholder="s/m"
+                                           :placeholder="measurementUnitHint(item)"
                                            :disabled="isAbsent(participant, item)">
                                 </td>
-                                <td class="p-2 align-middle">
+                                <td v-if="showScore(item)" class="p-2 align-middle">
+                                    <input v-model.number="markForms[participant.id].score" type="number" min="0" step="0.01" class="field" :aria-label="`Score for ${participant.student?.name ?? participant.teacher?.name ?? participant.id}`" />
+                                </td>
+                                <td v-if="showRankColumn(item)" class="p-2 align-middle">
                                     <SearchableSelect v-if="isSports"
                                             :model-value="markForms[participant.id].position ?? ''"
                                             class="min-w-[11rem] w-full"
@@ -159,7 +165,7 @@ const marksBaseUrl = computed(() => portalPaths.value.marksHref);
 const flatItems = computed(() => (props.headItemGroups ?? []).flatMap((h) => h.items ?? []));
 
 function onItemSelect(itemId) {
-    router.get(marksBaseUrl.value, itemId ? { item_id: itemId } : {}, { preserveScroll: true, preserveState: true });
+    router.get(marksBaseUrl.value, itemId ? { item_id: itemId } : {}, { preserveScroll: true, preserveState: false });
 }
 
 const navItems = computed(() => {
@@ -177,6 +183,9 @@ const {
     attendanceStatus,
     isAbsent,
     showMeasurement,
+    rankEntryOnly,
+    showRankColumn,
+    measurementUnitHint,
     buildMarkPayload,
     rankOptionsForItem,
     setRank,
@@ -201,6 +210,14 @@ function rankSelectOptions(item) {
     return rankOptionsForItem(item).map((opt) => ({ value: opt.rank, label: `${opt.label} (${opt.points} pts)` }));
 }
 
+function showScore(item) {
+    return !rankEntryOnly(item) && !['time', 'distance'].includes((item?.result_method || '').toLowerCase());
+}
+
+function measurementPlaceholder(item) {
+    return (item?.result_method || '').toLowerCase() === 'time' ? 'Time (s)' : 'Dist (m)';
+}
+
 function markAttendance(participant, item, status) {
     if (!status) {
         return;
@@ -218,10 +235,10 @@ function saveMark(participant, item) {
 }
 
 async function autoRank(item) {
-    if (!item?.id || !(await confirm({ message: `Auto-rank "${item.title}" from the entered measurements or scores? Absent participants are skipped.`, destructive: false }))) {
+    if (!item?.id || !(await confirm({ message: `Auto-rank "${item.title}" from saved measurements or scores? Save your changes first. Absent participants are skipped.`, destructive: false }))) {
         return;
     }
 
-    router.post(portalPaths.value.autoRankUrl(item.id), {}, { preserveScroll: true });
+    router.post(portalPaths.value.autoRankUrl(item.id), {}, { preserveScroll: true, preserveState: false });
 }
 </script>

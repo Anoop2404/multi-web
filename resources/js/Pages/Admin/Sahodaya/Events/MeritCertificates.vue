@@ -14,6 +14,8 @@
             </Link>
         </div>
 
+        <ItemConductCard :base="base" :items="conductItems" :phases="certificatePhases" />
+
         <EventSignatoriesCard :base="base" :initial-signatories="certificateSignatories" :label-suggestions="signatoryLabelSuggestions" />
 
         <!-- Filter + pipeline: item/school here drive both the list below and every
@@ -192,6 +194,7 @@ import { sortByPublication } from '@/support/certificatePublicationSort.js';
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
+import ItemConductCard from '@/Components/certificates/ItemConductCard.vue';
 import EventSignatoriesCard from '@/Components/certificates/EventSignatoriesCard.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
@@ -200,6 +203,8 @@ const props = defineProps({
     sahodaya: Object, publicUrl: String, pendingPaymentsCount: Number,
     event: Object, certificates: Array,
     participationParentUrl: { type: String, default: null },
+    certificatePhases: { type: Array, default: () => [] },
+    conductItems: { type: Array, default: () => [] },
     publishedItems: { type: Array, default: () => [] },
     schools: { type: Array, default: () => [] },
     recentBatches: { type: Array, default: () => [] },
@@ -227,7 +232,7 @@ const itemOptions = computed(() => props.publishedItems.map(item => {
     return { id: item.id, name };
 }));
 
-const meritItemSort = ref('default');
+const meritItemSort = ref('published_asc');
 const filteredCertificates = computed(() => sortByPublication(props.certificates.filter(c => {
     if (selectedItemId.value && c.item?.id !== selectedItemId.value) return false;
     if (selectedSchoolId.value) {

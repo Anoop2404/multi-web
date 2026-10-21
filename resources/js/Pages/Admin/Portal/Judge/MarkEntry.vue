@@ -20,11 +20,14 @@
                                 @select="onItemSelect" />
 
         <p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
-            You are entering <strong>your judge scores</strong>. When all judges for an item have scored a participant, the official mark is averaged automatically.
+            You are entering <strong>your judge scores</strong>. Scores are averaged when every assigned judge has scored. For rank-only items, enter the agreed table result; it is saved as the shared official rank.
         </p>
         <p class="text-xs text-slate-600 bg-slate-50 border rounded-lg px-3 py-2 mb-3">
             Position / rank: same number can be used for multiple athletes (ties). Enter measurement for sports timing.
         </p>
+
+        <div v-if="saveError" role="alert" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ saveError }}</div>
+        <p v-if="saved" role="status" class="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">Result saved.</p>
 
         <p v-if="!registrations.length" class="text-sm text-slate-500 py-6 text-center">
             No participants in this section. Pick another item above.
@@ -42,14 +45,14 @@
                     <span v-if="!maskNames">{{ p.student?.name ?? p.teacher?.name }}</span>
                     <span v-else class="text-gray-400 text-xs">(anonymous)</span>
                 </div>
-                <SearchableSelect v-if="!isSports" v-model="forms[p.id].grade" :options="gradeOptions" :all-option="true" all-label="Grade" />
-                <input v-model.number="forms[p.id].position" type="number" min="1" placeholder="Rank (ties OK)" class="field" title="Same rank allowed for ties">
-                <input v-model.number="forms[p.id].score" type="number" min="0" step="0.01" placeholder="Score" class="field">
+                <SearchableSelect v-if="!isSports && !rankEntryOnly(reg.item)" v-model="forms[p.id].grade" :options="gradeOptions" :all-option="true" all-label="Grade" />
+                <input :aria-label="`Rank for ${participantRegNo(p) || p.id}`" v-model.number="forms[p.id].position" type="number" min="1" placeholder="Rank (ties OK)" class="field" title="Same rank allowed for ties">
+                <input v-if="!rankEntryOnly(reg.item)" v-model.number="forms[p.id].score" type="number" min="0" step="0.01" placeholder="Score" class="field">
                 <template v-if="showMeasurement(reg.item)">
-                    <input v-model="forms[p.id].measurement_value" placeholder="Time/dist" class="field">
-                    <input v-model="forms[p.id].measurement_unit" placeholder="s/m" class="field">
+                    <input v-model="forms[p.id].measurement_value" :placeholder="measurementPlaceholder(reg.item)" class="field">
+                    <input v-model="forms[p.id].measurement_unit" :placeholder="unitHint(reg.item)" class="field">
                 </template>
-                <button @click="save(p, reg.item_id)" class="px-3 py-2 text-white rounded-lg text-sm md:col-span-1 bg-amber-600 hover:bg-amber-700">Save</button>
+                <button @click="save(p, reg.item)" :disabled="savingId !== null" class="px-3 py-2 text-white rounded-lg text-sm md:col-span-1 bg-amber-600 hover:bg-amber-700">{{ savingId === p.id ? 'Saving…' : 'Save' }}</button>
             </div>
         </div>
     </PortalLayout>
@@ -60,7 +63,7 @@ import PortalLayout from '@/Layouts/PortalLayout.vue';
 import ReportItemSearchSelect from '@/Components/reports/ReportItemSearchSelect.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { judgePortalNavItems } from '@/support/judgePortalNav.js';
-import { computed, reactive, onMounted } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 
 const props = defineProps({
@@ -79,6 +82,9 @@ const props = defineProps({
 
 const gradeOptions = ['A+', 'A', 'B', 'C'];
 const forms = reactive({});
+const savingId = ref(null);
+const saveError = ref('');
+const saved = ref(false);
 
 const isSports = computed(() => props.event?.event_type === 'sports');
 const marksBaseUrl = computed(() => `/portal/judge/${props.sahodaya.id}/events/${props.event.id}/marks`);
@@ -87,12 +93,13 @@ const navItems = computed(() => judgePortalNavItems(props.sahodaya.id, props.eve
 const flatItems = computed(() => (props.headItemGroups ?? []).flatMap((h) => h.items ?? []));
 
 function onItemSelect(itemId) {
-    router.get(marksBaseUrl.value, itemId ? { item_id: itemId } : {}, { preserveScroll: true, preserveState: true });
+    router.get(marksBaseUrl.value, itemId ? { item_id: itemId } : {}, { preserveScroll: true, preserveState: false });
 }
 
-onMounted(() => {
+watch(() => props.registrations, () => {
     for (const reg of props.registrations) {
         for (const p of reg.participants) {
+            if (forms[p.id]) continue;
             const existing = props.marks?.[p.id];
             forms[p.id] = {
                 grade: existing?.grade ?? '',
@@ -103,19 +110,57 @@ onMounted(() => {
             };
         }
     }
-});
+}, { immediate: true });
+
+// Per-item result mode (item.result_method): rank-only items take just the rank,
+// time/distance items show the measurement fields, everything else keeps them all.
+function resultMethod(item) {
+    return (item?.result_method || '').toLowerCase();
+}
+
+function rankEntryOnly(item) {
+    return resultMethod(item) === 'rank';
+}
 
 function showMeasurement(item) {
+    if (rankEntryOnly(item)) return false;
+    if (['time', 'distance'].includes(resultMethod(item))) {
+        return true;
+    }
+
     return props.event.record_tracking_enabled
         && (item?.category === 'sports' || item?.sport_discipline);
 }
 
-function save(participant, itemId) {
-    router.post(`/portal/judge/${props.sahodaya.id}/events/${props.event.id}/marks`, {
+function measurementPlaceholder(item) {
+    return resultMethod(item) === 'time' ? 'Time (s)' : 'Dist (m)';
+}
+
+function unitHint(item) {
+    return resultMethod(item) === 'time' ? 's' : 'm';
+}
+
+function save(participant, item) {
+    if (savingId.value !== null) return;
+    savingId.value = participant.id;
+    saveError.value = '';
+    saved.value = false;
+    const payload = {
         participant_id: participant.id,
-        item_id: itemId,
+        item_id: item.id,
         ...forms[participant.id],
-    }, { preserveScroll: true });
+    };
+
+    // Rank-only items never carry a measurement field on the form — make sure a stale
+    // measurement on an existing mark can't sneak back through a bare save either.
+    if (rankEntryOnly(item)) {
+        payload.score = null;
+        payload.grade = null;
+        payload.measurement_value = null;
+        payload.measurement_unit = null;
+    }
+
+    router.post(`/portal/judge/${props.sahodaya.id}/events/${props.event.id}/marks`, payload, { preserveScroll: true, onSuccess: () => { saved.value = true; }, onError: errors => { saveError.value = Object.values(errors).flat().join(' '); }, onFinish: () => { savingId.value = null; } });
 }
 
 function participantRegNo(participant) {

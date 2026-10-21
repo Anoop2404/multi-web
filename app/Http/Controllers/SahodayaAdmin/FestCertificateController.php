@@ -76,6 +76,8 @@ class FestCertificateController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Events/MeritCertificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
             'event' => $event,
             'certificates' => $this->slimCertificates($certificates),
+            'conductItems' => FestEventItem::whereIn('event_id', $event->reportableEventIds())->orderByRaw('CASE WHEN results_published_at IS NULL THEN 1 ELSE 0 END')->orderBy('results_published_at')->orderBy('item_code')->orderBy('id')->get(['id', 'title', 'item_code', 'class_group', 'gender', 'certificate_phase_id', 'results_published_at']),
+            'certificatePhases' => \App\Models\FestCertificatePhase::where('event_id', $event->id)->orderBy('name')->get(),
             'publishedItems' => $this->publishedItemsForEvent($event),
             'schools' => $this->schoolsFromCertificates($certificates),
             'recentBatches' => $this->recentBatchesForEvent($event, 'winner'),
@@ -200,12 +202,13 @@ class FestCertificateController extends SahodayaAdminController
 
         return FestEventItem::whereIn('event_id', $event->reportableEventIds())
             ->whereNotNull('results_published_at')
-            ->orderBy('title')
-            ->get(['id', 'title', 'item_code', 'class_group', 'category', 'gender', 'participant_type'])
+            ->orderBy('results_published_at')->orderBy('item_code')->orderBy('id')
+            ->get(['id', 'title', 'item_code', 'class_group', 'category', 'gender', 'participant_type', 'results_published_at'])
             ->map(fn ($item) => [
                 'id' => $item->id,
                 'title' => $item->title,
                 'item_code' => $item->item_code,
+                'results_published_at' => $item->results_published_at?->toIso8601String(),
                 'category_label' => FestItemCategoryLabel::shortLabel($item, $classGroupLabels, $artsCategoryLabels),
                 'gender_label' => $this->itemGenderLabel($item),
                 'type_label' => $this->itemTypeLabel($item),
@@ -1134,6 +1137,40 @@ class FestCertificateController extends SahodayaAdminController
             ->unique()
             ->values()
             ->all();
+    }
+
+    public function saveCertificatePhase(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        $data = $request->validate([
+            'phase_id' => 'nullable|integer',
+            'name' => 'required|string|max:255',
+            'venue' => 'required|string|max:255',
+            'date_start' => 'required|date_format:Y-m-d',
+            'date_end' => 'nullable|date_format:Y-m-d|after_or_equal:date_start',
+            'item_ids' => 'present|array|max:1000',
+            'item_ids.*' => 'required|integer|distinct',
+        ]);
+        $phase = !empty($data['phase_id'])
+            ? \App\Models\FestCertificatePhase::where('event_id', $event->id)->findOrFail($data['phase_id'])
+            : new \App\Models\FestCertificatePhase(['event_id' => $event->id]);
+        $items = FestEventItem::whereIn('event_id', $event->reportableEventIds())->whereIn('id', $data['item_ids'])->get();
+        abort_unless($items->count() === count($data['item_ids']), 422, 'One or more items do not belong to this event.');
+        \Illuminate\Support\Facades\DB::transaction(function () use ($phase, $data, $items) {
+            $previous = $phase->exists ? FestEventItem::where('certificate_phase_id', $phase->id)->pluck('id') : collect();
+            $phase->fill(\Illuminate\Support\Arr::only($data, ['name', 'venue', 'date_start', 'date_end']));
+            $phase->date_end = $data['date_end'] ?? null;
+            $phase->save();
+            FestEventItem::where('certificate_phase_id', $phase->id)->whereNotIn('id', $items->pluck('id'))
+                ->update(['certificate_phase_id' => null]);
+            FestEventItem::whereIn('id', $items->pluck('id'))->update(['certificate_phase_id' => $phase->id]);
+            $affected = $previous->merge($items->pluck('id'))->unique();
+            Certificate::where('entity_type', FestParticipant::class)->where('cert_type', 'winner')
+                ->whereIn('entity_id', FestParticipant::whereHas('registration', fn ($q) => $q->whereIn('item_id', $affected))->select('id'))
+                ->update(['is_stale' => true]);
+        });
+
+        return back()->with('success', 'Certificate phase saved. Regenerate affected merit certificates.');
     }
 
     public function updateItemStages(Request $request, string $tenantId, FestEvent $event)

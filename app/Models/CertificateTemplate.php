@@ -335,7 +335,7 @@ class CertificateTemplate extends Model
                 // Only `body` grows with variable content (achievement text, the
                 // participation items box) — `bottom` marks the artwork's fillable-zone
                 // edge for that field alone (see overlayFieldStyle()).
-                'body' => array_merge($textKeys, ['bottom']),
+                'body' => array_merge($textKeys, ['bottom', 'min_font_size']),
                 default => $textKeys,
             };
             $defaults[$key] = array_merge(

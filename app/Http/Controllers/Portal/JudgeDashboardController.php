@@ -44,7 +44,10 @@ class JudgeDashboardController extends Controller
                 ->pluck('id');
 
             $total = $participantIds->count();
-            $marked = FestJudgeScore::where('event_id', $eventId)
+            $marked = $item?->result_method === 'rank'
+                ? \App\Models\FestMark::where('event_id', $eventId)->where('item_id', $item->id)
+                    ->whereIn('participant_id', $participantIds)->whereNotNull('position')->count()
+                : FestJudgeScore::where('event_id', $eventId)
                 ->where('item_id', $item?->id)
                 ->where('judge_user_id', $user->id)
                 ->whereIn('participant_id', $participantIds)

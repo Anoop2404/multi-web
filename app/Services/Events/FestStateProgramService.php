@@ -215,9 +215,15 @@ class FestStateProgramService
     /**
      * Spawn school-round child events for each member school.
      *
+     * @param  bool  $conductInPlatform  The school runs the whole meet in the platform (marks,
+     *                                   auto-rank, judges, submit winners). Only sports has
+     *                                   that machinery today — a non-sports parent gets
+     *                                   results-only school rounds instead: the school records
+     *                                   its own winners and submits them to the parent.
+     *
      * @return list<FestEvent>
      */
-    public function spawnSchoolRounds(FestEvent $parent, ?array $schoolIds = null): array
+    public function spawnSchoolRounds(FestEvent $parent, ?array $schoolIds = null, bool $conductInPlatform = true): array
     {
         abort_if($parent->tenant_id === null, 422);
         abort_unless($parent->conductsAt('school'), 422, 'This event does not include school-level rounds.');
@@ -243,23 +249,29 @@ class FestStateProgramService
             $schoolFee = app(FestEventFeeResolver::class)->resolveSchoolRoundFromParent($parent);
             $schoolFeeModel = $schoolFee['fee_model'] ?? 'none';
 
+            // Results-only school round: a school that isn't conducting the meet in the
+            // platform — it just records its own winners and submits them to the parent
+            // (FestQualificationService::submitSchoolSportsWinners already accepts
+            // submissions for any linked school event).
+            $childAttrs = [
+                'level_round'           => 'school',
+                'conducting_school_id'  => $schoolId,
+                'conduct_levels'        => ['school'],
+                'conductor_level'       => $parent->conductor_level,
+                'fee_type'              => $schoolFeeModel === 'none' ? 'none' : 'per_item',
+                'fee_amount'            => null,
+                // Inherit the parent's points table/appeal fee so school rounds score by the
+                // same manual — otherwise a school round scored differently from its own
+                // Sahodaya round would make promoted positions inconsistent with the points
+                // that got them there.
+                'scoring_preset'        => $parent->scoring_preset,
+                'appeal_fee_amount'     => $parent->appeal_fee_amount,
+            ];
+
             $child = app(FestCascadeService::class)->spawnChildEvent(
                 $parent,
                 "{$parent->title} — {$school->name}",
-                [
-                    'level_round'           => 'school',
-                    'conducting_school_id'  => $schoolId,
-                    'conduct_levels'        => ['school'],
-                    'conductor_level'       => $parent->conductor_level,
-                    'fee_type'              => $schoolFeeModel === 'none' ? 'none' : 'per_item',
-                    'fee_amount'            => null,
-                    // Inherit the parent's points table/appeal fee so school rounds score by the
-                    // same manual — otherwise a school round scored differently from its own
-                    // Sahodaya round would make promoted positions inconsistent with the points
-                    // that got them there.
-                    'scoring_preset'        => $parent->scoring_preset,
-                    'appeal_fee_amount'     => $parent->appeal_fee_amount,
-                ]
+                $childAttrs
             );
 
             $created[] = $child;

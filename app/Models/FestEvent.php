@@ -1078,6 +1078,17 @@ class FestEvent extends Model
         return in_array($level, $this->conduct_levels ?? ['sahodaya'], true);
     }
 
+    /**
+     * School rounds for a non-sports event are results-only: the school records its own
+     * winners and submits them to the parent — it does not run a full in-platform meet
+     * (marks entry, auto-rank and judges only exist for sports today, see
+     * FestStateProgramService::spawnSchoolRounds()).
+     */
+    public function isSchoolResultsOnly(): bool
+    {
+        return $this->level_round === 'school' && $this->event_type !== 'sports';
+    }
+
     public function isStateProgram(): bool
     {
         return $this->state_program_id !== null;

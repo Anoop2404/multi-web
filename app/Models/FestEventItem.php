@@ -15,7 +15,7 @@ class FestEventItem extends Model
 
     protected $fillable = [
         'event_id', 'title', 'item_code', 'exclusive_group_key', 'category', 'stage_type', 'venue_type',
-        'competition_format', 'sport_discipline', 'ranking_direction', 'result_method', 'duration_minutes', 'timing_mode', 'calling_buffer_minutes', 'criteria_json', 'total_marks',
+        'competition_format', 'sport_discipline', 'ranking_direction', 'result_method', 'duration_minutes', 'timing_mode', 'calling_buffer_minutes', 'criteria_json', 'certificate_phase_id', 'total_marks',
         'participant_type', 'gender', 'class_group', 'age_group', 'kids_band',
         'max_per_school', 'min_group_size', 'max_group_size', 'qualify_count',
         'owner_level', 'state_program_item_id', 'inherited_from_item_id', 'display_order',
@@ -67,6 +67,11 @@ class FestEventItem extends Model
                 $item->class_group = 'open';
             }
         });
+    }
+
+    public function certificatePhase(): BelongsTo
+    {
+        return $this->belongsTo(FestCertificatePhase::class, 'certificate_phase_id');
     }
 
     public function getSquadSummaryAttribute(): ?string

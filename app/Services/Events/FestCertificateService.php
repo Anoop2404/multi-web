@@ -1145,10 +1145,18 @@ class FestCertificateService
         // same certificate. Collapses to a single ordinal date when the event is one day
         // (or has no end date), and only repeats the month/year on the end date when it
         // actually differs from the start date's.
+        // Conduct details belong to the item; recipient school and issue date remain unchanged.
+        $conduct = $certType === 'winner'
+            ? ($item?->certificatePhase?->conductDetails() ?? [])
+            : [];
+        $conductStart = !empty($conduct['date_start']) ? \Illuminate\Support\Carbon::parse($conduct['date_start']) : $event?->event_start;
+        $conductEnd = !empty($conduct['date_start'])
+            ? (!empty($conduct['date_end']) ? \Illuminate\Support\Carbon::parse($conduct['date_end']) : null)
+            : $event?->event_end;
         $eventDates = '';
-        if ($event?->event_start) {
-            $start = $event->event_start;
-            $end = $event->event_end && !$event->event_end->isSameDay($start) ? $event->event_end : null;
+        if ($conductStart) {
+            $start = $conductStart;
+            $end = $conductEnd && !$conductEnd->isSameDay($start) ? $conductEnd : null;
             if (!$end) {
                 $eventDates = $start->format('jS F Y');
             } elseif ($start->isSameMonth($end) && $start->isSameYear($end)) {
@@ -1230,7 +1238,9 @@ class FestCertificateService
             // already handles the region-vs-hub venue-assignment split — see its own
             // docblock) — a template using {venue} shouldn't render an empty gap just
             // because this particular event never had one set.
-            'venue'               => $event?->resolvedVenueName() ?: ($event?->title ?? ''),
+            'venue'               => ($conduct['venue'] ?? null) ?: ($event?->resolvedVenueName() ?: ($event?->title ?? '')),
+            'host_school'         => ($conduct['host_school'] ?? null) ?: ($event?->resolvedVenueName() ?? ''),
+            'conduct_location'    => implode(', ', array_unique(array_filter([$conduct['host_school'] ?? null, $conduct['venue'] ?? null]))) ?: ($event?->resolvedVenueName() ?: ($event?->title ?? '')),
             'item_title'          => $itemTitle,
             // Kept as an alias of item_title for templates already using {item_details}
             // as the bold item-name line — category/type are now their own placeholders.
@@ -1586,7 +1596,7 @@ class FestCertificateService
             return $this->recordBreakPayload($certificate);
         }
 
-        $participant = FestParticipant::with(['student', 'registration.item', 'registration.event'])
+        $participant = FestParticipant::with(['student', 'registration.item.certificatePhase', 'registration.event'])
             ->find($certificate->entity_id);
 
         return [
@@ -1618,7 +1628,7 @@ class FestCertificateService
         $participantEntityIds = $certificates->where('entity_type', FestParticipant::class)->pluck('entity_id');
         $recordBreakEntityIds = $certificates->where('entity_type', FestRecordBreak::class)->pluck('entity_id');
 
-        $participants = FestParticipant::with(['student', 'registration.item', 'registration.event', 'registration.school', 'registration.originSchool'])
+        $participants = FestParticipant::with(['student', 'registration.item.certificatePhase', 'registration.event', 'registration.school', 'registration.originSchool'])
             ->whereIn('id', $participantEntityIds)
             ->get()
             ->keyBy('id');
@@ -1627,7 +1637,7 @@ class FestCertificateService
         // FestMark::where('participant_id', ...)->first() call — ordered by id so the
         // batched result is deterministic.
         $marksByParticipant = FestMark::whereIn('participant_id', $participants->keys())
-            ->with(['item'])
+            ->with(['item.certificatePhase'])
             ->orderBy('id')
             ->get()
             ->groupBy('participant_id')

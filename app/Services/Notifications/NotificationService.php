@@ -162,6 +162,10 @@ class NotificationService
                 'title' => 'Registration needs re-approval',
                 'body_template' => 'A roster change for {{event_title}} ({{item_title}}) requires re-approval.',
             ],
+            'fest.school.round.due' => [
+                'title' => 'School round due',
+                'body_template' => '{{event_title}}: {{mode_label}} before it {{due_date}}.',
+            ],
             'fee.receipt.reversed' => [
                 'title' => 'Fee receipt reversed',
                 'body_template' => 'Fee receipt {{receipt_number}} for ₹{{amount}} has been reversed. Reason: {{reason}}',

@@ -119,13 +119,63 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
         return attendanceStatus(participant, item) === 'absent';
     }
 
+    // Driven by the item's own result_method (rank / time / distance / ...), not just
+    // "is this a sports event". Falls back to the old behavior (measurement column for
+    // any sports item) only when the item has no result_method set yet.
+    function resultMethod(item) {
+        return (item?.result_method || '').toLowerCase();
+    }
+
     function showMeasurement(item) {
-        if (isSports.value) {
+        const method = resultMethod(item);
+
+        if (method === 'rank') return false;
+
+        if (method === 'time' || method === 'distance') {
             return true;
+        }
+
+        if (isSports.value) {
+            return !method || method === 'marks' || method === 'points';
         }
 
         return props.event.record_tracking_enabled
             && (item?.category === 'sports' || item?.sport_discipline);
+    }
+
+    // Items whose result is fixed at the table, not by measurement — the rank column is
+    // the only input that matters there, and it can't be auto-ranked from a time/distance.
+    function rankEntryOnly(item) {
+        return resultMethod(item) === 'rank';
+    }
+
+    function showRankColumn(item) {
+        return true;
+    }
+
+    function directionLabel(item) {
+        const method = resultMethod(item);
+        const dir = (item?.ranking_direction || '').toLowerCase();
+
+        if (['time', 'distance'].includes(method) && (dir === 'asc' || (!dir && method === 'time'))) {
+            return 'lower is better';
+        }
+        if (['time', 'distance'].includes(method) && (dir === 'desc' || (!dir && method === 'distance'))) {
+            return 'higher is better';
+        }
+        if (method === 'rank') {
+            return 'rank only — enter rank directly, no auto-rank';
+        }
+
+        return '';
+    }
+
+    function measurementUnitHint(item) {
+        switch (resultMethod(item)) {
+            case 'time': return 's';
+            case 'distance': return 'm';
+            default: return 's/m';
+        }
     }
 
     function pointsForRank(rank, item) {
@@ -205,13 +255,13 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
             participant_id: participant.id,
             item_id: item.id,
             position: form.position ?? null,
-            measurement_value: form.measurement_value || null,
-            measurement_unit: form.measurement_unit || null,
+            measurement_value: rankEntryOnly(item) ? null : form.measurement_value || null,
+            measurement_unit: rankEntryOnly(item) ? null : form.measurement_unit || null,
         };
 
         if (!isSports.value) {
-            payload.grade = form.grade || null;
-            payload.score = form.score ?? null;
+            payload.grade = rankEntryOnly(item) ? null : form.grade || null;
+            payload.score = rankEntryOnly(item) ? null : form.score ?? null;
         }
 
         return payload;
@@ -243,6 +293,11 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
         attendanceStatus,
         isAbsent,
         showMeasurement,
+        rankEntryOnly,
+        showRankColumn,
+        directionLabel,
+        measurementUnitHint,
+        resultMethod,
         rankLabel,
         rankOptionsForItem,
         setRank,

@@ -128,16 +128,12 @@
 
         if (body) {
             var allowedBottom = computeAllowedBottom(page, body, dateEl, uuidEl);
-            // floorPx = the body's own configured size, not a small fallback like the
-            // recipient field uses above: the participated-items box is already bounded by
-            // a hard cap server-side (see participationItemsBoxHtml()'s 7-item limit in
-            // FestCertificateService.php), so there's no real content this ever needs to
-            // shrink to protect. Letting it shrink anyway made borderline item counts
-            // render visibly smaller than the 1-3 item common case for no benefit —
-            // truncateItemList (the sentence-style ">3 items" cap) is the only correction
-            // still wired up here, unrelated to the box's own PHP-side cap.
+            // Templates can opt into bounded shrinking for long names/item lists.
+            // Existing layouts retain their configured size unless they set a floor.
             var bodyOriginalSize = parseFloat(getComputedStyle(body).fontSize) || 6;
-            fitTextToBox(body, bodyOriginalSize, allowedBottom, truncateItemList);
+            var configuredFloor = parseFloat(body.getAttribute('data-min-font-size'));
+            var floorPx = isNaN(configuredFloor) ? bodyOriginalSize : Math.max(6, Math.min(bodyOriginalSize, configuredFloor));
+            fitTextToBox(body, floorPx, allowedBottom, truncateItemList);
             centerWithinZone(body, allowedBottom);
         }
     }

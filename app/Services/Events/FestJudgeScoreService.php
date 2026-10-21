@@ -38,6 +38,20 @@ class FestJudgeScoreService
 
         abort_unless($assigned, 403, 'You are not assigned as a judge for this item.');
 
+        // Rank-only items record the agreed table result, not an individual score
+        // to average. Keep the same assignment and participant checks as scoring.
+        if ($item->result_method === 'rank') {
+            return app(FestMarkSaveService::class)->save($event, [
+                'participant_id' => $participant->id,
+                'item_id' => $item->id,
+                'position' => $data['position'] ?? null,
+                'grade' => null,
+                'score' => null,
+                'measurement_value' => null,
+                'measurement_unit' => null,
+            ], $judgeUserId, item: $item, participant: $participant);
+        }
+
         if (! empty($data['score']) && empty($data['grade'])) {
             $data['grade'] = $this->gradePointService->resolveGradeFromScore(
                 $event,
@@ -70,6 +84,9 @@ class FestJudgeScoreService
     public function syncAggregatedMark(FestEvent $event, int $itemId, int $participantId): void
     {
         $item = FestEventItem::findOrFail($itemId);
+        if ($item->result_method === 'rank') {
+            return;
+        }
         $participant = FestParticipant::with('registration')->findOrFail($participantId);
         abort_if($item->event_id !== $event->id || $participant->registration->event_id !== $event->id, 403);
         abort_if($participant->registration->item_id !== $item->id, 422, 'The participant is not registered for this item.');
@@ -116,15 +133,22 @@ class FestJudgeScoreService
         FestScoreboardUpdated::dispatch($event->fresh());
     }
 
-    /** @return array<int, FestJudgeScore> keyed by participant_id */
+    /** @return array<int, FestJudgeScore|FestMark> keyed by participant_id */
     public function scoresForJudge(FestEvent $event, int $judgeUserId, ?array $itemIds = null): array
     {
-        return FestJudgeScore::query()
+        $scores = FestJudgeScore::query()
             ->where('event_id', $event->id)
             ->where('judge_user_id', $judgeUserId)
             ->when($itemIds !== null, fn ($q) => $q->whereIn('item_id', $itemIds ?: [0]))
             ->get()
             ->keyBy('participant_id')
             ->all();
+
+        $ranks = FestMark::where('event_id', $event->id)
+            ->whereHas('item', fn ($q) => $q->where('result_method', 'rank'))
+            ->when($itemIds !== null, fn ($q) => $q->whereIn('item_id', $itemIds ?: [0]))
+            ->get()->keyBy('participant_id')->all();
+
+        return array_replace($scores, $ranks);
     }
 }

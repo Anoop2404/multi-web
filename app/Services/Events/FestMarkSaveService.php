@@ -77,6 +77,37 @@ class FestMarkSaveService
             ->where('participant_id', $data['participant_id'])
             ->first();
 
+        // Per-item result mode (FestEventItem::result_method): the admin chooses on the
+        // item itself whether the result is taken from a measurement (time/distance) or
+        // from the rank itself (rank) — and this is the one place every save path
+        // (admin mark entry, judge/coordinator portals, school rounds, CSV import)
+        // converges, so the mode is enforced here rather than per-form.
+        $resultMethod = strtolower((string) $item->result_method);
+        if ($resultMethod === 'rank' && ! empty($data['measurement_value'])) {
+            throw ValidationException::withMessages([
+                'measurement_value' => 'This item is rank-only — its result is the rank from the judges\' table, so no time/distance measurement may be recorded for it.',
+            ]);
+        }
+
+        // Measured items auto-rank from the recorded time/distance (FestSportsAutoRankService)
+        // — saving a blank measurement on one (fresh, or overwriting a recorded one) would
+        // silently drop that participant from the next ranking pass.
+        if (in_array($resultMethod, ['time', 'distance'], true)) {
+            $measurement = trim((string) (array_key_exists('measurement_value', $data)
+                ? $data['measurement_value'] : $existingMark?->measurement_value));
+            $position = array_key_exists('position', $data) ? $data['position'] : $existingMark?->position;
+            $score = array_key_exists('score', $data) ? $data['score'] : $existingMark?->score;
+            if ($measurement === '' && ($position || ($score !== null && $score !== ''))) {
+                // Rank entered by hand on a measured item is allowed (the admin is the
+                // referee of record), but the measurement itself still has to be on file.
+                throw ValidationException::withMessages([
+                    'measurement_value' => $resultMethod === 'time'
+                        ? 'This item is time-based — record a time (e.g. 12.5 s or 1:02.5) before saving.'
+                        : 'This item is distance-based — record a distance (e.g. 4.2 m) before saving.',
+                ]);
+            }
+        }
+
         // Only auto-derive grade from score when the caller isn't explicitly asserting
         // a grade of its own — comparing against what's already stored (rather than
         // just checking "is the incoming value blank") is what lets an admin clear a

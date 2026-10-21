@@ -146,4 +146,26 @@ class FestCertificateDedicatedPagesTest extends TestCase
         $this->assertSame(1, $batch->total_count, 'Only item A\'s winner certificate should be in scope.');
         $this->assertSame($itemA->id, $batch->item_id);
     }
+    public function test_certificate_items_follow_publication_order_with_unpublished_items_last(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $sahodaya = $this->makeSahodaya();
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+        $event = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Order Event', 'event_type' => 'kalolsavam']);
+        $newest = FestEventItem::create(['event_id' => $event->id, 'title' => 'AAA New', 'item_code' => '1', 'results_published_at' => '2026-10-20 10:00:00']);
+        $unpublished = FestEventItem::create(['event_id' => $event->id, 'title' => 'BBB Pending', 'item_code' => '2']);
+        $oldest = FestEventItem::create(['event_id' => $event->id, 'title' => 'ZZZ Old', 'item_code' => '3', 'results_published_at' => '2026-10-17 10:00:00']);
+        $this->actingAs($admin)->get(route('sahodaya.events.certificates.merit', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]))->assertOk()->assertInertia(fn ($page) => $page
+            ->has('conductItems', 3)
+            ->where('conductItems.0.id', $oldest->id)
+            ->where('conductItems.1.id', $newest->id)
+            ->where('conductItems.2.id', $unpublished->id)
+            ->where('publishedItems.0.id', $oldest->id)
+            ->where('publishedItems.1.id', $newest->id)
+        );
+    }
+
 }

@@ -26,6 +26,16 @@ class FestSportsAutoRankService
     {
         abort_if($item->event_id !== $event->id, 404);
 
+        // Rank-only items are ranked by table result, not by any recorded measurement —
+        // auto-ranking them would invent a result from scratch. The mark entry UI hides
+        // the Auto-rank button for these (useFestMarkEntryDisplay::rankEntryOnly); this
+        // keeps the server side consistent if the route is ever called directly.
+        if (strtolower((string) $item->result_method) === 'rank') {
+            throw ValidationException::withMessages([
+                'measurement' => 'This item is ranked by result, not by measurement — enter ranks directly instead of auto-ranking.',
+            ]);
+        }
+
         $absentParticipantIds = FestAttendance::query()
             ->where('event_id', $event->id)
             ->where('item_id', $item->id)
@@ -139,11 +149,25 @@ class FestSportsAutoRankService
 
     private function lowerIsBetter(FestEventItem $item): bool
     {
+        // The item's own fields are authoritative. ranking_direction (asc/desc, now
+        // editable in the item form) wins first; result_method next — 'time' means
+        // faster wins, 'distance' means farther wins; only when neither is set does the
+        // old name-guessing (a "jump"/"throw" is a field event) apply, so items created
+        // before these fields existed still rank the way they always have.
         if ($item->ranking_direction === 'asc') {
             return true;
         }
 
         if ($item->ranking_direction === 'desc') {
+            return false;
+        }
+
+        $method = strtolower((string) $item->result_method);
+        if ($method === 'time') {
+            return true;
+        }
+
+        if ($method === 'distance') {
             return false;
         }
 
@@ -159,6 +183,15 @@ class FestSportsAutoRankService
 
     private function parseNumeric(string $value): ?float
     {
+        $value = trim($value);
+
+        // Time-style entries (m:ss or m:ss.ff, e.g. "1:23.45" or "2:01") must expand to
+        // seconds — the old digit-stripping below would read "1:23.45" as 123.45, which
+        // is wildly different from the true 83.45s and would rank a slow runner first.
+        if (preg_match('/^(\d{1,2}):([0-5]?\d(?:[.,]\d{1,3})?)$/', $value, $m)) {
+            return (float) $m[1] * 60 + (float) str_replace(',', '.', $m[2]);
+        }
+
         $clean = preg_replace('/[^0-9.]/', '', $value);
         if ($clean === '' || ! is_numeric($clean)) {
             return null;

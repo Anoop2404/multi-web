@@ -717,6 +717,44 @@ class FestEventNotifier
         $this->notifyHeadExtras($head, $slug, $replacements);
     }
 
+    /**
+     * Nudge a school whose own round is due: platform-conducted sports meet still
+     * unpublished, or a results-only round (non-sports, see
+     * FestEvent::isSchoolResultsOnly()) that hasn't had any winner submitted yet.
+     * Without this, a school that never engages is silently skipped by bulk
+     * promotion (FestQualificationService::promoteAllSchoolRounds() counts it as
+     * rounds_skipped) and its results simply never reach the parent event.
+     */
+    public function schoolRoundDueReminder(FestEvent $schoolRound, ?string $template = null, ?string $message = null): void
+    {
+        $head = $this->resolveHeadForEvent($schoolRound);
+        if ($this->suppressed($head, $schoolRound, 'school_round_due')) {
+            return;
+        }
+
+        $resultsOnly = $schoolRound->isSchoolResultsOnly();
+        $parentTitle = $schoolRound->parentEvent?->title;
+
+        $replacements = [
+            'event_title' => $schoolRound->title,
+            'parent_title' => $parentTitle ?: 'its Sahodaya event',
+            'mode_label' => $resultsOnly ? 'record your winners and submit them' : 'complete and publish the meet results',
+            'competition_label' => $this->competitionLabel($schoolRound),
+        ];
+
+        if ($message !== null) {
+            $replacements['message'] = $message;
+        }
+
+        $url = $schoolRound->level_round === 'school'
+            ? "/school-admin/{$schoolRound->conducting_school_id}/fest-programs/{$schoolRound->id}"
+            : null;
+
+        $slug = $template ?: 'fest.school.round.due';
+        $this->notifySchool((string) $schoolRound->conducting_school_id, $slug, $replacements, $url);
+        $this->notifyHeadExtras($head, $slug, $replacements, $url);
+    }
+
     public function registrationDeadlineReminder(FestEvent $event, int $daysLeft): void
     {
         $head = $this->resolveHeadForEvent($event);
