@@ -356,6 +356,8 @@ function saveDesign() {
     if (file) fd.append('logo', file);
     if (backgroundFile.value) fd.append('background', backgroundFile.value);
     fd.append('show_student_photo', designForm.show_student_photo ? '1' : '0');
+    fd.append('remarks_text', designForm.remarks_text || '');
+    fd.append('remarks_height_mm', String(designForm.remarks_height_mm || 35));
     for (const [index, field] of (designForm.custom_fields || []).entries()) {
         for (const [key, value] of Object.entries(field)) fd.append(`custom_fields[${index}][${key}]`, String(value));
     }

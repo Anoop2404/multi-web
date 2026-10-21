@@ -2,7 +2,7 @@
     <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm mb-6">
         <header class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
             <div><p class="text-[10px] font-bold uppercase tracking-[.16em] text-indigo-600">Exam workspace · Admit cards</p><h2 class="text-lg font-bold text-slate-900 mt-1">Design {{ exam.title }} admit cards</h2><p class="text-xs text-slate-500 mt-1">Changes are saved to this exam only.</p></div>
-            <div class="flex items-center gap-2"><span v-if="saved" role="status" class="text-xs text-emerald-700">Design saved</span><a :href="previewUrl" target="_blank" rel="noopener" class="btn-secondary text-sm">Saved print preview ↗</a><button class="btn-primary text-sm" type="button" :disabled="saving || !!uploadError" @click="$emit('save')">{{ saving ? 'Saving…' : saveLabel }}</button></div>
+            <div class="flex items-center gap-2"><span v-if="saved" role="status" class="text-xs text-emerald-700">Design saved</span><a :href="previewUrl" target="_blank" rel="noopener" class="btn-secondary text-sm">Saved print preview ↗</a><button class="btn-primary text-sm" type="button" :disabled="saving || !!uploadError || remarksOverflow" @click="$emit('save')">{{ saving ? 'Saving…' : saveLabel }}</button></div>
         </header>
         <div class="grid xl:grid-cols-[310px_minmax(0,1fr)_240px]">
             <aside class="p-5 border-b xl:border-b-0 xl:border-r border-slate-200 space-y-5">
@@ -18,25 +18,32 @@
                     <div class="grid grid-cols-2 gap-2"><label class="text-xs text-slate-600">Die width (mm)<input v-model.number="design.card_width_mm" type="number" min="20" :max="geometry.pageWidth-20" step="0.5" class="field mt-1"></label><label class="text-xs text-slate-600">Die height (mm)<input v-model.number="design.card_height_mm" type="number" min="20" :max="geometry.pageHeight-20" step="0.5" class="field mt-1"></label></div>
                     <label class="block text-xs text-slate-600">Gap between cards (mm)<input v-model.number="design.card_gap_mm" class="field mt-1" type="number" min="0" max="15" step="0.5"></label>
                     <label class="block text-xs text-slate-600">Background fit<select v-model="design.background_fit" class="field mt-1"><option value="contain">Full image · keep proportions</option><option value="stretch">Fill the die · stretch image</option></select></label>
-                    <p class="text-xs text-slate-500">{{ geometry.columns }} across × {{ geometry.rows }} down = <strong>{{ geometry.perPage }} cards per A4</strong>. 10 mm page margins.</p>
+                    <p class="text-xs text-slate-500">{{ geometry.columns }} across × {{ geometry.rows }} down = <strong>{{ geometry.perPage }} {{ geometry.perPage===1 ? 'card' : 'cards' }} per A4</strong>. 10 mm page margins.</p>
+                </div>
+                <div v-if="isArtwork" class="border-t pt-4 space-y-3">
+                    <h3 class="text-xs font-bold uppercase tracking-wide text-slate-500">Remarks / Instructions</h3>
+                    <div class="flex gap-2"><button type="button" class="btn-secondary text-xs" @click="applyPreset('one')">Full A4 page</button><button type="button" class="btn-secondary text-xs" @click="applyPreset('two')">2 per page</button></div>
+                    <label class="block text-xs text-slate-600">Extra content<textarea v-model="design.remarks_text" class="field mt-1" rows="4" maxlength="3000" placeholder="Add remarks or exam instructions if needed"></textarea></label>
+                    <label v-if="(design.remarks_text || '').trim()" class="block text-xs text-slate-600">Remarks area height (mm)<input v-model.number="design.remarks_height_mm" class="field mt-1" type="number" min="15" :max="Math.min(150,geometry.height-20)"></label>
+                    <p class="text-xs text-slate-500">A separate area appears only when you add content. Choose a full page or two per page for longer instructions.</p><p v-if="remarksOverflow" role="alert" class="text-xs text-red-600">The remarks do not fit in this area. Increase its height, shorten the text, or choose a full A4 page before saving.</p>
                 </div>
                 <slot name="settings" />
             </aside>
             <div class="bg-slate-100/80 p-5 sm:p-8 min-w-0">
                 <div class="flex items-center justify-between text-xs text-slate-500 mb-5"><strong class="font-semibold">{{ isArtwork ? (viewMode==='sheet'?'A4 sheet preview':'Live card canvas') : 'Live preview' }}</strong><span>{{ isArtwork ? `${geometry.width.toFixed(1)} × ${geometry.height.toFixed(1)} mm` : 'A4 layout' }}</span></div>
                 <div v-if="isArtwork" class="flex justify-center gap-1 mb-4"><button v-for="view in ['card','sheet']" :key="view" type="button" class="px-3 py-1.5 rounded-lg text-xs font-semibold" :class="viewMode===view?'bg-white shadow-sm text-indigo-700':'text-slate-500'" @click="viewMode=view">{{ view==='card'?'Edit card':'Preview A4 sheet' }}</button></div>
-                <McqAdmitSheetPreview v-if="isArtwork && viewMode==='sheet'" :design="design" :sample="sample" :background="background" />
-                <div v-else-if="isArtwork" class="mx-auto max-w-[540px] shadow-lg"><McqAdmitCardCanvas :design="design" :sample="sample" :background="background" editable :selected="selected" @select="selected=$event" @move="moveField" /></div>
+                <McqAdmitSheetPreview v-if="isArtwork && viewMode==='sheet'" :design="design" :sample="sample" :background="background" @remarks-overflow="remarksOverflow=$event" />
+                <div v-else-if="isArtwork" class="mx-auto max-w-[540px] shadow-lg"><McqAdmitCardCanvas :design="design" :sample="sample" :background="background" editable :selected="selected" @select="selected=$event" @move="moveField" @remarks-overflow="remarksOverflow=$event" /></div>
                 <McqHallTicketPreview v-else :design="design" :sample="sample" :logo-url="logoUrl" />
                 <p v-if="isArtwork" class="text-center text-xs text-slate-500 mt-5">{{ viewMode==='sheet'?'Dashed lines show die boundaries. The image stays inside each card.':'Select a field to position it. Drag to move; arrow keys fine-tune.' }}</p>
-                <div class="mt-6 rounded-xl border border-slate-200 bg-white px-4 py-3 flex items-center justify-between gap-3 text-xs"><div><strong class="block text-slate-700">{{ isArtwork ? `${geometry.perPage} cards per sheet` : design.layout === 'compact' ? 'Compact cards' : 'One card per sheet' }}</strong><span class="text-slate-500">{{ isArtwork ? `${design.page_orientation === 'portrait' ? 'Portrait' : 'Landscape'} A4 · print at 100%` : 'Portrait A4' }}</span></div><div v-if="isArtwork" :style="{display:'grid',gridTemplateColumns:`repeat(${Math.min(geometry.columns,6)},1fr)`,gap:'2px'}" aria-label="Cards on the A4 sheet"><span v-for="n in Math.min(geometry.perPage,12)" :key="n" class="h-8 w-5 rounded-sm border border-indigo-300 bg-indigo-50"></span></div></div>
+                <div class="mt-6 rounded-xl border border-slate-200 bg-white px-4 py-3 flex items-center justify-between gap-3 text-xs"><div><strong class="block text-slate-700">{{ isArtwork ? `${geometry.perPage} ${geometry.perPage===1?'card':'cards'} per sheet` : design.layout === 'compact' ? 'Compact cards' : 'One card per sheet' }}</strong><span class="text-slate-500">{{ isArtwork ? `${design.page_orientation === 'portrait' ? 'Portrait' : 'Landscape'} A4 · print at 100%` : 'Portrait A4' }}</span></div><div v-if="isArtwork" :style="{display:'grid',gridTemplateColumns:`repeat(${Math.min(geometry.columns,6)},1fr)`,gap:'2px'}" aria-label="Cards on the A4 sheet"><span v-for="n in Math.min(geometry.perPage,12)" :key="n" class="h-8 w-5 rounded-sm border border-indigo-300 bg-indigo-50"></span></div></div>
             </div>
             <aside class="p-5 border-t xl:border-t-0 xl:border-l border-slate-200 space-y-4">
                 <h3 class="text-xs font-bold uppercase tracking-wide text-slate-500">2. Align fields</h3>
                 <template v-if="isArtwork">
                     <div class="space-y-2">
                         <label class="flex items-center gap-2 text-xs font-semibold text-slate-600"><input v-model="design.show_student_photo" type="checkbox" @change="selectPhoto"> Include student photo</label>
-                        <p class="text-xs text-slate-500">Uses each student's saved profile photo. Position and resize it on the card.</p>
+                        <p class="text-xs text-slate-500">Uses each student's saved profile photo. Missing images leave no placeholder.</p>
                         <button type="button" class="btn-secondary text-xs w-full" :disabled="(design.custom_fields || []).length >= 20" @click="addCustomField">+ Add custom field</button>
                     </div>
                     <div class="space-y-1"><button v-for="(label,key) in labels" :key="key" type="button" @click="selected=key;viewMode='card'" class="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold" :class="selected===key ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'">{{ label }}</button></div>
@@ -64,6 +71,7 @@ const presets={one:[190,277,'portrait'],two:[190,136,'portrait'],three:[190,90,'
 const preset=computed(()=>Object.entries(presets).find(([,v])=>Math.abs(props.design.card_width_mm-v[0])<.01&&Math.abs(props.design.card_height_mm-v[1])<.01&&props.design.page_orientation===v[2])?.[0]||'custom');
 function applyPreset(key){viewMode.value='sheet';const p=presets[key];if(p)Object.assign(props.design,{card_width_mm:p[0],card_height_mm:p[1],page_orientation:p[2],card_gap_mm:3});}
 const fontFamilies=['Arial','Times New Roman','Georgia','Verdana','Tahoma','Courier New'];
+const remarksOverflow=ref(false);
 const viewMode=ref('sheet');
 const selected=ref('name'),uploadError=ref(''),localBackground=ref(null);
 const labels=computed(()=>({registration:'Registration number',name:'Student name',class:'Class',date:'Examination date',centre:'Examination centre',principal_signature:'Principal signature',...(props.design.show_student_photo?{student_photo:'Student photo'}:{}),...Object.fromEntries((props.design.custom_fields||[]).map(field=>[field.id,field.label||'Custom field']))}));

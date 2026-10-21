@@ -1,6 +1,7 @@
 @php
     $die = \App\Support\Mcq\McqHallTicketDesign::printGeometry($design);
     $artwork = \App\Support\Mcq\McqHallTicketDesign::artworkBox($design);
+    $remarksHeight = \App\Support\Mcq\McqHallTicketDesign::remarksHeight($design);
 @endphp
 <div style="position:relative;width:{{ $die['width'] }}mm;height:{{ $die['height'] }}mm;break-inside:avoid;page-break-inside:avoid;overflow:hidden;font-family:Arial,Helvetica,sans-serif;color:#111;background:white;">
     <div style="position:absolute;left:{{ $artwork['x'] }}mm;top:{{ $artwork['y'] }}mm;width:{{ $artwork['width'] }}mm;height:{{ $artwork['height'] }}mm;">
@@ -27,4 +28,7 @@
         <img src="{{ $sample['principal_signature_src'] }}" alt="Principal signature" style="position:absolute;left:{{ $signaturePosition['x'] }}%;top:{{ $signaturePosition['y'] }}%;width:{{ $signaturePosition['width'] }}%;height:6%;object-fit:contain;">
     @endif
     </div>
+    @if($remarksHeight > 0)
+        <div style="position:absolute;bottom:0;left:0;width:100%;height:{{ $remarksHeight }}mm;box-sizing:border-box;padding:8px 12px;border-top:1px solid #cbd5e1;font:11px/1.4 Arial,Helvetica,sans-serif;color:#111;overflow:hidden;"><strong>Remarks / Instructions</strong><div style="white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px;">{{ $design['remarks_text'] }}</div></div>
+    @endif
 </div>

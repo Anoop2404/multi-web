@@ -9,9 +9,15 @@ export function printGeometry(design) {
     return { width, height, gap, columns, rows, perPage: columns * rows, pageWidth:landscape ? 297 : 210, pageHeight:landscape ? 210 : 297 };
 }
 export function artworkBox(design) {
-    const {width,height}=printGeometry(design);
+    const {width,height:dieHeight}=printGeometry(design);
+    const height=dieHeight-remarksHeight(design);
     if(design.background_fit==='stretch')return {x:0,y:0,width,height};
     const aspect=design.layout==='stse_three_up'?780/1052:Number(design.background_aspect_ratio)||780/1052;
     const artWidth=Math.min(width,height*aspect),artHeight=artWidth/aspect;
     return {x:(width-artWidth)/2,y:(height-artHeight)/2,width:artWidth,height:artHeight};
+}
+
+export function remarksHeight(design){
+    if(!String(design.remarks_text || '').trim())return 0;
+    return Math.min(Math.max(15,Number(design.remarks_height_mm)||35),printGeometry(design).height-20);
 }

@@ -31,6 +31,8 @@ class McqHallTicketDesign
             'background_aspect_ratio' => 780 / 1052,
             'show_student_photo' => false,
             'custom_fields' => [],
+            'remarks_text' => '',
+            'remarks_height_mm' => 35,
             'field_positions' => [
                 'registration' => ['x' => 41, 'y' => 48, 'size' => 11, 'width' => 52],
                 'name' => ['x' => 41, 'y' => 54, 'size' => 11, 'width' => 52],
@@ -132,6 +134,8 @@ class McqHallTicketDesign
             'field_positions' => $positions,
             'show_student_photo' => (bool) ($settings['show_student_photo'] ?? false),
             'custom_fields' => array_values($customFields),
+            'remarks_text' => mb_substr(trim((string) ($settings['remarks_text'] ?? '')), 0, 3000),
+            'remarks_height_mm' => max(15, min(150, (float) ($settings['remarks_height_mm'] ?? 35))),
             'card_width_mm' => max(20, min(277, (float) ($settings['card_width_mm'] ?? 90))),
             'card_height_mm' => max(20, min(277, (float) ($settings['card_height_mm'] ?? 121.384615))),
             'page_orientation' => ($settings['page_orientation'] ?? 'landscape') === 'portrait' ? 'portrait' : 'landscape',
@@ -299,12 +303,20 @@ class McqHallTicketDesign
         return ['width' => $width, 'height' => $height, 'gap' => $gap, 'columns' => $columns, 'rows' => $rows, 'per_page' => $columns * $rows];
     }
 
+    public static function remarksHeight(array $design): float
+    {
+        if (trim($design['remarks_text'] ?? '') === '') {
+            return 0;
+        }
+        return min(max(15, (float) ($design['remarks_height_mm'] ?? 35)), self::printGeometry($design)['height'] - 20);
+    }
+
     /** Artwork bounds inside a die; text uses the same coordinate space as its labels. */
     public static function artworkBox(array $design): array
     {
         $geometry = self::printGeometry($design);
         $width = $geometry['width'];
-        $height = $geometry['height'];
+        $height = $geometry['height'] - self::remarksHeight($design);
         if (($design['background_fit'] ?? 'contain') === 'stretch') {
             return ['x' => 0, 'y' => 0, 'width' => $width, 'height' => $height];
         }

@@ -29,6 +29,30 @@ class StseAdmitCardTest extends TestCase
         $this->assertNull(McqHallTicketDesign::centreForSchool($exam, $school));
     }
 
+    public function test_remarks_have_no_empty_space_and_can_extend_full_page_or_two_card_designs(): void
+    {
+        foreach ([[277,1],[136,2]] as [$height,$count]) {
+            $design = McqHallTicketDesign::normalize(['layout'=>'stse_three_up','card_width_mm'=>190,'card_height_mm'=>$height,'page_orientation'=>'portrait','remarks_text'=>'Bring your school ID.','remarks_height_mm'=>35]);
+            $this->assertSame($count, McqHallTicketDesign::printGeometry($design)['per_page']);
+            $this->assertEquals(35, McqHallTicketDesign::remarksHeight($design));
+            $html = view('mcq.partials.hall-ticket-card', ['design'=>$design,'sample'=>[]])->render();
+            $this->assertStringContainsString('Bring your school ID.', $html);
+            $this->assertStringContainsString('Remarks / Instructions', $html);
+            $design['remarks_text'] = '';
+            $this->assertEquals(0, McqHallTicketDesign::remarksHeight($design));
+            $html = view('mcq.partials.hall-ticket-card', ['design'=>$design,'sample'=>[]])->render();
+            $this->assertStringNotContainsString('Remarks / Instructions', $html);
+        }
+    }
+
+    public function test_missing_optional_images_never_add_placeholder_blocks_to_print(): void
+    {
+        $design = McqHallTicketDesign::normalize(['layout'=>'stse_three_up','show_student_photo'=>true,'show_signature'=>true]);
+        $html = view('mcq.partials.hall-ticket-card', ['design'=>$design,'sample'=>[]])->render();
+        $this->assertStringNotContainsString('alt="Student photo"', $html);
+        $this->assertStringNotContainsString('alt="Principal signature"', $html);
+    }
+
     public function test_text_formatting_is_saved_rendered_and_restricted_to_safe_styles(): void
     {
         $design = McqHallTicketDesign::normalize(['layout'=>'stse_three_up', 'field_positions'=>[
