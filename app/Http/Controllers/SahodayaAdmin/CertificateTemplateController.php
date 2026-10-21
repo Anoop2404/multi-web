@@ -963,10 +963,10 @@ class CertificateTemplateController extends SahodayaAdminController
             ));
         }
 
-        if (isset($input['custom_fields']) && is_array($input['custom_fields'])) {
+        if (array_key_exists('custom_fields', $input)) {
             $textKeys = ['top', 'left', 'width', 'font_size', 'font_family', 'font_weight', 'font_style', 'align'];
             $allowed = array_merge($textKeys, ['text']);
-            $layout['custom_fields'] = collect($input['custom_fields'])
+            $layout['custom_fields'] = collect($input['custom_fields'] ?? [])
                 ->filter(fn ($field) => is_array($field))
                 ->map(fn ($field) => array_intersect_key($field, array_flip($allowed)))
                 ->values()

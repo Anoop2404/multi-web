@@ -1202,15 +1202,24 @@ function upload() {
         onError: () => { window.scrollTo({ top: 0, behavior: 'smooth' }); },
     };
 
+    // FormData omits empty arrays. Send null explicitly to clear the last HTML field.
+    const payload = (data) => ({
+        ...data,
+        layout_json: {
+            ...data.layout_json,
+            custom_fields: data.layout_json?.custom_fields?.length ? data.layout_json.custom_fields : null,
+        },
+    });
+
     if (editingId.value) {
         form.transform((data) => ({
-            ...data,
+            ...payload(data),
             _method: 'put',
         })).post(`/sahodaya-admin/${props.sahodaya.id}/certificate-templates/${editingId.value}`, options);
         return;
     }
 
-    form.transform(data => data).post(`/sahodaya-admin/${props.sahodaya.id}/certificate-templates`, options);
+    form.transform(payload).post(`/sahodaya-admin/${props.sahodaya.id}/certificate-templates`, options);
 }
 
 async function remove(template) {

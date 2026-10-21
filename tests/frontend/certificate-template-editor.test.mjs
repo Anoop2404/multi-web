@@ -3,12 +3,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 
+const participationLayoutDefaults = JSON.parse(readFileSync(new URL('../../resources/js/support/participationItemsLayout.json', import.meta.url), 'utf8'));
 const source = readFileSync(new URL('../../resources/js/Pages/Admin/Sahodaya/Certificates/Templates.vue', import.meta.url), 'utf8');
 const layoutSource = source.slice(source.indexOf('function textFieldDefaults('), source.indexOf('const form = useForm('));
 const uploadSource = source.slice(source.indexOf('function upload()'), source.indexOf('async function remove('));
 
 test('loading a partial custom field preserves saved layout and false toggles', () => {
-    const ctx = vm.createContext({ props: { defaultLayout: {} } });
+    const ctx = vm.createContext({ participationLayoutDefaults, props: { defaultLayout: {} } });
     vm.runInContext(layoutSource, ctx);
     const saved = { show_photo: false, show_certificate_date: false, body: { top: 43, left: 12, width: 68, bottom: 70, font_size: 22 }, custom_fields: [{ text: '{recipient_name}', top: 40 }] };
     const loaded = ctx.layoutDefaults(saved);
@@ -39,7 +40,8 @@ test('creating after editing clears the previous PUT transform', () => {
     const ctx = vm.createContext({ form, props: { sahodaya: { id: 'tenant' } }, editingId: { value: null } });
     vm.runInContext(uploadSource, ctx);
     ctx.upload();
-    assert.deepEqual(transform({ title: 'New template' }), { title: 'New template' });
+    assert.equal(transform({ title: 'New template' }).title, 'New template');
+    assert.equal(transform({ layout_json: { custom_fields: [] } }).layout_json.custom_fields, null);
 });
 
 test('the separate edit page loads its requested template on entry', () => {
@@ -76,10 +78,22 @@ test('cancel on the edit page navigates back to the template list', () => {
 });
 
 test('achievement wording defaults to lowercase and loads per-template overrides', () => {
-    const ctx = vm.createContext({ props: { defaultLayout: {} } });
+    const ctx = vm.createContext({ participationLayoutDefaults, props: { defaultLayout: {} } });
     vm.runInContext(layoutSource, ctx);
     assert.equal(ctx.layoutDefaults().achievement_verb, 'secured');
     const loaded = ctx.layoutDefaults({ achievement_verb: 'Secured', body: { top: 41 } });
     assert.equal(loaded.achievement_verb, 'Secured');
     assert.equal(loaded.body.top, 41);
+});
+
+test('removing the final HTML overlay sends an explicit clear on edit', () => {
+    let transform;
+    const form = { transform(fn) { transform = fn; return this; }, post() {} };
+    const ctx = vm.createContext({ form, props: { sahodaya: { id: 'tenant' } }, editingId: { value: 23 } });
+    vm.runInContext(uploadSource, ctx);
+    ctx.upload();
+    const sent = transform({ layout_json: { custom_fields: [], body: { top: 40 } } });
+    assert.equal(sent.layout_json.custom_fields, null);
+    assert.equal(sent.layout_json.body.top, 40);
+    assert.equal(sent._method, 'put');
 });

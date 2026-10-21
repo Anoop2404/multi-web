@@ -43,6 +43,19 @@ class CertificateTemplateCustomFieldsTest extends TestCase
         return compact('sahodaya', 'admin', 'event');
     }
 
+    public function test_explicit_clear_removes_the_last_html_overlay_while_omitted_fields_are_preserved(): void
+    {
+        $controller = (new \ReflectionClass(\App\Http\Controllers\SahodayaAdmin\CertificateTemplateController::class))->newInstanceWithoutConstructor();
+        $merge = new \ReflectionMethod($controller, 'mergeLayout');
+        $existing = ['custom_fields' => [['text' => 'Certificate of Participation']]];
+
+        $cleared = $merge->invoke($controller, ['custom_fields' => null], $existing);
+        $this->assertSame([], $cleared['custom_fields']);
+
+        $unchanged = $merge->invoke($controller, [], $existing);
+        $this->assertSame($existing['custom_fields'], $unchanged['custom_fields']);
+    }
+
     public function test_storing_a_template_persists_custom_fields(): void
     {
         ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event] = $this->makeSahodayaAdminAndEvent();
