@@ -138,7 +138,7 @@ class McqHallTicketService
                     return strcasecmp($nameA, $nameB);
                 })->values();
 
-                $number = $startNumber;
+                $number = (int) ($exam->settings_json['hall_ticket_class_starts'][self::classBucketKey($sorted->first())] ?? $startNumber);
                 foreach ($sorted as $registration) {
                     DB::table('mcq_registrations')->where('id', $registration->id)->update([
                         'hall_ticket_no' => (string) $number,
@@ -182,7 +182,10 @@ class McqHallTicketService
 
         $max = $query->pluck('hall_ticket_no')->map(fn ($v) => (int) $v)->max();
 
-        return $max !== null ? $max + 1 : (int) $exam->next_hall_ticket_no;
+        return max(
+            (int) ($exam->settings_json['hall_ticket_class_starts'][$classKey] ?? $exam->next_hall_ticket_no),
+            $max !== null ? $max + 1 : 0,
+        );
     }
 
     /** Bucket key a registration's roll number is scoped to: its class name, "Teacher", or "Unassigned". */
