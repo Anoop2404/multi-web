@@ -87,7 +87,7 @@
                     'hall_room'          => $r->hall_room,
                     'seat_no'            => $r->seat_no,
                     'venue'              => $examCentre,
-                    'center_code'        => 'CEN-' . str_pad((string) ($exam->id * 17 + 101), 4, '0', STR_PAD_LEFT),
+                    'center_code'        => \App\Support\Mcq\McqHallTicketDesign::centreCodeForSchool($exam, $r->school) ?? '',
                     'center_name'        => $examCentre ?: 'Designated Examination Centre',
                     'center_address'     => $examCentre,
                     'exam_date'          => $exam->scheduled_at ? $exam->scheduled_at->format('l, d F Y') : 'TBA',

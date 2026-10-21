@@ -21,6 +21,7 @@
                         <img v-if="sample.principal_signature_src" :src="sample.principal_signature_src" alt="Principal signature" style="width:100%;height:100%;object-fit:contain;">
 
                     </template>
+                    <template v-else-if="key.startsWith('custom_') && position.source !== 'text'"><strong v-if="position.show_label !== false && position.label">{{ position.label }}: </strong>{{ sample[position.source] || '' }}</template>
                     <template v-else>{{ values[key] ?? '' }}</template>
                 </div>
             </template>

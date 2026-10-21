@@ -226,6 +226,7 @@ class McqExamController extends SahodayaAdminController
             'certificateTemplates' => \App\Models\McqCertificateTemplate::where('tenant_id', $this->sahodaya->id)->where('is_active', true)->orderBy('title')->get(['id', 'title', 'is_default']),
             'gradeBands' => app(\App\Services\Mcq\McqGradeService::class)->bandsForExam($exam),
             'classOptions' => $reports->classFilterOptions($exam),
+            'centreSchools' => \App\Models\Tenant::where('parent_id', $this->sahodaya->id)->where('type', 'school')->orderBy('name')->get(['id', 'name'])->map(fn ($school) => ['id' => $school->id, 'name' => $school->name, 'code' => $exam->settings_json['school_centre_codes'][$school->id] ?? ''])->values(),
             'classRollRanges' => app(\App\Services\Mcq\McqClassRollRangeService::class)->preview($exam),
             'clusterRequireStudentVerification' => app(StudentVerificationGate::class)
                 ->requiredGlobally($this->sahodaya->id),

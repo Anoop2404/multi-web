@@ -61,6 +61,7 @@
             </div>
         </div>
 
+        <McqSchoolCentreCodes :sahodaya-id="sahodaya.id" :exam-id="exam.id" :schools="centreSchools" />
         <McqRegistrationNumbering :sahodaya-id="sahodaya.id" :exam-id="exam.id" :ranges="classRollRanges" />
 
         <p class="text-sm text-slate-600 mb-4">
@@ -314,6 +315,7 @@
 import { computed, ref } from 'vue';
 import { router, useForm, Link } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
+import McqSchoolCentreCodes from '@/Components/sahodaya/McqSchoolCentreCodes.vue';
 import McqRegistrationNumbering from '@/Components/sahodaya/McqRegistrationNumbering.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 import McqEligibilityPicker from '@/Components/sahodaya/McqEligibilityPicker.vue';
@@ -339,6 +341,7 @@ const props = defineProps({
     certificateTemplates: { type: Array, default: () => [] },
     gradeBands: { type: Array, default: () => [] },
     clusterRequireStudentVerification: { type: Boolean, default: true },
+    centreSchools: { type: Array, default: () => [] },
     classRollRanges: { type: Array, default: () => [] },
     classOptions: { type: Array, default: () => [] },
 });

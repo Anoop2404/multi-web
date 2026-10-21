@@ -352,7 +352,7 @@ class McqExamOpsController extends SahodayaAdminController
             'custom_fields.*.label' => 'nullable|string|max:80',
             'custom_fields.*.show_label' => 'nullable|boolean',
             'custom_fields.*.text' => 'nullable|string|max:500',
-            'custom_fields.*.source' => 'required|in:text,school_name,hall_room,seat_no,exam_title,admission_no,academic_year',
+            'custom_fields.*.source' => 'required|in:text,school_name,center_code,hall_room,seat_no,exam_title,admission_no,academic_year',
             'custom_fields.*.x' => 'required|numeric|min:0|max:95',
             'custom_fields.*.y' => 'required|numeric|min:0|max:95',
             'custom_fields.*.width' => 'required|numeric|min:1|max:100',
@@ -504,6 +504,31 @@ class McqExamOpsController extends SahodayaAdminController
         }
 
         return back()->with('success', "Assigned Reg. No. to {$count} candidate(s).");
+    }
+
+    public function saveSchoolCentreCode(string $tenantId, McqExam $exam, Request $request)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        $data = $request->validate([
+            'school_id' => ['required', 'uuid', \Illuminate\Validation\Rule::exists('tenants', 'id')->where('parent_id', $this->sahodaya->id)->where('type', 'school')],
+            'code' => 'nullable|string|max:40|regex:/^[A-Za-z0-9 _\/-]*$/',
+        ]);
+        DB::transaction(function () use ($exam, $data) {
+            $locked = McqExam::whereKey($exam->id)->lockForUpdate()->firstOrFail();
+            $settings = $locked->settings_json ?? [];
+            $codes = $settings['school_centre_codes'] ?? [];
+            $code = trim($data['code'] ?? '');
+            foreach ($codes as $schoolId => $existing) {
+                if ($schoolId !== $data['school_id'] && $code !== '' && strcasecmp($existing, $code) === 0) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['code' => 'This centre code is already assigned to another school in this exam.']);
+                }
+            }
+            if ($code === '') unset($codes[$data['school_id']]);
+            else $codes[$data['school_id']] = $code;
+            $settings['school_centre_codes'] = $codes;
+            $locked->update(['settings_json' => $settings]);
+        });
+        return back()->with('success', 'School centre code saved for this exam.');
     }
 
     public function resetRegistrationNumbers(string $tenantId, McqExam $exam, Request $request)

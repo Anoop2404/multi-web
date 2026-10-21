@@ -90,6 +90,22 @@ class McqSahodayaCandidateManagementTest extends TestCase
         return compact('sahodaya', 'sahodayaAdmin', 'school', 'class', 'student1', 'student2', 'exam');
     }
 
+    public function test_admin_assigns_unique_school_centre_codes_per_exam(): void
+    {
+        $env = $this->setUpEnvironment();
+        $url = "/sahodaya-admin/{$env['sahodaya']->id}/mcq-exams/{$env['exam']->id}/school-centre-code";
+        $this->actingAs($env['sahodayaAdmin'])->post($url, ['school_id' => $env['school']->id, 'code' => 'STSE-001'])
+            ->assertSessionHasNoErrors()->assertSessionHas('success');
+        $this->assertSame('STSE-001', \App\Support\Mcq\McqHallTicketDesign::centreCodeForSchool($env['exam']->fresh(), $env['school']));
+        $otherSchool = Tenant::create(['id' => (string) Str::uuid(), 'type' => 'school', 'name' => 'Second', 'parent_id' => $env['sahodaya']->id]);
+        $this->actingAs($env['sahodayaAdmin'])->post($url, ['school_id' => $otherSchool->id, 'code' => 'stse-001'])
+            ->assertSessionHasErrors('code');
+        $this->assertNull(\App\Support\Mcq\McqHallTicketDesign::centreCodeForSchool($env['exam']->fresh(), $otherSchool));
+        $this->actingAs($env['sahodayaAdmin'])->post($url, ['school_id' => $env['school']->id, 'code' => ''])
+            ->assertSessionHasNoErrors();
+        $this->assertNull(\App\Support\Mcq\McqHallTicketDesign::centreCodeForSchool($env['exam']->fresh(), $env['school']));
+    }
+
     public function test_frontend_resets_exam_registration_numbers_without_approving_pending_payments(): void
     {
         \Illuminate\Support\Facades\Storage::fake('local');

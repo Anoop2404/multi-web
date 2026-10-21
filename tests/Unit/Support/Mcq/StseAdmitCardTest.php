@@ -179,14 +179,14 @@ class StseAdmitCardTest extends TestCase
         $sample = ['photo_src'=>'/students/photo.png','school_name'=>'Test Academy'];
         $html = view('mcq.partials.hall-ticket-card', compact('design','sample'))->render();
         $this->assertStringContainsString('/students/photo.png', $html);
-        $this->assertStringContainsString('School: Test Academy', $html);
+        $this->assertStringContainsString('<strong>School: </strong>Test Academy', $html);
         $this->assertStringContainsString('&lt;script&gt;bad()', $html);
         $this->assertStringNotContainsString('<script>', $html);
         $design['show_student_photo'] = false;
         $design['custom_fields'] = [];
         $html = view('mcq.partials.hall-ticket-card', compact('design','sample'))->render();
         $this->assertStringNotContainsString('/students/photo.png', $html);
-        $this->assertStringNotContainsString('School: Test Academy', $html);
+        $this->assertStringNotContainsString('School: Test Academy', strip_tags($html));
     }
 
     public function test_custom_field_geometry_is_bounded_and_unknown_sources_are_rejected(): void

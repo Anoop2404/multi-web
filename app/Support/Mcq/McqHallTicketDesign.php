@@ -120,7 +120,7 @@ class McqHallTicketDesign
         unset($position);
 
         $customFields = [];
-        $sources = ['text', 'school_name', 'hall_room', 'seat_no', 'exam_title', 'admission_no', 'academic_year'];
+        $sources = ['text', 'school_name', 'center_code', 'hall_room', 'seat_no', 'exam_title', 'admission_no', 'academic_year'];
         foreach (array_slice(is_array($settings['custom_fields'] ?? null) ? $settings['custom_fields'] : [], 0, 20) as $field) {
             if (!is_array($field) || !is_string($field['id'] ?? null) || !preg_match('/^custom_[a-zA-Z0-9_-]{1,64}$/', $field['id'] ?? '')) {
                 continue;
@@ -391,6 +391,12 @@ class McqHallTicketDesign
     }
 
     /** A school-specific centre overrides the Sahodaya's exam-wide venue. */
+    public static function centreCodeForSchool(McqExam $exam, ?Tenant $school): ?string
+    {
+        $code = $school ? ($exam->settings_json['school_centre_codes'][$school->id] ?? null) : null;
+        return is_string($code) && trim($code) !== '' ? trim($code) : null;
+    }
+
     public static function centreForSchool(McqExam $exam, ?Tenant $school): ?string
     {
         if (($exam->settings_json['hall_ticket']['venue_source'] ?? '') === 'student_school') {
