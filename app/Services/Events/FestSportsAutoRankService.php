@@ -23,7 +23,7 @@ class FestSportsAutoRankService
      *
      * @return array{ranked: int, item_title: string}
      */
-    public function rankItem(FestEvent $event, FestEventItem $item): array
+    public function rankItem(FestEvent $event, FestEventItem $item, ?string $basis = null): array
     {
         abort_if($item->event_id !== $event->id, 404);
 
@@ -37,23 +37,45 @@ class FestSportsAutoRankService
             ]);
         }
 
+        // If an explicit basis is provided ('time' or 'distance' / 'length'), persist it on the item
+        if ($basis) {
+            $basis = strtolower(trim($basis));
+            if (in_array($basis, ['time', 'distance', 'length'], true)) {
+                $method = $basis === 'length' ? 'distance' : $basis;
+                $direction = $method === 'time' ? 'asc' : 'desc';
+                if ($item->result_method !== $method || $item->ranking_direction !== $direction) {
+                    $item->update([
+                        'result_method'     => $method,
+                        'ranking_direction' => $direction,
+                    ]);
+                }
+            }
+        }
+
         $absentParticipantIds = FestAttendance::query()
             ->where('event_id', $event->id)
             ->where('item_id', $item->id)
             ->where('status', 'absent')
             ->pluck('participant_id');
 
+        $lowerIsBetter = $this->determineLowerIsBetter($item, $basis);
+        $method = (string) ($item->result_method ?: ($basis === 'length' ? 'distance' : ($basis ?? '')));
+
+        // Fetch marks with non-empty, non-zero measurements
         $measurementMarks = FestMark::where('event_id', $event->id)
             ->where('item_id', $item->id)
             ->whereNotNull('measurement_value')
             ->where('measurement_value', '!=', '')
+            ->where('measurement_value', '!=', '0')
             ->when($absentParticipantIds->isNotEmpty(), fn ($q) => $q->whereNotIn('participant_id', $absentParticipantIds))
-            ->get();
+            ->get()
+            ->filter(function (FestMark $mark) use ($method) {
+                $val = FestSportsMeasurementHelper::parseMeasurement((string) $mark->measurement_value, $method, (string) $mark->measurement_unit);
+
+                return $val !== null && $val > 0;
+            });
 
         if ($measurementMarks->isNotEmpty()) {
-            $lowerIsBetter = $this->lowerIsBetter($item);
-            $method = (string) $item->result_method;
-
             $sorted = $measurementMarks->sort(fn ($a, $b) => $this->compareNumeric(
                 FestSportsMeasurementHelper::parseMeasurement((string) $a->measurement_value, $method, (string) $a->measurement_unit),
                 FestSportsMeasurementHelper::parseMeasurement((string) $b->measurement_value, $method, (string) $b->measurement_unit),
@@ -68,6 +90,14 @@ class FestSportsAutoRankService
                 $mark->update(['position' => $rank, 'score' => $points > 0 ? $points : null]);
             });
 
+            // Zero, empty, unentered or absent marks must NOT receive any rank: clear position and score
+            $rankedIds = $sorted->pluck('id')->all();
+            FestMark::where('event_id', $event->id)
+                ->where('item_id', $item->id)
+                ->whereNotIn('id', $rankedIds)
+                ->whereNotNull('position')
+                ->update(['position' => null, 'score' => null]);
+
             EventContext::for($event)->recalculateSchoolPoints();
 
             return ['ranked' => $sorted->count(), 'item_title' => $item->title];
@@ -76,18 +106,22 @@ class FestSportsAutoRankService
         $scoredMarks = FestMark::where('event_id', $event->id)
             ->where('item_id', $item->id)
             ->whereNotNull('score')
+            ->where('score', '>', 0)
             ->when($absentParticipantIds->isNotEmpty(), fn ($q) => $q->whereNotIn('participant_id', $absentParticipantIds))
             ->get();
 
         if ($scoredMarks->isEmpty()) {
+            FestMark::where('event_id', $event->id)
+                ->where('item_id', $item->id)
+                ->whereNotNull('position')
+                ->update(['position' => null]);
+
             throw ValidationException::withMessages([
-                'measurement' => 'Enter measurement values or judged scores before auto-ranking this item.',
+                'measurement' => 'Enter non-zero measurement values (time/distance) or judged scores before auto-ranking this item.',
             ]);
         }
 
-        // Higher score is better for every judged Grand Total in this platform — unlike
-        // measurement events, there's no "lower is better" case here (no judged item is
-        // scored like a race time).
+        // Higher score is better for every judged Grand Total in this platform
         $sorted = $scoredMarks->sort(fn ($a, $b) => $this->compareNumeric(
             (float) $a->score,
             (float) $b->score,
@@ -99,9 +133,32 @@ class FestSportsAutoRankService
             $mark->update(['position' => $rank]);
         });
 
+        // Zero, empty, unentered or absent marks must NOT receive any rank
+        $rankedIds = $sorted->pluck('id')->all();
+        FestMark::where('event_id', $event->id)
+            ->where('item_id', $item->id)
+            ->whereNotIn('id', $rankedIds)
+            ->whereNotNull('position')
+            ->update(['position' => null]);
+
         EventContext::for($event)->recalculateSchoolPoints();
 
         return ['ranked' => $sorted->count(), 'item_title' => $item->title];
+    }
+
+    public function determineLowerIsBetter(FestEventItem $item, ?string $basis = null): bool
+    {
+        if ($basis) {
+            $basis = strtolower(trim($basis));
+            if ($basis === 'time') {
+                return true;
+            }
+            if ($basis === 'distance' || $basis === 'length') {
+                return false;
+            }
+        }
+
+        return $this->lowerIsBetter($item);
     }
 
     private function compareNumeric(?float $a, ?float $b, bool $lowerIsBetter): int
@@ -136,7 +193,7 @@ class FestSportsAutoRankService
 
         foreach ($sorted as $mark) {
             $value = $valueOf($mark);
-            if ($value === null) {
+            if ($value === null || $value <= 0) {
                 continue;
             }
 

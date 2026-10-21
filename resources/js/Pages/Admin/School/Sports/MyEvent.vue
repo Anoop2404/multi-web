@@ -101,6 +101,7 @@
 
         <!-- Marks -->
         <SchoolRoundMarks v-else-if="tab === 'marks'" :school="school" :event="event" :registrations="registrations" :marks="marks"
+                          :athletic-records="athleticRecords"
                           :save-url="`/school-admin/${school.id}/sports/my-event/${event.id}/marks`" />
 
         <!-- Results -->
@@ -154,6 +155,163 @@
             </div>
         </div>
 
+        <!-- Records -->
+        <div v-else-if="tab === 'records'" class="space-y-6">
+            <div class="rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-sm text-slate-800 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <p class="font-semibold text-slate-900">
+                        Record Tracking:
+                        <span :class="event.record_tracking_enabled ? 'text-emerald-700' : 'text-slate-500'">
+                            {{ event.record_tracking_enabled ? 'ENABLED' : 'DISABLED' }}
+                        </span>
+                    </p>
+                    <p class="text-xs text-slate-600 mt-0.5">
+                        When enabled, marks that surpass standing records will automatically flag as New Records during evaluation.
+                    </p>
+                </div>
+                <button type="button" class="btn-secondary text-xs !py-1.5" @click="toggleRecordTracking">
+                    {{ event.record_tracking_enabled ? 'Disable tracking' : 'Enable record tracking' }}
+                </button>
+            </div>
+
+            <div class="grid lg:grid-cols-2 gap-6">
+                <!-- Standing Records & Manual Entry Form -->
+                <div class="space-y-4">
+                    <div class="card p-4 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h3 class="font-semibold text-sm text-slate-900">Add / Update Standing Record</h3>
+                            <span class="text-xs text-slate-500">Record previous meet or historical results</span>
+                        </div>
+                        <form @submit.prevent="saveRecord" class="grid sm:grid-cols-2 gap-3 text-xs">
+                            <div class="sm:col-span-2">
+                                <label class="label text-xs">Sports Item</label>
+                                <SearchableSelect
+                                    v-model="recordForm.item_id"
+                                    :options="sportsItemOptions"
+                                    placeholder="Select sports item"
+                                    search-placeholder="Search item…"
+                                    :all-option="false"
+                                />
+                            </div>
+                            <div>
+                                <label class="label text-xs">Class Group</label>
+                                <SearchableSelect
+                                    v-model="recordForm.class_group"
+                                    :options="classGroupOptions"
+                                    placeholder="Class group"
+                                    :all-option="false"
+                                />
+                            </div>
+                            <div>
+                                <label class="label text-xs">Gender</label>
+                                <SearchableSelect
+                                    v-model="recordForm.gender"
+                                    :options="[{ value: 'male', label: 'Boys / Male' }, { value: 'female', label: 'Girls / Female' }, { value: 'open', label: 'Open' }]"
+                                    placeholder="Gender"
+                                    :all-option="false"
+                                />
+                            </div>
+                            <div>
+                                <label class="label text-xs">Type / Direction</label>
+                                <SearchableSelect
+                                    v-model="recordForm.record_direction"
+                                    :options="[{ value: 'lower_better', label: 'Time (Faster wins)' }, { value: 'higher_better', label: 'Distance (Longer wins)' }]"
+                                    :all-option="false"
+                                />
+                            </div>
+                            <div>
+                                <label class="label text-xs">Record Value</label>
+                                <input v-model="recordForm.record_value" class="field text-xs" :placeholder="recordForm.record_direction === 'lower_better' ? 'e.g. 11.45 or 1:02.50' : 'e.g. 5.45'" required>
+                            </div>
+                            <div>
+                                <label class="label text-xs">Unit</label>
+                                <input v-model="recordForm.record_unit" class="field text-xs" placeholder="s, m, cm">
+                            </div>
+                            <div>
+                                <label class="label text-xs">Record Date / Year</label>
+                                <input v-model="recordForm.record_date" type="date" class="field text-xs">
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="label text-xs">Previous Holder Name</label>
+                                <input v-model="recordForm.holder_name" class="field text-xs" placeholder="Student / athlete name (optional)">
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="label text-xs">Notes / Previous Meet Details</label>
+                                <input v-model="recordForm.notes" class="field text-xs" placeholder="e.g. 2024 Sports Meet · Red House · 10.98s">
+                            </div>
+                            <button type="submit" class="btn-primary text-xs sm:col-span-2 py-2" :disabled="recordForm.processing">
+                                {{ recordForm.processing ? 'Saving record…' : 'Save standing record' }}
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Standing Records List -->
+                    <div class="card p-0 overflow-hidden">
+                        <div class="px-4 py-3 bg-slate-50 border-b flex items-center justify-between">
+                            <h3 class="font-semibold text-xs text-slate-900 uppercase tracking-wider">Standing Meet Records ({{ athleticRecords.length }})</h3>
+                        </div>
+                        <ul v-if="athleticRecords.length" class="divide-y text-xs">
+                            <li v-for="r in athleticRecords" :key="r.id" class="p-3.5 flex justify-between items-start gap-2 hover:bg-slate-50/50">
+                                <div>
+                                    <p class="font-semibold text-slate-800 text-sm">{{ r.item?.title }}</p>
+                                    <div class="flex items-center gap-2 mt-1 text-slate-600 flex-wrap">
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-mono font-bold text-xs border border-indigo-100">
+                                            {{ r.record_value }} {{ r.record_unit }}
+                                        </span>
+                                        <span class="capitalize">{{ r.gender }}</span>
+                                        <span>·</span>
+                                        <span>{{ classGroups[r.class_group] || r.class_group }}</span>
+                                    </div>
+                                    <p v-if="r.holder_name" class="text-slate-700 mt-1 font-medium">
+                                        Holder: {{ r.holder_name }}
+                                    </p>
+                                    <p v-if="r.notes" class="text-slate-500 mt-0.5 text-[11px]">
+                                        {{ r.notes }}
+                                    </p>
+                                </div>
+                                <button type="button" @click="removeRecord(r.id)" class="text-rose-600 hover:text-rose-800 font-medium text-xs shrink-0">
+                                    Remove
+                                </button>
+                            </li>
+                        </ul>
+                        <div v-else class="p-8 text-center text-slate-400 text-xs">
+                            No standing records added yet. Use the form above to add previous meet records.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Record Breaks in this meet -->
+                <div>
+                    <div class="card p-0 overflow-hidden">
+                        <div class="px-4 py-3 bg-slate-50 border-b">
+                            <h3 class="font-semibold text-xs text-slate-900 uppercase tracking-wider">Record Breaks (This Meet)</h3>
+                        </div>
+                        <ul v-if="recordBreaks.length" class="divide-y text-xs">
+                            <li v-for="b in recordBreaks" :key="b.id" class="p-3.5 space-y-1 hover:bg-slate-50/50">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-semibold text-slate-800">{{ b.item?.title }}</span>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                        🏆 {{ b.prize_label || 'New Record' }}
+                                    </span>
+                                </div>
+                                <p class="text-slate-700">
+                                    <strong>{{ b.participant?.student?.name }}</strong>
+                                    <span v-if="b.participant?.student?.school_house"> ({{ b.participant?.student?.school_house.name }})</span>
+                                    surpassed previous record:
+                                    <span class="line-through text-slate-400">{{ b.previous_value }}</span>
+                                    → <strong class="text-emerald-700 font-mono">{{ b.new_value }} {{ b.record_unit }}</strong>
+                                </p>
+                                <p class="text-[10px] text-slate-400 mt-1">{{ b.broken_at }}</p>
+                            </li>
+                        </ul>
+                        <div v-else class="p-8 text-center text-slate-400 text-xs">
+                            No records broken in this meet yet.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Link parent -->
         <div v-else-if="tab === 'link'" class="max-w-lg">
             <div v-if="event.parent_event_id" class="notice-banner notice-banner--success text-sm mb-4">
@@ -186,10 +344,11 @@
 
 <script setup>
 import { computed, ref } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link, router, useForm } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import SchoolRoundMarks from '@/Components/events/SchoolRoundMarks.vue';
+import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
     school: Object,
@@ -200,13 +359,20 @@ const props = defineProps({
     marks: { type: Object, default: () => ({}) },
     resultsByItem: { type: Object, default: () => ({}) },
     houseStandings: { type: Array, default: () => [] },
+    athleticRecords: { type: Array, default: () => [] },
+    recordBreaks: { type: Array, default: () => [] },
+    classGroups: { type: Object, default: () => ({}) },
+    ageGroupLabels: { type: Object, default: () => ({}) },
     stats: { type: Object, default: () => ({}) },
 });
+
+const { confirm } = useConfirm();
 
 const tabs = [
     { key: 'overview', label: 'Overview' },
     { key: 'marks', label: 'Marks' },
     { key: 'results', label: 'Results' },
+    { key: 'records', label: 'Records' },
     { key: 'link', label: 'Link parent' },
     { key: 'winners', label: 'Winners' },
 ];
@@ -215,6 +381,7 @@ const tabDescriptions = {
     overview: 'School-round sports day — registrations, marks, and winner promotion.',
     marks: 'Enter times, distances, and ranks for your athletes.',
     results: 'Ranked results by event item.',
+    records: 'School & meet athletic records — standing records, previous records, and record breaks.',
     link: 'Connect this school meet to the Sahodaya cluster event.',
     winners: 'Promote school-round winners to Sahodaya registration.',
 };
@@ -226,6 +393,27 @@ const parentEventOptions = computed(() => (props.parentEvents ?? []).map((p) => 
 })));
 const resultItems = computed(() => [...new Map(props.registrations.map(reg => [reg.item?.id, reg])).values()].filter(reg => reg.item));
 
+const sportsItems = computed(() => (props.event.items || []).filter(i => i.category === 'sports' || i.sport_discipline || ['time', 'distance'].includes(i.result_method)));
+
+const sportsItemOptions = computed(() => sportsItems.value.map(i => ({
+    value: i.id,
+    label: i.class_group && i.class_group !== 'open' ? `${i.title} (${props.classGroups?.[i.class_group] || i.class_group})` : i.title,
+})));
+
+const classGroupOptions = computed(() => Object.entries(props.classGroups || {}).map(([value, label]) => ({ value, label })));
+
+const recordForm = useForm({
+    item_id: '',
+    class_group: 'open',
+    gender: 'open',
+    record_direction: 'lower_better',
+    record_value: '',
+    record_unit: 's',
+    holder_name: '',
+    notes: '',
+    record_date: '',
+});
+
 function tabHref(key) {
     return `/school-admin/${props.school.id}/sports/my-event/${props.event.id}/${key}`;
 }
@@ -234,5 +422,29 @@ function linkParent() {
     router.post(`/school-admin/${props.school.id}/sports/my-event/${props.event.id}/link-parent`, {
         parent_event_id: parentEventId.value,
     }, { preserveScroll: true });
+}
+
+function saveRecord() {
+    if (!recordForm.item_id) return;
+    recordForm.post(`/school-admin/${props.school.id}/sports/my-event/${props.event.id}/records`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            recordForm.reset('record_value', 'holder_name', 'notes');
+        },
+    });
+}
+
+async function removeRecord(recordId) {
+    if (await confirm({ message: 'Are you sure you want to remove this standing record?' })) {
+        router.delete(`/school-admin/${props.school.id}/sports/my-event/${props.event.id}/records/${recordId}`, {
+            preserveScroll: true,
+        });
+    }
+}
+
+function toggleRecordTracking() {
+    router.post(`/school-admin/${props.school.id}/sports/my-event/${props.event.id}/toggle-record-tracking`, {}, {
+        preserveScroll: true,
+    });
 }
 </script>

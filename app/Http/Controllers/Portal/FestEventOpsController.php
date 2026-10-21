@@ -647,7 +647,8 @@ class FestEventOpsController extends Controller
 
         app(FestMarkEntryScopeService::class)->assertCanEnterMark($request->user(), $event, $item->id);
 
-        $result = $ranker->rankItem($event, $item);
+        $basis = $request->input('rank_basis');
+        $result = $ranker->rankItem($event, $item, $basis);
 
         return back()->with('success', "Auto-ranked {$result['ranked']} athlete(s) for {$result['item_title']}.");
     }

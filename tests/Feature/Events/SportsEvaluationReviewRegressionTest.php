@@ -231,4 +231,44 @@ class SportsEvaluationReviewRegressionTest extends TestCase
         $this->assertSame(2, FestMark::where('participant_id', $participant->id)->first()->position);
         $this->assertSame(1, FestMark::where('participant_id', $p2->id)->first()->position);
     }
+
+    public function test_school_sports_manual_record_entry_and_tracking_toggle(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        extract($this->fixture('time'));
+        SahodayaProfile::create(['tenant_id' => $tenant->id, 'prefix' => 'REV', 'student_data_mode' => 'counts_only']);
+        $user->update(['tenant_id' => $school->id]);
+        $user->assignRole('school_admin');
+
+        $event->update([
+            'level_round'          => 'school',
+            'conducting_school_id' => $school->id,
+            'status'               => 'ongoing',
+        ]);
+
+        // Toggle record tracking
+        $toggleUrl = route('school.sports.my-event.records.toggle-tracking', ['tenantId' => $school->id, 'event' => $event->id]);
+        $this->actingAs($user)->post($toggleUrl)->assertRedirect()->assertSessionHas('success');
+        $this->assertTrue($event->fresh()->record_tracking_enabled);
+
+        // Store manual standing record for previous meet
+        $storeUrl = route('school.sports.my-event.records.store', ['tenantId' => $school->id, 'event' => $event->id]);
+        $this->actingAs($user)->post($storeUrl, [
+            'item_id'          => $item->id,
+            'class_group'      => 'hs',
+            'gender'           => 'male',
+            'record_direction' => 'lower_better',
+            'record_value'     => '10.95',
+            'record_unit'      => 's',
+            'holder_name'      => 'Previous Champion',
+            'notes'            => 'Annual Sports Meet 2024 · Blue House',
+        ])->assertRedirect()->assertSessionHas('success');
+
+        $this->assertDatabaseHas('fest_athletic_records', [
+            'event_id'    => $event->id,
+            'item_id'     => $item->id,
+            'holder_name' => 'Previous Champion',
+            'notes'       => 'Annual Sports Meet 2024 · Blue House',
+        ]);
+    }
 }

@@ -136,4 +136,51 @@ class FestSportsAutoRankServiceTest extends TestCase
         $this->expectException(\Illuminate\Validation\ValidationException::class);
         app(FestSportsAutoRankService::class)->rankItem($event, $item);
     }
+
+    public function test_auto_rank_does_not_assign_rank_to_zero_or_empty_or_absent_marks(): void
+    {
+        [$event, $item, $school] = $this->makeEventAndItem('sports');
+        $item->update(['result_method' => 'time']);
+
+        // Participant 1: 11.20s -> should get Rank 1
+        $m1 = $this->markWithMeasurement($event, $item, $school, '11.20');
+
+        // Participant 2: 12.10s -> should get Rank 2
+        $m2 = $this->markWithMeasurement($event, $item, $school, '12.10');
+
+        // Participant 3: 0 -> should NOT receive rank!
+        $m3 = $this->markWithMeasurement($event, $item, $school, '0');
+
+        // Participant 4: empty string -> should NOT receive rank!
+        $m4 = $this->markWithMeasurement($event, $item, $school, '');
+
+        $result = app(FestSportsAutoRankService::class)->rankItem($event, $item);
+
+        $this->assertSame(2, $result['ranked'], 'Only the 2 participants with valid positive measurements should be ranked.');
+        $this->assertSame(1, $m1->fresh()->position);
+        $this->assertSame(2, $m2->fresh()->position);
+        $this->assertNull($m3->fresh()->position, 'Participant with 0 must not receive a rank.');
+        $this->assertNull($m4->fresh()->position, 'Participant with empty mark must not receive a rank.');
+    }
+
+    public function test_auto_rank_option_based_on_time_or_length(): void
+    {
+        [$event, $item, $school] = $this->makeEventAndItem('sports');
+
+        // Distances: 5.45m and 5.10m
+        $m1 = $this->markWithMeasurement($event, $item, $school, '5.45');
+        $m2 = $this->markWithMeasurement($event, $item, $school, '5.10');
+
+        // When ranked with basis 'distance' (length), longer distance (5.45) wins Rank 1!
+        app(FestSportsAutoRankService::class)->rankItem($event, $item, 'distance');
+
+        $this->assertSame(1, $m1->fresh()->position);
+        $this->assertSame(2, $m2->fresh()->position);
+
+        // When ranked with basis 'time', lower time (5.10) would win Rank 1!
+        app(FestSportsAutoRankService::class)->rankItem($event, $item, 'time');
+
+        $this->assertSame(2, $m1->fresh()->position);
+        $this->assertSame(1, $m2->fresh()->position);
+    }
 }

@@ -44,7 +44,13 @@ class FestAthleticRecordService
         $classGroup = $item->class_group ?? 'open';
         $gender = $this->resolveGender($participant, $item);
         $direction = $this->resolveDirection($item);
-        $newValue = $this->parseMeasurement((string) $mark->measurement_value);
+        $method = $direction === 'lower_better' ? 'time' : 'distance';
+        $newValue = $this->parseMeasurement((string) $mark->measurement_value, $method, $mark->measurement_unit);
+
+        if ($newValue <= 0) {
+            return ['record_break' => false, 'break' => null, 'message' => null];
+        }
+
         $unit = $mark->measurement_unit ?? $this->defaultUnit($item);
 
         $record = FestAthleticRecord::where('event_id', $event->id)
@@ -117,14 +123,19 @@ class FestAthleticRecordService
         ];
     }
 
-    public function parseMeasurement(string $value): float
+    public function parseMeasurement(string $value, ?string $resultMethod = null, ?string $unit = null): float
     {
-        $value = trim($value);
-        if (preg_match('/^(\d+):(\d+(?:\.\d+)?)$/', $value, $m)) {
+        $parsed = \App\Support\FestSportsMeasurementHelper::parseMeasurement($value, $resultMethod ?? '', $unit);
+        if ($parsed !== null && $parsed > 0) {
+            return round($parsed, 4);
+        }
+
+        $clean = trim($value);
+        if (preg_match('/^(\d+):(\d+(?:\.\d+)?)$/', $clean, $m)) {
             return round((float) $m[1] * 60 + (float) $m[2], 4);
         }
 
-        return round((float) $value, 4);
+        return round((float) $clean, 4);
     }
 
     public function isBetter(float $new, float $old, string $direction): bool

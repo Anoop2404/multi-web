@@ -1953,13 +1953,14 @@ class FestMarkEntryController extends SahodayaAdminController
         return [$included === [] ? '' : $pdf->Output('S'), $included];
     }
 
-    public function autoRankItem(string $tenantId, FestEvent $event, FestEventItem $item, FestSportsAutoRankService $ranker)
+    public function autoRankItem(Request $request, string $tenantId, FestEvent $event, FestEventItem $item, FestSportsAutoRankService $ranker)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($item->event_id !== $event->id, 404);
 
         EventLifecycleGate::allowMarkEntryForItem($event, $item);
-        $result = $ranker->rankItem($event, $item);
+        $basis = $request->input('rank_basis');
+        $result = $ranker->rankItem($event, $item, $basis);
 
         return back()->with('success', "Auto-ranked {$result['ranked']} athlete(s) for {$result['item_title']}.");
     }

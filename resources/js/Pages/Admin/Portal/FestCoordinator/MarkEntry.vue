@@ -86,12 +86,22 @@
                         {{ section.item?.title }}
                     </p>
                     <template v-if="section.item?.id && !rankEntryOnly(section.item)">
-                        <button type="button"
-                                class="btn-secondary text-xs !min-h-0"
-                                :disabled="autoRankingItem === section.item.id"
-                                @click="autoRank(section.item)">
-                            {{ autoRankingItem === section.item.id ? 'Ranking…' : 'Auto-rank' }}
-                        </button>
+                        <div class="flex items-center gap-1.5">
+                            <select v-if="isSports"
+                                    :value="getAutoRankBasis(section.item.id, section.item)"
+                                    @change="setAutoRankBasis(section.item.id, $event.target.value)"
+                                    class="field !py-1 !px-2 !text-xs w-36"
+                                    title="Auto-rank criteria">
+                                <option value="time">⏱️ Time (Faster 1st)</option>
+                                <option value="distance">📏 Length / Dist</option>
+                            </select>
+                            <button type="button"
+                                    class="btn-secondary text-xs !min-h-0"
+                                    :disabled="autoRankingItem === section.item.id"
+                                    @click="autoRank(section.item)">
+                                {{ autoRankingItem === section.item.id ? 'Ranking…' : 'Auto-rank' }}
+                            </button>
+                        </div>
                     </template>
                     <span v-else-if="section.item?.id" class="text-[11px] text-slate-400">Rank-only — enter ranks directly</span>
                 </div>
@@ -215,6 +225,18 @@ const savedIds = reactive(new Set());
 const failedIds = reactive(new Set());
 const autoRankingItem = ref(null);
 const showInstructions = ref(false);
+const autoRankBasis = reactive({});
+
+function getAutoRankBasis(itemId, item) {
+    if (!autoRankBasis[itemId]) {
+        autoRankBasis[itemId] = (item?.result_method === 'distance' || item?.ranking_direction === 'desc') ? 'distance' : 'time';
+    }
+    return autoRankBasis[itemId];
+}
+
+function setAutoRankBasis(itemId, val) {
+    autoRankBasis[itemId] = val;
+}
 
 const portalPaths = computed(() =>
     festMarkPortalPaths(props.sahodaya.id, props.event.id, props.festOpsBase),
@@ -315,7 +337,8 @@ async function autoRank(item) {
     }
 
     autoRankingItem.value = item.id;
-    router.post(portalPaths.value.autoRankUrl(item.id), {}, {
+    const basis = isSports.value ? getAutoRankBasis(item.id, item) : null;
+    router.post(portalPaths.value.autoRankUrl(item.id), { rank_basis: basis }, {
         preserveScroll: true,
         preserveState: false,
         onFinish: () => {

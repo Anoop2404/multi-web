@@ -355,13 +355,16 @@ foreach ($festPrograms as $cfg) {
 
 Route::prefix('sports')->name('sports.')->group(function () {
     Route::get('/my-event/{event}/{tab?}', [SportsMeetController::class, 'myEvent'])
-        ->where('tab', 'overview|marks|results|link|winners')
+        ->where('tab', 'overview|marks|results|records|link|winners')
         ->name('my-event');
     Route::get('/sahodaya-event/{event}', [SportsMeetController::class, 'sahodayaEvent'])->name('sahodaya-event');
     Route::post('/my-event/{event}/link-parent', [SportsMeetController::class, 'linkParent'])->name('my-event.link-parent');
     Route::post('/my-event/{event}/marks', [SportsMeetController::class, 'storeMark'])->name('my-event.marks.store');
     Route::post('/my-event/{event}/marks/bulk', [SportsMeetController::class, 'bulkStoreMarks'])->name('my-event.marks.bulk');
     Route::post('/my-event/{event}/items/{item}/auto-rank', [SportsMeetController::class, 'autoRankItem'])->name('my-event.auto-rank');
+    Route::post('/my-event/{event}/records', [SportsMeetController::class, 'storeRecord'])->name('my-event.records.store');
+    Route::delete('/my-event/{event}/records/{record}', [SportsMeetController::class, 'destroyRecord'])->name('my-event.records.destroy');
+    Route::post('/my-event/{event}/toggle-record-tracking', [SportsMeetController::class, 'toggleRecordTracking'])->name('my-event.records.toggle-tracking');
     Route::get('/submit-winners', [SportsMeetController::class, 'submitWinners'])->name('submit-winners');
     Route::post('/submit-winners', [SportsMeetController::class, 'storeWinners'])->name('submit-winners.store');
 });

@@ -345,7 +345,8 @@ class FestProgramController extends SchoolAdminController
             if ($rankItem) {
                 \App\Services\Events\EventLifecycleGate::allowMarkEntryForItem($festProgram, $rankItem);
                 $ranker = app(\App\Services\Events\FestSportsAutoRankService::class);
-                $rankResult = $ranker->rankItem($festProgram, $rankItem);
+                $basis = $request->input('rank_basis');
+                $rankResult = $ranker->rankItem($festProgram, $rankItem, $basis);
                 $message .= " Auto-ranked {$rankResult['ranked']} athlete(s).";
             }
         }

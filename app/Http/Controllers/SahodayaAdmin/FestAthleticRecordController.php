@@ -60,7 +60,11 @@ class FestAthleticRecordController extends SahodayaAdminController
             'record_unit' => 'nullable|string|max:20',
             'holder_name' => 'nullable|string|max:255',
             'notes' => 'nullable|string|max:500',
+            'record_date' => 'nullable|date',
         ]);
+
+        $method = $data['record_direction'] === 'lower_better' ? 'time' : 'distance';
+        $parsedValue = $service->parseMeasurement($data['record_value'], $method, $data['record_unit'] ?? null);
 
         FestAthleticRecord::updateOrCreate(
             [
@@ -71,11 +75,11 @@ class FestAthleticRecordController extends SahodayaAdminController
             ],
             [
                 'record_direction' => $data['record_direction'],
-                'record_value' => $service->parseMeasurement($data['record_value']),
-                'record_unit' => $data['record_unit'],
+                'record_value' => $parsedValue,
+                'record_unit' => $data['record_unit'] ?: ($data['record_direction'] === 'lower_better' ? 's' : 'm'),
                 'holder_name' => $data['holder_name'],
                 'notes' => $data['notes'] ?? null,
-                'record_date' => now()->toDateString(),
+                'record_date' => $data['record_date'] ?? now()->toDateString(),
             ]
         );
 

@@ -69,8 +69,25 @@
                 <div>
                     <h3 class="font-semibold text-slate-900">{{ section.item.title }}</h3>
                     <p class="mt-1 text-xs text-slate-600">{{ section.rows.length }} participants · {{ entryHint(section.item) }}</p>
+                    <div v-if="recordsByItemId[section.item.id]?.length" class="mt-1.5 flex items-center gap-1.5 text-xs text-amber-800 flex-wrap">
+                        <span class="font-bold">⭐ Standing Record:</span>
+                        <span v-for="rec in recordsByItemId[section.item.id]" :key="rec.id" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-900 font-mono text-[11px]">
+                            <strong>{{ rec.record_value }} {{ rec.record_unit }}</strong>
+                            <span v-if="rec.holder_name" class="font-sans text-amber-800">({{ rec.holder_name }}{{ rec.notes ? ' · ' + rec.notes : '' }})</span>
+                        </span>
+                    </div>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <div v-if="canAutoRank(section.item)" class="flex items-center gap-1.5">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Rank by:</label>
+                        <select :value="getAutoRankBasis(section.item.id, section.item)"
+                                @change="setAutoRankBasis(section.item.id, $event.target.value)"
+                                class="field !py-1 !px-2 !text-xs w-40"
+                                title="Auto-rank criteria">
+                            <option value="time">⏱️ Time (Faster 1st)</option>
+                            <option value="distance">📏 Length / Dist (Longest 1st)</option>
+                        </select>
+                    </div>
                     <button v-if="sectionDirty(section)" type="button" class="btn-secondary text-xs !py-1 !px-2.5" :disabled="busy" @click="saveSection(section)">
                         {{ savingSection === section.key ? 'Saving all…' : 'Save all' }}
                     </button>
@@ -86,7 +103,7 @@
                     <thead>
                         <tr>
                             <th class="min-w-[14rem]">Participant & House</th>
-                            <th v-if="showMeasurement(section.item)" class="min-w-[12rem]">{{ resultMethod(section.item) === 'distance' ? 'Distance (e.g. 5.45)' : 'Time (s or min:s)' }}</th>
+                            <th v-if="showMeasurement(section.item)" class="min-w-[12rem]">{{ currentResultMethod(section.item) === 'distance' ? 'Length / Distance (m)' : 'Time (s or min:s)' }}</th>
                             <th v-if="showMeasurement(section.item)" class="w-20">Unit</th>
                             <th class="w-24">Rank</th>
                             <th v-if="showScore(section.item)" class="w-28 text-center">Score</th>
@@ -120,7 +137,7 @@
                                                class="field text-sm"
                                                :class="measurementError(p.id, section.item) ? '!border-rose-400 !bg-rose-50/30' : ''"
                                                :aria-label="`Measurement for ${participantName(p)}`"
-                                               :placeholder="resultMethod(section.item) === 'time' ? '12.45 or 1:02.50' : '5.45'"
+                                               :placeholder="measurementPlaceholder(section.item)"
                                                :disabled="busy" />
                                         <div v-if="measurementPreview(p.id, section.item)" class="text-[11px] font-mono leading-tight">
                                             <span v-if="measurementPreview(p.id, section.item).valid" class="text-emerald-700 font-medium">
@@ -182,9 +199,39 @@ const props = defineProps({
     marks: Object,
     saveUrl: String,
     gradeOptions: { type: Array, default: () => [] },
+    athleticRecords: { type: Array, default: () => [] },
 });
 
 const showInstructions = ref(false);
+const autoRankBasis = reactive({});
+
+function getAutoRankBasis(itemId, item) {
+    if (!autoRankBasis[itemId]) {
+        autoRankBasis[itemId] = (resultMethod(item) === 'distance' || item?.ranking_direction === 'desc') ? 'distance' : 'time';
+    }
+    return autoRankBasis[itemId];
+}
+
+function setAutoRankBasis(itemId, val) {
+    autoRankBasis[itemId] = val;
+}
+
+function currentResultMethod(item) {
+    return autoRankBasis[item.id] || resultMethod(item) || 'time';
+}
+
+function measurementPlaceholder(item) {
+    return currentResultMethod(item) === 'distance' ? '5.45 (m)' : '12.45 or 1:02.50';
+}
+
+const recordsByItemId = computed(() => {
+    const map = {};
+    for (const r of props.athleticRecords || []) {
+        if (!map[r.item_id]) map[r.item_id] = [];
+        map[r.item_id].push(r);
+    }
+    return map;
+});
 
 // School endpoints save individual participants, including every member of a group.
 const groupedProps = computed(() => ({
@@ -308,7 +355,10 @@ function classOf(p) {
 function measurementPreview(pId, item) {
     const val = forms[pId]?.measurement_value;
     if (!val) return null;
-    const method = resultMethod(item);
+    if (val === '0' || val === '0.0' || val === '0.00') {
+        return { valid: true, formatted: '0 (unranked / foul)' };
+    }
+    const method = currentResultMethod(item);
     if (method === 'time') {
         return parseTime(val);
     }
@@ -393,6 +443,8 @@ function saveSection(section) {
 async function saveAndAutoRank(section) {
     if (busy.value) return;
 
+    const basis = getAutoRankBasis(section.item.id, section.item);
+
     if (sectionDirty(section)) {
         if (!(await confirm({ message: `Save changes and auto-rank results for ${section.item.title}? Equal results will share a rank.`, destructive: false }))) {
             return;
@@ -401,7 +453,7 @@ async function saveAndAutoRank(section) {
         rankingItem.value = section.item.id;
         const rows = section.rows.map(({ participant, item }) => payload(participant, item));
 
-        router.post(bulkSaveUrl.value, { rows, auto_rank_item_id: section.item.id }, {
+        router.post(bulkSaveUrl.value, { rows, auto_rank_item_id: section.item.id, rank_basis: basis }, {
             preserveScroll: true,
             preserveState: false,
             onSuccess: () => {
@@ -420,7 +472,7 @@ async function saveAndAutoRank(section) {
         }
 
         rankingItem.value = section.item.id;
-        router.post(`/school-admin/${props.school.id}/sports/my-event/${props.event.id}/items/${section.item.id}/auto-rank`, {}, {
+        router.post(`/school-admin/${props.school.id}/sports/my-event/${props.event.id}/items/${section.item.id}/auto-rank`, { rank_basis: basis }, {
             preserveScroll: true,
             preserveState: false,
             onFinish: () => {

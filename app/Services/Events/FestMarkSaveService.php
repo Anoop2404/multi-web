@@ -101,30 +101,34 @@ class FestMarkSaveService
                 ? $data['measurement_value'] : $existingMark?->measurement_value));
             $position = array_key_exists('position', $data) ? $data['position'] : $existingMark?->position;
             $score = array_key_exists('score', $data) ? $data['score'] : $existingMark?->score;
-            if ($measurement === '' && ($position || ($score !== null && $score !== ''))) {
-                // Rank entered by hand on a measured item is allowed (the admin is the
-                // referee of record), but the measurement itself still has to be on file.
+
+            $isZeroOrBlank = $measurement === '' || $measurement === '0' || $measurement === '0.0' || $measurement === '0.00';
+
+            if ($isZeroOrBlank && ($position || ($score !== null && $score !== '' && (float) $score > 0))) {
+                // Rank entered by hand on a measured item requires a non-zero measurement.
                 throw ValidationException::withMessages([
                     'measurement_value' => $resultMethod === 'time'
-                        ? 'This item is time-based — record a time (e.g. 12.5 s or 1:02.5) before saving.'
-                        : 'This item is distance-based — record a distance (e.g. 4.2 m) before saving.',
+                        ? 'This item is time-based — record a valid time (e.g. 12.5 s or 1:02.5) before assigning a rank.'
+                        : 'This item is distance-based — record a valid distance (e.g. 4.2 m) before assigning a rank.',
                 ]);
             }
 
-            if ($resultMethod === 'time' && $measurement !== '') {
-                $parsedTime = \App\Support\FestSportsMeasurementHelper::parseTimeInSeconds($measurement);
-                if ($parsedTime === null || $parsedTime <= 0) {
-                    throw ValidationException::withMessages([
-                        'measurement_value' => 'Invalid time format. Enter seconds (e.g. 12.45) or minutes:seconds (e.g. 1:02.50).',
-                    ]);
-                }
-            } elseif ($resultMethod === 'distance' && $measurement !== '') {
-                $unit = $data['measurement_unit'] ?? $existingMark?->measurement_unit ?? 'm';
-                $parsedDist = \App\Support\FestSportsMeasurementHelper::parseDistanceInMeters($measurement, $unit);
-                if ($parsedDist === null || $parsedDist <= 0) {
-                    throw ValidationException::withMessages([
-                        'measurement_value' => 'Invalid distance format. Enter a valid distance (e.g. 5.45 or 12.30 m).',
-                    ]);
+            if (! $isZeroOrBlank) {
+                if ($resultMethod === 'time') {
+                    $parsedTime = \App\Support\FestSportsMeasurementHelper::parseTimeInSeconds($measurement);
+                    if ($parsedTime === null || $parsedTime <= 0) {
+                        throw ValidationException::withMessages([
+                            'measurement_value' => 'Invalid time format. Enter seconds (e.g. 12.45) or minutes:seconds (e.g. 1:02.50).',
+                        ]);
+                    }
+                } elseif ($resultMethod === 'distance') {
+                    $unit = $data['measurement_unit'] ?? $existingMark?->measurement_unit ?? 'm';
+                    $parsedDist = \App\Support\FestSportsMeasurementHelper::parseDistanceInMeters($measurement, $unit);
+                    if ($parsedDist === null || $parsedDist <= 0) {
+                        throw ValidationException::withMessages([
+                            'measurement_value' => 'Invalid distance format. Enter a valid distance (e.g. 5.45 or 12.30 m).',
+                        ]);
+                    }
                 }
             }
         }

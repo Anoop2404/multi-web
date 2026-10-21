@@ -3,16 +3,21 @@
 namespace App\Http\Controllers\SchoolAdmin;
 
 use App\Http\Controllers\SchoolAdmin\Concerns\ForwardsFestProgramActions;
+use App\Models\FestAthleticRecord;
 use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestMark;
+use App\Models\FestRecordBreak;
 use App\Models\FestRegistration;
 use App\Models\FestSchoolEventFee;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Events\FestAthleticRecordService;
 use App\Services\Events\FestEventNotifier;
 use App\Services\Events\FestQualificationService;
 use App\Services\Events\FestSchoolEventFeeService;
 use App\Services\Events\FestSportsAutoRankService;
+use App\Support\FestClassGroupScheme;
+use App\Support\FestSportsMeasurementHelper;
 use Illuminate\Http\Request;
 
 class SportsMeetController extends SchoolAdminController
@@ -86,19 +91,34 @@ class SportsMeetController extends SchoolAdminController
 
         $houseStandings = app(\App\Services\Events\SchoolHouseFestPointsService::class)->rankingForSchool($this->school->id, $event->id);
 
+        $athleticRecords = FestAthleticRecord::where('event_id', $event->id)
+            ->with('item')
+            ->orderBy('item_id')
+            ->get();
+
+        $recordBreaks = FestRecordBreak::where('event_id', $event->id)
+            ->with(['item', 'participant.student.schoolHouse', 'participant.student.schoolClass'])
+            ->orderByDesc('broken_at')
+            ->get();
+
         return $this->inertia('School/Sports/MyEvent', [
-            'tab'            => $tab,
-            'event'          => $event,
-            'parentEvents'   => $parentEvents,
-            'registrations'  => $registrations,
-            'marks'          => $marks,
-            'resultsByItem'  => $resultsByItem,
-            'houseStandings' => $houseStandings,
-            'stats'          => [
+            'tab'             => $tab,
+            'event'           => $event,
+            'parentEvents'    => $parentEvents,
+            'registrations'   => $registrations,
+            'marks'           => $marks,
+            'resultsByItem'   => $resultsByItem,
+            'houseStandings'  => $houseStandings,
+            'athleticRecords' => $athleticRecords,
+            'recordBreaks'    => $recordBreaks,
+            'classGroups'     => FestClassGroupScheme::labels(null, $event->rootEvent()),
+            'ageGroupLabels'  => config('fest_item_taxonomy.age_group', []),
+            'stats'           => [
                 'items'          => $event->items->count(),
                 'registrations'  => $registrations->count(),
                 'marks_entered'  => $marks->count(),
                 'ranked'         => FestMark::where('event_id', $event->id)->whereNotNull('position')->count(),
+                'records'        => $athleticRecords->count(),
             ],
         ]);
     }
@@ -132,7 +152,7 @@ class SportsMeetController extends SchoolAdminController
         return app(FestProgramController::class)->bulkStoreMarks($request, $tenantId, $event, $markSave, $audit);
     }
 
-    public function autoRankItem(string $tenantId, FestEvent $event, FestEventItem $item, FestSportsAutoRankService $ranker)
+    public function autoRankItem(Request $request, string $tenantId, FestEvent $event, FestEventItem $item, FestSportsAutoRankService $ranker)
     {
         $this->assertSchoolMeetEvent($event);
         abort_if($item->event_id !== $event->id, 404);
@@ -143,10 +163,86 @@ class SportsMeetController extends SchoolAdminController
             return back()->with('info', 'This round is results-only — your recorded ranks are the winners; nothing to auto-rank.');
         }
 
+        $basis = $request->input('rank_basis');
         \App\Services\Events\EventLifecycleGate::allowMarkEntryForItem($event, $item);
-        $result = $ranker->rankItem($event, $item);
+        $result = $ranker->rankItem($event, $item, $basis);
 
         return back()->with('success', "Auto-ranked {$result['ranked']} athlete(s) for {$result['item_title']}.");
+    }
+
+    public function storeRecord(Request $request, string $tenantId, FestEvent $event, FestAthleticRecordService $service, PlatformAuditLogger $audit)
+    {
+        $this->assertSchoolMeetEvent($event);
+
+        $data = $request->validate([
+            'item_id'          => 'required|exists:fest_event_items,id',
+            'class_group'      => 'required|in:lp,up,hs,hss,open',
+            'gender'           => 'required|in:male,female,open',
+            'record_direction' => 'required|in:lower_better,higher_better',
+            'record_value'     => 'required|string|max:50',
+            'record_unit'      => 'nullable|string|max:20',
+            'holder_name'      => 'nullable|string|max:255',
+            'notes'            => 'nullable|string|max:500',
+            'record_date'      => 'nullable|date',
+        ]);
+
+        $item = FestEventItem::where('event_id', $event->id)->findOrFail($data['item_id']);
+        $method = $data['record_direction'] === 'lower_better' ? 'time' : 'distance';
+        $parsedValue = FestSportsMeasurementHelper::parseMeasurement($data['record_value'], $method, $data['record_unit']);
+
+        if ($parsedValue === null || $parsedValue <= 0) {
+            return back()->withErrors(['record_value' => 'Enter a valid positive measurement value (e.g. 11.45 or 5.45).']);
+        }
+
+        FestAthleticRecord::updateOrCreate(
+            [
+                'event_id'    => $event->id,
+                'item_id'     => $item->id,
+                'class_group' => $data['class_group'],
+                'gender'      => $data['gender'],
+            ],
+            [
+                'record_direction' => $data['record_direction'],
+                'record_value'     => $parsedValue,
+                'record_unit'      => $data['record_unit'] ?: ($data['record_direction'] === 'lower_better' ? 's' : 'm'),
+                'holder_name'      => $data['holder_name'] ?? null,
+                'notes'            => $data['notes'] ?? null,
+                'record_date'      => $data['record_date'] ?? now()->toDateString(),
+            ]
+        );
+
+        $audit->festEvent($event, 'records', 'fest.athletic_record.saved', 'School meet athletic record saved', [
+            'item_id' => $data['item_id'],
+        ]);
+
+        return back()->with('success', 'Standing record saved successfully.');
+    }
+
+    public function destroyRecord(string $tenantId, FestEvent $event, FestAthleticRecord $record, PlatformAuditLogger $audit)
+    {
+        $this->assertSchoolMeetEvent($event);
+        abort_if($record->event_id !== $event->id, 404);
+
+        $record->delete();
+
+        $audit->festEvent($event, 'records', 'fest.athletic_record.deleted', 'School meet athletic record removed');
+
+        return back()->with('success', 'Record removed.');
+    }
+
+    public function toggleRecordTracking(string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
+    {
+        $this->assertSchoolMeetEvent($event);
+
+        $event->update([
+            'record_tracking_enabled' => ! $event->record_tracking_enabled,
+        ]);
+
+        $audit->festEvent($event, 'settings', 'fest.event.record_tracking_toggled', 'Toggled athletic record tracking', [
+            'record_tracking_enabled' => $event->record_tracking_enabled,
+        ]);
+
+        return back()->with('success', 'Record tracking ' . ($event->record_tracking_enabled ? 'enabled' : 'disabled') . '.');
     }
 
     public function submitWinners(string $tenantId, FestQualificationService $qualification, FestEventNotifier $notifier)
