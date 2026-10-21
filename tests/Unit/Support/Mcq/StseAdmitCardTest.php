@@ -7,6 +7,27 @@ use Tests\TestCase;
 
 class StseAdmitCardTest extends TestCase
 {
+    public function test_school_venue_setting_uses_the_candidates_school_without_a_custom_field(): void
+    {
+        $exam = new \App\Models\McqExam(['venue' => 'Central Hall', 'settings_json' => [
+            'hall_ticket' => ['venue_source' => 'student_school'],
+        ]]);
+        $school = new \App\Models\Tenant(['name' => 'Candidate School']);
+        $this->assertSame('Candidate School', McqHallTicketDesign::centreForSchool($exam, $school));
+    }
+
+    public function test_custom_labels_can_be_hidden_and_empty_labels_remain_empty(): void
+    {
+        $design = McqHallTicketDesign::normalize(['custom_fields' => [
+            ['id' => 'custom_school', 'source' => 'school_name', 'label' => 'School', 'show_label' => false],
+            ['id' => 'custom_empty', 'source' => 'school_name', 'label' => null],
+        ]]);
+        foreach ($design['custom_fields'] as $field) {
+            $this->assertSame('School A', McqHallTicketDesign::customFieldValue($field, ['school_name' => 'School A']));
+        }
+        $this->assertSame('', $design['custom_fields'][1]['label']);
+    }
+
     public function test_saved_preview_renders_every_card_in_the_a4_layout(): void
     {
         $design = McqHallTicketDesign::normalize([

@@ -31,6 +31,7 @@ class McqHallTicketDesign
             'background_fit' => 'contain',
             'background_aspect_ratio' => 780 / 1052,
             'show_student_photo' => false,
+            'venue_source' => 'assigned_centre',
             'custom_fields' => [],
             'remarks_text' => '',
             'remarks_height_mm' => 35,
@@ -128,7 +129,8 @@ class McqHallTicketDesign
             $x = max(0, min(95, $number('x', 10)));
             $customFields[$field['id']] = [
                 'id' => $field['id'],
-                'label' => mb_substr(trim((is_scalar($field['label'] ?? null) ? (string) $field['label'] : 'Custom field')), 0, 80),
+                'label' => mb_substr(trim(array_key_exists('label', $field) ? (string) ($field['label'] ?? '') : 'Custom field'), 0, 80),
+                'show_label' => filter_var($field['show_label'] ?? true, FILTER_VALIDATE_BOOLEAN),
                 'source' => in_array($field['source'] ?? '', $sources, true) ? $field['source'] : 'text',
                 'text' => mb_substr((is_scalar($field['text'] ?? null) ? (string) $field['text'] : ''), 0, 500),
                 'x' => $x, 'y' => max(0, min(95, $number('y', 35))),
@@ -141,6 +143,7 @@ class McqHallTicketDesign
         return [
             'field_positions' => $positions,
             'show_student_photo' => (bool) ($settings['show_student_photo'] ?? false),
+            'venue_source' => ($settings['venue_source'] ?? '') === 'student_school' ? 'student_school' : 'assigned_centre',
             'custom_fields' => array_values($customFields),
             'remarks_text' => mb_substr(trim((string) ($settings['remarks_text'] ?? '')), 0, 3000),
             'remarks_format' => in_array($settings['remarks_format'] ?? '', ['paragraph','numbered','bullets'], true) ? $settings['remarks_format'] : 'paragraph',
@@ -306,7 +309,8 @@ class McqHallTicketDesign
             return (string) ($field['text'] ?? '');
         }
         $value = $sample[$field['source']] ?? '';
-        return trim(($field['label'] ?? '') . (filled($field['label'] ?? '') ? ': ' : '') . $value);
+        $label = ($field['show_label'] ?? true) ? ($field['label'] ?? '') : '';
+        return trim($label . (filled($label) ? ': ' : '') . $value);
     }
 
     /** Derive A4 capacity from the selected die and page margins. */
@@ -389,6 +393,9 @@ class McqHallTicketDesign
     /** A school-specific centre overrides the Sahodaya's exam-wide venue. */
     public static function centreForSchool(McqExam $exam, ?Tenant $school): ?string
     {
+        if (($exam->settings_json['hall_ticket']['venue_source'] ?? '') === 'student_school') {
+            return $school?->name;
+        }
         $centre = $school?->getSetting(self::schoolCentreSettingKey($exam));
         if (is_string($centre) && trim($centre) !== '') {
             return trim($centre);
@@ -470,9 +477,9 @@ class McqHallTicketDesign
             'exam_passcode'      => $exam->isOnlineDelivery() ? 'K7M2P-Q9RTX' : null,
             'hall_room'          => 'Hall A - Room 102',
             'seat_no'            => '24',
-            'venue'              => $exam->venue ?: 'Main Examination Center Campus',
+            'venue'              => $design['venue_source'] === 'student_school' ? 'St. Thomas Model Higher Secondary School' : ($exam->venue ?: 'Main Examination Center Campus'),
             'center_code'        => 'CEN-' . str_pad((string) ($exam->id * 17 + 101), 4, '0', STR_PAD_LEFT),
-            'center_name'        => $exam->venue ?: 'St. Thomas Central School Examination Centre',
+            'center_name'        => $design['venue_source'] === 'student_school' ? 'St. Thomas Model Higher Secondary School' : ($exam->venue ?: 'St. Thomas Central School Examination Centre'),
             'center_address'     => 'Bypass Road, Alappuzha, Kerala - 688001',
             'scheduled_at_label' => self::examTimingLabel($scheduledAt, $exam->duration_minutes) ?? 'Saturday, 28 Oct 2026, 10:00 AM – 11:30 AM',
             'exam_date'          => $scheduledAt ? $scheduledAt->format('l, d F Y') : 'Saturday, 28 October 2026',

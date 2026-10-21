@@ -67,6 +67,7 @@
                 <details class="border-t border-slate-200 pt-3 text-xs">
                     <summary class="font-semibold cursor-pointer text-slate-700">Exam card settings</summary>
                     <div class="space-y-3 mt-3">
+                        <FormField label="Exam venue source"><select v-model="designForm.venue_source" class="field" @change="designForm.field_positions.centre.text_color = '#111111'"><option value="assigned_centre">Assigned examination centre</option><option value="student_school">Student's school</option></select><p class="text-xs text-slate-500 mt-1">Student's school fills the Examination centre field automatically for every candidate.</p></FormField>
                         <FormField label="Ticket heading"><input v-model="designForm.header_title" class="field"></FormField>
                         <FormField label="Footer note"><input v-model="designForm.footer_note" class="field"></FormField>
                         <FormField label="Reporting lead time (minutes)"><input v-model.number="designForm.report_before_minutes" class="field" type="number" min="0" max="240"></FormField>
@@ -327,6 +328,8 @@ watch(() => logoInput.value?.files?.[0], (file) => {
 const previewSampleData = computed(() => ({
     ...props.previewSample,
     hall_instructions: designForm.hall_instructions || props.previewSample?.hall_instructions,
+    venue: designForm.venue_source === 'student_school' ? props.previewSample?.school_name : props.previewSample?.venue,
+    center_name: designForm.venue_source === 'student_school' ? props.previewSample?.school_name : props.previewSample?.center_name,
 }));
 
 const previewUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/preview`);
@@ -366,9 +369,9 @@ function saveDesign() {
     for (const [key,value] of Object.entries(designForm.remarks_text_style || {})) fd.append(`remarks_text_style[${key}]`,String(value));
     for(const key of ['remarks_theme_color','remarks_paper_color','remarks_text_color']) fd.append(key,designForm[key] || (key==='remarks_theme_color'?'#101b6f':key==='remarks_paper_color'?'#ffffff':'#111111'));
     for (const [index, field] of (designForm.custom_fields || []).entries()) {
-        for (const [key, value] of Object.entries(field)) fd.append(`custom_fields[${index}][${key}]`, String(value));
+        for (const [key, value] of Object.entries(field)) fd.append(`custom_fields[${index}][${key}]`, typeof value === 'boolean' ? (value ? '1' : '0') : String(value));
     }
-    for (const key of ['card_width_mm','card_height_mm','page_orientation','card_gap_mm','page_margin_mm','background_fit']) fd.append(key, String(designForm[key]));
+    for (const key of ['card_width_mm','card_height_mm','page_orientation','card_gap_mm','page_margin_mm','background_fit','venue_source']) fd.append(key, String(designForm[key]));
     for (const [key, position] of Object.entries(designForm.field_positions)) {
         for (const [axis, value] of Object.entries(position)) fd.append(`field_positions[${key}][${axis}]`, String(value));
     }
