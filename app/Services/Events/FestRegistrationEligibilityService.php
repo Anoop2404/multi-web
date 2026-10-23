@@ -174,6 +174,7 @@ class FestRegistrationEligibilityService
                 'event_registered' => $eventRegNo !== null,
                 'event_registration_number' => $eventRegNo,
                 'kalolsav_class_group' => ($isKalolsav || $isKidsFest) ? FestStudentClassResolver::classGroupForStudent($student, $event) : null,
+                'eligible_class_groups' => ($isKalolsav || $isKidsFest) ? FestStudentClassResolver::classGroupsForStudent($student, $event) : [],
                 'kids_fest_band' => $isKidsFest ? FestStudentClassResolver::kidsFestBandForStudent($student) : null,
                 'sports_age_group' => $isSports ? FestSportsAgeGroup::primaryAgeGroupForStudent($student, $event) : null,
                 'eligible_sports_groups' => $isSports ? FestSportsAgeGroup::eligibleAgeGroupsForStudent($student, $event) : [],
@@ -326,9 +327,10 @@ class FestRegistrationEligibilityService
         }
 
         if (! $this->isItemOpenClass($item) && $item->class_group && $item->class_group !== 'open') {
-            $studentGroup = FestStudentClassResolver::classGroupForStudent($student, $event);
-            if ($studentGroup !== null && ($err = $this->validateItemClassGroup($studentGroup, $item, $event))) {
-                return $err;
+            $groups = FestStudentClassResolver::classGroupsForStudent($student, $event);
+            $matches = collect($groups)->contains(fn ($group) => $this->validateItemClassGroup($group, $item, $event) === null);
+            if (! $matches) {
+                return 'class does not belong to the category configured for this item.';
             }
         }
 

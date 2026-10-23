@@ -92,6 +92,20 @@ trait BuildsSchoolFestEventContext
             return null;
         }
 
+        $root = $event->rootEvent();
+        $eventRegions = app(\App\Services\Events\FestSchoolEventRegionService::class);
+        if (! $root->usesPhasedRegionalBilling() && $eventRegions->regions($root)->isNotEmpty()) {
+            $current = $eventRegions->current($root, $this->school->id);
+            $prefix = \App\Support\ProgramRouteMap::prefixFromSlug(\App\Support\SchoolFestProgram::slugForEventType($event->event_type));
+            $base = "/school-admin/{$this->school->id}/{$prefix}/events/{$root->id}";
+            return [
+                'applies' => true, 'region' => $current?->region?->name ?? $current?->cluster_label,
+                'locked' => $current !== null, 'event_scoped' => true,
+                'set_url' => $base.'/phase-region', 'request_url' => $base.'/region-change-requests',
+                'regions' => $eventRegions->regions($root)->map(fn ($child) => ['value' => $child->region_id, 'label' => $child->region?->name ?? $child->cluster_label])->values(),
+            ];
+        }
+
         $sahodayaId = $this->school->parent_id;
         $regionService = app(FestRegionPartitionService::class);
         if (! $regionService->regionsApply($sahodayaId)) {

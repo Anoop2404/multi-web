@@ -38,7 +38,7 @@
                                       :options="regionOptions(phase, phase.current_region_id)"
                                       :all-option="false" placeholder="Requested region…" :required="true" />
                     <textarea v-model="requestForms[phase.id].reason" class="field text-sm" rows="2" placeholder="Reason for the change" required></textarea>
-                    <p v-if="requestForms[phase.id].errors.reason" class="text-xs text-red-600">{{ requestForms[phase.id].errors.reason }}</p>
+                    <p v-for="(error, key) in requestForms[phase.id].errors" :key="key" class="text-xs text-red-600">{{ error }}</p>
                     <button type="submit" class="btn-primary text-xs" :disabled="requestForms[phase.id].processing">Submit request</button>
                 </form>
             </div>
@@ -57,7 +57,7 @@
                 </thead>
                 <tbody>
                     <tr v-for="r in requests" :key="r.id">
-                        <td>{{ r.phase?.name }}</td>
+                        <td>{{ r.phase?.name || event.title }}</td>
                         <td class="text-sm">{{ r.current_region?.name || '—' }} &rarr; <strong>{{ r.requested_region?.name }}</strong></td>
                         <td class="text-sm max-w-xs">{{ r.reason }}</td>
                         <td>

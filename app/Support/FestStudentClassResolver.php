@@ -2,8 +2,11 @@
 
 namespace App\Support;
 
+use App\Models\FestClassCategorySchemeGroup;
 use App\Models\FestEvent;
+use App\Models\FestEventClassGroup;
 use App\Models\Student;
+use Illuminate\Support\Collection;
 
 class FestStudentClassResolver
 {
@@ -14,7 +17,7 @@ class FestStudentClassResolver
      * turns hundreds of identical FestClassCategorySchemeGroup queries into one per
      * scheme_id per request.
      *
-     * @var array<int, \Illuminate\Support\Collection>
+     * @var array<int, Collection>
      */
     private static array $schemeGroupsCache = [];
 
@@ -134,7 +137,7 @@ class FestStudentClassResolver
             return null;
         }
 
-        $groups = \App\Models\FestEventClassGroup::where('event_id', $event->id)->get(['key', 'classes']);
+        $groups = FestEventClassGroup::where('event_id', $event->id)->get(['key', 'classes']);
 
         foreach ($groups as $group) {
             $groupClasses = collect($group->classes ?? [])->map(fn ($c) => strtoupper(trim((string) $c)))->all();
@@ -158,7 +161,7 @@ class FestStudentClassResolver
             return null;
         }
 
-        $groups = self::$schemeGroupsCache[$schemeId] ??= \App\Models\FestClassCategorySchemeGroup::where('scheme_id', $schemeId)->get(['key', 'classes']);
+        $groups = self::$schemeGroupsCache[$schemeId] ??= FestClassCategorySchemeGroup::where('scheme_id', $schemeId)->get(['key', 'classes']);
 
         foreach ($groups as $group) {
             $groupClasses = collect($group->classes ?? [])->map(fn ($c) => strtoupper(trim((string) $c)))->all();
@@ -172,6 +175,7 @@ class FestStudentClassResolver
 
     public static function classGroupForStudent(Student $student, FestEvent $event): ?string
     {
+        $event = $event->rootEvent();
         $scheme = FestClassGroupScheme::resolveForEvent($event);
 
         if (is_string($scheme) && ctype_digit($scheme)) {
@@ -187,6 +191,26 @@ class FestStudentClassResolver
         }
 
         return self::kalolsavClassGroupForStudent($student);
+    }
+
+    /** A class may belong to both a single-class and combined category. */
+    public static function classGroupsForStudent(Student $student, FestEvent $event): array
+    {
+        $root = $event->rootEvent();
+        $scheme = FestClassGroupScheme::resolveForEvent($root);
+        $normalized = self::normalizedClassFromStudent($student);
+        if ($normalized === null) {
+            return [];
+        }
+        if ($scheme === 'custom') {
+            $groups = FestEventClassGroup::where('event_id', $root->id)->get(['key', 'classes']);
+        } elseif (is_string($scheme) && ctype_digit($scheme)) {
+            $groups = self::$schemeGroupsCache[(int) $scheme] ??= FestClassCategorySchemeGroup::where('scheme_id', (int) $scheme)->get(['key', 'classes']);
+        } else {
+            return array_values(array_filter([self::classGroupForStudent($student, $root)]));
+        }
+
+        return $groups->filter(fn ($group) => collect($group->classes ?? [])->contains(fn ($class) => strtoupper(trim((string) $class)) === strtoupper($normalized)))->pluck('key')->values()->all();
     }
 
     public static function kidsFestBandForStudent(Student $student): ?string

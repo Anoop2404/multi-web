@@ -26,9 +26,10 @@
         <InlineAlert :message="alertMessage" type="error" @dismiss="alertMessage = ''" />
 
         <div v-if="schoolRegion?.applies && !focusEvent?.uses_registration_batch_billing" class="mb-5 max-w-2xl">
-            <div v-if="schoolRegion.region && !showChangeRegion" class="notice-banner notice-banner--info text-sm flex flex-wrap items-center gap-3 justify-between">
+            <div v-if="schoolRegion.region && (schoolRegion.locked || !showChangeRegion)" class="notice-banner notice-banner--info text-sm flex flex-wrap items-center gap-3 justify-between">
                 <p>Your {{ programLabel }} region: <strong>{{ schoolRegion.region }}</strong>.</p>
-                <button type="button" class="link-brand font-semibold text-xs shrink-0" @click="showChangeRegion = true">Change region →</button>
+                <Link v-if="schoolRegion.locked" :href="schoolRegion.request_url" class="link-brand font-semibold text-xs shrink-0">🔒 Request region change →</Link>
+                <button v-else type="button" class="link-brand font-semibold text-xs shrink-0" @click="showChangeRegion = true">Change region →</button>
             </div>
             <div v-else class="notice-banner notice-banner--warning text-sm">
                 <p class="font-semibold mb-2">{{ schoolRegion.region ? 'Change your' : 'Select your' }} {{ programLabel }} region</p>
@@ -300,7 +301,7 @@
                                 {{ event.payer_label }}
                                 <span v-if="event.parent_hub_id && event.partition_key" class="ml-2">
                                     • Region: <strong class="text-slate-700 capitalize">{{ event.cluster_label || event.partition_key }}</strong>
-                                    <Link :href="`${programBase}/events/${event.parent_hub_id}/registration?change_region=1`" class="text-blue-600 hover:underline ml-1 font-medium">
+                                    <Link :href="`${programBase}/events/${event.parent_hub_id}/region-change-requests`" class="text-blue-600 hover:underline ml-1 font-medium">
                                         (Change region)
                                     </Link>
                                 </span>
@@ -1807,7 +1808,7 @@ function studentMatchesItem(student, event, item, { skipVerification = false } =
         if (!isItemOpenClass(item)) {
             if (!student.eligible_kids_fest) return false;
             if (item.class_group && item.class_group !== 'open') {
-                if (!matchesClassGroup(student.kalolsav_class_group, item.class_group)) return false;
+                if (!(student.eligible_class_groups ?? [student.kalolsav_class_group]).some(group => matchesClassGroup(group, item.class_group))) return false;
             }
             if (item.kids_band && item.kids_band !== 'open' && student.kids_fest_band !== item.kids_band) return false;
         }
@@ -1905,6 +1906,8 @@ function studentIneligibilityReason(student, event, item) {
     if (props.eventType === 'kids_fest') {
         if (!isItemOpenClass(item)) {
             if (!student.eligible_kids_fest) return 'Not eligible for Kids Fest (Pre-KG to Class 2)';
+            if (!(student.eligible_class_groups ?? [student.kalolsav_class_group]).some(group => matchesClassGroup(group, item.class_group))) return classGroupMismatchReason(student, item, event);
+            if (item.kids_band && item.kids_band !== 'open' && student.kids_fest_band !== item.kids_band) return `This item is for ${item.kids_band}`;
         }
     }
 

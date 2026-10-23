@@ -225,7 +225,7 @@ class FestRegistrationController extends SchoolAdminController
             'programMeta' => $meta,
             'events' => $events,
             'registrations' => $registrations,
-            'schoolRegion' => $this->schoolRegionContext($eventType),
+            'schoolRegion' => $events->count() === 1 ? $this->schoolKalotsavRegion($events->first()) : null,
             'students' => $studentsByEvent->first() ?? [],
             'studentsByEvent' => $studentsByEvent,
             'lazyLoadStudents' => $lazyStudents,
@@ -1125,23 +1125,12 @@ class FestRegistrationController extends SchoolAdminController
         $partition = $partitionService->partitionByKey($hub, $data['partition_key']);
         abort_if(! $partition, 422, 'Selected region/partition does not exist.');
 
-        $schoolPartitionService->assign($hub, $this->school->id, $data['partition_key'], $request->user()?->id);
-
         if ($partition->region_id) {
-            $year = AcademicYear::forSahodaya($hub->tenant_id);
-            SchoolRegionAssignment::updateOrCreate(
-                [
-                    'tenant_id' => $hub->tenant_id,
-                    'school_id' => $this->school->id,
-                    'academic_year' => $year,
-                    'partition_group' => null,
-                ],
-                [
-                    'region_id' => $partition->region_id,
-                ]
-            );
-
-            app(FestRegionPartitionService::class)->syncSchoolAcrossHubs($hub->tenant_id, $this->school->id);
+            app(\App\Services\Events\FestSchoolEventRegionService::class)->select($hub, $this->school->id, (int) $partition->region_id, $request->user()?->id);
+        } else {
+            $existing = $schoolPartitionService->resolvePartitionKey($hub, $this->school->id);
+            abort_if($existing && $existing !== $data['partition_key'], 422, 'Your event region is locked. Request Sahodaya approval to change it.');
+            $schoolPartitionService->assign($hub, $this->school->id, $data['partition_key'], $request->user()?->id);
         }
 
         $prefix = ProgramRouteMap::prefixFromSlug($meta['slug']);

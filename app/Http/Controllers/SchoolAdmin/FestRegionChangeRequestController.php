@@ -6,10 +6,12 @@ use App\Models\FestEvent;
 use App\Models\FestEventPhase;
 use App\Models\FestPhaseRegion;
 use App\Models\FestRegionChangeRequest;
+use App\Services\Events\FestSchoolEventRegionService;
 use App\Services\Events\FestSchoolPhaseRegionService;
 use App\Support\ProgramRouteMap;
 use App\Support\SchoolFestProgram;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class FestRegionChangeRequestController extends SchoolAdminController
@@ -20,6 +22,20 @@ class FestRegionChangeRequestController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $root = $event->rootEvent();
+        if (! $root->usesPhasedRegionalBilling()) {
+            $service = app(FestSchoolEventRegionService::class);
+            $current = $service->current($root, $this->school->id);
+
+            return $this->inertia('School/Events/RegionChangeRequests', [
+                'event' => $root->only('id', 'title', 'status'), 'program' => $meta['slug'], 'programMeta' => $meta,
+                'phases' => [['id' => 0, 'name' => $root->title,
+                    'regions' => $service->regions($root)->map(fn ($child) => ['region_id' => $child->region_id, 'name' => $child->region?->name ?? $child->cluster_label])->values(),
+                    'current_region_id' => $current?->region_id, 'current_region_name' => $current?->region?->name ?? $current?->cluster_label, 'locked' => $current !== null,
+                ]],
+                'requests' => FestRegionChangeRequest::where('event_id', $root->id)->where('school_id', $this->school->id)->whereNull('phase_id')->with(['currentRegion:id,name', 'requestedRegion:id,name'])->latest()->get(),
+            ]);
+        }
+
         $phases = FestEventPhase::where('event_id', $root->id)
             ->where(function ($q) {
                 $q->where('is_regional', true)->orWhereNotNull('region_partition_group');
@@ -62,6 +78,24 @@ class FestRegionChangeRequestController extends SchoolAdminController
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
         $root = $event->rootEvent();
+        if (! $root->usesPhasedRegionalBilling()) {
+            $data = $request->validate(['requested_region_id' => 'required|integer', 'reason' => 'required|string|max:2000']);
+            $service = app(FestSchoolEventRegionService::class);
+            $current = $service->current($root, $this->school->id);
+            abort_unless($current, 422, 'Select your initial event region first.');
+            abort_unless($service->regions($root)->contains('region_id', (int) $data['requested_region_id']), 422, 'That region is not configured for this event.');
+            abort_if((int) $current->region_id === (int) $data['requested_region_id'], 422, 'That is already your region.');
+            DB::transaction(function () use ($root, $current, $data, $request) {
+                FestEvent::whereKey($root->id)->lockForUpdate()->firstOrFail();
+                abort_if(FestRegionChangeRequest::where('event_id', $root->id)->whereNull('phase_id')->where('school_id', $this->school->id)->where('status', 'pending')->exists(), 422, 'A region change request is already pending review.');
+                FestRegionChangeRequest::create(['event_id' => $root->id, 'school_id' => $this->school->id, 'phase_id' => null,
+                    'current_region_id' => $current->region_id, 'requested_region_id' => $data['requested_region_id'], 'reason' => $data['reason'],
+                    'status' => 'pending', 'requested_by_user_id' => $request->user()?->id]);
+            });
+
+            return back()->with('success', 'Event region change submitted for Sahodaya approval.');
+        }
+
         $data = $request->validate([
             'phase_id' => ['required', 'integer', Rule::exists('fest_event_phases', 'id')->where('event_id', $root->id)],
             'requested_region_id' => 'required|integer|exists:regions,id',

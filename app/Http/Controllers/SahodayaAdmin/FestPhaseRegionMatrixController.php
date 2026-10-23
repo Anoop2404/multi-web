@@ -9,9 +9,11 @@ use App\Models\FestSchoolPhaseRegionSelection;
 use App\Models\Tenant;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Events\FestPhasedWorkflowService;
+use App\Services\Events\FestSchoolEventRegionService;
 use App\Services\Events\FestSchoolPhaseRegionService;
 use App\Support\FestPageActivity;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class FestPhaseRegionMatrixController extends SahodayaAdminController
 {
@@ -19,10 +21,7 @@ class FestPhaseRegionMatrixController extends SahodayaAdminController
     {
         $events = FestEvent::forTenant($this->sahodaya->id)
             ->whereNull('parent_event_id')
-            ->where('workflow_mode', FestPhasedWorkflowService::MODE)
-            ->whereHas('phases', fn ($q) => $q->where(function ($w) {
-                $w->where('is_regional', true)->orWhereNotNull('region_partition_group');
-            }))
+            ->where(fn ($q) => $q->where('workflow_mode', FestPhasedWorkflowService::MODE)->orWhere('conduct_mode', 'partitioned'))
             ->orderByDesc('event_start')
             ->get(['id', 'title', 'event_start', 'status']);
 
@@ -58,7 +57,7 @@ class FestPhaseRegionMatrixController extends SahodayaAdminController
             ->keyBy(fn (FestSchoolPhaseRegionSelection $s) => $s->school_id.':'.$s->phase_id);
 
         $pendingRequests = FestRegionChangeRequest::where('event_id', $event->id)
-            ->whereIn('phase_id', $phaseIds)
+            ->where(fn ($q) => $q->whereIn('phase_id', $phaseIds)->orWhereNull('phase_id'))
             ->where('status', 'pending')
             ->with(['school:id,name', 'phase:id,name', 'requestedRegion:id,name', 'currentRegion:id,name'])
             ->latest()
@@ -66,6 +65,7 @@ class FestPhaseRegionMatrixController extends SahodayaAdminController
 
         return $this->inertia('Sahodaya/Events/PhaseRegionMatrix', [
             'event' => $event->only('id', 'title'),
+            'eventScoped' => ! $event->usesPhasedRegionalBilling(),
             'phases' => $phases->map(fn (FestEventPhase $p) => [
                 'id' => $p->id,
                 'name' => $p->name,
@@ -93,7 +93,7 @@ class FestPhaseRegionMatrixController extends SahodayaAdminController
                 'school_id' => $r->school_id,
                 'school_name' => $r->school?->name,
                 'phase_id' => $r->phase_id,
-                'phase_name' => $r->phase?->name,
+                'phase_name' => $r->phase?->name ?? $event->title,
                 'current_region_name' => $r->currentRegion?->name,
                 'requested_region_name' => $r->requestedRegion?->name,
                 'requested_region_id' => $r->requested_region_id,
@@ -119,6 +119,20 @@ class FestPhaseRegionMatrixController extends SahodayaAdminController
             'resolution_note' => 'nullable|string|max:2000',
             'acknowledge_paid_invoice' => 'nullable|boolean',
         ]);
+
+        if ($regionChangeRequest->phase_id === null) {
+            DB::transaction(function () use ($event, $regionChangeRequest, $data, $request, $audit) {
+                $row = FestRegionChangeRequest::whereKey($regionChangeRequest->id)->lockForUpdate()->firstOrFail();
+                abort_unless($row->status === 'pending', 422, 'Only pending requests can be reviewed.');
+                $service = app(FestSchoolEventRegionService::class);
+                abort_unless((int) $service->current($event, $row->school_id)?->region_id === (int) $row->current_region_id, 422, 'The school region has changed since this request. Review its current region.');
+                $service->select($event, $row->school_id, (int) $row->requested_region_id, $request->user()?->id, true, (bool) ($data['acknowledge_paid_invoice'] ?? false));
+                $row->update(['status' => 'approved', 'resolution_note' => $data['resolution_note'] ?? null, 'reviewed_by_user_id' => $request->user()?->id, 'reviewed_at' => now()]);
+                $audit->festEvent($event, FestPageActivity::REGISTRATIONS, 'fest.event_region.request_approved', 'Approved event region change', ['request_id' => $row->id, 'school_id' => $row->school_id, 'region_id' => $row->requested_region_id]);
+            });
+
+            return back()->with('success', 'Event region change approved and applied.');
+        }
 
         $phase = FestEventPhase::findOrFail($regionChangeRequest->phase_id);
 

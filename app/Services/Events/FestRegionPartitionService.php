@@ -329,7 +329,7 @@ class FestRegionPartitionService
                 continue;
             }
 
-            FestEventSchoolPartition::updateOrCreate(
+            FestEventSchoolPartition::firstOrCreate(
                 ['event_id' => $hub->id, 'school_id' => $assignment->school_id],
                 ['partition_key' => $key, 'assigned_at' => now()],
             );
@@ -439,7 +439,7 @@ class FestRegionPartitionService
                 continue;
             }
 
-            FestEventSchoolPartition::updateOrCreate(
+            FestEventSchoolPartition::firstOrCreate(
                 ['event_id' => $hub->id, 'school_id' => $assignment->school_id],
                 ['partition_key' => $key, 'assigned_at' => now()],
             );
@@ -484,7 +484,7 @@ class FestRegionPartitionService
                 continue;
             }
 
-            FestEventSchoolPartition::updateOrCreate(
+            FestEventSchoolPartition::firstOrCreate(
                 ['event_id' => $hub->id, 'school_id' => $schoolId],
                 ['partition_key' => $key, 'assigned_at' => now()],
             );

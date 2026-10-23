@@ -1,13 +1,14 @@
 <template>
     <SahodayaEventsLayout :title="`${event.title} — Region Matrix`" :sahodaya="sahodaya" :event="event" :show-header-title="false">
-        <PageHeader :title="`${event.title} — Region Matrix`" eyebrow="Regional phases"
-                    description="See and change which region each school competes in, per regional phase. Changing a locked selection migrates the school's existing registrations for that phase." />
+        <PageHeader :title="`${event.title} — Region Matrix`" :eyebrow="eventScoped ? 'Event regions' : 'Regional phases'"
+                    :description="eventScoped ? 'Review event-specific region change requests from schools.' : 'See and change which region each school competes in, per regional phase.'" />
 
         <EventSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" active="phase-regions" />
 
         <div v-if="phases.length === 0" class="card text-sm text-slate-400 max-w-3xl">
-            This event has no regional phases configured yet. Mark a phase "Regional" and choose its allowed regions on the
-            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/phases`" class="link-brand font-semibold">Phases</Link> page first.
+            <template v-if="eventScoped">Schools select their region once for this event. Review requested changes below.</template>
+            <template v-else>This event has no regional phases configured yet. Mark a phase "Regional" and choose its allowed regions on the
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/phases`" class="link-brand font-semibold">Phases</Link> page first.</template>
         </div>
 
         <div v-else class="space-y-3">
@@ -131,6 +132,7 @@ function isPaidInvoiceWarning(message) {
 }
 
 const props = defineProps({
+    eventScoped: Boolean,
     sahodaya: Object,
     event: Object,
     phases: { type: Array, default: () => [] },
