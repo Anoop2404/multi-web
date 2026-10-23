@@ -6,7 +6,7 @@
             description="Create judges, exam staff, mark-entry coordinators, event ops, and view-only Sahodaya staff."
         >
             <template #actions>
-                <button v-if="canCreateEventLogins" type="button" class="btn-secondary text-sm" :disabled="!eventLoginOptions.length" @click="creatingEventLogin = !creatingEventLogin">
+                <button v-if="canCreateEventLogins" type="button" class="btn-secondary text-sm" :disabled="!eventAdminOptions.length" @click="creatingEventLogin = !creatingEventLogin">
                     + Event admin login
                 </button>
                 <button type="button" class="btn-secondary text-sm" @click="exportCredentials">
@@ -18,20 +18,21 @@
             </template>
         </PageHeader>
 
-        <p v-if="canCreateEventLogins && !eventLoginOptions.length" class="mb-4 text-xs text-slate-500">All available events already have automatic admin logins.</p>
+        <p v-if="canCreateEventLogins && !eventAdminOptions.length" class="mb-4 text-xs text-slate-500">No events are available. Create a sports or other event first.</p>
 
         <div v-if="newCredentials" class="notice-banner notice-banner--success mb-4 text-sm">
             Account created. Username: <strong class="font-mono">{{ newCredentials.username }}</strong>
             · Temp password: <strong class="font-mono">{{ newCredentials.password }}</strong> (shown once — share this with the user, it won't be shown again)
         </div>
 
-        <form v-if="creatingEventLogin" class="card mb-4 space-y-3" @submit.prevent="createEventLogin">
-            <h3 class="section-title">Create event admin login</h3>
-            <p class="text-xs text-slate-500">Select an event without an automatic login. Regional child events also receive missing logins. Finance access is excluded.</p>
+        <form v-if="creatingEventLogin" class="card mb-4 space-y-3" @submit.prevent="createNamedEventAdmin">
+            <h3 class="section-title">Create sports or event admin</h3>
+            <p class="text-xs text-slate-500">Choose any sports, fest or regional event, including events that already have an admin. Create a separate named login, or view/create the automatic login. Finance access starts disabled.</p>
             <SearchableSelect v-model="eventLoginForm.event_id" :options="eventLoginSelectOptions" :required="true" :all-option="true" all-label="Select event or regional event" />
             <p v-if="eventLoginForm.errors.event_id" class="text-xs text-red-600">{{ eventLoginForm.errors.event_id }}</p>
             <div class="flex gap-2">
-                <button type="submit" class="btn-primary text-sm" :disabled="!eventLoginForm.event_id || eventLoginForm.processing">{{ eventLoginForm.processing ? 'Creating…' : 'Create login' }}</button>
+                <button type="submit" class="btn-primary text-sm" :disabled="!eventLoginForm.event_id || eventLoginForm.processing">Create named admin</button>
+                <button type="button" class="btn-secondary text-sm" :disabled="!eventLoginForm.event_id || eventLoginForm.processing" @click="createEventLogin">{{ selectedEventHasAutomaticLogin ? 'View automatic login' : 'Create automatic login' }}</button>
                 <button type="button" class="btn-secondary text-sm" @click="creatingEventLogin = false">Cancel</button>
             </div>
         </form>
@@ -197,11 +198,11 @@
                     <p class="text-xs font-semibold text-violet-900">Event admin — assigned events</p>
                     <p class="text-xs text-slate-500">This user gets full sahodaya-admin control (items, fees, registrations, results, settings) but only for the events checked below.</p>
                     <div class="flex flex-wrap gap-2">
-                        <label v-for="e in festEvents" :key="e.id" class="flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-2 py-1 text-xs">
+                        <label v-for="e in adminAssignableEvents" :key="e.id" class="flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-2 py-1 text-xs">
                             <input type="checkbox" :value="e.id" v-model="form.event_admin_event_ids">
                             {{ e.title }} ({{ e.status }})
                         </label>
-                        <p v-if="!festEvents.length" class="text-xs text-slate-400 italic">No active events yet.</p>
+                        <p v-if="!adminAssignableEvents.length" class="text-xs text-slate-400 italic">No active events yet.</p>
                     </div>
                 </div>
                 <div v-if="hasExamRole(form.roles)" class="card card--muted space-y-3">
@@ -332,11 +333,11 @@
                 <div v-if="editForm.roles.includes('event_admin')" class="card card--accent space-y-3">
                     <p class="text-xs font-semibold text-violet-900">Event admin — assigned events</p>
                     <div class="flex flex-wrap gap-2">
-                        <label v-for="e in festEvents" :key="e.id" class="flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-2 py-1 text-xs">
+                        <label v-for="e in adminAssignableEvents" :key="e.id" class="flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-2 py-1 text-xs">
                             <input type="checkbox" :value="e.id" v-model="editForm.event_admin_event_ids">
                             {{ e.title }} ({{ e.status }})
                         </label>
-                        <p v-if="!festEvents.length" class="text-xs text-slate-400 italic">No active events yet.</p>
+                        <p v-if="!adminAssignableEvents.length" class="text-xs text-slate-400 italic">No active events yet.</p>
                     </div>
                 </div>
                 <div v-if="hasExamRole(editForm.roles)" class="card card--muted space-y-3">
@@ -435,6 +436,7 @@ const props = defineProps({
     festEvents: Array,
     canCreateEventLogins: Boolean,
     eventLoginOptions: { type: Array, default: () => [] },
+    eventAdminOptions: { type: Array, default: () => [] },
     newEventAdminCredentials: Object,
     eventPhases: { type: Object, default: () => ({}) },
     mcqExams: Array,
@@ -446,7 +448,19 @@ const props = defineProps({
 const creating = ref(false);
 const creatingEventLogin = ref(false);
 const eventLoginForm = useForm({ event_id: '' });
-const eventLoginSelectOptions = computed(() => props.eventLoginOptions.map(event => ({ value: event.id, label: event.title })));
+const eventLoginSelectOptions = computed(() => props.eventAdminOptions.map(event => ({ value: event.id, label: `${event.title} · ${String(event.event_type ?? '').replaceAll('_', ' ')}` })));
+const selectedEventHasAutomaticLogin = computed(() => !!eventLoginForm.event_id && !props.eventLoginOptions.some(event => Number(event.id) === Number(eventLoginForm.event_id)));
+const adminAssignableEvents = computed(() => [...new Map([...(props.festEvents ?? []), ...props.eventAdminOptions].map(event => [event.id, event])).values()]);
+async function createNamedEventAdmin() {
+    if (!eventLoginForm.event_id) return;
+    const eventId = Number(eventLoginForm.event_id);
+    openCreate();
+    form.roles = ['event_admin'];
+    form.event_admin_event_ids = [eventId];
+    await nextTick();
+    form.permissions = form.permissions.filter(permission => permission !== 'fest.finance');
+    creatingEventLogin.value = false;
+}
 function createEventLogin() {
     eventLoginForm.post(`/sahodaya-admin/${props.sahodaya.id}/events/${eventLoginForm.event_id}/event-admin-login`, {
         preserveScroll: true,

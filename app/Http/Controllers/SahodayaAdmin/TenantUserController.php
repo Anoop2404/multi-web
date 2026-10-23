@@ -100,6 +100,11 @@ class TenantUserController extends SahodayaAdminController
                 ])->all(),
             'festEvents'      => $festEvents,
             'canCreateEventLogins' => $canShareEventLogins && Schema::hasTable('fest_event_admin_accounts'),
+            'eventAdminOptions' => $canShareEventLogins
+                ? FestEvent::where('tenant_id', $this->sahodaya->id)
+                    ->whereNull('conducting_school_id')->where('status', '!=', 'cancelled')
+                    ->orderBy('title')->get(['id', 'title', 'event_type', 'status', 'parent_event_id'])
+                : collect(),
             'eventLoginOptions' => $canShareEventLogins && Schema::hasTable('fest_event_admin_accounts')
                 ? FestEvent::where('tenant_id', $this->sahodaya->id)
                     ->whereNull('conducting_school_id')

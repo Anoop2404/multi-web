@@ -191,6 +191,7 @@ class FestAutomaticEventAdminTest extends TestCase
         $url = '/sahodaya-admin/'.$tenant->id.'/users';
         $this->actingAs($owner)->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page
             ->where('canCreateEventLogins', true)->has('eventLoginOptions', 2)
+            ->where('eventAdminOptions', fn ($options) => collect($options)->pluck('id')->contains($existing->id) && collect($options)->pluck('id')->contains($legacy->id))
             ->where('eventLoginOptions', fn ($options) => ! collect($options)->pluck('id')->contains($existing->id)));
 
         $endpoint = '/sahodaya-admin/'.$tenant->id.'/events/'.$legacy->id.'/event-admin-login';
