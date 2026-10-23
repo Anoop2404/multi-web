@@ -264,6 +264,35 @@ class FestCertificateAbsenceAndDateTest extends TestCase
         $this->actingAs($f['admin'])->post($url, array_merge($data, ['phase_id' => $otherPhase->id]))->assertNotFound();
     }
 
+    public function test_removing_certificate_phase_restores_defaults_and_preserves_items_and_certificates(): void
+    {
+        $f = $this->fixture(['venue' => 'Default Venue']);
+        $phase = \App\Models\FestCertificatePhase::create(['event_id' => $f['event']->id, 'name' => 'Remove me', 'venue' => 'Phase Venue', 'date_start' => '2026-10-17']);
+        $item = FestEventItem::create(['event_id' => $f['event']->id, 'title' => 'Song', 'item_code' => 'DEL', 'certificate_phase_id' => $phase->id]);
+        $participant = $this->registerParticipant($f['event'], $item, $f['school']->id, 901);
+        $certificates = [];
+        foreach (['winner', 'participation'] as $type) {
+            $certificates[$type] = Certificate::create(['entity_type' => FestParticipant::class, 'entity_id' => $participant->id,
+                'cert_type' => $type, 'verification_uuid' => (string) Str::uuid(), 'generated_at' => now(), 'is_stale' => false]);
+        }
+        $url = route('sahodaya.events.certificates.phases.destroy', ['tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id, 'phaseId' => $phase->id]);
+        $this->actingAs($f['admin'])->delete($url)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertNull($phase->fresh());
+        $this->assertNull($item->fresh()->certificate_phase_id);
+        $this->assertTrue($certificates['winner']->fresh()->is_stale);
+        $this->assertFalse($certificates['participation']->fresh()->is_stale);
+        $this->assertSame('Default Venue', app(FestCertificateService::class)->renderContext($certificates['winner'])['fieldValues']['venue']);
+
+        $otherEvent = FestEvent::create(['tenant_id' => $f['sahodaya']->id, 'title' => 'Other', 'event_type' => 'kalolsavam']);
+        $otherPhase = \App\Models\FestCertificatePhase::create(['event_id' => $otherEvent->id, 'name' => 'Keep', 'venue' => 'Other', 'date_start' => '2026-10-19']);
+        $foreignUrl = route('sahodaya.events.certificates.phases.destroy', ['tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id, 'phaseId' => $otherPhase->id]);
+        $this->actingAs($f['admin'])->delete($foreignUrl)->assertNotFound();
+        $this->assertNotNull($otherPhase->fresh());
+        $empty = \App\Models\FestCertificatePhase::create(['event_id' => $f['event']->id, 'name' => 'Empty', 'venue' => 'Other', 'date_start' => '2026-10-19']);
+        $this->actingAs($f['admin'])->delete(route('sahodaya.events.certificates.phases.destroy', ['tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id, 'phaseId' => $empty->id]))->assertRedirect();
+        $this->assertNull($empty->fresh());
+    }
+
     public function test_moving_item_between_certificate_phases_changes_render_values_and_hash(): void
     {
         $f = $this->fixture(['event_start' => '2026-10-24', 'event_end' => '2026-10-25', 'venue' => 'Default Venue']);

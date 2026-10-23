@@ -133,6 +133,14 @@ class FestStateNominationService
     /** @return list<FestEvent> */
     public function sourceEvents(FestEvent $hubEvent, FestPartitionService $partitions): array
     {
+        if (! $hubEvent->parent_event_id && $hubEvent->usesPhasedRegionalBilling()) {
+            return FestEvent::where('parent_event_id', $hubEvent->id)
+                ->where('tenant_id', $hubEvent->tenant_id)
+                ->whereNotNull('source_phase_id')
+                ->orderBy('source_phase_id')->orderBy('region_id')->orderBy('id')
+                ->get()->all();
+        }
+
         if ($partitions->isPartitionedHub($hubEvent)) {
             return $partitions->partitions($hubEvent)->all();
         }

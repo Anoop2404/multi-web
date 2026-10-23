@@ -1173,6 +1173,22 @@ class FestCertificateController extends SahodayaAdminController
         return back()->with('success', 'Certificate phase saved. Regenerate affected merit certificates.');
     }
 
+    public function destroyCertificatePhase(Request $request, string $tenantId, FestEvent $event, int $phaseId)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($event, $phaseId) {
+            $phase = \App\Models\FestCertificatePhase::where('event_id', $event->id)->lockForUpdate()->findOrFail($phaseId);
+            $itemIds = FestEventItem::where('certificate_phase_id', $phase->id)->pluck('id');
+            FestEventItem::whereIn('id', $itemIds)->update(['certificate_phase_id' => null]);
+            Certificate::where('entity_type', FestParticipant::class)->where('cert_type', 'winner')
+                ->whereIn('entity_id', FestParticipant::whereHas('registration', fn ($q) => $q->whereIn('item_id', $itemIds))->select('id'))
+                ->update(['is_stale' => true]);
+            $phase->delete();
+        });
+
+        return back()->with('success', 'Certificate phase removed. Its items now use event defaults. Regenerate affected merit certificates.');
+    }
+
     public function updateItemStages(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

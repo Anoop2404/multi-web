@@ -1867,6 +1867,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/certificates/certificate-date', [FestCertificateController::class, 'updateCertificateDate'])->name('certificates.certificate-date');
             Route::post('/{event}/certificates/signatories', [FestCertificateController::class, 'updateSignatories'])->name('certificates.signatories');
             Route::post('/{event}/certificates/phases', [FestCertificateController::class, 'saveCertificatePhase'])->name('certificates.phases');
+            Route::delete('/{event}/certificates/phases/{phaseId}', [FestCertificateController::class, 'destroyCertificatePhase'])->name('certificates.phases.destroy');
             Route::post('/{event}/certificates/item-stages', [FestCertificateController::class, 'updateItemStages'])->name('certificates.item-stages');
             Route::get('/{event}/certificates/merit-winner-sheet', [FestCertificateController::class, 'meritWinnerSheet'])->name('certificates.merit-winner-sheet');
             Route::get('/{event}/certificates/merged-merit', [FestCertificateController::class, 'downloadMergedMerit'])->name('certificates.merged-merit');

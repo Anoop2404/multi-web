@@ -37,6 +37,7 @@
                 <p v-for="(error, key) in form.errors" :key="key" class="text-sm text-red-600">{{ error }}</p>
                 <div class="flex gap-3">
                     <button class="btn-primary" :disabled="form.processing">Save phase and assigned items</button>
+                    <button v-if="form.phase_id" type="button" class="btn-secondary !text-red-700" :disabled="form.processing || removing" @click="removePhase">Remove phase</button>
                 </div>
                 <p class="text-xs text-gray-500">Uncheck an item and save to restore its event defaults. Existing affected merit certificates need regeneration. The student's school and certificate issue date stay unchanged.</p>
             </form>
@@ -46,9 +47,12 @@
 
 <script setup>
 import { computed, ref } from 'vue';
-import { useForm } from '@inertiajs/vue3';
+import { router, useForm } from '@inertiajs/vue3';
+import { useConfirm } from '@/composables/useConfirm';
 const props = defineProps({ base: String, items: { type: Array, default: () => [] }, phases: { type: Array, default: () => [] } });
 const search = ref('');
+const removing = ref(false);
+const { confirm } = useConfirm();
 const sort = ref('published_asc');
 const form = useForm({ phase_id: null, name: '', item_ids: [], venue: '', date_start: '', date_end: '' });
 const filtered = computed(() => props.items.filter(item => `${item.item_code} ${item.title} ${item.class_group} ${item.gender}`.toLowerCase().includes(search.value.toLowerCase())).sort((a, b) => {
@@ -78,5 +82,21 @@ function save() {
     form.post(`${props.base}/phases`, { preserveScroll: true, onSuccess: () => {
         if (!form.phase_id) newPhase();
     } });
+}
+async function removePhase() {
+    const phase = props.phases.find(value => value.id === form.phase_id);
+    if (!phase || removing.value) return;
+    const count = phaseCount(phase.id);
+    if (!(await confirm({
+        title: 'Remove certificate phase?',
+        message: `Remove "${phase.name}"? ${count} assigned item(s) will use the event's default date and venue. Items and certificates are kept; affected merit certificates need regeneration.`,
+        confirmLabel: 'Remove phase', destructive: true,
+    }))) return;
+    removing.value = true;
+    router.delete(`${props.base}/phases/${phase.id}`, {
+        preserveScroll: true,
+        onSuccess: newPhase,
+        onFinish: () => { removing.value = false; },
+    });
 }
 </script>

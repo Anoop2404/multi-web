@@ -116,6 +116,32 @@ class FestStateSlotCollectionTest extends TestCase
         ]);
     }
 
+    public function test_collection_reads_published_winners_from_phased_regional_leaves(): void
+    {
+        $this->hubEvent->update(['workflow_mode' => 'phased_regional_billing', 'results_published' => false]);
+        $root = $this->hubEvent;
+        $phase = \App\Models\FestEventPhase::create(['event_id' => $root->id, 'name' => 'Regional phase', 'is_regional' => true]);
+        $marks = collect();
+        foreach (['Manjeri', 'Nilambur'] as $name) {
+            $leaf = FestEvent::create(['tenant_id' => $root->tenant_id, 'parent_event_id' => $root->id,
+                'source_phase_id' => $phase->id, 'partition_key' => strtolower($name),
+                'workflow_mode' => 'phased_regional_billing', 'title' => $name, 'event_type' => 'kalolsavam',
+                'state_program_id' => $this->program->id, 'results_published' => false]);
+            $this->hubEvent = $leaf;
+            $this->item = FestEventItem::create(['event_id' => $leaf->id, 'title' => 'Light Music',
+                'item_code' => 'LM01', 'state_program_item_id' => $this->stateItem->id,
+                'results_published_at' => now()]);
+            $marks->push($this->winner($name.' Winner', 1, 95));
+        }
+        $pool = app(\App\Services\State\FestStateCollectionCandidates::class)->pool($this->program, $root->fresh());
+        $this->assertEqualsCanonicalizing($marks->pluck('id')->all(), $pool->pluck('mark_id')->all());
+        $this->assertEqualsCanonicalizing(['manjeri', 'nilambur'], $pool->pluck('partition_key')->all());
+        $this->item->update(['results_hidden' => true]);
+        $pool = app(\App\Services\State\FestStateCollectionCandidates::class)->pool($this->program, $root->fresh());
+        $this->assertCount(1, $pool->where('direct_entry', false));
+        $this->assertFalse($pool->contains('mark_id', $marks->last()->id));
+    }
+
     public function test_overview_uses_the_shared_public_url_without_an_undefined_property(): void
     {
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);

@@ -232,11 +232,7 @@ class FestStateQualifierPayloadBuilder
     /** @return list<FestEvent> */
     private function sourceEvents(FestEvent $sourceEvent): array
     {
-        if ($this->partitions->isPartitionedHub($sourceEvent)) {
-            return $this->partitions->partitions($sourceEvent)->all();
-        }
-
-        return [$sourceEvent];
+        return app(FestStateNominationService::class)->sourceEvents($sourceEvent, $this->partitions);
     }
 
     /**
