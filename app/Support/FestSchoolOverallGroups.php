@@ -13,6 +13,25 @@ class FestSchoolOverallGroups
             ->map(fn ($group) => array_merge($group, ['school_tier' => $group['key']]))->all();
     }
 
+    /** Registered school level takes precedence over the classes entered in this event. */
+    public static function schoolTierFor(\App\Models\Tenant $school): string
+    {
+        $payload = $school->application_payload ?? [];
+        foreach (['highest_class', 'highest_class_offered', 'institution_level', 'school_category', 'institution_type', 'affiliation_category'] as $field) {
+            $value = $payload[$field] ?? null;
+            if (! is_scalar($value) || trim((string) $value) === '') continue;
+            $group = SchoolClassCategoryResolver::classGroupKeyFromText((string) $value);
+            if ($group === 'hss') return 'senior_secondary';
+            if ($group === 'hs') return 'secondary';
+        }
+        if ($school->school_category) {
+            $group = SchoolClassCategoryResolver::classGroupKeyFromText((string) $school->school_category);
+            if ($group === 'hss') return 'senior_secondary';
+            if ($group === 'hs') return 'secondary';
+        }
+        return SchoolClassCategoryResolver::feeTierFor($school);
+    }
+
     public static function find(FestEvent $event, ?string $key): ?array
     {
         if (! $key || ! str_starts_with($key, 'overall:')) return null;

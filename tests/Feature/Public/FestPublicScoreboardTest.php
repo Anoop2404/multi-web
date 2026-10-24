@@ -83,6 +83,15 @@ class FestPublicScoreboardTest extends TestCase
         ]);
     }
 
+    public function test_overall_school_type_uses_registered_level_without_requiring_category_four(): void
+    {
+        $this->northSchool->update(['application_payload' => ['institution_level' => 'Senior Secondary']]);
+        SchoolClass::create(['tenant_id' => $this->northSchool->id, 'name' => 'Class 10']);
+        $this->southSchool->update(['application_payload' => ['school_category' => 'Secondary']]);
+        $this->assertSame('senior_secondary', \App\Support\FestSchoolOverallGroups::schoolTierFor($this->northSchool));
+        $this->assertSame('secondary', \App\Support\FestSchoolOverallGroups::schoolTierFor($this->southSchool));
+    }
+
     public function test_admin_can_save_overlapping_school_overall_groups(): void
     {
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
@@ -129,10 +138,11 @@ class FestPublicScoreboardTest extends TestCase
         $secondary = $service->scoreboard($this->north, $scope, 'overall:secondary');
         $senior = $service->scoreboard($this->north, $scope, 'overall:senior_secondary');
         $this->assertCount(1, $secondary);
-        $this->assertCount(1, $senior);
+        $this->assertCount(2, $senior);
         $this->assertSame($this->northSchool->id, $secondary[0]['school_id']);
         $this->assertSame($this->southSchool->id, $senior[0]['school_id']);
-        $this->assertNotContains($seniorWithoutCategoryFour->id, array_column($senior, 'school_id'));
+        $this->assertContains($seniorWithoutCategoryFour->id, array_column($senior, 'school_id'));
+        $this->assertNotContains($this->northSchool->id, array_column($senior, 'school_id'));
         $this->assertSame('secondary', \App\Support\FestSchoolOverallGroups::find($this->hub, 'overall:secondary')['school_tier']);
         $this->assertEquals($secondary[0]['total_points'] * 4 / 3, $senior[0]['total_points']);
         $this->assertGreaterThan(0, $secondary[0]['total_points']);
