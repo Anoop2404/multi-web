@@ -104,7 +104,7 @@ class ProgramHubDataService
                 'fees_paid'         => (float) $fees->where('status', 'approved')->sum('total_due'),
                 'fees_awaiting'     => $fees->where('status', 'proof_uploaded')->count(),
             ],
-            'events' => $openEvents->take(6)->map(function (FestEvent $e) use ($school) {
+            'events' => $openEvents->map(function (FestEvent $e) use ($school) {
                 $partitionService = app(FestPartitionService::class);
                 $isHub = $partitionService->isPartitionedHub($e);
                 $assignedKey = $isHub ? app(FestSchoolPartitionService::class)->resolvePartitionKey($e, $school->id) : null;

@@ -14,7 +14,7 @@ use Illuminate\Http\Request;
 
 class FestProgramController extends SchoolAdminController
 {
-    public function index()
+    public function index(Request $request)
     {
         $sahodayaId = $this->school->parent_id;
 
@@ -44,6 +44,7 @@ class FestProgramController extends SchoolAdminController
             ->get(['id', 'title', 'event_type', 'level_round']);
 
         return $this->inertia('School/Events/Programs', [
+            'initialType' => array_key_exists((string) $request->query('type', ''), $this->eventTypes()) ? $request->query('type') : '',
             'events'     => $events,
             'parentEvents' => $parentEvents,
             'eventTypes' => $this->eventTypes(),
@@ -103,8 +104,11 @@ class FestProgramController extends SchoolAdminController
             $message .= " Inherited {$inherited} state/Sahodaya item(s).";
         }
 
-        return redirect("/school-admin/{$this->school->id}/fest-programs/{$event->id}")
-            ->with('success', $message);
+        $workspace = $event->event_type === 'sports'
+            ? "/school-admin/{$this->school->id}/sports/my-event/{$event->id}"
+            : "/school-admin/{$this->school->id}/fest-programs/{$event->id}";
+
+        return redirect($workspace)->with('success', $message);
     }
 
     public function linkParent(Request $request, string $tenantId, FestEvent $festProgram)
