@@ -466,7 +466,7 @@
             <div v-if="enableSchoolOverallGroups" class="grid gap-4 md:grid-cols-2">
                 <div v-for="group in schoolOverallForms" :key="group.key" class="space-y-3 rounded-xl border border-slate-200 p-4">
                     <label class="block text-sm font-semibold">Championship title<input v-model="group.label" class="field mt-1 w-full" maxlength="100"></label>
-                    <p class="rounded-lg bg-indigo-50 p-3 text-sm font-semibold text-indigo-900">{{ group.key === 'secondary' ? 'Secondary schools only' : 'Senior Secondary schools only' }}</p>
+                    <p class="rounded-lg bg-indigo-50 p-3 text-sm font-semibold text-indigo-900">{{ group.key === 'secondary' ? 'Secondary schools only' : 'Senior Secondary schools participating in Category 4 only' }}</p>
                     <p class="text-sm font-semibold">Categories included</p>
                     <label v-for="option in categoryOptions" :key="option.value" class="flex items-start gap-2 text-sm"><input v-model="group.categories" :value="option.value" type="checkbox" class="mt-1">{{ option.label }}</label>
                 </div>

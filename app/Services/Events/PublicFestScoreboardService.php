@@ -512,6 +512,20 @@ class PublicFestScoreboardService
             $schools = Tenant::whereIn('id', array_column($rows, 'school_id'))->get()->keyBy('id');
             $rows = array_values(array_filter($rows, fn ($row) => isset($schools[$row['school_id']]) && \App\Support\SchoolClassCategoryResolver::feeTierFor($schools[$row['school_id']]) === $group['school_tier']));
         }
+        if ($group['key'] === 'senior_secondary') {
+            $categoryFourItems = FestEventItem::whereIn('event_id', $scope['event_ids'])
+                ->where('is_enabled', true)->get(['id', 'class_group'])
+                ->filter(function ($item) use ($event) {
+                    if (\App\Support\FestClassGroupScheme::canonicalKey($item->class_group) === 'hss') return true;
+                    return (bool) preg_match('/category\s*(?:IV|4)\b/i', $this->categoryLabel($event, (string) $item->class_group));
+                })->pluck('id');
+            $eligibleSchools = \App\Models\FestRegistration::whereIn('event_id', $scope['event_ids'])
+                ->whereIn('item_id', $categoryFourItems)->active()
+                ->whereHas('participants', fn ($query) => $query->whereNull('disqualified_at')
+                    ->where(fn ($role) => $role->whereNull('participant_role')->orWhere('participant_role', 'performer')))
+                ->pluck('school_id')->flip();
+            $rows = array_values(array_filter($rows, fn ($row) => isset($eligibleSchools[$row['school_id']])));
+        }
         return $this->applyCompetitionRanks(collect($rows))->all();
     }
 

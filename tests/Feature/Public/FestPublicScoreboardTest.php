@@ -118,6 +118,10 @@ class FestPublicScoreboardTest extends TestCase
             $this->markItemWinner($this->north, $item, $this->northSchool);
             $this->markItemWinner($this->north, $item, $this->southSchool);
         }
+        $seniorWithoutCategoryFour = $this->school('Senior Without Category Four');
+        $seniorWithoutCategoryFour->update(['application_payload' => ['highest_class' => 'Class 12']]);
+        $categoryOne = FestEventItem::where('event_id', $this->north->id)->where('class_group', 'lp')->firstOrFail();
+        $this->markItemWinner($this->north, $categoryOne, $seniorWithoutCategoryFour);
         $unpublished = FestEventItem::create(['event_id' => $this->north->id, 'title' => 'Not published', 'class_group' => 'lp', 'is_enabled' => true]);
         $this->markItemWinner($this->north, $unpublished, $this->school('Unpublished School'));
         $scope = ['event_ids' => [$this->north->id], 'event_id' => $this->north->id];
@@ -128,6 +132,7 @@ class FestPublicScoreboardTest extends TestCase
         $this->assertCount(1, $senior);
         $this->assertSame($this->northSchool->id, $secondary[0]['school_id']);
         $this->assertSame($this->southSchool->id, $senior[0]['school_id']);
+        $this->assertNotContains($seniorWithoutCategoryFour->id, array_column($senior, 'school_id'));
         $this->assertSame('secondary', \App\Support\FestSchoolOverallGroups::find($this->hub, 'overall:secondary')['school_tier']);
         $this->assertEquals($secondary[0]['total_points'] * 4 / 3, $senior[0]['total_points']);
         $this->assertGreaterThan(0, $secondary[0]['total_points']);
