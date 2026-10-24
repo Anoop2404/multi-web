@@ -235,7 +235,7 @@
             </div>
             <div class="overflow-x-auto">
                 <table class="data-table">
-                    <thead><tr><th>Event</th><th>Level</th><th>Entries</th><th></th></tr></thead>
+                    <thead><tr><th>Event</th><th>Registration dates</th><th>Event dates</th><th>Level</th><th>Entries</th><th></th></tr></thead>
                     <tbody>
                         <tr v-for="ev in events" :key="ev.id">
                             <td class="font-medium">
@@ -244,6 +244,8 @@
                                     Region-wise
                                 </span>
                             </td>
+                            <td class="text-xs whitespace-nowrap" :class="!ev.registration_open && !ev.registration_close ? 'text-slate-400' : 'text-slate-600'">{{ eventDateRange(ev.registration_open, ev.registration_close) }}</td>
+                            <td class="text-xs whitespace-nowrap" :class="!ev.event_start && !ev.event_end ? 'text-slate-400' : 'text-slate-600'">{{ eventDateRange(ev.event_start, ev.event_end) }}</td>
                             <td class="text-xs">{{ ev.level_label }}</td>
                             <td>{{ ev.registrations_count }}</td>
                             <td class="text-right whitespace-nowrap">
@@ -378,6 +380,15 @@ function formatDateStr(val) {
     const d = new Date(val);
     if (isNaN(d.getTime())) return val;
     return d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function eventDateRange(start, end) {
+    const format = value => new Date(`${value.slice(0, 10)}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    if (!start && !end) return 'Not scheduled';
+    if (!start) return `Until ${format(end)}`;
+    if (!end) return `From ${format(start)}`;
+    if (start === end) return format(start);
+    return `${format(start)} – ${format(end)}`;
 }
 
 function isRegionSelected(regionId) {

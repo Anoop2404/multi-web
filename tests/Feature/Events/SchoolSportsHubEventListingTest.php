@@ -36,12 +36,16 @@ class SchoolSportsHubEventListingTest extends TestCase
         $school = Tenant::create(['id' => 'sports-school', 'name' => 'Sports School', 'type' => 'school', 'parent_id' => $sahodaya->id]);
         $ids = [];
         foreach (range(1, 9) as $number) {
-            $ids[] = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Sport '.$number, 'event_type' => 'sports', 'level_round' => 'sahodaya', 'status' => 'registration_open'])->id;
+            $ids[] = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Sport '.$number, 'registration_open' => '2026-10-01', 'registration_close' => '2026-10-30', 'event_start' => '2026-11-05', 'event_end' => '2026-11-06', 'event_type' => 'sports', 'level_round' => 'sahodaya', 'status' => 'registration_open'])->id;
         }
         FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Draft sport', 'event_type' => 'sports', 'level_round' => 'sahodaya', 'status' => 'draft']);
         FestEvent::create(['tenant_id' => $other->id, 'title' => 'Other sport', 'event_type' => 'sports', 'level_round' => 'sahodaya', 'status' => 'registration_open']);
         $data = app(ProgramHubDataService::class)->schoolFestHub($school, 'sports-meet');
         $this->assertCount(9, $data['events']);
+        $this->assertSame('2026-10-01', $data['events'][0]['registration_open']);
+        $this->assertSame('2026-10-30', $data['events'][0]['registration_close']);
+        $this->assertSame('2026-11-05', $data['events'][0]['event_start']);
+        $this->assertSame('2026-11-06', $data['events'][0]['event_end']);
         $this->assertSame(9, $data['stats']['open_events']);
         $this->assertEqualsCanonicalizing($ids, array_column($data['events'], 'id'));
     }

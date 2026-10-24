@@ -40,6 +40,8 @@ class FestChampionshipController extends SahodayaAdminController
             'categoryOptions'            => collect($categoryLabels)->map(fn ($label, $key) => ['value' => $key, 'label' => $label])->values(),
             'championshipCategoryLabels' => FestClassGroupScheme::canonicalLabels(null, $root),
             'categoryMergeGroups'        => $this->mergeGroupsForDisplay($categoryMap),
+            'categoryDisplaySort' => $root->aggregation_config['category_display_sort'] ?? 'natural',
+            'categoryDisplayOrder' => $root->aggregation_config['category_display_order'] ?? [],
             'schoolGenderCategories' => \App\Support\FestSchoolGenderStandings::categories($root),
             'excludedOverallCategories'  => \App\Support\FestOverallCategoryExclusion::excluded($root),
             'usesPhases'                 => $usesPhases,
@@ -262,6 +264,23 @@ class FestChampionshipController extends SahodayaAdminController
         EventContext::for($event)->recalculateSchoolPoints();
 
         return back()->with('success', 'Overall scoreboard exclusions saved.');
+    }
+
+    public function updateCategoryOrder(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        $root = $event->rootEvent();
+        $allowed = array_keys($this->schoolCategoryLabels($root));
+        $data = $request->validate([
+            'mode' => 'required|in:natural,name,custom',
+            'categories' => 'present|array|max:500',
+            'categories.*' => ['string', 'distinct', \Illuminate\Validation\Rule::in($allowed)],
+        ]);
+        $config = $root->aggregation_config ?? [];
+        $config['category_display_sort'] = $data['mode'];
+        $config['category_display_order'] = array_values($data['categories']);
+        $root->update(['aggregation_config' => $config]);
+        return back()->with('success', 'Public category order saved.');
     }
 
     public function updateSchoolGenderCategories(Request $request, string $tenantId, FestEvent $event)

@@ -265,7 +265,8 @@ class PublicFestScoreboardService
         // down to their target key so a merged bucket appears once in the filter list,
         // not once per raw category that now feeds it.
         $collapsed = FestCategoryMerge::collapse($root, $rawKeys);
-        sort($collapsed);
+        $labels = collect($collapsed)->mapWithKeys(fn ($key) => [$key => $this->categoryLabel($root, $key)])->all();
+        $collapsed = \App\Support\FestCategoryOrder::sort($collapsed, $labels, $root->aggregation_config ?? []);
 
         return $collapsed;
     }

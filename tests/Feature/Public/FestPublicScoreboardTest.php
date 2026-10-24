@@ -83,6 +83,16 @@ class FestPublicScoreboardTest extends TestCase
         ]);
     }
 
+    public function test_public_categories_follow_saved_custom_order(): void
+    {
+        foreach (['hs', 'hss', 'lp', 'up'] as $key) {
+            FestEventItem::create(['event_id' => $this->north->id, 'title' => 'Item '.$key, 'class_group' => $key, 'is_enabled' => true]);
+        }
+        $this->hub->update(['aggregation_config' => array_merge($this->hub->aggregation_config, ['category_display_sort' => 'custom', 'category_display_order' => ['up', 'lp', 'hss', 'hs']])]);
+        $service = app(\App\Services\Events\PublicFestScoreboardService::class);
+        $this->assertSame(['up', 'lp', 'hss', 'hs'], $service->categories($this->hub, ['event_ids' => [$this->north->id, $this->south->id]]));
+    }
+
     public function test_public_index_lists_operational_children_and_hides_administrative_hub(): void
     {
         $response = $this->get('http://public-scoreboard.test/fest');

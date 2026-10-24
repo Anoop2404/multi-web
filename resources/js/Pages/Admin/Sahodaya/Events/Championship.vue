@@ -458,6 +458,27 @@
         </div>
 
         <div class="card mb-6 space-y-3">
+            <h3 class="section-title !mb-0">Public category order</h3>
+            <p class="section-desc">Arrange the category tabs on the public scoreboard. All Categories stays first.</p>
+            <label class="block max-w-sm text-sm font-medium">Sort categories
+                <select v-model="categorySort" class="field mt-2 w-full">
+                    <option value="natural">Category number — I, II, III / 1, 2, 3</option>
+                    <option value="name">Category name — A to Z</option>
+                    <option value="custom">Custom order</option>
+                </select>
+            </label>
+            <ol v-if="categorySort === 'custom'" class="max-w-2xl space-y-2">
+                <li v-for="(key, index) in categoryOrder" :key="key" class="flex items-center gap-3 rounded-lg border border-slate-200 p-3 text-sm">
+                    <span class="text-slate-400">{{ index + 1 }}</span>
+                    <span class="flex-1">{{ categoryOptions.find(option => option.value === key)?.label ?? key }}</span>
+                    <button type="button" class="btn-secondary !px-3 !py-1" :disabled="index === 0" :aria-label="`Move ${key} up`" @click="moveCategory(index, -1)">↑</button>
+                    <button type="button" class="btn-secondary !px-3 !py-1" :disabled="index === categoryOrder.length - 1" :aria-label="`Move ${key} down`" @click="moveCategory(index, 1)">↓</button>
+                </li>
+            </ol>
+            <button type="button" class="btn-primary text-sm" :disabled="savingCategoryOrder" @click="saveCategoryOrder">{{ savingCategoryOrder ? 'Saving…' : 'Save category order' }}</button>
+        </div>
+
+        <div class="card mb-6 space-y-3">
             <h3 class="section-title !mb-0">Gender-wise school standings</h3>
             <p class="section-desc">Combined school standings are the default. Enable categories below to list separate Boys and Girls school totals on the public portal.</p>
             <div class="flex flex-wrap gap-2">
@@ -640,6 +661,8 @@ const props = defineProps({
     championshipConfig: { type: Object, default: () => ({ male_title: 'Kalaprathibha', female_title: 'Kalathilakam', runner_up_title: 'Runner Up', disabled: false, max_counting_items: 0, multi_person_mode: 'tie_break_only', group_weight_percent: 100, must_have_first_place: false, minimum_points: 0, group_by_gender: true }) },
     activityLogs: { type: Array, default: () => [] },
     categoryOptions: { type: Array, default: () => [] },
+    categoryDisplaySort: { type: String, default: 'natural' },
+    categoryDisplayOrder: { type: Array, default: () => [] },
     championshipCategoryLabels: { type: Object, default: () => ({}) },
     categoryMergeGroups: { type: Array, default: () => [] },
     schoolGenderCategories: { type: Array, default: () => [] },
@@ -746,6 +769,22 @@ function saveMergeGroups() {
     router.put(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/championship/category-merge`, {
         groups: mergeGroups.value,
     }, { preserveScroll: true });
+}
+
+const categorySort = ref(props.categoryDisplaySort);
+const categoryOrder = ref([...new Set([...props.categoryDisplayOrder, ...props.categoryOptions.map(option => option.value)])].filter(key => props.categoryOptions.some(option => option.value === key)));
+const savingCategoryOrder = ref(false);
+function moveCategory(index, direction) {
+    const next = index + direction;
+    if (next < 0 || next >= categoryOrder.value.length) return;
+    [categoryOrder.value[index], categoryOrder.value[next]] = [categoryOrder.value[next], categoryOrder.value[index]];
+}
+function saveCategoryOrder() {
+    savingCategoryOrder.value = true;
+    router.put(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/championship/category-order`, { mode: categorySort.value, categories: categoryOrder.value }, {
+        preserveScroll: true,
+        onFinish: () => { savingCategoryOrder.value = false; },
+    });
 }
 
 const schoolGenderCategories = ref([...props.schoolGenderCategories]);
