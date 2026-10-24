@@ -1179,7 +1179,7 @@ private function renderScoreboardPage(Request $request, Tenant $tenant, FestEven
     $isPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
 
     $scopes = [$selectedScope];
-    $categories = $this->scoreboards->categories($event, $selectedScope);
+    $categories = $this->scoreboards->categories($event, $selectedScope, true);
     $category = $this->stringQuery($request, 'category');
     if ($category !== null) {
         abort_unless(in_array($category, $categories, true), 404);
@@ -1215,7 +1215,7 @@ public function scoreboardData(Request $request, int $eventId)
     $tenant = $this->resolveTenant();
     $event = $this->findEvent($tenant->id, $eventId);
     $selectedScope = $this->operationalEvents->directScope($event);
-    $categories = $this->scoreboards->categories($event, $selectedScope);
+    $categories = $this->scoreboards->categories($event, $selectedScope, true);
     $category = $this->stringQuery($request, 'category');
     if ($category !== null) {
         abort_unless(in_array($category, $categories, true), 404);
@@ -1673,7 +1673,7 @@ public function tv(Request $request, int $eventId)
         }
 
         $scoreboard = $this->scoreboards->scoreboard($event, $selectedScope, $category);
-        $cumulativeStanding = $this->cumulativeChampionship->publicStanding($event, $category);
+        $cumulativeStanding = \App\Support\FestSchoolOverallGroups::find($event, $category) ? null : $this->cumulativeChampionship->publicStanding($event, $category);
         if ($cumulativeStanding !== null) {
             $scoreboard = $cumulativeStanding['rows'];
         }
@@ -1960,7 +1960,7 @@ public function tv(Request $request, int $eventId)
         // an existing cumulative-championship $cumulativeStanding (a different,
         // already-hub-wide running total — see resolveScoreboard()) takes precedence
         // when present.
-        if ($cumulativeStanding === null && $request) {
+        if ($cumulativeStanding === null && $request && ! \App\Support\FestSchoolOverallGroups::find($event, $category)) {
             $crossPhaseBoard = $this->crossPhaseScoreboard($event, $category, $request);
             if ($crossPhaseBoard !== null) {
                 $scoreboard = $crossPhaseBoard;

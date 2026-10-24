@@ -1838,6 +1838,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/championship/students/{studentId}/breakdown', [FestChampionshipController::class, 'studentBreakdown'])->name('championship.student-breakdown');
             Route::post('/{event}/championship/sync-to-trophies', [FestChampionshipController::class, 'syncToTrophyTemplate'])->name('championship.sync-to-trophies');
             Route::put('/{event}/championship/category-merge', [FestChampionshipController::class, 'updateCategoryMerge'])->name('championship.category-merge');
+            Route::put('/{event}/championship/school-overall-groups', [FestChampionshipController::class, 'updateSchoolOverallGroups'])->name('championship.school-overall-groups');
             Route::put('/{event}/championship/category-order', [FestChampionshipController::class, 'updateCategoryOrder'])->name('championship.category-order');
             Route::put('/{event}/championship/school-gender-categories', [FestChampionshipController::class, 'updateSchoolGenderCategories'])->name('championship.school-gender-categories');
             Route::put('/{event}/championship/excluded-overall-categories', [FestChampionshipController::class, 'updateExcludedOverallCategories'])->name('championship.excluded-overall-categories');

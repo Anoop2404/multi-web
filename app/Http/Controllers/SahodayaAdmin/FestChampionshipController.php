@@ -40,6 +40,7 @@ class FestChampionshipController extends SahodayaAdminController
             'categoryOptions'            => collect($categoryLabels)->map(fn ($label, $key) => ['value' => $key, 'label' => $label])->values(),
             'championshipCategoryLabels' => FestClassGroupScheme::canonicalLabels(null, $root),
             'categoryMergeGroups'        => $this->mergeGroupsForDisplay($categoryMap),
+            'schoolOverallGroups' => \App\Support\FestSchoolOverallGroups::groups($root),
             'categoryDisplaySort' => $root->aggregation_config['category_display_sort'] ?? 'natural',
             'categoryDisplayOrder' => $root->aggregation_config['category_display_order'] ?? [],
             'schoolGenderCategories' => \App\Support\FestSchoolGenderStandings::categories($root),
@@ -264,6 +265,25 @@ class FestChampionshipController extends SahodayaAdminController
         EventContext::for($event)->recalculateSchoolPoints();
 
         return back()->with('success', 'Overall scoreboard exclusions saved.');
+    }
+
+    public function updateSchoolOverallGroups(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        $root = $event->rootEvent();
+        $allowed = array_keys($this->schoolCategoryLabels($root));
+        $data = $request->validate([
+            'groups' => 'present|array|max:2',
+            'groups.*.key' => 'required|string|distinct|in:secondary,senior_secondary',
+            'groups.*.label' => 'required|string|max:100',
+            'groups.*.school_tier' => 'required|in:all,secondary,senior_secondary',
+            'groups.*.categories' => 'required|array|min:1|max:100',
+            'groups.*.categories.*' => ['required', 'string', \Illuminate\Validation\Rule::in($allowed)],
+        ]);
+        $config = $root->aggregation_config ?? [];
+        $config['school_overall_groups'] = $data['groups'];
+        $root->update(['aggregation_config' => $config]);
+        return back()->with('success', 'School overall championship groups saved.');
     }
 
     public function updateCategoryOrder(Request $request, string $tenantId, FestEvent $event)

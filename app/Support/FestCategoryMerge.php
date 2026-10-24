@@ -44,6 +44,7 @@ class FestCategoryMerge
      */
     public static function sourceKeysFor(FestEvent $root, string $target): array
     {
+        if ($group = FestSchoolOverallGroups::find($root, $target)) return $group['categories'];
         $sources = collect(self::map($root))->filter(fn ($t) => $t === $target)->keys();
 
         return $sources->push($target)->unique()->values()->all();

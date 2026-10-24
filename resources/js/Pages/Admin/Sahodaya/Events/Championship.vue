@@ -457,6 +457,26 @@
             </div>
         </div>
 
+        <section class="card mb-6 space-y-4">
+            <div>
+                <h3 class="section-title !mb-0">School overall championship</h3>
+                <p class="section-desc">Separate school standings for Secondary (1 + 2 + 3) and Senior Secondary (1 + 2 + 3 + 4). A category can count in both totals.</p>
+            </div>
+            <label class="flex items-center gap-2 text-sm font-semibold"><input v-model="enableSchoolOverallGroups" type="checkbox">Show both championship groups on the public scoreboard</label>
+            <div v-if="enableSchoolOverallGroups" class="grid gap-4 md:grid-cols-2">
+                <div v-for="group in schoolOverallForms" :key="group.key" class="space-y-3 rounded-xl border border-slate-200 p-4">
+                    <label class="block text-sm font-semibold">Championship title<input v-model="group.label" class="field mt-1 w-full" maxlength="100"></label>
+                    <label class="block text-sm">Schools to compare
+                        <select v-model="group.school_tier" class="field mt-1 w-full"><option value="all">All participating schools</option><option value="secondary">Secondary schools only</option><option value="senior_secondary">Senior Secondary schools only</option></select>
+                    </label>
+                    <p class="text-sm font-semibold">Categories included</p>
+                    <label v-for="option in categoryOptions" :key="option.value" class="flex items-start gap-2 text-sm"><input v-model="group.categories" :value="option.value" type="checkbox" class="mt-1">{{ option.label }}</label>
+                </div>
+            </div>
+            <p v-for="(error, key) in overallGroupErrors" :key="key" class="text-sm text-red-600">{{ error }}</p>
+            <button type="button" class="btn-primary text-sm" :disabled="savingOverallGroups" @click="saveSchoolOverallGroups">{{ savingOverallGroups ? 'Saving…' : 'Save overall championship' }}</button>
+        </section>
+
         <div class="card mb-6 space-y-3">
             <h3 class="section-title !mb-0">Public category order</h3>
             <p class="section-desc">Arrange the category tabs on the public scoreboard. All Categories stays first.</p>
@@ -661,6 +681,7 @@ const props = defineProps({
     championshipConfig: { type: Object, default: () => ({ male_title: 'Kalaprathibha', female_title: 'Kalathilakam', runner_up_title: 'Runner Up', disabled: false, max_counting_items: 0, multi_person_mode: 'tie_break_only', group_weight_percent: 100, must_have_first_place: false, minimum_points: 0, group_by_gender: true }) },
     activityLogs: { type: Array, default: () => [] },
     categoryOptions: { type: Array, default: () => [] },
+    schoolOverallGroups: { type: Array, default: () => [] },
     categoryDisplaySort: { type: String, default: 'natural' },
     categoryDisplayOrder: { type: Array, default: () => [] },
     championshipCategoryLabels: { type: Object, default: () => ({}) },
@@ -769,6 +790,28 @@ function saveMergeGroups() {
     router.put(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/championship/category-merge`, {
         groups: mergeGroups.value,
     }, { preserveScroll: true });
+}
+
+function categoryNumber(option) {
+    const match = option.label.match(/category\s*(IV|III|II|I|[1-4])\b/i);
+    if (match) return ({ I: 1, II: 2, III: 3, IV: 4 })[match[1].toUpperCase()] ?? Number(match[1]);
+    return ({ lp: 1, up: 2, hs: 3, hss: 4 })[option.value] ?? null;
+}
+const enableSchoolOverallGroups = ref(props.schoolOverallGroups.length > 0);
+const schoolOverallForms = ref([
+    { key: 'secondary', label: 'Overall championship — Secondary', school_tier: 'all', categories: props.categoryOptions.filter(option => [1, 2, 3].includes(categoryNumber(option))).map(option => option.value) },
+    { key: 'senior_secondary', label: 'Overall championship — Senior Secondary', school_tier: 'all', categories: props.categoryOptions.filter(option => [1, 2, 3, 4].includes(categoryNumber(option))).map(option => option.value) },
+].map(group => props.schoolOverallGroups.find(saved => saved.key === group.key) ?? group));
+const savingOverallGroups = ref(false);
+const overallGroupErrors = ref({});
+function saveSchoolOverallGroups() {
+    savingOverallGroups.value = true;
+    overallGroupErrors.value = {};
+    router.put(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/championship/school-overall-groups`, { groups: enableSchoolOverallGroups.value ? schoolOverallForms.value : [] }, {
+        preserveScroll: true,
+        onError: errors => { overallGroupErrors.value = errors; },
+        onFinish: () => { savingOverallGroups.value = false; },
+    });
 }
 
 const categorySort = ref(props.categoryDisplaySort);

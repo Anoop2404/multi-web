@@ -246,7 +246,7 @@ class PublicFestScoreboardService
     }
 
     /** @return list<string> */
-    public function categories(FestEvent $event, array $scope): array
+    public function categories(FestEvent $event, array $scope, bool $includeOverallGroups = false): array
     {
         $root = $this->rootEvent($event);
         $column = $root->event_type === 'sports' ? 'age_group' : 'class_group';
@@ -268,11 +268,16 @@ class PublicFestScoreboardService
         $labels = collect($collapsed)->mapWithKeys(fn ($key) => [$key => $this->categoryLabel($root, $key)])->all();
         $collapsed = \App\Support\FestCategoryOrder::sort($collapsed, $labels, $root->aggregation_config ?? []);
 
+        if ($includeOverallGroups) {
+            $groups = collect(\App\Support\FestSchoolOverallGroups::groups($root))->pluck('key')->map(fn ($key) => 'overall:'.$key)->all();
+            $collapsed = array_merge($groups, $collapsed);
+        }
         return $collapsed;
     }
 
     public function categoryLabel(FestEvent $event, string $category): string
     {
+        if ($group = \App\Support\FestSchoolOverallGroups::find($event, $category)) return $group['label'];
         $root = $this->rootEvent($event);
 
         if ($root->event_type === 'sports') {
@@ -299,6 +304,9 @@ class PublicFestScoreboardService
     public function scoreboard(FestEvent $event, array $scope, ?string $category = null): array
     {
         $root = $this->rootEvent($event);
+        if ($group = \App\Support\FestSchoolOverallGroups::find($root, $category)) {
+            return $this->schoolOverallGroupBoard($event, $scope, $category, $group);
+        }
 
         // Phase-cumulative routing applies regardless of $category (a class/age-group
         // board needs the same phase-carry-forward the overall board gets — see
@@ -405,8 +413,11 @@ class PublicFestScoreboardService
     public function provisionalScoreboard(FestEvent $event, array $scope, ?string $category = null, ?string $gender = null): array
     {
         $root = $this->rootEvent($event);
+        if ($group = \App\Support\FestSchoolOverallGroups::find($root, $category)) {
+            return $this->schoolOverallGroupBoard($event, $scope, $category, $group, $gender);
+        }
         $categoryColumn = $root->event_type === 'sports' ? 'age_group' : 'class_group';
-        $sourceCategoryKeys = $category ? FestCategoryMerge::sourceKeysFor($root, $category) : null;
+        $sourceCategoryKeys = $scope['overall_group_categories'] ?? ($category ? FestCategoryMerge::sourceKeysFor($root, $category) : null);
         // Only the combined "All Categories" total (no specific $category requested)
         // honors excluded_overall_categories — viewing an excluded category on its own
         // tab still works, only the combined total leaves it out.
@@ -455,7 +466,7 @@ class PublicFestScoreboardService
             return $compute();
         }
 
-        $key = 'fest-provisional-scoreboard:v2:'.$root->tenant_id.':'.$root->id.':'.($category ?? 'all').':'.($gender ?? 'combined').':'.sha1(json_encode($root->aggregation_config)).':'.implode(',', $scope['event_ids']);
+        $key = 'fest-provisional-scoreboard:v2:'.$root->tenant_id.':'.$root->id.':'.($category ?? 'all').':'.($gender ?? 'combined').':'.sha1(json_encode([$root->aggregation_config, $scope['overall_group_categories'] ?? null])).':'.implode(',', $scope['event_ids']);
 
         return \Illuminate\Support\Facades\Cache::remember($key, 30, $compute);
     }
@@ -493,6 +504,17 @@ class PublicFestScoreboardService
     }
 
     /** @return Collection<int, array{school_id: string, school_name: string, total_points: int, rank: int}> */
+    private function schoolOverallGroupBoard(FestEvent $event, array $scope, string $key, array $group, ?string $gender = null): array
+    {
+        $scope['overall_group_categories'] = $group['categories'];
+        $rows = $this->provisionalScoreboard($event, $scope, '__overall_group__', $gender);
+        if (($group['school_tier'] ?? 'all') !== 'all') {
+            $schools = Tenant::whereIn('id', array_column($rows, 'school_id'))->get()->keyBy('id');
+            $rows = array_values(array_filter($rows, fn ($row) => isset($schools[$row['school_id']]) && \App\Support\SchoolClassCategoryResolver::feeTierFor($schools[$row['school_id']]) === $group['school_tier']));
+        }
+        return $this->applyCompetitionRanks(collect($rows))->all();
+    }
+
     private function applyCompetitionRanks(Collection $rows): Collection
     {
         $previousPoints = null;
