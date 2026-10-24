@@ -63,6 +63,13 @@ class SetPublicCacheHeadersTest extends TestCase
         $this->assertSame($normalize($expected), $normalize($actual), "Cache-Control mismatch for {$path}");
     }
 
+    public function test_scoreboard_pages_and_updates_are_not_cached_by_browsers_or_edges(): void
+    {
+        $this->assertCacheControl('private, no-store', "fest/{$this->event->id}/scoreboard");
+        $this->assertCacheControl('private, no-store', "fest/{$this->event->id}/scoreboard/data");
+        $this->assertCacheControl('private, no-store', "fest/{$this->event->id}/scoreboard/data?refresh=1");
+    }
+
     public function test_the_event_show_page_gets_the_short_lived_cache_like_results_does(): void
     {
         $this->assertCacheControl(

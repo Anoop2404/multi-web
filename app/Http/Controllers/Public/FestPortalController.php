@@ -1238,10 +1238,14 @@ public function scoreboardData(Request $request, int $eventId)
         ];
     };
     $authenticated = (bool) ($request->user() ?? auth()->user());
-    $json = $authenticated ? $compute() : $this->rememberPublicHotPath($cacheKey, 30, $compute);
+    $fresh = $request->filled('refresh');
+    $json = ($authenticated || $fresh) ? $compute() : $this->rememberPublicHotPath($cacheKey, 30, $compute);
+    if ($fresh && ! $authenticated) {
+        Cache::put($cacheKey, $json, 30);
+    }
 
     return response()->json($json)
-        ->header('Cache-Control', $authenticated ? 'private, no-store' : 'public, max-age=0, s-maxage=30, stale-while-revalidate=60');
+        ->header('Cache-Control', 'private, no-store');
 }
 
 /**
@@ -1903,7 +1907,7 @@ public function tv(Request $request, int $eventId)
 
     private function scoreboardDynamicData(FestEvent $event, array $selectedScope, ?string $category, bool $isPublished, bool $isAdminPreview = false, ?Request $request = null): array
     {
-        $bypassCache = (bool) ($request?->user() ?? auth()->user());
+        $bypassCache = (bool) ($request?->user() ?? auth()->user()) || ($request?->filled('refresh') ?? false);
 
         $version = $this->publicResultsVersion($selectedScope['event_ids'])[0];
 

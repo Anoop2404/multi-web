@@ -135,14 +135,17 @@
 
     // Background refreshes avoid a "Loading…" flicker; a manual tab click still shows
     // it because that is an immediate action the visitor is watching.
-    const loadCategory = async (cat, {silent = false, updateHistory = false} = {}) => {
+    const loadCategory = async (cat, {silent = false, updateHistory = false, fresh = false} = {}) => {
         if (refreshing) return;
         refreshing = true;
         refreshButton.disabled = true;
         root.setAttribute('aria-busy', 'true');
         if (!silent) status.textContent = 'Loading…';
         try {
-            const response = await fetch(urlFor(cat), {headers: {'Accept': 'application/json'}});
+            const refreshUrl = new URL(urlFor(cat));
+            refreshUrl.searchParams.set('_request', Date.now().toString());
+            if (fresh) refreshUrl.searchParams.set('refresh', '1');
+            const response = await fetch(refreshUrl, {cache: 'no-store', headers: {'Accept': 'application/json'}});
             if (!response.ok) throw new Error('Refresh failed');
             const data = await response.json();
             content.innerHTML = data.contentHtml;
@@ -175,9 +178,11 @@
         });
     }
 
-    refreshButton.addEventListener('click', () => loadCategory(current));
+    refreshButton.addEventListener('click', () => loadCategory(current, {fresh: true}));
     // Restore the server-rendered category when navigating browser history.
     window.addEventListener('popstate', () => window.location.reload());
+
+    window.addEventListener('pageshow', () => loadCategory(current, {silent: true}));
 
     updateClock();
     setInterval(updateClock, 1000);

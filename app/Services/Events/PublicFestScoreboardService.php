@@ -423,7 +423,7 @@ class PublicFestScoreboardService
         // tab still works, only the combined total leaves it out.
         $excludedCategories = $category ? [] : FestOverallCategoryExclusion::excluded($root);
 
-        $bypass = auth()->check() || request()->user();
+        $bypass = auth()->check() || request()->user() || request()->filled('refresh');
 
         $compute = function () use ($root, $scope, $categoryColumn, $sourceCategoryKeys, $excludedCategories, $event, $gender) {
             $marks = FestMark::currentPerformers()->whereIn('event_id', $scope['event_ids'])

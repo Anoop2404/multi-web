@@ -22,7 +22,9 @@ class SetPublicCacheHeaders
             // Admin preview responses can contain unpublished results and must never be
             // stored by a shared edge cache. Anonymous festival GETs do not need a PHP
             // session; dropping Laravel's Set-Cookie lets Cloudflare cache them.
-            if ($request->user() ?? auth()->user()) {
+            if (($request->user() ?? auth()->user())
+                || $request->is('fest/*/scoreboard/data')
+                || $request->is('fest/*/scoreboard')) {
                 $response->headers->set('Cache-Control', 'private, no-store');
 
                 return $response;
