@@ -460,15 +460,13 @@
         <section class="card mb-6 space-y-4">
             <div>
                 <h3 class="section-title !mb-0">School overall championship</h3>
-                <p class="section-desc">Separate school standings for Secondary (1 + 2 + 3) and Senior Secondary (1 + 2 + 3 + 4). A category can count in both totals.</p>
+                <p class="section-desc">Secondary schools compete using Categories 1 + 2 + 3. Senior Secondary schools compete using Categories 1 + 2 + 3 + 4. Each school appears only in its own school-type championship.</p>
             </div>
             <label class="flex items-center gap-2 text-sm font-semibold"><input v-model="enableSchoolOverallGroups" type="checkbox">Show both championship groups on the public scoreboard</label>
             <div v-if="enableSchoolOverallGroups" class="grid gap-4 md:grid-cols-2">
                 <div v-for="group in schoolOverallForms" :key="group.key" class="space-y-3 rounded-xl border border-slate-200 p-4">
                     <label class="block text-sm font-semibold">Championship title<input v-model="group.label" class="field mt-1 w-full" maxlength="100"></label>
-                    <label class="block text-sm">Schools to compare
-                        <select v-model="group.school_tier" class="field mt-1 w-full"><option value="all">All participating schools</option><option value="secondary">Secondary schools only</option><option value="senior_secondary">Senior Secondary schools only</option></select>
-                    </label>
+                    <p class="rounded-lg bg-indigo-50 p-3 text-sm font-semibold text-indigo-900">{{ group.key === 'secondary' ? 'Secondary schools only' : 'Senior Secondary schools only' }}</p>
                     <p class="text-sm font-semibold">Categories included</p>
                     <label v-for="option in categoryOptions" :key="option.value" class="flex items-start gap-2 text-sm"><input v-model="group.categories" :value="option.value" type="checkbox" class="mt-1">{{ option.label }}</label>
                 </div>
@@ -799,8 +797,8 @@ function categoryNumber(option) {
 }
 const enableSchoolOverallGroups = ref(props.schoolOverallGroups.length > 0);
 const schoolOverallForms = ref([
-    { key: 'secondary', label: 'Overall championship — Secondary', school_tier: 'all', categories: props.categoryOptions.filter(option => [1, 2, 3].includes(categoryNumber(option))).map(option => option.value) },
-    { key: 'senior_secondary', label: 'Overall championship — Senior Secondary', school_tier: 'all', categories: props.categoryOptions.filter(option => [1, 2, 3, 4].includes(categoryNumber(option))).map(option => option.value) },
+    { key: 'secondary', label: 'Overall championship — Secondary', school_tier: 'secondary', categories: props.categoryOptions.filter(option => [1, 2, 3].includes(categoryNumber(option))).map(option => option.value) },
+    { key: 'senior_secondary', label: 'Overall championship — Senior Secondary', school_tier: 'senior_secondary', categories: props.categoryOptions.filter(option => [1, 2, 3, 4].includes(categoryNumber(option))).map(option => option.value) },
 ].map(group => props.schoolOverallGroups.find(saved => saved.key === group.key) ?? group));
 const savingOverallGroups = ref(false);
 const overallGroupErrors = ref({});

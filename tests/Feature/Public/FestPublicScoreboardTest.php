@@ -98,13 +98,16 @@ class FestPublicScoreboardTest extends TestCase
         ];
         $url = '/sahodaya-admin/'.$this->sahodaya->id.'/events/'.$this->hub->id.'/championship/school-overall-groups';
         $this->actingAs($admin)->put($url, ['groups' => $groups])->assertRedirect()->assertSessionHasNoErrors();
-        $this->assertEquals($groups, $this->hub->fresh()->aggregation_config['school_overall_groups']);
+        $expected = array_map(fn ($group) => array_merge($group, ['school_tier' => $group['key']]), $groups);
+        $this->assertEquals($expected, $this->hub->fresh()->aggregation_config['school_overall_groups']);
         $groups[0]['categories'][] = 'unknown-category';
         $this->put($url, ['groups' => $groups])->assertSessionHasErrors('groups.0.categories.3');
     }
 
     public function test_school_overall_groups_sum_overlapping_categories_without_counting_unpublished_items(): void
     {
+        $this->northSchool->update(['application_payload' => ['highest_class' => 'Class 10']]);
+        $this->southSchool->update(['application_payload' => ['highest_class' => 'Class 12']]);
         $groups = [
             ['key' => 'secondary', 'label' => 'Secondary (1+2+3)', 'categories' => ['lp', 'up', 'hs'], 'school_tier' => 'all'],
             ['key' => 'senior_secondary', 'label' => 'Senior Secondary (1+2+3+4)', 'categories' => ['lp', 'up', 'hs', 'hss'], 'school_tier' => 'all'],
@@ -113,9 +116,10 @@ class FestPublicScoreboardTest extends TestCase
         foreach (['lp', 'up', 'hs', 'hss'] as $key) {
             $item = FestEventItem::create(['event_id' => $this->north->id, 'title' => 'Published '.$key, 'class_group' => $key, 'participant_type' => 'individual', 'is_enabled' => true, 'results_published_at' => now()]);
             $this->markItemWinner($this->north, $item, $this->northSchool);
+            $this->markItemWinner($this->north, $item, $this->southSchool);
         }
         $unpublished = FestEventItem::create(['event_id' => $this->north->id, 'title' => 'Not published', 'class_group' => 'lp', 'is_enabled' => true]);
-        $this->markItemWinner($this->north, $unpublished, $this->southSchool);
+        $this->markItemWinner($this->north, $unpublished, $this->school('Unpublished School'));
         $scope = ['event_ids' => [$this->north->id], 'event_id' => $this->north->id];
         $service = app(\App\Services\Events\PublicFestScoreboardService::class);
         $secondary = $service->scoreboard($this->north, $scope, 'overall:secondary');
@@ -123,6 +127,8 @@ class FestPublicScoreboardTest extends TestCase
         $this->assertCount(1, $secondary);
         $this->assertCount(1, $senior);
         $this->assertSame($this->northSchool->id, $secondary[0]['school_id']);
+        $this->assertSame($this->southSchool->id, $senior[0]['school_id']);
+        $this->assertSame('secondary', \App\Support\FestSchoolOverallGroups::find($this->hub, 'overall:secondary')['school_tier']);
         $this->assertEquals($secondary[0]['total_points'] * 4 / 3, $senior[0]['total_points']);
         $this->assertGreaterThan(0, $secondary[0]['total_points']);
         $this->assertSame(1, $secondary[0]['rank']);

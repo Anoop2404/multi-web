@@ -9,7 +9,8 @@ class FestSchoolOverallGroups
 {
     public static function groups(FestEvent $event): array
     {
-        return $event->rootEvent()->aggregation_config['school_overall_groups'] ?? [];
+        return collect($event->rootEvent()->aggregation_config['school_overall_groups'] ?? [])
+            ->map(fn ($group) => array_merge($group, ['school_tier' => $group['key']]))->all();
     }
 
     public static function find(FestEvent $event, ?string $key): ?array
