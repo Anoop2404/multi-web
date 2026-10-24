@@ -62,12 +62,6 @@
 
         @if(count($categories ?? []))
         <nav id="scoreboard-category-nav" class="flex gap-2 overflow-x-auto rounded-2xl p-3 border border-slate-800 bg-slate-900/70" aria-label="Event category">
-            {{-- Auto-rotates through these every 3s until a visitor clicks one (see the
-                 script below) — tv_show_overall_standings also gates the "All Categories"
-                 tab and drops it from the rotation, matching the TV screen's own Overall
-                 Standings slide. Category tabs (and merged-category labels, since
-                 $categories/$categoryLabels already fold through FestCategoryMerge) always
-                 show and rotate regardless. --}}
             @if($event->tv_show_overall_standings ?? true)
             <a href="{{ route('tenant.fest.scoreboard', array_filter(['event' => $event->id, 'gender' => request('gender')])) }}" data-category=""
                class="shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold border {{ !$category ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-amber-500' }}">All Categories</a>
@@ -78,6 +72,10 @@
             @endforeach
         </nav>
         @endif
+
+        <div class="flex justify-end">
+            <button type="button" id="scoreboard-refresh-current" class="px-4 py-2 rounded-xl border border-slate-700 bg-slate-800 text-sm font-semibold hover:border-amber-500 disabled:opacity-50">Refresh this tab</button>
+        </div>
 
         <div id="scoreboard-dynamic-content" aria-live="off">
             @include('public.fest.partials.scoreboard-content')
@@ -97,6 +95,7 @@
     const content = document.getElementById('scoreboard-dynamic-content');
     const titleEl = document.getElementById('scoreboard-title-category');
     const nav = document.getElementById('scoreboard-category-nav');
+    const refreshButton = document.getElementById('scoreboard-refresh-current');
 
     const categories = JSON.parse(root.dataset.categories || '[]'); // '' entry means the fest-wide combined view
     const categoryLabels = JSON.parse(root.dataset.categoryLabels || '{}');
@@ -136,9 +135,10 @@
 
     // Background refreshes avoid a "Loading…" flicker; a manual tab click still shows
     // it because that is an immediate action the visitor is watching.
-    const loadCategory = async (cat, {silent = false} = {}) => {
+    const loadCategory = async (cat, {silent = false, updateHistory = false} = {}) => {
         if (refreshing) return;
         refreshing = true;
+        refreshButton.disabled = true;
         root.setAttribute('aria-busy', 'true');
         if (!silent) status.textContent = 'Loading…';
         try {
@@ -147,6 +147,12 @@
             const data = await response.json();
             content.innerHTML = data.contentHtml;
             current = cat;
+            if (updateHistory) {
+                const pageUrl = new URL(window.location.href);
+                if (cat) pageUrl.searchParams.set('category', cat);
+                else pageUrl.searchParams.delete('category');
+                if (pageUrl.href !== window.location.href) history.pushState(null, '', pageUrl);
+            }
             setActiveTab(cat);
             setTitle(cat);
             lastUpdated = Date.now();
@@ -155,6 +161,7 @@
             status.textContent = 'Update delayed — showing the last confirmed standings';
         } finally {
             refreshing = false;
+            refreshButton.disabled = false;
             root.removeAttribute('aria-busy');
         }
     };
@@ -164,9 +171,13 @@
             const link = e.target.closest('[data-category]');
             if (!link || e.ctrlKey || e.metaKey || e.shiftKey) return; // let modified clicks (open in new tab, etc.) behave normally
             e.preventDefault();
-            loadCategory(link.dataset.category);
+            loadCategory(link.dataset.category, {updateHistory: true});
         });
     }
+
+    refreshButton.addEventListener('click', () => loadCategory(current));
+    // Restore the server-rendered category when navigating browser history.
+    window.addEventListener('popstate', () => window.location.reload());
 
     updateClock();
     setInterval(updateClock, 1000);
