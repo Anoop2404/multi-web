@@ -10,7 +10,7 @@ class FestSchoolOverallGroups
     public static function groups(FestEvent $event): array
     {
         return collect($event->rootEvent()->aggregation_config['school_overall_groups'] ?? [])
-            ->map(fn ($group) => array_merge($group, ['school_tier' => $group['key']]))->all();
+            ->map(fn ($group) => array_merge($group, ['school_tier' => $group['key'] === 'secondary' ? 'all' : 'senior_secondary']))->all();
     }
 
     /** Registered school level takes precedence over the classes entered in this event. */

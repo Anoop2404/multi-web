@@ -281,7 +281,7 @@ class FestChampionshipController extends SahodayaAdminController
             'groups.*.categories.*' => ['required', 'string', \Illuminate\Validation\Rule::in($allowed)],
         ]);
         $config = $root->aggregation_config ?? [];
-        $config['school_overall_groups'] = array_map(fn ($group) => array_merge($group, ['school_tier' => $group['key']]), $data['groups']);
+        $config['school_overall_groups'] = array_map(fn ($group) => array_merge($group, ['school_tier' => $group['key'] === 'secondary' ? 'all' : 'senior_secondary']), $data['groups']);
         $root->update(['aggregation_config' => $config]);
         return back()->with('success', 'School overall championship groups saved.');
     }

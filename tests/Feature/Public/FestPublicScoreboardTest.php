@@ -107,7 +107,7 @@ class FestPublicScoreboardTest extends TestCase
         ];
         $url = '/sahodaya-admin/'.$this->sahodaya->id.'/events/'.$this->hub->id.'/championship/school-overall-groups';
         $this->actingAs($admin)->put($url, ['groups' => $groups])->assertRedirect()->assertSessionHasNoErrors();
-        $expected = array_map(fn ($group) => array_merge($group, ['school_tier' => $group['key']]), $groups);
+        $expected = array_map(fn ($group) => array_merge($group, ['school_tier' => $group['key'] === 'secondary' ? 'all' : 'senior_secondary']), $groups);
         $this->assertEquals($expected, $this->hub->fresh()->aggregation_config['school_overall_groups']);
         $groups[0]['categories'][] = 'unknown-category';
         $this->put($url, ['groups' => $groups])->assertSessionHasErrors('groups.0.categories.3');
@@ -137,13 +137,15 @@ class FestPublicScoreboardTest extends TestCase
         $service = app(\App\Services\Events\PublicFestScoreboardService::class);
         $secondary = $service->scoreboard($this->north, $scope, 'overall:secondary');
         $senior = $service->scoreboard($this->north, $scope, 'overall:senior_secondary');
-        $this->assertCount(1, $secondary);
+        $this->assertCount(3, $secondary);
         $this->assertCount(2, $senior);
-        $this->assertSame($this->northSchool->id, $secondary[0]['school_id']);
+        $this->assertContains($this->northSchool->id, array_column($secondary, 'school_id'));
+        $this->assertContains($this->southSchool->id, array_column($secondary, 'school_id'));
+        $this->assertContains($seniorWithoutCategoryFour->id, array_column($secondary, 'school_id'));
         $this->assertSame($this->southSchool->id, $senior[0]['school_id']);
         $this->assertContains($seniorWithoutCategoryFour->id, array_column($senior, 'school_id'));
         $this->assertNotContains($this->northSchool->id, array_column($senior, 'school_id'));
-        $this->assertSame('secondary', \App\Support\FestSchoolOverallGroups::find($this->hub, 'overall:secondary')['school_tier']);
+        $this->assertSame('all', \App\Support\FestSchoolOverallGroups::find($this->hub, 'overall:secondary')['school_tier']);
         $this->assertEquals($secondary[0]['total_points'] * 4 / 3, $senior[0]['total_points']);
         $this->assertGreaterThan(0, $secondary[0]['total_points']);
         $this->assertSame(1, $secondary[0]['rank']);
