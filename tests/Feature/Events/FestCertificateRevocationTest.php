@@ -11,6 +11,8 @@ use App\Models\FestRegistration;
 use App\Models\SahodayaProfile;
 use App\Models\Tenant;
 use App\Services\Events\FestCertificateService;
+use App\Services\Events\FestItemResultsService;
+use App\Services\Events\FestRegistrationService;
 use App\Support\TenantStorage;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -65,6 +67,36 @@ class FestCertificateRevocationTest extends TestCase
         ]);
     }
 
+    public function test_republished_result_issues_merit_to_substitute_instead_of_original(): void
+    {
+        $f = $this->fixture();
+        $item = FestEventItem::create(['event_id' => $f['event']->id, 'title' => 'Group Song',
+            'item_code' => 'SUB1', 'participant_type' => 'group']);
+        $original = $this->makeParticipant($f['event'], $item, $f['school']->id, 2901);
+        $replacement = FestParticipant::create([
+            'registration_id' => $original->registration_id, 'event_id' => $f['event']->id,
+            'student_id' => 2902, 'participant_type' => 'student', 'participant_role' => 'standby',
+        ]);
+        FestMark::create(['event_id' => $f['event']->id, 'item_id' => $item->id,
+            'participant_id' => $original->id, 'position' => 1, 'grade' => 'A', 'score' => 95]);
+        $summary = [['item_id' => $item->id, 'results_published' => false,
+            'performers' => 1, 'marks_entered' => 1, 'ranks_assigned' => 1]];
+        $results = app(FestItemResultsService::class);
+        $results->publishItem($item, $summary);
+        $this->assertTrue(Certificate::where('entity_id', $original->id)->where('cert_type', 'winner')->exists());
+        $results->unpublishItem($item);
+        app(FestRegistrationService::class)->substitutePerformer($original->fresh(), $replacement);
+        $results->publishItem($item->fresh(), $summary);
+
+        $this->assertFalse(Certificate::where('entity_id', $original->id)->where('cert_type', 'winner')->exists());
+        $this->assertTrue(Certificate::where('entity_id', $replacement->id)->where('cert_type', 'winner')->exists());
+        $mark = FestMark::where('participant_id', $replacement->id)->firstOrFail();
+        $this->assertSame(1, (int) $mark->position);
+        $this->assertSame('A', $mark->grade);
+        $this->assertEquals(95, $mark->score);
+        $this->assertSame(1, FestMark::currentPerformers()->where('item_id', $item->id)->count());
+    }
+
     public function test_item_publication_and_republication_sync_merit_certificates(): void
     {
         $f = $this->fixture();
@@ -78,7 +110,7 @@ class FestCertificateRevocationTest extends TestCase
         }
         $summary = [['item_id' => $item->id, 'results_published' => false,
             'performers' => 3, 'marks_entered' => 3, 'ranks_assigned' => 3]];
-        $results = app(\App\Services\Events\FestItemResultsService::class);
+        $results = app(FestItemResultsService::class);
         $results->publishItem($item, $summary);
         $this->assertSame(2, Certificate::where('cert_type', 'winner')->count());
         $this->assertNotNull($item->fresh()->results_published_at);

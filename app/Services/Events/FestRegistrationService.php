@@ -227,9 +227,24 @@ class FestRegistrationService
         // number (and showing up on the Chest Numbers page as if performing; see
         // FestChestNumberController's participant_role filter added alongside this).
         // The promoted standby doesn't inherit it automatically — re-assign via the
-        $performer->update(['participant_role' => 'standby', 'chest_no' => null, 'order_no' => null, 'chest_revealed_at' => null]);
-        $standby->update(['participant_role' => 'performer']);
-        $performer->registration?->touch();
+        DB::transaction(function () use ($performer, $standby) {
+            // The saved result belongs to the replaced performance slot. Keep the
+            // original mark for history, but give the replacement the same result;
+            // current-performer queries exclude the demoted participant.
+            $mark = FestMark::where('item_id', $performer->registration->item_id)
+                ->where('participant_id', $performer->id)->lockForUpdate()->first();
+            if ($mark) {
+                FestMark::updateOrCreate(
+                    ['item_id' => $mark->item_id, 'participant_id' => $standby->id],
+                    collect($mark->getAttributes())->only($mark->getFillable())
+                        ->except(['item_id', 'participant_id'])->all()
+                );
+            }
+
+            $performer->update(['participant_role' => 'standby', 'chest_no' => null, 'order_no' => null, 'chest_revealed_at' => null]);
+            $standby->update(['participant_role' => 'performer', 'group_id' => $performer->group_id]);
+            $performer->registration?->touch();
+        });
 
         app(PlatformAuditLogger::class)->festParticipantSubstituted($performer, $standby);
     }
