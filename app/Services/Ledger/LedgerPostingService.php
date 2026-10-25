@@ -5,11 +5,12 @@ namespace App\Services\Ledger;
 use App\Models\AccountHead;
 use App\Models\FeeReceipt;
 use App\Models\LedgerTransaction;
-use App\Support\AcademicYear;
 use App\Support\FinancialYear;
 use App\Support\LedgerAccountCatalog;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class LedgerPostingService
 {
@@ -27,13 +28,13 @@ class LedgerPostingService
         $head = AccountHead::firstOrCreate(
             ['tenant_id' => $tenantId, 'code' => $code],
             [
-                'name'                 => $nameOverride ?? $def['name'],
-                'type'                 => $def['type'],
-                'category'             => $category ?? $def['category'],
-                'event_id'             => $eventId,
-                'mcq_exam_id'          => $mcqExamId,
-                'training_program_id'  => $trainingProgramId,
-                'is_active'            => true,
+                'name' => $nameOverride ?? $def['name'],
+                'type' => $def['type'],
+                'category' => $category ?? $def['category'],
+                'event_id' => $eventId,
+                'mcq_exam_id' => $mcqExamId,
+                'training_program_id' => $trainingProgramId,
+                'is_active' => true,
             ]
         );
 
@@ -82,7 +83,39 @@ class LedgerPostingService
         bool $forceRepost = false,
         ?int $financialYearId = null,
     ): array {
+        $debits = $credits = 0;
+        if (count($lines) < 2) {
+            throw new \InvalidArgumentException('A journal requires at least two lines.');
+        }
+        foreach ($lines as $line) {
+            if (! in_array($line['entry_type'] ?? '', ['debit', 'credit'], true)
+                || ! is_numeric($line['amount'] ?? null) || ! is_finite((float) $line['amount'])
+                || round((float) $line['amount'], 2) <= 0 || empty($line['code'])) {
+                throw new \InvalidArgumentException('Journal lines require an account and a positive amount.');
+            }
+            $cents = (int) round((float) $line['amount'] * 100);
+            if ($line['entry_type'] === 'debit') {
+                $debits += $cents;
+            } else {
+                $credits += $cents;
+            }
+        }
+        if ($debits !== $credits) {
+            throw new \InvalidArgumentException('Journal debits and credits must balance.');
+        }
+
         return DB::transaction(function () use ($tenantId, $lines, $referenceType, $referenceId, $transactionDate, $postedBy, $forceRepost, $financialYearId) {
+            $date = $transactionDate ?? now()->toDateString();
+            $yearId = $financialYearId ?? \App\Models\FinancialYear::whereDate('start_date', '<=', $date)->whereDate('end_date', '>=', $date)->value('id') ?? FinancialYear::currentId();
+            if ($yearId && Schema::hasTable('finance_period_locks')) {
+                $year = \App\Models\FinancialYear::whereKey($yearId)->lockForUpdate()->first();
+                if ($year && ($date < $year->start_date->format('Y-m-d') || $date > $year->end_date->format('Y-m-d'))) {
+                    throw ValidationException::withMessages(['transaction_date' => 'The posting date must belong to its financial year.']);
+                }
+                if (DB::table('finance_period_locks')->where('tenant_id', $tenantId)->where('financial_year_id', $yearId)->exists()) {
+                    throw ValidationException::withMessages(['transaction_date' => 'This financial year is closed.']);
+                }
+            }
             // Serialize concurrent approve/repost races for the same receipt (#FRD-06 #4).
             if ($referenceType === FeeReceipt::class && $referenceId) {
                 FeeReceipt::query()->whereKey($referenceId)->lockForUpdate()->first();
@@ -108,24 +141,23 @@ class LedgerPostingService
 
             $journalId = (string) Str::uuid();
             $date = $transactionDate ?? now()->toDateString();
-            $yearId = $financialYearId ?? FinancialYear::currentId();
             $created = [];
 
             foreach ($lines as $line) {
                 $head = $this->ensureHead($tenantId, $line['code']);
 
                 $created[] = LedgerTransaction::create([
-                    'tenant_id'         => $tenantId,
-                    'journal_id'        => $journalId,
+                    'tenant_id' => $tenantId,
+                    'journal_id' => $journalId,
                     'financial_year_id' => $yearId,
-                    'account_head_id'   => $head->id,
-                    'reference_type'    => $referenceType,
-                    'reference_id'      => $referenceId,
-                    'entry_type'        => $line['entry_type'],
-                    'amount'            => $line['amount'],
-                    'description'       => $line['description'] ?? null,
-                    'transaction_date'  => $date,
-                    'posted_by'         => $postedBy,
+                    'account_head_id' => $head->id,
+                    'reference_type' => $referenceType,
+                    'reference_id' => $referenceId,
+                    'entry_type' => $line['entry_type'],
+                    'amount' => $line['amount'],
+                    'description' => $line['description'] ?? null,
+                    'transaction_date' => $date,
+                    'posted_by' => $postedBy,
                 ]);
             }
 
@@ -137,6 +169,9 @@ class LedgerPostingService
     public function postIncomeReceipt(FeeReceipt $receipt, string $tenantId, string $incomeCode, string $description, bool $forceRepost = false): array
     {
         $amount = $receipt->amount;
+        if ((float) $amount === 0.0) {
+            return [];
+        }
         $date = $receipt->payment_date?->format('Y-m-d') ?? now()->toDateString();
 
         return $this->postJournal($tenantId, [
@@ -183,9 +218,9 @@ class LedgerPostingService
                 }
 
                 return [
-                    'code'        => $code,
-                    'entry_type'  => $row->entry_type === 'debit' ? 'credit' : 'debit',
-                    'amount'      => $row->amount,
+                    'code' => $code,
+                    'entry_type' => $row->entry_type === 'debit' ? 'credit' : 'debit',
+                    'amount' => $row->amount,
                     'description' => 'Reversal of receipt #'.$row->reference_id.($row->description ? " — {$row->description}" : ''),
                 ];
             })->all();
@@ -242,9 +277,9 @@ class LedgerPostingService
                 }
 
                 return [
-                    'code'        => $code,
-                    'entry_type'  => $row->entry_type === 'debit' ? 'credit' : 'debit',
-                    'amount'      => $row->amount,
+                    'code' => $code,
+                    'entry_type' => $row->entry_type === 'debit' ? 'credit' : 'debit',
+                    'amount' => $row->amount,
                     'description' => 'Restore of reversal of receipt #'.$row->reference_id.($row->description ? " — {$row->description}" : ''),
                 ];
             })->all();

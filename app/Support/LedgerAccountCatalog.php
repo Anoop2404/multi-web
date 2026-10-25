@@ -36,13 +36,14 @@ class LedgerAccountCatalog
             'FEE-CREDIT-PAYABLE' => ['name' => 'Fee Credits Payable to Schools', 'type' => 'liability', 'category' => 'other'],
             default            => [
                 'name'     => match (true) {
+                    str_starts_with($code, 'BANK-') => 'Bank account',
                     str_starts_with($code, 'SPT-') => 'Sports meet fees',
                     str_starts_with($code, 'EVT-') => 'Event fees',
                     str_starts_with($code, 'MCQ-') && $code !== 'MCQ-FEE' => 'Talent Search exam fees',
                     str_starts_with($code, 'TRN-') => 'Training program fees',
                     default                          => $code,
                 },
-                'type'     => 'income',
+                'type'     => str_starts_with($code, 'BANK-') || $code === 'ADVANCES' ? 'asset' : 'income',
                 'category' => match (true) {
                     str_starts_with($code, 'SPT-') => 'sports',
                     str_starts_with($code, 'EVT-') => 'event',

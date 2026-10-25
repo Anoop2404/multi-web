@@ -25,7 +25,7 @@
                                        :all-option="true" all-label="All categories" />
                 </template>
             </FormField>
-            <FormField label="Academic year">
+            <FormField label="Financial year">
                 <template #default="{ id }">
                     <SearchableSelect :id="id" v-model="financialYearId" :options="academicYearOptions"
                                        :all-option="true" all-label="All years" />
@@ -272,7 +272,7 @@ function applyFilter() {
         from: from.value || undefined,
         to: to.value || undefined,
         category: category.value || undefined,
-        financial_year_id: financialYearId.value || undefined,
+        financial_year_id: financialYearId.value || '',
     }, { preserveScroll: true });
 }
 

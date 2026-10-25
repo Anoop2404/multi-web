@@ -8,18 +8,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class SahodayaPayable extends Model
 {
     protected $fillable = [
-        'tenant_id', 'financial_year_id', 'vendor_name', 'description',
+        'tenant_id', 'financial_year_id', 'vendor_name', 'description', 'submission_key',
         'amount', 'amount_paid', 'due_date', 'incurred_date', 'status',
         'expense_head_id', 'obligation_journal_id', 'payment_journal_id',
         'paid_at', 'created_by',
     ];
 
     protected $casts = [
-        'amount'       => 'decimal:2',
-        'amount_paid'  => 'decimal:2',
-        'due_date'     => 'date',
-        'incurred_date'=> 'date',
-        'paid_at'      => 'datetime',
+        'amount' => 'decimal:2',
+        'amount_paid' => 'decimal:2',
+        'due_date' => 'date',
+        'incurred_date' => 'date',
+        'paid_at' => 'datetime',
     ];
 
     public function expenseHead(): BelongsTo
@@ -29,6 +29,10 @@ class SahodayaPayable extends Model
 
     public function balanceDue(): float
     {
+        if ($this->status === 'cancelled') {
+            return 0;
+        }
+
         return max(0, (float) $this->amount - (float) $this->amount_paid);
     }
 }

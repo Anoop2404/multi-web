@@ -1271,6 +1271,18 @@ Route::prefix('sahodaya-admin/{tenantId}')
         Route::get('/teachers/{teacher}/reveal-portal-password', [\App\Http\Controllers\SahodayaAdmin\TeacherProfileController::class, 'revealPortalPassword'])->name('teachers.reveal-portal-password');
 
         Route::prefix('finance')->name('finance.')->group(function () {
+            Route::get('/workspace', [\App\Http\Controllers\SahodayaAdmin\FinanceWorkspaceController::class, 'index'])->name('workspace');
+            Route::post('/documents', [\App\Http\Controllers\SahodayaAdmin\FinanceWorkspaceController::class, 'store'])->name('documents.store');
+            Route::post('/documents/{document}/review', [\App\Http\Controllers\SahodayaAdmin\FinanceWorkspaceController::class, 'review'])->name('documents.review');
+            Route::get('/documents/{document}/attachment', [\App\Http\Controllers\SahodayaAdmin\FinanceWorkspaceController::class, 'attachment'])->name('documents.attachment');
+            Route::get('/documents/{document}/voucher', [\App\Http\Controllers\SahodayaAdmin\FinanceWorkspaceController::class, 'voucher'])->name('documents.voucher');
+            Route::post('/vendors', [\App\Http\Controllers\SahodayaAdmin\FinanceWorkspaceController::class, 'vendor'])->name('vendors.store');
+            Route::post('/budgets', [\App\Http\Controllers\SahodayaAdmin\FinanceWorkspaceController::class, 'budget'])->name('budgets.store');
+            Route::post('/banks', [\App\Http\Controllers\SahodayaAdmin\FinanceWorkspaceController::class, 'bank'])->name('banks.store');
+            Route::post('/recurring/generate', [\App\Http\Controllers\SahodayaAdmin\FinanceWorkspaceController::class, 'recurring'])->name('recurring.generate');
+            Route::post('/years/close', [\App\Http\Controllers\SahodayaAdmin\FinanceWorkspaceController::class, 'closeYear'])->name('years.close');
+            Route::post('/bank-reconciliation/import', [\App\Http\Controllers\SahodayaAdmin\BankReconciliationController::class, 'import'])->name('bank-reconciliation.import');
+            Route::post('/bank-reconciliation/lines/{line}/match', [\App\Http\Controllers\SahodayaAdmin\BankReconciliationController::class, 'match'])->name('bank-reconciliation.match');
             Route::get('/', [\App\Http\Controllers\SahodayaAdmin\FinanceHubController::class, 'index'])->name('hub');
             Route::get('/payments', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'index'])->name('payments.index');
             Route::get('/payments/export', [\App\Http\Controllers\SahodayaAdmin\UnifiedPaymentsController::class, 'export'])->name('payments.export');

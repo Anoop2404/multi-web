@@ -3,6 +3,8 @@
 namespace App\Services\Ledger;
 
 use App\Models\AccountHead;
+use App\Models\BankAccount;
+use App\Models\FinancialYear;
 use App\Models\LedgerOpeningBalance;
 use App\Models\LedgerTransaction;
 use Illuminate\Support\Facades\DB;
@@ -36,6 +38,7 @@ class OpeningBalanceService
     ): LedgerOpeningBalance {
         $head = AccountHead::findOrFail($accountHeadId);
         abort_unless($head->tenant_id === $tenantId, 403);
+        abort_unless(in_array($head->type, ['asset', 'liability']) && $head->code !== 'OPENING-BAL', 422, 'Opening balances require an asset or liability account.');
 
         $amount = round((float) $amount, 2);
         if ($amount <= 0) {
@@ -44,9 +47,9 @@ class OpeningBalanceService
 
         return DB::transaction(function () use ($tenantId, $financialYearId, $head, $entryType, $amount, $notes, $postedBy) {
             $balance = LedgerOpeningBalance::firstOrNew([
-                'tenant_id'         => $tenantId,
+                'tenant_id' => $tenantId,
                 'financial_year_id' => $financialYearId,
-                'account_head_id'   => $head->id,
+                'account_head_id' => $head->id,
             ]);
 
             if ($balance->journal_id) {
@@ -55,9 +58,9 @@ class OpeningBalanceService
 
             $balance->fill([
                 'entry_type' => $entryType,
-                'amount'     => $amount,
-                'notes'      => $notes,
-                'posted_by'  => $postedBy,
+                'amount' => $amount,
+                'notes' => $notes,
+                'posted_by' => $postedBy,
             ]);
             $balance->save();
 
@@ -80,6 +83,11 @@ class OpeningBalanceService
                 $financialYearId,
             );
 
+            if (preg_match('/^BANK-(\d+)$/', $head->code, $matches)) {
+                $bank = BankAccount::where('tenant_id', $tenantId)->findOrFail((int) $matches[1]);
+                $rows[0]->update(['bank_account_id' => $bank->id]);
+            }
+
             $balance->update(['journal_id' => $rows[0]->journal_id ?? null]);
 
             return $balance->fresh('accountHead');
@@ -88,16 +96,19 @@ class OpeningBalanceService
 
     public function remove(LedgerOpeningBalance $balance): void
     {
-        if ($balance->journal_id) {
-            LedgerTransaction::where('journal_id', $balance->journal_id)->delete();
-        }
-
-        $balance->delete();
+        DB::transaction(function () use ($balance) {
+            FinancialYear::whereKey($balance->financial_year_id)->lockForUpdate()->firstOrFail();
+            abort_if(DB::table('finance_period_locks')->where('tenant_id', $balance->tenant_id)->where('financial_year_id', $balance->financial_year_id)->exists(), 422, 'This financial year is closed.');
+            if ($balance->journal_id) {
+                LedgerTransaction::where('tenant_id', $balance->tenant_id)->where('journal_id', $balance->journal_id)->delete();
+            }
+            $balance->delete();
+        });
     }
 
     private function openingDate(int $financialYearId): string
     {
-        $record = \App\Models\AcademicYearRecord::find($financialYearId);
+        $record = FinancialYear::findOrFail($financialYearId);
 
         return $record?->start_date?->format('Y-m-d') ?? now()->startOfYear()->toDateString();
     }

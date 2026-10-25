@@ -8,18 +8,16 @@ use App\Models\LedgerTransaction;
 
 class FinancialStatementsService
 {
-    public function trialBalance(string $tenantId, ?int $financialYearId = null)
+    public function trialBalance(string $tenantId, ?int $financialYearId = null, ?string $to = null)
     {
         $heads = AccountHead::where('tenant_id', $tenantId)
-            ->when($financialYearId, fn ($q) => $q->where(fn ($q2) => $q2
-                ->where('financial_year_id', $financialYearId)->orWhereNull('financial_year_id')))
             ->orderBy('code')
             ->get();
 
-        return $heads->map(function (AccountHead $head) use ($tenantId, $financialYearId) {
+        return $heads->map(function (AccountHead $head) use ($tenantId, $financialYearId, $to) {
             $opening = $this->openingBalance($tenantId, $head->id, $financialYearId);
-            $debits = $this->sumForHead($tenantId, $head->id, 'debit', $financialYearId);
-            $credits = $this->sumForHead($tenantId, $head->id, 'credit', $financialYearId);
+            $debits = $this->sumForHead($tenantId, $head->id, 'debit', $financialYearId, $to);
+            $credits = $this->sumForHead($tenantId, $head->id, 'credit', $financialYearId, $to);
 
             return (object) [
                 'code' => $head->code,
@@ -36,13 +34,14 @@ class FinancialStatementsService
 
     public function cashBook(string $tenantId, ?int $financialYearId = null, ?string $from = null, ?string $to = null)
     {
-        $head = AccountHead::where('tenant_id', $tenantId)->where('code', 'CASH-BANK')->first();
-        if (! $head) {
+        $heads = AccountHead::where('tenant_id', $tenantId)->where('type', 'asset')->where(fn ($q) => $q->where('code', 'CASH-BANK')->orWhere('code', 'like', 'BANK-%'))->get();
+        if ($heads->isEmpty()) {
             return collect();
         }
 
         $txns = LedgerTransaction::where('tenant_id', $tenantId)
-            ->where('account_head_id', $head->id)
+            ->whereIn('account_head_id', $heads->pluck('id'))
+            ->with('accountHead')
             ->when($financialYearId, fn ($q) => $q->where('financial_year_id', $financialYearId))
             ->when($from, fn ($q) => $q->where('transaction_date', '>=', $from))
             ->when($to, fn ($q) => $q->where('transaction_date', '<=', $to))
@@ -50,18 +49,19 @@ class FinancialStatementsService
             ->orderBy('id')
             ->get();
 
-        $running = $this->openingBalance($tenantId, $head->id, $financialYearId);
+        $running = $heads->sum(fn ($head) => $this->carryIn($tenantId, $head->id, $financialYearId, $from));
 
         return $txns->map(function (LedgerTransaction $txn) use (&$running) {
             $running += $txn->entry_type === 'debit' ? (float) $txn->amount : -(float) $txn->amount;
             $txn->setAttribute('running_balance', $running);
+
             return $txn;
         });
     }
 
     public function generalLedger(string $tenantId, int $headId, ?int $financialYearId = null, ?string $from = null, ?string $to = null)
     {
-        $running = $this->openingBalance($tenantId, $headId, $financialYearId);
+        $running = $this->carryIn($tenantId, $headId, $financialYearId, $from);
 
         return LedgerTransaction::where('tenant_id', $tenantId)
             ->where('account_head_id', $headId)
@@ -74,26 +74,40 @@ class FinancialStatementsService
             ->map(function (LedgerTransaction $txn) use (&$running) {
                 $running += $txn->entry_type === 'debit' ? (float) $txn->amount : -(float) $txn->amount;
                 $txn->setAttribute('running_balance', $running);
+
                 return $txn;
             });
     }
 
     public function incomeAndExpenditure(string $tenantId, ?int $financialYearId = null, ?string $from = null, ?string $to = null): array
     {
-        $income = $this->sumByType($tenantId, 'income', $financialYearId, $from, $to, 'credit');
-        $expense = $this->sumByType($tenantId, 'expense', $financialYearId, $from, $to, 'debit');
+        $income = $this->sumByType($tenantId, 'income', $financialYearId, $from, $to, 'credit') - $this->sumByType($tenantId, 'income', $financialYearId, $from, $to, 'debit');
+        $expense = $this->sumByType($tenantId, 'expense', $financialYearId, $from, $to, 'debit') - $this->sumByType($tenantId, 'expense', $financialYearId, $from, $to, 'credit');
 
         return ['income' => $income, 'expense' => $expense, 'surplus' => $income - $expense];
     }
 
-    public function balanceSheet(string $tenantId, ?int $financialYearId = null): array
+    public function balanceSheet(string $tenantId, ?int $financialYearId = null, ?string $to = null): array
     {
-        $assets = $this->sumByType($tenantId, 'asset', $financialYearId, null, null, 'debit')
-            - $this->sumByType($tenantId, 'asset', $financialYearId, null, null, 'credit');
-        $liabilities = $this->sumByType($tenantId, 'liability', $financialYearId, null, null, 'credit')
-            - $this->sumByType($tenantId, 'liability', $financialYearId, null, null, 'debit');
+        $rows = $this->trialBalance($tenantId, $financialYearId, $to);
+        $assets = (float) $rows->where('type', 'asset')->sum('balance');
+        $liabilities = -(float) $rows->where('type', 'liability')->sum('balance');
 
         return ['assets' => $assets, 'liabilities' => $liabilities, 'equity' => $assets - $liabilities];
+    }
+
+    private function carryIn(string $tenantId, int $headId, ?int $yearId, ?string $from): float
+    {
+        $balance = $this->openingBalance($tenantId, $headId, $yearId);
+        if ($from) {
+            $balance += (float) LedgerTransaction::where('tenant_id', $tenantId)->where('account_head_id', $headId)
+                ->when($yearId, fn ($q) => $q->where('financial_year_id', $yearId))
+                ->where('transaction_date', '<', $from)
+                ->selectRaw("COALESCE(SUM(CASE WHEN entry_type = 'debit' THEN amount ELSE -amount END), 0) AS balance")
+                ->value('balance');
+        }
+
+        return $balance;
     }
 
     private function openingBalance(string $tenantId, int $headId, ?int $financialYearId): float
@@ -104,17 +118,19 @@ class FinancialStatementsService
 
         $row = LedgerOpeningBalance::where('tenant_id', $tenantId)
             ->where('account_head_id', $headId)
+            ->whereNull('journal_id')
             ->where('financial_year_id', $financialYearId)
             ->first();
 
-        return (float) ($row?->amount ?? 0);
+        return (float) ($row?->amount ?? 0) * ($row?->entry_type === 'credit' ? -1 : 1);
     }
 
-    private function sumForHead(string $tenantId, int $headId, string $entryType, ?int $financialYearId): float
+    private function sumForHead(string $tenantId, int $headId, string $entryType, ?int $financialYearId, ?string $to = null): float
     {
         return (float) LedgerTransaction::where('tenant_id', $tenantId)
             ->where('account_head_id', $headId)
             ->where('entry_type', $entryType)
+            ->when($to, fn ($q) => $q->where('transaction_date', '<=', $to))
             ->when($financialYearId, fn ($q) => $q->where('financial_year_id', $financialYearId))
             ->sum('amount');
     }

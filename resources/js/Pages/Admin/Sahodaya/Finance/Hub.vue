@@ -39,6 +39,9 @@
         </div>
 
         <div class="grid md:grid-cols-2 gap-4 mb-8">
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/finance/workspace`" class="card border-2 border-indigo-200 block"><h3 class="font-semibold">Income, expenses & budgets</h3><p class="text-sm text-slate-600 mt-1">Vouchers, bill uploads, vendors, approvals, bank transfers, advances, recurring expenses and year closing.</p></Link>
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/finance/financial-statements`" class="card block"><h3 class="font-semibold">Financial reports</h3><p class="text-sm text-slate-600 mt-1">Trial balance, cash book, general ledger and income & expenditure.</p></Link>
+            <Link :href="`/sahodaya-admin/${sahodaya.id}/finance/bank-reconciliation`" class="card block"><h3 class="font-semibold">Banking & reconciliation</h3><p class="text-sm text-slate-600 mt-1">Import statement lines and match them with bank ledger entries.</p></Link>
             <Link :href="links.payment_reconciliation" class="card hover:border-red-300 transition !p-5 block border-2 border-red-200 bg-red-50/40">
                 <h3 class="font-semibold text-red-800">Payment reconciliation</h3>
                 <p class="text-sm text-red-700 mt-1">Find overpayments, missing credits, paid-total drift, and receipt ledger mismatches by school.</p>
