@@ -28,8 +28,9 @@
     $examCentre = \App\Support\Mcq\McqHallTicketDesign::centreForSchool($exam, $schoolModel);
 
     $student = $registration->student;
-    $scheduledAt = $exam->scheduled_at;
-    $timingLabel = \App\Support\Mcq\McqHallTicketDesign::examTimingLabel($scheduledAt, $exam->duration_minutes) ?? 'TBA';
+    $schedule = $exam->scheduleForClass($participant['class_name'] ?? null);
+    $scheduledAt = $schedule['scheduled_at'];
+    $timingLabel = \App\Support\Mcq\McqHallTicketDesign::examTimingLabel($scheduledAt, $schedule['duration_minutes']) ?? 'TBA';
     $reportLabel = \App\Support\Mcq\McqHallTicketDesign::reportTimeLabel($scheduledAt, $design) ?? 'TBA';
     $gateLabel = \App\Support\Mcq\McqHallTicketDesign::gateClosureLabel($scheduledAt, $design) ?? 'At Exam Start';
     $classBucket = $participant['class_name'] ?? null;
@@ -67,7 +68,7 @@
         'scheduled_at_label' => $timingLabel,
         'report_time_label'  => $reportLabel,
         'gate_closure_label' => $gateLabel,
-        'duration_minutes'   => $exam->duration_minutes ?: 60,
+        'duration_minutes'   => $schedule['duration_minutes'] ?: 60,
         'total_questions'    => $totalQuestions,
         'max_marks'          => $totalQuestions,
         'hall_instructions'  => $exam->hall_instructions,

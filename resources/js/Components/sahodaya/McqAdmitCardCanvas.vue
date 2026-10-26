@@ -64,7 +64,7 @@ let drag;
 const positions=computed(()=>overlayPositions(props.design));
 const baseLabels = {student_photo:'Student photo', registration:'Registration number', name:'Student name', class:'Class', date:'Examination date', centre:'Examination centre', principal_signature:'Principal signature' };
 const labels=computed(()=>({...baseLabels,...Object.fromEntries((props.design.custom_fields||[]).map(field=>[field.id,field.label||'Custom field']))}));
-const values = computed(() => ({ registration:props.sample.hall_ticket_no, name:props.sample.participant_name || props.sample.student_name, class:props.sample.class_name, date:props.sample.exam_date, centre:props.sample.venue, ...Object.fromEntries((props.design.custom_fields||[]).map(field=>[field.id,customFieldValue(field,props.sample)])) }));
+const values = computed(() => ({ registration:props.sample.hall_ticket_no, name:props.sample.participant_name || props.sample.student_name, class:props.sample.class_name, date:props.sample.exam_time || props.sample.exam_date, centre:props.sample.venue, ...Object.fromEntries((props.design.custom_fields||[]).map(field=>[field.id,customFieldValue(field,props.sample)])) }));
 function showField(key){
     if(key==='student_photo')return props.design.show_student_photo && (props.sample.photo_src || (props.editable && props.selected===key));
     if(key==='principal_signature')return props.design.show_signature && (props.sample.principal_signature_src || (props.editable && props.selected===key));

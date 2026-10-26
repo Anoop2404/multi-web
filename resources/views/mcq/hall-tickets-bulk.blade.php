@@ -62,6 +62,11 @@
                 $participant = \App\Support\Mcq\McqHallTicketDesign::participantFields($r);
                 $examCentre = \App\Support\Mcq\McqHallTicketDesign::centreForSchool($exam, $r->school);
                 $classBucket = $participant['class_name'] ?? null;
+                $schedule = $exam->scheduleForClass($classBucket);
+                $scheduledAt = $schedule['scheduled_at'];
+                $timingLabel = \App\Support\Mcq\McqHallTicketDesign::examTimingLabel($scheduledAt, $schedule['duration_minutes']) ?? 'TBA';
+                $reportLabel = \App\Support\Mcq\McqHallTicketDesign::reportTimeLabel($scheduledAt, $design) ?? 'TBA';
+                $gateLabel = \App\Support\Mcq\McqHallTicketDesign::gateClosureLabel($scheduledAt, $design) ?? 'At Exam Start';
                 $totalQuestions = $exam->totalQuestionsForClass($classBucket);
                 $sampleData = [
                     'exam_title'         => $exam->title,
@@ -90,12 +95,12 @@
                     'center_code'        => \App\Support\Mcq\McqHallTicketDesign::centreCodeForSchool($exam, $r->school) ?? '',
                     'center_name'        => $examCentre ?: 'Designated Examination Centre',
                     'center_address'     => $examCentre,
-                    'exam_date'          => $exam->scheduled_at ? $exam->scheduled_at->format('l, d F Y') : 'TBA',
+                    'exam_date'          => $scheduledAt ? $scheduledAt->format('l, d F Y') : 'TBA',
                     'exam_time'          => $timingLabel,
                     'scheduled_at_label' => $timingLabel,
                     'report_time_label'  => $reportLabel,
                     'gate_closure_label' => $gateLabel,
-                    'duration_minutes'   => $exam->duration_minutes ?: 60,
+                    'duration_minutes'   => $schedule['duration_minutes'],
                     'total_questions'    => $totalQuestions,
                     'max_marks'          => $totalQuestions,
                     'hall_instructions'  => $exam->hall_instructions,

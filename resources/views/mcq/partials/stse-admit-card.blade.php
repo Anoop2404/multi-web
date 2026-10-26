@@ -15,7 +15,7 @@
         'registration' => $sample['hall_ticket_no'] ?? '',
         'name' => $sample['participant_name'] ?? $sample['student_name'] ?? '',
         'class' => $sample['class_name'] ?? '',
-        'date' => $sample['exam_date'] ?? '',
+        'date' => $sample['exam_time'] ?? $sample['exam_date'] ?? '',
         'centre' => $sample['venue'] ?? '',
     ] as $key => $value)
         @php $position = $design['field_positions'][$key] ?? \App\Support\Mcq\McqHallTicketDesign::defaults()['field_positions'][$key]; @endphp

@@ -464,7 +464,8 @@ class McqHallTicketDesign
     public static function previewSample(McqExam $exam): array
     {
         $design = self::fromExam($exam);
-        $scheduledAt = $exam->scheduled_at;
+        $schedule = $exam->scheduleForClass('Class 10');
+        $scheduledAt = $schedule['scheduled_at'];
         $qrService = app(\App\Services\Events\FestIdCardQrService::class);
 
         return [
@@ -492,15 +493,15 @@ class McqHallTicketDesign
             'center_code'        => 'CEN-' . str_pad((string) ($exam->id * 17 + 101), 4, '0', STR_PAD_LEFT),
             'center_name'        => $design['venue_source'] === 'student_school' ? 'St. Thomas Model Higher Secondary School' : ($exam->venue ?: 'St. Thomas Central School Examination Centre'),
             'center_address'     => 'Bypass Road, Alappuzha, Kerala - 688001',
-            'scheduled_at_label' => self::examTimingLabel($scheduledAt, $exam->duration_minutes) ?? 'Saturday, 28 Oct 2026, 10:00 AM – 11:30 AM',
+            'scheduled_at_label' => self::examTimingLabel($scheduledAt, $schedule['duration_minutes']) ?? 'Saturday, 28 Oct 2026, 10:00 AM – 11:30 AM',
             'exam_date'          => $scheduledAt ? $scheduledAt->format('l, d F Y') : 'Saturday, 28 October 2026',
-            'exam_time'          => self::examTimingLabel($scheduledAt, $exam->duration_minutes) ?? '10:00 AM – 11:30 AM',
+            'exam_time'          => self::examTimingLabel($scheduledAt, $schedule['duration_minutes']) ?? '10:00 AM – 11:30 AM',
             'report_time_label'  => self::reportTimeLabel($scheduledAt, $design) ?? '09:15 AM',
             'gate_closure_label' => self::gateClosureLabel($scheduledAt, $design) ?? '09:45 AM',
             'exam_title'         => $exam->title ?: 'Sahodaya Talent Search Examination',
             'paper_name'         => $exam->title ?: 'Class 10 MCQ Aptitude & Composite Assessment',
             'exam_code'          => $exam->code ?: 'MCQ-X-2026',
-            'duration_minutes'   => $exam->duration_minutes ?: 90,
+            'duration_minutes'   => $schedule['duration_minutes'] ?: 90,
             'total_questions'    => $exam->total_questions ?: 60,
             'max_marks'          => $exam->total_questions ?: 60,
             'hall_instructions'  => $exam->hall_instructions,

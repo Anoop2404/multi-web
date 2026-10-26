@@ -94,6 +94,21 @@
 
         <form @submit.prevent="save" class="card mb-6 space-y-4">
             <h3 class="section-title">Exam details</h3>
+            <div class="rounded-xl border border-slate-200 p-4 space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div><h4 class="font-semibold">Class-wise exam timings</h4><p class="text-sm text-slate-500">Set a date, start time and duration for each class. Other classes use the main exam schedule. These timings appear on admit cards.</p></div>
+                    <button type="button" class="btn-secondary text-sm" @click="form.class_schedules.push({ class_name: '', scheduled_at: '', duration_minutes: exam.duration_minutes || 60 })">+ Add class timing</button>
+                </div>
+                <datalist id="exam-timing-classes"><option v-for="cls in timingClasses" :key="cls" :value="cls" /></datalist>
+                <div v-for="(row, index) in form.class_schedules" :key="index" class="grid sm:grid-cols-4 gap-3 items-end">
+                    <label class="text-sm">Class<input v-model="row.class_name" list="exam-timing-classes" class="field mt-1" placeholder="LKG, UKG, 1…" required></label>
+                    <label class="text-sm">Exam date &amp; start time<input v-model="row.scheduled_at" type="datetime-local" class="field mt-1" required></label>
+                    <label class="text-sm">Duration (minutes)<input v-model.number="row.duration_minutes" type="number" min="1" max="1440" class="field mt-1" required></label>
+                    <button type="button" class="btn-secondary text-sm" @click="form.class_schedules.splice(index, 1)">Remove timing</button>
+                </div>
+                <p v-for="(error, key) in timingErrors" :key="key" class="text-sm text-red-600">{{ error }}</p>
+                <p class="text-xs text-slate-500">Use Save exam below to save timings. Removing a timing restores the main exam schedule for that class.</p>
+            </div>
             <FormGrid>
                 <FormField label="Exam title" class-extra="sm:col-span-2" required>
                     <template #default="{ id }">
@@ -375,7 +390,10 @@ for (const cls of props.classOptions) {
     initialClassMaxMarks[cls] = props.exam.settings_json?.class_max_marks?.[cls] ?? null;
 }
 
+const timingClasses = computed(() => [...new Set(['LKG', 'UKG', ...Array.from({ length: 12 }, (_, i) => String(i + 1)), ...props.classOptions])]);
+const timingErrors = computed(() => Object.fromEntries(Object.entries(form.errors).filter(([key]) => key.startsWith('class_schedules'))));
 const form = useForm({
+    class_schedules: (props.exam.settings_json?.class_schedules ?? []).map(row => ({ ...row })),
     title: props.exam.title,
     code: props.exam.code ?? '',
     status: props.exam.status,

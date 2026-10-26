@@ -242,6 +242,10 @@ class McqExamController extends SahodayaAdminController
             'code'             => 'nullable|string|max:64',
             'exam_type'        => 'nullable|in:practice,assessment,competitive',
             'scheduled_at'     => 'nullable|date',
+            'class_schedules' => 'sometimes|array|max:100',
+            'class_schedules.*.class_name' => 'required|string|max:100|distinct:ignore_case',
+            'class_schedules.*.scheduled_at' => 'required|date_format:Y-m-d\\TH:i',
+            'class_schedules.*.duration_minutes' => 'required|integer|min:1|max:1440',
             'registration_opens_at'  => 'nullable|date',
             'registration_closes_at' => 'nullable|date|after_or_equal:registration_opens_at',
             'result_date'      => 'nullable|date',
@@ -376,6 +380,12 @@ class McqExamController extends SahodayaAdminController
                 $settings['require_verified_students'] = false;
             }
             $data['settings_json'] = $settings;
+        }
+        if (array_key_exists('class_schedules', $data)) {
+            $settings = $data['settings_json'] ?? ($exam->settings_json ?? []);
+            $settings['class_schedules'] = $data['class_schedules'];
+            $data['settings_json'] = $settings;
+            unset($data['class_schedules']);
         }
         $previousStatus = $exam->status;
         $newStatus = $data['status'] ?? $previousStatus;

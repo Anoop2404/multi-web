@@ -65,6 +65,20 @@ class McqExam extends Model
         'hall_tickets_published_at' => 'datetime',
     ];
 
+    /** Resolve a class override without changing the exam's shared schedule. */
+    public function scheduleForClass(?string $className): array
+    {
+        $key = static fn ($name) => strtoupper(trim(preg_replace('/^CLASS\s*/i', '', trim((string) $name))));
+        $override = collect($this->settings_json['class_schedules'] ?? [])
+            ->first(fn ($row) => $key($row['class_name'] ?? '') === $key($className));
+
+        return [
+            'scheduled_at' => !empty($override['scheduled_at'])
+                ? \Carbon\Carbon::parse($override['scheduled_at'], config('app.timezone')) : $this->scheduled_at,
+            'duration_minutes' => (int) ($override['duration_minutes'] ?? $this->duration_minutes ?: 60),
+        ];
+    }
+
     /** Whether Sahodaya has released hall tickets (roll no./hall/seat) for schools & candidates to see. */
     public function hallTicketsPublished(): bool
     {
