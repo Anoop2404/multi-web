@@ -638,23 +638,7 @@
 
                 <!-- ── KALOTSAV / KIDS FEST / TEACHER FEST / ENGLISH FEST / SCIENCE FEST: generic flat table ── -->
                 <form v-else v-show="getTab(event.id) === 'items'" :id="`item-registration-${event.id}`" class="mt-4 space-y-4" @submit.prevent>
-                    <section v-if="eventType === 'kids_fest'" class="card space-y-3 border-indigo-200 bg-indigo-50/40">
-                        <h3 class="text-base font-bold text-slate-900">Choose a child to see eligible items</h3>
-                        <p class="text-sm text-slate-600">Children are matched to items using the event's class, band, gender, and verification rules. For group items, add the remaining members using the student picker.</p>
-                        <div v-if="lazyLoadStudents" class="flex flex-wrap gap-2">
-                            <label :for="`kids-search-${event.id}`" class="sr-only">Find a child by name</label>
-                            <input :id="`kids-search-${event.id}`" v-model="kidsChildSearch[event.id]" type="search" class="field flex-1" placeholder="Find a child by name…">
-                            <button type="button" class="btn-secondary" @click="searchStudentsForEvent(event.id, kidsChildSearch[event.id])">Find child</button>
-                        </div>
-                        <label :for="`kids-child-${event.id}`" class="block text-sm font-semibold">Child</label>
-                        <select :id="`kids-child-${event.id}`" :value="kidsChildIds[event.id] || ''" class="field w-full" @change="selectKidsChild(event, $event.target.value)">
-                            <option value="">Select a child…</option>
-                            <option v-for="child in studentsForEvent(event.id)" :key="child.id" :value="child.id">{{ studentOptionLabel(child) }}</option>
-                        </select>
-                        <p v-if="!kidsChildIds[event.id]" class="text-sm text-slate-600">Select a child above to start. Existing registrations remain available in the registration and reports steps.</p>
-                        <p v-else-if="!filteredAllItems(event).length" role="status" class="text-sm text-amber-800">No items match this child and the current filters. Check their class, band, verification, and event registration, or clear the item filters.</p>
-                    </section>
-                    <div v-show="eventType !== 'kids_fest' || kidsChildIds[event.id]" class="rounded-xl border border-gray-100 overflow-hidden bg-white shadow-sm">
+                    <div class="rounded-xl border border-gray-100 overflow-hidden bg-white shadow-sm">
                         <!-- 3-Type Quick Tabs (On-stage Individual, On-stage Group, Off-stage) -->
                         <div class="px-4 py-2.5 bg-slate-100/90 border-b border-slate-200 flex flex-wrap gap-2 text-xs font-semibold">
                             <button type="button" @click="itemTypeTab[event.id] = 'all'"
@@ -699,7 +683,7 @@
                                            class="field w-full !py-1.5 text-xs rounded-lg border-slate-300"
                                            placeholder="Search items by name or code..." autocomplete="off">
                                 </div>
-                                <div v-if="eventType !== 'kids_fest'">
+                                <div>
                                     <SearchableSelect v-model="itemCategoryFilter[event.id]" class="w-full"
                                                       :options="[
                                                           { value: 'category1', label: 'Category 1 (Classes 3 & 4)' },
@@ -721,7 +705,7 @@
                                 <div>
                                     <SearchableSelect v-model="itemSort[event.id]" class="w-full"
                                                       :options="[
-                                                          ...(eventType === 'kids_fest' ? [] : [{ value: 'category', label: 'Sort by Category (Cat 1 → 5)' }]),
+                                                          { value: 'category', label: 'Sort by Category (Cat 1 → 5)' },
                                                           { value: 'stage', label: 'Sort by Stage (On-stage first)' },
                                                           { value: 'name', label: 'Sort by Item Name (A → Z)' },
                                                       ]"
@@ -1480,24 +1464,6 @@ function limitLabel(val) {
     return val == null || val === '' ? '∞' : val;
 }
 
-const kidsChildIds = reactive({});
-const kidsChildSearch = reactive({});
-
-function selectKidsChild(event, value) {
-    kidsChildIds[event.id] = value ? Number(value) : null;
-    clearItemFilters(event.id);
-    itemTypeTab[event.id] = 'all';
-    for (const item of event.items ?? []) {
-        const key = itemFormKey(event.id, item.id);
-        if (editingRegistrationId[key]) continue;
-        const form = itemForms[key];
-        if (!form) continue;
-        const child = eligibleStudentsForItem(event.id, item).find(student => Number(student.id) === Number(value));
-        form.student_ids = child ? [child.id] : [];
-        form.standby_ids = [];
-    }
-}
-
 const itemForms = reactive({});
 const itemErrors = reactive({});
 const eventPaymentFiles = reactive({});
@@ -1608,11 +1574,6 @@ function filteredAllItems(event) {
     const activeTab = itemTypeTab[eventId] ?? 'all';
 
     let items = rawItems;
-    if (props.eventType === 'kids_fest') {
-        const childId = Number(kidsChildIds[eventId]);
-        if (!childId) return [];
-        items = items.filter(item => eligibleStudentsForItem(eventId, item).some(student => Number(student.id) === childId));
-    }
 
     if (activeTab !== 'all') {
         items = items.filter(item => itemCompetitionType(item) === activeTab);

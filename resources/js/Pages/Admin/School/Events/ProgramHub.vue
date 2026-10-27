@@ -49,39 +49,7 @@
             <span v-for="g in registeredAgeGroups" :key="g" class="font-semibold ml-1">{{ ageGroups[g] ?? g }}</span>
         </div>
 
-        <section v-if="isKidsFest" class="space-y-4 mb-8" aria-label="Kids Fest quick access">
-            <div class="notice-banner notice-banner--info text-sm">
-                Start by registering children, then choose their eligible items and complete payment.
-                Your schedule, ID cards, results, and certificates are available below for each event.
-            </div>
-            <p v-if="!events.length" class="card text-sm text-slate-600">No Kids Fest events are open yet. Check back when your Sahodaya opens registration.</p>
-            <article v-for="ev in events" :key="ev.id" class="card space-y-3">
-                <h2 class="text-lg font-bold text-slate-900">{{ ev.title }}</h2>
-                <p class="text-sm text-slate-600">{{ eventDateRange(ev.event_start, ev.event_end) }} · {{ ev.registrations_count ?? 0 }} entries</p>
-                <p v-if="ev.is_partitioned && !ev.has_assigned_partition" class="text-sm text-amber-800">Next step: select your region when you open registration.</p>
-                <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <HubCard :href="`${programBase}/events/${ev.id}/registration`" icon="📝" label="Register children" hint="Choose a child, then eligible items" />
-                    <HubCard :href="`${programBase}/events/${ev.id}/registration?tab=payment`" icon="💳" label="Payment" hint="Review fees and payment status" />
-                    <HubCard :href="`${programBase}/fest-day/${ev.id}`" icon="📅" label="Schedule" hint="View event-day details" />
-                    <HubCard :href="`${programBase}/reports/${ev.id}/admit-cards`" icon="🎟️" label="ID cards" hint="Open participant admit cards" />
-                </div>
-                <div class="flex flex-wrap gap-4 text-sm">
-                    <Link :href="`${programBase}/results?event=${ev.id}`" class="link-brand">Results →</Link>
-                    <a :href="`/school-admin/${school.id}/fest/${ev.id}/certificates/download-all`" class="link-brand">Download certificates →</a>
-                    <Link :href="`${programBase}/reports/${ev.id}`" class="link-brand">All reports →</Link>
-                    <Link :href="`/school-admin/${school.id}/fest/${ev.id}/food-order`" class="link-brand">Food menu →</Link>
-                </div>
-            </article>
-            <div class="flex flex-wrap gap-4 text-sm">
-                <Link :href="`${programBase}/results`" class="link-brand">All results →</Link>
-                <Link :href="`${programBase}/reports`" class="link-brand">All events, ID cards &amp; certificates →</Link>
-                <Link :href="`${programBase}/qualifiers`" class="link-brand">Qualifiers →</Link>
-                <Link :href="`${programBase}/state-slots`" class="link-brand">State slots →</Link>
-                <Link v-if="canManageCoordinators" :href="`/school-admin/${school.id}/users?coordinators=1`" class="link-brand">Assign coordinator →</Link>
-            </div>
-        </section>
-
-        <div v-else class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
             <HubCard :href="`${programBase}/registration`" icon="📝" label="Register for Sahodaya" :hint="isSports ? 'Per sport: Chess, Aquatics, …' : `Register for ${programLabel}`" />
             <HubCard v-if="showSchoolEvents" :href="`${programBase}/my-events`" icon="🏫" label="My school events" :hint="isSports ? 'Run your own sports day' : 'Internal school events'" />
             <HubCard v-if="isSports" :href="`${programBase}/submit-winners`" icon="🏅" label="Submit winners" hint="Promote to Sahodaya meet" />
@@ -261,7 +229,7 @@
             </div>
         </section>
 
-        <section v-if="events.length && !isKidsFest" class="card card--flush overflow-hidden">
+        <section v-if="events.length" class="card card--flush overflow-hidden">
             <div class="p-4 border-b border-slate-100 bg-slate-50/80">
                 <h3 class="section-title !mb-0">Open Sahodaya events</h3>
             </div>
@@ -318,7 +286,6 @@ const props = defineProps({
 
 const { programLabel, programBase } = useSchoolProgramContext(props);
 const page = usePage();
-const isKidsFest = computed(() => props.eventType === 'kids_fest');
 const isSports = computed(() => props.eventType === 'sports');
 const isTeacherFest = computed(() => props.eventType === 'teacher_fest');
 const canManageCoordinators = computed(() => !page.props.isStaff && !page.props.isEventCoordinator);
