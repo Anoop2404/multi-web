@@ -452,7 +452,7 @@ const statusOptions = [
 
 const itemsWithNull = computed(() => [{ value: null, label: '— Use name pattern instead —' }, ...props.items.map(it => ({
     value: it.id,
-    label: `${it.item_code ? it.item_code + ' — ' : ''}${it.title} (${it.class_group || it.category})`,
+    label: `${it.item_code ? it.item_code + ' — ' : ''}${it.title} (${it.category_label || '—'})`,
 }))]);
 
 const genderOptions = [

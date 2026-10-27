@@ -31,11 +31,14 @@ class FestTrophyController extends SahodayaAdminController
         $parent = $event->parent_event_id ? FestEvent::find($event->parent_event_id) : null;
         $childEvents = FestEvent::where('parent_event_id', $event->id)->get(['id', 'title', 'event_type']);
 
-        $categoryLabels = FestClassGroupScheme::labels(null, $root);
+        $categoryLabels = $root->event_type === 'sports'
+            ? \App\Support\FestSportsAgeGroup::labels($root->tenant_id)
+            : FestClassGroupScheme::labels(null, $root);
         $items = FestEventItem::where('event_id', $event->id)
             ->orderBy('item_code')
             ->orderBy('title')
-            ->get(['id', 'title', 'item_code', 'category', 'class_group', 'participant_type']);
+            ->get(['id', 'event_id', 'title', 'item_code', 'category', 'class_group', 'age_group', 'participant_type'])
+            ->each(fn ($item) => $item->setAttribute('category_label', \App\Support\FestItemCategoryLabel::resolve($item, $categoryLabels)));
 
         $stats = [
             'total_trophies' => $trophies->count(),

@@ -114,7 +114,7 @@ class FestItemReportingBatchTimeTest extends TestCase
         $this->actingAs($admin)->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reporting-batches?item_id={$itemA->id}")
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('Admin/Sahodaya/Events/ReportingBatches')
+                ->component('Sahodaya/Events/ReportingBatches', false)
                 ->has('batches', 2)
                 ->where('batches.0.id', $batch1->id)
                 ->where('batches.0.report_at', fn ($val) => str_starts_with($val, '2026-11-20'))
@@ -124,7 +124,7 @@ class FestItemReportingBatchTimeTest extends TestCase
         $this->actingAs($admin)->get("/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/reporting-batches?item_id={$itemB->id}")
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('Admin/Sahodaya/Events/ReportingBatches')
+                ->component('Sahodaya/Events/ReportingBatches', false)
                 ->has('batches', 2)
                 ->where('batches.0.id', $batch1->id)
                 ->where('batches.0.report_at', null)

@@ -41,6 +41,10 @@ class FestAttendanceController extends SahodayaAdminController
             'items' => fn ($query) => $query->where('is_enabled', true)->with('phase:id,source_phase_id'),
         ]);
         $event->setRelation('items', \App\Services\Events\FestHeadItemNavigationService::filterToOwnPhase($event->items, $event));
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
+        foreach ($event->items as $item) {
+            $item->setAttribute('category_label', \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels));
+        }
 
         // For sports season events (parent hub), registrations live under
         // child events — filtering by event_id alone returns nothing.

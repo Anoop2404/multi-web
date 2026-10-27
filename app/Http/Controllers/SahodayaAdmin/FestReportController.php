@@ -313,7 +313,7 @@ class FestReportController extends SahodayaAdminController
             'exports'                  => $exports,
             'regionChildrenWithExports' => $regionChildrenWithExports,
             'schools'                  => $service->schools(),
-            'items'                    => $service->items()->map->only(['id', 'title', 'class_group']),
+            'items'                    => $service->items()->map(fn ($item) => $item->only(['id', 'title', 'class_group', 'age_group']) + ['category_label' => \App\Support\FestItemCategoryLabel::resolve($item, \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent()))]),
             'heads'                    => $event->event_type === 'sports'
                 ? ($event->isSportsSeasonEvent()
                     ? FestEvent::where('parent_event_id', $targetEvent->id)->ofType('sports')->orderBy('sort_order')->orderBy('title')->get(['id', 'title'])->map(fn ($e) => ['id' => $e->id, 'name' => $e->title])->values()

@@ -329,15 +329,7 @@ const filteredParticipants = computed(() => {
 });
 
 function formatItemCat(item) {
-    if (!item) return '';
-    if (item.class_group && item.class_group !== 'open') {
-        return item.class_group.toUpperCase();
-    }
-    if (item.age_group) return item.age_group;
-    if (item.category && item.category !== 'general') {
-        return item.category.replace(/_/g, ' ').toUpperCase();
-    }
-    return '';
+    return item?.category_label || '';
 }
 
 function formatItemTypeLabel(item) {

@@ -429,13 +429,9 @@ class FestChestNumberController extends SahodayaAdminController
 
         $rows = $this->chestNumberRows($event, $itemId, $bulkItemIds ?? [], $request->query('school_id'));
 
-        $itemCategory = null;
-        if ($item && $item->class_group && $item->class_group !== 'open') {
-            $itemCategory = \App\Support\FestClassGroupScheme::resolveItemLabel(
-                \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent()),
-                $item->class_group,
-            );
-        }
+        $itemCategory = \App\Support\FestItemCategoryLabel::resolve(
+            $item, \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent())
+        );
 
         $orgName = $this->sahodaya->name;
         $logoSrc = TenantBranding::logoEmbedSrc($this->sahodaya);
@@ -722,13 +718,7 @@ class FestChestNumberController extends SahodayaAdminController
 
         $numbering = app(FestNumberingService::class);
         $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent());
-        $categoryFor = function (?FestEventItem $item) use ($classGroupLabels) {
-            if (! $item || ! $item->class_group || $item->class_group === 'open') {
-                return null;
-            }
-
-            return \App\Support\FestClassGroupScheme::resolveItemLabel($classGroupLabels, $item->class_group);
-        };
+        $categoryFor = fn (?FestEventItem $item) => \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels);
 
         $individualRows = $participants->toBase()
             ->filter(fn ($p) => ! $p->registration->item || ! $numbering->isGroupItem($p->registration->item))

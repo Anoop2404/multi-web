@@ -49,14 +49,14 @@ class FestHeadItemNavigationService
             ->orderBy('name')
             ->get(['id', 'name', 'sort_order', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'schedule_mode', 'competition_time', 'status']);
 
-        $itemColumns = ['id', 'head_id'];
+        $itemColumns = ['id', 'event_id', 'head_id'];
         $classGroupLabels = [];
         $artsCategoryLabels = [];
         $defaultChestStart = 1;
 
         if ($withItems) {
             $itemColumns = [
-                'id', 'title', 'item_code', 'head_id', 'chest_no_start', 'item_reg_id_start',
+                'id', 'event_id', 'title', 'item_code', 'head_id', 'chest_no_start', 'item_reg_id_start',
                 'stage_type', 'reg_start', 'reg_end', 'competition_start', 'competition_end',
                 'competition_time', 'results_published_at', 'participant_type', 'gender',
                 'age_group', 'class_group', 'category', 'min_group_size', 'max_group_size', 'criteria_json',
@@ -76,7 +76,7 @@ class FestHeadItemNavigationService
             FestEventItem::query()
                 ->where('event_id', $targetEvent->id)
                 ->where('is_enabled', true)
-                ->with('phase:id,source_phase_id')
+                ->with(['phase:id,source_phase_id', 'event:id,tenant_id,event_type'])
                 ->get($itemColumns),
             $event,
         );
@@ -186,10 +186,10 @@ class FestHeadItemNavigationService
             FestEventItem::query()
                 ->where('event_id', $targetEvent->id)
                 ->where('is_enabled', true)
-                ->with('phase:id,source_phase_id')
+                ->with(['phase:id,source_phase_id', 'event:id,tenant_id,event_type'])
                 ->orderBy('display_order')
                 ->orderBy('title')
-                ->get(['id', 'title', 'item_code', 'head_id', 'chest_no_start', 'item_reg_id_start', 'stage_type', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'competition_time', 'results_published_at', 'class_group', 'category', 'age_group', 'phase_id', 'participant_type', 'gender']),
+                ->get(['id', 'event_id', 'title', 'item_code', 'head_id', 'chest_no_start', 'item_reg_id_start', 'stage_type', 'reg_start', 'reg_end', 'competition_start', 'competition_end', 'competition_time', 'results_published_at', 'class_group', 'category', 'age_group', 'phase_id', 'participant_type', 'gender']),
             $event,
         );
 
@@ -436,7 +436,7 @@ class FestHeadItemNavigationService
      * Public (and static) so every controller loading $event->items directly for an item
      * picker/filter — not just this service's own navigationForEvent()/
      * participantStatsByItem() — can reuse the exact same rule instead of re-deriving it.
-     * Callers must eager-load item.phase (e.g. ->with('phase:id,source_phase_id')) first;
+     * Callers must eager-load item.phase (e.g. ->with(['phase:id,source_phase_id', 'event:id,tenant_id,event_type'])) first;
      * this never queries on its own.
      *
      * @param  \Illuminate\Support\Collection<int, FestEventItem>  $items
@@ -472,7 +472,7 @@ class FestHeadItemNavigationService
             FestEventItem::query()
                 ->where('event_id', $targetEvent->id)
                 ->where('is_enabled', true)
-                ->with('phase:id,source_phase_id')
+                ->with(['phase:id,source_phase_id', 'event:id,tenant_id,event_type'])
                 ->get(['id', 'item_code', 'participant_type', 'inherited_from_item_id', 'phase_id']),
             $event,
         );
@@ -599,11 +599,12 @@ class FestHeadItemNavigationService
 
             $items = FestEventItem::query()
                 ->where('event_id', $sport->id)
+                ->with('event:id,tenant_id,event_type')
                 ->where('is_enabled', true)
                 ->orderBy('display_order')
                 ->orderBy('title')
                 ->get([
-                    'id', 'title', 'item_code', 'head_id', 'chest_no_start', 'item_reg_id_start',
+                    'id', 'event_id', 'title', 'item_code', 'head_id', 'chest_no_start', 'item_reg_id_start',
                     'stage_type', 'reg_start', 'reg_end', 'competition_start', 'competition_end',
                     'competition_time', 'results_published_at',
                     'participant_type', 'gender', 'age_group', 'min_group_size', 'max_group_size', 'criteria_json',

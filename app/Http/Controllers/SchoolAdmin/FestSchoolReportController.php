@@ -890,7 +890,7 @@ class FestSchoolReportController extends SchoolAdminController
         $itemCounts = $service->itemParticipantCounts($event, $this->school->id);
         $registrationCounts = $service->itemRegistrationCounts($event, $this->school->id);
         $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
-        $ageGroupLabels = config('fest_item_taxonomy.age_group', []);
+        $ageGroupLabels = \App\Support\FestSportsAgeGroup::labels($event->tenant_id);
 
         $cluster = Tenant::find($this->school->parent_id);
 
@@ -2175,19 +2175,6 @@ class FestSchoolReportController extends SchoolAdminController
      */
     private function itemCategoryLabel(\App\Models\FestEventItem $item, array $classGroupLabels, array $ageGroupLabels): ?string
     {
-        if ($item->age_group && $item->age_group !== 'open') {
-            return $ageGroupLabels[$item->age_group] ?? strtoupper($item->age_group);
-        }
-
-        if ($item->class_group && $item->class_group !== 'open') {
-            return \App\Support\FestClassGroupScheme::resolveItemLabel($classGroupLabels, $item->class_group);
-        }
-
-        if ($item->category && $item->category !== 'general') {
-            return config("fest_item_taxonomy.arts_category.{$item->category}")
-                ?? ucwords(str_replace(['_', '-'], ' ', $item->category));
-        }
-
-        return null;
+        return \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels, config('fest_item_taxonomy.arts_category', []));
     }
 }

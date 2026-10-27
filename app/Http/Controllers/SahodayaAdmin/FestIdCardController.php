@@ -34,7 +34,7 @@ class FestIdCardController extends SahodayaAdminController
         // may return a clone with parent_event_id nulled out, which would make ->rootEvent()
         // resolve to itself instead of walking to the real root where class_group_scheme lives.
         $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
-        $ageGroupLabels = config('fest_item_taxonomy.age_group', []);
+        $ageGroupLabels = \App\Support\FestSportsAgeGroup::labels($this->sahodaya->id);
 
         return $this->inertia('Sahodaya/Events/IdCards/Index', $this->withEventActivity($event, FestPageActivity::ID_CARDS, [
             'event'  => $targetEvent->only('id', 'title', 'status', 'event_type'),
@@ -729,20 +729,7 @@ class FestIdCardController extends SahodayaAdminController
      */
     private function itemCategoryLabel(FestEventItem $item, array $classGroupLabels, array $ageGroupLabels): ?string
     {
-        if ($item->age_group && $item->age_group !== 'open') {
-            return $ageGroupLabels[$item->age_group] ?? strtoupper($item->age_group);
-        }
-
-        if ($item->class_group && $item->class_group !== 'open') {
-            return \App\Support\FestClassGroupScheme::resolveItemLabel($classGroupLabels, $item->class_group);
-        }
-
-        if ($item->category && $item->category !== 'general') {
-            return config("fest_item_taxonomy.arts_category.{$item->category}")
-                ?? ucwords(str_replace(['_', '-'], ' ', $item->category));
-        }
-
-        return null;
+        return \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels, config('fest_item_taxonomy.arts_category', []));
     }
 
     /** @return array<string, mixed> */

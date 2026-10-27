@@ -77,7 +77,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
             ->get()
             ->groupBy('item_id');
 
-        $items = $event->items()->orderBy('title')->get(['id', 'title', 'item_code', 'category', 'class_group', 'age_group', 'gender', 'stage_type'])
+        $items = $event->items()->orderBy('title')->get(['id', 'event_id', 'title', 'item_code', 'category', 'class_group', 'age_group', 'gender', 'stage_type'])
             ->map(function (FestEventItem $item) use ($regCounts, $assignedCounts, $usedBatchCounts, $classGroupLabels, $schedulesByItem) {
                 $regCount = (int) ($regCounts[$item->id] ?? 0);
                 $assignedCount = (int) ($assignedCounts[$item->id] ?? 0);
@@ -628,6 +628,7 @@ class FestItemReportingBatchController extends SahodayaAdminController
             ->with('festStage')
             ->first();
         $stageName = $sched?->festStage?->name ?? $sched?->stage;
+        $classGroupLabels = \App\Support\FestClassGroupScheme::labels(null, $item->event?->rootEvent());
 
         return [
             'id'                 => $item->id,

@@ -36,6 +36,37 @@ class FestSportsReportLabelsTest extends TestCase
         $participant = FestParticipant::create(['event_id' => $event->id, 'registration_id' => $registration->id, 'student_id' => $student->id, 'participant_type' => 'student', 'participant_role' => 'performer']);
         FestAttendance::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $participant->id, 'status' => 'absent', 'marked_at' => now()]);
 
+        $navigation = app(\App\Services\Events\FestHeadItemNavigationService::class)->navigationForEvent($event);
+        $navItem = collect($navigation['headItemGroups'])->flatMap(fn ($group) => $group['items'])->firstWhere('id', $item->id);
+        $this->assertSame('Junior Athletes — Under 14', $navItem['category_label']);
+        $limits = new \App\Services\Events\FestParticipationLimitService($event);
+        $this->assertSame('Junior Athletes — Under 14', $limits->itemFilterOptions()[0]['category_label']);
+        $this->assertSame('Junior Athletes — Under 14', \App\Services\Events\FestParticipationLimitService::categoryFilterOptions($event)['age:u14']);
+
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        \App\Models\SahodayaProfile::create(['tenant_id' => $owner->id, 'prefix' => 'SL', 'student_data_mode' => 'counts_only']);
+        $admin = \App\Models\User::factory()->create(['tenant_id' => $owner->id]);
+        $admin->assignRole('sahodaya_admin');
+        $base = "/sahodaya-admin/{$owner->id}/events/{$event->id}";
+        $this->actingAs($admin)->get($base.'/attendance?item_id='.$item->id)->assertOk()
+            ->assertInertia(fn ($page) => $page->where('event.items.0.category_label', 'Junior Athletes — Under 14'));
+        $this->get($base.'/marks?item_id='.$item->id)->assertOk()
+            ->assertInertia(fn ($page) => $page->where('headItemGroups', fn ($groups) => collect($groups)->flatMap(fn ($group) => $group['items'])
+                ->firstWhere('id', $item->id)['category_label'] === 'Junior Athletes — Under 14'));
+
+        $reports = new \App\Services\Events\FestReportService($event);
+        $attendanceHtml = $reports->export('attendance-sheet', \Illuminate\Http\Request::create('/', 'GET', ['item_id' => $item->id, 'preview' => 1]))->getContent();
+        $this->assertStringContainsString('Junior Athletes — Under 14', $attendanceHtml);
+        \Barryvdh\DomPDF\Facade\Pdf::shouldReceive('loadView')->once()->andReturnUsing(function ($view, $data) {
+            $this->assertStringContainsString('Junior Athletes — Under 14', view($view, $data)->render());
+            $pdf = \Mockery::mock(\Barryvdh\DomPDF\PDF::class);
+            $pdf->shouldReceive('setPaper')->once()->andReturnSelf();
+            $pdf->shouldReceive('download')->once()->andReturn(response('%PDF-test', 200, ['Content-Type' => 'application/pdf']));
+
+            return $pdf;
+        });
+        $this->get($base.'/reports/mark-entry-sheet?item_id='.$item->id)->assertOk();
+
         $status = (new FestSchoolReportAnalyticsService($event, $school->id))->resultsPublishStatus();
         $this->assertSame('Junior Athletes — Under 14', $status['rows'][0]['category_label']);
         $this->assertSame('u14', $status['rows'][0]['age_group']);

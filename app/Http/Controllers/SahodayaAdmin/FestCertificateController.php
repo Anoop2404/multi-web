@@ -76,7 +76,7 @@ class FestCertificateController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Events/MeritCertificates', $this->withEventActivity($event, FestPageActivity::CERTIFICATES, [
             'event' => $event,
             'certificates' => $this->slimCertificates($certificates),
-            'conductItems' => FestEventItem::whereIn('event_id', $event->reportableEventIds())->orderByRaw('CASE WHEN results_published_at IS NULL THEN 1 ELSE 0 END')->orderBy('results_published_at')->orderBy('item_code')->orderBy('id')->get(['id', 'title', 'item_code', 'class_group', 'gender', 'certificate_phase_id', 'results_published_at']),
+            'conductItems' => FestEventItem::whereIn('event_id', $event->reportableEventIds())->orderByRaw('CASE WHEN results_published_at IS NULL THEN 1 ELSE 0 END')->orderBy('results_published_at')->orderBy('item_code')->orderBy('id')->get(['id', 'event_id', 'title', 'item_code', 'class_group', 'age_group', 'gender', 'certificate_phase_id', 'results_published_at']),
             'certificatePhases' => \App\Models\FestCertificatePhase::where('event_id', $event->id)->orderBy('name')->get(),
             'publishedItems' => $this->publishedItemsForEvent($event),
             'schools' => $this->schoolsFromCertificates($certificates),
@@ -203,7 +203,7 @@ class FestCertificateController extends SahodayaAdminController
         return FestEventItem::whereIn('event_id', $event->reportableEventIds())
             ->whereNotNull('results_published_at')
             ->orderBy('results_published_at')->orderBy('item_code')->orderBy('id')
-            ->get(['id', 'title', 'item_code', 'class_group', 'category', 'gender', 'participant_type', 'results_published_at'])
+            ->get(['id', 'event_id', 'title', 'item_code', 'class_group', 'age_group', 'category', 'gender', 'participant_type', 'results_published_at'])
             ->map(fn ($item) => [
                 'id' => $item->id,
                 'title' => $item->title,
