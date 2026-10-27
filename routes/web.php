@@ -2071,6 +2071,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{exam}/hall-tickets/halls', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'saveHalls'])->name('hall-tickets.halls');
             Route::post('/{exam}/hall-tickets/allocate-seats', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'allocateSeats'])->name('hall-tickets.allocate-seats');
             Route::post('/{exam}/registrations/{registration}/issue-reg-no', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'issueSingleRegNo'])->name('registrations.issue-reg-no');
+            Route::post('/{exam}/hall-tickets/saved-pdfs', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'saveAdmitCardPdf'])->name('hall-tickets.saved-pdfs.store');
+            Route::get('/{exam}/hall-tickets/saved-pdfs/{export}', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'downloadSavedAdmitCardPdf'])->name('hall-tickets.saved-pdfs.download');
             Route::get('/{exam}/hall-tickets/print-all', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'printAllHallTickets'])->name('hall-tickets.print-all');
             Route::post('/{exam}/registrations/{registration}/passcode', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'reissuePasscode'])->name('registrations.passcode.reissue');
             Route::get('/{exam}/staff', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'staff'])->name('staff');

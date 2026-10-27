@@ -277,6 +277,9 @@ class McqExamOpsController extends SahodayaAdminController
             'exam'            => $exam,
             'templates'       => $templates,
             'registrations'   => $registrations,
+            'savedExports' => \App\Models\McqAdmitCardExport::where('tenant_id', $this->sahodaya->id)
+                ->where('exam_id', $exam->id)->latest('id')->limit(30)
+                ->get(['id', 'status', 'scope_description', 'total_count', 'filename', 'created_at', 'completed_at']),
             'hallTicketDesign'=> $design,
             'backgroundUrl' => TenantStorage::logoUrl($this->sahodaya, $design['background_path'] ?? null),
             'defaultHallTicketDesign' => McqHallTicketDesign::defaults(),
@@ -518,6 +521,53 @@ class McqExamOpsController extends SahodayaAdminController
         }
 
         return view('mcq.hall-tickets-bulk', compact('exam', 'registrations'));
+    }
+
+    public function saveAdmitCardPdf(Request $request, string $tenantId, McqExam $exam)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        $this->assertStaffCan('mcq.manage');
+        $filters = $request->validate([
+            'search' => 'nullable|string|max:100',
+            'school_id' => 'nullable|string|max:36',
+            'class' => 'nullable|string|max:60',
+            'registration_id' => 'nullable|integer|min:1',
+        ]);
+        $query = McqRegistration::where('exam_id', $exam->id)->active()->whereNotNull('hall_ticket_no');
+        if (! empty($filters['registration_id'])) {
+            $query->whereKey($filters['registration_id']);
+        } else {
+            $this->applyRegistrationFilters($query, $filters);
+        }
+        $ids = $query->orderBy('hall_ticket_no')->pluck('id')->all();
+        if (! $ids) {
+            return back()->with('error', 'No issued admit cards match this selection. Assign registration numbers first.');
+        }
+        $scope = ! empty($filters['registration_id']) ? 'Individual candidate #'.$filters['registration_id']
+            : implode(' · ', array_filter([
+                ! empty($filters['class']) ? 'Class: '.$filters['class'] : null,
+                ! empty($filters['school_id']) ? 'School: '.\App\Models\Tenant::find($filters['school_id'])?->name : null,
+                ! empty($filters['search']) ? 'Search: '.$filters['search'] : null,
+            ]));
+        $export = \App\Models\McqAdmitCardExport::create([
+            'tenant_id' => $this->sahodaya->id, 'exam_id' => $exam->id,
+            'scope_description' => $scope ?: 'All issued admit cards',
+            'registration_ids' => $ids, 'total_count' => count($ids), 'status' => 'pending',
+            'filename' => (\Illuminate\Support\Str::slug($exam->title) ?: 'exam').'-admit-cards-'.now()->format('Ymd-His').'.pdf',
+            'storage_disk' => TenantStorage::uploadDisk(),
+        ]);
+        \App\Jobs\GenerateMcqAdmitCardExport::dispatch($this->sahodaya->id, $export->id);
+
+        return back()->with('success', 'Admit card PDF generation started. The saved file will appear below when ready.');
+    }
+
+    public function downloadSavedAdmitCardPdf(string $tenantId, McqExam $exam, \App\Models\McqAdmitCardExport $export)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id || $export->tenant_id !== $this->sahodaya->id
+            || $export->exam_id !== $exam->id, 403);
+        abort_if($export->status !== 'completed' || ! $export->file_path, 404, 'The PDF is not ready.');
+
+        return TenantStorage::downloadPrivate($export->file_path, $export->storage_disk, $export->filename);
     }
 
     public function generateHallTickets(string $tenantId, McqExam $exam, McqHallTicketService $service)

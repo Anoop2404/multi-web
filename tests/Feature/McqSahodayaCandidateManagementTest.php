@@ -90,6 +90,63 @@ class McqSahodayaCandidateManagementTest extends TestCase
         return compact('sahodaya', 'sahodayaAdmin', 'school', 'class', 'student1', 'student2', 'exam');
     }
 
+    public function test_saved_admit_card_generation_records_failure_and_respects_class_filter(): void
+    {
+        $env = $this->setUpEnvironment();
+        \Illuminate\Support\Facades\Queue::fake();
+        $base = ['exam_id' => $env['exam']->id, 'school_id' => $env['school']->id,
+            'status' => 'registered', 'approval_status' => 'approved'];
+        $alice = McqRegistration::create($base + ['student_id' => $env['student1']->id, 'hall_ticket_no' => '101']);
+        $otherClass = SchoolClass::create(['tenant_id' => $env['school']->id, 'name' => 'Class 9', 'is_active' => true]);
+        $env['student2']->update(['school_class_id' => $otherClass->id]);
+        McqRegistration::create($base + ['student_id' => $env['student2']->id, 'hall_ticket_no' => '102']);
+        $url = "/sahodaya-admin/{$env['sahodaya']->id}/mcq-exams/{$env['exam']->id}/hall-tickets/saved-pdfs";
+        $this->actingAs($env['sahodayaAdmin'])->post($url, ['class' => 'Class 10'])->assertRedirect();
+        $export = \App\Models\McqAdmitCardExport::firstOrFail();
+        $this->assertSame([$alice->id], $export->registration_ids);
+        $alice->update(['status' => 'cancelled']);
+        try {
+            (new \App\Jobs\GenerateMcqAdmitCardExport($env['sahodaya']->id, $export->id))->handle();
+            $this->fail('Expected generation to fail for cancelled candidates.');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('No issued admit cards remain in this selection.', $e->getMessage());
+        }
+        $this->assertSame('failed', $export->fresh()->status);
+        $this->get($url.'/'.$export->id)->assertNotFound();
+        $this->post($url, ['class' => 'Unknown'])->assertRedirect()->assertSessionHas('error');
+        $this->assertSame(1, \App\Models\McqAdmitCardExport::count());
+    }
+
+    public function test_admit_card_pdfs_are_saved_and_downloaded_without_rendering_again(): void
+    {
+        $env = $this->setUpEnvironment();
+        \Illuminate\Support\Facades\Storage::fake('shared');
+        config(['filesystems.upload_disk' => 'shared', 'services.pdf_converter.url' => 'http://pdf-renderer.test/convert']);
+        \Illuminate\Support\Facades\Queue::fake();
+        \Illuminate\Support\Facades\Http::fake(['*' => \Illuminate\Support\Facades\Http::response('%PDF-saved-card', 200)]);
+        $base = ['exam_id' => $env['exam']->id, 'school_id' => $env['school']->id,
+            'status' => 'registered', 'approval_status' => 'approved'];
+        $alice = McqRegistration::create($base + ['student_id' => $env['student1']->id, 'hall_ticket_no' => '101']);
+        $bob = McqRegistration::create($base + ['student_id' => $env['student2']->id, 'hall_ticket_no' => '102']);
+        $url = "/sahodaya-admin/{$env['sahodaya']->id}/mcq-exams/{$env['exam']->id}/hall-tickets/saved-pdfs";
+        $this->actingAs($env['sahodayaAdmin'])->post($url, ['registration_id' => $alice->id])->assertRedirect();
+        $export = \App\Models\McqAdmitCardExport::firstOrFail();
+        $this->assertSame([$alice->id], $export->registration_ids);
+        $this->assertSame('pending', $export->status);
+        $this->get($url.'/'.$export->id)->assertNotFound();
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\GenerateMcqAdmitCardExport::class);
+        (new \App\Jobs\GenerateMcqAdmitCardExport($env['sahodaya']->id, $export->id))->handle();
+        $export->refresh();
+        $this->assertSame('completed', $export->status);
+        \Illuminate\Support\Facades\Storage::disk('shared')->assertExists($export->file_path);
+        \Illuminate\Support\Facades\Http::assertSent(fn ($request) => str_contains($request['html'], 'Alice Candidate') && ! str_contains($request['html'], 'Bob Candidate'));
+        \Illuminate\Support\Facades\Http::fake();
+        $this->get($url.'/'.$export->id)->assertOk()->assertDownload($export->filename);
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+        $export->update(['tenant_id' => 'another-tenant']);
+        $this->get($url.'/'.$export->id)->assertForbidden();
+    }
+
     public function test_admit_card_exports_filter_class_and_individual_and_download_pdf(): void
     {
         $env = $this->setUpEnvironment();

@@ -124,7 +124,7 @@
             </div>
             <div class="flex items-center gap-3">
                 <span class="text-xs text-slate-500 font-semibold">Showing {{ registrations.total }} candidate(s)</span>
-                <a :href="ticketExportUrl(true)" class="btn-primary text-sm">Download {{ hasFilters ? 'filtered' : 'all' }} admit cards PDF</a>
+                <button type="button" :disabled="exportGenerating" @click="savePdf()" class="btn-primary text-sm">{{ exportGenerating ? 'Starting…' : `Generate & save ${hasFilters ? 'filtered' : 'all'} admit cards PDF` }}</button>
             </div>
         </div>
 
@@ -172,6 +172,7 @@
                             <td class="text-right text-xs">
                                 <div class="flex items-center justify-end gap-3">
                                     <a v-if="r.hall_ticket_no" :href="ticketExportUrl(true, r.id)" class="font-semibold text-indigo-600 hover:underline">Download PDF</a>
+                                    <button v-if="r.hall_ticket_no" type="button" :disabled="exportGenerating" @click="savePdf(r.id)" class="font-semibold text-indigo-600 hover:underline">Generate & save PDF</button>
                                     <button
                                         v-if="!r.hall_ticket_no && r.status !== 'cancelled'"
                                         type="button"
@@ -201,6 +202,21 @@
             <PaginationLinks :links="registrations.links" :meta="{ from: registrations.from, to: registrations.to, total: registrations.total, last_page: registrations.last_page }" />
         </div>
 
+        <section class="card mt-6">
+            <h3 class="section-title">Saved admit card PDFs</h3>
+            <p class="section-desc">Saved files can be downloaded again without generating them. Generate a new PDF after changing card designs, candidate details, seats, or passcodes.</p>
+            <p v-if="!savedExports.length" class="text-sm text-slate-500">No saved PDFs yet. Select a class or student, then choose Generate & save PDF.</p>
+            <div v-for="file in savedExports" :key="file.id" class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 py-3">
+                <div>
+                    <p class="font-semibold text-sm">{{ file.scope_description }} · {{ file.total_count }} card(s)</p>
+                    <p class="text-xs text-slate-500">{{ file.filename }}</p>
+                </div>
+                <a v-if="file.status === 'completed'" :href="`${exportBase}/${file.id}`" class="btn-secondary text-sm">Download saved PDF</a>
+                <span v-else-if="file.status === 'failed'" class="text-sm text-rose-600">Generation failed. Generate again to retry.</span>
+                <span v-else class="text-sm text-indigo-600">{{ file.status === 'processing' ? 'Generating PDF…' : 'Waiting to generate…' }}</span>
+            </div>
+        </section>
+
         <McqAddCandidateModal
             :show="showAddCandidateModal"
             :sahodaya-id="sahodaya.id"
@@ -213,7 +229,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
@@ -233,6 +249,7 @@ const props = defineProps({
     exam: Object,
     templates: { type: Array, default: () => [] },
     registrations: Object,
+    savedExports: { type: Array, default: () => [] },
     hallTicketDesign: Object,
     defaultHallTicketDesign: Object,
     backgroundUrl: String,
@@ -262,6 +279,25 @@ const filterForm = reactive({
 });
 
 const hasFilters = computed(() => !!(filterForm.search || filterForm.school_id || filterForm.class));
+
+const exportGenerating = ref(false);
+const exportBase = computed(() => `/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/saved-pdfs`);
+function savePdf(registrationId = null) {
+    exportGenerating.value = true;
+    router.post(exportBase.value, registrationId ? { registration_id: registrationId } : { ...filterForm }, {
+        preserveScroll: true,
+        onFinish: () => { exportGenerating.value = false; },
+    });
+}
+let exportPoll;
+onMounted(() => {
+    exportPoll = setInterval(() => {
+        if (props.savedExports.some(file => ['pending', 'processing'].includes(file.status))) {
+            router.reload({ only: ['savedExports'], preserveScroll: true });
+        }
+    }, 5000);
+});
+onUnmounted(() => clearInterval(exportPoll));
 
 function ticketExportUrl(download = false, registrationId = null) {
     const params = new URLSearchParams();
