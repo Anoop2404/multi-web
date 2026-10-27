@@ -48,12 +48,14 @@
     $gateLabel = \App\Support\Mcq\McqHallTicketDesign::gateClosureLabel($exam->scheduled_at, $design) ?? 'At Exam Start';
     $qrService = app(\App\Services\Events\FestIdCardQrService::class);
 @endphp
+    @unless($pdfDownload ?? false)
     <p class="no-print" style="margin-bottom:16px;font-size:13px;font-family:sans-serif;display:flex;align-items:center;gap:12px;">
         <button onclick="window.print()" style="padding:8px 20px;background:{{ $design['primary_color'] }};color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:bold;">
             🖨️ Print All ({{ count($registrations) }} tickets)
         </button>
         <span style="color:#64748b;font-weight:600;">{{ $exam->title }} ({{ $isArtwork ? ($die['per_page'] . ' cards per A4') : ($isCompact ? 'Compact 2-Up' : 'Standard Full A4') }})</span>
     </p>
+    @endunless
 
     @foreach(collect($registrations)->chunk($isArtwork ? $die['per_page'] : max(1, count($registrations))) as $pageRegistrations)
     <div class="ticket-page"><div class="tickets-wrapper">

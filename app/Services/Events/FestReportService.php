@@ -265,7 +265,9 @@ class FestReportService
     public function uniqueParticipantCategoryReport(?string $schoolId = null): array
     {
         $rootEvent = $this->event->rootEvent();
-        $rawCategoryLabels = FestClassGroupScheme::labels(null, $rootEvent);
+        $rawCategoryLabels = $rootEvent->event_type === 'sports'
+            ? \App\Support\FestSportsAgeGroup::labels($rootEvent->tenant_id)
+            : FestClassGroupScheme::labels(null, $rootEvent);
 
         $schoolId = $this->scopedSchoolId($schoolId);
         $participants = $this->participantsFlat(schoolId: $schoolId);
@@ -292,7 +294,9 @@ class FestReportService
             $rawCat = $item?->class_group;
             $catKey = null;
 
-            if ($rawCat && $rawCat !== 'open') {
+            if ($rootEvent->event_type === 'sports') {
+                $catKey = \App\Support\FestSportsAgeGroup::resolveForItem($item?->age_group, $rawCat, 'sports', $rootEvent->tenant_id);
+            } elseif ($rawCat && $rawCat !== 'open') {
                 $catKey = FestClassGroupScheme::resolveItemKey($rawCategoryLabels, $rawCat);
             } elseif ($p->student) {
                 $studentCat = FestStudentClassResolver::classGroupForStudent($p->student, $rootEvent);
@@ -598,7 +602,7 @@ class FestReportService
                 $schools[$schoolKey]['students'][$personKey]['name'] = $person->name;
                 $schools[$schoolKey]['students'][$personKey]['results'][] = [
                     'item' => $mark->item?->title ?? 'Item',
-                    'category' => $categoryLabels[$mark->item?->class_group] ?? $mark->item?->age_group ?? '',
+                    'category' => FestItemCategoryLabel::resolve($mark->item, $categoryLabels) ?? '',
                     'rank' => $mark->position ? (int) $mark->position : null,
                     'grade' => $mark->grade,
                 ];
@@ -711,6 +715,7 @@ class FestReportService
                 'item_id'      => $item->id,
                 'title'        => $item->title,
                 'class_group'  => $item->class_group,
+                'category_label' => FestItemCategoryLabel::resolve($item, FestClassGroupScheme::labels(null, $this->event->rootEvent())),
                 'head_id'      => $item->head_id,
                 'head_name'    => $item->head?->name,
                 'judges'       => $judges,
@@ -1046,9 +1051,7 @@ class FestReportService
                     // single-item header meta line (item_category/item_type/item_gender
                     // keys were previously read but never actually set anywhere, so that
                     // header line was always blank).
-                    'item_category' => ($classGroup !== '' && $classGroup !== 'open')
-                        ? \App\Support\FestClassGroupScheme::resolveItemLabel($classGroupLabels, $classGroup)
-                        : null,
+                    'item_category' => FestItemCategoryLabel::resolve($item, $classGroupLabels),
                     'item_type'   => $item ? (\App\Support\FestTeamSquadRules::isMultiPerson($item->participant_type) ? 'Group' : 'Individual') : null,
                     'item_gender' => $item ? (\App\Support\FestSportsAgeGroup::genderLabel($item->gender) ?? 'Open') : null,
                 ],
@@ -1118,7 +1121,7 @@ class FestReportService
             ->map(fn (FestParticipant $p) => [
                 $p->registration?->item?->head?->name,
                 $p->registration?->item?->title,
-                $p->registration?->item?->class_group,
+                FestItemCategoryLabel::resolve($p->registration?->item, FestClassGroupScheme::labels(null, $this->event->rootEvent())),
                 $p->registration?->school?->name,
                 $p->student?->name ?? $p->teacher?->name,
                 $p->student?->reg_no,
@@ -1492,7 +1495,9 @@ class FestReportService
     private function individualChampionshipXls(): StreamedResponse
     {
         $data = $this->individualChampionshipData();
-        $categoryLabels = FestClassGroupScheme::labels(null, $this->event->rootEvent());
+        $categoryLabels = $this->event->rootEvent()->event_type === 'sports'
+            ? \App\Support\FestSportsAgeGroup::labels($this->event->tenant_id)
+            : FestClassGroupScheme::labels(null, $this->event->rootEvent());
         $genderLabels = ['male' => 'Boys', 'female' => 'Girls'];
 
         $headers = ['Rank', 'Student', 'School', 'Category', 'Gender', 'Points'];
@@ -1516,7 +1521,9 @@ class FestReportService
     private function individualChampionshipPdf(): \Symfony\Component\HttpFoundation\Response
     {
         $data = $this->individualChampionshipData();
-        $categoryLabels = FestClassGroupScheme::labels(null, $this->event->rootEvent());
+        $categoryLabels = $this->event->rootEvent()->event_type === 'sports'
+            ? \App\Support\FestSportsAgeGroup::labels($this->event->tenant_id)
+            : FestClassGroupScheme::labels(null, $this->event->rootEvent());
         $genderLabels = ['male' => 'Boys', 'female' => 'Girls'];
 
         $groups = $data['rows']
@@ -2118,7 +2125,7 @@ class FestReportService
         $data = $this->markEntryStatusRows();
         $rows = array_map(fn ($r) => [
             $r['title'],
-            $r['class_group'] ?? '',
+            $r['category_label'] ?? $r['class_group'] ?? '',
             $r['judges'],
             $r['participants'],
             $r['marked'],
@@ -2391,14 +2398,14 @@ class FestReportService
                 $p->student?->name ?? $p->teacher?->name ?? '',
                 $p->registration?->school?->name ?? '',
                 $p->registration?->item?->title ?? '',
-                $p->registration?->item?->class_group ?? '',
+                FestItemCategoryLabel::resolve($p->registration?->item, FestClassGroupScheme::labels(null, $this->event->rootEvent())) ?? '',
                 $p->chest_no ?? '',
                 $p->level_registration_number ?? '',
             ];
         });
 
         return ExcelExport::download($this->slug().'-student-participation', [
-            'Reg No', 'Name', 'School', 'Item', 'Class Group', 'Chest No', 'Level Reg No',
+            'Reg No', 'Name', 'School', 'Item', 'Category', 'Chest No', 'Level Reg No',
         ], $rows, ExcelExport::generatedOnNote());
     }
 

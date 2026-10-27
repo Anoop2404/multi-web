@@ -90,6 +90,35 @@ class McqSahodayaCandidateManagementTest extends TestCase
         return compact('sahodaya', 'sahodayaAdmin', 'school', 'class', 'student1', 'student2', 'exam');
     }
 
+    public function test_admit_card_exports_filter_class_and_individual_and_download_pdf(): void
+    {
+        $env = $this->setUpEnvironment();
+        $base = ['exam_id' => $env['exam']->id, 'school_id' => $env['school']->id,
+            'status' => 'registered', 'approval_status' => 'approved'];
+        $alice = McqRegistration::create($base + ['student_id' => $env['student1']->id, 'hall_ticket_no' => '101']);
+        $bob = McqRegistration::create($base + ['student_id' => $env['student2']->id, 'hall_ticket_no' => '102']);
+        $otherClass = SchoolClass::create(['tenant_id' => $env['school']->id, 'name' => 'Class 9', 'is_active' => true]);
+        $env['student2']->update(['school_class_id' => $otherClass->id]);
+        $url = "/sahodaya-admin/{$env['sahodaya']->id}/mcq-exams/{$env['exam']->id}/hall-tickets/print-all";
+        $this->actingAs($env['sahodayaAdmin'])->get($url.'?class=Class%2010')
+            ->assertOk()->assertViewHas('registrations', fn ($rows) => $rows->modelKeys() === [$alice->id]);
+        $this->get($url.'?registration_id='.$bob->id)
+            ->assertOk()->assertViewHas('registrations', fn ($rows) => $rows->modelKeys() === [$bob->id]);
+        $this->get($url.'?class=Unknown')->assertNotFound();
+
+        config(['services.pdf_converter.url' => 'http://pdf-renderer.test/convert']);
+        \Illuminate\Support\Facades\Http::fake(['*' => \Illuminate\Support\Facades\Http::response('%PDF-test', 200, ['Content-Type' => 'application/pdf'])]);
+        $this->get($url.'?download=1&registration_id='.$alice->id)->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf')
+            ->assertDownload();
+        \Illuminate\Support\Facades\Http::assertSent(fn ($request) => str_contains($request['html'], 'Alice Candidate')
+            && ! str_contains($request['html'], 'Bob Candidate') && ! str_contains($request['html'], 'Print All'));
+        $alice->update(['status' => 'cancelled']);
+        $this->get($url.'?registration_id='.$alice->id)->assertNotFound();
+        $bob->update(['hall_ticket_no' => null]);
+        $this->get($url.'?registration_id='.$bob->id)->assertNotFound();
+    }
+
     public function test_centre_code_auto_assignment_lists_schools_and_preserves_existing_codes(): void
     {
         \Illuminate\Support\Facades\Storage::fake('local');

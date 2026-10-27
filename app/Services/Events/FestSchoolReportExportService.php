@@ -210,7 +210,9 @@ class FestSchoolReportExportService
             $r['head_name'] ?? '—',
             $r['title'],
             $r['item_code'] ?? '',
-            $r['age_group'] ?? $r['class_group'] ?? '',
+            ($event->event_type === 'sports'
+                ? (\App\Support\FestSportsAgeGroup::labels($event->tenant_id)[$r['age_group'] ?? \App\Support\FestSportsAgeGroup::fromClassGroup($r['class_group'] ?? null, $event->tenant_id) ?? 'open'] ?? $r['age_group'] ?? '')
+                : ($r['class_group'] ?? '')),
             $r['approved'],
             $r['pending'],
             $r['registration_count'],

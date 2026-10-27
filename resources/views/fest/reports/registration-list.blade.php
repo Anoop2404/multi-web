@@ -7,7 +7,7 @@
 
 <h2 style="text-align:center">{{ $event->title }} — Registration Master List</h2>
 <p style="text-align:center;font-size:10px;color:#64748b;margin-top:2px">Generated on {{ now()->format('d M Y, h:i A') }}</p>
-<table><thead><tr><th>Sl No</th><th>School</th><th>Item</th><th>Class</th><th>Students</th><th>Chest</th><th>Status</th></tr></thead>
+<table><thead><tr><th>Sl No</th><th>School</th><th>Item</th><th>Category</th><th>Students</th><th>Chest</th><th>Status</th></tr></thead>
 <tbody>
 @php $slNo = 0; @endphp
 @foreach($rows as $r)
@@ -17,7 +17,7 @@
 <td>{{ $slNo }}</td>
 <td>{{ strtoupper($r->school?->name ?? '') }}</td>
 <td>{{ $r->item?->title }}</td>
-<td>{{ strtoupper($r->item?->class_group ?? '') }}</td>
+<td>{{ \App\Support\FestItemCategoryLabel::resolve($r->item, \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent())) ?? '—' }}</td>
 <td>{{ $p->student?->name ?? $p->teacher?->name ?? '—' }}</td>
 <td>{{ $p->chest_no ?? '—' }}</td>
 <td>{{ $r->status }}</td>

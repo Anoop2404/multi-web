@@ -25,7 +25,7 @@
                     Regenerate all Reg. Nos
                 </button>
                 <button type="button" @click="allocateSeats(false)" class="btn-secondary text-sm">Allocate seats</button>
-                <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/hall-tickets/print-all`"
+                <a :href="ticketExportUrl(false)"
                    target="_blank" rel="noopener" class="btn-secondary text-sm">Print all ↗</a>
                 </template>
             </template>
@@ -122,7 +122,10 @@
                 <SearchableSelect v-model="filterForm.class" :options="classOptions.map(c => ({ value: c, label: c }))" :all-option="true" all-label="All classes" placeholder="All classes" />
                 <button v-if="hasFilters" type="button" @click="clearFilters" class="text-xs text-slate-400 hover:underline">Clear</button>
             </div>
-            <span class="text-xs text-slate-500 font-semibold">Showing {{ registrations.total }} candidate(s)</span>
+            <div class="flex items-center gap-3">
+                <span class="text-xs text-slate-500 font-semibold">Showing {{ registrations.total }} candidate(s)</span>
+                <a :href="ticketExportUrl(true)" class="btn-primary text-sm">Download {{ hasFilters ? 'filtered' : 'all' }} admit cards PDF</a>
+            </div>
         </div>
 
         <div class="form-section overflow-hidden !p-0">
@@ -168,6 +171,7 @@
                             </td>
                             <td class="text-right text-xs">
                                 <div class="flex items-center justify-end gap-3">
+                                    <a v-if="r.hall_ticket_no" :href="ticketExportUrl(true, r.id)" class="font-semibold text-indigo-600 hover:underline">Download PDF</a>
                                     <button
                                         v-if="!r.hall_ticket_no && r.status !== 'cancelled'"
                                         type="button"
@@ -258,6 +262,16 @@ const filterForm = reactive({
 });
 
 const hasFilters = computed(() => !!(filterForm.search || filterForm.school_id || filterForm.class));
+
+function ticketExportUrl(download = false, registrationId = null) {
+    const params = new URLSearchParams();
+    const selection = registrationId ? { registration_id: registrationId } : filterForm;
+    for (const [key, value] of Object.entries(selection)) {
+        if (value !== null && value !== '') params.set(key, value);
+    }
+    if (download) params.set('download', '1');
+    return `/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/print-all?${params}`;
+}
 
 function applyFilters() {
     router.get(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets`, { ...filterForm }, { preserveState: true, preserveScroll: true });

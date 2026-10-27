@@ -8,8 +8,8 @@ use App\Models\FestEventItem;
  * Centralizes the "category" shown next to a Kalotsav item's name across mark entry
  * sheets, exports, public visibility, and reports. "Category" in Kalotsav context
  * usually means the item's class/age bracket (e.g. "Category 1 — Classes 3 & 4"), not
- * the internal arts_category genre tag — so class_group takes priority, then the
- * sports-only age_group, and only then the arts genre as a last resort. Callers pass
+ * the internal arts_category genre tag — so sports age_group takes priority over legacy class_group values,
+ * followed by the arts genre as a last resort. Callers pass
  * in already-resolved label maps (FestClassGroupScheme::labels(), the arts_category
  * taxonomy) so this stays a cheap, DB-free lookup safe to call in a loop.
  */
@@ -25,15 +25,21 @@ class FestItemCategoryLabel
             return null;
         }
 
-        if ($item->class_group && $item->class_group !== 'open') {
-            return FestClassGroupScheme::resolveItemLabel($classGroupLabels, $item->class_group);
+        // An explicit sports age bracket is more specific than a legacy class group.
+        $tenantId = $item->age_group ? $item->event?->tenant_id : null;
+        $ageGroup = $item->age_group;
+        if (! $ageGroup && $item->event_id && $item->event?->event_type === 'sports') {
+            $tenantId = $item->event->tenant_id;
+            $ageGroup = FestSportsAgeGroup::fromClassGroup($item->class_group, $tenantId);
         }
-
-        if ($item->age_group) {
-            $tenantId = $item->event?->tenant_id;
+        if ($ageGroup) {
             $labels = FestSportsAgeGroup::labels($tenantId);
 
-            return $labels[$item->age_group] ?? $item->age_group;
+            return $labels[$ageGroup] ?? $ageGroup;
+        }
+
+        if ($item->class_group && $item->class_group !== 'open') {
+            return FestClassGroupScheme::resolveItemLabel($classGroupLabels, $item->class_group);
         }
 
         if ($item->category && $item->category !== 'general') {

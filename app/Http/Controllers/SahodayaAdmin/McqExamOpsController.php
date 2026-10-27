@@ -481,14 +481,41 @@ class McqExamOpsController extends SahodayaAdminController
         return back()->with('success', "New passcode for {$name}: {$code}. The old one no longer works — reprint their hall ticket.");
     }
 
-    public function printAllHallTickets(string $tenantId, McqExam $exam)
+    public function printAllHallTickets(Request $request, string $tenantId, McqExam $exam)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
-        $registrations = McqRegistration::where('exam_id', $exam->id)
-            ->with(['student.schoolClass', 'teacher', 'school'])
-            ->orderBy('hall_ticket_no')
-            ->get();
+        $filters = $request->validate([
+            'search' => 'nullable|string|max:100',
+            'school_id' => 'nullable|string|max:36',
+            'class' => 'nullable|string|max:60',
+            'registration_id' => 'nullable|integer|min:1',
+            'download' => 'nullable|boolean',
+        ]);
+        $query = McqRegistration::where('exam_id', $exam->id)
+            ->active()
+            ->whereNotNull('hall_ticket_no')
+            ->with(['student.schoolClass', 'teacher', 'school']);
+        $this->applyRegistrationFilters($query, $filters);
+        if (! empty($filters['registration_id'])) {
+            $query->whereKey($filters['registration_id']);
+        }
+        $registrations = $query->orderBy('hall_ticket_no')->get();
+        abort_if($registrations->isEmpty(), 404, 'No issued admit cards match this selection. Assign registration numbers first.');
+
+        if ($request->boolean('download')) {
+            $design = McqHallTicketDesign::fromExam($exam);
+            $artwork = in_array($design['layout'] ?? '', ['stse_three_up', 'custom_background'], true);
+            $suffix = ! empty($filters['registration_id']) ? '-'.$filters['registration_id']
+                : (! empty($filters['class']) ? '-class-'.\Illuminate\Support\Str::slug($filters['class']) : '');
+
+            return \App\Support\PdfGenerator::fromView(
+                'mcq.hall-tickets-bulk',
+                compact('exam', 'registrations', 'design') + ['pdfDownload' => true],
+                (\Illuminate\Support\Str::slug($exam->title) ?: 'exam').'-admit-cards'.$suffix.'.pdf',
+                isLandscape: $artwork && ($design['page_orientation'] ?? 'landscape') === 'landscape',
+            );
+        }
 
         return view('mcq.hall-tickets-bulk', compact('exam', 'registrations'));
     }

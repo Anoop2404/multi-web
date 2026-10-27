@@ -19,7 +19,7 @@ h3{margin:0 0 6px;color:#1e3a8a;font-size:15px}
 @if($showChestNo ?? true)
 <strong>Chest:</strong> {{ $p->chest_no ?? 'TBA' }} ·
 @endif
-<strong>Class:</strong> {{ strtoupper($p->registration?->item?->class_group ?? '') }}
+<strong>Category:</strong> {{ \App\Support\FestItemCategoryLabel::resolve($p->registration?->item, \App\Support\FestClassGroupScheme::labels(null, $event->rootEvent())) ?? '—' }}
 </p>
 @if($event->venue)<p class="meta"><strong>Venue:</strong> {{ $event->venue }}</p>@endif
 </div>

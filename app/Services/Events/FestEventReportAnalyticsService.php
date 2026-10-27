@@ -175,8 +175,7 @@ class FestEventReportAnalyticsService
     /** @return array{schools: list<string>, age_groups: list<string>, matrix: array<string, array<string, int>>, totals: array<string, int>} */
     public function ageGroupMatrix(?string $schoolId = null): array
     {
-        $taxonomy = app(FestTaxonomyRegistry::class)->forTenant($this->event->tenant_id);
-        $ageLabels = $taxonomy->allLabels()['age_group'] ?? [];
+        $ageLabels = \App\Support\FestSportsAgeGroup::labels($this->event->tenant_id);
 
         $query = FestRegistration::where('fest_registrations.event_id', $this->event->id)
             ->whereIn('fest_registrations.status', ['submitted', 'approved'])
@@ -1276,7 +1275,7 @@ class FestEventReportAnalyticsService
                 'student.schoolClass:id,name',
                 'teacher:id,name,reg_no',
                 'registration.school:id,name',
-                'registration.item:id,title,head_id,class_group,category,competition_start,competition_end,competition_time',
+                'registration.item:id,event_id,title,head_id,class_group,age_group,category,competition_start,competition_end,competition_time',
             ])
             ->get()
             ->groupBy(fn ($p) => $itemHeadMap->get($p->registration?->item_id));
@@ -1348,7 +1347,7 @@ class FestEventReportAnalyticsService
                 'student.schoolClass:id,name',
                 'teacher:id,name,reg_no',
                 'registration.school:id,name',
-                'registration.item:id,title,head_id,class_group,category,competition_start,competition_end,competition_time',
+                'registration.item:id,event_id,title,head_id,class_group,age_group,category,competition_start,competition_end,competition_time',
             ])
             ->get()
             ->groupBy(fn ($p) => $p->registration?->event_id);
@@ -1627,7 +1626,7 @@ class FestEventReportAnalyticsService
                 'student:id,name,reg_no,tenant_id',
                 'teacher:id,name,reg_no',
                 'registration.school:id,name',
-                'registration.item:id,title,area_id,class_group,category',
+                'registration.item:id,event_id,title,area_id,class_group,age_group,category',
             ])
             ->get()
             ->groupBy(fn ($p) => $itemAreaMap->get($p->registration?->item_id));
@@ -1667,7 +1666,7 @@ class FestEventReportAnalyticsService
                         'student:id,name,reg_no,tenant_id',
                         'teacher:id,name,reg_no',
                         'registration.school:id,name',
-                        'registration.item:id,title,area_id,class_group,category',
+                        'registration.item:id,event_id,title,area_id,class_group,age_group,category',
                     ])
                     ->get();
 
@@ -2106,7 +2105,7 @@ class FestEventReportAnalyticsService
                 // int-typed eventById() throws a TypeError the moment score-based grading
                 // needs it (a combined participation-certificate/hub-level view is exactly
                 // when $item->event_id genuinely differs from $event->id).
-                'registration.item:id,event_id,title,item_code,category,stage_type,participant_type,gender,class_group,results_published_at,results_hidden',
+                'registration.item:id,event_id,title,item_code,category,stage_type,participant_type,gender,class_group,age_group,results_published_at,results_hidden',
                 'registration.event:id,source_phase_id,region_id',
                 'registration.event.sourcePhase:id,name',
                 'registration.event.region:id,name,code',
@@ -2158,7 +2157,7 @@ class FestEventReportAnalyticsService
                     'item_title' => $item->title,
                     'item_code' => $item->item_code,
                     'category' => FestClassGroupScheme::resolveItemKey($classGroupLabels, $item->class_group),
-                    'category_label' => FestClassGroupScheme::resolveItemLabel($classGroupLabels, $item->class_group),
+                    'category_label' => FestItemCategoryLabel::resolve($item, $classGroupLabels),
                     'stage_type' => $item->stage_type,
                     'participant_type' => $item->participant_type,
                     'results_published' => $itemPublished,
