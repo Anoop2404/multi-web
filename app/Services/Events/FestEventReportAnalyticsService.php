@@ -2253,6 +2253,7 @@ class FestEventReportAnalyticsService
             ->pluck('name', 'id');
 
         $taxonomy = app(FestTaxonomyRegistry::class)->forTenant($this->event->tenant_id)->labels('arts_category');
+        $classGroupLabels = FestClassGroupScheme::labels(null, $this->event->rootEvent());
         $usesPhasedRegionalBilling = $this->event->rootEvent()->usesPhasedRegionalBilling();
 
         return FestParticipant::query()
@@ -2268,7 +2269,7 @@ class FestEventReportAnalyticsService
                 'group:id,chest_no',
                 'registration:id,event_id,item_id,school_id,status',
                 'registration.school:id,name',
-                'registration.item:id,title,item_code,category',
+                'registration.item:id,event_id,title,item_code,category,class_group,age_group',
                 'registration.event:id,source_phase_id,region_id',
                 'registration.event.sourcePhase:id,name',
                 'registration.event.region:id,name,code',
@@ -2277,7 +2278,7 @@ class FestEventReportAnalyticsService
             ->filter(fn (FestParticipant $p) => $p->registration && $p->registration->item)
             ->map(fn (FestParticipant $p) => [$p, $absentByKey->get($p->registration->item_id.'-'.$p->id)])
             ->filter(fn (array $tuple) => $tuple[1] !== null)
-            ->map(function (array $tuple) use ($taxonomy, $usesPhasedRegionalBilling, $markedByNames) {
+            ->map(function (array $tuple) use ($taxonomy, $classGroupLabels, $usesPhasedRegionalBilling, $markedByNames) {
                 [$p, $attendance] = $tuple;
                 $registration = $p->registration;
                 $item = $registration->item;
@@ -2287,7 +2288,7 @@ class FestEventReportAnalyticsService
                     'item_id' => $item->id,
                     'item_title' => $item->title,
                     'item_code' => $item->item_code,
-                    'category_label' => $taxonomy[$item->category] ?? ucfirst((string) $item->category),
+                    'category_label' => FestItemCategoryLabel::resolve($item, $classGroupLabels, $taxonomy),
                     'phase_name' => $usesPhasedRegionalBilling ? ($event?->sourcePhase?->name) : null,
                     'region_name' => $event?->region?->name,
                     'region_code' => $event?->region?->code,

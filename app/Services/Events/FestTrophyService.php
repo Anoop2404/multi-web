@@ -49,7 +49,9 @@ class FestTrophyService
         $targetEvent = $cumulative ? $root : $event;
 
         $types = $trophies->pluck('trophy_type');
-        $categoryLabels = FestClassGroupScheme::labels(null, $targetEvent);
+        $categoryLabels = $root->event_type === 'sports'
+            ? \App\Support\FestSportsAgeGroup::labels($root->tenant_id)
+            : FestClassGroupScheme::labels(null, $targetEvent);
         $itemStandings = [];
         $groupStandings = [];
         // Only compute leaderboards the configured trophies actually use.
@@ -94,7 +96,7 @@ class FestTrophyService
                     'position_ordinal' => $trophy->positionOrdinal(),
                     'award_type' => $trophy->award_type,
                     'category_key' => $trophy->category_key,
-                    'category_label' => $trophy->category_key ? FestClassGroupScheme::resolveItemLabel($categoryLabels, $trophy->category_key) : null,
+                    'category_label' => $trophy->category_key ? ($categoryLabels[$trophy->category_key] ?? FestClassGroupScheme::resolveItemLabel($categoryLabels, $trophy->category_key)) : null,
                     'item_id' => $trophy->item_id,
                     'item_name' => $trophy->item?->title,
                     'item_name_pattern' => $trophy->item_name_pattern,

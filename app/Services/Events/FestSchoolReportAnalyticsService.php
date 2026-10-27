@@ -330,6 +330,7 @@ class FestSchoolReportAnalyticsService
                 'title'                => $r['title'],
                 'item_code'            => $r['item_code'] ?? null,
                 'age_group'            => $r['age_group'] ?? null,
+                'category_label'       => $r['category_label'] ?? null,
                 'class_group'          => $r['class_group'] ?? null,
                 'sport_discipline'     => $r['sport_discipline'] ?? null,
                 'competition_start'    => $r['competition_start'],
@@ -399,6 +400,7 @@ class FestSchoolReportAnalyticsService
                 'title'     => $item->title,
                 'head_name' => $item->head?->name,
                 'age_group' => $item->age_group,
+                'category_label' => \App\Support\FestItemCategoryLabel::resolve($item, \App\Support\FestClassGroupScheme::labels(null, $this->event->rootEvent())),
             ],
             'participants' => $participants,
         ];

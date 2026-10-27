@@ -76,9 +76,9 @@
                                     <p v-if="row.item_code" class="text-xs font-mono text-slate-400 mt-0.5">{{ row.item_code }}</p>
                                 </td>
                                 <td class="text-xs text-slate-600">
-                                    <span v-if="row.age_group">{{ row.age_group }}</span>
+                                    <span v-if="row.category_label">{{ row.category_label }}</span>
                                     <span v-if="row.sport_discipline"> · {{ row.sport_discipline }}</span>
-                                    <span v-if="!row.age_group && !row.sport_discipline">—</span>
+                                    <span v-if="!row.category_label && !row.sport_discipline">—</span>
                                 </td>
                                 <td class="text-sm text-slate-600">{{ formatWindow(row) }}</td>
                                 <td class="text-sm">
