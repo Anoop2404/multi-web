@@ -536,22 +536,24 @@ class FestMarkEntryController extends SahodayaAdminController
 
         $data = $request->validate([
             'judge_count'           => 'nullable|integer|min:1|max:20',
-            'total_marks'           => 'nullable|numeric|min:0',
+            'total_marks'           => 'nullable|numeric|gt:0|max:999999.99|decimal:0,2',
             'sync_to_child_events'  => 'nullable|boolean',
             'criteria'              => 'nullable|array',
             'criteria.*.id'         => 'nullable|integer',
             'criteria.*.label'      => 'required|string|max:100',
-            'criteria.*.max_score'  => 'nullable|numeric|min:0.5',
+            'criteria.*.max_score'  => 'nullable|numeric|min:0.01|max:999999.99|decimal:0,2',
         ]);
 
-        $criteria = $criteriaService->saveCriteria($event, $item, $data['criteria'] ?? []);
-        $criteriaService->setJudgeCount($item, $data['judge_count'] ?? 1);
-        $item->update(['total_marks' => $data['total_marks'] ?? null]);
+        [$criteria, $syncedCount] = DB::transaction(function () use ($criteriaService, $event, $item, $data) {
+            $criteriaService->validateSettings($item, $data['total_marks'] ?? null, $data['judge_count'] ?? 1);
+            $criteria = $criteriaService->saveCriteria($event, $item, $data['criteria'] ?? []);
+            $item->update(['total_marks' => $data['total_marks'] ?? null]);
+            $criteriaService->setJudgeCount($item, $data['judge_count'] ?? 1);
+            $syncedCount = ! empty($data['sync_to_child_events'])
+                ? $criteriaService->syncCriteriaToChildEvents($event, $item) : 0;
 
-        $syncedCount = 0;
-        if (! empty($data['sync_to_child_events'])) {
-            $syncedCount = $criteriaService->syncCriteriaToChildEvents($event, $item);
-        }
+            return [$criteria, $syncedCount];
+        });
 
         $auditLog = "Mark criteria updated for item #{$item->id}";
         if ($syncedCount > 0) {
@@ -781,7 +783,7 @@ class FestMarkEntryController extends SahodayaAdminController
         $data = $request->validate([
             'items'                => 'required|array',
             'items.*.id'           => 'required|integer|exists:fest_event_items,id',
-            'items.*.total_marks'  => 'nullable|numeric|min:0',
+            'items.*.total_marks'  => 'nullable|numeric|gt:0|max:999999.99|decimal:0,2',
             'items.*.judge_count'  => 'nullable|integer|min:1|max:20',
         ]);
 
@@ -797,6 +799,7 @@ class FestMarkEntryController extends SahodayaAdminController
                     continue;
                 }
 
+                $criteriaService->validateSettings($item, $itemData['total_marks'] ?? null, $itemData['judge_count'] ?? 1);
                 $item->update(['total_marks' => $itemData['total_marks'] ?? null]);
                 $criteriaService->setJudgeCount($item, $itemData['judge_count'] ?? 1);
                 $updatedCount++;
@@ -825,7 +828,7 @@ class FestMarkEntryController extends SahodayaAdminController
         $data = $request->validate([
             'items'               => 'required|array',
             'items.*.id'          => 'required|integer|exists:fest_event_items,id',
-            'items.*.total_marks' => 'nullable|numeric|min:0',
+            'items.*.total_marks' => 'nullable|numeric|gt:0|max:999999.99|decimal:0,2',
         ]);
 
         $updatedCount = 0;
@@ -955,6 +958,7 @@ class FestMarkEntryController extends SahodayaAdminController
                         'event_id'     => $item->event_id,
                         'region_label' => $multiRegion ? ($eventLabels->get($item->event_id)['short_title'] ?? null) : null,
                         'judge_count'  => $criteriaService->judgeCountForItem($item),
+                        'judge_count_configured' => $item->mark_judge_count !== null,
                     ])
                     ->sortBy('region_label')
                     ->values()
@@ -1047,6 +1051,10 @@ class FestMarkEntryController extends SahodayaAdminController
                     ]);
                 }
             }
+        }
+
+        if ($item && is_array($judgeScores)) {
+            $criteriaService->validateJudgeScores($item, $judgeScores);
         }
 
         EventLifecycleGate::allowMarkEntryForItem($event, $item);

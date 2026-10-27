@@ -1400,6 +1400,15 @@ class FestEventSettingsController extends SahodayaAdminController
         }
 
         $itemId = $data['item_id'] ?? null;
+        if (! $usePercentage && $itemId) {
+            $maximum = \App\Models\FestEventItem::where('event_id', $event->id)->whereKey($itemId)->value('total_marks');
+            if ($maximum !== null && $max > (float) $maximum) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'max_score' => "The grade range cannot exceed this item's maximum of {$maximum} marks.",
+                ]);
+            }
+        }
+
 
         $overlap = FestGradeConfig::where('event_id', $event->id)
             ->when($itemId !== null, fn ($q) => $q->where('item_id', $itemId), fn ($q) => $q->whereNull('item_id'))

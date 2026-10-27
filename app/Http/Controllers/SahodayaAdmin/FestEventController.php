@@ -1276,7 +1276,7 @@ class FestEventController extends SahodayaAdminController
             'item_code'            => 'nullable|string|max:20',
             'exclusive_group_key'  => 'nullable|string|max:64',
             'duration_minutes'     => 'nullable|integer|min:1|max:480',
-            'total_marks'          => 'nullable|numeric|min:0',
+            'total_marks'          => 'nullable|numeric|gt:0|max:999999.99|decimal:0,2',
             'max_per_school'       => 'nullable|integer|min:1',
             'min_group_size'       => 'nullable|integer|min:1',
             'max_group_size'       => 'nullable|integer|min:1',
@@ -1360,7 +1360,7 @@ class FestEventController extends SahodayaAdminController
             'qualify_count'  => 'nullable|integer|min:1',
             'max_per_school' => 'nullable|integer|min:1',
             'fee_amount'     => 'nullable|numeric|min:0',
-            'total_marks'    => 'nullable|numeric|min:0',
+            'total_marks'    => 'nullable|numeric|gt:0|max:999999.99|decimal:0,2',
             'is_enabled'     => 'nullable|boolean',
             'head_id'        => 'nullable|exists:fest_item_heads,id',
             'area_id'        => [
@@ -1440,6 +1440,10 @@ class FestEventController extends SahodayaAdminController
 
         $data = FestEventItemPayload::applyDefaults($data, $item);
 
+        if (array_key_exists('total_marks', $data)) {
+            $criteriaService = app(\App\Services\Events\FestMarkCriteriaService::class);
+            $criteriaService->validateSettings($item, $data['total_marks'], $criteriaService->judgeCountForItem($item));
+        }
         $item->update($data);
 
         $audit->festEvent($event, FestPageActivity::ITEMS, 'fest.item.updated', "Item updated: {$item->title}", [

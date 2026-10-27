@@ -24,6 +24,60 @@ use Illuminate\Support\Collection;
  */
 class FestMarkCriteriaService
 {
+    public function validateSettings(FestEventItem $item, ?float $totalMarks, int $judgeCount): void
+    {
+        $errors = [];
+        if ($totalMarks !== null && (! is_finite($totalMarks) || $totalMarks <= 0 || $totalMarks > 999999.99)) {
+            $errors['total_marks'] = 'Maximum marks must be greater than 0 and no more than 999999.99.';
+        }
+        if ($judgeCount < 1 || $judgeCount > 20) {
+            $errors['judge_count'] = 'Choose between 1 and 20 judges.';
+        }
+        if ($errors) {
+            throw \Illuminate\Validation\ValidationException::withMessages($errors);
+        }
+        $scores = FestMarkJudgeScore::where('item_id', $item->id)->whereNotNull('score');
+        if ((clone $scores)->where('judge_number', '>', $judgeCount)->exists()) {
+            $errors['judge_count'] = 'This would remove a judge with saved marks. Review those marks before reducing the panel.';
+        }
+        if ($totalMarks !== null) {
+            $largestJudgeScore = (float) ((clone $scores)->max('score') ?? 0);
+            if ($largestJudgeScore > $totalMarks / $judgeCount + 0.000001) {
+                $errors['total_marks'] = 'The new per-judge limit is below an existing judge score. Increase maximum marks or review the saved marks first.';
+            }
+            if (\App\Models\FestMark::where('item_id', $item->id)->where('score', '>', $totalMarks)->exists()) {
+                $errors['total_marks'] = 'Maximum marks cannot be lower than a saved total score.';
+            }
+        }
+        if ($errors) {
+            throw \Illuminate\Validation\ValidationException::withMessages($errors);
+        }
+    }
+
+    public function validateJudgeScores(FestEventItem $item, array $scores): void
+    {
+        $count = $this->judgeCountForItem($item);
+        $cap = $item->total_marks !== null ? (float) $item->total_marks / $count : null;
+        foreach ($scores as $number => $score) {
+            if (! ctype_digit((string) $number) || (int) $number < 1 || (int) $number > $count) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'judge_scores' => "Only judge numbers 1 to {$count} are configured for this item.",
+                ]);
+            }
+            if ($score === null || $score === '') {
+                continue;
+            }
+            if (! is_numeric($score) || ! is_finite((float) $score) || (float) $score < 0
+                || ($cap !== null && (float) $score > $cap + 0.000001)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    "judge_scores.{$number}" => $cap !== null
+                        ? "Enter a judge score between 0 and {$cap}."
+                        : 'Enter a valid, non-negative judge score.',
+                ]);
+            }
+        }
+    }
+
     public function judgeCountForItem(FestEventItem $item): int
     {
         return max(1, (int) ($item->mark_judge_count ?? 1));
@@ -31,7 +85,8 @@ class FestMarkCriteriaService
 
     public function setJudgeCount(FestEventItem $item, int $count): void
     {
-        $item->update(['mark_judge_count' => max(1, $count)]);
+        $this->validateSettings($item, $item->total_marks !== null ? (float) $item->total_marks : null, $count);
+        $item->update(['mark_judge_count' => $count]);
     }
 
     public function hasJudgePanel(FestEventItem $item): bool
@@ -63,6 +118,7 @@ class FestMarkCriteriaService
      */
     public function saveParticipantJudgeScores(FestEventItem $item, int $participantId, array $scores): float
     {
+        $this->validateJudgeScores($item, $scores);
         $judgeCount = $this->judgeCountForItem($item);
         $total = 0.0;
 
@@ -191,10 +247,28 @@ class FestMarkCriteriaService
     {
         $criteria = $this->criteriaForItem($item);
         $total = 0.0;
+        $criteriaById = $criteria->keyBy('id');
+        foreach ($scores as $criterionId => $raw) {
+            $criterion = $criteriaById->get($criterionId);
+            if (! $criterion) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['criteria_scores' => 'This scoring criterion does not belong to the selected item.']);
+            }
+            if ($raw !== null && $raw !== '' && (! is_numeric($raw) || ! is_finite((float) $raw)
+                || (float) $raw < 0 || (float) $raw > (float) $criterion->max_score)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    "criteria_scores.{$criterionId}" => "Enter a score between 0 and {$criterion->max_score} for {$criterion->label}.",
+                ]);
+            }
+            $total += (float) ($raw ?: 0);
+        }
+        if ($item->total_marks !== null && $total > (float) $item->total_marks) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['criteria_scores' => 'The criterion scores exceed the maximum marks for this item.']);
+        }
+        $total = 0.0;
 
         foreach ($criteria as $criterion) {
             $raw = $scores[$criterion->id] ?? null;
-            $value = ($raw === null || $raw === '') ? null : max(0, min((float) $raw, (float) $criterion->max_score));
+            $value = ($raw === null || $raw === '') ? null : (float) $raw;
 
             FestMarkCriterionScore::updateOrCreate(
                 ['criterion_id' => $criterion->id, 'participant_id' => $participantId],
@@ -260,10 +334,14 @@ class FestMarkCriteriaService
      */
     public function syncTotalMarksToFamily(FestEvent $event, FestEventItem $item, ?float $totalMarks): int
     {
+        $targets = $this->matchingFamilyItems($event, $item);
+        foreach (collect([$item])->concat($targets) as $target) {
+            $this->validateSettings($target, $totalMarks, $this->judgeCountForItem($target));
+        }
         $item->update(['total_marks' => $totalMarks]);
 
         $synced = 0;
-        foreach ($this->matchingFamilyItems($event, $item) as $targetItem) {
+        foreach ($targets as $targetItem) {
             $targetItem->update(['total_marks' => $totalMarks]);
             $synced++;
         }
@@ -320,9 +398,13 @@ class FestMarkCriteriaService
             ->values()
             ->all();
 
+        $targets = $this->matchingFamilyItems($event, $sourceItem);
+        foreach ($targets as $targetItem) {
+            $this->validateSettings($targetItem, $sourceItem->total_marks !== null ? (float) $sourceItem->total_marks : null, $this->judgeCountForItem($targetItem));
+        }
         $syncedCount = 0;
 
-        foreach ($this->matchingFamilyItems($event, $sourceItem) as $targetItem) {
+        foreach ($targets as $targetItem) {
             if (! $targetItem->event) {
                 continue;
             }

@@ -333,7 +333,7 @@
 
                                 <!-- Marks / Score (Optional) -->
                                 <td v-else-if="!isSports && !rankEntryOnly(section.item)" class="px-2.5 py-2 text-center">
-                                    <input v-model.number="markForms[participant.id].score" type="number" min="0" step="0.5"
+                                    <input v-model.number="markForms[participant.id].score" type="number" min="0" :max="item.total_marks || undefined" step="0.01"
                                            class="field text-sm font-bold tabular-nums w-20 !py-1.5 !px-2 text-center" placeholder="Optional"
                                            :disabled="isAbsent(participant, item) || itemLocked"
                                            @input="onScoreInput(participant.id, item)">

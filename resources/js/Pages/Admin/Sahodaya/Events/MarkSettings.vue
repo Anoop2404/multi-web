@@ -62,11 +62,18 @@
                 <label class="text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
                     Total Marks
                 </label>
-                <input v-model.number="totalMarksDraft" type="number" min="0" step="0.5" placeholder="e.g. 100"
+                <input v-model.number="totalMarksDraft" type="number" min="0.01" max="999999.99" step="0.01" placeholder="e.g. 100"
                        class="field text-xs !py-1 w-28">
                 <p class="text-[11px] text-slate-400">
-                    Optional. Set this to switch Grade Master's bands for this item to a percentage range instead of a raw score range.
+                    Combined maximum across all judges. Leave blank for grade-only results; numeric scores then have no upper limit.
                 </p>
+            </div>
+
+            <div class="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+                <p v-if="Number(totalMarksDraft) > 0">{{ totalMarksDraft }} combined marks ÷ {{ judgeCountDraft }} judge(s) = 0–{{ Number((Number(totalMarksDraft) / Number(judgeCountDraft || 1)).toFixed(4)) }} per judge.</p>
+                <p v-else class="text-amber-700">Maximum marks not set.</p>
+                <p v-if="columnDraft.length && Number(totalMarksDraft) > 0 && Math.abs(criteriaTotal * Number(judgeCountDraft || 1) - Number(totalMarksDraft)) > 0.01" class="mt-1 text-amber-700">Judging sheet totals {{ criteriaTotal }} per judge. Sheet total × judge count does not match maximum marks.</p>
+                <p v-if="settingsError" role="alert" class="mt-2 text-rose-600">{{ settingsError }}</p>
             </div>
 
             <div class="flex items-center gap-3 pt-3 border-t border-slate-100">
@@ -246,26 +253,32 @@ function removeColumnRow(idx) {
 }
 
 const savingColumns = ref(false);
+const settingsError = ref('');
+const criteriaTotal = computed(() => columnDraft.reduce((total, row) => total + Number(row.max_score || 0), 0));
 
 function saveColumnConfig() {
     if (!props.selectedItemId) return;
+    settingsError.value = '';
+    if (totalMarksDraft.value !== null && totalMarksDraft.value !== '' && !(Number(totalMarksDraft.value) > 0)) { settingsError.value = 'Maximum marks must be above 0.'; return; }
+    if (!Number.isInteger(Number(judgeCountDraft.value)) || Number(judgeCountDraft.value) < 1 || Number(judgeCountDraft.value) > 20) { settingsError.value = 'Choose between 1 and 20 judges.'; return; }
     savingColumns.value = true;
     const rows = columnDraft.map((r, idx) => ({
         id: r.id,
         label: (r.label ?? '').trim() || `Criterion ${idx + 1}`,
-        max_score: r.max_score || 10,
+        max_score: r.max_score ?? 10,
     }));
 
     router.post(
         `/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${props.selectedItemId}/mark-criteria`,
         {
-            judge_count: judgeCountDraft.value || 1,
+            judge_count: judgeCountDraft.value,
             criteria: rows,
-            total_marks: totalMarksDraft.value || null,
+            total_marks: totalMarksDraft.value === '' ? null : totalMarksDraft.value,
             sync_to_child_events: Boolean(syncToChildEvents.value && hasPartitionEvents.value),
         },
         {
             preserveScroll: true,
+            onError: errors => { settingsError.value = Object.values(errors).flat().join(' '); },
             onFinish: () => {
                 savingColumns.value = false;
             },

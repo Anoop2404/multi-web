@@ -45,6 +45,16 @@ class FestMarkSaveService
         $item ??= FestEventItem::findOrFail($data['item_id']);
         abort_if($item->event_id !== $event->id, 403);
 
+        if (isset($data['score']) && $data['score'] !== '') {
+            $score = $data['score'];
+            if (! is_numeric($score) || ! is_finite((float) $score) || (float) $score < 0) {
+                throw ValidationException::withMessages(['score' => 'Enter a valid score of 0 or more.']);
+            }
+            if ($item->total_marks !== null && (float) $score > (float) $item->total_marks) {
+                throw ValidationException::withMessages(['score' => "Score must be between 0 and {$item->total_marks}."]);
+            }
+        }
+
         $participant ??= FestParticipant::with('registration')->findOrFail($data['participant_id']);
         $participant->loadMissing('registration');
         abort_if($participant->registration->event_id !== $event->id, 403);

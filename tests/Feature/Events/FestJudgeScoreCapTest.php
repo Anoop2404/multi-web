@@ -135,4 +135,86 @@ class FestJudgeScoreCapTest extends TestCase
 
         $response->assertSessionDoesntHaveErrors();
     }
+    public function test_direct_score_cannot_exceed_the_configured_maximum(): void
+    {
+        $env = $this->fixture(totalMarks: 100);
+        $response = $this->actingAs($env['admin'])->post(route('sahodaya.events.marks.store', [
+            'tenantId' => $env['sahodaya']->id, 'event' => $env['event']->id,
+        ]), ['participant_id' => $env['participant']->id, 'item_id' => $env['item']->id, 'score' => 101]);
+        $response->assertSessionHasErrors('score');
+        $this->assertDatabaseCount('fest_marks', 0);
+    }
+
+    public function test_judge_numbers_outside_the_configured_panel_are_rejected(): void
+    {
+        $env = $this->fixture(totalMarks: 100);
+        $response = $this->actingAs($env['admin'])->post(route('sahodaya.events.marks.store', [
+            'tenantId' => $env['sahodaya']->id, 'event' => $env['event']->id,
+        ]), ['participant_id' => $env['participant']->id, 'item_id' => $env['item']->id,
+            'judge_scores' => [1 => 40, 2 => 40, 3 => 10]]);
+        $response->assertSessionHasErrors('judge_scores');
+        $this->assertDatabaseCount('fest_mark_judge_scores', 0);
+        $this->assertDatabaseCount('fest_marks', 0);
+    }
+
+    public function test_zero_maximum_marks_is_rejected_in_bulk_settings(): void
+    {
+        $env = $this->fixture(totalMarks: 100);
+        $response = $this->actingAs($env['admin'])->post(route('sahodaya.events.mark-settings.bulk-update', [
+            'tenantId' => $env['sahodaya']->id, 'event' => $env['event']->id,
+        ]), ['items' => [['id' => $env['item']->id, 'total_marks' => 0, 'judge_count' => 2]]]);
+        $response->assertSessionHasErrors('items.0.total_marks');
+        $this->assertSame('100.00', $env['item']->fresh()->total_marks);
+    }
+
+    public function test_reducing_the_maximum_cannot_invalidate_saved_judge_marks(): void
+    {
+        $env = $this->fixture(totalMarks: 100);
+        $service = app(FestMarkCriteriaService::class);
+        $service->saveParticipantJudgeScores($env['item'], $env['participant']->id, [1 => 40, 2 => 45]);
+        $response = $this->actingAs($env['admin'])->post(route('sahodaya.events.mark-settings.bulk-update', [
+            'tenantId' => $env['sahodaya']->id, 'event' => $env['event']->id,
+        ]), ['items' => [['id' => $env['item']->id, 'total_marks' => 60, 'judge_count' => 2]]]);
+        $response->assertSessionHasErrors('total_marks');
+        $this->assertSame('100.00', $env['item']->fresh()->total_marks);
+    }
+
+    public function test_reducing_the_panel_cannot_drop_saved_judge_marks(): void
+    {
+        $env = $this->fixture(totalMarks: 100);
+        $service = app(FestMarkCriteriaService::class);
+        $service->saveParticipantJudgeScores($env['item'], $env['participant']->id, [1 => 40, 2 => 45]);
+        try {
+            $service->setJudgeCount($env['item'], 1);
+            $this->fail('A judge with saved marks must not be removed.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->assertArrayHasKey('judge_count', $e->errors());
+        }
+        $this->assertSame(2, $service->judgeCountForItem($env['item']->fresh()));
+    }
+
+    public function test_item_grade_range_cannot_exceed_maximum_marks(): void
+    {
+        $env = $this->fixture(totalMarks: 50);
+        $response = $this->actingAs($env['admin'])->post(route('sahodaya.events.grade-configs.store', [
+            'tenantId' => $env['sahodaya']->id, 'event' => $env['event']->id,
+        ]), ['item_id' => $env['item']->id, 'grade' => 'Excellent', 'min_score' => 40, 'max_score' => 60]);
+        $response->assertSessionHasErrors('max_score');
+        $this->assertDatabaseCount('fest_grade_configs', 0);
+    }
+
+    public function test_criterion_scores_are_rejected_instead_of_silently_clamped(): void
+    {
+        $env = $this->fixture(totalMarks: 100);
+        $service = app(FestMarkCriteriaService::class);
+        $criteria = $service->saveCriteria($env['event'], $env['item'], [['label' => 'Content', 'max_score' => 20]]);
+        try {
+            $service->saveParticipantScores($env['item'], $env['participant']->id, [$criteria->first()->id => 25]);
+            $this->fail('Out-of-range criterion scores must be rejected.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->assertArrayHasKey('criteria_scores.'.$criteria->first()->id, $e->errors());
+        }
+        $this->assertDatabaseCount('fest_mark_criterion_scores', 0);
+    }
+
 }

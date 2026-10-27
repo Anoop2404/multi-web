@@ -336,7 +336,7 @@
                     </FormField>
 
                     <FormField label="Total Marks" hint="Max score for this item — enables percentage-based grade bands">
-                        <input v-model.number="itemForm.total_marks" type="number" min="0" step="0.01" class="field" placeholder="e.g. 100">
+                        <input v-model.number="itemForm.total_marks" type="number" min="0.01" max="999999.99" step="0.01" class="field" placeholder="e.g. 100">
                     </FormField>
 
                     <FormField label="Result Method">
@@ -476,7 +476,7 @@
                         </FormField>
 
                         <FormField label="Total Marks" hint="Max score for this item — enables percentage-based grade bands">
-                            <input v-model.number="editForm.total_marks" type="number" min="0" step="0.01" class="field" placeholder="e.g. 100">
+                            <input v-model.number="editForm.total_marks" type="number" min="0.01" max="999999.99" step="0.01" class="field" placeholder="e.g. 100">
                         </FormField>
 
                         <FormField label="Result Method">

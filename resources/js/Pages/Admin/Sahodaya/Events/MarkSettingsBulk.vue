@@ -76,7 +76,7 @@
                 <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm space-y-2">
                     <label class="font-bold text-slate-800 block">🎯 Batch Set Total Marks</label>
                     <div class="flex items-center gap-2">
-                        <input v-model.number="batchForm.total_marks" type="number" min="0" step="0.5" class="field text-xs flex-1" placeholder="e.g. 100">
+                        <input v-model.number="batchForm.total_marks" type="number" min="0.01" max="999999.99" step="0.01" class="field text-xs flex-1" placeholder="e.g. 100">
                         <button type="button" class="btn-secondary text-xs shrink-0 !bg-indigo-50 !text-indigo-700 hover:!bg-indigo-100 font-bold"
                                 @click="applyBatch('total_marks')">
                             Apply
@@ -184,7 +184,7 @@
                             </td>
 
                             <td class="py-2 px-3 text-center bg-indigo-50/30 border-x border-indigo-100/60">
-                                <input type="number" min="0" step="0.5" class="field text-center font-bold text-xs !py-1 !px-2 w-24 mx-auto"
+                                <input type="number" min="0.01" max="999999.99" step="0.01" class="field text-center font-bold text-xs !py-1 !px-2 w-24 mx-auto"
                                        v-model.number="settingsState[item.id].total_marks" placeholder="e.g. 100">
                             </td>
 

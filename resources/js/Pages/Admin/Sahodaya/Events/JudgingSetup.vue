@@ -26,6 +26,27 @@
             </Link>
         </div>
 
+        <section class="card mb-5 space-y-3">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div><h2 class="font-semibold text-slate-900">Mark setup readiness</h2>
+                    <p class="text-sm text-slate-500">Maximum marks is the combined total across all judges. For example: 100 marks ÷ 2 judges = 0–50 per judge.</p>
+                </div>
+                <label class="text-sm">Show setup status
+                    <select v-model="setupFilter" class="field mt-1">
+                        <option value="all">All items</option><option value="ready">Configured</option>
+                        <option value="missing">Missing settings</option><option value="review">Needs review</option>
+                    </select>
+                </label>
+            </div>
+            <div class="grid grid-cols-3 gap-3 text-sm">
+                <div class="rounded-lg bg-emerald-50 p-3"><strong>{{ setupCounts.ready }}</strong> Configured</div>
+                <div class="rounded-lg bg-amber-50 p-3"><strong>{{ setupCounts.missing }}</strong> Missing settings</div>
+                <div class="rounded-lg bg-rose-50 p-3"><strong>{{ setupCounts.review }}</strong> Needs review</div>
+            </div>
+            <p class="text-xs text-slate-500">Status reflects saved settings. A missing judging sheet is shown separately; direct score entry can still be used. Grade-only and measured sports results do not require a numeric maximum.</p>
+            <p v-if="saveError" role="alert" class="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{{ saveError }}</p>
+        </section>
+
         <!-- BULK RUBRIC + BATCH PANEL -->
         <div class="card !p-4 mb-5 bg-indigo-50/40 border-indigo-100 space-y-3">
             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100/80 pb-2">
@@ -58,7 +79,7 @@
                 <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm space-y-2">
                     <label class="font-bold text-slate-800 block">🎯 Batch Set Total Marks</label>
                     <div class="flex items-center gap-2">
-                        <input v-model.number="batchForm.total_marks" type="number" min="0" step="0.5" class="field text-xs flex-1" placeholder="e.g. 100">
+                        <input v-model.number="batchForm.total_marks" type="number" min="0.01" max="999999.99" step="0.01" class="field text-xs flex-1" placeholder="e.g. 100">
                         <button type="button" class="btn-secondary text-xs shrink-0 !bg-indigo-50 !text-indigo-700 hover:!bg-indigo-100 font-bold"
                                 @click="applyBatchTotalMarks">
                             Apply
@@ -107,6 +128,9 @@
                     </div>
                 </div>
 
+                <button type="button" class="btn-secondary text-xs" :disabled="saving || !changedJudgeCount" @click="saveAllJudgeCounts">
+                    Save judge counts ({{ changedJudgeCount }})
+                </button>
                 <button type="button" class="btn-primary text-xs" :disabled="saving || !hasTotalMarksChanges" @click="saveAllTotalMarks">
                     <span v-if="saving">Saving...</span>
                     <span v-else>💾 Save Total Marks ({{ changedTotalMarksCount }})</span>
@@ -143,6 +167,10 @@
                                 </div>
                                 <div v-if="item.item_code" class="text-[11px] text-slate-500 font-mono mt-0.5">
                                     Code: {{ item.item_code }}
+                                </div>
+                                <div class="mt-2">
+                                    <span class="rounded px-2 py-1 text-[10px] font-semibold" :class="setupStatus(item).kind === 'ready' ? 'bg-emerald-50 text-emerald-700' : setupStatus(item).kind === 'review' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'">{{ setupStatus(item).label }}</span>
+                                    <p v-for="issue in setupStatus(item).issues" :key="issue" class="mt-1 text-[11px] text-slate-500">{{ issue }}</p>
                                 </div>
                             </td>
 
@@ -184,11 +212,13 @@
                             </td>
 
                             <td class="py-2 px-3 text-center bg-indigo-50/30 border-x border-indigo-100/60 align-top">
-                                <input type="number" min="0" step="0.5" class="field text-center font-bold text-xs !py-1 !px-2 w-24 mx-auto"
-                                       v-model.number="totalMarksState[item.key]" placeholder="e.g. 100">
+                                <input type="number" min="0.01" max="999999.99" step="0.01" class="field text-center font-bold text-xs !py-1 !px-2 w-24 mx-auto"
+                                       v-model.number="totalMarksState[item.key]" placeholder="e.g. 100" aria-label="Combined maximum marks">
+                                <p v-if="totalMarksError(item)" class="mt-1 text-[10px] text-rose-600">{{ totalMarksError(item) }}</p>
+                                <p v-else-if="!totalMarksState[item.key]" class="mt-1 text-[10px] text-amber-700">Maximum not set</p>
                                 <button v-if="isTotalMarksDirty(item.key)" type="button"
                                         class="mt-1 btn-secondary text-[10px] !py-1 !px-2 !bg-indigo-100 !text-indigo-900 hover:!bg-indigo-200 font-bold w-full"
-                                        :disabled="totalMarksSaving[item.key]" @click="saveTotalMarks(item)">
+                                        :disabled="totalMarksSaving[item.key] || !!totalMarksError(item)" @click="saveTotalMarks(item)">
                                     {{ totalMarksSaving[item.key] ? '…' : '💾 Save' }}
                                 </button>
                             </td>
@@ -199,10 +229,11 @@
                                         {{ region.region_label }}
                                     </span>
                                     <input type="number" min="1" max="20" class="field text-center font-bold text-xs !py-1 !px-2 w-16 shrink-0"
-                                           v-model.number="judgeState[region.item_id]" placeholder="1">
+                                           v-model.number="judgeState[region.item_id]" placeholder="1" :aria-label="`Judge count ${region.region_label || ''}`">
+                                    <span class="text-[10px] text-slate-500">{{ judgeLimit(item, region) }}</span>
                                     <button v-if="isJudgeCountDirty(region.item_id)" type="button"
                                             class="btn-secondary text-[10px] !py-1 !px-1.5 !bg-amber-100 !text-amber-900 hover:!bg-amber-200 font-bold shrink-0"
-                                            :disabled="judgeSaving[region.item_id]" @click="saveJudgeCount(region)">
+                                            :disabled="judgeSaving[region.item_id] || !validJudgeCount(judgeState[region.item_id])" @click="saveJudgeCount(region)">
                                         {{ judgeSaving[region.item_id] ? '…' : '💾' }}
                                     </button>
                                 </div>
@@ -273,6 +304,8 @@ function eventUrl(eventId) {
 }
 
 const searchQuery = ref('');
+const setupFilter = ref('all');
+const saveError = ref('');
 const selectedKeys = ref([]);
 const saving = ref(false);
 
@@ -332,16 +365,38 @@ function isJudgeCountDirty(itemId) {
     return (judgeState[itemId] ?? null) !== (judgeOriginal[itemId] ?? null);
 }
 
+const changedJudgeCount = computed(() => itemsList.value.reduce((sum, item) => sum + (item.regions ?? []).filter(region => isJudgeCountDirty(region.item_id)).length, 0));
 const changedTotalMarksCount = computed(() => itemsList.value.filter(item => isTotalMarksDirty(item.key)).length);
 const hasTotalMarksChanges = computed(() => changedTotalMarksCount.value > 0);
 
+function validJudgeCount(value) { return Number.isInteger(Number(value)) && Number(value) >= 1 && Number(value) <= 20; }
+function totalMarksError(item) {
+    const value = totalMarksState[item.key];
+    if (value === null || value === '') return '';
+    return !Number.isFinite(Number(value)) || Number(value) <= 0 || Number(value) > 999999.99 || Math.abs(Number(value) * 100 - Math.round(Number(value) * 100)) > 0.000001
+        ? 'Enter a maximum above 0, with up to 2 decimal places.' : '';
+}
+function setupStatus(item) {
+    const total = Number(totalMarksOriginal[item.key]);
+    const issues = [];
+    if (!(total > 0)) issues.push('Maximum marks not set; numeric scores have no upper limit.');
+    if (!item.criteria_count) issues.push('Judging sheet not set.');
+    if ((item.regions ?? []).some(region => !validJudgeCount(judgeOriginal[region.item_id]))) issues.push('Judge count must be between 1 and 20.');
+    const mismatch = total > 0 && item.criteria_count > 0 && (item.regions ?? []).some(region => Math.abs(Number(item.criteria_sum) * Number(judgeOriginal[region.item_id]) - total) > 0.01);
+    if (mismatch) issues.push('Judging sheet total × judge count differs from maximum marks. Review each region.');
+    const kind = mismatch ? 'review' : issues.length ? 'missing' : 'ready';
+    return { kind, label: kind === 'ready' ? 'Configured' : kind === 'review' ? 'Needs review' : 'Missing settings', issues };
+}
+function judgeLimit(item, region) {
+    const total = Number(totalMarksState[item.key]);
+    const count = Number(judgeState[region.item_id]);
+    return total > 0 && validJudgeCount(count) ? `0–${Number((total / count).toFixed(4))} per judge` : 'No maximum set';
+}
+const setupCounts = computed(() => itemsList.value.reduce((counts, item) => { counts[setupStatus(item).kind]++; return counts; }, { ready: 0, missing: 0, review: 0 }));
 const filteredItems = computed(() => {
     const q = searchQuery.value.trim().toLowerCase();
-    if (!q) return itemsList.value;
-    return itemsList.value.filter(item => {
-        const haystack = `${item.title} ${item.item_code ?? ''}`.toLowerCase();
-        return haystack.includes(q);
-    });
+    return itemsList.value.filter(item => (!q || `${item.title} ${item.item_code ?? ''}`.toLowerCase().includes(q))
+        && (setupFilter.value === 'all' || setupStatus(item).kind === setupFilter.value));
 });
 
 // Kalotsav events run to ~140 items at once, each row mounting a SearchableSelect (its own
@@ -365,7 +420,7 @@ const pagedItems = computed(() => {
     return filteredItems.value.slice(pageStartIndex.value, pageStartIndex.value + perPageNum.value);
 });
 
-watch([searchQuery, perPage], () => {
+watch([searchQuery, setupFilter, perPage], () => {
     currentPage.value = 1;
 });
 watch(totalPages, (max) => {
@@ -408,14 +463,14 @@ function targetSelection() {
 }
 
 function applyBatchTotalMarks() {
-    if (batchForm.total_marks === null) return;
+    if (!(Number(batchForm.total_marks) > 0) || Number(batchForm.total_marks) > 999999.99) { saveError.value = 'Enter maximum marks above 0.'; return; }
     for (const item of targetSelection()) {
         totalMarksState[item.key] = batchForm.total_marks;
     }
 }
 
 function applyBatchJudgeCount() {
-    if (batchForm.judge_count === null) return;
+    if (!validJudgeCount(batchForm.judge_count)) { saveError.value = 'Choose between 1 and 20 judges.'; return; }
     for (const item of targetSelection()) {
         for (const region of item.regions ?? []) {
             judgeState[region.item_id] = batchForm.judge_count;
@@ -426,19 +481,27 @@ function applyBatchJudgeCount() {
 /** Wraps an Inertia POST as a Promise so multiple region groups can be saved one after another. */
 function postInertia(url, data) {
     return new Promise((resolve) => {
-        router.post(url, data, { preserveScroll: true, preserveState: true, onFinish: resolve });
+        let succeeded = false;
+        saveError.value = '';
+        router.post(url, data, {
+            preserveScroll: true, preserveState: true,
+            onSuccess: () => { succeeded = true; },
+            onError: errors => { saveError.value = Object.values(errors).flat().join(' '); },
+            onFinish: () => resolve(succeeded),
+        });
     });
 }
 
 /** Total marks is common across the family — save writes to the representative item and the server propagates it everywhere. */
 async function saveTotalMarks(item) {
-    if (!isTotalMarksDirty(item.key)) return;
+    if (!isTotalMarksDirty(item.key) || totalMarksError(item)) return;
 
     totalMarksSaving[item.key] = true;
-    await postInertia(`${eventUrl(item.representative_event_id)}/mark-settings/sync-total-marks`, {
-        items: [{ id: item.representative_id, total_marks: totalMarksState[item.key] }],
+    const submitted = totalMarksState[item.key];
+    const succeeded = await postInertia(`${eventUrl(item.representative_event_id)}/mark-settings/sync-total-marks`, {
+        items: [{ id: item.representative_id, total_marks: submitted }],
     });
-    totalMarksOriginal[item.key] = totalMarksState[item.key];
+    if (succeeded) totalMarksOriginal[item.key] = submitted;
     totalMarksSaving[item.key] = false;
 }
 
@@ -446,16 +509,19 @@ async function saveAllTotalMarks() {
     if (!hasTotalMarksChanges.value || saving.value) return;
 
     const dirtyItems = itemsList.value.filter(item => isTotalMarksDirty(item.key));
+    if (dirtyItems.some(item => totalMarksError(item))) { saveError.value = 'Correct invalid maximum marks before saving.'; return; }
     saving.value = true;
 
     // Each save already propagates to the whole family server-side, so these are independent,
     // single-item calls rather than needing to be grouped by event first.
     for (const item of dirtyItems) {
+        const submitted = totalMarksState[item.key];
         // eslint-disable-next-line no-await-in-loop
-        await postInertia(`${eventUrl(item.representative_event_id)}/mark-settings/sync-total-marks`, {
-            items: [{ id: item.representative_id, total_marks: totalMarksState[item.key] }],
+        const succeeded = await postInertia(`${eventUrl(item.representative_event_id)}/mark-settings/sync-total-marks`, {
+            items: [{ id: item.representative_id, total_marks: submitted }],
         });
-        totalMarksOriginal[item.key] = totalMarksState[item.key];
+        if (!succeeded) break;
+        totalMarksOriginal[item.key] = submitted;
     }
 
     saving.value = false;
@@ -463,14 +529,27 @@ async function saveAllTotalMarks() {
 
 /** Judge count is per-region — saves only that one region's item, no propagation. */
 async function saveJudgeCount(region) {
-    if (!isJudgeCountDirty(region.item_id)) return;
+    if (!isJudgeCountDirty(region.item_id) || !validJudgeCount(judgeState[region.item_id])) return;
 
     judgeSaving[region.item_id] = true;
-    await postInertia(`${eventUrl(region.event_id)}/mark-settings/judge-count`, {
-        items: [{ id: region.item_id, judge_count: judgeState[region.item_id] }],
+    const submitted = judgeState[region.item_id];
+    const succeeded = await postInertia(`${eventUrl(region.event_id)}/mark-settings/judge-count`, {
+        items: [{ id: region.item_id, judge_count: submitted }],
     });
-    judgeOriginal[region.item_id] = judgeState[region.item_id];
+    if (succeeded) judgeOriginal[region.item_id] = submitted;
     judgeSaving[region.item_id] = false;
+}
+
+async function saveAllJudgeCounts() {
+    if (saving.value) return;
+    const regions = itemsList.value.flatMap(item => item.regions ?? []).filter(region => isJudgeCountDirty(region.item_id));
+    if (regions.some(region => !validJudgeCount(judgeState[region.item_id]))) { saveError.value = 'Choose between 1 and 20 judges for every edited region.'; return; }
+    saving.value = true;
+    for (const region of regions) {
+        await saveJudgeCount(region);
+        if (saveError.value) break;
+    }
+    saving.value = false;
 }
 
 const templateOptions = computed(() => (props.rubricTemplates ?? []).map(t => ({
@@ -505,10 +584,11 @@ async function applyTemplateToSelection() {
 
     for (const [eventId, items] of byEvent) {
         // eslint-disable-next-line no-await-in-loop
-        await postInertia(`${eventUrl(eventId)}/mark-settings/bulk-apply-template`, {
+        const succeeded = await postInertia(`${eventUrl(eventId)}/mark-settings/bulk-apply-template`, {
             template_id: templateId,
             item_ids: items.map(i => i.representative_id),
         });
+        if (!succeeded) break;
         for (const item of items) {
             rowTemplateChoice[item.key] = String(templateId);
         }
