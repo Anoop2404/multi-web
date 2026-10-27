@@ -129,7 +129,13 @@ class FestSchoolPartitionService
             return $explicit;
         }
 
-        // Check the school's membership region for any partitioned hub event
+        // Kids Fest requires an explicit event choice; membership belongs to a
+        // different workflow and must not silently lock a school to a venue.
+        if ($hub->event_type === 'kids_fest') {
+            return null;
+        }
+
+        // Check the school's membership region for other partitioned hub events
         $key = app(FestRegionPartitionService::class)->partitionKeyForSchool($hub, $schoolId);
         if ($key !== null && $this->partitions->partitionByKey($hub, $key)) {
             return $key;

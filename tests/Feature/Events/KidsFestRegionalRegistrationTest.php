@@ -41,6 +41,31 @@ class KidsFestRegionalRegistrationTest extends TestCase
         return [$sahodaya, $school, $root, $children];
     }
 
+    public function test_membership_region_does_not_select_or_lock_the_kids_fest_region(): void
+    {
+        [$sahodaya, $school, $root, $children] = $this->fixture();
+        \App\Models\SchoolRegionAssignment::create([
+            'tenant_id' => $sahodaya->id, 'school_id' => $school->id,
+            'region_id' => $children[0]->region_id,
+            'academic_year' => \App\Support\AcademicYear::forSahodaya($sahodaya->id),
+        ]);
+        $partitions = app(\App\Services\Events\FestSchoolPartitionService::class);
+        $this->assertNull($partitions->resolvePartitionKey($root, $school->id));
+        $this->assertSame([$root->id], $partitions->filterVisibleToSchool(collect([$root, ...$children]), $school->id)->pluck('id')->all());
+        $hub = app(\App\Services\Events\ProgramHubDataService::class)->resolveRegionOptionsForSchool($school, 'kids_fest');
+        $this->assertFalse($hub['event_region_options'][0]['locked']);
+        $this->assertCount(2, $hub['event_region_options'][0]['regions']);
+
+        // A school's first event choice may differ from its membership region.
+        app(FestSchoolEventRegionService::class)->select($root, $school->id, $children[1]->region_id);
+        $this->assertSame('nilambur', $partitions->resolvePartitionKey($root, $school->id));
+        app(\App\Services\Events\FestRegionPartitionService::class)->assertRegionSelected($children[1], $school);
+        $hub = app(\App\Services\Events\ProgramHubDataService::class)->resolveRegionOptionsForSchool($school, 'kids_fest');
+        $this->assertTrue($hub['event_region_options'][0]['locked']);
+        $this->assertSame('Nilambur', $hub['event_region_options'][0]['current_region']);
+        $this->assertDatabaseHas('school_region_assignments', ['school_id' => $school->id, 'region_id' => $children[0]->region_id]);
+    }
+
     public function test_lkg_students_match_root_categories_and_combined_categories_on_regional_child(): void
     {
         [$sahodaya, $school, $root, $children] = $this->fixture();

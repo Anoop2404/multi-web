@@ -192,6 +192,32 @@ class ProgramHubDataService
             return ['has_regions' => false, 'regions' => [], 'assignments' => []];
         }
 
+        if ($eventType === 'kids_fest') {
+            $service = app(FestSchoolEventRegionService::class);
+            $options = FestEvent::where('tenant_id', $sahodayaId)->ofType($eventType)
+                ->listedForSchool($school->id, $eventType)
+                ->whereNull('parent_event_id')->get()
+                ->filter(fn (FestEvent $event) => ! $event->usesPhasedRegionalBilling() && $service->regions($event)->isNotEmpty())
+                ->map(function (FestEvent $event) use ($service, $school) {
+                    $current = $service->current($event, $school->id);
+
+                    return [
+                        'event_id' => $event->id,
+                        'event_title' => $event->title,
+                        'current_region' => $current?->region?->name ?? $current?->cluster_label,
+                        'locked' => $current !== null,
+                        'regions' => $service->regions($event)->map(fn ($child) => [
+                            'id' => $child->region_id,
+                            'name' => $child->region?->name ?? $child->cluster_label ?? $child->title,
+                            'venue' => $child->venue,
+                        ])->values()->all(),
+                    ];
+                })->values()->all();
+            if ($options !== []) {
+                return ['has_regions' => false, 'regions' => [], 'assignments' => [], 'event_region_options' => $options];
+            }
+        }
+
         $regionService = app(FestRegionPartitionService::class);
         if (! $regionService->regionsApply($sahodayaId)) {
             return ['has_regions' => false, 'regions' => [], 'assignments' => []];

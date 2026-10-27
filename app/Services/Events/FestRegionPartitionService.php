@@ -121,6 +121,12 @@ class FestRegionPartitionService
             return;
         }
 
+        if ($hub->event_type === 'kids_fest') {
+            app(FestSchoolPartitionService::class)->requireAssignment($hub, $school->id);
+
+            return;
+        }
+
         $sahodayaId = $hub->tenant_id;
         if (! $this->regionsApply($sahodayaId)) {
             return;

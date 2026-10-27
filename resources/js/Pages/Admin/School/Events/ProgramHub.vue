@@ -61,6 +61,22 @@
                      label="Assign coordinator" :hint="`Give a teacher access to ${programLabel} only`" />
         </div>
 
+        <section v-for="option in regionOptions?.event_region_options ?? []" :key="option.event_id" class="card mb-6 space-y-3 border-sky-200">
+            <h3 class="text-base font-bold">{{ option.event_title }} — Event region</h3>
+            <div v-if="option.locked" class="flex flex-wrap items-center justify-between gap-3 text-sm">
+                <p>Selected region: <strong>{{ option.current_region }}</strong></p>
+                <Link :href="`${programBase}/events/${option.event_id}/region-change-requests`" class="btn-secondary">Request region change →</Link>
+            </div>
+            <template v-else>
+                <p class="text-sm text-slate-600">Choose the region for this Kids Fest. This selection is separate from your school's membership region. Later changes require Sahodaya approval.</p>
+                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <button v-for="region in option.regions" :key="region.id" type="button" class="btn-secondary text-left" @click="selectEventRegion(option.event_id, region.id)">
+                        {{ region.name }}{{ region.venue ? ' — ' + region.venue : '' }} →
+                    </button>
+                </div>
+            </template>
+        </section>
+
         <!-- Phase-wise Region & Venue Selection — collapsed to a confirmation strip once
              every phase is locked, since there's nothing left to act on. -->
         <section v-if="regionOptions?.phase_region_options?.length && allPhaseRegionsLocked && !regionsSectionExpanded"
@@ -401,6 +417,10 @@ const activeRegionName = computed(() => {
     if (!assignedId) return null;
     return props.regionOptions?.regions?.find(r => String(r.id) === String(assignedId))?.name;
 });
+
+function selectEventRegion(eventId, regionId) {
+    router.post(`${programBase.value}/events/${eventId}/phase-region`, { region_id: regionId }, { preserveScroll: true });
+}
 
 function selectRegion(regionId) {
     router.post(`${programBase.value}/select-region`, { region_id: regionId }, { preserveScroll: true });
