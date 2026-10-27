@@ -1698,7 +1698,7 @@ class FestSchoolReportController extends SchoolAdminController
         $service = new FestReportService($event);
         $date = $request->input('date');
         $stageId = $request->integer('stage_id') ?: null;
-        $rows = $service->itemScheduleRows($date, $stageId);
+        $rows = $service->itemScheduleRows($date, $stageId, $this->school->id);
         $summary = $service->itemScheduleSummary();
         $base = $this->schoolReportsBase($program, $event);
 

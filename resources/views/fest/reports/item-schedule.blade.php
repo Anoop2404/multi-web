@@ -24,12 +24,12 @@
     </div>
 
     <table>
-    <thead><tr><th>Sl No</th><th>Item</th><th>Category</th><th>Gender</th><th>Time</th><th>Venue</th><th>Stage</th></tr></thead>
+    <thead><tr><th>Sl No</th><th>Item</th><th>Category</th><th>Gender</th><th>Time</th><th>Venue</th><th>Stage</th><th>Participant · Fest ID / Register No.</th></tr></thead>
     <tbody>
     @php($prevStage = '__none__')
     @foreach($dateRows as $row)
     @if(($row['stage'] ?? null) !== $prevStage)
-    <tr class="stage-band"><td colspan="7">{{ $row['stage'] ?? 'No stage assigned' }}</td></tr>
+    <tr class="stage-band"><td colspan="8">{{ $row['stage'] ?? 'No stage assigned' }}</td></tr>
     @php($prevStage = $row['stage'] ?? null)
     @endif
     @php($slNo++)
@@ -41,6 +41,17 @@
         <td>{{ $row['scheduled_time_12h'] ?? '—' }}</td>
         <td>{{ $row['venue'] ?? '—' }}</td>
         <td>{{ $row['stage'] ?? '—' }}</td>
+        <td>
+            @forelse($row['participants'] ?? [] as $participant)
+                <div style="margin-bottom:4px;page-break-inside:avoid">
+                    <strong>{{ $participant['name'] }}</strong><br>
+                    Fest ID: {{ $participant['fest_id'] ?: '—' }}<br>
+                    Reg. No: {{ $participant['reg_no'] ?: '—' }}
+                </div>
+            @empty
+                —
+            @endforelse
+        </td>
     </tr>
     @endforeach
     </tbody>

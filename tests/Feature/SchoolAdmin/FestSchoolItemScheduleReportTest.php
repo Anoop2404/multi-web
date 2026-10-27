@@ -85,6 +85,33 @@ class FestSchoolItemScheduleReportTest extends TestCase
             'registration_status' => 'completed',
         ]);
 
+        $class = \App\Models\SchoolClass::create(['tenant_id' => $school->id, 'name' => 'Class 5', 'is_active' => true]);
+        $student = \App\Models\Student::create([
+            'tenant_id' => $school->id, 'school_class_id' => $class->id, 'name' => 'Schedule Student', 'reg_no' => 'STU/26/12345', 'status' => 'active',
+        ]);
+        $registration = \App\Models\FestRegistration::create([
+            'event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved',
+        ]);
+        \App\Models\FestParticipant::create([
+            'event_id' => $event->id, 'registration_id' => $registration->id,
+            'student_id' => $student->id, 'level_registration_number' => 'FEST-001',
+        ]);
+        $otherSchool = Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'school', 'name' => 'Other School',
+            'parent_id' => $sahodaya->id, 'is_active' => true,
+        ]);
+        $otherClass = \App\Models\SchoolClass::create(['tenant_id' => $otherSchool->id, 'name' => 'Class 5', 'is_active' => true]);
+        $otherStudent = \App\Models\Student::create([
+            'tenant_id' => $otherSchool->id, 'school_class_id' => $otherClass->id, 'name' => 'Private Other Student', 'reg_no' => 'PRIVATE-123', 'status' => 'active',
+        ]);
+        $otherRegistration = \App\Models\FestRegistration::create([
+            'event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $otherSchool->id, 'status' => 'approved',
+        ]);
+        \App\Models\FestParticipant::create([
+            'event_id' => $event->id, 'registration_id' => $otherRegistration->id,
+            'student_id' => $otherStudent->id, 'level_registration_number' => 'PRIVATE-FEST',
+        ]);
+
         $response = $this->actingAs($admin)->get(
             route('school.kalotsav.reports.item-schedule', ['tenantId' => $school->id, 'event' => $event->id]),
         );
@@ -97,9 +124,32 @@ class FestSchoolItemScheduleReportTest extends TestCase
             ->where('rows.0.scheduled_time', '14:30')
             ->where('rows.0.stage', 'Distinctive Stage A')
             ->where('rows.0.venue', 'Distinctive Main Auditorium')
+            ->has('rows.0.participants', 1)
+            ->where('rows.0.participants.0.name', 'Schedule Student')
+            ->where('rows.0.participants.0.fest_id', 'FEST-001')
+            ->where('rows.0.participants.0.reg_no', 'STU/26/12345')
             ->missing('rows.0.item_title')
             ->missing('rows.0.date')
             ->missing('rows.0.time')
         );
+
+        $reports = new \App\Services\Events\FestReportService($event);
+        $request = \Illuminate\Http\Request::create('/', 'GET', ['school_id' => $school->id, 'date' => '2026-09-15']);
+        $download = $reports->export('item-schedule', $request);
+        ob_start();
+        $download->sendContent();
+        $csv = ob_get_clean();
+        $this->assertStringContainsString('Participants,Fest ID,Register Number', $csv);
+        $this->assertStringContainsString('FEST-001', $csv);
+        $this->assertStringContainsString('STU/26/12345', $csv);
+        $this->assertStringNotContainsString('PRIVATE-', $csv);
+        $html = view('fest.reports.item-schedule', [
+            'event' => $event, 'date' => null, 'rows' => $reports->itemScheduleRows(schoolId: $school->id),
+            'summary' => $reports->itemScheduleSummary(),
+        ])->render();
+        $this->assertStringContainsString('FEST-001', $html);
+        $this->assertStringContainsString('STU/26/12345', $html);
+        $this->assertStringNotContainsString('PRIVATE-', $html);
+        $this->assertSame([], $reports->itemScheduleRows(date: '2026-09-16', schoolId: $school->id));
     }
 }

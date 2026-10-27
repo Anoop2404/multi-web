@@ -793,9 +793,26 @@ class FestReportService
     }
 
     /** @return list<array<string, mixed>> */
-    public function itemScheduleRows(?string $date = null, ?int $stageId = null): array
+    public function itemScheduleRows(?string $date = null, ?int $stageId = null, ?string $schoolId = null): array
     {
-        return app(FestItemScheduleService::class)->reportRows($this->event, $date, $stageId);
+        $rows = app(FestItemScheduleService::class)->reportRows($this->event, $date, $stageId);
+        if (! $rows) {
+            return [];
+        }
+        $itemIds = array_column($rows, 'item_id');
+        $participants = $this->participantsFlat(schoolId: $schoolId, explicitItemIds: $itemIds)
+            ->groupBy(fn ($p) => $p->registration->item_id);
+
+        return array_map(function (array $row) use ($participants) {
+            $row['participants'] = $participants->get($row['item_id'], collect())
+                ->map(fn (FestParticipant $p) => [
+                    'name' => $p->student?->name ?? $p->teacher?->name ?? '—',
+                    'fest_id' => $p->level_registration_number,
+                    'reg_no' => $p->student?->reg_no ?? $p->teacher?->reg_no,
+                ])->values()->all();
+
+            return $row;
+        }, $rows);
     }
 
     /** @return array{total: int, scheduled: int, unscheduled: int} */
@@ -2173,9 +2190,9 @@ class FestReportService
     {
         $date = $request->input('date');
         $stageId = $request->integer('stage_id') ?: null;
-        $rows = $this->itemScheduleRows($date, $stageId);
+        $rows = $this->itemScheduleRows($date, $stageId, $request->input('school_id'));
 
-        $csv = "Sl No,Item,Category,Gender,Date,Time,Venue,Stage\n";
+        $csv = "Sl No,Item,Category,Gender,Date,Time,Venue,Stage,Participants,Fest ID,Register Number\n";
         foreach ($rows as $i => $row) {
             $csv .= '"'.($i + 1).'",';
             $csv .= '"'.str_replace('"', '""', (string) $row['title']).'",';
@@ -2184,7 +2201,11 @@ class FestReportService
             $csv .= '"'.($row['scheduled_date'] ?? '').'",';
             $csv .= '"'.($row['scheduled_time_12h'] ?? '').'",';
             $csv .= '"'.str_replace('"', '""', (string) ($row['venue'] ?? '')).'",';
-            $csv .= '"'.str_replace('"', '""', (string) ($row['stage'] ?? ''))."\"\n";
+            $csv .= '"'.str_replace('"', '""', (string) ($row['stage'] ?? '')).'",';
+            foreach (['name', 'fest_id', 'reg_no'] as $index => $field) {
+                $values = collect($row['participants'])->map(fn ($p) => $p[$field] ?: '—')->implode('; ');
+                $csv .= '"'.str_replace('"', '""', $values).'"'.($index === 2 ? "\n" : ',');
+            }
         }
 
         return response()->streamDownload(
@@ -2202,7 +2223,7 @@ class FestReportService
         return $this->renderPdf('fest.reports.item-schedule', [
             'event'   => $this->event,
             'date'    => $date,
-            'rows'    => $this->itemScheduleRows($date, $stageId),
+            'rows'    => $this->itemScheduleRows($date, $stageId, $request->input('school_id')),
             'summary' => $this->itemScheduleSummary(),
             ...$this->brandingData(),
         ], $this->slug().'-item-schedule.pdf');

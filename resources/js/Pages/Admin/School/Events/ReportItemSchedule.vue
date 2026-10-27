@@ -65,17 +65,18 @@
                             <th>Time</th>
                             <th>Venue</th>
                             <th>Stage</th>
+                            <th>Participant · Fest ID / Register No.</th>
                         </tr>
                     </thead>
                     <tbody>
                         <template v-for="(row, idx) in displayRows" :key="row.item_id">
                             <tr v-if="shouldShowDateDivider(row, displayRows[idx - 1])" class="bg-slate-100">
-                                <td colspan="9" class="px-3 py-2 text-sm font-bold uppercase tracking-wide text-slate-700">
+                                <td colspan="10" class="px-3 py-2 text-sm font-bold uppercase tracking-wide text-slate-700">
                                     {{ row.scheduled_date ? formatCalendarDate(row.scheduled_date) : 'Not scheduled' }}
                                 </td>
                             </tr>
                             <tr v-if="shouldShowStageDivider(row, displayRows[idx - 1])" class="bg-slate-50/80">
-                                <td colspan="9" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                <td colspan="10" class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     {{ row.stage || 'No stage assigned' }}
                                 </td>
                             </tr>
@@ -89,10 +90,18 @@
                                 <td>{{ row.scheduled_time_12h ?? '—' }}</td>
                                 <td class="text-xs">{{ row.venue ?? '—' }}</td>
                                 <td class="text-xs">{{ row.stage ?? '—' }}</td>
+                                <td class="text-xs">
+                                    <div v-for="(participant, participantIndex) in row.participants" :key="participantIndex" class="mb-2 last:mb-0">
+                                        <p class="font-medium">{{ participant.name }}</p>
+                                        <p>Fest ID: {{ participant.fest_id || '—' }}</p>
+                                        <p>Reg. No: {{ participant.reg_no || '—' }}</p>
+                                    </div>
+                                    <span v-if="!row.participants?.length">—</span>
+                                </td>
                             </tr>
                         </template>
                         <tr v-if="!displayRows.length">
-                            <td colspan="9" class="p-8 text-center text-slate-400">No schedule rows match filters.</td>
+                            <td colspan="10" class="p-8 text-center text-slate-400">No schedule rows match filters.</td>
                         </tr>
                     </tbody>
                 </table>
