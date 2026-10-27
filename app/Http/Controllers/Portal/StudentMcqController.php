@@ -103,16 +103,22 @@ class StudentMcqController extends Controller
         }
 
         if ($registration->started_at && $sessions->isExpired($registration)) {
-            return redirect()
-                ->route('portal.student.dashboard', ['tenantId' => $tenantId])
-                ->withErrors(['exam' => 'Exam time has expired.']);
+            $sessions->submit($registration, $registration->draft_answers ?? []);
+            app(PlatformAuditLogger::class)->mcqRegistration(
+                $registration->fresh(['exam']), 'mcq.exam.auto_submitted',
+                'Expired online exam submitted from its saved answers on resume.',
+            );
+
+            return redirect()->route('portal.student.mcq.exam', ['tenantId' => $tenantId, 'registration' => $registration->id]);
         }
+
+        $schedule = $registration->paper_snapshot['schedule'] ?? $registration->exam->scheduleForClass($registration->student?->schoolClass?->name);
 
         return inertia('Portal/Student/McqExam', [
             'school'       => Tenant::findOrFail($tenantId)->only('id', 'name'),
             'student'      => $student->only('id', 'name', 'admission_number', 'reg_no'),
             'registration' => $registration->only('id', 'status', 'started_at'),
-            'exam'         => $registration->exam->only('id', 'title', 'duration_minutes', 'scheduled_at'),
+            'exam'         => array_merge($registration->exam->only('id', 'title'), $schedule),
             'questions'    => $sessions->paperForStudent($registration),
             'savedAnswers' => $registration->draft_answers ?? [],
             'expiresAt'    => $sessions->expiresAt($registration)?->toIso8601String(),
@@ -150,12 +156,13 @@ class StudentMcqController extends Controller
     }
 
     /** A question or option image on the student's own paper, once they have started writing. */
-    public function questionImage(Request $request, string $tenantId, McqRegistration $registration, McqQuestion $question, McqPaperService $papers)
+    public function questionImage(Request $request, string $tenantId, McqRegistration $registration, string $question, McqPaperService $papers)
     {
         $student = $request->attributes->get('portalStudent');
         abort_if($registration->school_id !== $tenantId || $registration->student_id !== $student->id, 403);
         abort_unless($registration->started_at, 403);
-        abort_unless($papers->questionsForRegistration($registration)->contains('id', $question->id), 404);
+        $question = $papers->questionsForRegistration($registration)->firstWhere('id', (int) $question);
+        abort_unless($question, 404);
 
         $option = $request->query('option');
         $path = is_string($option) && $option !== ''
@@ -225,7 +232,7 @@ class StudentMcqController extends Controller
         abort_if($registration->school_id !== $tenantId || $registration->student_id !== $student->id, 403);
 
         $data = $request->validate([
-            'answers'   => 'required|array',
+            'answers'   => 'present|array',
             'answers.*' => 'nullable|string|max:10',
         ]);
 
@@ -243,8 +250,11 @@ class StudentMcqController extends Controller
         );
 
         $message = $autoSubmitted
-            ? "Time expired — your answers were auto-submitted. Score: {$mark->score}"
-            : "Exam submitted. Score: {$mark->score}";
+            ? 'Time expired — your answers were auto-submitted.'
+            : 'Exam submitted.';
+        if ($registration->exam->results_published) {
+            $message .= " Score: {$mark->score}";
+        }
 
         return redirect()->route('portal.student.mcq.exam', [
             'tenantId'     => $tenantId,

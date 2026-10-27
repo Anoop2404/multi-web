@@ -2007,6 +2007,11 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{exam}/eligible-candidates', [McqExamController::class, 'eligibleCandidates'])->name('eligible-candidates');
             Route::post('/{exam}/registrations', [McqExamController::class, 'storeRegistration'])->name('registrations.store');
             Route::get('/{exam}/registrations/{registration}/fee/proof', [McqExamController::class, 'feeProof'])->name('registrations.fee.proof');
+            Route::post('/{exam}/paper-templates', [\App\Http\Controllers\SahodayaAdmin\McqPaperTemplateController::class, 'store'])->name('paper-templates.store');
+            Route::put('/{exam}/paper-templates/{template}', [\App\Http\Controllers\SahodayaAdmin\McqPaperTemplateController::class, 'update'])->name('paper-templates.update');
+            Route::delete('/{exam}/paper-templates/{template}', [\App\Http\Controllers\SahodayaAdmin\McqPaperTemplateController::class, 'archive'])->name('paper-templates.archive');
+            Route::put('/{exam}/class-papers', [\App\Http\Controllers\SahodayaAdmin\McqPaperTemplateController::class, 'assign'])->name('class-papers.assign');
+            Route::get('/{exam}/paper-library/banks/{bank}', [\App\Http\Controllers\SahodayaAdmin\McqPaperTemplateController::class, 'bank'])->name('paper-library.bank');
             Route::post('/{exam}/publish-results', [McqExamController::class, 'publishResults'])->name('results.publish');
             Route::post('/{exam}/unpublish-results', [McqExamController::class, 'unpublishResults'])->name('results.unpublish');
             Route::get('/{exam}/leaderboard', [McqExamController::class, 'leaderboard'])->name('leaderboard');

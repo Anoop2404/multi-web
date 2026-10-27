@@ -2,14 +2,14 @@
     <PortalLayout
         role-label="Student Portal"
         :title="exam.title"
-        :subtitle="`${school.name} · ${student.reg_no}`"
+        :subtitle="[school.name, student.reg_no].filter(Boolean).join(' · ')"
         accent="indigo"
         :nav-items="navItems"
     >
         <div v-if="!started" class="card text-center py-10 space-y-4">
             <p class="text-sm text-gray-600">You are about to start the online exam.</p>
             <p v-if="exam.duration_minutes" class="text-sm font-medium">Duration: {{ exam.duration_minutes }} minutes</p>
-            <p class="text-sm text-gray-500">{{ questions.length }} question(s) · {{ gradableCount }} auto-graded</p>
+            <p class="text-sm text-gray-500">{{ questions.length }} question(s) · {{ gradableCount }} auto-graded · {{ totalMarks }} marks</p>
             <p class="text-xs text-amber-700 max-w-md mx-auto">
                 The timer starts when you click Start. Your answers auto-submit when time runs out.
             </p>
@@ -69,6 +69,7 @@
                                 {{ markedForReview.has(q.id) ? 'Marked for review' : 'Mark for review' }}
                             </button>
                         </div>
+                        <p class="text-xs font-medium text-slate-500">{{ q.marks }} mark{{ q.marks === 1 ? '' : 's' }}<span v-if="q.negative_mark > 0"> · −{{ q.negative_mark }} for a wrong answer</span></p>
                         <McqRichText v-if="q.body_text" :text="q.body_text" tag="p" class="text-sm text-gray-700" />
                         <img v-if="q.image_url" :src="q.image_url" alt="Question image" class="max-h-80 max-w-full rounded-lg border bg-white object-contain">
                         <p v-if="q.type === 'true_false'" class="text-xs font-medium text-gray-500">True or false?</p>
@@ -82,14 +83,15 @@
                                 <input
                                     type="radio"
                                     :name="`q-${q.id}`"
+                                    :aria-label="`Question ${q.number}, option ${(opt.display_key || opt.key).toUpperCase()}: ${opt.label || 'Image option'}`"
                                     :value="opt.key"
                                     v-model="answers[q.id]"
                                     class="mt-1"
                                     @change="scheduleSave"
                                 >
                                 <span class="min-w-0 space-y-1.5">
-                                    <span class="flex gap-1"><strong class="uppercase">{{ opt.key }}.</strong> <McqRichText :text="opt.label" /></span>
-                                    <img v-if="opt.image_url" :src="opt.image_url" :alt="`Option ${opt.key.toUpperCase()}`" class="block max-h-40 max-w-full rounded border bg-white object-contain">
+                                    <span class="flex gap-1"><strong class="uppercase">{{ opt.display_key || opt.key }}.</strong> <McqRichText :text="opt.label" /></span>
+                                    <img v-if="opt.image_url" :src="opt.image_url" :alt="`Option ${(opt.display_key || opt.key).toUpperCase()}`" class="block max-h-40 max-w-full rounded border bg-white object-contain">
                                 </span>
                             </label>
                         </div>
@@ -99,6 +101,7 @@
                     <div class="flex flex-wrap justify-between items-center gap-3 pb-4">
                         <p class="text-xs text-gray-500">
                             {{ answeredCount }} of {{ questions.length }} answered
+                            <span v-if="saveStatus === 'failed'" role="alert" class="text-red-700"> · Answers could not be saved. Check your connection and select an answer again to retry.</span>
                             <span v-if="markedForReview.size"> · {{ markedForReview.size }} marked for review</span>
                             <span v-if="saveStatus === 'saving'" class="text-gray-400"> · Saving…</span>
                             <span v-else-if="saveStatus === 'saved'" class="text-emerald-600"> · Saved</span>
@@ -194,14 +197,16 @@ const starting = ref(false);
 const confirmOpen = ref(false);
 const mobileDrawerOpen = ref(false);
 const saveStatus = ref('');
-const remainingSeconds = ref(0);
+const remainingSeconds = ref(props.expiresAt ? Math.max(0, Math.ceil((new Date(props.expiresAt).getTime() - Date.now()) / 1000)) : 0);
 const questionRefs = ref({});
 const proctorWarningVisible = ref(false);
 let timerId = null;
+let autoSubmitRequested = false;
 let saveTimerId = null;
 let lastProctorEventAt = 0;
 const PROCTOR_EVENT_THROTTLE_MS = 2000;
 
+const totalMarks = computed(() => props.questions.reduce((total, q) => total + Number(q.marks || 0), 0));
 const gradableCount = computed(() => props.questions.filter(q => q.options?.length >= 2).length);
 
 const navItems = computed(() => studentPortalNavItems(props.school.id));
@@ -262,6 +267,7 @@ function toggleReview(questionId) {
         next.add(questionId);
     }
     markedForReview.value = next;
+    try { sessionStorage.setItem(`mcq-review-${props.school.id}-${props.registration.id}`, JSON.stringify([...next])); } catch { /* Storage may be disabled. */ }
 }
 
 function scheduleSave() {
@@ -286,9 +292,9 @@ async function saveDraft() {
                 body: JSON.stringify({ answers }),
             },
         );
-        saveStatus.value = res.ok ? 'saved' : '';
+        saveStatus.value = res.ok ? 'saved' : 'failed';
     } catch {
-        saveStatus.value = '';
+        saveStatus.value = 'failed';
     }
 }
 
@@ -328,9 +334,10 @@ function handleWindowBlur() {
 
 function tickTimer() {
     if (!props.expiresAt) return;
-    const diff = Math.max(0, Math.floor((new Date(props.expiresAt).getTime() - Date.now()) / 1000));
+    const diff = Math.max(0, Math.ceil((new Date(props.expiresAt).getTime() - Date.now()) / 1000));
     remainingSeconds.value = diff;
-    if (diff === 0 && props.started && !submitting.value) {
+    if (diff === 0 && props.started && !submitting.value && !autoSubmitRequested) {
+        autoSubmitRequested = true;
         submit();
     }
 }
@@ -354,14 +361,22 @@ function submit() {
         answers,
     }, {
         preserveScroll: true,
+        onSuccess: () => {
+            try { sessionStorage.removeItem(`mcq-review-${props.school.id}-${props.registration.id}`); } catch { /* Optional storage. */ }
+        },
         onFinish: () => { submitting.value = false; },
     });
 }
 
 watch(() => props.savedAnswers, restoreSavedAnswers, { deep: true });
+watch(() => props.expiresAt, tickTimer);
 
 onMounted(() => {
     restoreSavedAnswers();
+    try {
+        const ids = JSON.parse(sessionStorage.getItem(`mcq-review-${props.school.id}-${props.registration.id}`) || '[]');
+        markedForReview.value = new Set(Array.isArray(ids) ? ids.filter(id => props.questions.some(q => q.id === id)) : []);
+    } catch { /* Review flags are optional when browser storage is unavailable. */ }
     tickTimer();
     timerId = window.setInterval(tickTimer, 1000);
     document.addEventListener('visibilitychange', handleVisibilityChange);

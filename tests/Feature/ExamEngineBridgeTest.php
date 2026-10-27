@@ -77,6 +77,19 @@ class ExamEngineBridgeTest extends TestCase
         return "/sahodaya-admin/{$this->sahodaya->id}/mcq-exams/{$exam->id}";
     }
 
+    public function test_class_templates_cannot_silently_arm_the_default_engine_paper(): void
+    {
+        $exam = $this->engineExam();
+        $exam->update(['settings_json' => array_merge($exam->settings_json, ['paper_assignments' => [['classes' => ['8']]]])]);
+        try {
+            app(ExamEngineBridge::class)->arm($exam);
+            $this->fail('Class templates must not arm the default engine bundle.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->assertStringContainsString('Class paper templates', $e->getMessage());
+        }
+        Http::assertNothingSent();
+    }
+
     public function test_arming_sends_meta_roster_and_an_encrypted_paper_without_answer_keys(): void
     {
         $exam = $this->engineExam();

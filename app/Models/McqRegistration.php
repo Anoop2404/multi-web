@@ -20,7 +20,7 @@ class McqRegistration extends Model
         'status', 'approval_status', 'rejection_reason', 'approved_at', 'approved_by_user_id',
         'attendance_status', 'attendance_marked_at', 'attendance_marked_by', 'attendance_note',
         'fee_receipt_id',
-        'started_at', 'submitted_at', 'draft_answers',
+        'started_at', 'submitted_at', 'draft_answers', 'paper_snapshot',
         'cancelled_at', 'cancelled_by_user_id',
         'school_marked_paid_at', 'school_marked_paid_by_user_id', 'school_paid_note',
         'exam_passcode', 'exam_passcode_lookup',
@@ -28,12 +28,13 @@ class McqRegistration extends Model
     ];
 
     /** The exam passcode is a credential: only McqExamPasscodeService and printouts read it. */
-    protected $hidden = ['exam_passcode', 'exam_passcode_lookup'];
+    protected $hidden = ['exam_passcode', 'exam_passcode_lookup', 'paper_snapshot'];
 
     protected $casts = [
         'started_at'            => 'datetime',
         'submitted_at'          => 'datetime',
         'draft_answers'         => 'array',
+        'paper_snapshot'        => 'array',
         'approved_at'           => 'datetime',
         'attendance_marked_at'  => 'datetime',
         'cancelled_at'          => 'datetime',

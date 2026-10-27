@@ -274,6 +274,9 @@ class ExamEngineBridge
     private function assertArmable(McqExam $exam): void
     {
         $problems = [];
+        if (! empty($exam->settings_json['paper_assignments'])) {
+            $problems[] = 'Class paper templates currently use the in-app online exam. Turn off the separate exam engine, or remove class assignments before arming it.';
+        }
         if (! ExamEngineRun::usesEngine($exam)) {
             $problems[] = 'Turn on "Use the online exam engine" (the exam must be online).';
         }

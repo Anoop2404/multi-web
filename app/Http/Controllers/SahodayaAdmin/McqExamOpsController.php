@@ -820,8 +820,18 @@ class McqExamOpsController extends SahodayaAdminController
             'exam'      => $exam->only('id', 'title', 'delivery_mode', 'results_published', 'total_questions', 'status'),
             'paper'     => $papers->summary($exam),
             'available' => $available,
+            'paperTemplates' => \App\Models\McqPaperTemplate::where('tenant_id', $exam->tenant_id)->orderBy('title')->get()->map(fn ($t) => [
+                'id' => $t->id, 'title' => $t->title, 'version' => $t->version, 'sections' => $t->definition_json,
+                'total_marks' => $t->total_marks, 'question_count' => count($t->questions_json), 'is_active' => $t->is_active,
+                'questions' => collect($t->questions_json)->map(fn ($q) => ['id' => $q['id'], 'body_text' => $q['body_text'], 'marks' => $q['marks'], 'section_title' => $q['section_title'] ?? ''])->all(),
+            ]),
+            'classPapers' => $exam->settings_json['paper_assignments'] ?? [],
+            'paperFallback' => $exam->settings_json['paper_fallback'] ?? 'require',
+            'templateBanks' => McqQuestionBank::where('sahodaya_id', $exam->tenant_id)->where('status', 'active')->withCount('questions')->orderBy('title')->get(['id', 'title', 'subject']),
+            'paperClasses' => \App\Models\SchoolClass::whereIn('id', \App\Models\Student::whereIn('id', McqRegistration::where('exam_id', $exam->id)->where('status', '!=', 'cancelled')->select('student_id'))->select('school_class_id'))->distinct()->pluck('name'),
             'settings'  => [
                 'shuffle_questions' => (bool) ($exam->settings_json['shuffle_questions'] ?? false),
+                'shuffle_options' => (bool) ($exam->settings_json['shuffle_options'] ?? false),
                 'multi_marking'     => $exam->multiMarkingMode(),
             ],
             'banksUrl'  => "/sahodaya-admin/{$this->sahodaya->id}/mcq/question-banks",
@@ -1025,11 +1035,13 @@ class McqExamOpsController extends SahodayaAdminController
 
         $data = $request->validate([
             'shuffle_questions' => 'required|boolean',
+            'shuffle_options' => 'sometimes|boolean',
             'multi_marking'     => 'required|in:all_or_nothing,partial',
         ]);
 
         $exam->update(['settings_json' => array_merge($exam->settings_json ?? [], [
             'shuffle_questions' => (bool) $data['shuffle_questions'],
+            'shuffle_options' => (bool) ($data['shuffle_options'] ?? $exam->settings_json['shuffle_options'] ?? false),
             'multi_marking'     => $data['multi_marking'],
         ])]);
 
@@ -1043,17 +1055,25 @@ class McqExamOpsController extends SahodayaAdminController
         $this->assertStaffCan('mcq.manage');
 
         $banksUrl = "/sahodaya-admin/{$this->sahodaya->id}/mcq/question-banks";
-        $questions = $papers->questionsForExam($exam)->values()->map(fn (\App\Models\McqQuestion $q, int $i) => [
+        $assignment = null;
+        if (request()->filled('class')) {
+            $class = \App\Support\Mcq\McqClassKey::normalize((string) request('class'));
+            $assignment = \App\Models\McqExamPaperAssignment::where('exam_id', $exam->id)->get()
+                ->first(fn ($row) => in_array($class, $row->mapping_json['classes'], true));
+            abort_unless($assignment, 404);
+        }
+        $source = $assignment ? collect($assignment->questions_json)->map(fn ($row) => (new \App\Models\McqQuestion)->forceFill($row)) : $papers->questionsForExam($exam);
+        $questions = $source->values()->map(fn (\App\Models\McqQuestion $q, int $i) => [
             'id'           => $q->id,
             'number'       => $i + 1,
             'type'         => $q->typeValue(),
             'type_label'   => \App\Models\McqQuestion::TYPE_LABELS[$q->typeValue()],
             'body_text'    => $q->body_text,
-            'image_url'    => $q->document_path ? "{$banksUrl}/{$q->bank_id}/questions/{$q->id}/image" : null,
+            'image_url'    => $q->document_path ? ($assignment ? $this->paperPreviewImage($q->document_path) : "{$banksUrl}/{$q->bank_id}/questions/{$q->id}/image") : null,
             'options'      => collect($q->options_json ?? [])->map(fn ($o) => [
                 'key'       => strtolower((string) ($o['key'] ?? '')),
                 'label'     => (string) ($o['label'] ?? ''),
-                'image_url' => filled($o['image_path'] ?? null) ? "{$banksUrl}/{$q->bank_id}/questions/{$q->id}/image?option=".strtolower((string) $o['key']) : null,
+                'image_url' => filled($o['image_path'] ?? null) ? ($assignment ? $this->paperPreviewImage($o['image_path']) : "{$banksUrl}/{$q->bank_id}/questions/{$q->id}/image?option=".strtolower((string) $o['key'])) : null,
             ])->values(),
             'correct_keys' => $q->typeValue() === \App\Models\McqQuestion::TYPE_NUMERIC ? [] : $q->correctKeys(),
             'show_count'   => $q->showsCorrectCount(),
@@ -1067,8 +1087,17 @@ class McqExamOpsController extends SahodayaAdminController
         return $this->inertia('Sahodaya/Mcq/PaperPreview', [
             'exam'      => $exam->only('id', 'title', 'delivery_mode', 'results_published', 'duration_minutes'),
             'questions' => $questions,
-            'paper'     => $papers->summary($exam),
+            'paper'     => $assignment ? ['total' => $source->count(), 'max_score' => $assignment->mapping_json['total_marks'], 'warnings' => []] : $papers->summary($exam),
         ]);
+    }
+
+    private function paperPreviewImage(string $path): ?string
+    {
+        $bytes = \App\Support\TenantStorage::get($path);
+        if ($bytes === null) return null;
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
+        return in_array($mime, ['image/png', 'image/jpeg', 'image/webp', 'image/gif'], true)
+            ? 'data:'.$mime.';base64,'.base64_encode($bytes) : null;
     }
 
     public function detachBank(string $tenantId, McqExam $exam, McqQuestionBank $bank)

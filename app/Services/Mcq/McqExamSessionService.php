@@ -32,6 +32,7 @@ class McqExamSessionService
     public function assertCanStart(McqRegistration $registration): void
     {
         $registration->loadMissing('exam', 'feeReceipt');
+        $this->assertCandidateEligible($registration);
 
         if ($registration->status === 'submitted') {
             throw ValidationException::withMessages(['exam' => 'Exam already submitted.']);
@@ -56,7 +57,8 @@ class McqExamSessionService
             ]);
         }
 
-        if ($exam->scheduled_at && now()->lt($exam->scheduled_at)) {
+        $scheduledAt = $exam->scheduleForClass($registration->student?->schoolClass?->name)['scheduled_at'];
+        if ($scheduledAt && now()->lt($scheduledAt)) {
             throw ValidationException::withMessages(['exam' => 'The exam has not started yet.']);
         }
 
@@ -89,7 +91,7 @@ class McqExamSessionService
             throw ValidationException::withMessages(['exam' => 'Attendance must be marked present before starting.']);
         }
 
-        $paper = $this->questionsForExam($exam);
+        $paper = app(McqPaperService::class)->questionsForRegistration($registration);
 
         if (app(McqPaperService::class)->needsExamEngine($paper)) {
             throw ValidationException::withMessages([
@@ -108,16 +110,15 @@ class McqExamSessionService
 
     public function start(McqRegistration $registration): McqRegistration
     {
-        $this->assertCanStart($registration);
-
-        if (! $registration->started_at) {
-            $registration->update([
-                'status'     => 'started',
-                'started_at' => now(),
-            ]);
-        }
-
-        return $registration->fresh(['exam']);
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($registration) {
+            // Same lock as class assignment saves: a start cannot race a paper change.
+            McqExam::whereKey($registration->exam_id)->lockForUpdate()->firstOrFail();
+            $registration = McqRegistration::whereKey($registration->id)->lockForUpdate()->firstOrFail();
+            $this->assertCanStart($registration);
+            app(McqPaperService::class)->freezeForRegistration($registration);
+            if (! $registration->started_at) $registration->update(['status' => 'started', 'started_at' => now()]);
+            return $registration->fresh(['exam']);
+        });
     }
 
     /**
@@ -135,12 +136,15 @@ class McqExamSessionService
                 'id'            => $q->id,
                 'number'        => $index + 1,
                 'type'          => $q->typeValue(),
+                'marks'         => $q->marksValue(),
+                'negative_mark' => $q->negativeMarkValue(),
                 'title'         => $q->title,
                 'body_text'     => $q->body_text,
                 'image_url'     => $q->document_path ? "{$imageBase}/{$q->id}/image" : null,
                 'options'       => collect($q->options_json ?? [])
-                    ->map(fn ($opt) => [
+                    ->map(fn ($opt, $optionIndex) => [
                         'key'       => $opt['key'],
+                        'display_key' => chr(97 + $optionIndex),
                         'label'     => $opt['label'] ?? '',
                         'image_url' => filled($opt['image_path'] ?? null) ? "{$imageBase}/{$q->id}/image?option={$opt['key']}" : null,
                     ])
@@ -154,18 +158,20 @@ class McqExamSessionService
     public function expiresAt(McqRegistration $registration): ?\Carbon\Carbon
     {
         $registration->loadMissing('exam');
-        if (! $registration->started_at || ! $registration->exam?->duration_minutes) {
+        if (! $registration->started_at || ! $registration->exam) {
             return null;
         }
 
-        return $registration->started_at->copy()->addMinutes((int) $registration->exam->duration_minutes);
+        $schedule = $registration->paper_snapshot['schedule'] ?? $registration->exam->scheduleForClass($registration->student?->schoolClass?->name);
+
+        return $registration->started_at->copy()->addMinutes($schedule['duration_minutes']);
     }
 
     public function isExpired(McqRegistration $registration): bool
     {
         $expires = $this->expiresAt($registration);
 
-        return $expires !== null && now()->greaterThan($expires);
+        return $expires !== null && now()->greaterThanOrEqualTo($expires);
     }
 
     /** @param  array<int|string, string|null>  $answers  question_id => option_key */
@@ -187,6 +193,7 @@ class McqExamSessionService
     public function submit(McqRegistration $registration, array $answers): McqMark
     {
         $registration->loadMissing('exam', 'mark');
+        $this->assertCandidateEligible($registration);
 
         if ($registration->status === 'submitted') {
             throw ValidationException::withMessages(['exam' => 'Exam already submitted.']);
@@ -203,12 +210,15 @@ class McqExamSessionService
             $registration->refresh();
         }
 
-        $autoSubmitted = $expired;
+        // Once time is over, only answers received before the deadline may score.
+        if ($expired) {
+            $answers = $registration->draft_answers ?? [];
+        }
 
         $result = app(McqGrader::class)->grade(
-            $this->questionsForExam($registration->exam),
+            app(McqPaperService::class)->questionsForRegistration($registration),
             $answers,
-            $registration->exam->multiMarkingMode(),
+            $registration->paper_snapshot['multi_marking'] ?? $registration->exam->multiMarkingMode(),
         );
 
         $mark = $this->storeGradedResult($registration, $result);
@@ -231,7 +241,7 @@ class McqExamSessionService
     {
         $registration->loadMissing('exam');
         $percentage = $result['percentage'];
-        $passMark = (int) ($registration->exam->pass_mark ?? 0);
+        $passMark = (float) ($registration->paper_snapshot['pass_mark'] ?? $registration->exam->pass_mark ?? 0);
         $gradeService = app(\App\Services\Mcq\McqGradeService::class);
         $grade = $gradeService->gradeForPercentage($registration->exam, $percentage);
         if ($passMark > 0 && $percentage < $passMark && $grade !== 'F') {
@@ -240,7 +250,7 @@ class McqExamSessionService
             $grade = $failBand['label'] ?? 'F';
         }
 
-        return McqMark::updateOrCreate(
+        $mark = McqMark::updateOrCreate(
             ['registration_id' => $registration->id],
             [
                 'correct_count'    => $result['correct'],
@@ -253,6 +263,13 @@ class McqExamSessionService
                 'locked_at'        => now(),
             ],
         );
+
+        if ($registration->exam->results_published) {
+            app(McqRankingService::class)->rankExam($registration->exam);
+            $mark->refresh();
+        }
+
+        return $mark;
     }
 
     /**
@@ -285,8 +302,16 @@ class McqExamSessionService
         ]);
     }
 
+    private function assertCandidateEligible(McqRegistration $registration): void
+    {
+        if ($registration->isCancelled() || $registration->approval_status === 'rejected' || $registration->blocksScoring()) {
+            throw ValidationException::withMessages(['exam' => 'This registration is not cleared to take the exam. Contact your school.']);
+        }
+    }
+
     private function assertActiveSession(McqRegistration $registration, bool $allowExpired = false): void
     {
+        $this->assertCandidateEligible($registration);
         if ($registration->status === 'submitted') {
             throw ValidationException::withMessages(['exam' => 'Exam already submitted.']);
         }

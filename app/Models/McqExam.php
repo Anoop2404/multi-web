@@ -190,9 +190,13 @@ class McqExam extends Model
     }
 
     /** Total questions/max marks for a class bucket, falling back to the exam-wide default. */
-    public function totalQuestionsForClass(?string $classBucket): int
+    public function totalQuestionsForClass(?string $classBucket): int|float
     {
         if ($classBucket !== null) {
+            $key = \App\Support\Mcq\McqClassKey::normalize($classBucket);
+            foreach ($this->settings_json['paper_assignments'] ?? [] as $paper) {
+                if (in_array($key, $paper['classes'], true)) return (float) $paper['total_marks'] == (int) $paper['total_marks'] ? (int) $paper['total_marks'] : (float) $paper['total_marks'];
+            }
             $override = $this->classMaxMarks()[$classBucket] ?? null;
             if ($override !== null && (int) $override > 0) {
                 return (int) $override;

@@ -4,7 +4,7 @@
         <PageHeader :title="exam.title" eyebrow="Talent Search exam"
                     description="Build the paper from Ready question banks. Each bank is a section that takes all, the first N, or N random questions.">
             <template #actions>
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/paper-preview`" class="btn-secondary text-sm">Preview paper</Link>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/paper-preview`" class="btn-secondary text-sm">Preview default paper</Link>
                 <Link :href="banksUrl" class="btn-secondary text-sm">Question banks</Link>
             </template>
         </PageHeader>
@@ -20,6 +20,7 @@
             {{ warning }}
         </div>
 
+        <h3 class="mb-3 font-semibold">Default paper summary</h3>
         <!-- Totals -->
         <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-6">
             <div class="card card--muted !py-3 text-center">
@@ -38,7 +39,7 @@
 
         <!-- Sections -->
         <section class="card mb-6">
-            <h3 class="section-title">Sections</h3>
+            <h3 class="section-title">Default paper sections</h3>
             <EmptyState v-if="!paper.sections.length" title="No sections yet" description="Add a Ready question bank below." icon="📚" class="py-6" />
             <div v-else class="divide-y divide-slate-100">
                 <div v-for="(section, index) in paper.sections" :key="section.bank_id" class="flex flex-wrap items-start gap-4 py-4">
@@ -74,6 +75,8 @@
                 </div>
             </div>
         </section>
+
+        <McqPaperTemplates :exam-url="examUrl" :templates="paperTemplates" :banks="templateBanks" :assignments="classPapers" :fallback="paperFallback" :classes="paperClasses" :locked="paper.locked" />
 
         <!-- Add bank -->
         <section v-if="!paper.locked" class="card mb-6">
@@ -211,6 +214,7 @@
                     <input v-model="settingsForm.shuffle_questions" type="checkbox" class="mt-1" :disabled="paper.locked">
                     <span>Shuffle question order for each student <span class="block text-xs text-slate-500">Each student keeps the same order if they reload.</span></span>
                 </label>
+                <label class="flex items-start gap-2 text-sm"><input v-model="settingsForm.shuffle_options" type="checkbox" class="mt-1" :disabled="paper.locked"><span>Shuffle answer options for each candidate<span class="block text-xs text-slate-500">Stable on reload. True/false options retain their order. Class templates have their own shuffle settings.</span></span></label>
                 <div class="text-sm">
                     <p class="mb-1 font-medium">Marking multiple-correct questions</p>
                     <label class="mr-4 inline-flex items-center gap-2">
@@ -235,6 +239,7 @@ import { formatDateTime } from '@/support/calendarDates.js';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
+import McqPaperTemplates from '@/Components/mcq/McqPaperTemplates.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const props = defineProps({
@@ -247,6 +252,11 @@ const props = defineProps({
     settings: { type: Object, required: true },
     banksUrl: { type: String, required: true },
     engine: { type: Object, required: true },
+    paperTemplates: { type: Array, default: () => [] },
+    templateBanks: { type: Array, default: () => [] },
+    classPapers: { type: Array, default: () => [] },
+    paperClasses: { type: Array, default: () => [] },
+    paperFallback: { type: String, default: 'require' },
 });
 
 const typeLabels = { single: 'Single correct', multiple: 'Multiple correct', true_false: 'True / False', numeric: 'Numeric' };

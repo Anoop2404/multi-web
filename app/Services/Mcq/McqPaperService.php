@@ -45,14 +45,57 @@ class McqPaperService
      */
     public function questionsForRegistration(McqRegistration $registration): Collection
     {
+        if ($registration->paper_snapshot) return $this->hydrate($registration->paper_snapshot['questions']);
+        return $this->buildForRegistration($registration)['questions'];
+    }
+
+    /** Freeze the actual ordered paper, including answer keys, before the first start. */
+    public function freezeForRegistration(McqRegistration $registration): void
+    {
+        if ($registration->paper_snapshot) return;
+        $paper = $this->buildForRegistration($registration);
+        $registration->update(['paper_snapshot' => [
+            'questions' => $paper['questions']->map->toArray()->all(),
+            'template_title' => $paper['title'], 'template_version' => $paper['version'],
+            'total_marks' => $paper['questions']->sum(fn ($q) => $q->marksValue()),
+            'pass_mark' => $paper['pass_mark'], 'multi_marking' => $registration->exam->multiMarkingMode(),
+            'schedule' => $registration->exam->scheduleForClass($registration->student?->schoolClass?->name),
+        ]]);
+    }
+
+    public function buildForRegistration(McqRegistration $registration): array
+    {
         $registration->loadMissing('exam');
-        $questions = $this->questionsForExam($registration->exam);
-
-        if (! ($registration->exam->settings_json['shuffle_questions'] ?? false)) {
-            return $questions;
+        $exam = $registration->exam;
+        $service = app(McqPaperTemplateService::class);
+        $assignment = $service->assignment($registration);
+        if (! $assignment && ! empty($exam->settings_json['paper_assignments']) && ($exam->settings_json['paper_fallback'] ?? 'require') === 'require') {
+            $service->fail('No paper template is assigned to this candidate’s class. Ask the exam administrator to assign one.');
         }
+        $questions = $assignment ? $this->hydrate($assignment['questions']) : $this->questionsForExam($exam);
+        $shuffle = $assignment['shuffle_questions'] ?? (($exam->settings_json['shuffle_questions'] ?? false) ? 'all' : 'none');
+        if ($shuffle === 'sections') {
+            $questions = $questions->groupBy(fn ($q) => $q->section_index ?? $q->bank_id)
+                ->flatMap(fn ($group, $section) => self::seededShuffle($group->all(), 'reg:'.$registration->id.':section:'.$section))->values();
+        } elseif ($shuffle === 'all') {
+            $questions = collect(self::seededShuffle($questions->all(), 'reg:'.$registration->id))->values();
+        }
+        if ($assignment['shuffle_options'] ?? $exam->settings_json['shuffle_options'] ?? false) {
+            $questions = $questions->map(function ($q) use ($registration) {
+                $q = clone $q;
+                if ($q->typeValue() === 'single' || $q->typeValue() === 'multiple') {
+                    $q->options_json = self::seededShuffle($q->options_json ?? [], 'reg:'.$registration->id.':question:'.$q->id);
+                }
+                return $q;
+            });
+        }
+        return ['questions' => $questions, 'title' => $assignment['title'] ?? 'Default paper',
+            'version' => $assignment['version'] ?? null, 'pass_mark' => $assignment['pass_mark'] ?? $exam->pass_mark ?? 0];
+    }
 
-        return collect(self::seededShuffle($questions->all(), 'reg:'.$registration->id))->values();
+    private function hydrate(array $rows): Collection
+    {
+        return collect($rows)->map(fn ($row) => (new McqQuestion)->forceFill($row));
     }
 
     /** @return Collection<int, McqQuestion> */
