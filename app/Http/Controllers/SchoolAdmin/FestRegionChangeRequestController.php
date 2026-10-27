@@ -13,6 +13,7 @@ use App\Support\SchoolFestProgram;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class FestRegionChangeRequestController extends SchoolAdminController
 {
@@ -27,6 +28,7 @@ class FestRegionChangeRequestController extends SchoolAdminController
             $current = $service->current($root, $this->school->id);
 
             return $this->inertia('School/Events/RegionChangeRequests', [
+                'eventScoped' => true,
                 'event' => $root->only('id', 'title', 'status'), 'program' => $meta['slug'], 'programMeta' => $meta,
                 'phases' => [['id' => 0, 'name' => $root->title,
                     'regions' => $service->regions($root)->map(fn ($child) => ['region_id' => $child->region_id, 'name' => $child->region?->name ?? $child->cluster_label])->values(),
@@ -51,7 +53,8 @@ class FestRegionChangeRequestController extends SchoolAdminController
             ->get();
 
         return $this->inertia('School/Events/RegionChangeRequests', [
-            'event' => $event->only('id', 'title', 'status'),
+            'eventScoped' => false,
+            'event' => $root->only('id', 'title', 'status'),
             'program' => $meta['slug'],
             'programMeta' => $meta,
             'phases' => $phases->map(function (FestEventPhase $phase) use ($root, $selections) {
@@ -81,13 +84,21 @@ class FestRegionChangeRequestController extends SchoolAdminController
         if (! $root->usesPhasedRegionalBilling()) {
             $data = $request->validate(['requested_region_id' => 'required|integer', 'reason' => 'required|string|max:2000']);
             $service = app(FestSchoolEventRegionService::class);
-            $current = $service->current($root, $this->school->id);
-            abort_unless($current, 422, 'Select your initial event region first.');
-            abort_unless($service->regions($root)->contains('region_id', (int) $data['requested_region_id']), 422, 'That region is not configured for this event.');
-            abort_if((int) $current->region_id === (int) $data['requested_region_id'], 422, 'That is already your region.');
-            DB::transaction(function () use ($root, $current, $data, $request) {
+            if (! $service->regions($root)->contains('region_id', (int) $data['requested_region_id'])) {
+                throw ValidationException::withMessages(['requested_region_id' => 'Choose a region configured for this fest.']);
+            }
+            DB::transaction(function () use ($root, $service, $data, $request) {
                 FestEvent::whereKey($root->id)->lockForUpdate()->firstOrFail();
-                abort_if(FestRegionChangeRequest::where('event_id', $root->id)->whereNull('phase_id')->where('school_id', $this->school->id)->where('status', 'pending')->exists(), 422, 'A region change request is already pending review.');
+                $current = $service->current($root, $this->school->id);
+                if (! $current) {
+                    throw ValidationException::withMessages(['requested_region_id' => 'Select your initial event region from registration first.']);
+                }
+                if ((int) $current->region_id === (int) $data['requested_region_id']) {
+                    throw ValidationException::withMessages(['requested_region_id' => 'That is already your selected region.']);
+                }
+                if (FestRegionChangeRequest::where('event_id', $root->id)->whereNull('phase_id')->where('school_id', $this->school->id)->where('status', 'pending')->exists()) {
+                    throw ValidationException::withMessages(['requested_region_id' => 'A region change request is already pending review.']);
+                }
                 FestRegionChangeRequest::create(['event_id' => $root->id, 'school_id' => $this->school->id, 'phase_id' => null,
                     'current_region_id' => $current->region_id, 'requested_region_id' => $data['requested_region_id'], 'reason' => $data['reason'],
                     'status' => 'pending', 'requested_by_user_id' => $request->user()?->id]);

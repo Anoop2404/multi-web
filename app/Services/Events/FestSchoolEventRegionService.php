@@ -18,7 +18,16 @@ class FestSchoolEventRegionService
 {
     public function regions(FestEvent $event)
     {
-        return app(FestPartitionService::class)->legacyPartitions($event->rootEvent())->filter(fn ($child) => $child->region_id);
+        $root = $event->rootEvent();
+
+        return app(FestPartitionService::class)->legacyPartitions($root)
+            ->loadMissing('region')
+            ->filter(fn (FestEvent $child) => $child->tenant_id === $root->tenant_id
+                && $child->event_type === $root->event_type
+                && $child->region
+                && $child->region->tenant_id === $root->tenant_id
+                && ($child->region->fest_event_id === null || (int) $child->region->fest_event_id === (int) $root->id))
+            ->unique('region_id')->values();
     }
 
     public function current(FestEvent $event, string $schoolId): ?FestEvent

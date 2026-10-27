@@ -1,14 +1,14 @@
 <template>
     <SchoolAdminLayout :title="`Region change requests — ${event.title}`" :school="school" :show-header-title="false">
         <PageHeader :title="`Region change requests`" :eyebrow="programLabel"
-                    :description="`Manage your school's region for each regional phase of ${event.title}.`">
+                    :description="eventScoped ? `Request a change to your school’s region for ${event.title}.` : `Manage your school’s region for each regional phase of ${event.title}.`">
             <template #actions>
                 <Link :href="`${programBase}/registration?event=${event.id}`" class="btn-secondary text-sm">← Registration</Link>
             </template>
         </PageHeader>
 
         <div v-if="phases.length === 0" class="card text-sm text-slate-400 max-w-2xl mb-6">
-            This event has no regional phases.
+            This fest has no regions available for change requests.
         </div>
 
         <div v-else class="space-y-4 mb-8 max-w-2xl">
@@ -22,14 +22,22 @@
                 </div>
 
                 <p v-if="!phase.current_region_id" class="text-xs text-slate-400">
-                    No region selected yet for this phase — select one from the event's registration page first.
+                    No region selected yet — select one from this fest’s registration page first.
+                </p>
+
+                <p v-else-if="pendingRequest(phase)" role="status" class="text-sm text-amber-800">
+                    Your region change request is awaiting Sahodaya approval. See its details below.
+                </p>
+                <p v-else-if="!regionOptions(phase, phase.current_region_id).length" class="text-sm text-slate-500">
+                    No other regions are configured for this fest{{ eventScoped ? '' : ' phase' }}. Contact your Sahodaya.
                 </p>
 
                 <form v-else-if="!phase.locked" class="flex flex-wrap items-center gap-2" @submit.prevent="submitDirectChange(phase)">
                     <SearchableSelect v-model="directForms[phase.id].region_id" class="min-w-[14rem]"
                                       :options="regionOptions(phase, phase.current_region_id)"
                                       :all-option="false" placeholder="Choose new region…" :required="true" />
-                    <button type="submit" class="btn-primary text-xs" :disabled="directForms[phase.id].processing">Change region</button>
+                    <p v-for="(error, key) in directForms[phase.id].errors" :key="key" class="text-xs text-red-600">{{ error }}</p>
+                    <button type="submit" class="btn-primary text-xs" :disabled="directForms[phase.id].processing || !directForms[phase.id].region_id">Change region</button>
                 </form>
 
                 <form v-else class="space-y-2" @submit.prevent="submitRequest(phase)">
@@ -39,7 +47,7 @@
                                       :all-option="false" placeholder="Requested region…" :required="true" />
                     <textarea v-model="requestForms[phase.id].reason" class="field text-sm" rows="2" placeholder="Reason for the change" required></textarea>
                     <p v-for="(error, key) in requestForms[phase.id].errors" :key="key" class="text-xs text-red-600">{{ error }}</p>
-                    <button type="submit" class="btn-primary text-xs" :disabled="requestForms[phase.id].processing">Submit request</button>
+                    <button type="submit" class="btn-primary text-xs" :disabled="requestForms[phase.id].processing || !requestForms[phase.id].requested_region_id || !requestForms[phase.id].reason.trim()">Submit request</button>
                 </form>
             </div>
         </div>
@@ -48,7 +56,7 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Phase</th>
+                        <th>{{ eventScoped ? 'Fest' : 'Phase' }}</th>
                         <th>Current &rarr; Requested</th>
                         <th>Reason</th>
                         <th>Status</th>
@@ -87,6 +95,7 @@ const props = defineProps({
     program: [String, Object],
     programMeta: { type: Object, default: null },
     event: Object,
+    eventScoped: { type: Boolean, default: false },
     phases: { type: Array, default: () => [] },
     requests: { type: Array, default: () => [] },
 });
@@ -102,8 +111,13 @@ const requestForms = reactive(Object.fromEntries(
 
 function regionOptions(phase, excludeRegionId) {
     return (phase.regions || [])
-        .filter((r) => r.region_id !== excludeRegionId)
+        .filter((r) => Number(r.region_id) !== Number(excludeRegionId))
         .map((r) => ({ value: r.region_id, label: r.name }));
+}
+
+function pendingRequest(phase) {
+    return props.requests.find(request => request.status === 'pending'
+        && (props.eventScoped ? request.phase_id == null : Number(request.phase_id) === Number(phase.id)));
 }
 
 function submitDirectChange(phase) {
@@ -113,7 +127,7 @@ function submitDirectChange(phase) {
 function submitRequest(phase) {
     requestForms[phase.id].post(`${programBase.value}/events/${props.event.id}/region-change-requests`, {
         preserveScroll: true,
-        onSuccess: () => { requestForms[phase.id].reset('reason'); },
+        onSuccess: () => { requestForms[phase.id].reset(); },
     });
 }
 

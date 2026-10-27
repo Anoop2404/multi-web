@@ -91,6 +91,14 @@ class KidsFestRegionalRegistrationTest extends TestCase
     public function test_school_and_admin_can_request_and_review_an_event_region_change(): void
     {
         [$sahodaya, $school, $root, $children] = $this->fixture();
+        $otherFest = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Other Kids Fest', 'event_type' => 'kids_fest', 'status' => 'registration_open']);
+        $foreignRegion = Region::create(['tenant_id' => $sahodaya->id, 'fest_event_id' => $otherFest->id, 'name' => 'Other fest venue', 'code' => 'OTHER', 'is_active' => true]);
+        $unconfiguredRegion = Region::create(['tenant_id' => $sahodaya->id, 'name' => 'Membership only', 'code' => 'MEM', 'is_active' => true]);
+        // Even a mistakenly linked child must not expose another fest's region.
+        FestEvent::create(['tenant_id' => $sahodaya->id, 'parent_event_id' => $root->id, 'title' => 'Wrong fest region', 'event_type' => 'kids_fest', 'partition_role' => 'region', 'partition_key' => 'wrong', 'region_id' => $foreignRegion->id, 'status' => 'registration_open']);
+        foreach ($children as $child) {
+            $child->region->update(['fest_event_id' => $root->id]);
+        }
         $this->seed(RolesAndPermissionsSeeder::class);
         SahodayaProfile::create(['tenant_id' => $sahodaya->id, 'prefix' => 'KID', 'student_data_mode' => 'counts_only']);
         $school->update(['is_active' => true, 'membership_status' => 'approved']);
@@ -103,7 +111,19 @@ class KidsFestRegionalRegistrationTest extends TestCase
         $this->get('/school-admin/'.$school->id.'/kids-fest/events/'.$children[0]->id.'/registration')->assertOk()->assertInertia(fn ($page) => $page->component('School/Events/Registration', false)->where('schoolRegion.locked', true)->has('schoolRegion.regions', 2));
         $this->get($base.'/region-change-requests')->assertOk()->assertInertia(fn ($page) => $page->component('School/Events/RegionChangeRequests', false)->where('phases.0.locked', true)->has('phases.0.regions', 2));
         $this->post($base.'/phase-region', ['region_id' => $children[1]->region_id])->assertSessionHasErrors('region_id');
+        $this->get($base.'/region-change-requests')->assertOk()->assertInertia(fn ($page) => $page
+            ->where('eventScoped', true)->where('event.id', $root->id)
+            ->where('phases.0.regions.0.region_id', $children[0]->region_id)
+            ->where('phases.0.regions.1.region_id', $children[1]->region_id)
+            ->has('phases.0.regions', 2));
+        foreach ([$foreignRegion->id, $unconfiguredRegion->id, $children[0]->region_id] as $invalidRegion) {
+            $this->post($base.'/region-change-requests', ['requested_region_id' => $invalidRegion, 'reason' => 'Invalid choice'])
+                ->assertSessionHasErrors('requested_region_id');
+        }
         $this->post($base.'/region-change-requests', ['requested_region_id' => $children[1]->region_id, 'reason' => 'Closer venue'])->assertRedirect()->assertSessionHasNoErrors();
+        $this->post($base.'/region-change-requests', ['requested_region_id' => $children[1]->region_id, 'reason' => 'Duplicate'])
+            ->assertSessionHasErrors('requested_region_id');
+        $this->assertSame(1, FestRegionChangeRequest::where('event_id', $root->id)->where('school_id', $school->id)->count());
         $change = FestRegionChangeRequest::where('event_id', $root->id)->firstOrFail();
         $adminBase = '/sahodaya-admin/'.$sahodaya->id.'/events/'.$root->id;
         $this->actingAs($admin)->get($adminBase.'/phases/regions-matrix')->assertOk()->assertInertia(fn ($page) => $page->component('Sahodaya/Events/PhaseRegionMatrix', false)->has('pendingRequests', 1)->where('eventScoped', true));
