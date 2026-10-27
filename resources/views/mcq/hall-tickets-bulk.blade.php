@@ -75,6 +75,7 @@
                     'paper_name'         => $exam->title,
                     'exam_code'          => $exam->code ?: 'MCQ-' . $exam->id,
                     'participant_type'   => $participant['type'],
+                    'gender' => ucfirst((string) ($r->student?->gender ?? $r->teacher?->gender ?? '')),
                     'participant_name'   => $participant['name'],
                     'secondary_label'    => $participant['secondary_label'],
                     'secondary_value'    => $participant['secondary_value'],

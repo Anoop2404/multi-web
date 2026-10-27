@@ -62,7 +62,7 @@
         <McqAdmitCardDesigner v-if="workspaceTab === 'design'" :design="designForm" :defaults="defaultHallTicketDesign" :exam="exam"
             :sample="previewSampleData" :background-url="backgroundUrl" :logo-url="logoUrl"
             :preview-url="previewUrl" :saving="designSaving" :saved="designSaved" :errors="designErrors"
-            @background="backgroundFile = $event" @save="saveDesign">
+            @background="backgroundFile = $event" @controller-signature="controllerSignatureFile = $event" @save="saveDesign">
             <template #settings>
                 <details class="border-t border-slate-200 pt-3 text-xs">
                     <summary class="font-semibold cursor-pointer text-slate-700">Exam card settings</summary>
@@ -345,6 +345,7 @@ function allocateSeats(reallocate = false) {
 }
 
 const backgroundFile = ref(null);
+const controllerSignatureFile = ref(null);
 const designSaving = ref(false);
 const designSaved = ref(false);
 const designErrors = ref({});
@@ -363,6 +364,7 @@ const designForm = useForm({
     next_hall_ticket_no: props.exam.next_hall_ticket_no ?? 100,
     hall_instructions: props.exam.hall_instructions ?? '',
     remove_logo: false,
+    remove_controller_signature: false,
     show_photo: props.hallTicketDesign?.show_photo ?? true,
     show_qr: props.hallTicketDesign?.show_qr ?? true,
     show_signature: props.hallTicketDesign?.show_signature ?? true,
@@ -388,6 +390,7 @@ const previewSampleData = computed(() => ({
 const previewUrl = computed(() => `/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/hall-tickets/preview`);
 watch(() => designForm.data(), () => { designSaved.value = false; }, { deep: true });
 watch(backgroundFile, () => { designSaved.value = false; });
+watch(controllerSignatureFile, () => { designSaved.value = false; });
 
 function saveDesign() {
     designSaving.value = true;
@@ -405,6 +408,10 @@ function saveDesign() {
     fd.append('next_hall_ticket_no', String(designForm.next_hall_ticket_no));
     fd.append('hall_instructions', designForm.hall_instructions || '');
     fd.append('remove_logo', designForm.remove_logo ? '1' : '0');
+    fd.append('remove_controller_signature', designForm.remove_controller_signature ? '1' : '0');
+    fd.append('show_controller_sig', designForm.show_controller_sig !== false ? '1' : '0');
+    fd.append('show_exam_date', designForm.show_exam_date !== false ? '1' : '0');
+    if (controllerSignatureFile.value) fd.append('controller_signature', controllerSignatureFile.value);
     fd.append('show_photo', designForm.show_photo ? '1' : '0');
     fd.append('show_qr', designForm.show_qr ? '1' : '0');
     fd.append('show_signature', designForm.show_signature ? '1' : '0');
@@ -437,6 +444,8 @@ function saveDesign() {
         onSuccess: () => {
             designSaved.value = true;
             backgroundFile.value = null;
+            controllerSignatureFile.value = null;
+            designForm.remove_controller_signature = false;
             designForm.remove_logo = false;
             if (logoInput.value) logoInput.value.value = '';
             localLogoPreview.value = null;

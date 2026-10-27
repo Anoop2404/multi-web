@@ -383,6 +383,9 @@
 
         @if($showControllerSig)
         <div style="width:{{ !empty($sample['principal_signature_src']) ? '23%' : '31%' }};text-align:center;">
+            @if($controllerSignature = \App\Support\Mcq\McqHallTicketDesign::controllerSignatureUrl($design))
+                <img src="{{ $controllerSignature }}" alt="Controller signature" style="width:100%;height:30px;object-fit:contain;">
+            @endif
             <div style="border-top:1.2px solid #334155;margin-top:{{ $isCompact ? '24px' : '30px' }};padding-top:3px;font-size:9.5px;font-weight:700;color:#334155;text-transform:uppercase;">
                 {{ $signatoryTitle }}
             </div>

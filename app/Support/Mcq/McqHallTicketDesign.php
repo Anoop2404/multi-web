@@ -23,6 +23,8 @@ class McqHallTicketDesign
             'accent_color'      => '#b91c1c',
             'layout'            => 'standard',
             'background_path'   => null,
+            'controller_signature_path' => null,
+            'show_exam_date' => true,
             'card_width_mm' => 90,
             'card_height_mm' => 121.384615,
             'page_orientation' => 'landscape',
@@ -48,7 +50,8 @@ class McqHallTicketDesign
                 'class' => ['x' => 24, 'y' => 66, 'size' => 11, 'width' => 68],
                 'date' => ['x' => 49, 'y' => 71.5, 'size' => 10, 'width' => 44],
                 'centre' => ['x' => 37, 'y' => 76, 'size' => 10, 'width' => 56],
-                'principal_signature' => ['x' => 10, 'y' => 81.7, 'size' => 11, 'width' => 30],
+                'principal_signature' => ['x' => 10, 'y' => 81.7, 'size' => 11, 'width' => 30, 'height' => 6],
+                'controller_signature' => ['x' => 65, 'y' => 81.7, 'size' => 11, 'width' => 25, 'height' => 6],
                 'student_photo' => ['x' => 75, 'y' => 31, 'size' => 11, 'width' => 16, 'height' => 15],
             ],
             'logo_path'         => null,
@@ -120,7 +123,7 @@ class McqHallTicketDesign
         unset($position);
 
         $customFields = [];
-        $sources = ['text', 'school_name', 'center_code', 'hall_room', 'seat_no', 'exam_title', 'admission_no', 'academic_year'];
+        $sources = ['text', 'school_name', 'center_code', 'hall_room', 'seat_no', 'exam_title', 'admission_no', 'academic_year', 'gender'];
         foreach (array_slice(is_array($settings['custom_fields'] ?? null) ? $settings['custom_fields'] : [], 0, 20) as $field) {
             if (!is_array($field) || !is_string($field['id'] ?? null) || !preg_match('/^custom_[a-zA-Z0-9_-]{1,64}$/', $field['id'] ?? '')) {
                 continue;
@@ -176,6 +179,8 @@ class McqHallTicketDesign
             'accent_color'      => $accent,
             'layout'            => $layout,
             'background_path'   => filled($settings['background_path'] ?? null) ? (string) $settings['background_path'] : null,
+            'controller_signature_path' => filled($settings['controller_signature_path'] ?? null) ? (string) $settings['controller_signature_path'] : null,
+            'show_exam_date' => (bool) ($settings['show_exam_date'] ?? true),
             'logo_path'         => filled($settings['logo_path'] ?? null) ? (string) $settings['logo_path'] : null,
             'board_logo_path'   => filled($settings['board_logo_path'] ?? null) ? (string) $settings['board_logo_path'] : null,
             'show_photo'        => (bool) ($settings['show_photo'] ?? $defaults['show_photo']),
@@ -434,6 +439,11 @@ class McqHallTicketDesign
         return self::normalize($exam->settings_json['hall_ticket'] ?? null);
     }
 
+    public static function controllerSignatureUrl(array $design): ?string
+    {
+        return TenantStorage::logoUrl(null, $design['controller_signature_path'] ?? null);
+    }
+
     public static function logoUrl(?Tenant $tenant, array $design): ?string
     {
         return TenantStorage::logoUrl($tenant, $design['logo_path'] ?? null);
@@ -508,6 +518,8 @@ class McqHallTicketDesign
             'generated_at'       => now()->format('d-m-Y H:i:s'),
             'security_ref'       => 'SEC-' . strtoupper(substr(md5((string) $exam->id), 0, 8)),
             'photo_src'          => self::samplePhotoDataUri(),
+            'gender' => 'Male',
+            'controller_signature_src' => self::controllerSignatureUrl($design),
             'qr_src'             => $qrService->dataUri('MCQHT|SAMPLE|10001'),
         ];
     }
@@ -557,6 +569,8 @@ class McqHallTicketDesign
             'generated_at'       => now()->format('d-m-Y H:i:s'),
             'security_ref'       => 'SEC-DEMO789',
             'photo_src'          => self::samplePhotoDataUri(),
+            'gender' => 'Male',
+            'controller_signature_src' => self::controllerSignatureUrl($design),
             'qr_src'             => $qrService->dataUri('MCQHT|SAMPLE|10001'),
         ];
     }

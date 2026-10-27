@@ -238,6 +238,7 @@
             </div>
 
             <div v-if="design.show_controller_sig !== false" class="w-[30%] text-center">
+                <img v-if="sample.controller_signature_src" :src="sample.controller_signature_src" alt="Controller signature" class="h-8 w-full object-contain">
                 <div class="border-t border-slate-700 pt-1 mt-6 text-[9.5px] font-bold text-slate-800 uppercase">
                     {{ design.signatory_title || 'Controller of Examinations' }}
                 </div>

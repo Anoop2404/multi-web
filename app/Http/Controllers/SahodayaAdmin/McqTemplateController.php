@@ -35,6 +35,7 @@ class McqTemplateController extends SahodayaAdminController
                 $data['design_json']['background_url'] = \App\Support\TenantStorage::logoUrl(
                     $this->sahodaya, $template->design_json['background_path'] ?? null,
                 );
+                $data['design_json']['controller_signature_url'] = \App\Support\Mcq\McqHallTicketDesign::controllerSignatureUrl($template->design_json);
                 return $data;
             }),
             'defaultDesign' => $defaultDesign,
@@ -50,6 +51,8 @@ class McqTemplateController extends SahodayaAdminController
             'is_default'   => 'nullable|boolean',
             'design_json'  => 'nullable|array',
             'background' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:2048',
+            'controller_signature' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:2048',
+            'remove_controller_signature' => 'nullable|boolean',
         ]);
 
         if (($data['design_json']['layout'] ?? '') === 'custom_background') {
@@ -61,6 +64,9 @@ class McqTemplateController extends SahodayaAdminController
         }
 
         $normalizedDesign = \App\Support\Mcq\McqHallTicketDesign::normalize($data['design_json'] ?? null);
+        $normalizedDesign['controller_signature_path'] = $request->hasFile('controller_signature')
+            ? \App\Support\TenantStorage::storeUploadedFile($request->file('controller_signature'), 'mcq-signatures/'.$this->sahodaya->id)
+            : null;
         $normalizedDesign['background_path'] = $request->hasFile('background')
             ? \App\Support\TenantStorage::storeUploadedFile($request->file('background'), 'mcq-backgrounds/'.$this->sahodaya->id)
             : null;
@@ -89,6 +95,8 @@ class McqTemplateController extends SahodayaAdminController
             'is_default'   => 'nullable|boolean',
             'design_json'  => 'nullable|array',
             'background' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:2048',
+            'controller_signature' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:2048',
+            'remove_controller_signature' => 'nullable|boolean',
         ]);
 
         if (($data['design_json']['layout'] ?? '') === 'custom_background' && empty($template->design_json['background_path'])) {
@@ -102,6 +110,9 @@ class McqTemplateController extends SahodayaAdminController
         }
 
         $normalizedDesign = \App\Support\Mcq\McqHallTicketDesign::normalize($data['design_json'] ?? $template->design_json);
+        $normalizedDesign['controller_signature_path'] = $request->hasFile('controller_signature')
+            ? \App\Support\TenantStorage::storeUploadedFile($request->file('controller_signature'), 'mcq-signatures/'.$this->sahodaya->id)
+            : ($request->boolean('remove_controller_signature') ? null : ($template->design_json['controller_signature_path'] ?? null));
         $normalizedDesign['background_path'] = $request->hasFile('background')
             ? \App\Support\TenantStorage::storeUploadedFile($request->file('background'), 'mcq-backgrounds/'.$this->sahodaya->id)
             : ($template->design_json['background_path'] ?? null);

@@ -19,7 +19,9 @@
         'centre' => $sample['venue'] ?? '',
     ] as $key => $value)
         @php $position = $design['field_positions'][$key] ?? \App\Support\Mcq\McqHallTicketDesign::defaults()['field_positions'][$key]; @endphp
+        @if($key !== 'date' || ($design['show_exam_date'] ?? true))
         <span style="position:absolute;top:{{ $position['y'] }}%;left:{{ $position['x'] }}%;width:{{ $position['width'] ?? 50 }}%;line-height:{{ $position['line_height'] ?? 1.25 }};font-size:{{ $position['size'] * $artwork['height'] / 121.384615 }}px;font-family:{{ $position['font_family'] ?? 'Arial' }};font-weight:{{ $position['font_weight'] ?? 'normal' }};font-style:{{ $position['font_style'] ?? 'normal' }};text-align:{{ $position['text_align'] ?? 'left' }};text-decoration:{{ $position['text_decoration'] ?? 'none' }};letter-spacing:{{ ($position['letter_spacing'] ?? 0) * $artwork['height'] / 121.384615 }}px;color:{{ $position['text_color'] ?? '#111111' }};z-index:{{ $position['layer'] ?? 2 }};white-space:pre-wrap;overflow-wrap:anywhere;">{{ $value }}</span>
+        @endif
     @endforeach
     @if(($design['show_student_photo'] ?? false) && !empty($sample['photo_src']))
         @php $photoPosition = $design['field_positions']['student_photo']; @endphp
@@ -28,9 +30,13 @@
     @foreach($design['custom_fields'] ?? [] as $field)
         <span style="position:absolute;left:{{ $field['x'] }}%;top:{{ $field['y'] }}%;width:{{ $field['width'] }}%;font-size:{{ $field['size'] * $artwork['height'] / 121.384615 }}px;font-family:{{ $field['font_family'] ?? 'Arial' }};font-weight:{{ $field['font_weight'] ?? 'normal' }};font-style:{{ $field['font_style'] ?? 'normal' }};text-align:{{ $field['text_align'] ?? 'left' }};line-height:{{ $field['line_height'] ?? 1.25 }};text-decoration:{{ $field['text_decoration'] ?? 'none' }};letter-spacing:{{ ($field['letter_spacing'] ?? 0) * $artwork['height'] / 121.384615 }}px;color:{{ $field['text_color'] ?? '#111111' }};z-index:{{ $field['layer'] ?? 2 }};white-space:pre-wrap;overflow-wrap:anywhere;">@if(($field['source'] ?? 'text') !== 'text' && ($field['show_label'] ?? true) && !empty($field['label']))<strong>{{ $field['label'] }}: </strong>@endif{{ \App\Support\Mcq\McqHallTicketDesign::customFieldValue(array_merge($field, ['show_label' => false]), $sample) }}</span>
     @endforeach
+    @if(($design['show_controller_sig'] ?? true) && ($controllerSignature = \App\Support\Mcq\McqHallTicketDesign::controllerSignatureUrl($design)))
+        @php $controllerPosition = $design['field_positions']['controller_signature']; @endphp
+        <img src="{{ $controllerSignature }}" alt="Controller signature" style="position:absolute;left:{{ $controllerPosition['x'] }}%;top:{{ $controllerPosition['y'] }}%;width:{{ $controllerPosition['width'] }}%;height:{{ $controllerPosition['height'] ?? 6 }}%;z-index:{{ $controllerPosition['layer'] ?? 2 }};object-fit:contain;">
+    @endif
     @if(!empty($sample['principal_signature_src']) && ($design['show_signature'] ?? true))
         @php $signaturePosition = $design['field_positions']['principal_signature']; @endphp
-        <img src="{{ $sample['principal_signature_src'] }}" alt="Principal signature" style="position:absolute;left:{{ $signaturePosition['x'] }}%;top:{{ $signaturePosition['y'] }}%;width:{{ $signaturePosition['width'] }}%;height:6%;z-index:{{ $signaturePosition['layer'] ?? 2 }};object-fit:contain;">
+        <img src="{{ $sample['principal_signature_src'] }}" alt="Principal signature" style="position:absolute;left:{{ $signaturePosition['x'] }}%;top:{{ $signaturePosition['y'] }}%;width:{{ $signaturePosition['width'] }}%;height:{{ $signaturePosition['height'] ?? 6 }}%;z-index:{{ $signaturePosition['layer'] ?? 2 }};object-fit:contain;">
     @endif
     </div>
     @if($remarksHeight > 0)

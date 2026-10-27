@@ -329,6 +329,12 @@
                     </div>
 
                     <div class="overflow-x-auto bg-white p-2 rounded shadow-inner border border-slate-300">
+                        <div class="mb-4 rounded-lg border border-slate-200 p-3 text-xs space-y-2">
+                            <label class="block font-semibold">Controller signature<input type="file" accept="image/png,image/jpeg,image/webp" class="block mt-2" @change="chooseControllerSignature"></label>
+                            <label class="flex gap-2"><input v-model="design.show_controller_sig" type="checkbox">Show controller signature</label>
+                            <label v-if="design.controller_signature_url" class="flex gap-2"><input v-model="design.remove_controller_signature" type="checkbox">Remove saved controller signature</label>
+                            <p class="text-slate-500">The exam designer can position this signature on custom artwork.</p>
+                        </div>
                         <McqHallTicketPreview
                             :design="design"
                             :sample="samplePreviewData"
@@ -373,6 +379,7 @@ const tabs = [
 const activeTab = ref('branding');
 const saving = ref(false);
 const backgroundFile = ref(null);
+const controllerSignatureFile = ref(null);
 const backgroundError = ref('');
 const savedNotice = ref(false);
 
@@ -398,6 +405,7 @@ design.field_positions = JSON.parse(JSON.stringify(design.field_positions || {})
 const samplePreviewData = computed(() => {
     return {
         ...props.samplePreview,
+        controller_signature_src: design.remove_controller_signature ? null : design.controller_signature_url,
         exam_title: props.samplePreview.exam_title || 'Sahodaya Talent Search Examination',
         paper_name: props.samplePreview.paper_name || 'Class 10 MCQ Aptitude & Composite Assessment',
         class_name: props.samplePreview.class_name || 'Class 10',
@@ -406,6 +414,8 @@ const samplePreviewData = computed(() => {
 
 function selectTemplate(t) {
     backgroundFile.value = null;
+    controllerSignatureFile.value = null;
+    design.remove_controller_signature = false;
     backgroundError.value = '';
     selectedTemplate.value = t;
     editingId.value = t.id;
@@ -428,6 +438,8 @@ function startNewTemplate() {
     form.title = 'New MCQ Hall Ticket Template';
     form.is_default = false;
     backgroundFile.value = null;
+    controllerSignatureFile.value = null;
+    design.remove_controller_signature = false;
     design.background_url = null;
     Object.assign(design, props.defaultDesign);
     design.field_positions = JSON.parse(JSON.stringify(props.defaultDesign.field_positions || {}));
@@ -437,6 +449,8 @@ function startNewTemplate() {
 
 function resetToDefault() {
     backgroundFile.value = null;
+    controllerSignatureFile.value = null;
+    design.remove_controller_signature = false;
     design.background_url = null;
     Object.assign(design, props.defaultDesign);
     design.field_positions = JSON.parse(JSON.stringify(props.defaultDesign.field_positions || {}));
@@ -470,6 +484,19 @@ function chooseBackground(event) {
     reader.readAsDataURL(file);
 }
 
+function chooseControllerSignature(event) {
+    const file=event.target.files?.[0];
+    if(!file)return;
+    if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>2097152){backgroundError.value='Choose a signature image up to 2 MB.';return;}
+    backgroundError.value='';
+    controllerSignatureFile.value=file;
+    design.remove_controller_signature=false;
+    design.show_controller_sig=true;
+    const reader=new FileReader();
+    reader.onload=()=>{design.controller_signature_url=reader.result;};
+    reader.readAsDataURL(file);
+}
+
 function saveTemplate() {
     saving.value = true;
     savedNotice.value = false;
@@ -477,7 +504,9 @@ function saveTemplate() {
     const payload = {
         title: form.title,
         is_default: form.is_default,
-        design_json: { ...design, background_url: undefined },
+        design_json: { ...design, background_url: undefined, controller_signature_url: undefined },
+        controller_signature: controllerSignatureFile.value,
+        remove_controller_signature: !!design.remove_controller_signature,
         background: backgroundFile.value,
         ...(editingId.value ? { _method: 'put' } : {}),
     };

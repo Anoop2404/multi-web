@@ -337,6 +337,10 @@ class McqExamOpsController extends SahodayaAdminController
             'accent_color'        => 'nullable|string|max:7',
             'layout'              => 'nullable|in:standard,compact,stse_three_up,custom_background',
             'background' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:2048',
+            'controller_signature' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:2048',
+            'remove_controller_signature' => 'nullable|boolean',
+            'show_controller_sig' => 'nullable|boolean',
+            'show_exam_date' => 'nullable|boolean',
             'field_positions' => 'nullable|array',
             'remarks_text' => 'nullable|string|max:3000',
             'remarks_height_mm' => 'nullable|numeric|min:15|max:257',
@@ -355,7 +359,7 @@ class McqExamOpsController extends SahodayaAdminController
             'custom_fields.*.label' => 'nullable|string|max:80',
             'custom_fields.*.show_label' => 'nullable|boolean',
             'custom_fields.*.text' => 'nullable|string|max:500',
-            'custom_fields.*.source' => 'required|in:text,school_name,center_code,hall_room,seat_no,exam_title,admission_no,academic_year',
+            'custom_fields.*.source' => 'required|in:text,school_name,center_code,hall_room,seat_no,exam_title,admission_no,academic_year,gender',
             'custom_fields.*.x' => 'required|numeric|min:0|max:95',
             'custom_fields.*.y' => 'required|numeric|min:0|max:95',
             'custom_fields.*.width' => 'required|numeric|min:1|max:100',
@@ -411,6 +415,14 @@ class McqExamOpsController extends SahodayaAdminController
             );
         }
 
+        if ($request->boolean('remove_controller_signature')) {
+            $current['controller_signature_path'] = null;
+        }
+        if ($request->hasFile('controller_signature')) {
+            $current['controller_signature_path'] = TenantStorage::storeUploadedFile(
+                $request->file('controller_signature'), "mcq-hall-tickets/{$this->sahodaya->id}/{$exam->id}/signatures"
+            );
+        }
         if ($request->boolean('remove_logo')) {
             $current['logo_path'] = null;
         }
@@ -423,6 +435,8 @@ class McqExamOpsController extends SahodayaAdminController
         }
 
         $design = McqHallTicketDesign::normalize(array_merge($current, [
+            'show_controller_sig' => array_key_exists('show_controller_sig', $data) ? (bool) $data['show_controller_sig'] : $current['show_controller_sig'],
+            'show_exam_date' => array_key_exists('show_exam_date', $data) ? (bool) $data['show_exam_date'] : $current['show_exam_date'],
             'header_title'  => $data['header_title'] ?? $current['header_title'],
             'footer_note'   => $data['footer_note'] ?? $current['footer_note'],
             'show_reg_no'   => array_key_exists('show_reg_no', $data) ? (bool) $data['show_reg_no'] : $current['show_reg_no'],

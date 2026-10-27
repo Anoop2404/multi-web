@@ -17,8 +17,8 @@
                         <img v-if="sample.photo_src" :src="sample.photo_src" alt="Student photo" style="width:100%;height:100%;object-fit:contain;">
 
                     </template>
-                    <template v-else-if="key === 'principal_signature'">
-                        <img v-if="sample.principal_signature_src" :src="sample.principal_signature_src" alt="Principal signature" style="width:100%;height:100%;object-fit:contain;">
+                    <template v-else-if="['principal_signature','controller_signature'].includes(key)">
+                        <img v-if="sample[`${key}_src`]" :src="sample[`${key}_src`]" alt="Principal signature" style="width:100%;height:100%;object-fit:contain;">
 
                     </template>
                     <template v-else-if="key.startsWith('custom_') && position.source !== 'text'"><strong v-if="position.show_label !== false && position.label">{{ position.label }}: </strong>{{ sample[position.source] || '' }}</template>
@@ -62,16 +62,18 @@ const scale = computed(()=>wrapperWidth.value / width.value);
 let observer;
 let drag;
 const positions=computed(()=>overlayPositions(props.design));
-const baseLabels = {student_photo:'Student photo', registration:'Registration number', name:'Student name', class:'Class', date:'Examination date', centre:'Examination centre', principal_signature:'Principal signature' };
+const baseLabels = {student_photo:'Student photo', registration:'Registration number', name:'Student name', class:'Class', date:'Examination date', centre:'Examination centre', principal_signature:'Principal signature', controller_signature:'Controller signature' };
 const labels=computed(()=>({...baseLabels,...Object.fromEntries((props.design.custom_fields||[]).map(field=>[field.id,field.label||'Custom field']))}));
 const values = computed(() => ({ registration:props.sample.hall_ticket_no, name:props.sample.participant_name || props.sample.student_name, class:props.sample.class_name, date:props.sample.exam_time || props.sample.exam_date, centre:props.sample.venue, ...Object.fromEntries((props.design.custom_fields||[]).map(field=>[field.id,customFieldValue(field,props.sample)])) }));
 function showField(key){
     if(key==='student_photo')return props.design.show_student_photo && (props.sample.photo_src || (props.editable && props.selected===key));
-    if(key==='principal_signature')return props.design.show_signature && (props.sample.principal_signature_src || (props.editable && props.selected===key));
+    if(key==='date')return props.design.show_exam_date !== false;
+    if(key==='controller_signature')return props.design.show_controller_sig !== false && (props.sample.controller_signature_src || (props.editable && props.selected===key));
+    if(key==='principal_signature')return props.design.show_signature && (props.sample[`${key}_src`] || (props.editable && props.selected===key));
     return true;
 }
 function fieldStyle(p, key) {
-    return { position:'absolute', left:`${p.x}%`, top:`${p.y}%`, width:`${p.width || 50}%`, height:key === 'student_photo' ? `${p.height || 17}%` : key === 'principal_signature' ? '6%' : undefined, fontSize:`${p.size * box.value.height / 121.384615}px`, lineHeight:p.line_height || 1.25, letterSpacing:`${(p.letter_spacing || 0) * box.value.height / 121.384615}px`,textDecoration:p.text_decoration || 'none',zIndex:p.layer || 2, fontFamily:p.font_family || 'Arial', fontWeight:p.font_weight || 'normal', fontStyle:p.font_style || 'normal', textAlign:p.text_align || 'left', overflowWrap:'anywhere',whiteSpace:'pre-wrap', color:p.text_color || '#111111' };
+    return { position:'absolute', left:`${p.x}%`, top:`${p.y}%`, width:`${p.width || 50}%`, height:key === 'student_photo' ? `${p.height || 17}%` : ['principal_signature','controller_signature'].includes(key) ? `${p.height || 6}%` : undefined, fontSize:`${p.size * box.value.height / 121.384615}px`, lineHeight:p.line_height || 1.25, letterSpacing:`${(p.letter_spacing || 0) * box.value.height / 121.384615}px`,textDecoration:p.text_decoration || 'none',zIndex:p.layer || 2, fontFamily:p.font_family || 'Arial', fontWeight:p.font_weight || 'normal', fontStyle:p.font_style || 'normal', textAlign:p.text_align || 'left', overflowWrap:'anywhere',whiteSpace:'pre-wrap', color:p.text_color || '#111111' };
 }
 function beginDrag(event, key) {
     if (!props.editable || event.button !== 0) return;
