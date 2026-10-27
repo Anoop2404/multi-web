@@ -28,7 +28,7 @@
         <div v-if="schoolRegion?.applies && !focusEvent?.uses_registration_batch_billing" class="mb-5 max-w-2xl">
             <div v-if="schoolRegion.region && (schoolRegion.locked || !showChangeRegion)" class="notice-banner notice-banner--info text-sm flex flex-wrap items-center gap-3 justify-between">
                 <p>Your {{ programLabel }} region: <strong>{{ schoolRegion.region }}</strong>.</p>
-                <Link v-if="schoolRegion.locked" :href="schoolRegion.request_url" class="link-brand font-semibold text-xs shrink-0">🔒 Request region change →</Link>
+                <Link v-if="schoolRegion.locked" :href="schoolRegion.request_url" class="btn-secondary min-h-11 w-full sm:w-auto justify-center text-sm">Request region change →</Link>
                 <button v-else type="button" class="link-brand font-semibold text-xs shrink-0" @click="showChangeRegion = true">Change region →</button>
             </div>
             <div v-else class="notice-banner notice-banner--warning text-sm">

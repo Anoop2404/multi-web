@@ -1,6 +1,6 @@
 <template>
     <div class="card space-y-4">
-        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
                 <h4 class="section-title !mb-0 flex items-center gap-2 text-base">
                     <span>📊</span> Region Drill-Down
@@ -14,10 +14,10 @@
             </span>
         </div>
 
-        <div class="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             <div v-for="r in regions" :key="r.id"
-                 class="rounded-xl border border-slate-200 bg-white p-4 space-y-3 hover:border-indigo-300 hover:shadow-md transition flex flex-col">
-                <div class="flex items-start justify-between gap-2">
+                 class="min-w-0 rounded-xl border border-slate-200 bg-white p-3 sm:p-4 space-y-3 hover:border-indigo-300 hover:shadow-md transition flex flex-col">
+                <div class="flex flex-wrap items-start justify-between gap-2">
                     <div>
                         <p class="font-bold text-slate-900 text-sm leading-snug">{{ r.label }}</p>
                         <p v-if="r.venue" class="text-[11px] text-slate-500 mt-0.5">📍 {{ r.venue }}</p>
@@ -62,20 +62,20 @@
                     </span>
                 </div>
 
-                <div class="flex items-center gap-2 mt-auto pt-1">
+                <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 mt-auto pt-1">
                     <button type="button" @click="$emit('edit-region', r)"
-                            class="btn-secondary text-xs justify-center !py-2 flex-1 flex items-center gap-1 hover:border-indigo-400">
+                            class="btn-secondary min-w-0 !px-2 text-xs justify-center !py-2 flex-1 flex items-center gap-1 hover:border-indigo-400">
                         <span>✏️</span>
                         <span>Edit</span>
                     </button>
                     <Link :href="`/sahodaya-admin/${sahodayaId}/events/${r.id}`"
-                          class="btn-secondary text-xs justify-center !py-2 flex-1 flex items-center gap-1.5">
+                          class="btn-secondary min-w-0 !px-2 text-xs justify-center !py-2 flex-1 flex items-center gap-1.5">
                         <span>View</span>
                         <span>→</span>
                     </Link>
                     <button type="button" @click="$emit('delete-region', r)"
-                            class="btn-ghost !p-2 text-xs text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg flex items-center justify-center shrink-0"
-                            title="Delete this regional partition">
+                            class="btn-ghost min-h-11 min-w-11 !p-2 text-xs text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg flex items-center justify-center shrink-0"
+                            :aria-label="`Delete ${r.label}`" title="Delete this regional partition">
                         <span>🗑️</span>
                     </button>
                 </div>
