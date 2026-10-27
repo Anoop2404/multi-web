@@ -251,7 +251,7 @@
 import { computed, ref, watch } from 'vue';
 import FestStudentPickerModal from '@/Components/school/FestStudentPickerModal.vue';
 import { studentDisplayName } from '@/support/studentDisplay.js';
-import { formatSportsItemTitle } from '@/support/festItemEligibility.js';
+import { ageGroupLabel, formatItemEligibility, formatSportsItemTitle } from '@/support/festItemEligibility.js';
 import { useSweetAlert } from '@/composables/useSweetAlert.js';
 import { formatDateTime } from '@/support/calendarDates.js';
 
@@ -284,6 +284,7 @@ const props = defineProps({
     columnCount: { type: Number, default: 6 },
     layout: { type: String, default: 'default' },
     classGroupLabels: { type: Object, default: () => ({}) },
+    ageGroupLabels: { type: Object, default: () => ({}) },
 });
 
 const emit = defineEmits(['register', 'update', 'withdraw', 'edit', 'cancel-edit', 'add-student', 'search-students']);
@@ -348,6 +349,9 @@ const competitionTypeBadge = computed(() => {
 const nextTeamName = computed(() => `Team ${(props.registrations?.length ?? 0) + 1}`);
 
 const eligibilityLabel = computed(() => {
+    if (props.eventType === 'sports') {
+        return formatItemEligibility(props.item, { event_type: 'sports' }, { ageGroupLabels: props.ageGroupLabels }) || 'Open';
+    }
     const parts = [];
     const age = props.item.age_group;
     if (age && age !== 'open') {
@@ -536,7 +540,7 @@ const selectedAgeNotes = computed(() => {
             return `${student.name}: DOB required for age check`;
         }
         const group = props.item.age_group && props.item.age_group !== 'open'
-            ? String(props.item.age_group).toUpperCase()
+            ? ageGroupLabel(props.item.age_group, props.ageGroupLabels)
             : 'eligible';
         return `${student.name}: age ${student.sports_age_on_cutoff} on cutoff (${group})`;
     }).filter(Boolean);

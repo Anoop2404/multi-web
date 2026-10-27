@@ -619,6 +619,7 @@
                                         :editing-registration-id="editingRegistrationId[itemFormKey(event.id, item.id)]"
                                         :column-count="event.fee_required ? 6 : 5"
                                         :class-group-labels="event.class_group_labels ?? {}"
+                                        :age-group-labels="event.item_group_labels ?? {}"
                                         @register="submitItem(event, item)"
                                         @update="updateItem(event, item)"
                                         @withdraw="withdraw"
@@ -768,6 +769,7 @@
                                         :editing-registration-id="editingRegistrationId[itemFormKey(event.id, item.id)]"
                                         :column-count="event.fee_required ? 6 : 5"
                                         :class-group-labels="event.class_group_labels ?? {}"
+                                        :age-group-labels="event.item_group_labels ?? {}"
                                         @register="submitItem(event, item)"
                                         @update="updateItem(event, item)"
                                         @withdraw="withdraw"
@@ -929,7 +931,7 @@ import EventBillingPanel from '@/Components/school/EventBillingPanel.vue';
 import PhasedRegionBillingPanel from '@/Components/school/PhasedRegionBillingPanel.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useSchoolProgramContext } from '@/composables/useSchoolProgramContext.js';
-import { genderLabel } from '@/support/festItemEligibility.js';
+import { ageGroupLabel, genderLabel } from '@/support/festItemEligibility.js';
 import { studentDisplayName } from '@/support/studentDisplay.js';
 import { useConfirm } from '@/composables/useConfirm';
 import { useSweetAlert } from '@/composables/useSweetAlert.js';
@@ -1320,7 +1322,7 @@ function sportsGroups(event) {
         })
         .map((key) => {
             const groupItems = byAge[key] ?? [];
-            const label = labels[key] ?? String(key).toUpperCase();
+            const label = labels[key] ?? ageGroupLabel(key) ?? 'Open';
             const itemIds = new Set(groupItems.map((i) => Number(i.id)));
 
             const eligiblePool = event.require_event_registration
@@ -1448,7 +1450,7 @@ function itemGroupsFor(event) {
     if (props.eventType === 'sports') {
         return Object.keys(grouped)
             .filter((key) => (grouped[key]?.length ?? 0) > 0)
-            .map((key) => ({ key, label: labels[key] ?? String(key).toUpperCase() }));
+            .map((key) => ({ key, label: labels[key] ?? ageGroupLabel(key) ?? 'Open' }));
     }
 
     if (props.eventType === 'kids_fest') {
@@ -1877,7 +1879,7 @@ function studentIneligibilityReason(student, event, item) {
                 const ageHint = student.sports_age_on_cutoff != null
                     ? ` (age ${student.sports_age_on_cutoff} on cutoff)`
                     : '';
-                return `Must be under ${underN} on cutoff date${ageHint} — not eligible for ${String(itemAge).toUpperCase()}`;
+                return `Must be under ${underN} on cutoff date${ageHint} — not eligible for ${ageGroupLabel(itemAge, event.item_group_labels ?? {})}`;
             }
         }
     }
@@ -2025,7 +2027,7 @@ function studentOptionLabel(student) {
     }
     parts.push(student.class_name || 'no class');
     if (student.sports_age_on_cutoff != null) parts.push(`age ${student.sports_age_on_cutoff}`);
-    if (student.sports_age_group) parts.push(String(student.sports_age_group).toUpperCase());
+    if (student.sports_age_group) parts.push(ageGroupLabel(student.sports_age_group, Object.assign({}, ...(props.events ?? []).filter(e => e.event_type === 'sports').map(e => e.item_group_labels ?? {}))));
     if (student.kalolsav_class_group) parts.push(`Cat ${categoryShort(student)}`);
     if (student.kids_fest_band) parts.push(student.kids_fest_band);
     const g = genderLabel(student.gender);

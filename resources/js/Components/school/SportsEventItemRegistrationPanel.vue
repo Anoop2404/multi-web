@@ -118,6 +118,7 @@
                                         performer-label="athletes"
                                         :is-teacher-fest="false"
                                         event-type="sports"
+                                        :age-group-labels="event.item_group_labels ?? {}"
                                         :teachers="[]"
                                         :student-label="studentOptionLabel"
                                         :registered-names="registeredNames"
@@ -168,7 +169,7 @@
 import { computed, reactive, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import FestRegistrationItemRow from '@/Components/school/FestRegistrationItemRow.vue';
-import { genderLabel } from '@/support/festItemEligibility.js';
+import { ageGroupLabel, genderLabel } from '@/support/festItemEligibility.js';
 import { studentDisplayName } from '@/support/studentDisplay.js';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -295,7 +296,7 @@ const sportsGroups = computed(() => {
         .map((key) => {
             const groupItems = byAge[key] ?? [];
             const headName = activeHeadId.value ? (headNameById.value[Number(activeHeadId.value)] ?? null) : null;
-            const label = labels[key] ?? String(key).toUpperCase();
+            const label = labels[key] ?? ageGroupLabel(key) ?? 'Open';
             const itemIds = new Set(groupItems.map((i) => Number(i.id)));
             const eligiblePool = props.students ?? [];
             const eligibleCount = eligiblePool.filter(
@@ -427,7 +428,7 @@ function studentIneligibilityReason(student, item) {
     }
     if (item.age_group && item.age_group !== 'open') {
         if (!(student.eligible_sports_groups ?? []).includes(item.age_group)) {
-            return `Not eligible for ${String(item.age_group).toUpperCase()}`;
+            return `Not eligible for ${ageGroupLabel(item.age_group, props.event.item_group_labels ?? {})}`;
         }
     }
     return 'Not eligible for this item';

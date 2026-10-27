@@ -42,18 +42,21 @@ export function formatSportsItemTitle(title, gender) {
 }
 
 export function ageGroupLabel(key, labels = {}) {
-    if (!key || key === 'open') return null;
-    return labels[key] ?? String(key).toUpperCase();
+    if (!key) return null;
+    if (labels[key]) return labels[key];
+    if (key === 'open') return null;
+    const underAge = /^u(\d+)$/i.exec(String(key));
+    return underAge ? `Under ${underAge[1]}` : String(key).replace(/[_-]/g, ' ');
 }
 
 /**
- * Build a short eligibility string for an item row (sports: U17 · Boys).
+ * Build a short eligibility string for an item row (sports: Under 17 · Boys).
  */
 export function formatItemEligibility(item, event, { ageGroupLabels = {}, classGroupLabels = {}, kidsBandLabels = {} } = {}) {
     const parts = [];
 
     if (event?.event_type === 'sports') {
-        const age = item.age_group && item.age_group !== 'open' ? item.age_group : null;
+        const age = item.age_group && (item.age_group !== 'open' || ageGroupLabels.open) ? item.age_group : null;
         if (age) parts.push(ageGroupLabel(age, ageGroupLabels));
     } else {
         if (item.class_group && item.class_group !== 'open') {
