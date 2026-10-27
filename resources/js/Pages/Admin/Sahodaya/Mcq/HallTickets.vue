@@ -124,9 +124,12 @@
             </div>
             <div class="flex items-center gap-3">
                 <span class="text-xs text-slate-500 font-semibold">Showing {{ registrations.total }} candidate(s)</span>
+                <a :href="ticketExportUrl(true)" class="btn-secondary text-sm">Bulk download {{ hasFilters ? 'filtered' : 'all' }} PDFs</a>
                 <button type="button" :disabled="exportGenerating" @click="savePdf()" class="btn-primary text-sm">{{ exportGenerating ? 'Starting…' : `Generate & save ${hasFilters ? 'filtered' : 'all'} admit cards PDF` }}</button>
             </div>
         </div>
+
+        <p class="mb-4 text-xs text-slate-500">Bulk download includes all issued admit cards matching the selected class, school, and search filters across every page, combined into one PDF.</p>
 
         <div class="form-section overflow-hidden !p-0">
             <div class="overflow-x-auto">
