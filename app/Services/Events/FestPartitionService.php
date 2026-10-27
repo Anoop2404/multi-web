@@ -448,6 +448,7 @@ class FestPartitionService
         }
 
         $child = app(FestCascadeService::class)->spawnChildEvent($hub, $data['title'], $attrs);
+        app(FestKidsFestRegionLinkService::class)->ensureRegionLink($child);
 
         if ($hub->items()->exists()) {
             app(FestItemSyncService::class)->copyItemsToPartition($hub, $child, $data['partition_role'] ?? 'region');

@@ -41,6 +41,44 @@ class KidsFestRegionalRegistrationTest extends TestCase
         return [$sahodaya, $school, $root, $children];
     }
 
+    public function test_legacy_kids_partitions_are_linked_and_all_four_regions_are_requestable(): void
+    {
+        [$sahodaya, $school, $root, $children] = $this->fixture();
+        foreach (['Region 3 (Perinthalmanna)', 'Region 4 (Nilambur)'] as $index => $name) {
+            FestEvent::create(['tenant_id' => $sahodaya->id, 'parent_event_id' => $root->id,
+                'event_type' => 'kids_fest', 'status' => 'registration_open', 'title' => 'Kids Fest — '.$name,
+                'cluster_label' => $name, 'partition_key' => 'region-'.($index + 3), 'partition_role' => 'region']);
+        }
+        $service = app(FestSchoolEventRegionService::class);
+        $this->assertCount(2, $service->regions($root));
+        $migration = require database_path('migrations/tenant/2026_12_03_000001_link_legacy_kids_fest_regions.php');
+        $migration->up();
+        $migration->up(); // Re-running must preserve stable identities and existing choices.
+        $regions = $service->regions($root);
+        $this->assertCount(4, $regions);
+        $this->assertSame(4, $regions->pluck('region_id')->unique()->count());
+        $this->assertDatabaseCount('regions', 4);
+        foreach ($regions->whereNotIn('id', $children->pluck('id')) as $partition) {
+            $this->assertSame($root->id, $partition->region->fest_event_id);
+            $this->assertSame($partition->cluster_label, $partition->region->name);
+        }
+        $target = $regions->firstWhere('partition_key', 'region-4');
+        $service->select($root, $school->id, $target->region_id);
+        $this->assertSame($target->id, $service->current($root, $school->id)->id);
+    }
+
+    public function test_new_kids_partitions_get_an_event_region_without_a_membership_region(): void
+    {
+        [$sahodaya, , $root] = $this->fixture();
+        $root->update(['conductor_level' => 'sahodaya', 'level_round' => 'sahodaya']);
+        $partition = app(\App\Services\Events\FestPartitionService::class)->spawnPartition($root, [
+            'title' => 'Kids Fest — New Venue', 'partition_key' => 'new-venue', 'cluster_label' => 'New Venue',
+        ]);
+        $this->assertNotNull($partition->region_id);
+        $this->assertDatabaseHas('regions', ['id' => $partition->region_id, 'tenant_id' => $sahodaya->id, 'fest_event_id' => $root->id, 'name' => 'New Venue']);
+        $this->assertDatabaseCount('school_region_assignments', 0);
+    }
+
     public function test_membership_region_does_not_select_or_lock_the_kids_fest_region(): void
     {
         [$sahodaya, $school, $root, $children] = $this->fixture();
