@@ -379,6 +379,8 @@ Route::prefix('model-exams')->name('model-exams.')->group(function () {
     Route::get('/question-banks', [McqModelExamQuestionBankController::class, 'index'])->name('question-banks');
     Route::post('/question-banks', [McqModelExamQuestionBankController::class, 'storeBank'])->name('question-banks.store');
     Route::get('/question-banks/import-template', [McqModelExamQuestionBankController::class, 'importTemplate'])->name('question-banks.import-template');
+    Route::post('/question-banks/{bank}/copy-to-school', [McqModelExamQuestionBankController::class, 'copyAssociationBank'])->name('question-banks.copy-to-school');
+    Route::post('/question-banks/{bank}/contribute', [McqModelExamQuestionBankController::class, 'contributeBank'])->name('question-banks.contribute');
     Route::get('/question-banks/{bank}', [McqModelExamQuestionBankController::class, 'show'])->name('question-banks.show');
     Route::put('/question-banks/{bank}', [McqModelExamQuestionBankController::class, 'updateBank'])->name('question-banks.update');
     Route::delete('/question-banks/{bank}', [McqModelExamQuestionBankController::class, 'destroyBank'])->name('question-banks.destroy');

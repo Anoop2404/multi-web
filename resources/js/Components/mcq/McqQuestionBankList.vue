@@ -36,7 +36,23 @@
                     <InputError :message="form.errors.subject" />
                 </div>
                 <div>
-                    <label class="form-label">Class group</label>
+                    <label class="form-label">Class category</label>
+                    <select v-model="form.class_category_id" class="field" @change="onCategoryChange">
+                        <option :value="null">Any / not scoped</option>
+                        <option v-for="c in classCategories" :key="c.id" :value="c.id">{{ c.label }}</option>
+                    </select>
+                    <InputError :message="form.errors.class_category_id" />
+                </div>
+                <div>
+                    <label class="form-label">Class</label>
+                    <select v-model="form.master_class_id" class="field">
+                        <option :value="null">Any / not scoped</option>
+                        <option v-for="c in filteredMasterClasses" :key="c.id" :value="c.id">{{ c.name }}</option>
+                    </select>
+                    <InputError :message="form.errors.master_class_id" />
+                </div>
+                <div v-if="classGroups.length" class="sm:col-span-2">
+                    <label class="form-label">Class group <span class="font-normal text-slate-400">(optional fest grouping)</span></label>
                     <select v-model="form.class_group" class="field">
                         <option :value="null">Any</option>
                         <option v-for="g in classGroups" :key="g.value" :value="g.value">{{ g.label }}</option>
@@ -83,7 +99,7 @@
                     <tr v-for="bank in banks" :key="bank.id" class="cursor-pointer" @click="router.visit(`${baseUrl}/${bank.id}`)">
                         <td class="font-medium"><Link :href="`${baseUrl}/${bank.id}`" class="link-brand" @click.stop>{{ bank.title }}</Link></td>
                         <td>{{ bank.subject }}</td>
-                        <td class="text-xs">{{ bank.class_group_label || '—' }}</td>
+                        <td class="text-xs">{{ bank.scope_label || bank.class_group_label || 'Any' }}</td>
                         <td>
                             <span class="rounded-full px-2 py-0.5 text-xs font-semibold"
                                   :class="{ active: 'bg-emerald-100 text-emerald-800', draft: 'bg-slate-100 text-slate-700', archived: 'bg-slate-200 text-slate-500' }[bank.status]">
@@ -102,7 +118,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { formatDateTime } from '@/support/calendarDates.js';
 
@@ -112,13 +128,33 @@ const props = defineProps({
     filters: { type: Object, default: () => ({}) },
     subjects: { type: Array, default: () => [] },
     classGroups: { type: Array, default: () => [] },
+    classCategories: { type: Array, default: () => [] },
+    masterClasses: { type: Array, default: () => [] },
     baseUrl: { type: String, required: true },
 });
 
 const creating = ref(false);
 const search = ref(props.filters?.search ?? '');
 const status = ref(props.filters?.status ?? '');
-const form = useForm({ title: '', subject: '', class_group: null, description: '' });
+const form = useForm({
+    title: '',
+    subject: '',
+    class_group: null,
+    class_category_id: null,
+    master_class_id: null,
+    description: '',
+});
+
+const filteredMasterClasses = computed(() => {
+    if (!form.class_category_id) return props.masterClasses;
+    return props.masterClasses.filter((c) => c.class_category_id === form.class_category_id);
+});
+
+function onCategoryChange() {
+    if (form.master_class_id && !filteredMasterClasses.value.some((c) => c.id === form.master_class_id)) {
+        form.master_class_id = null;
+    }
+}
 
 function create() {
     form.post(props.baseUrl);

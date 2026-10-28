@@ -91,6 +91,7 @@
                         <p class="text-sm font-medium">{{ bank.title }}</p>
                         <p class="text-xs text-slate-500">
                             {{ bank.subject }} · {{ bank.questions_count }} question(s)
+                            <span v-if="bank.scope_label"> · {{ bank.scope_label }}</span>
                             <span v-if="bank.owner_label"> · {{ bank.owner_label }}</span>
                         </p>
                     </div>

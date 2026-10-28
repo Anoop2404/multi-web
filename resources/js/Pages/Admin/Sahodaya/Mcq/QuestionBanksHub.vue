@@ -9,7 +9,8 @@
         </PageHeader>
 
         <McqQuestionBankList :banks="banks" :stats="stats" :filters="filters" :subjects="subjects"
-                             :class-groups="classGroups" :base-url="baseUrl" />
+                             :class-groups="classGroups" :class-categories="classCategories"
+                             :master-classes="masterClasses" :base-url="baseUrl" />
 
         <p class="mt-4 text-xs text-slate-500">
             Exam controllers can also manage these banks from the exam portal.
@@ -31,6 +32,8 @@ defineProps({
     filters: { type: Object, default: () => ({}) },
     subjects: { type: Array, default: () => [] },
     classGroups: { type: Array, default: () => [] },
+    classCategories: { type: Array, default: () => [] },
+    masterClasses: { type: Array, default: () => [] },
     baseUrl: { type: String, required: true },
 });
 </script>

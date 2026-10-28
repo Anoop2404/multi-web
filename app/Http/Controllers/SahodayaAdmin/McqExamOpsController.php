@@ -880,17 +880,19 @@ class McqExamOpsController extends SahodayaAdminController
         if (! $exam->allowsMemberBanks()) {
             $availableQuery->whereNull('school_id');
         }
+        \App\Support\Mcq\McqQuestionBankScope::constrainQueryToExam($availableQuery, $exam);
         $available = $availableQuery
             ->withCount('questions')
-            ->with(['school:id,name'])
+            ->with(['school:id,name', 'classCategory:id,label', 'masterClass:id,name', 'contributedBySchool:id,name'])
             ->orderBy('title')
-            ->get(['id', 'title', 'subject', 'class_group', 'school_id']);
+            ->get();
 
         return $this->inertia('Sahodaya/Mcq/QuestionBanks', [
             'exam'      => array_merge($exam->only('id', 'title', 'delivery_mode', 'results_published', 'total_questions', 'status'), [
                 'product_mode' => $exam->productMode(),
                 'is_model_exam' => $exam->isModelExam(),
                 'allow_member_banks' => $exam->allowsMemberBanks(),
+                'eligibility_filter' => \App\Support\Mcq\McqQuestionBankScope::examFilterMeta($exam),
             ]),
             'paper'     => $papers->summary($exam),
             'available' => $available->map(fn (McqQuestionBank $bank) => [
@@ -899,7 +901,12 @@ class McqExamOpsController extends SahodayaAdminController
                 'subject' => $bank->subject,
                 'class_group' => $bank->class_group,
                 'questions_count' => $bank->questions_count,
-                'owner_label' => $bank->school_id ? ($bank->school?->name ?? 'Member school') : 'Sahodaya',
+                'scope_label' => \App\Support\Mcq\McqQuestionBankScope::label($bank) ?? 'Any class',
+                'owner_label' => $bank->school_id
+                    ? ($bank->school?->name ?? 'Member school')
+                    : ($bank->contributed_by_school_id
+                        ? ('Sahodaya · from '.($bank->contributedBySchool?->name ?? 'school'))
+                        : 'Sahodaya'),
             ]),
             'paperTemplates' => \App\Models\McqPaperTemplate::where('tenant_id', $exam->tenant_id)->orderBy('title')->get()->map(fn ($t) => [
                 'id' => $t->id, 'title' => $t->title, 'version' => $t->version, 'sections' => $t->definition_json,
@@ -1058,6 +1065,9 @@ class McqExamOpsController extends SahodayaAdminController
         }
         if ($bank->school_id && ! $exam->allowsMemberBanks()) {
             return back()->with('error', 'Member school banks are not allowed on this exam. Enable “Allow member school banks” on Overview first.');
+        }
+        if (! \App\Support\Mcq\McqQuestionBankScope::matchesExam($bank, $exam)) {
+            return back()->with('error', 'That bank’s class/category does not match this exam’s eligibility.');
         }
 
         $nextOrder = ((int) DB::table('mcq_exam_question_banks')->where('exam_id', $exam->id)->max('display_order')) + 1;

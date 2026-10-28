@@ -1,7 +1,9 @@
 <template>
     <SchoolAdminLayout :title="bank.title" :school="school" :show-header-title="false">
         <McqQuestionBankWorkspace :bank="bank" :questions="questions" :stats="stats" :type-labels="typeLabels"
-                                  :difficulties="difficulties" :subjects="subjects" :class-groups="classGroups" :base-url="baseUrl" />
+                                  :difficulties="difficulties" :subjects="subjects" :class-groups="classGroups"
+                                  :class-categories="classCategories" :master-classes="masterClasses"
+                                  :can-contribute="true" :base-url="baseUrl" />
     </SchoolAdminLayout>
 </template>
 
@@ -18,6 +20,8 @@ defineProps({
     difficulties: { type: Array, default: () => [] },
     subjects: { type: Array, default: () => [] },
     classGroups: { type: Array, default: () => [] },
+    classCategories: { type: Array, default: () => [] },
+    masterClasses: { type: Array, default: () => [] },
     baseUrl: { type: String, required: true },
 });
 </script>

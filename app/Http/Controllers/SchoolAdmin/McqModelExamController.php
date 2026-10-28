@@ -270,17 +270,29 @@ class McqModelExamController extends SchoolAdminController
         $this->modelExams->assertOwnedBySchool($exam, $this->school);
 
         $linkedIds = $exam->questionBanks()->pluck('mcq_question_banks.id');
-        $available = $this->modelExams->schoolBanksQuery($this->school)
+        $availableQuery = $this->modelExams->schoolBanksQuery($this->school)
             ->where('status', 'active')
-            ->whereNotIn('id', $linkedIds)
+            ->whereNotIn('id', $linkedIds);
+        \App\Support\Mcq\McqQuestionBankScope::constrainQueryToExam($availableQuery, $exam);
+        $available = $availableQuery
+            ->with(['classCategory:id,label', 'masterClass:id,name'])
             ->withCount('questions')
             ->orderBy('title')
-            ->get(['id', 'title', 'subject', 'class_group']);
+            ->get();
 
         return $this->inertia('School/ModelExams/Paper', [
-            'exam'      => $exam->only('id', 'title', 'delivery_mode', 'results_published', 'total_questions', 'status'),
+            'exam'      => array_merge($exam->only('id', 'title', 'delivery_mode', 'results_published', 'total_questions', 'status'), [
+                'eligibility_filter' => \App\Support\Mcq\McqQuestionBankScope::examFilterMeta($exam),
+            ]),
             'paper'     => $papers->summary($exam),
-            'available' => $available,
+            'available' => $available->map(fn (McqQuestionBank $bank) => [
+                'id' => $bank->id,
+                'title' => $bank->title,
+                'subject' => $bank->subject,
+                'class_group' => $bank->class_group,
+                'questions_count' => $bank->questions_count,
+                'scope_label' => \App\Support\Mcq\McqQuestionBankScope::label($bank) ?? 'Any class',
+            ]),
             'settings'  => [
                 'shuffle_questions' => (bool) ($exam->settings_json['shuffle_questions'] ?? true),
                 'shuffle_options'   => (bool) ($exam->settings_json['shuffle_options'] ?? true),
@@ -301,6 +313,9 @@ class McqModelExamController extends SchoolAdminController
         $bank = $this->modelExams->schoolBanksQuery($this->school)->findOrFail($data['bank_id']);
         if ($bank->status !== 'active') {
             return back()->with('error', 'Only banks marked Ready can be added to a paper.');
+        }
+        if (! \App\Support\Mcq\McqQuestionBankScope::matchesExam($bank, $exam)) {
+            return back()->with('error', 'That bank’s class/category does not match this exam’s eligibility.');
         }
 
         $nextOrder = ((int) DB::table('mcq_exam_question_banks')->where('exam_id', $exam->id)->max('display_order')) + 1;

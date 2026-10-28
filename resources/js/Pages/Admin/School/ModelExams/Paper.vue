@@ -63,13 +63,17 @@
 
         <section v-if="!paper.locked" class="card mb-6">
             <h3 class="section-title">Add Ready bank</h3>
+            <p v-if="exam.eligibility_filter?.assignment_type && exam.eligibility_filter.assignment_type !== 'all'"
+               class="section-desc mb-2">
+                Showing banks matching this exam’s {{ exam.eligibility_filter.assignment_type }} eligibility, plus unscoped banks.
+            </p>
             <EmptyState v-if="!available.length" title="No unused Ready banks"
-                        description="Create a bank, add questions, mark it Ready, then return here." icon="📚" class="py-6" />
+                        description="Create a bank scoped to this exam’s class/category (or leave unscoped), add questions, mark Ready, then return here." icon="📚" class="py-6" />
             <ul v-else class="divide-y divide-slate-100">
                 <li v-for="bank in available" :key="bank.id" class="flex flex-wrap items-center justify-between gap-3 py-3">
                     <div>
                         <p class="font-medium">{{ bank.title }}</p>
-                        <p class="text-xs text-slate-500">{{ bank.subject }} · {{ bank.questions_count }} questions</p>
+                        <p class="text-xs text-slate-500">{{ bank.subject }} · {{ bank.questions_count }} questions · {{ bank.scope_label || 'Any class' }}</p>
                     </div>
                     <button type="button" class="btn-secondary text-sm" @click="attach(bank)">Add to paper</button>
                 </li>
