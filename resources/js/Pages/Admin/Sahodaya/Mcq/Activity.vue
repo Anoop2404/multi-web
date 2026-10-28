@@ -4,7 +4,7 @@
         <PageHeader :title="`${exam.title} — Activity log`" eyebrow="Audit trail"
                     description="All actions on this Talent Search exam, newest first." />
 
-        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" active="activity" />
+        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" :is-model-exam="!!exam.is_model_exam" active="activity" />
 
         <div class="form-section overflow-hidden !p-0">
             <EmptyState v-if="!activityLogs.length" title="No activity yet"

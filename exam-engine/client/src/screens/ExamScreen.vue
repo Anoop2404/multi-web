@@ -334,12 +334,24 @@ function onKey(e: KeyboardEvent) {
     }
 }
 
+function attemptActive(): boolean {
+    return !status.submitted && !status.submitting && !status.signedOut && !status.timeUp;
+}
+
+function handleBeforeUnload(e: BeforeUnloadEvent) {
+    if (!attemptActive()) return;
+    e.preventDefault();
+    e.returnValue = 'Your exam is in progress. Answers already saved will be kept, but leaving may interrupt you.';
+}
+
 onMounted(() => {
     window.addEventListener('keydown', onKey);
+    window.addEventListener('beforeunload', handleBeforeUnload);
     if (status.submitted) finishToResult();
 });
 onBeforeUnmount(() => {
     window.removeEventListener('keydown', onKey);
+    window.removeEventListener('beforeunload', handleBeforeUnload);
     announced = new Set();
 });
 </script>

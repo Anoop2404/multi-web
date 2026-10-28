@@ -65,7 +65,9 @@
                         aria-describedby="pin-help"
                     />
                 </label>
-                <small id="pin-help" class="help">Your invigilator will tell you the PIN when the exam starts.</small>
+                <small id="pin-help" class="help">
+                    Start PIN is told by the invigilator at the venue when the exam starts — not your hall-ticket passcode or portal password.
+                </small>
                 <div v-if="startError" class="notice" :class="startError.kind" role="alert">
                     {{ startError.text }}<span v-if="retryIn > 0"> ({{ retryIn }} s)</span>
                 </div>

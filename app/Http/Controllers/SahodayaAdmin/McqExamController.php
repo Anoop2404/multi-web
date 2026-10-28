@@ -1074,7 +1074,9 @@ class McqExamController extends SahodayaAdminController
         $ledger = $reporting->mcqExamPaymentLedger($exam);
 
         return $this->inertia('Sahodaya/Mcq/FeeLedger', [
-            'exam'           => $exam->only('id', 'title', 'status', 'fee_type', 'fee_amount'),
+            'exam'           => array_merge($exam->only('id', 'title', 'status', 'fee_type', 'fee_amount', 'delivery_mode', 'results_published'), [
+                'is_model_exam' => $exam->isModelExam(),
+            ]),
             'accountCode'    => $ledger['account_code'],
             'accountName'    => $ledger['account_name'],
             'transactions'   => $ledger['transactions'],

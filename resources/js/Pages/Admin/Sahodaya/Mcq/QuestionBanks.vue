@@ -83,8 +83,16 @@
         <!-- Add bank -->
         <section v-if="!paper.locked" class="card mb-6">
             <h3 class="section-title">Add a section</h3>
+            <p class="section-desc mb-2">
+                {{ exam.allow_member_banks
+                    ? 'Member school Ready banks are allowed on this paper (allow_member_banks is on).'
+                    : 'Only Sahodaya-owned Ready banks are listed (allow_member_banks is off on Overview).' }}
+                <template v-if="exam.eligibility_filter?.assignment_type && exam.eligibility_filter.assignment_type !== 'all'">
+                    Showing banks matching this exam’s {{ exam.eligibility_filter.assignment_type }} eligibility, plus unscoped banks.
+                </template>
+            </p>
             <EmptyState v-if="!available.length" title="No Ready banks to add"
-                        description="Mark a question bank Ready (Question banks → open a bank → Mark Ready) to add it here." icon="📝" class="py-6" />
+                        :description="emptyBanksDescription" icon="📝" class="py-6" />
             <ul v-else class="divide-y divide-slate-100">
                 <li v-for="bank in available" :key="bank.id" class="flex items-center justify-between gap-3 py-3">
                     <div>
@@ -271,6 +279,18 @@ const props = defineProps({
 const typeLabels = { single: 'Single correct', multiple: 'Multiple correct', true_false: 'True / False', numeric: 'Numeric' };
 const examUrl = `/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}`;
 const { confirm } = useConfirm();
+
+const emptyBanksDescription = computed(() => {
+    const parts = ['Mark a question bank Ready (Question banks → open a bank → Mark Ready) to add it here.'];
+    if (!props.exam.allow_member_banks) {
+        parts.push('Turn on “Allow member school question banks” on Overview if schools should contribute.');
+    }
+    const filter = props.exam.eligibility_filter;
+    if (filter?.assignment_type && filter.assignment_type !== 'all') {
+        parts.push(`Banks must match this exam’s ${filter.assignment_type} eligibility (or be unscoped).`);
+    }
+    return parts.join(' ');
+});
 
 const drafts = reactive({});
 watch(() => props.paper.sections, (sections) => {

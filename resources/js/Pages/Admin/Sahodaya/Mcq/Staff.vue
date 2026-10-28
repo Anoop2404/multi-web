@@ -2,7 +2,7 @@
     <SahodayaAdminLayout :title="`Exam Staff — ${exam.title}`" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="exam.title" eyebrow="Talent Search exam" description="Assign hall staff and exam controllers." />
-        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" active="staff" />
+        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" :is-model-exam="!!exam.is_model_exam" active="staff" />
 
         <form @submit.prevent="assign" class="card mb-4 grid gap-3 sm:grid-cols-2">
             <FormField label="User" class-extra="sm:col-span-2" required>

@@ -26,7 +26,7 @@
             <form v-if="creating" class="mt-4 grid gap-3 sm:grid-cols-2" @submit.prevent="create">
                 <div class="sm:col-span-2">
                     <label class="form-label">Title</label>
-                    <input v-model="form.title" class="field" placeholder="e.g. Class 8 Science — Talent Search 2026">
+                    <input v-model="form.title" class="field" :placeholder="titlePlaceholder">
                     <InputError :message="form.errors.title" />
                 </div>
                 <div>
@@ -77,6 +77,26 @@
                 <option value="draft">Draft</option>
                 <option value="archived">Archived</option>
             </select>
+            <select v-if="classCategories.length" v-model="classCategoryId" class="field max-w-[12rem]" @change="onFilterCategoryChange">
+                <option value="">All categories</option>
+                <option v-for="c in classCategories" :key="c.id" :value="String(c.id)">{{ c.label }}</option>
+            </select>
+            <select v-if="masterClasses.length" v-model="masterClassId" class="field max-w-[12rem]" @change="applyFilters">
+                <option value="">All classes</option>
+                <option v-for="c in filteredFilterMasterClasses" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
+            </select>
+        </div>
+        <div v-if="classCategoryId || masterClassId" class="flex flex-wrap gap-2 -mt-3">
+            <button v-if="classCategoryId" type="button"
+                    class="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-800"
+                    @click="clearCategoryFilter">
+                {{ classCategories.find(c => String(c.id) === classCategoryId)?.label || 'Category' }} ×
+            </button>
+            <button v-if="masterClassId" type="button"
+                    class="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-800"
+                    @click="clearClassFilter">
+                {{ masterClasses.find(c => String(c.id) === masterClassId)?.name || 'Class' }} ×
+            </button>
         </div>
 
         <div class="card card--flush overflow-hidden">
@@ -131,11 +151,16 @@ const props = defineProps({
     classCategories: { type: Array, default: () => [] },
     masterClasses: { type: Array, default: () => [] },
     baseUrl: { type: String, required: true },
+    /** e.g. "Talent Search" or "Model exam" — drives create-title placeholder. */
+    productLabel: { type: String, default: '' },
+    placeholderExample: { type: String, default: '' },
 });
 
 const creating = ref(false);
 const search = ref(props.filters?.search ?? '');
 const status = ref(props.filters?.status ?? '');
+const classCategoryId = ref(props.filters?.class_category_id != null ? String(props.filters.class_category_id) : '');
+const masterClassId = ref(props.filters?.master_class_id != null ? String(props.filters.master_class_id) : '');
 const form = useForm({
     title: '',
     subject: '',
@@ -145,15 +170,49 @@ const form = useForm({
     description: '',
 });
 
+const titlePlaceholder = computed(() => {
+    if (props.placeholderExample) return `e.g. ${props.placeholderExample}`;
+    if (props.productLabel) {
+        const label = props.productLabel.toLowerCase();
+        if (label.includes('model')) return 'e.g. Class 8 Science — Model exam 2026';
+        return `e.g. Class 8 Science — ${props.productLabel} 2026`;
+    }
+    return 'e.g. Class 8 Science — Talent Search 2026';
+});
+
 const filteredMasterClasses = computed(() => {
     if (!form.class_category_id) return props.masterClasses;
     return props.masterClasses.filter((c) => c.class_category_id === form.class_category_id);
+});
+
+const filteredFilterMasterClasses = computed(() => {
+    if (!classCategoryId.value) return props.masterClasses;
+    const catId = Number(classCategoryId.value);
+    return props.masterClasses.filter((c) => c.class_category_id === catId);
 });
 
 function onCategoryChange() {
     if (form.master_class_id && !filteredMasterClasses.value.some((c) => c.id === form.master_class_id)) {
         form.master_class_id = null;
     }
+}
+
+function onFilterCategoryChange() {
+    if (masterClassId.value && !filteredFilterMasterClasses.value.some((c) => String(c.id) === masterClassId.value)) {
+        masterClassId.value = '';
+    }
+    applyFilters();
+}
+
+function clearCategoryFilter() {
+    classCategoryId.value = '';
+    masterClassId.value = '';
+    applyFilters();
+}
+
+function clearClassFilter() {
+    masterClassId.value = '';
+    applyFilters();
 }
 
 function create() {
@@ -164,6 +223,8 @@ function applyFilters() {
     router.get(props.baseUrl, {
         search: search.value || undefined,
         status: status.value || undefined,
+        class_category_id: classCategoryId.value || undefined,
+        master_class_id: masterClassId.value || undefined,
     }, { preserveState: true, replace: true });
 }
 </script>

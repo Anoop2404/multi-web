@@ -53,7 +53,7 @@
                 </FormField>
             </FormGrid>
             <div class="border-t border-slate-100 pt-4">
-                <McqEligibilityPicker v-model="form.eligibility_config" :class-categories="classCategories" :master-classes="masterClasses" />
+                <McqEligibilityPicker mode="school_model" v-model="form.eligibility_config" :class-categories="classCategories" :master-classes="masterClasses" />
             </div>
             <FormActions>
                 <button type="submit" class="btn-primary" :disabled="form.processing">Create exam</button>

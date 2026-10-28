@@ -128,11 +128,49 @@ class McqModelExamController extends SchoolAdminController
         $registrations = McqRegistration::where('exam_id', $exam->id)
             ->where('school_id', $this->school->id)
             ->active()
-            ->with(['student.schoolClass:id,name', 'mark'])
+            ->with(['student.schoolClass:id,name', 'mark', 'proctorEvents'])
+            ->withCount('proctorEvents')
             ->orderBy('id')
             ->get();
 
         $masterData = app(EffectiveMasterDataResolver::class);
+
+        $roster = $registrations->take(100)->map(fn (McqRegistration $reg) => [
+            'id'         => $reg->id,
+            'status'     => $reg->status,
+            'started_at' => $reg->started_at?->toIso8601String(),
+            'submitted_at' => $reg->submitted_at?->toIso8601String(),
+            'student'    => $reg->student ? [
+                'id'         => $reg->student->id,
+                'name'       => $reg->student->name,
+                'class_name' => $reg->student->schoolClass?->name,
+            ] : null,
+            'mark' => $exam->results_published ? McqResultPresenter::forRegistration($reg, $reg->mark) : null,
+            'proctor_events_count' => (int) $reg->proctor_events_count,
+            'proctor_events' => $reg->proctorEvents->map(fn ($e) => [
+                'type'        => $e->event_type,
+                'occurred_at' => $e->occurred_at?->toDateTimeString(),
+            ])->values(),
+        ]);
+
+        $proctorTotals = [
+            'students_with_signals' => $roster->filter(fn ($r) => ($r['proctor_events_count'] ?? 0) > 0)->count(),
+            'events' => $roster->sum(fn ($r) => $r['proctor_events_count'] ?? 0),
+            'by_type' => [
+                'tab_hidden' => 0,
+                'window_blur' => 0,
+                'fullscreen_exit' => 0,
+                'offline' => 0,
+            ],
+        ];
+        foreach ($roster as $row) {
+            foreach ($row['proctor_events'] as $event) {
+                $type = $event['type'] ?? '';
+                if (array_key_exists($type, $proctorTotals['by_type'])) {
+                    $proctorTotals['by_type'][$type]++;
+                }
+            }
+        }
 
         return $this->inertia('School/ModelExams/Show', [
             'exam' => array_merge($exam->toArray(), [
@@ -158,18 +196,8 @@ class McqModelExamController extends SchoolAdminController
                 'submitted' => $registrations->where('status', 'submitted')->count(),
                 'marked'    => $registrations->filter(fn ($r) => $r->mark?->score !== null)->count(),
             ],
-            'registrations' => $registrations->take(100)->map(fn (McqRegistration $reg) => [
-                'id'         => $reg->id,
-                'status'     => $reg->status,
-                'started_at' => $reg->started_at?->toIso8601String(),
-                'submitted_at' => $reg->submitted_at?->toIso8601String(),
-                'student'    => $reg->student ? [
-                    'id'         => $reg->student->id,
-                    'name'       => $reg->student->name,
-                    'class_name' => $reg->student->schoolClass?->name,
-                ] : null,
-                'mark' => $exam->results_published ? McqResultPresenter::forRegistration($reg, $reg->mark) : null,
-            ]),
+            'proctorTotals' => $proctorTotals,
+            'registrations' => $roster,
             'classCategories' => $masterData->classCategories($this->school->parent_id)->values(),
             'masterClasses'   => $masterData->masterClasses($this->school->parent_id)->map(fn ($c) => [
                 'id'                => $c->id,
@@ -299,6 +327,12 @@ class McqModelExamController extends SchoolAdminController
         $this->modelExams->assertOwnedBySchool($exam, $this->school);
 
         $linkedIds = $exam->questionBanks()->pluck('mcq_question_banks.id');
+        $schoolBanks = $this->modelExams->schoolBanksQuery($this->school)
+            ->whereNotIn('id', $linkedIds)
+            ->with(['classCategory:id,label', 'masterClass:id,name'])
+            ->withCount('questions')
+            ->get();
+
         $availableQuery = $this->modelExams->schoolBanksQuery($this->school)
             ->where('status', 'active')
             ->whereNotIn('id', $linkedIds);
@@ -309,9 +343,22 @@ class McqModelExamController extends SchoolAdminController
             ->orderBy('title')
             ->get();
 
+        $draftUnused = $schoolBanks->where('status', 'draft')->count();
+        $readyOutOfScope = $schoolBanks
+            ->where('status', 'active')
+            ->filter(fn (McqQuestionBank $bank) => ! \App\Support\Mcq\McqQuestionBankScope::matchesExam($bank, $exam))
+            ->count();
+
+        $eligibilityFilter = \App\Support\Mcq\McqQuestionBankScope::examFilterMeta($exam);
+        $eligibilityFilter['explanation'] = match ($eligibilityFilter['assignment_type'] ?? 'all') {
+            'category' => 'Showing Ready banks for the selected class categories (and unscoped banks).',
+            'class' => 'Showing Ready banks for the selected classes (and unscoped banks).',
+            default => 'Showing all Ready school banks not already on this paper.',
+        };
+
         return $this->inertia('School/ModelExams/Paper', [
             'exam'      => array_merge($exam->only('id', 'title', 'delivery_mode', 'results_published', 'total_questions', 'status'), [
-                'eligibility_filter' => \App\Support\Mcq\McqQuestionBankScope::examFilterMeta($exam),
+                'eligibility_filter' => $eligibilityFilter,
             ]),
             'paper'     => $papers->summary($exam),
             'available' => $available->map(fn (McqQuestionBank $bank) => [
@@ -322,6 +369,11 @@ class McqModelExamController extends SchoolAdminController
                 'questions_count' => $bank->questions_count,
                 'scope_label' => \App\Support\Mcq\McqQuestionBankScope::label($bank) ?? 'Any class',
             ]),
+            'bankHints' => [
+                'draft_unused' => $draftUnused,
+                'ready_out_of_scope' => $readyOutOfScope,
+                'linked' => $linkedIds->count(),
+            ],
             'settings'  => [
                 'shuffle_questions' => (bool) ($exam->settings_json['shuffle_questions'] ?? true),
                 'shuffle_options'   => (bool) ($exam->settings_json['shuffle_options'] ?? true),

@@ -65,6 +65,16 @@ class McqExam extends Model
         'hall_tickets_published_at' => 'datetime',
     ];
 
+    /** Exposed on Inertia payloads when the full model (or toArray) is sent. */
+    protected $appends = [
+        'is_model_exam',
+    ];
+
+    public function getIsModelExamAttribute(): bool
+    {
+        return $this->isModelExam();
+    }
+
     /** Resolve a class override without changing the exam's shared schedule. */
     public function scheduleForClass(?string $className): array
     {

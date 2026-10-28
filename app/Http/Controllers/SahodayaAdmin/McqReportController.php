@@ -71,7 +71,9 @@ class McqReportController extends SahodayaAdminController
             ->values();
 
         return $this->inertia('Sahodaya/Mcq/Reports/Registration', [
-            'exam'          => $exam->only('id', 'title', 'exam_level', 'status', 'delivery_mode', 'results_published'),
+            'exam'          => array_merge($exam->only('id', 'title', 'exam_level', 'status', 'delivery_mode', 'results_published'), [
+                'is_model_exam' => $exam->isModelExam(),
+            ]),
             'registrations' => $registrations,
             'filters'       => $filters,
             'schoolOptions' => $reports->schoolFilterOptions($exam),
@@ -102,7 +104,9 @@ class McqReportController extends SahodayaAdminController
             ->withQueryString();
 
         return $this->inertia('Sahodaya/Mcq/Reports/AttendanceSheet', [
-            'exam'          => $exam->only('id', 'title', 'exam_level', 'status'),
+            'exam'          => array_merge($exam->only('id', 'title', 'exam_level', 'status', 'delivery_mode', 'results_published'), [
+                'is_model_exam' => $exam->isModelExam(),
+            ]),
             'registrations' => $registrations,
             'filters'       => $filters,
             'schoolOptions' => $reports->schoolFilterOptions($exam),
@@ -129,7 +133,9 @@ class McqReportController extends SahodayaAdminController
             ->all();
 
         return $this->inertia('Sahodaya/Mcq/Reports/FeeSummary', [
-            'exam'       => $exam->only('id', 'title', 'exam_level', 'status'),
+            'exam'       => array_merge($exam->only('id', 'title', 'exam_level', 'status', 'delivery_mode', 'results_published'), [
+                'is_model_exam' => $exam->isModelExam(),
+            ]),
             'feeSummary' => $rows,
             'filters'    => $filters,
         ]);
@@ -145,7 +151,9 @@ class McqReportController extends SahodayaAdminController
         ]);
 
         return $this->inertia('Sahodaya/Mcq/Reports/ClassWiseCounts', [
-            'exam'            => $exam->only('id', 'title', 'exam_level', 'status'),
+            'exam'            => array_merge($exam->only('id', 'title', 'exam_level', 'status', 'delivery_mode', 'results_published'), [
+                'is_model_exam' => $exam->isModelExam(),
+            ]),
             'classWiseCounts' => $reports->classWiseCountMatrix($exam, $filters['school_id'] ?? null),
             'filters'         => $filters,
             'schoolOptions'   => $reports->schoolFilterOptions($exam),

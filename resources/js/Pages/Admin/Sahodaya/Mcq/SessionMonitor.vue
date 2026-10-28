@@ -1,6 +1,7 @@
 <template>
     <SahodayaAdminLayout :title="exam.title" :sahodaya="sahodaya" :show-header-title="false">
-        <PageHeader :title="`${exam.title} — Live session`" eyebrow="Talent Search exam"
+        <PageHeader :title="`${exam.title} — Live session`"
+                    :eyebrow="exam.is_model_exam ? 'Sahodaya model exam' : 'Talent Search exam'"
                     description="Monitor who has started, submitted, and remaining progress.">
             <template #actions>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}`" class="btn-secondary text-sm">← Exam overview</Link>
@@ -10,7 +11,13 @@
         <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id"
                        :delivery-mode="exam.delivery_mode || 'online'"
                        :results-published="!!exam.results_published"
+                       :is-model-exam="!!exam.is_model_exam"
+                       :uses-engine="false"
                        active="session" />
+
+        <p class="mb-4 text-xs text-slate-600">
+            Signals for review — mark Malpractice on Attendance only after confirmation.
+        </p>
 
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
             <div class="card card--muted text-center !py-4">
@@ -53,7 +60,7 @@
                                 class="font-semibold text-amber-700 cursor-help"
                                 :title="proctorEventsTooltip(r.proctor_events)"
                             >
-                                {{ r.proctor_events.length }} tab-switch event{{ r.proctor_events.length === 1 ? '' : 's' }}
+                                {{ proctorEventsSummary(r.proctor_events) }}
                             </span>
                             <span v-else class="text-slate-400">—</span>
                         </td>
@@ -99,5 +106,24 @@ function proctorEventsTooltip(events) {
     return events
         .map(e => `${PROCTOR_EVENT_LABELS[e.type] || e.type} — ${formatDateTime(e.occurred_at)}`)
         .join('\n');
+}
+
+function proctorEventsSummary(events) {
+    const counts = {};
+    for (const e of events) {
+        const key = e.type || 'unknown';
+        counts[key] = (counts[key] || 0) + 1;
+    }
+    const parts = Object.entries(counts).map(([type, n]) => {
+        const label = PROCTOR_EVENT_LABELS[type] || type;
+        return n === 1 ? label : `${n}× ${label}`;
+    });
+    if (parts.length === 1 && events.length === 1) {
+        return parts[0];
+    }
+    if (parts.length <= 2) {
+        return parts.join(', ');
+    }
+    return `${events.length} proctor signal${events.length === 1 ? '' : 's'}`;
 }
 </script>

@@ -30,7 +30,7 @@
                 </template>
             </template>
         </PageHeader>
-        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" active="hall-tickets" />
+        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" :is-model-exam="!!exam.is_model_exam" active="hall-tickets" />
 
         <div class="flex gap-1 rounded-xl bg-slate-100 p-1 mb-5 w-fit" role="tablist" aria-label="Hall ticket workspace">
             <button v-for="tab in [{id:'design',label:'Design admit cards'},{id:'operations',label:'Issue & print'}]" :key="tab.id" type="button" role="tab" :aria-selected="workspaceTab===tab.id" @click="workspaceTab=tab.id" class="rounded-lg px-4 py-2 text-sm font-semibold" :class="workspaceTab===tab.id ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500'">{{ tab.label }}</button>

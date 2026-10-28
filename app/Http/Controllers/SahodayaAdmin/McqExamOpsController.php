@@ -1337,7 +1337,9 @@ class McqExamOpsController extends SahodayaAdminController
             ]);
 
         return $this->inertia('Sahodaya/Mcq/AttendanceCorrections', [
-            'exam'     => $exam->only('id', 'title', 'results_published', 'delivery_mode'),
+            'exam'     => array_merge($exam->only('id', 'title', 'results_published', 'delivery_mode'), [
+                'is_model_exam' => $exam->isModelExam(),
+            ]),
             'requests' => $requests,
         ]);
     }

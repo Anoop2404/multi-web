@@ -123,6 +123,33 @@
                 </div>
             </form>
 
+            <section class="card" style="margin-top: 14px" aria-label="Before you sign in">
+                <h2 style="font-size: 0.95rem; margin-bottom: 8px">Quick checklist</h2>
+                <ul class="checks">
+                    <li>
+                        <span class="icon ok" aria-hidden="true">✓</span>
+                        <div>
+                            <div style="font-weight: 600">Chrome or Edge</div>
+                            <div class="faint">Use a current desktop browser — avoid outdated or unsupported apps.</div>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="icon ok" aria-hidden="true">✓</span>
+                        <div>
+                            <div style="font-weight: 600">Stable power</div>
+                            <div class="faint">Plug in the device; don’t rely on a low battery mid-exam.</div>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="icon ok" aria-hidden="true">✓</span>
+                        <div>
+                            <div style="font-weight: 600">One device only</div>
+                            <div class="faint">Sign in and stay on this computer for the whole exam.</div>
+                        </div>
+                    </li>
+                </ul>
+            </section>
+
             <p class="center faint" style="margin-top: 16px">
                 Not your Sahodaya? <a href="/" @click.prevent="changeCode">Change code</a>
             </p>

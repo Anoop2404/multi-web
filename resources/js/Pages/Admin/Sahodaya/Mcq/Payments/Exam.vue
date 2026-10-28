@@ -4,7 +4,8 @@
         <PageHeader :title="exam.title" eyebrow="Talent Search exam"
                     description="Verify school batch payments and confirm candidate registrations with hall tickets." />
         <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" active="payments"
-                       :delivery-mode="exam.delivery_mode" :results-published="exam.results_published" />
+                       :delivery-mode="exam.delivery_mode" :results-published="!!exam.results_published"
+                       :is-model-exam="!!exam.is_model_exam" />
 
         <!-- Executive Summary Cards -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3.5 mb-6">

@@ -30,7 +30,9 @@
         </div>
 
         <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'"
-                       :results-published="!!exam.results_published" :is-model-exam="!!exam.is_model_exam" active="overview" />
+                       :results-published="!!exam.results_published" :is-model-exam="!!exam.is_model_exam"
+                       :uses-engine="capacityGate?.uses_engine ?? null"
+                       active="overview" />
 
         <McqSahodayaWorkflowBanner
             v-if="!exam.is_model_exam"
@@ -49,12 +51,27 @@
         <div v-if="membershipHealth?.length" class="card mb-4 !border-amber-200 !py-3 px-4 text-sm">
             <p class="font-semibold text-amber-900 mb-2">Membership / roster flags ({{ membershipHealth.length }} school{{ membershipHealth.length === 1 ? '' : 's' }})</p>
             <ul class="space-y-1 text-xs text-slate-700">
-                <li v-for="row in membershipHealth.slice(0, 12)" :key="row.school_id">
-                    <strong>{{ row.school_name }}</strong>
-                    — {{ row.flags.join(', ') }}
+                <li v-for="row in visibleMembershipHealth" :key="row.school_id" class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <Link :href="`/sahodaya-admin/${sahodaya.id}/schools/${row.school_id}`" class="font-semibold link-brand">
+                        {{ row.school_name }}
+                    </Link>
+                    <span>— {{ humanizeMembershipFlags(row.flags) }}</span>
                     <span class="text-slate-400">(roster {{ row.roster_students }}, registered {{ row.registered }})</span>
+                    <Link
+                        v-if="row.flags.includes('membership_unpaid') || row.flags.includes('rejected')"
+                        :href="`/sahodaya-admin/${sahodaya.id}/membership/payments`"
+                        class="text-amber-800 underline"
+                    >Membership fees</Link>
                 </li>
             </ul>
+            <button
+                v-if="membershipHealth.length > membershipHealthCap && !showAllMembershipHealth"
+                type="button"
+                class="mt-2 text-xs font-semibold text-amber-900 underline"
+                @click="showAllMembershipHealth = true"
+            >
+                Show all {{ membershipHealth.length }}
+            </button>
         </div>
 
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
@@ -280,7 +297,12 @@
                         </p>
                     </template>
                 </FormField>
-                <McqEligibilityPicker v-model="form.eligibility_config" :class-categories="classCategories" :master-classes="masterClasses" />
+                <McqEligibilityPicker
+                    :mode="form.product_mode === 'sahodaya_model_exam' ? 'school_model' : 'talent_search'"
+                    v-model="form.eligibility_config"
+                    :class-categories="classCategories"
+                    :master-classes="masterClasses"
+                />
             </div>
 
             <h3 class="section-title pt-2">Templates & grading</h3>
@@ -414,6 +436,28 @@ const props = defineProps({
 });
 
 const { confirm } = useConfirm();
+
+const MEMBERSHIP_FLAG_LABELS = {
+    inactive: 'School inactive',
+    rejected: 'Membership rejected',
+    membership_unpaid: 'Membership unpaid',
+    empty_roster: 'Empty roster',
+    registered_while_blocked: 'Registered while membership blocked',
+};
+
+const membershipHealthCap = 12;
+const showAllMembershipHealth = ref(false);
+const visibleMembershipHealth = computed(() =>
+    showAllMembershipHealth.value
+        ? props.membershipHealth
+        : props.membershipHealth.slice(0, membershipHealthCap),
+);
+
+function humanizeMembershipFlags(flags) {
+    return (flags || [])
+        .map(f => MEMBERSHIP_FLAG_LABELS[f] || String(f).replace(/_/g, ' '))
+        .join(', ');
+}
 
 function studentVerificationModeFromExam(exam) {
     const settings = exam?.settings_json ?? {};

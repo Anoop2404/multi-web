@@ -63,12 +63,9 @@
 
         <section v-if="!paper.locked" class="card mb-6">
             <h3 class="section-title">Add Ready bank</h3>
-            <p v-if="exam.eligibility_filter?.assignment_type && exam.eligibility_filter.assignment_type !== 'all'"
-               class="section-desc mb-2">
-                Showing banks matching this exam’s {{ exam.eligibility_filter.assignment_type }} eligibility, plus unscoped banks.
-            </p>
+            <p v-if="eligibilityExplanation" class="section-desc mb-2">{{ eligibilityExplanation }}</p>
             <EmptyState v-if="!available.length" title="No unused Ready banks"
-                        description="Create a bank scoped to this exam’s class/category (or leave unscoped), add questions, mark Ready, then return here." icon="📚" class="py-6" />
+                        :description="emptyAvailableDescription" icon="📚" class="py-6" />
             <ul v-else class="divide-y divide-slate-100">
                 <li v-for="bank in available" :key="bank.id" class="flex flex-wrap items-center justify-between gap-3 py-3">
                     <div>
@@ -110,7 +107,7 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue';
+import { computed, reactive } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 
@@ -119,8 +116,46 @@ const props = defineProps({
     exam: { type: Object, required: true },
     paper: { type: Object, default: () => ({ sections: [], total: 0, max_score: 0, warnings: [], locked: false }) },
     available: { type: Array, default: () => [] },
+    bankHints: {
+        type: Object,
+        default: () => ({ draft_unused: 0, ready_out_of_scope: 0, linked: 0 }),
+    },
     settings: { type: Object, default: () => ({}) },
     banksUrl: { type: String, required: true },
+});
+
+const ASSIGNMENT_TYPE_LABELS = {
+    all: 'all classes',
+    category: 'class categories',
+    class: 'specific classes',
+};
+
+const eligibilityExplanation = computed(() => {
+    const filter = props.exam.eligibility_filter;
+    if (!filter) return '';
+    if (filter.explanation) return filter.explanation;
+    const type = filter.assignment_type || 'all';
+    if (type === 'all') return '';
+    const human = ASSIGNMENT_TYPE_LABELS[type] || type;
+    return `Showing banks matching this exam’s ${human} eligibility, plus unscoped banks.`;
+});
+
+const emptyAvailableDescription = computed(() => {
+    const parts = [];
+    const draft = props.bankHints?.draft_unused ?? 0;
+    const wrongScope = props.bankHints?.ready_out_of_scope ?? 0;
+    if (draft > 0) {
+        parts.push(`${draft} draft bank${draft === 1 ? '' : 's'} still need questions and Mark Ready`);
+    }
+    if (wrongScope > 0) {
+        const type = props.exam.eligibility_filter?.assignment_type;
+        const human = ASSIGNMENT_TYPE_LABELS[type] || 'exam eligibility';
+        parts.push(`${wrongScope} Ready bank${wrongScope === 1 ? '' : 's'} are outside this exam’s ${human} (wrong class/category scope)`);
+    }
+    if (parts.length) {
+        return `${parts.join('. ')}. Create or fix a bank scoped to this exam (or leave unscoped), mark it Ready, then return here.`;
+    }
+    return 'Create a bank scoped to this exam’s class/category (or leave unscoped), add questions, mark Ready, then return here.';
 });
 
 const drafts = reactive({});

@@ -6,7 +6,11 @@
                     :description="exam.is_model_exam
                         ? 'Association rollup and per-school result sheets for this model exam.'
                         : 'Registration register, fee summary, and attendance exports.'" />
-        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :is-model-exam="!!exam.is_model_exam" active="reports" />
+        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id"
+                       :delivery-mode="exam.delivery_mode || 'offline'"
+                       :results-published="!!exam.results_published"
+                       :is-model-exam="!!exam.is_model_exam"
+                       active="reports" />
 
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">

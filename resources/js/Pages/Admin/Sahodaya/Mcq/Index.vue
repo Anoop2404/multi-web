@@ -72,7 +72,12 @@
                 </FormField>
             </FormGrid>
             <div class="border-t border-slate-100 pt-4">
-                <McqEligibilityPicker v-model="form.eligibility_config" :class-categories="classCategories" :master-classes="masterClasses" />
+                <McqEligibilityPicker
+                    :mode="form.product_mode === 'sahodaya_model_exam' ? 'school_model' : 'talent_search'"
+                    v-model="form.eligibility_config"
+                    :class-categories="classCategories"
+                    :master-classes="masterClasses"
+                />
             </div>
             <FormActions>
                 <button type="submit" class="btn-primary" :disabled="form.processing">Create exam</button>
@@ -173,7 +178,12 @@
                 </FormGrid>
                 <div class="border-t border-slate-100 pt-4">
                     <h4 class="text-sm font-semibold mb-2">Class / category assignment</h4>
-                    <McqEligibilityPicker v-model="editForm.eligibility_config" :class-categories="classCategories" :master-classes="masterClasses" />
+                    <McqEligibilityPicker
+                        :mode="editingExam?.product_mode === 'sahodaya_model_exam' ? 'school_model' : 'talent_search'"
+                        v-model="editForm.eligibility_config"
+                        :class-categories="classCategories"
+                        :master-classes="masterClasses"
+                    />
                 </div>
                 <p v-if="editForm.errors.fee_amount" class="text-xs text-red-600">{{ editForm.errors.fee_amount }}</p>
                 <FormActions>

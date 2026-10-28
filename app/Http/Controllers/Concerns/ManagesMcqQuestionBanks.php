@@ -63,6 +63,8 @@ trait ManagesMcqQuestionBanks
         $filters = $request->validate([
             'search' => 'nullable|string|max:100',
             'status' => 'nullable|in:'.implode(',', McqQuestionBank::STATUSES),
+            'class_category_id' => 'nullable|integer',
+            'master_class_id' => 'nullable|integer',
         ]);
 
         $classGroups = FestClassGroupScheme::labelsForSahodaya($sahodayaId);
@@ -71,6 +73,8 @@ trait ManagesMcqQuestionBanks
             ->with(['school:id,name', 'teacher:id,name', 'classCategory:id,label', 'masterClass:id,name,class_category_id'])
             ->withCount(['questions', 'exams'])
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
+            ->when($filters['class_category_id'] ?? null, fn ($q, $id) => $q->where('class_category_id', $id))
+            ->when($filters['master_class_id'] ?? null, fn ($q, $id) => $q->where('master_class_id', $id))
             ->when($filters['search'] ?? null, function ($q, $search) {
                 $needle = '%'.mb_strtolower($search).'%';
                 $q->where(fn ($inner) => $inner->whereRaw('LOWER(title) LIKE ?', [$needle])->orWhereRaw('LOWER(subject) LIKE ?', [$needle]));

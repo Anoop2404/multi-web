@@ -121,13 +121,22 @@ class StudentMcqController extends Controller
         }
 
         $schedule = $registration->paper_snapshot['schedule'] ?? $registration->exam->scheduleForClass($registration->student?->schoolClass?->name);
+        $exam = $registration->exam;
+        $questions = $sessions->paperForStudent($registration);
+        $hasNegative = collect($questions)->contains(fn ($q) => (float) ($q['negative_mark'] ?? 0) > 0);
 
         return inertia('Portal/Student/McqExam', [
             'school'       => Tenant::findOrFail($tenantId)->only('id', 'name'),
             'student'      => $student->only('id', 'name', 'admission_number', 'reg_no'),
             'registration' => $registration->only('id', 'status', 'started_at'),
-            'exam'         => array_merge($registration->exam->only('id', 'title'), $schedule),
-            'questions'    => $sessions->paperForStudent($registration),
+            'exam'         => array_merge($exam->only('id', 'title', 'pass_mark'), $schedule, [
+                'product_mode' => $exam->productMode(),
+                'is_model_exam' => $exam->isModelExam(),
+                'requires_hall_ticket' => $exam->requiresHallTicket(),
+                'no_pin_required' => $exam->isModelExam() || ! $exam->requiresHallTicket(),
+                'has_negative_marking' => $hasNegative,
+            ]),
+            'questions'    => $questions,
             'savedAnswers' => $registration->draft_answers ?? [],
             'expiresAt'    => $sessions->expiresAt($registration)?->toIso8601String(),
             'started'      => (bool) $registration->started_at,
@@ -207,12 +216,12 @@ class StudentMcqController extends Controller
 
         $data = $request->validate([
             'answers'   => 'required|array',
-            'answers.*' => 'nullable|string|max:10',
+            'answers.*' => 'nullable',
         ]);
 
         $sessions->saveDraftAnswers($registration, $data['answers']);
 
-        return response()->json(['saved' => true]);
+        return response()->json(['saved' => true, 'saved_at' => now()->toIso8601String()]);
     }
 
     /**
@@ -241,7 +250,7 @@ class StudentMcqController extends Controller
 
         $data = $request->validate([
             'answers'   => 'present|array',
-            'answers.*' => 'nullable|string|max:10',
+            'answers.*' => 'nullable',
         ]);
 
         $registration->loadMissing('exam');

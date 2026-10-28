@@ -9,7 +9,9 @@
 
         <McqQuestionBankList :banks="banks" :stats="stats" :filters="filters" :subjects="subjects"
                              :class-groups="classGroups" :class-categories="classCategories"
-                             :master-classes="masterClasses" :base-url="baseUrl" />
+                             :master-classes="masterClasses" :base-url="baseUrl"
+                             product-label="Model exam"
+                             placeholder-example="Class 8 Science — Model exam 2026" />
 
         <section v-if="associationBanks?.length" class="card mt-6">
             <h3 class="section-title">Association Ready banks</h3>

@@ -93,17 +93,14 @@ class McqExamSessionService
 
         $paper = app(McqPaperService::class)->questionsForRegistration($registration);
 
-        if (app(McqPaperService::class)->needsExamEngine($paper)) {
-            throw ValidationException::withMessages([
-                'exam' => 'This exam has multiple-correct or numeric questions, which need the new online exam engine. Ask the Sahodaya to use single-correct or true/false questions for this exam.',
-            ]);
-        }
+        // Multi-correct / numeric are supported on the in-app portal take-exam path
+        // (and on the exam engine). Do not block start for those types.
 
         $gradable = $paper->filter(fn (McqQuestion $q) => $q->isGradable());
 
         if ($gradable->isEmpty()) {
             throw ValidationException::withMessages([
-                'exam' => 'No gradable Talent Search questions are attached to this exam.',
+                'exam' => 'No gradable questions are attached to this exam.',
             ]);
         }
     }
@@ -138,6 +135,7 @@ class McqExamSessionService
                 'type'          => $q->typeValue(),
                 'marks'         => $q->marksValue(),
                 'negative_mark' => $q->negativeMarkValue(),
+                'choose_count'  => $q->showsCorrectCount() ? count($q->correctKeys()) : null,
                 'title'         => $q->title,
                 'body_text'     => $q->body_text,
                 'image_url'     => $q->document_path ? "{$imageBase}/{$q->id}/image" : null,
@@ -174,22 +172,28 @@ class McqExamSessionService
         return $expires !== null && now()->greaterThanOrEqualTo($expires);
     }
 
-    /** @param  array<int|string, string|null>  $answers  question_id => option_key */
+    /**
+     * Persist draft answers. Values may be a single option key, a numeric string,
+     * or a list of option keys for multiple-correct questions.
+     *
+     * @param  array<int|string, mixed>  $answers
+     */
     public function saveDraftAnswers(McqRegistration $registration, array $answers): void
     {
         $this->assertActiveSession($registration, allowExpired: false);
 
         $normalized = [];
-        foreach ($answers as $questionId => $optionKey) {
-            if ($optionKey !== null && $optionKey !== '') {
-                $normalized[(string) $questionId] = (string) $optionKey;
+        foreach ($answers as $questionId => $value) {
+            $clean = $this->normalizeAnswerValue($value);
+            if ($clean !== null) {
+                $normalized[(string) $questionId] = $clean;
             }
         }
 
         $registration->update(['draft_answers' => $normalized]);
     }
 
-    /** @param  array<int|string, string>  $answers  question_id => option_key */
+    /** @param  array<int|string, mixed>  $answers */
     public function submit(McqRegistration $registration, array $answers): McqMark
     {
         $registration->loadMissing('exam', 'mark');
@@ -300,6 +304,36 @@ class McqExamSessionService
             'event_type'      => $eventType,
             'occurred_at'     => $occurredAt ?? now(),
         ]);
+    }
+
+    /**
+     * @return string|list<string>|null
+     */
+    private function normalizeAnswerValue(mixed $value): string|array|null
+    {
+        if (is_array($value)) {
+            $keys = McqGrader::normalizeKeyList($value);
+
+            return $keys === [] ? null : $keys;
+        }
+
+        if (! is_scalar($value)) {
+            return null;
+        }
+
+        $trimmed = trim((string) $value);
+        if ($trimmed === '') {
+            return null;
+        }
+
+        // Comma-separated multi keys from older clients → list.
+        if (str_contains($trimmed, ',')) {
+            $keys = McqGrader::normalizeKeyList($trimmed);
+
+            return $keys === [] ? null : $keys;
+        }
+
+        return $trimmed;
     }
 
     private function assertCandidateEligible(McqRegistration $registration): void

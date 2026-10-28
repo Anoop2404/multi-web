@@ -1,11 +1,16 @@
 <template>
-    <nav class="flex flex-wrap gap-2 border-b border-slate-200 pb-4 mb-4">
-        <Link v-for="tab in tabs" :key="tab.key"
-              :href="tab.href"
-              :class="active === tab.key ? 'subnav-link subnav-link--active' : 'subnav-link'">
-            {{ tab.label }}
-        </Link>
-    </nav>
+    <div class="border-b border-slate-200 pb-4 mb-4">
+        <nav class="flex flex-wrap gap-2">
+            <Link v-for="tab in tabs" :key="tab.key"
+                  :href="tab.href"
+                  :class="active === tab.key ? 'subnav-link subnav-link--active' : 'subnav-link'">
+                {{ tab.label }}
+            </Link>
+        </nav>
+        <p v-if="deliveryMode === 'online' && usesEngine === null" class="mt-2 text-[11px] text-slate-500">
+            Live session is the portal proctor view. Open Live monitor from Paper if this exam uses the online exam engine.
+        </p>
+    </div>
 </template>
 
 <script setup>
@@ -18,8 +23,7 @@ const props = defineProps({
     active: { type: String, required: true },
     deliveryMode: { type: String, default: 'offline' },
     resultsPublished: { type: Boolean, default: false },
-    // true/false when the page knows whether the exam runs on the online exam engine; null = unknown
-    // (both "Live session" and "Live monitor" are shown; the monitor explains when it doesn't apply).
+    // true → Live monitor only; false/null → Live session only (never both).
     usesEngine: { type: [Boolean, null], default: null },
     /** When true, hide Talent Search fee/hall-ticket ceremony tabs. */
     isModelExam: { type: Boolean, default: false },
@@ -62,11 +66,11 @@ const tabs = computed(() => {
     );
 
     if (props.deliveryMode === 'online') {
-        if (props.usesEngine !== true) {
-            list.push({ key: 'session', label: 'Live session', href: `${base.value}/session` });
-        }
-        if (props.usesEngine !== false) {
+        if (props.usesEngine === true) {
             list.push({ key: 'live', label: 'Live monitor', href: `${base.value}/live` });
+        } else {
+            // false or null → portal proctor session only (avoid dual Live tabs).
+            list.push({ key: 'session', label: 'Live session', href: `${base.value}/session` });
         }
     }
 

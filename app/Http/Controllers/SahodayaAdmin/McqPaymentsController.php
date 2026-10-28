@@ -83,7 +83,9 @@ class McqPaymentsController extends SahodayaAdminController
         )->count();
 
         return $this->inertia('Sahodaya/Mcq/Payments/Exam', [
-            'exam'              => $exam->only('id', 'title', 'exam_level', 'status', 'fee_amount', 'fee_type', 'delivery_mode', 'results_published'),
+            'exam'              => array_merge($exam->only('id', 'title', 'exam_level', 'status', 'fee_amount', 'fee_type', 'delivery_mode', 'results_published'), [
+                'is_model_exam' => $exam->isModelExam(),
+            ]),
             'schoolFees'        => $schoolFees,
             'pendingCount'      => $pendingCount,
         ]);

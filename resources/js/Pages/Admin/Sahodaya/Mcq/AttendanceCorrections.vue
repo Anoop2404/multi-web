@@ -3,7 +3,7 @@
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="exam.title" eyebrow="Talent Search exam"
                     description="Review attendance changes submitted by schools and exam-day staff after attendance was already marked." />
-        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" active="attendance-corrections" />
+        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" :is-model-exam="!!exam.is_model_exam" active="attendance-corrections" />
 
         <div class="grid grid-cols-3 gap-3 mb-4">
             <div class="card card--muted !py-3 text-center"><p class="text-lg font-bold text-amber-700">{{ pendingCount }}</p><p class="text-[10px] uppercase text-slate-500">Pending</p></div>

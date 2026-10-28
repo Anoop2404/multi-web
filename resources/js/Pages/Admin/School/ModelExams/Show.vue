@@ -119,17 +119,33 @@
                 </FormField>
             </FormGrid>
             <div class="border-t border-slate-100 pt-4">
-                <McqEligibilityPicker v-model="form.eligibility_config" :class-categories="classCategories" :master-classes="masterClasses" />
+                <McqEligibilityPicker mode="school_model" v-model="form.eligibility_config" :class-categories="classCategories" :master-classes="masterClasses" />
             </div>
             <FormActions>
                 <button type="submit" class="btn-primary" :disabled="form.processing">Save</button>
             </FormActions>
         </form>
 
+        <div v-if="exam.delivery_mode === 'online' && (proctorTotals.events > 0 || registrations.some(r => r.started_at))"
+             class="card mb-4 !py-3 px-4">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <h3 class="text-sm font-semibold text-slate-800">Live signals</h3>
+                <p class="text-xs text-slate-500">Signals for review only — not automatic malpractice.</p>
+            </div>
+            <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+                <span><strong class="text-slate-900">{{ proctorTotals.events }}</strong> events</span>
+                <span><strong class="text-slate-900">{{ proctorTotals.students_with_signals }}</strong> students</span>
+                <span v-if="proctorTotals.by_type.tab_hidden">Tab hidden {{ proctorTotals.by_type.tab_hidden }}</span>
+                <span v-if="proctorTotals.by_type.window_blur">Window blur {{ proctorTotals.by_type.window_blur }}</span>
+                <span v-if="proctorTotals.by_type.fullscreen_exit">Fullscreen exit {{ proctorTotals.by_type.fullscreen_exit }}</span>
+                <span v-if="proctorTotals.by_type.offline">Offline {{ proctorTotals.by_type.offline }}</span>
+            </div>
+        </div>
+
         <div class="card overflow-hidden p-0">
-            <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+            <div class="px-4 py-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
                 <h3 class="font-semibold text-sm">Enrolled students</h3>
-                <span class="text-xs text-slate-500">Showing up to 100</span>
+                <span class="text-xs text-slate-500">Showing up to 100 · Signals for review only — not automatic malpractice.</span>
             </div>
             <EmptyState v-if="!registrations.length" title="No students enrolled yet"
                         description="Publish with auto-enroll, or use Enroll eligible students." icon="👥" class="py-8" />
@@ -140,6 +156,7 @@
                         <th>Class</th>
                         <th>Status</th>
                         <th>Score</th>
+                        <th>Proctor</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -149,6 +166,16 @@
                         <td class="text-xs capitalize">{{ reg.status }}</td>
                         <td class="text-xs">
                             <span v-if="reg.mark">{{ reg.mark.score }}{{ reg.mark.grade ? ` · ${reg.mark.grade}` : '' }}</span>
+                            <span v-else class="text-slate-400">—</span>
+                        </td>
+                        <td class="text-xs">
+                            <span
+                                v-if="reg.proctor_events_count > 0"
+                                class="font-semibold text-amber-700 cursor-help"
+                                :title="proctorEventsTooltip(reg.proctor_events)"
+                            >
+                                {{ reg.proctor_events_count }} signal{{ reg.proctor_events_count === 1 ? '' : 's' }}
+                            </span>
                             <span v-else class="text-slate-400">—</span>
                         </td>
                     </tr>
@@ -170,6 +197,14 @@ const props = defineProps({
     exam: { type: Object, required: true },
     registrationCounts: { type: Object, default: () => ({}) },
     registrations: { type: Array, default: () => [] },
+    proctorTotals: {
+        type: Object,
+        default: () => ({
+            events: 0,
+            students_with_signals: 0,
+            by_type: { tab_hidden: 0, window_blur: 0, fullscreen_exit: 0, offline: 0 },
+        }),
+    },
     classCategories: { type: Array, default: () => [] },
     masterClasses: { type: Array, default: () => [] },
     gradeMasters: { type: Array, default: () => [] },
@@ -177,6 +212,35 @@ const props = defineProps({
     certificateTemplates: { type: Array, default: () => [] },
     gradeBands: { type: Array, default: () => [] },
 });
+
+const PROCTOR_EVENT_LABELS = {
+    tab_hidden: 'Tab hidden',
+    window_blur: 'Window lost focus',
+    fullscreen_exit: 'Exited fullscreen',
+    offline: 'Went offline',
+};
+
+function formatProctorAt(value) {
+    if (!value) return '';
+    try {
+        return new Date(value).toLocaleString();
+    } catch {
+        return value;
+    }
+}
+
+function proctorEventsTooltip(events) {
+    if (!events?.length) return '';
+    const counts = {};
+    for (const e of events) {
+        counts[e.type] = (counts[e.type] || 0) + 1;
+    }
+    const breakdown = Object.entries(counts)
+        .map(([type, n]) => `${PROCTOR_EVENT_LABELS[type] || type}: ${n}`)
+        .join('\n');
+    const recent = events.slice(-5).map((e) => `${PROCTOR_EVENT_LABELS[e.type] || e.type} — ${formatProctorAt(e.occurred_at)}`).join('\n');
+    return `${breakdown}\n\nRecent:\n${recent}`;
+}
 
 const gradeMasterOptions = computed(() => [
     { value: null, label: 'None' },
