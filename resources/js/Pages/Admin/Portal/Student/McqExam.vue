@@ -68,6 +68,13 @@
                     <span>{{ proctorMessage }}</span>
                     <button type="button" class="text-xs font-semibold underline shrink-0" @click="proctorWarningVisible = false">Dismiss</button>
                 </div>
+                <div v-if="!fullscreenActive && !fullscreenDismissed" class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 flex flex-wrap justify-between gap-2 items-center">
+                    <span>Optional: use fullscreen for fewer distractions. Leaving fullscreen is recorded as a signal — not an automatic fail.</span>
+                    <div class="flex gap-2 shrink-0">
+                        <button type="button" class="btn-secondary text-xs" @click="enterFullscreen">Enter fullscreen</button>
+                        <button type="button" class="text-xs font-semibold text-slate-500 underline" @click="fullscreenDismissed = true">Not now</button>
+                    </div>
+                </div>
             </div>
 
             <div class="lg:grid lg:grid-cols-[12rem_minmax(0,1fr)] lg:gap-4 lg:items-start">
@@ -210,15 +217,24 @@
         </div>
 
         <div v-if="confirmOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" @click.self="confirmOpen = false">
-            <div class="card max-w-md w-full space-y-4 shadow-xl" role="dialog" aria-modal="true">
-                <h2 class="font-semibold text-base">Submit exam?</h2>
-                <p class="text-sm text-gray-600">
+            <div
+                ref="confirmPanelRef"
+                class="card max-w-md w-full space-y-4 shadow-xl"
+                role="alertdialog"
+                aria-modal="true"
+                aria-labelledby="submit-exam-title"
+                aria-describedby="submit-exam-desc"
+                tabindex="-1"
+                @keydown="onConfirmKeydown"
+            >
+                <h2 id="submit-exam-title" class="font-semibold text-base">Submit exam?</h2>
+                <p id="submit-exam-desc" class="text-sm text-gray-600">
                     You have answered {{ answeredCount }} of {{ gradableCount }} gradable questions.
                     <span v-if="markedForReview.size"> {{ markedForReview.size }} question(s) are marked for review.</span>
                     Once submitted, you cannot change your answers.
                 </p>
                 <div class="flex flex-wrap justify-end gap-2">
-                    <button type="button" class="btn-secondary text-sm" @click="confirmOpen = false">Cancel</button>
+                    <button ref="confirmCancelRef" type="button" class="btn-secondary text-sm" @click="confirmOpen = false">Cancel</button>
                     <button type="button" class="btn-primary text-sm" :disabled="submitting || submitBlocked" @click="submit">
                         {{ submitting ? 'Submitting…' : 'Submit now' }}
                     </button>
@@ -233,7 +249,7 @@ import McqRichText from '@/Components/mcq/McqRichText.vue';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import QuestionNavGrid from '@/Components/portal/QuestionNavGrid.vue';
 import { studentPortalNavItems } from '@/support/studentPortalNav.js';
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 
 const props = defineProps({
@@ -262,6 +278,10 @@ const questionRefs = ref({});
 const proctorWarningVisible = ref(false);
 const proctorEventCount = ref(0);
 const resumeBanner = ref(false);
+const fullscreenActive = ref(false);
+const fullscreenDismissed = ref(false);
+const confirmPanelRef = ref(null);
+const confirmCancelRef = ref(null);
 let timerId = null;
 let autoSubmitRequested = false;
 let saveTimerId = null;
@@ -471,6 +491,45 @@ function startExam() {
 function requestSubmit() {
     if (submitBlocked.value) return;
     confirmOpen.value = true;
+    nextTick(() => confirmCancelRef.value?.focus?.());
+}
+
+function onConfirmKeydown(e) {
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        confirmOpen.value = false;
+        return;
+    }
+    if (e.key !== 'Tab' || ! confirmPanelRef.value) return;
+    const nodes = [...confirmPanelRef.value.querySelectorAll('button:not([disabled])')];
+    if (! nodes.length) return;
+    const first = nodes[0];
+    const last = nodes[nodes.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+    } else if (! e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+    }
+}
+
+async function enterFullscreen() {
+    try {
+        await document.documentElement.requestFullscreen?.();
+        fullscreenActive.value = true;
+        fullscreenDismissed.value = true;
+    } catch {
+        fullscreenDismissed.value = true;
+    }
+}
+
+function handleFullscreenChange() {
+    const nowFs = !!document.fullscreenElement;
+    if (fullscreenActive.value && ! nowFs && props.started && ! submitting.value) {
+        reportProctorEvent('fullscreen_exit');
+    }
+    fullscreenActive.value = nowFs;
 }
 
 function submit() {
@@ -508,6 +567,8 @@ onMounted(() => {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    fullscreenActive.value = !!document.fullscreenElement;
 });
 
 onUnmounted(() => {
@@ -518,5 +579,6 @@ onUnmounted(() => {
     window.removeEventListener('online', handleOnline);
     window.removeEventListener('offline', handleOffline);
     window.removeEventListener('beforeunload', handleBeforeUnload);
+    document.removeEventListener('fullscreenchange', handleFullscreenChange);
 });
 </script>

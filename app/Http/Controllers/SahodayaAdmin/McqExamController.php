@@ -158,7 +158,8 @@ class McqExamController extends SahodayaAdminController
 
         $exam = McqExam::create($data);
 
-        app(PlatformAuditLogger::class)->mcq($exam, 'mcq.exam.created', "Talent Search exam created: {$exam->title}");
+        $modeLabel = \App\Support\Mcq\McqProductMode::label($exam->productMode());
+        app(PlatformAuditLogger::class)->mcq($exam, 'mcq.exam.created', "{$modeLabel} created: {$exam->title}");
 
         return redirect("/sahodaya-admin/{$this->sahodaya->id}/mcq-exams/{$exam->id}")
             ->with('success', 'Exam created.');
@@ -493,7 +494,8 @@ class McqExamController extends SahodayaAdminController
             }
         }
 
-        app(PlatformAuditLogger::class)->mcq($exam, 'mcq.exam.updated', "Talent Search exam updated: {$exam->title}", [
+        $modeLabel = \App\Support\Mcq\McqProductMode::label($exam->productMode());
+        app(PlatformAuditLogger::class)->mcq($exam, 'mcq.exam.updated', "{$modeLabel} updated: {$exam->title}", [
             'status' => $data['status'] ?? $exam->status,
             'product_mode' => $exam->productMode(),
         ]);
@@ -505,7 +507,7 @@ class McqExamController extends SahodayaAdminController
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
-        $label = $exam->isModelExam() ? 'Sahodaya model exam' : 'Talent Search';
+        $label = \App\Support\Mcq\McqProductMode::label($exam->productMode());
         $result = $publisher->publish($exam, $label);
         $msg = "Results published. {$result['ranked']} student(s) ranked.";
         if ($result['certificates_issued'] > 0) {
@@ -519,7 +521,7 @@ class McqExamController extends SahodayaAdminController
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
-        $label = $exam->isModelExam() ? 'Sahodaya model exam' : 'Talent Search';
+        $label = \App\Support\Mcq\McqProductMode::label($exam->productMode());
         $publisher->unpublish($exam, "{$label} by {$request->user()?->name}");
 
         return back()->with('success', 'Results hidden. Marks can now be edited; publish again when corrections are complete.');
@@ -987,7 +989,14 @@ class McqExamController extends SahodayaAdminController
                 'grade'       => $m->grade,
             ]);
 
-        return $this->inertia('Sahodaya/Mcq/Leaderboard', compact('exam', 'rows'));
+        return $this->inertia('Sahodaya/Mcq/Leaderboard', [
+            'exam' => array_merge($exam->only('id', 'title', 'delivery_mode', 'results_published'), [
+                'product_mode' => $exam->productMode(),
+                'product_mode_label' => \App\Support\Mcq\McqProductMode::label($exam->productMode()),
+                'is_model_exam' => $exam->isModelExam(),
+            ]),
+            'rows' => $rows,
+        ]);
     }
 
     public function exportLeaderboard(string $tenantId, McqExam $exam)

@@ -1,7 +1,10 @@
 <template>
-    <SahodayaAdminLayout title="Talent Search series" :sahodaya="sahodaya">
-        <PageHeader title="Talent Search exam series" eyebrow="Talent Search"
-                    description="Group multi-level exams (Level 1, 2, 3…) with promotion rules.">
+    <SahodayaAdminLayout title="Exam series" :sahodaya="sahodaya">
+        <PageHeader title="Exam series" eyebrow="Multi-level exams"
+                    description="Group Level 1, 2, 3… exams with promotion rules. Works for Talent Search and model exams.">
+            <template #actions>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams`" class="btn-secondary text-sm">All exams</Link>
+            </template>
         </PageHeader>
 
         <form class="card max-w-xl space-y-3 mb-6" @submit.prevent="createSeries">
@@ -15,7 +18,14 @@
             <Link v-for="s in series" :key="s.id"
                   :href="`/sahodaya-admin/${sahodaya.id}/mcq-series/${s.id}`"
                   class="card hover:border-indigo-200">
-                <h3 class="font-semibold">{{ s.title }}</h3>
+                <div class="flex items-start justify-between gap-2">
+                    <h3 class="font-semibold">{{ s.title }}</h3>
+                    <span v-if="seriesModeBadge(s)"
+                          class="shrink-0 px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                          :class="seriesModeBadge(s).className">
+                        {{ seriesModeBadge(s).label }}
+                    </span>
+                </div>
                 <p class="text-xs text-slate-500 mt-1">{{ s.exams?.length || 0 }} level(s) · {{ s.status }}</p>
             </Link>
         </div>
@@ -29,6 +39,20 @@ import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 const props = defineProps({ sahodaya: Object, series: Array });
 
 const seriesForm = useForm({ title: '', description: '' });
+
+function seriesModeBadge(s) {
+    const exams = s.exams ?? [];
+    if (!exams.length) return null;
+    const hasModel = exams.some((e) => e.is_model_exam || e.product_mode === 'sahodaya_model_exam' || e.product_mode === 'school_model_exam');
+    const hasTalent = exams.some((e) => !(e.is_model_exam || e.product_mode === 'sahodaya_model_exam' || e.product_mode === 'school_model_exam'));
+    if (hasModel && hasTalent) {
+        return { label: 'Mixed modes', className: 'bg-slate-100 text-slate-700' };
+    }
+    if (hasModel) {
+        return { label: 'Model exam', className: 'bg-sky-50 text-sky-800' };
+    }
+    return { label: 'Talent Search', className: 'bg-indigo-50 text-indigo-800' };
+}
 
 function createSeries() {
     seriesForm.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-series`, {

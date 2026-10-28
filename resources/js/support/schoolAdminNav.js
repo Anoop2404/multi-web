@@ -221,8 +221,11 @@ export function schoolMcqHubNav(schoolId, options = {}) {
             items: [{ label: 'Dashboard', href: base, icon: 'grid', exact: true }],
         },
         {
-            section: TALENT_SEARCH_LABEL,
-            items: [{ label: 'Available exams', href: schoolAdminHref(schoolId, 'mcq'), icon: 'clipboard' }],
+            section: 'Online exams',
+            items: [
+                { label: 'Model exams', href: schoolAdminHref(schoolId, 'model-exams'), icon: 'edit' },
+                { label: `${TALENT_SEARCH_LABEL} exams`, href: schoolAdminHref(schoolId, 'mcq'), icon: 'clipboard' },
+            ],
         },
     ];
 }

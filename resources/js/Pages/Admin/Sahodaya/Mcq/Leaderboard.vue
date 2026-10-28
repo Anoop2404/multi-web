@@ -1,8 +1,11 @@
 <template>
     <SahodayaAdminLayout :title="`Leaderboard — ${exam.title}`" :sahodaya="sahodaya" :publicUrl="publicUrl" :show-header-title="false">
-        <PageHeader :title="exam.title" eyebrow="Talent Search exam" description="Top scorers across all schools">
+        <PageHeader :title="exam.title"
+                    :eyebrow="exam.is_model_exam ? (exam.product_mode_label || 'Sahodaya model exam') : 'Talent Search exam'"
+                    description="Top scorers across schools. Publish results first — then ranks show here for staff export and school visibility.">
             <template #actions>
                 <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/leaderboard/export`" class="btn-secondary text-sm">Export CSV</a>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/results`" class="btn-secondary text-sm">Results &amp; marks</Link>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}`" class="btn-secondary text-sm">← Exam overview</Link>
             </template>
         </PageHeader>
@@ -12,6 +15,10 @@
                        :results-published="!!exam.results_published"
                        :is-model-exam="!!exam.is_model_exam"
                        active="leaderboard" />
+
+        <p v-if="exam.results_published" class="text-xs text-slate-500 mb-3">
+            Results are published. Review or correct marks on Results if you need to unpublish first.
+        </p>
 
         <div class="card overflow-x-auto">
             <table class="data-table">

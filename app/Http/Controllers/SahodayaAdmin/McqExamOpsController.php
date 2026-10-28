@@ -819,10 +819,11 @@ class McqExamOpsController extends SahodayaAdminController
 
         $count = $certificates->issueBulk($exam);
 
+        $modeLabel = \App\Support\Mcq\McqProductMode::label($exam->productMode());
         app(\App\Services\Audit\PlatformAuditLogger::class)->mcq(
             $exam,
             'mcq.certificates.generated',
-            "Generated {$count} Talent Search certificate(s) for {$exam->title}",
+            "Generated {$count} {$modeLabel} certificate(s) for {$exam->title}",
             ['count' => $count],
         );
 
@@ -1290,10 +1291,11 @@ class McqExamOpsController extends SahodayaAdminController
 
         $count = app(\App\Services\Mcq\McqRankingService::class)->rankExam($exam);
 
+        $modeLabel = \App\Support\Mcq\McqProductMode::label($exam->productMode());
         app(\App\Services\Audit\PlatformAuditLogger::class)->mcq(
             $exam,
             'mcq.ranking.computed',
-            "Talent Search ranking computed for {$exam->title}",
+            "{$modeLabel} ranking computed for {$exam->title}",
             ['count' => $count],
         );
 

@@ -203,7 +203,8 @@ class ExamOpsController extends Controller
         $baseQuery = McqRegistration::where('exam_id', $exam->id);
 
         $registrations = (clone $baseQuery)
-            ->with(['student', 'school', 'mark'])
+            ->with(['student', 'school', 'mark', 'proctorEvents' => fn ($q) => $q->orderByDesc('occurred_at')->limit(8)])
+            ->withCount('proctorEvents')
             ->orderBy('hall_ticket_no')
             ->paginate(50)
             ->withQueryString()
@@ -217,6 +218,11 @@ class ExamOpsController extends Controller
                 'started_at'         => $r->started_at?->toIso8601String(),
                 'submitted_at'       => $r->submitted_at?->toIso8601String(),
                 'score'              => $r->mark?->score,
+                'proctor_events_count' => (int) $r->proctor_events_count,
+                'proctor_events'     => $r->proctorEvents->map(fn ($e) => [
+                    'type' => $e->event_type,
+                    'occurred_at' => $e->occurred_at?->toIso8601String(),
+                ])->values(),
             ]);
 
         $summary = [
@@ -227,13 +233,20 @@ class ExamOpsController extends Controller
             'absent'      => (clone $baseQuery)->where('attendance_status', 'absent')->count(),
             'malpractice' => (clone $baseQuery)->where('attendance_status', 'malpractice')->count(),
             'withheld'    => (clone $baseQuery)->where('attendance_status', 'withheld')->count(),
+            'proctor_signals' => (int) \App\Models\McqProctorEvent::whereIn(
+                'registration_id',
+                (clone $baseQuery)->select('id'),
+            )->count(),
         ];
 
         return inertia('Portal/Exam/Supervision', [
             'sahodaya'      => Tenant::findOrFail($tenantId)->only('id', 'name'),
-            'exam'          => $exam->only('id', 'title', 'status', 'scheduled_at', 'duration_minutes'),
+            'exam'          => array_merge($exam->only('id', 'title', 'status', 'scheduled_at', 'duration_minutes', 'delivery_mode'), [
+                'is_model_exam' => $exam->isModelExam(),
+            ]),
             'registrations' => $registrations,
             'summary'       => $summary,
+            'attendanceUrl' => "/portal/exam/{$tenantId}/exams/{$exam->id}/attendance",
         ]);
     }
 

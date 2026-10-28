@@ -85,8 +85,9 @@
         </form>
 
         <div class="card overflow-hidden p-0">
-            <EmptyState v-if="!exams.length" title="No Talent Search exams yet" description="Create your first exam using the form above." icon="📝" />
-            <table v-else class="data-table">
+            <EmptyState v-if="!exams.length" title="No MCQ exams yet" description="Create a Talent Search or Sahodaya model exam using the form above." icon="📝" />
+            <div v-else class="overflow-x-auto">
+            <table class="data-table min-w-[720px]">
                 <thead>
                     <tr>
                         <th>Title</th>
@@ -128,11 +129,12 @@
                         <td>{{ exam.registrations_count ?? 0 }}</td>
                         <td class="text-right whitespace-nowrap space-x-2">
                             <button type="button" class="text-xs font-semibold text-indigo-600 hover:underline" @click="openEdit(exam)">Edit</button>
-                            <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}`" class="link-brand text-xs font-semibold">Open →</Link>
+                            <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}`" class="link-brand text-xs font-semibold">View →</Link>
                         </td>
                     </tr>
                 </tbody>
             </table>
+            </div>
         </div>
 
         <div v-if="editingExam" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="closeEdit">

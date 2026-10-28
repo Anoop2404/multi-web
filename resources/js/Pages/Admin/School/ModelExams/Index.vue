@@ -60,39 +60,54 @@
             </FormActions>
         </form>
 
+        <div v-if="!exams.length" class="card mb-6 bg-sky-50/60 border-sky-100">
+            <h3 class="text-sm font-semibold text-sky-950 mb-2">First exam checklist</h3>
+            <ol class="text-sm text-sky-900 list-decimal pl-5 space-y-1">
+                <li>
+                    Create a
+                    <Link :href="`/school-admin/${school.id}/model-exams/question-banks`" class="link-brand font-semibold">Ready question bank</Link>
+                </li>
+                <li>Create the exam above and attach the bank on Paper</li>
+                <li>Publish (and enroll eligible students)</li>
+                <li>Release results when ready — configure visibility & certificates on the exam</li>
+            </ol>
+        </div>
+
         <div class="card overflow-hidden p-0">
             <EmptyState v-if="!exams.length" title="No model exams yet"
                         description="Create an exam above, add a Ready question bank, then publish and enroll students."
                         icon="📝" />
-            <table v-else class="data-table">
-                <thead>
-                    <tr>
-                        <th>Title</th>
-                        <th>Schedule</th>
-                        <th>Delivery</th>
-                        <th>Classes</th>
-                        <th>Status</th>
-                        <th>Enrolled</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="exam in exams" :key="exam.id">
-                        <td class="font-medium text-slate-900">{{ exam.title }}</td>
-                        <td class="text-xs text-slate-600 whitespace-nowrap">{{ formatSchedule(exam.scheduled_at) }}</td>
-                        <td class="text-xs capitalize">{{ exam.delivery_mode || 'online' }}</td>
-                        <td class="text-xs text-slate-600 max-w-[180px]">{{ exam.eligibility_summary || 'All classes' }}</td>
-                        <td>
-                            <span class="status-pill capitalize" :class="statusClass(exam.status)">{{ exam.status }}</span>
-                            <span v-if="exam.results_published" class="ml-1 text-[11px] text-emerald-700">· results out</span>
-                        </td>
-                        <td>{{ exam.registrations_count ?? 0 }}</td>
-                        <td class="text-right">
-                            <Link :href="`/school-admin/${school.id}/model-exams/${exam.id}`" class="link-brand text-xs font-semibold">Open →</Link>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <div v-else class="overflow-x-auto">
+                <table class="data-table min-w-[640px]">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Schedule</th>
+                            <th>Delivery</th>
+                            <th>Classes</th>
+                            <th>Status</th>
+                            <th>Enrolled</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="exam in exams" :key="exam.id">
+                            <td class="font-medium text-slate-900">{{ exam.title }}</td>
+                            <td class="text-xs text-slate-600 whitespace-nowrap">{{ formatSchedule(exam.scheduled_at) }}</td>
+                            <td class="text-xs capitalize">{{ exam.delivery_mode || 'online' }}</td>
+                            <td class="text-xs text-slate-600 max-w-[180px]">{{ exam.eligibility_summary || 'All classes' }}</td>
+                            <td>
+                                <span class="status-pill capitalize" :class="statusClass(exam.status)">{{ statusLabel(exam.status) }}</span>
+                                <span v-if="exam.results_published" class="ml-1 text-[11px] text-emerald-700">· results out</span>
+                            </td>
+                            <td>{{ exam.registrations_count ?? 0 }}</td>
+                            <td class="text-right">
+                                <Link :href="`/school-admin/${school.id}/model-exams/${exam.id}`" class="link-brand text-xs font-semibold">View →</Link>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </SchoolAdminLayout>
 </template>
@@ -159,5 +174,12 @@ function statusClass(status) {
     if (status === 'draft') return 'status-pill--neutral';
     if (status === 'cancelled') return 'status-pill--danger';
     return 'status-pill--info';
+}
+
+function statusLabel(status) {
+    if (status === 'published' || status === 'ongoing') return 'Open';
+    if (status === 'completed') return 'Completed';
+    if (status === 'cancelled') return 'Cancelled';
+    return status || 'Draft';
 }
 </script>
