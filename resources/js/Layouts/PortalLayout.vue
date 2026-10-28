@@ -1,7 +1,10 @@
 <template>
     <div class="min-h-screen bg-slate-50 flex font-sans text-slate-900 portal-shell">
-        <!-- Desktop Fixed/Sticky Left Sidebar Navigation -->
-        <aside class="hidden lg:flex w-64 bg-[#041525] text-white flex-col shrink-0 border-r border-slate-800/80 sticky top-0 h-screen overflow-y-auto shadow-xl">
+        <!-- Desktop Fixed/Sticky Left Sidebar Navigation (hidden in exam focus mode) -->
+        <aside
+            v-if="!focusMode"
+            class="hidden lg:flex w-64 bg-[#041525] text-white flex-col shrink-0 border-r border-slate-800/80 sticky top-0 h-screen overflow-y-auto shadow-xl"
+        >
             <!-- Top Vibrant Accent Strip -->
             <div class="h-1 bg-gradient-to-r from-[#041525] via-[#0f3d7a] via-40% via-[#1e5aa8] to-[#d4a017]" />
 
@@ -54,8 +57,11 @@
 
         <!-- Main Workspace (Content + Mobile Topbar) -->
         <div class="flex-1 flex flex-col min-w-0 min-h-screen">
-            <!-- Mobile Top Header Bar -->
-            <header class="lg:hidden sticky top-0 z-40 bg-[#041525] text-white border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-md">
+            <!-- Mobile Top Header Bar (skipped in exam focus — attempt chrome owns the top) -->
+            <header
+                v-if="!focusMode"
+                class="lg:hidden sticky top-0 z-40 bg-[#041525] text-white border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-md"
+            >
                 <div class="flex items-center gap-3 min-w-0">
                     <div class="h-9 w-9 rounded-xl bg-gradient-to-br from-[#0f3d7a] to-[#1e5aa8] text-white flex items-center justify-center font-bold text-xs shrink-0">
                         {{ initials }}
@@ -112,9 +118,17 @@
             <FlashBanner class="max-w-7xl mx-auto px-4 sm:px-6 pt-4 w-full" />
 
             <!-- Main Page View Content -->
-            <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
-                <!-- Page Content Top Heading -->
-                <div v-if="title" class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-slate-200/60">
+            <main
+                class="flex-1 w-full mx-auto space-y-6"
+                :class="focusMode
+                    ? 'max-w-6xl px-3 sm:px-4 py-3'
+                    : 'max-w-7xl px-4 sm:px-6 py-6'"
+            >
+                <!-- Page Content Top Heading (hidden in exam focus mode) -->
+                <div
+                    v-if="title && !focusMode"
+                    class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-slate-200/60"
+                >
                     <div>
                         <h1 class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">{{ title }}</h1>
                         <p v-if="subtitle" class="text-xs text-slate-500 mt-0.5">{{ subtitle }}</p>
@@ -143,6 +157,8 @@ const props = defineProps({
     navItems: { type: Array, default: () => [] },
     avatarUrl: { type: String, default: '' },
     showAvatarPlaceholder: { type: Boolean, default: false },
+    /** Exam attempt: hide page H1, tighten padding so the paper owns the viewport. */
+    focusMode: { type: Boolean, default: false },
 });
 
 const page = usePage();

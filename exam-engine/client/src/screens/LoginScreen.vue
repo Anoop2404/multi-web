@@ -103,7 +103,8 @@
                             />
                         </label>
                         <small id="passcode-help" class="help">
-                            10 letters and numbers from your hall ticket.
+                            10 letters and numbers printed on your hall ticket (exam passcode for sign-in).
+                            This is not the Start PIN an invigilator may give later.
                             <template v-if="lookalike"> Passcodes never use I, L, O, 0 or 1 — check those characters.</template>
                         </small>
                     </template>

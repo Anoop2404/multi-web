@@ -3,26 +3,34 @@
         <header class="topbar">
             <div class="title">
                 <b>{{ st.title }}</b>
-                <span>{{ st.name }} · {{ st.hall_ticket }}</span>
+                <span>{{ st.name }} · {{ st.hall_ticket }} · {{ answered }}/{{ questions.length }} answered</span>
             </div>
             <div class="timer" :class="timerClass" role="timer" :aria-label="`Time left ${formatCountdown(msLeft)}`">{{ formatCountdown(msLeft) }}</div>
+            <span class="pill sync-pill" :class="syncPill.cls" role="status" aria-live="polite"><span class="dot" />{{ syncPill.text }}</span>
+            <button
+                v-if="canFullscreen && !status.fullscreen"
+                class="btn ghost hide-narrow"
+                style="min-height: 36px; padding: 4px 10px"
+                type="button"
+                @click="goFullscreen"
+            >
+                Full screen
+            </button>
             <button class="icon-btn only-mobile" type="button" aria-haspopup="dialog" :aria-expanded="drawer" @click="drawer = true">
                 <span aria-hidden="true">☰</span><span class="sr-only">Question list</span>
             </button>
         </header>
 
-        <div class="statusbar" role="status" aria-live="polite">
-            <span class="pill" :class="syncPill.cls"><span class="dot" />{{ syncPill.text }}</span>
-            <span class="faint">{{ answered }}/{{ questions.length }} answered</span>
-            <span class="spacer" />
-            <button v-if="canFullscreen && !status.fullscreen" class="btn ghost hide-narrow" style="min-height: 36px; padding: 4px 10px" type="button" @click="goFullscreen">
-                Full screen
-            </button>
-        </div>
-
         <div v-if="!status.online || status.sync === 'offline'" class="banner offline" role="status">
             <span aria-hidden="true">⚠</span>
             <span><b>Offline — answers saved on this device.</b> Keep writing; they’ll be sent when the connection is back.</span>
+        </div>
+        <div v-if="timerUrgent" class="banner" role="status" style="background: var(--bad-soft); border-color: #f1c0c0; color: var(--bad)">
+            <span><b>Less than 5 minutes left.</b> Answers submit automatically when the timer reaches zero.</span>
+        </div>
+        <div v-if="proctorVisible && status.proctorSignalCount > 0" class="banner" role="status">
+            <span style="flex: 1">{{ proctorMessage }}</span>
+            <button class="btn" style="min-height: 36px; padding: 4px 12px" type="button" @click="proctorVisible = false">Dismiss</button>
         </div>
         <div v-if="message" class="banner" role="alert">
             <span aria-hidden="true">📢</span>
@@ -226,19 +234,40 @@ const message = computed(() => {
 });
 
 const syncPill = computed(() => {
+    const savedClock =
+        status.lastSavedAt != null
+            ? new Date(status.lastSavedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            : null;
     switch (status.sync) {
         case 'saved':
-            return { cls: 'ok', text: status.lastSavedAt ? 'All answers saved' : 'Saved on this device' };
+            return {
+                cls: 'ok',
+                text: savedClock ? `All answers saved · ${savedClock}` : 'Saved on this device',
+            };
         case 'saving':
             return { cls: '', text: 'Saving…' };
         case 'pending':
-            return { cls: '', text: 'Saved on this device' };
+            return { cls: '', text: savedClock ? `Saved on this device · ${savedClock}` : 'Saved on this device' };
         case 'offline':
             return { cls: 'warn', text: 'Offline — saved on this device' };
         default:
             return { cls: 'warn', text: 'Server busy — retrying' };
     }
 });
+
+const timerUrgent = computed(() => msLeft.value > 0 && msLeft.value <= 300000 && Number.isFinite(msLeft.value));
+const proctorVisible = ref(false);
+const proctorMessage = computed(() => {
+    const n = status.proctorSignalCount;
+    if (n <= 1) return 'Leaving this tab is recorded for review — not an automatic fail.';
+    return `${n} leave/blur signals recorded. Stay on this exam until you submit.`;
+});
+watch(
+    () => status.proctorSignalCount,
+    (n, prev) => {
+        if (n > (prev ?? 0)) proctorVisible.value = true;
+    },
+);
 
 const canFullscreen = typeof document.documentElement.requestFullscreen === 'function' && document.fullscreenEnabled !== false;
 

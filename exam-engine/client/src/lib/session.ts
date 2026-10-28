@@ -33,6 +33,8 @@ export interface SessionStatus {
     seenMessageIds: number[];
     fullscreen: boolean;
     storageWarning: boolean;
+    /** Student-facing leave/blur/fullscreen signal count (review only — not auto-fail). */
+    proctorSignalCount: number;
 }
 
 const MAX_EVENTS_PER_SYNC = 50; // CONTRACT §4
@@ -108,6 +110,7 @@ export class ExamSession {
             seenMessageIds: (record?.seenMessageIds ?? []).slice(),
             fullscreen: !!document.fullscreenElement,
             storageWarning: false,
+            proctorSignalCount: 0,
         });
     }
 
@@ -206,6 +209,9 @@ export class ExamSession {
         this.lastEventAt[type] = now;
         this.events.push({ type, at: clock.nowIso(), ...extra });
         if (this.events.length > MAX_QUEUED_EVENTS) this.events.splice(0, this.events.length - MAX_QUEUED_EVENTS);
+        if (type === 'tab_hidden' || type === 'window_blur' || type === 'fullscreen_exit') {
+            this.status.proctorSignalCount += 1;
+        }
         this.persist();
     }
 

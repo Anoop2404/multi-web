@@ -4,7 +4,8 @@
         :title="exam.title"
         :subtitle="[school.name, student.reg_no].filter(Boolean).join(' · ')"
         accent="indigo"
-        :nav-items="navItems"
+        :nav-items="started ? [] : navItems"
+        :focus-mode="started"
     >
         <div v-if="!started" class="card py-8 px-5 space-y-4 max-w-2xl mx-auto">
             <div class="text-center space-y-2">
@@ -39,221 +40,366 @@
                 </ul>
             </div>
             <p v-if="exam.require_fullscreen" class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                This exam requires fullscreen after you start. Leaving fullscreen is recorded as a signal — not an automatic fail.
+                This exam requires fullscreen after you start. Leaving fullscreen is recorded as a signal — not an automatic fail. Extra monitors are not detected.
             </p>
             <div class="text-center pt-2">
-                <button type="button" class="btn-primary" :disabled="starting" @click="startExam">Start exam</button>
+                <button type="button" class="btn-primary min-h-12 px-8" :disabled="starting" @click="startExam">Start exam</button>
             </div>
         </div>
 
-        <form v-else @submit.prevent="requestSubmit" class="space-y-4 pb-20 lg:pb-4">
-            <div v-if="resumeBanner" class="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
-                Continuing your attempt — {{ timerLabel }} left · answers restored
-            </div>
-            <div
-                v-if="offline || saveStatus === 'failed'"
-                class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
-                role="status"
+        <div v-else class="exam-hall -mx-1">
+            <!-- Sticky top: title · timer · save -->
+            <header
+                class="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90"
+                :class="timerUrgent ? 'border-red-200' : ''"
             >
-                <span v-if="offline">You appear offline. Answers will retry when the connection returns.</span>
-                <span v-else>Answers could not be saved. Check your connection — Submit stays disabled until they save.</span>
-                <span v-if="lastSavedAt" class="block text-xs mt-1 opacity-80">Last saved: {{ lastSavedLabel }}</span>
-            </div>
-            <div
-                v-else-if="lastSavedAt && saveStatus === 'saved'"
-                class="text-xs text-emerald-700"
-            >
-                Last saved: {{ lastSavedLabel }}
-            </div>
-
-            <div
-                v-if="expiresAt"
-                class="sticky top-0 z-20 -mx-1 px-1 pt-1 space-y-2"
-            >
-                <div
-                    class="card flex flex-wrap justify-between items-center gap-2 text-sm shadow-sm"
-                    :class="timerUrgent ? 'border-red-300 bg-red-50' : ''"
-                >
-                    <span class="font-medium" :class="timerUrgent ? 'text-red-800' : ''">Time remaining</span>
-                    <span class="font-semibold tabular-nums text-lg" :class="timerUrgent ? 'text-red-600' : 'text-indigo-700'">
-                        {{ timerLabel }}
+                <div class="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2.5">
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-bold text-slate-900 truncate leading-tight">{{ exam.title }}</p>
+                        <p class="text-[11px] text-slate-500 truncate tabular-nums">
+                            {{ currentQuestion ? `Q ${currentQuestion.number} of ${questions.length}` : '' }}
+                            · {{ answeredCount }}/{{ questions.length }} answered
+                            <span v-if="markedForReview.size"> · {{ markedForReview.size }} review</span>
+                            <span class="text-slate-400"> · {{ student.reg_no || school.name }}</span>
+                        </p>
+                    </div>
+                    <SignOutButton class="hidden sm:inline-flex text-[11px] font-semibold text-slate-500 hover:text-red-700 shrink-0" />
+                    <div
+                        v-if="expiresAt"
+                        class="shrink-0 rounded-lg px-2.5 py-1.5 text-center min-w-[4.75rem]"
+                        :class="timerUrgent ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-900'"
+                        role="timer"
+                        :aria-label="`Time remaining ${timerLabel}`"
+                    >
+                        <span class="block text-[10px] font-semibold uppercase tracking-wide opacity-70">Time left</span>
+                        <span class="block text-lg font-extrabold tabular-nums leading-none">{{ timerLabel }}</span>
+                    </div>
+                    <span
+                        class="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border shrink-0"
+                        :class="syncPillClass"
+                        role="status"
+                        aria-live="polite"
+                    >
+                        <span class="h-1.5 w-1.5 rounded-full" :class="syncDotClass" aria-hidden="true" />
+                        {{ syncPillText }}
+                    </span>
+                    <span
+                        class="sm:hidden inline-flex items-center justify-center h-8 w-8 rounded-full border shrink-0"
+                        :class="syncPillClass"
+                        role="status"
+                        :aria-label="syncPillText"
+                        :title="syncPillText"
+                    >
+                        <span class="h-2 w-2 rounded-full" :class="syncDotClass" aria-hidden="true" />
                     </span>
                 </div>
-                <div v-if="timerUrgent" class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+
+                <div v-if="resumeBanner" class="px-3 py-1.5 text-xs text-sky-900 bg-sky-50 border-t border-sky-100">
+                    Continuing your attempt — answers restored
+                </div>
+                <div
+                    v-if="offline || saveStatus === 'failed'"
+                    class="px-3 py-2 text-sm text-amber-900 bg-amber-50 border-t border-amber-200"
+                    role="status"
+                >
+                    <span v-if="offline">You appear offline. Answers will retry when the connection returns.</span>
+                    <span v-else>Answers could not be saved. Check your connection — Submit stays disabled until they save.</span>
+                    <span v-if="lastSavedAt" class="block text-xs mt-0.5 opacity-80">Last saved: {{ lastSavedLabel }}</span>
+                </div>
+                <div v-if="timerUrgent" class="px-3 py-1.5 text-xs text-red-800 bg-red-50 border-t border-red-100">
                     Less than 5 minutes left. Your exam will submit automatically when the timer reaches zero.
                 </div>
-                <div v-if="proctorWarningVisible" class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 flex justify-between gap-2 items-start">
+                <div v-if="proctorWarningVisible" class="px-3 py-2 text-sm text-amber-800 bg-amber-50 border-t border-amber-200 flex justify-between gap-2 items-start">
                     <span>{{ proctorMessage }}</span>
                     <button type="button" class="text-xs font-semibold underline shrink-0" @click="proctorWarningVisible = false">Dismiss</button>
                 </div>
-                <div v-if="!fullscreenActive && !exam.require_fullscreen && !fullscreenDismissed" class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 flex flex-wrap justify-between gap-2 items-center">
-                    <span>Optional: use fullscreen for fewer distractions. Leaving fullscreen is recorded as a signal — not an automatic fail.</span>
+                <div
+                    v-if="!fullscreenActive && !exam.require_fullscreen && !fullscreenDismissed"
+                    class="px-3 py-2 text-xs text-slate-700 bg-slate-50 border-t border-slate-200 flex flex-wrap justify-between gap-2 items-center"
+                >
+                    <span>Optional fullscreen reduces distractions. Leaving it is recorded as a signal — not an automatic fail.</span>
                     <div class="flex gap-2 shrink-0">
-                        <button type="button" class="btn-secondary text-xs" @click="enterFullscreen">Enter fullscreen</button>
+                        <button type="button" class="btn-secondary text-xs min-h-9 !py-1.5" @click="enterFullscreen">Enter fullscreen</button>
                         <button type="button" class="text-xs font-semibold text-slate-500 underline" @click="fullscreenDismissed = true">Not now</button>
                     </div>
                 </div>
-                <div class="flex flex-wrap items-center gap-2 text-xs">
-                    <span class="text-slate-500">Text size</span>
-                    <button type="button" class="btn-secondary !px-2 !py-1 text-xs" @click="changeFont(-1)" aria-label="Decrease text size">A−</button>
-                    <button type="button" class="btn-secondary !px-2 !py-1 text-xs" @click="changeFont(1)" aria-label="Increase text size">A+</button>
-                </div>
-            </div>
+            </header>
 
-            <div class="lg:grid lg:grid-cols-[12rem_minmax(0,1fr)] lg:gap-4 lg:items-start">
-                <aside class="hidden lg:block card lg:sticky lg:top-28 space-y-3">
-                    <QuestionNavGrid
-                        :questions="questions"
-                        :answered-count="answeredCount"
-                        :nav-class="questionNavClass"
-                        @select="scrollToQuestion"
-                    />
-                </aside>
-
-                <div class="space-y-4 min-w-0" :style="{ fontSize: fontSizeRem + 'rem' }">
-                    <article
-                        v-for="q in questions"
-                        :key="q.id"
-                        :ref="el => setQuestionRef(q.id, el)"
-                        class="card space-y-3 scroll-mt-36"
-                    >
-                        <div class="flex flex-wrap items-start justify-between gap-2">
-                            <h2 class="font-semibold text-sm">Q{{ q.number }}. {{ q.title || 'Question' }}</h2>
-                            <button
-                                v-if="isAnswerable(q)"
-                                type="button"
-                                class="text-xs font-semibold px-2.5 py-1 rounded-md border transition shrink-0"
-                                :class="markedForReview.has(q.id)
-                                    ? 'border-amber-400 bg-amber-50 text-amber-900'
-                                    : 'border-gray-200 text-gray-600 hover:border-amber-300'"
-                                @click="toggleReview(q.id)"
-                            >
-                                {{ markedForReview.has(q.id) ? 'Marked for review' : 'Mark for review' }}
-                            </button>
+            <form @submit.prevent="requestSubmit" class="pb-28">
+                <div class="lg:grid lg:grid-cols-[11.5rem_minmax(0,1fr)] lg:gap-5 lg:items-start lg:pt-4">
+                    <aside class="hidden lg:block sticky top-[4.75rem] space-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                        <QuestionNavGrid
+                            :questions="questions"
+                            :answered-count="answeredCount"
+                            :current-id="currentQuestion?.id"
+                            :nav-class="questionNavClass"
+                            :nav-label="questionNavLabel"
+                            @select="goToQuestionId"
+                        />
+                        <div class="flex items-center gap-2 pt-2 border-t border-slate-100">
+                            <span class="text-[11px] text-slate-500">Text</span>
+                            <button type="button" class="btn-secondary !px-2.5 !py-1.5 text-xs min-h-9" @click="changeFont(-1)" aria-label="Decrease text size">A−</button>
+                            <button type="button" class="btn-secondary !px-2.5 !py-1.5 text-xs min-h-9" @click="changeFont(1)" aria-label="Increase text size">A+</button>
                         </div>
-                        <p class="text-xs font-medium text-slate-500">
-                            {{ q.marks }} mark{{ q.marks === 1 ? '' : 's' }}
-                            <span v-if="q.negative_mark > 0"> · −{{ q.negative_mark }} for a wrong answer</span>
-                            <span v-if="q.type === 'multiple' && q.choose_count"> · Choose {{ q.choose_count }}</span>
-                            <span v-else-if="q.type === 'multiple'"> · Select all that apply</span>
-                            <span v-else-if="q.type === 'numeric'"> · Enter a number</span>
-                            <span v-else-if="q.type === 'true_false'"> · True or false</span>
-                        </p>
-                        <McqRichText v-if="q.body_text" :text="q.body_text" tag="p" class="text-gray-700" />
                         <button
-                            v-if="q.image_url"
-                            type="button"
-                            class="block max-w-full text-left"
-                            @click="zoomSrc = q.image_url"
+                            type="submit"
+                            class="btn-secondary w-full min-h-11 text-sm"
+                            :disabled="submitting || submitBlocked"
                         >
-                            <img :src="q.image_url" :alt="`Question ${q.number} image — click to enlarge`" class="max-h-80 max-w-full rounded-lg border bg-white object-contain cursor-zoom-in">
+                            {{ submitting ? 'Submitting…' : (submitBlocked ? 'Wait until answers are saved' : 'Review & submit') }}
                         </button>
+                    </aside>
 
-                        <!-- Numeric -->
-                        <div v-if="q.type === 'numeric'" class="max-w-xs">
-                            <label :for="`num-${q.id}`" class="sr-only">Numeric answer for question {{ q.number }}</label>
-                            <input
-                                :id="`num-${q.id}`"
-                                type="text"
-                                inputmode="decimal"
-                                autocomplete="off"
-                                class="field"
-                                placeholder="e.g. 12.5"
-                                :value="answers[q.id] ?? ''"
-                                @input="onNumericInput(q.id, $event.target.value)"
-                            >
-                        </div>
-
-                        <!-- Multiple correct -->
-                        <div v-else-if="q.type === 'multiple' && q.options?.length" class="grid gap-2" :class="q.options.some(o => o.image_url) ? 'sm:grid-cols-2' : ''" role="group">
-                            <label
-                                v-for="opt in q.options"
-                                :key="opt.key"
-                                class="flex items-start gap-2 text-sm border rounded-lg px-3 py-2 cursor-pointer hover:bg-indigo-50"
-                                :class="isMultiSelected(q.id, opt.key) ? 'border-indigo-400 bg-indigo-50/70' : ''"
-                            >
-                                <input
-                                    type="checkbox"
-                                    :aria-label="`Question ${q.number}, option ${(opt.display_key || opt.key).toUpperCase()}`"
-                                    :checked="isMultiSelected(q.id, opt.key)"
-                                    class="mt-1"
-                                    @change="toggleMulti(q.id, opt.key)"
+                    <div v-if="currentQuestion" class="min-w-0 px-1 pt-4 lg:pt-0" :style="{ fontSize: fontSizeRem + 'rem' }">
+                        <article class="space-y-4" :aria-labelledby="qHeadingId">
+                            <div class="flex flex-wrap items-start justify-between gap-2">
+                                <div class="min-w-0">
+                                    <h2 :id="qHeadingId" ref="qHeadingRef" tabindex="-1" class="font-bold text-base text-slate-900 outline-none">
+                                        Question {{ currentQuestion.number }}
+                                        <span class="font-medium text-slate-400">of {{ questions.length }}</span>
+                                    </h2>
+                                    <p class="text-xs font-medium text-slate-500 mt-1">
+                                        {{ currentQuestion.marks }} mark{{ currentQuestion.marks === 1 ? '' : 's' }}
+                                        <span v-if="currentQuestion.negative_mark > 0"> · −{{ currentQuestion.negative_mark }} for a wrong answer</span>
+                                        <span v-if="currentQuestion.type === 'multiple' && currentQuestion.choose_count"> · Choose {{ currentQuestion.choose_count }}</span>
+                                        <span v-else-if="currentQuestion.type === 'multiple'"> · Select all that apply</span>
+                                        <span v-else-if="currentQuestion.type === 'numeric'"> · Enter a number</span>
+                                        <span v-else-if="currentQuestion.type === 'true_false'"> · True or false</span>
+                                    </p>
+                                </div>
+                                <button
+                                    v-if="isAnswerable(currentQuestion)"
+                                    type="button"
+                                    class="text-xs font-semibold px-3 py-2 min-h-10 rounded-lg border transition shrink-0"
+                                    :class="markedForReview.has(currentQuestion.id)
+                                        ? 'border-amber-400 bg-amber-50 text-amber-900'
+                                        : 'border-slate-200 text-slate-600 hover:border-amber-300'"
+                                    :aria-pressed="markedForReview.has(currentQuestion.id)"
+                                    @click="toggleReview(currentQuestion.id)"
                                 >
-                                <span class="min-w-0 space-y-1.5">
-                                    <span class="flex gap-1"><strong class="uppercase">{{ opt.display_key || opt.key }}.</strong> <McqRichText :text="opt.label" /></span>
-                                    <img
-                                        v-if="opt.image_url"
-                                        :src="opt.image_url"
-                                        :alt="`Option ${(opt.display_key || opt.key).toUpperCase()} — click to enlarge`"
-                                        class="block max-h-40 max-w-full rounded border bg-white object-contain cursor-zoom-in"
-                                        @click.prevent="zoomSrc = opt.image_url"
-                                    >
-                                </span>
-                            </label>
-                        </div>
+                                    {{ markedForReview.has(currentQuestion.id) ? 'Marked for review' : 'Mark for review' }}
+                                </button>
+                            </div>
 
-                        <!-- Single / true-false -->
-                        <div v-else-if="q.options?.length" class="grid gap-2" :class="q.options.some(o => o.image_url) ? 'sm:grid-cols-2' : ''" role="radiogroup">
-                            <label
-                                v-for="opt in q.options"
-                                :key="opt.key"
-                                class="flex items-start gap-2 text-sm border rounded-lg px-3 py-2 cursor-pointer hover:bg-indigo-50"
-                                :class="answers[q.id] === opt.key ? 'border-indigo-400 bg-indigo-50/70' : ''"
+                            <McqRichText v-if="currentQuestion.body_text" :text="currentQuestion.body_text" tag="p" class="text-slate-800 leading-relaxed" />
+                            <button
+                                v-if="currentQuestion.image_url"
+                                type="button"
+                                class="block max-w-full text-left"
+                                @click="zoomSrc = currentQuestion.image_url"
                             >
-                                <input
-                                    type="radio"
-                                    :name="`q-${q.id}`"
-                                    :aria-label="`Question ${q.number}, option ${(opt.display_key || opt.key).toUpperCase()}: ${opt.label || 'Image option'}`"
-                                    :value="opt.key"
-                                    v-model="answers[q.id]"
-                                    class="mt-1"
-                                    @change="scheduleSave"
+                                <img
+                                    :src="currentQuestion.image_url"
+                                    :alt="`Question ${currentQuestion.number} image — click to enlarge`"
+                                    class="max-h-80 max-w-full rounded-lg border bg-white object-contain cursor-zoom-in"
                                 >
-                                <span class="min-w-0 space-y-1.5">
-                                    <span class="flex gap-1"><strong class="uppercase">{{ opt.display_key || opt.key }}.</strong> <McqRichText :text="opt.label" /></span>
-                                    <img
-                                        v-if="opt.image_url"
-                                        :src="opt.image_url"
-                                        :alt="`Option ${(opt.display_key || opt.key).toUpperCase()} — click to enlarge`"
-                                        class="block max-h-40 max-w-full rounded border bg-white object-contain cursor-zoom-in"
-                                        @click.prevent="zoomSrc = opt.image_url"
-                                    >
-                                </span>
-                            </label>
-                        </div>
-                        <p v-else class="text-xs text-gray-400">Reference material — no online answer required.</p>
-                    </article>
+                            </button>
 
-                    <div class="flex flex-wrap justify-between items-center gap-3 pb-4">
-                        <p class="text-xs text-gray-500">
-                            {{ answeredCount }} of {{ questions.length }} answered
-                            <span v-if="markedForReview.size"> · {{ markedForReview.size }} marked for review</span>
-                            <span v-if="saveStatus === 'saving'" class="text-gray-400"> · Saving…</span>
-                            <span v-else-if="saveStatus === 'saved'" class="text-emerald-600"> · Saved</span>
-                        </p>
-                        <button type="submit" class="btn-primary" :disabled="submitting || submitBlocked">
-                            {{ submitting ? 'Submitting…' : (submitBlocked ? 'Wait until answers are saved' : 'Submit exam') }}
-                        </button>
+                            <!-- Numeric -->
+                            <div v-if="currentQuestion.type === 'numeric'" class="max-w-sm space-y-1.5">
+                                <label :for="`num-${currentQuestion.id}`" class="text-xs font-semibold text-slate-600">Type your answer (a number)</label>
+                                <div class="flex gap-2 items-stretch">
+                                    <button
+                                        type="button"
+                                        class="btn-secondary !px-3 min-h-14 shrink-0"
+                                        aria-label="Switch between positive and negative"
+                                        @click="flipNumericSign(currentQuestion.id)"
+                                    >±</button>
+                                    <input
+                                        :id="`num-${currentQuestion.id}`"
+                                        type="text"
+                                        inputmode="decimal"
+                                        autocomplete="off"
+                                        spellcheck="false"
+                                        class="field min-h-14 text-lg tabular-nums"
+                                        placeholder="e.g. 12.5"
+                                        :value="answers[currentQuestion.id] ?? ''"
+                                        @input="onNumericInput(currentQuestion.id, $event.target.value)"
+                                    >
+                                </div>
+                                <p v-if="answers[currentQuestion.id] && !isNumericValid(answers[currentQuestion.id])" class="text-xs text-amber-700" role="status">
+                                    Enter a number such as 42, -3 or 0.75.
+                                </p>
+                            </div>
+
+                            <!-- Multiple correct -->
+                            <div
+                                v-else-if="currentQuestion.type === 'multiple' && currentQuestion.options?.length"
+                                class="grid gap-3"
+                                :class="currentQuestion.options.some(o => o.image_url) ? 'sm:grid-cols-2' : ''"
+                                role="group"
+                            >
+                                <label
+                                    v-for="opt in currentQuestion.options"
+                                    :key="opt.key"
+                                    class="flex items-start gap-3 text-sm border-2 rounded-xl px-4 py-3.5 min-h-14 cursor-pointer transition hover:border-indigo-300"
+                                    :class="isMultiSelected(currentQuestion.id, opt.key) ? 'border-indigo-500 bg-indigo-50/80' : 'border-slate-200 bg-white'"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        :aria-label="`Question ${currentQuestion.number}, option ${(opt.display_key || opt.key).toUpperCase()}`"
+                                        :checked="isMultiSelected(currentQuestion.id, opt.key)"
+                                        class="mt-1 h-4 w-4"
+                                        @change="toggleMulti(currentQuestion.id, opt.key)"
+                                    >
+                                    <span class="min-w-0 space-y-1.5">
+                                        <span class="flex gap-1.5"><strong class="uppercase shrink-0">{{ opt.display_key || opt.key }}.</strong> <McqRichText :text="opt.label" /></span>
+                                        <img
+                                            v-if="opt.image_url"
+                                            :src="opt.image_url"
+                                            :alt="`Option ${(opt.display_key || opt.key).toUpperCase()} — click to enlarge`"
+                                            class="block max-h-40 max-w-full rounded border bg-white object-contain cursor-zoom-in"
+                                            @click.prevent="zoomSrc = opt.image_url"
+                                        >
+                                    </span>
+                                </label>
+                            </div>
+
+                            <!-- True / false -->
+                            <div
+                                v-else-if="currentQuestion.type === 'true_false' && currentQuestion.options?.length"
+                                class="grid grid-cols-2 gap-3"
+                                role="radiogroup"
+                                :aria-label="`Question ${currentQuestion.number} true or false`"
+                            >
+                                <label
+                                    v-for="opt in trueFalseOptions(currentQuestion)"
+                                    :key="opt.key"
+                                    class="flex items-center justify-center gap-2 text-base font-bold border-2 rounded-xl px-4 py-4 min-h-[4.5rem] cursor-pointer transition"
+                                    :class="answers[currentQuestion.id] === opt.key ? 'border-indigo-500 bg-indigo-50 text-indigo-900' : 'border-slate-200 text-slate-800 bg-white hover:border-indigo-300'"
+                                >
+                                    <input
+                                        type="radio"
+                                        class="sr-only"
+                                        :name="`q-${currentQuestion.id}`"
+                                        :value="opt.key"
+                                        v-model="answers[currentQuestion.id]"
+                                        @change="scheduleSave"
+                                    >
+                                    {{ opt.text }}
+                                </label>
+                            </div>
+
+                            <!-- Single choice -->
+                            <div
+                                v-else-if="currentQuestion.options?.length"
+                                class="grid gap-3"
+                                :class="currentQuestion.options.some(o => o.image_url) ? 'sm:grid-cols-2' : ''"
+                                role="radiogroup"
+                            >
+                                <label
+                                    v-for="opt in currentQuestion.options"
+                                    :key="opt.key"
+                                    class="flex items-start gap-3 text-sm border-2 rounded-xl px-4 py-3.5 min-h-14 cursor-pointer transition hover:border-indigo-300"
+                                    :class="answers[currentQuestion.id] === opt.key ? 'border-indigo-500 bg-indigo-50/80' : 'border-slate-200 bg-white'"
+                                >
+                                    <input
+                                        type="radio"
+                                        :name="`q-${currentQuestion.id}`"
+                                        :aria-label="`Question ${currentQuestion.number}, option ${(opt.display_key || opt.key).toUpperCase()}: ${opt.label || 'Image option'}`"
+                                        :value="opt.key"
+                                        v-model="answers[currentQuestion.id]"
+                                        class="mt-1 h-4 w-4"
+                                        @change="scheduleSave"
+                                    >
+                                    <span class="min-w-0 space-y-1.5">
+                                        <span class="flex gap-1.5"><strong class="uppercase shrink-0">{{ opt.display_key || opt.key }}.</strong> <McqRichText :text="opt.label" /></span>
+                                        <img
+                                            v-if="opt.image_url"
+                                            :src="opt.image_url"
+                                            :alt="`Option ${(opt.display_key || opt.key).toUpperCase()} — click to enlarge`"
+                                            class="block max-h-40 max-w-full rounded border bg-white object-contain cursor-zoom-in"
+                                            @click.prevent="zoomSrc = opt.image_url"
+                                        >
+                                    </span>
+                                </label>
+                            </div>
+                            <p v-else class="text-xs text-slate-400">Reference material — no online answer required.</p>
+
+                            <div v-if="isAnswerable(currentQuestion) && hasAnswer(currentQuestion.id)" class="pt-1">
+                                <button type="button" class="text-xs font-semibold text-slate-500 underline min-h-9" @click="clearAnswer(currentQuestion.id)">
+                                    Clear answer
+                                </button>
+                            </div>
+                        </article>
                     </div>
                 </div>
-            </div>
-        </form>
+            </form>
 
-        <div v-if="started" class="lg:hidden fixed bottom-0 inset-x-0 z-30 border-t border-gray-200 bg-white/95 backdrop-blur px-4 py-3">
-            <button type="button" class="btn-primary w-full text-sm" @click="mobileDrawerOpen = true">
-                Questions ({{ answeredCount }}/{{ questions.length }})
-            </button>
+            <!-- Bottom nav: Prev · palette · Next / Submit -->
+            <nav
+                class="fixed bottom-0 inset-x-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur px-3 py-2.5 pb-[max(0.65rem,env(safe-area-inset-bottom))]"
+                aria-label="Question navigation"
+            >
+                <div class="max-w-6xl mx-auto grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
+                    <button
+                        type="button"
+                        class="btn-secondary min-h-12 text-sm justify-self-start"
+                        :disabled="currentIndex <= 0"
+                        @click="go(currentIndex - 1)"
+                    >
+                        ← Prev
+                    </button>
+                    <button
+                        type="button"
+                        class="min-h-12 px-4 rounded-lg border border-slate-200 bg-slate-50 text-sm font-bold tabular-nums text-slate-800 lg:pointer-events-none"
+                        :class="{'hover:bg-slate-100': true}"
+                        @click="mobileDrawerOpen = true"
+                        :aria-label="`Question ${currentIndex + 1} of ${questions.length}. Open question list`"
+                    >
+                        {{ currentIndex + 1 }}/{{ questions.length }}
+                    </button>
+                    <button
+                        v-if="currentIndex < questions.length - 1"
+                        type="button"
+                        class="btn-primary min-h-12 text-sm justify-self-end"
+                        @click="go(currentIndex + 1)"
+                    >
+                        Next →
+                    </button>
+                    <button
+                        v-else
+                        type="button"
+                        class="btn-primary min-h-12 text-sm justify-self-end"
+                        :disabled="submitting || submitBlocked"
+                        @click="requestSubmit"
+                    >
+                        {{ submitting ? 'Submitting…' : (submitBlocked ? 'Wait to save' : 'Submit') }}
+                    </button>
+                </div>
+            </nav>
         </div>
 
         <div v-if="mobileDrawerOpen" class="lg:hidden fixed inset-0 z-40" @click.self="mobileDrawerOpen = false">
             <div class="absolute inset-0 bg-black/40" @click="mobileDrawerOpen = false" />
-            <div class="absolute inset-x-0 bottom-0 max-h-[70vh] rounded-t-2xl bg-white shadow-xl flex flex-col">
+            <div class="absolute inset-x-0 bottom-0 max-h-[75vh] rounded-t-2xl bg-white shadow-xl flex flex-col pb-[env(safe-area-inset-bottom)]">
                 <div class="flex items-center justify-between gap-2 px-4 py-3 border-b">
                     <h2 class="font-semibold text-sm">Question navigator</h2>
-                    <button type="button" class="text-xs font-semibold text-gray-500 px-2 py-1" @click="mobileDrawerOpen = false">Close</button>
+                    <button type="button" class="text-xs font-semibold text-slate-500 px-2 py-2 min-h-10" @click="mobileDrawerOpen = false">Close</button>
                 </div>
-                <div class="overflow-y-auto p-4">
-                    <QuestionNavGrid :questions="questions" :answered-count="answeredCount" :nav-class="questionNavClass" @select="selectFromDrawer" />
+                <div class="overflow-y-auto p-4 space-y-4">
+                    <QuestionNavGrid
+                        :questions="questions"
+                        :answered-count="answeredCount"
+                        :current-id="currentQuestion?.id"
+                        :nav-class="questionNavClass"
+                        :nav-label="questionNavLabel"
+                        @select="selectFromDrawer"
+                    />
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-slate-500">Text size</span>
+                        <button type="button" class="btn-secondary !px-2.5 !py-1.5 text-xs min-h-9" @click="changeFont(-1)" aria-label="Decrease text size">A−</button>
+                        <button type="button" class="btn-secondary !px-2.5 !py-1.5 text-xs min-h-9" @click="changeFont(1)" aria-label="Increase text size">A+</button>
+                    </div>
+                    <button
+                        type="button"
+                        class="btn-secondary w-full min-h-12"
+                        :disabled="submitting || submitBlocked"
+                        @click="mobileDrawerOpen = false; requestSubmit()"
+                    >
+                        {{ submitting ? 'Submitting…' : (submitBlocked ? 'Wait until answers are saved' : 'Review & submit') }}
+                    </button>
+                    <SignOutButton class="w-full justify-center text-xs font-semibold text-slate-500" />
                 </div>
             </div>
         </div>
@@ -270,7 +416,7 @@
                 <p class="text-sm text-slate-600">
                     This exam asks you to stay in fullscreen while writing. Leaving fullscreen is recorded for review — not an automatic fail. Extra monitors are not detected.
                 </p>
-                <button type="button" class="btn-primary" @click="enterFullscreen">Enter fullscreen to continue</button>
+                <button type="button" class="btn-primary min-h-12" @click="enterFullscreen">Enter fullscreen to continue</button>
             </div>
         </div>
 
@@ -284,7 +430,7 @@
             @keydown.esc="zoomSrc = null"
         >
             <img :src="zoomSrc" alt="Enlarged picture" class="max-h-[85vh] max-w-full object-contain" @click.stop>
-            <button type="button" class="btn-secondary text-sm" @click.stop="zoomSrc = null">Close</button>
+            <button type="button" class="btn-secondary text-sm min-h-10" @click.stop="zoomSrc = null">Close</button>
         </div>
 
         <div v-if="confirmOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" @click.self="confirmOpen = false">
@@ -305,8 +451,8 @@
                     Once submitted, you cannot change your answers.
                 </p>
                 <div class="flex flex-wrap justify-end gap-2">
-                    <button ref="confirmCancelRef" type="button" class="btn-secondary text-sm" @click="confirmOpen = false">Cancel</button>
-                    <button type="button" class="btn-primary text-sm" :disabled="submitting || submitBlocked" @click="submit">
+                    <button ref="confirmCancelRef" type="button" class="btn-secondary text-sm min-h-10" @click="confirmOpen = false">Cancel</button>
+                    <button type="button" class="btn-primary text-sm min-h-10" :disabled="submitting || submitBlocked" @click="submit">
                         {{ submitting ? 'Submitting…' : 'Submit now' }}
                     </button>
                 </div>
@@ -317,6 +463,7 @@
 
 <script setup>
 import McqRichText from '@/Components/mcq/McqRichText.vue';
+import SignOutButton from '@/Components/SignOutButton.vue';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import QuestionNavGrid from '@/Components/portal/QuestionNavGrid.vue';
 import { studentPortalNavItems } from '@/support/studentPortalNav.js';
@@ -328,6 +475,7 @@ const FONT_KEY = 'mcq:portal-font';
 const FONT_MIN = 0.875;
 const FONT_MAX = 1.5;
 const FONT_STEP = 0.125;
+const NUMERIC_RE = /^-?(?:\d+(?:\.\d*)?|\.\d+)$/;
 
 const props = defineProps({
     school: Object,
@@ -352,7 +500,6 @@ const saveStatus = ref('');
 const lastSavedAt = ref(null);
 const offline = ref(typeof navigator !== 'undefined' ? !navigator.onLine : false);
 const remainingSeconds = ref(props.expiresAt ? Math.max(0, Math.ceil((new Date(props.expiresAt).getTime() - Date.now()) / 1000)) : 0);
-const questionRefs = ref({});
 const proctorWarningVisible = ref(false);
 const proctorEventCount = ref(0);
 const resumeBanner = ref(false);
@@ -364,6 +511,9 @@ const zoomSrc = ref(null);
 const fontSizeRem = ref(1);
 const sysCheckRunning = ref(false);
 const sysCheckResult = ref(null);
+const qHeadingRef = ref(null);
+const qHeadingId = 'mcq-q-heading';
+const currentIndex = ref(0);
 let timerId = null;
 let autoSubmitRequested = false;
 let saveTimerId = null;
@@ -371,6 +521,9 @@ let lastProctorEventAt = 0;
 let dirtySinceSave = false;
 const PROCTOR_EVENT_THROTTLE_MS = 2000;
 
+const posKey = computed(() => `mcq:pos:${props.school.id}:${props.registration.id}`);
+
+const currentQuestion = computed(() => props.questions[currentIndex.value] ?? null);
 const totalMarks = computed(() => props.questions.reduce((total, q) => total + Number(q.marks || 0), 0));
 const gradableCount = computed(() => props.questions.filter(isAnswerable).length);
 const navItems = computed(() => studentPortalNavItems(props.school.id));
@@ -385,7 +538,7 @@ const timerLabel = computed(() => {
     const s = remainingSeconds.value % 60;
     return `${m}:${String(s).padStart(2, '0')}`;
 });
-const timerUrgent = computed(() => props.started && remainingSeconds.value > 0 && remainingSeconds.value <= 300);
+const timerUrgent = computed(() => props.started && props.expiresAt && remainingSeconds.value > 0 && remainingSeconds.value <= 300);
 const lastSavedLabel = computed(() => {
     if (!lastSavedAt.value) return '';
     try {
@@ -395,6 +548,27 @@ const lastSavedLabel = computed(() => {
     }
 });
 const submitBlocked = computed(() => dirtySinceSave && (saveStatus.value === 'failed' || saveStatus.value === 'saving' || offline.value));
+const syncPillText = computed(() => {
+    if (offline.value) return 'Offline — will retry';
+    if (saveStatus.value === 'saving') return 'Saving…';
+    if (saveStatus.value === 'failed') return 'Save failed — retrying';
+    if (saveStatus.value === 'saved') {
+        return lastSavedLabel.value ? `Saved · ${lastSavedLabel.value}` : 'Saved';
+    }
+    return 'Answers autosave';
+});
+const syncPillClass = computed(() => {
+    if (offline.value || saveStatus.value === 'failed') return 'border-amber-300 bg-amber-50 text-amber-900';
+    if (saveStatus.value === 'saved') return 'border-emerald-300 bg-emerald-50 text-emerald-800';
+    if (saveStatus.value === 'saving') return 'border-slate-200 bg-slate-50 text-slate-700';
+    return 'border-slate-200 bg-white text-slate-600';
+});
+const syncDotClass = computed(() => {
+    if (offline.value || saveStatus.value === 'failed') return 'bg-amber-500';
+    if (saveStatus.value === 'saved') return 'bg-emerald-500';
+    if (saveStatus.value === 'saving') return 'bg-slate-400 animate-pulse';
+    return 'bg-slate-300';
+});
 const proctorMessage = computed(() => {
     if (proctorEventCount.value <= 1) {
         return 'Leaving this tab during the exam is being recorded for review — not an automatic fail.';
@@ -411,7 +585,24 @@ function isAnswerable(q) {
 function hasAnswer(id) {
     const v = answers[id];
     if (Array.isArray(v)) return v.length > 0;
-    return v != null && String(v).trim() !== '';
+    if (v == null || String(v).trim() === '') return false;
+    const q = props.questions.find((item) => item.id === id);
+    if (q?.type === 'numeric') return isNumericValid(v);
+    return true;
+}
+
+function isNumericValid(raw) {
+    return NUMERIC_RE.test(String(raw ?? '').trim());
+}
+
+function trueFalseOptions(q) {
+    const opts = q.options || [];
+    const a = opts.find((o) => o.key === 'a') || opts[0];
+    const b = opts.find((o) => o.key === 'b') || opts[1];
+    return [
+        { key: a?.key ?? 'a', text: (a?.label || '').trim() || 'True' },
+        { key: b?.key ?? 'b', text: (b?.label || '').trim() || 'False' },
+    ];
 }
 
 function isMultiSelected(qid, key) {
@@ -428,8 +619,30 @@ function toggleMulti(qid, key) {
     scheduleSave();
 }
 
+function clearAnswer(qid) {
+    const q = props.questions.find((item) => item.id === qid);
+    if (q?.type === 'multiple') answers[qid] = [];
+    else answers[qid] = '';
+    scheduleSave();
+}
+
+function sanitiseNumeric(raw) {
+    let t = String(raw ?? '').replace(/[^\d.\-]/g, '');
+    const neg = t.startsWith('-');
+    t = t.replace(/-/g, '');
+    const parts = t.split('.');
+    if (parts.length > 2) t = `${parts[0]}.${parts.slice(1).join('')}`;
+    return (neg ? '-' : '') + t;
+}
+
 function onNumericInput(qid, raw) {
-    answers[qid] = String(raw ?? '');
+    answers[qid] = sanitiseNumeric(raw);
+    scheduleSave();
+}
+
+function flipNumericSign(qid) {
+    const t = String(answers[qid] ?? '');
+    answers[qid] = t.startsWith('-') ? t.slice(1) : `-${t}`;
     scheduleSave();
 }
 
@@ -453,18 +666,70 @@ function restoreSavedAnswers() {
 function questionNavClass(q) {
     if (markedForReview.value.has(q.id)) return 'border-amber-400 bg-amber-100 text-amber-900';
     if (hasAnswer(q.id)) return 'border-indigo-400 bg-indigo-100 text-indigo-900';
-    return 'border-gray-200 bg-white text-gray-700 hover:border-indigo-300';
+    return 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300';
 }
 
-function setQuestionRef(id, el) {
-    if (el) questionRefs.value[id] = el;
+function questionNavLabel(q) {
+    const parts = [`Question ${q.number}`];
+    if (markedForReview.value.has(q.id)) parts.push('marked for review');
+    else if (hasAnswer(q.id)) parts.push('answered');
+    else parts.push('not answered');
+    return parts.join(', ');
 }
-function scrollToQuestion(id) {
-    questionRefs.value[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+function readPos() {
+    try {
+        const n = Number(sessionStorage.getItem(posKey.value));
+        return Number.isInteger(n) && n >= 0 && n < props.questions.length ? n : 0;
+    } catch {
+        return 0;
+    }
 }
+
+function persistPos(i) {
+    try {
+        sessionStorage.setItem(posKey.value, String(i));
+    } catch {
+        /* optional */
+    }
+}
+
+function go(i) {
+    if (i < 0 || i >= props.questions.length) return;
+    currentIndex.value = i;
+}
+
+function goToQuestionId(id) {
+    const i = props.questions.findIndex((q) => q.id === id);
+    if (i >= 0) go(i);
+}
+
 function selectFromDrawer(id) {
     mobileDrawerOpen.value = false;
-    scrollToQuestion(id);
+    goToQuestionId(id);
+}
+
+watch(currentIndex, async (i) => {
+    persistPos(i);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    await nextTick();
+    qHeadingRef.value?.focus?.({ preventScroll: true });
+});
+
+function onExamKeydown(e) {
+    if (!props.started || confirmOpen.value || mobileDrawerOpen.value || zoomSrc.value) return;
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    const t = e.target;
+    const tag = t?.tagName;
+    if (tag === 'TEXTAREA') return;
+    if (tag === 'INPUT' && t.type !== 'radio' && t.type !== 'checkbox') return;
+    if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+        go(currentIndex.value + 1);
+        e.preventDefault();
+    } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        go(currentIndex.value - 1);
+        e.preventDefault();
+    }
 }
 
 function toggleReview(questionId) {
@@ -602,7 +867,6 @@ async function enterFullscreen() {
         fullscreenActive.value = true;
         fullscreenDismissed.value = true;
     } catch {
-        // Soft mode can dismiss; hard require keeps the blocking overlay.
         if (! props.exam?.require_fullscreen) {
             fullscreenDismissed.value = true;
         }
@@ -645,7 +909,10 @@ function submit() {
     }, {
         preserveScroll: true,
         onSuccess: () => {
-            try { sessionStorage.removeItem(`mcq-review-${props.school.id}-${props.registration.id}`); } catch { /* */ }
+            try {
+                sessionStorage.removeItem(`mcq-review-${props.school.id}-${props.registration.id}`);
+                sessionStorage.removeItem(posKey.value);
+            } catch { /* */ }
         },
         onFinish: () => { submitting.value = false; },
     });
@@ -656,6 +923,11 @@ watch(() => props.expiresAt, tickTimer);
 
 onMounted(() => {
     restoreSavedAnswers();
+    currentIndex.value = readPos();
+    if (props.started && Object.keys(props.savedAnswers ?? {}).length) {
+        saveStatus.value = 'saved';
+        lastSavedAt.value = new Date().toISOString();
+    }
     if (props.started && props.registration?.started_at) {
         resumeBanner.value = true;
         window.setTimeout(() => { resumeBanner.value = false; }, 8000);
@@ -671,6 +943,7 @@ onMounted(() => {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('keydown', onExamKeydown);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     fullscreenActive.value = !!document.fullscreenElement;
     try {
@@ -689,6 +962,7 @@ onUnmounted(() => {
     window.removeEventListener('online', handleOnline);
     window.removeEventListener('offline', handleOffline);
     window.removeEventListener('beforeunload', handleBeforeUnload);
+    window.removeEventListener('keydown', onExamKeydown);
     document.removeEventListener('fullscreenchange', handleFullscreenChange);
 });
 </script>

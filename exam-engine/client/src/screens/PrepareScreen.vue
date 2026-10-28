@@ -54,7 +54,7 @@
 
             <form v-if="phase === 'waiting' || phase === 'open'" class="stack" style="text-align: left" @submit.prevent="start">
                 <label v-if="st.start_pin_required" class="field">
-                    <span>Start PIN</span>
+                    <span>Start PIN — from your invigilator</span>
                     <input
                         v-model.trim="pin"
                         class="input code"
@@ -63,11 +63,15 @@
                         maxlength="12"
                         :disabled="starting"
                         aria-describedby="pin-help"
+                        :aria-invalid="startError?.kind === 'bad' ? 'true' : undefined"
                     />
+                    <small id="pin-help" class="help">
+                        Told by the invigilator at the venue when the exam starts — not your hall-ticket passcode or portal password.
+                    </small>
                 </label>
-                <small id="pin-help" class="help">
-                    Start PIN is told by the invigilator at the venue when the exam starts — not your hall-ticket passcode or portal password.
-                </small>
+                <p v-else class="help" style="margin: 0">
+                    No Start PIN for this exam — tap Start when the waiting room opens.
+                </p>
                 <div v-if="startError" class="notice" :class="startError.kind" role="alert">
                     {{ startError.text }}<span v-if="retryIn > 0"> ({{ retryIn }} s)</span>
                 </div>

@@ -632,6 +632,14 @@ p {
     text-overflow: ellipsis;
 }
 
+.topbar .sync-pill {
+    flex: none;
+    max-width: 11rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .timer {
     font-variant-numeric: tabular-nums;
     font-weight: 800;
