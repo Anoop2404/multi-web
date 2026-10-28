@@ -18,7 +18,7 @@
                     </div>
                     <div v-else class="shrink-0 relative">
                         <div class="h-11 w-11 rounded-2xl bg-gradient-to-br from-[#0f3d7a] to-[#1e5aa8] text-white flex items-center justify-center text-xs font-extrabold shadow-md ring-2 ring-[#0f3d7a]/30">
-                            TP
+                            {{ initials }}
                         </div>
                         <span class="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-[#041525]" />
                     </div>
@@ -26,7 +26,7 @@
                         <span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-white/10 text-amber-400">
                             {{ roleLabel }}
                         </span>
-                        <h2 class="text-sm font-bold text-white truncate mt-0.5 leading-tight">{{ headerTitle || 'Teacher Portal' }}</h2>
+                        <h2 class="text-sm font-bold text-white truncate mt-0.5 leading-tight">{{ brandTitle }}</h2>
                         <p v-if="subtitle" class="text-xs text-slate-400 truncate mt-0.5" :title="subtitle">{{ subtitle }}</p>
                     </div>
                 </div>
@@ -58,7 +58,7 @@
             <header class="lg:hidden sticky top-0 z-40 bg-[#041525] text-white border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-md">
                 <div class="flex items-center gap-3 min-w-0">
                     <div class="h-9 w-9 rounded-xl bg-gradient-to-br from-[#0f3d7a] to-[#1e5aa8] text-white flex items-center justify-center font-bold text-xs shrink-0">
-                        TP
+                        {{ initials }}
                     </div>
                     <div class="min-w-0">
                         <span class="text-[10px] uppercase font-extrabold text-amber-400 tracking-wider">{{ roleLabel }}</span>
@@ -89,7 +89,7 @@
                     <div class="p-4 border-b border-slate-800 flex items-center justify-between">
                         <div class="min-w-0">
                             <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400">{{ roleLabel }}</span>
-                            <h2 class="text-sm font-bold text-white truncate">{{ headerTitle || 'Teacher Portal' }}</h2>
+                            <h2 class="text-sm font-bold text-white truncate">{{ brandTitle }}</h2>
                         </div>
                         <button type="button" class="p-1.5 text-slate-400 hover:text-white" @click="mobileMenuOpen = false">
                             ✕
@@ -135,7 +135,8 @@ import { computed, ref } from 'vue';
 
 const props = defineProps({
     title: { type: String, required: true },
-    headerTitle: { type: String, default: 'Teacher Portal' },
+    /** Sidebar brand under the role badge. Defaults to roleLabel (e.g. Student Portal) — never hardcode Teacher. */
+    headerTitle: { type: String, default: null },
     subtitle: { type: String, default: '' },
     roleLabel: { type: String, required: true },
     accent: { type: String, default: 'navy' },
@@ -147,9 +148,11 @@ const props = defineProps({
 const page = usePage();
 const mobileMenuOpen = ref(false);
 
+const brandTitle = computed(() => (props.headerTitle && props.headerTitle.trim()) || props.roleLabel);
+
 const initials = computed(() => {
-    const parts = (props.headerTitle || props.roleLabel || '').trim().split(/\s+/).filter(Boolean);
-    if (!parts.length) return 'TP';
+    const parts = brandTitle.value.trim().split(/\s+/).filter(Boolean);
+    if (! parts.length) return 'P';
     if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
     return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 });

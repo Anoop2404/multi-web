@@ -39,7 +39,9 @@ sudo -u www php artisan migrate --force
 sudo -u www php artisan tenants:migrate-sahodayas --force
 #    (alternative that also reports per-Sahodaya failures: php artisan sahodaya:provision-databases --no-create)
 
-# 4. Front-end build: needed for KaTeX formulas and the exam pages
+# 4. Front-end build: needed for KaTeX, school Model exams, practice system-check,
+#    and every other Vite-code-split Inertia page under resources/js/Pages/Admin/
+#    (stale public/build → blank white screens with HTTP 200).
 npm ci && npm run build
 
 # 5. .env keys (first occurrence of a key wins: remove old duplicates), see below

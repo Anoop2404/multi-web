@@ -2089,6 +2089,13 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{exam}/engine/arm', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'armEngine'])->name('engine.arm');
             Route::post('/{exam}/engine/disarm', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'disarmEngine'])->name('engine.disarm');
             Route::get('/{exam}/session', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'sessionMonitor'])->name('session');
+            // Alias for bookmarks / old docs that used session-monitor.
+            Route::get('/{exam}/session-monitor', function (string $tenantId, \App\Models\McqExam $exam) {
+                return redirect()->route('sahodaya.mcq.session', [
+                    'tenantId' => $tenantId,
+                    'exam' => $exam,
+                ], 301);
+            })->name('session-monitor');
             Route::get('/{exam}/activity', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'activity'])->name('activity');
             Route::post('/{exam}/marks/bulk-import', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'bulkImportMarks'])->name('marks.bulk-import');
             Route::post('/{exam}/ranking/compute', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'computeRanking'])->name('ranking.compute');
