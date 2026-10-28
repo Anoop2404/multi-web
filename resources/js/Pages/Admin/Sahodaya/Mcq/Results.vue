@@ -1,16 +1,22 @@
 <template>
     <SahodayaAdminLayout :title="`Results — ${exam.title}`" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="exam.title" eyebrow="Talent Search exam"
-                    description="Verify school fee payments to confirm registrations and issue hall tickets, then enter marks.">
+        <PageHeader :title="exam.title"
+                    :eyebrow="exam.is_model_exam ? 'Sahodaya model exam' : 'Talent Search exam'"
+                    :description="exam.is_model_exam
+                        ? 'Enter marks (if offline), release results, and issue certificates when ready.'
+                        : 'Verify school fee payments to confirm registrations and issue hall tickets, then enter marks.'">
             <template #actions>
-                <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/certificates/preview`"
+                <a v-if="exam.result_release?.certificates_enabled !== false"
+                   :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/certificates/preview`"
                    target="_blank" rel="noopener" class="btn-secondary text-sm">Sample certificate ↗</a>
-                <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/hall-tickets/preview`"
+                <a v-if="!exam.is_model_exam"
+                   :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/hall-tickets/preview`"
                    target="_blank" rel="noopener" class="btn-secondary text-sm">Sample hall ticket ↗</a>
             </template>
         </PageHeader>
-        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" active="results" />
+        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'"
+                       :results-published="!!exam.results_published" :is-model-exam="!!exam.is_model_exam" active="results" />
 
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">
@@ -39,7 +45,14 @@
                 <p class="font-semibold" :class="exam.results_published ? 'text-emerald-900' : 'text-amber-900'">
                     {{ exam.results_published ? 'Results published' : 'Results not published' }}
                 </p>
-                <p class="text-xs text-slate-600 mt-0.5">Schools {{ exam.results_published ? 'can' : 'cannot' }} view scores in their portal.</p>
+                <p class="text-xs text-slate-600 mt-0.5">
+                    Students {{ exam.results_published ? 'can' : 'cannot' }} view scores
+                    ({{ visibilityLabel }}).
+                    Configure visibility & certificates on Overview.
+                </p>
+                <p v-if="exam.result_release?.results_auto_release_at && !exam.results_published" class="text-xs text-slate-500 mt-1">
+                    Auto-release scheduled: {{ exam.result_release.results_auto_release_at }}
+                </p>
                 <p v-if="exam.results_published" class="text-xs text-amber-700 mt-1">Marks are locked while results are published. Unpublish to reopen for correction.</p>
                 <p v-if="gradeBands?.length" class="text-xs text-slate-500 mt-1">
                     Grade bands: {{ gradeBands.map(b => `${b.label} (${b.min_percentage}-${b.max_percentage}%)`).join(' · ') }}
@@ -49,7 +62,8 @@
             <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/mark-sheet.pdf`" target="_blank" class="btn-secondary text-sm">Mark sheet PDF ↓</a>
             <button v-if="!exam.results_published" type="button" @click="publishResults" class="btn-primary text-sm">Publish results</button>
             <button v-else type="button" @click="unpublishResults" class="btn-secondary text-sm">Unpublish (reopen for correction)</button>
-            <button v-if="exam.results_published" type="button" @click="generateCertificates" class="btn-secondary text-sm">Generate certificates</button>
+            <button v-if="exam.results_published && exam.result_release?.certificates_enabled !== false"
+                    type="button" @click="generateCertificates" class="btn-secondary text-sm">Generate certificates</button>
         </div>
 
         <div v-if="!exam.results_published" class="card mb-6 space-y-3">
@@ -225,6 +239,13 @@ watch(() => props.registrations, syncMarkForms);
 
 const gradeOptions = computed(() => props.gradeBands?.length ? props.gradeBands.map((b) => b.label) : ['A+', 'A', 'B', 'C', 'D', 'F']);
 
+const visibilityLabel = computed(() => {
+    const v = props.exam?.result_release?.result_visibility ?? 'score_grade';
+    if (v === 'score') return 'score only';
+    if (v === 'review') return 'score, grade & review';
+    return 'score & grade';
+});
+
 function canEnterMarks(r) {
     return r.attendance_status === 'present' && !props.exam.results_published;
 }
@@ -249,11 +270,19 @@ function saveMark(registration) {
     );
 }
 
-function publishResults() {
+async function publishResults() {
+    if (!(await confirm({
+        message: `Publish results to students? They will see ${visibilityLabel.value}. Marks lock until you unpublish.`,
+        destructive: false,
+    }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/publish-results`, {}, { preserveScroll: true });
 }
 
-function unpublishResults() {
+async function unpublishResults() {
+    if (!(await confirm({
+        message: 'Unpublish results? Students will no longer see scores until you publish again.',
+        destructive: true,
+    }))) return;
     router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/unpublish-results`, {}, { preserveScroll: true });
 }
 

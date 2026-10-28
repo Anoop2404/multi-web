@@ -225,13 +225,20 @@ class McqExamOpsController extends SahodayaAdminController
         $gradeBands = app(\App\Services\Mcq\McqGradeService::class)->bandsForExam($exam);
 
         return $this->inertia('Sahodaya/Mcq/Results', [
-            'exam'          => $exam,
+            'exam' => array_merge($exam->toArray(), [
+                'is_model_exam' => $exam->isModelExam(),
+                'product_mode' => $exam->productMode(),
+                'product_mode_label' => \App\Support\Mcq\McqProductMode::label($exam->productMode()),
+                'result_release' => \App\Support\Mcq\McqResultReleaseSettings::forInertia($exam),
+            ]),
             'registrations' => $registrations,
             'gradeBands'    => $gradeBands,
             'counts'        => $counts,
             'filters'       => $filters,
             'schoolOptions' => $reports->schoolFilterOptions($exam),
             'classOptions'  => $reports->classFilterOptions($exam),
+            'certificateTemplates' => \App\Models\McqCertificateTemplate::where('tenant_id', $this->sahodaya->id)
+                ->where('is_active', true)->orderBy('title')->get(['id', 'title', 'is_default']),
         ]);
     }
 
@@ -808,6 +815,7 @@ class McqExamOpsController extends SahodayaAdminController
     public function generateCertificates(string $tenantId, McqExam $exam, \App\Services\Mcq\McqCertificateService $certificates)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        abort_unless(\App\Support\Mcq\McqResultReleaseSettings::certificatesEnabled($exam), 422, 'Enable certificates on Overview before generating.');
 
         $count = $certificates->issueBulk($exam);
 

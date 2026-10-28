@@ -8,8 +8,9 @@ use App\Models\McqQuestionBank;
 use App\Models\McqRegistration;
 use App\Models\SchoolClass;
 use App\Services\Audit\PlatformAuditLogger;
+use App\Services\Mcq\McqCertificateService;
 use App\Services\Mcq\McqPaperService;
-use App\Services\Mcq\McqRankingService;
+use App\Services\Mcq\McqResultPublishService;
 use App\Services\Mcq\McqSchoolModelExamService;
 use App\Services\Membership\EffectiveMasterDataResolver;
 use App\Support\Mcq\McqExamEligibilityConfig;
@@ -144,7 +145,13 @@ class McqModelExamController extends SchoolAdminController
                     'shuffle_options'   => (bool) ($exam->settings_json['shuffle_options'] ?? true),
                     'multi_marking'     => $exam->multiMarkingMode(),
                 ],
+                'result_release' => \App\Support\Mcq\McqResultReleaseSettings::forInertia($exam),
             ]),
+            'certificateTemplates' => \App\Models\McqCertificateTemplate::where('tenant_id', $this->school->parent_id)
+                ->where('is_active', true)
+                ->orderBy('title')
+                ->get(['id', 'title', 'is_default']),
+            'gradeBands' => app(\App\Services\Mcq\McqGradeService::class)->bandsForExam($exam),
             'registrationCounts' => [
                 'total'     => $registrations->count(),
                 'started'   => $registrations->whereNotNull('started_at')->count(),
@@ -199,6 +206,7 @@ class McqModelExamController extends SchoolAdminController
             'shuffle_questions'      => 'nullable|boolean',
             'shuffle_options'        => 'nullable|boolean',
             'multi_marking'          => 'nullable|in:all_or_nothing,partial',
+            ...\App\Support\Mcq\McqResultReleaseSettings::validationRules(),
         ]);
 
         if (! empty($data['code'])) {
@@ -224,14 +232,35 @@ class McqModelExamController extends SchoolAdminController
         $data['fee_amount'] = null;
         $data['conductor_level'] = 'school';
         $data['school_id'] = $this->school->id;
+
+        $releasePatch = \App\Support\Mcq\McqResultReleaseSettings::normalizeInput($data, $exam);
+        if (array_key_exists('certificate_template_id', $data)) {
+            $templateId = $data['certificate_template_id'] ?: null;
+            if ($templateId) {
+                $ok = \App\Models\McqCertificateTemplate::where('tenant_id', $this->school->parent_id)
+                    ->whereKey($templateId)->where('is_active', true)->exists();
+                if (! $ok) {
+                    return back()->withErrors(['certificate_template_id' => 'Invalid certificate template.']);
+                }
+            }
+            $data['certificate_template_id'] = $templateId;
+        }
+
         $data['settings_json'] = array_merge($exam->settings_json ?? [], [
             'requires_hall_ticket' => false,
             'product_mode'         => 'school_model_exam',
             'shuffle_questions'    => (bool) ($data['shuffle_questions'] ?? $exam->settings_json['shuffle_questions'] ?? true),
             'shuffle_options'      => (bool) ($data['shuffle_options'] ?? $exam->settings_json['shuffle_options'] ?? true),
             'multi_marking'        => $data['multi_marking'] ?? $exam->multiMarkingMode(),
+            'result_release'       => $releasePatch['result_release'],
+            'certificates'         => $releasePatch['certificates'],
         ]);
-        unset($data['shuffle_questions'], $data['shuffle_options'], $data['multi_marking']);
+        unset(
+            $data['shuffle_questions'], $data['shuffle_options'], $data['multi_marking'],
+            $data['result_visibility'], $data['results_auto_release_at'],
+            $data['certificates_enabled'], $data['certificates_auto_issue'],
+            $data['certificate_eligibility'], $data['certificate_eligible_grades'],
+        );
 
         $exam->update($data);
 
@@ -406,34 +435,71 @@ class McqModelExamController extends SchoolAdminController
         return back()->with('success', 'Paper settings saved.');
     }
 
-    public function publishResults(string $tenantId, McqExam $exam, McqRankingService $ranking)
+    public function publishResults(string $tenantId, McqExam $exam, McqResultPublishService $publisher)
     {
         $this->modelExams->assertOwnedBySchool($exam, $this->school);
 
-        $ranked = $ranking->rankExam($exam);
-        $exam->update([
-            'results_published'    => true,
-            'results_published_at' => now(),
-        ]);
+        $result = $publisher->publish($exam, 'School model exam');
+        $msg = "Results published. {$result['ranked']} student(s) ranked.";
+        if ($result['certificates_issued'] > 0) {
+            $msg .= " {$result['certificates_issued']} certificate(s) issued.";
+        }
 
-        app(PlatformAuditLogger::class)->mcq($exam, 'mcq.results.published', "School model exam results published: {$exam->title}", [
-            'school_id' => $this->school->id,
-            'ranked'    => $ranked,
-        ]);
-
-        return back()->with('success', "Results published. {$ranked} student(s) ranked.");
+        return back()->with('success', $msg);
     }
 
-    public function unpublishResults(Request $request, string $tenantId, McqExam $exam)
+    public function unpublishResults(Request $request, string $tenantId, McqExam $exam, McqResultPublishService $publisher)
     {
         $this->modelExams->assertOwnedBySchool($exam, $this->school);
-        $exam->update(['results_published' => false]);
+        $publisher->unpublish($exam, 'School model exam');
 
-        app(PlatformAuditLogger::class)->mcq($exam, 'mcq.results.unpublished', "School model exam results unpublished: {$exam->title}", [
+        return back()->with('success', 'Results hidden. Publish again when ready.');
+    }
+
+    public function generateCertificates(string $tenantId, McqExam $exam, McqCertificateService $certificates)
+    {
+        $this->modelExams->assertOwnedBySchool($exam, $this->school);
+        abort_unless($exam->results_published, 422, 'Release results before generating certificates.');
+        abort_unless(\App\Support\Mcq\McqResultReleaseSettings::certificatesEnabled($exam), 422, 'Enable certificates in result settings first.');
+
+        $count = $certificates->issueBulk($exam);
+
+        app(PlatformAuditLogger::class)->mcq($exam, 'mcq.certificates.generated', "Generated {$count} school model exam certificate(s) for {$exam->title}", [
             'school_id' => $this->school->id,
         ]);
 
-        return back()->with('success', 'Results hidden. Publish again when ready.');
+        return back()->with('success', "{$count} certificate(s) generated.");
+    }
+
+    public function previewCertificate(string $tenantId, McqExam $exam)
+    {
+        $this->modelExams->assertOwnedBySchool($exam, $this->school);
+        $service = app(McqCertificateService::class);
+
+        return view('mcq.certificate', [
+            'registration' => null,
+            'certificate'  => (object) ['verification_uuid' => 'SAMPLE-DEMO-0000'],
+            'sahodaya'     => \App\Models\Tenant::find($this->school->parent_id),
+            'fields'       => $service->previewSampleFields($exam, \App\Models\Tenant::find($this->school->parent_id)),
+            'design'       => $service->previewDesign($exam),
+        ]);
+    }
+
+    public function printCertificate(string $tenantId, McqExam $exam, McqRegistration $registration)
+    {
+        $this->modelExams->assertOwnedBySchool($exam, $this->school);
+        abort_if($registration->exam_id !== $exam->id || $registration->school_id !== $this->school->id, 404);
+
+        $certificate = app(McqCertificateService::class)->issue($registration->load(['exam', 'student', 'school', 'mark']));
+        $sahodaya = \App\Models\Tenant::find($this->school->parent_id);
+
+        return view('mcq.certificate', [
+            'registration' => $registration,
+            'certificate'  => $certificate,
+            'sahodaya'     => $sahodaya,
+            'fields'       => app(McqCertificateService::class)->fieldValues($registration, $sahodaya),
+            'design'       => $certificate->design_snapshot_json ?? [],
+        ]);
     }
 
     private function rejectIfPaperLocked(McqExam $exam)

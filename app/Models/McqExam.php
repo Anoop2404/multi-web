@@ -200,6 +200,23 @@ class McqExam extends Model
         return (bool) ($this->settings_json['allow_member_banks'] ?? false);
     }
 
+    /** What students see after results are released: score | score_grade | review */
+    public function resultVisibility(): string
+    {
+        return \App\Support\Mcq\McqResultReleaseSettings::visibility($this);
+    }
+
+    public function certificatesEnabled(): bool
+    {
+        return \App\Support\Mcq\McqResultReleaseSettings::certificatesEnabled($this);
+    }
+
+    /** @return array<string, mixed> */
+    public function resultReleaseSettings(): array
+    {
+        return \App\Support\Mcq\McqResultReleaseSettings::forInertia($this);
+    }
+
     public function owningSchoolId(): ?string
     {
         return $this->school_id ?: null;

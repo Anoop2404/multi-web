@@ -398,6 +398,9 @@ Route::prefix('model-exams')->name('model-exams.')->group(function () {
     Route::post('/{exam}/enroll-eligible', [McqModelExamController::class, 'enrollEligible'])->name('enroll-eligible');
     Route::post('/{exam}/publish-results', [McqModelExamController::class, 'publishResults'])->name('publish-results');
     Route::post('/{exam}/unpublish-results', [McqModelExamController::class, 'unpublishResults'])->name('unpublish-results');
+    Route::get('/{exam}/certificates/preview', [McqModelExamController::class, 'previewCertificate'])->name('certificates.preview');
+    Route::post('/{exam}/certificates/generate', [McqModelExamController::class, 'generateCertificates'])->name('certificates.generate');
+    Route::get('/{exam}/registrations/{registration}/certificate', [McqModelExamController::class, 'printCertificate'])->name('certificates.print');
 
     Route::get('/{exam}/paper', [McqModelExamController::class, 'paper'])->name('paper');
     Route::post('/{exam}/paper/banks', [McqModelExamController::class, 'attachBank'])->name('paper.banks.attach');

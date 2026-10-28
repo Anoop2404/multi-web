@@ -215,6 +215,7 @@ class McqExamController extends SahodayaAdminController
             'shows_fees'       => \App\Support\Mcq\McqProductMode::showsFees($exam),
             'shows_hall_tickets' => \App\Support\Mcq\McqProductMode::showsHallTickets($exam),
             'allow_member_banks' => $exam->allowsMemberBanks(),
+            'result_release' => \App\Support\Mcq\McqResultReleaseSettings::forInertia($exam),
         ]);
 
         $pendingPaymentApprovals = $schoolFees->filter(
@@ -322,6 +323,7 @@ class McqExamController extends SahodayaAdminController
             'hall_ticket_template_id' => 'nullable|integer|exists:mcq_hall_ticket_templates,id',
             'certificate_template_id' => 'nullable|integer|exists:mcq_certificate_templates,id',
             'student_verification_mode' => 'nullable|in:inherit,required,optional',
+            ...\App\Support\Mcq\McqResultReleaseSettings::validationRules(),
         ]);
 
         if (array_key_exists('code', $data)) {
@@ -440,6 +442,18 @@ class McqExamController extends SahodayaAdminController
             $data['settings_json'] = $settings;
             unset($data['class_schedules']);
         }
+
+        $releasePatch = \App\Support\Mcq\McqResultReleaseSettings::normalizeInput($data, $exam);
+        $settings = $data['settings_json'] ?? ($exam->settings_json ?? []);
+        $settings['result_release'] = $releasePatch['result_release'];
+        $settings['certificates'] = $releasePatch['certificates'];
+        $data['settings_json'] = $settings;
+        unset(
+            $data['result_visibility'], $data['results_auto_release_at'],
+            $data['certificates_enabled'], $data['certificates_auto_issue'],
+            $data['certificate_eligibility'], $data['certificate_eligible_grades'],
+        );
+
         $previousStatus = $exam->status;
         $newStatus = $data['status'] ?? $previousStatus;
 
@@ -487,40 +501,26 @@ class McqExamController extends SahodayaAdminController
         return back()->with('success', 'Exam updated.'.$capacityNote);
     }
 
-    public function publishResults(string $tenantId, McqExam $exam, McqRankingService $ranking)
+    public function publishResults(string $tenantId, McqExam $exam, \App\Services\Mcq\McqResultPublishService $publisher)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
-        $ranked = $ranking->rankExam($exam);
+        $label = $exam->isModelExam() ? 'Sahodaya model exam' : 'Talent Search';
+        $result = $publisher->publish($exam, $label);
+        $msg = "Results published. {$result['ranked']} student(s) ranked.";
+        if ($result['certificates_issued'] > 0) {
+            $msg .= " {$result['certificates_issued']} certificate(s) issued.";
+        }
 
-        $exam->update([
-            'results_published'    => true,
-            'results_published_at' => now(),
-        ]);
-
-        app(McqExamNotifier::class)->resultsPublished($exam);
-
-        app(PlatformAuditLogger::class)->mcq(
-            $exam,
-            'mcq.results.published',
-            "Talent Search results published for {$exam->title}",
-            ['ranked' => $ranked],
-        );
-
-        return back()->with('success', "Results published. {$ranked} student(s) ranked.");
+        return back()->with('success', $msg);
     }
 
-    public function unpublishResults(Request $request, string $tenantId, McqExam $exam)
+    public function unpublishResults(Request $request, string $tenantId, McqExam $exam, \App\Services\Mcq\McqResultPublishService $publisher)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
-        $exam->update(['results_published' => false]);
-
-        app(PlatformAuditLogger::class)->mcq(
-            $exam,
-            'mcq.results.unpublished',
-            "Talent Search results unpublished (reopened for correction) for {$exam->title} by {$request->user()?->name}",
-        );
+        $label = $exam->isModelExam() ? 'Sahodaya model exam' : 'Talent Search';
+        $publisher->unpublish($exam, "{$label} by {$request->user()?->name}");
 
         return back()->with('success', 'Results hidden. Marks can now be edited; publish again when corrections are complete.');
     }

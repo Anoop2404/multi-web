@@ -58,8 +58,27 @@
                 <button v-else type="button" class="btn-ghost text-sm !text-amber-700" :disabled="unpublishForm.processing" @click="holdResults">
                     Hold results
                 </button>
+                <button v-if="exam.results_published && form.certificates_enabled" type="button" class="btn-secondary text-sm"
+                        :disabled="certForm.processing" @click="generateCertificates">
+                    Generate certificates
+                </button>
+                <a v-if="form.certificates_enabled"
+                   :href="`/school-admin/${school.id}/model-exams/${exam.id}/certificates/preview`"
+                   target="_blank" rel="noopener" class="btn-ghost text-sm">Sample certificate ↗</a>
             </div>
         </div>
+
+        <form @submit.prevent="save" class="card mb-6 space-y-4">
+            <McqResultReleaseSettingsForm
+                v-model="releaseSettings"
+                :results-published="!!exam.results_published"
+                :certificate-templates="certificateTemplates"
+                :grade-bands="gradeBands"
+            />
+            <FormActions>
+                <button type="submit" class="btn-primary" :disabled="form.processing">Save result & certificate settings</button>
+            </FormActions>
+        </form>
 
         <form @submit.prevent="save" class="card mb-6 space-y-4">
             <h3 class="section-title">Exam details</h3>
@@ -140,10 +159,11 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, reactive, watch } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import McqEligibilityPicker from '@/Components/sahodaya/McqEligibilityPicker.vue';
+import McqResultReleaseSettingsForm from '@/Components/mcq/McqResultReleaseSettingsForm.vue';
 
 const props = defineProps({
     school: Object,
@@ -154,6 +174,8 @@ const props = defineProps({
     masterClasses: { type: Array, default: () => [] },
     gradeMasters: { type: Array, default: () => [] },
     schoolClasses: { type: Array, default: () => [] },
+    certificateTemplates: { type: Array, default: () => [] },
+    gradeBands: { type: Array, default: () => [] },
 });
 
 const gradeMasterOptions = computed(() => [
@@ -172,6 +194,8 @@ function toLocalInput(value) {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+const release = props.exam.result_release ?? {};
+
 const form = useForm({
     title: props.exam.title ?? '',
     code: props.exam.code ?? '',
@@ -186,31 +210,71 @@ const form = useForm({
     shuffle_questions: props.exam.settings?.shuffle_questions ?? true,
     shuffle_options: props.exam.settings?.shuffle_options ?? true,
     multi_marking: props.exam.settings?.multi_marking ?? 'partial',
+    result_visibility: release.result_visibility ?? 'score_grade',
+    results_auto_release_at: toLocalInput(release.results_auto_release_at),
+    certificates_enabled: !!release.certificates_enabled,
+    certificates_auto_issue: !!release.certificates_auto_issue,
+    certificate_eligibility: release.certificate_eligibility ?? 'participation',
+    certificate_eligible_grades: [...(release.certificate_eligible_grades ?? [])],
+    certificate_template_id: release.certificate_template_id ?? props.exam.certificate_template_id ?? null,
 });
+
+const releaseSettings = reactive({
+    result_visibility: form.result_visibility,
+    results_auto_release_at: form.results_auto_release_at,
+    certificates_enabled: form.certificates_enabled,
+    certificates_auto_issue: form.certificates_auto_issue,
+    certificate_eligibility: form.certificate_eligibility,
+    certificate_eligible_grades: [...form.certificate_eligible_grades],
+    certificate_template_id: form.certificate_template_id,
+});
+
+watch(releaseSettings, (val) => {
+    Object.assign(form, val);
+}, { deep: true });
 
 const publishForm = useForm({ auto_enroll: true });
 const enrollForm = useForm({});
 const resultsForm = useForm({});
 const unpublishForm = useForm({});
+const certForm = useForm({});
 
 function save() {
     form.put(`/school-admin/${props.school.id}/model-exams/${props.exam.id}`, { preserveScroll: true });
 }
 
 function publish(autoEnroll) {
+    const paperCount = props.exam.paper?.total ?? 0;
+    if (paperCount < 1) {
+        window.alert('Add questions to the paper before publishing.');
+        return;
+    }
+    const msg = autoEnroll
+        ? `Publish this exam and auto-enroll eligible students? Paper has ${paperCount} question(s).`
+        : `Publish this exam without enrolling? Paper has ${paperCount} question(s).`;
+    if (!window.confirm(msg)) return;
     publishForm.auto_enroll = autoEnroll;
     publishForm.post(`/school-admin/${props.school.id}/model-exams/${props.exam.id}/publish`, { preserveScroll: true });
 }
 
 function enroll() {
+    if (!window.confirm(`Enroll eligible students now? Currently ${props.registrationCounts.total ?? 0} enrolled.`)) return;
     enrollForm.post(`/school-admin/${props.school.id}/model-exams/${props.exam.id}/enroll-eligible`, { preserveScroll: true });
 }
 
 function releaseResults() {
+    const submitted = props.registrationCounts.submitted ?? 0;
+    if (!window.confirm(`Release results to students? ${submitted} submitted attempt(s). Visibility: ${form.result_visibility}.`)) return;
     resultsForm.post(`/school-admin/${props.school.id}/model-exams/${props.exam.id}/publish-results`, { preserveScroll: true });
 }
 
 function holdResults() {
+    if (!window.confirm('Hold results? Students will no longer see scores until you release again.')) return;
     unpublishForm.post(`/school-admin/${props.school.id}/model-exams/${props.exam.id}/unpublish-results`, { preserveScroll: true });
+}
+
+function generateCertificates() {
+    if (!window.confirm('Generate certificates for eligible students with released results?')) return;
+    certForm.post(`/school-admin/${props.school.id}/model-exams/${props.exam.id}/certificates/generate`, { preserveScroll: true });
 }
 </script>

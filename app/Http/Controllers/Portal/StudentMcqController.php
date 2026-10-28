@@ -77,20 +77,28 @@ class StudentMcqController extends Controller
         }
 
         if ($registration->status === 'submitted') {
+            $certs = app(\App\Services\Mcq\McqCertificateService::class);
+            $certAvailable = $certs->isAvailableForStudent($registration);
+
             return inertia('Portal/Student/McqResult', [
                 'school'       => Tenant::findOrFail($tenantId)->only('id', 'name'),
                 'student'      => $student->only('id', 'name', 'admission_number', 'reg_no'),
                 'registration' => array_merge(
                     $registration->only('id', 'status', 'submitted_at', 'attendance_status'),
-                    ['exam' => $registration->exam?->only('id', 'title')],
+                    ['exam' => $registration->exam?->only('id', 'title', 'results_published')],
                 ),
                 'mark'         => McqResultPresenter::forRegistration($registration, $registration->mark),
                 'showResults'  => (bool) $registration->exam?->results_published,
-                'certificateUrl' => $registration->exam?->results_published
-                    && $registration->attendance_status !== 'absent'
-                    && $registration->mark
+                'resultVisibility' => $registration->exam
+                    ? \App\Support\Mcq\McqResultReleaseSettings::visibility($registration->exam)
+                    : 'score_grade',
+                'certificateUrl' => $certAvailable
                     ? route('portal.student.mcq.certificate', ['tenantId' => $tenantId, 'registration' => $registration->id])
                     : null,
+                'certificateUnavailableReason' => $certAvailable ? null : $certs->unavailableReason($registration),
+                'certificatesEnabled' => $registration->exam
+                    ? \App\Support\Mcq\McqResultReleaseSettings::certificatesEnabled($registration->exam)
+                    : false,
             ]);
         }
 

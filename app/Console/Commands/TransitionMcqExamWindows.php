@@ -15,31 +15,34 @@ use Illuminate\Console\Command;
  * - published|ongoing stay open until registration_closes_at; after close, leave status (schools still see published/ongoing for ops)
  *   — when registration_closes_at passes and scheduled_at has passed, move published → ongoing
  * - on/after result_date: cue results by leaving a settings_json flag; do not auto-publish scores
+ * - settings_json.result_release.auto_release_at: auto-publish when due (optional admin schedule)
  * - completed is never auto-set (manual)
  */
 class TransitionMcqExamWindows extends Command
 {
     protected $signature = 'mcq:transition-exam-windows';
 
-    protected $description = 'Open/close Talent Search registration and cue results from exam window dates';
+    protected $description = 'Open/close Talent Search registration, cue results, and auto-release scheduled results';
 
     public function handle(): int
     {
         $opened = 0;
         $cued = 0;
+        $autoReleased = 0;
         $now = now();
 
         $sahodayas = Tenant::query()->sahodayas()->where('is_active', true)->get();
 
         foreach ($sahodayas as $sahodaya) {
-            TenancyDatabase::runWhenDatabaseReady($sahodaya, function () use ($now, &$opened, &$cued) {
+            TenancyDatabase::runWhenDatabaseReady($sahodaya, function () use ($now, &$opened, &$cued, &$autoReleased) {
                 McqExam::query()
-                    ->whereIn('status', ['draft', 'published', 'ongoing'])
+                    ->whereIn('status', ['draft', 'published', 'ongoing', 'completed'])
                     ->where(function ($q) {
                         $q->whereNotNull('registration_opens_at')
                             ->orWhereNotNull('registration_closes_at')
                             ->orWhereNotNull('result_date')
-                            ->orWhereNotNull('scheduled_at');
+                            ->orWhereNotNull('scheduled_at')
+                            ->orWhereNotNull('settings_json');
                     })
                     ->chunkById(50, function ($exams) use ($now, &$opened, &$cued) {
                         foreach ($exams as $exam) {
@@ -96,10 +99,12 @@ class TransitionMcqExamWindows extends Command
                             }
                         }
                     });
+
+                $autoReleased += app(\App\Services\Mcq\McqResultPublishService::class)->releaseDueExams($now);
             });
         }
 
-        $this->info("Opened {$opened} exam(s); cued results for {$cued} exam(s).");
+        $this->info("Opened {$opened} exam(s); cued results for {$cued} exam(s); auto-released {$autoReleased} exam(s).");
 
         return self::SUCCESS;
     }

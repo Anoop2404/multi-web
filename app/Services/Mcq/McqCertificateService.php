@@ -7,6 +7,7 @@ use App\Models\McqCertificateTemplate;
 use App\Models\McqExam;
 use App\Models\McqRegistration;
 use App\Models\Tenant;
+use App\Support\Mcq\McqResultReleaseSettings;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -15,6 +16,7 @@ class McqCertificateService
     public function assertEligible(McqRegistration $registration): void
     {
         $registration->loadMissing(['exam', 'mark']);
+        $exam = $registration->exam;
 
         if ($registration->blocksScoring()) {
             throw ValidationException::withMessages([
@@ -22,9 +24,15 @@ class McqCertificateService
             ]);
         }
 
-        if (! $registration->exam?->results_published) {
+        if (! $exam?->results_published) {
             throw ValidationException::withMessages([
                 'results' => 'Results must be published before issuing certificates.',
+            ]);
+        }
+
+        if (! McqResultReleaseSettings::certificatesEnabled($exam)) {
+            throw ValidationException::withMessages([
+                'certificates' => 'Certificates are not enabled for this exam.',
             ]);
         }
 
@@ -33,6 +41,63 @@ class McqCertificateService
                 'marks' => 'Student must have submitted marks before issuing a certificate.',
             ]);
         }
+
+        if (! $this->meetsEligibilityRules($registration)) {
+            throw ValidationException::withMessages([
+                'eligibility' => 'This student does not meet the certificate eligibility rules for this exam.',
+            ]);
+        }
+    }
+
+    /** Whether a student may see / download a certificate (no exception). */
+    public function isAvailableForStudent(McqRegistration $registration): bool
+    {
+        try {
+            $this->assertEligible($registration);
+
+            return true;
+        } catch (ValidationException) {
+            return false;
+        }
+    }
+
+    /** Student-facing reason when a certificate is not available. */
+    public function unavailableReason(McqRegistration $registration): ?string
+    {
+        $registration->loadMissing(['exam', 'mark']);
+        $exam = $registration->exam;
+
+        if (! $exam) {
+            return 'Certificate not available.';
+        }
+
+        if (! McqResultReleaseSettings::certificatesEnabled($exam)) {
+            return 'Certificates are not issued for this exam.';
+        }
+
+        if (! $exam->results_published) {
+            return 'Certificate not available yet — results have not been released.';
+        }
+
+        if ($registration->status !== 'submitted' || ! $registration->mark) {
+            return 'Certificate not available — exam not submitted.';
+        }
+
+        if ($registration->blocksScoring()) {
+            return 'Certificate not available for '.$registration->attendanceStatusLabel().' attendance.';
+        }
+
+        if (! $this->meetsEligibilityRules($registration)) {
+            $settings = McqResultReleaseSettings::certificates($exam);
+
+            return match ($settings['eligibility']) {
+                McqResultReleaseSettings::CERT_ELIGIBILITY_PASS => 'Certificate requires a passing score.',
+                McqResultReleaseSettings::CERT_ELIGIBILITY_GRADE_BANDS => 'Certificate requires an eligible grade band.',
+                default => 'Not eligible for a certificate.',
+            };
+        }
+
+        return null;
     }
 
     public function issue(McqRegistration $registration): McqCertificate
@@ -64,6 +129,7 @@ class McqCertificateService
     public function issueBulk(McqExam $exam): int
     {
         abort_unless($exam->results_published, 422, 'Publish results before generating certificates.');
+        abort_unless(McqResultReleaseSettings::certificatesEnabled($exam), 422, 'Enable certificates on the exam before generating.');
 
         $count = 0;
 
@@ -99,6 +165,47 @@ class McqCertificateService
 
         return $count;
     }
+
+    private function meetsEligibilityRules(McqRegistration $registration): bool
+    {
+        $exam = $registration->exam;
+        $mark = $registration->mark;
+        if (! $exam || ! $mark) {
+            return false;
+        }
+
+        $settings = McqResultReleaseSettings::certificates($exam);
+
+        return match ($settings['eligibility']) {
+            McqResultReleaseSettings::CERT_ELIGIBILITY_PASS => $this->isPassing($exam, $mark),
+            McqResultReleaseSettings::CERT_ELIGIBILITY_GRADE_BANDS => in_array(
+                (string) ($mark->grade ?? ''),
+                $settings['eligible_grades'],
+                true,
+            ),
+            default => true,
+        };
+    }
+
+    private function isPassing(McqExam $exam, $mark): bool
+    {
+        $passMark = (float) ($exam->pass_mark ?? 0);
+        if ($passMark > 0) {
+            return (float) ($mark->percentage ?? 0) >= $passMark;
+        }
+
+        $bands = app(McqGradeService::class)->bandsForExam($exam);
+        $grade = (string) ($mark->grade ?? '');
+        foreach ($bands as $band) {
+            if (($band['label'] ?? '') === $grade) {
+                return (bool) ($band['is_pass'] ?? true);
+            }
+        }
+
+        // No pass mark / no matching band — treat as participation pass.
+        return $grade !== '' && strtoupper($grade) !== 'F';
+    }
+
 
     /** @return array<string, string> */
     public function previewSampleFields(McqExam $exam, ?Tenant $sahodaya = null): array

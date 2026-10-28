@@ -1,17 +1,18 @@
 <template>
     <PortalLayout
         role-label="Student Portal"
-        title="Talent Search Exams"
+        title="Online exams"
         :subtitle="`${school.name} · ${student.reg_no}`"
         accent="indigo"
         :nav-items="navItems"
     >
         <section class="card">
-            <h2 class="font-semibold text-sm mb-2">Your Talent Search registrations</h2>
+            <h2 class="font-semibold text-sm mb-2">Your exams</h2>
             <ul class="text-sm divide-y">
                 <li v-for="r in mcqExams" :key="r.registration_route_id ?? r.id" class="py-3 flex justify-between items-center gap-2 flex-wrap">
                     <div>
                         <span class="font-medium">{{ r.exam?.title ?? r.title }}</span>
+                        <span v-if="r.product_label" class="text-[11px] ml-2 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">{{ r.product_label }}</span>
                         <span v-if="r.lifecycle_status?.label" class="text-xs ml-2 px-2 py-0.5 rounded-full"
                               :class="lifecycleClass(r.lifecycle_status)">{{ r.lifecycle_status.label }}</span>
                         <span v-else class="text-xs text-gray-400 ml-1">({{ r.status }})</span>
@@ -22,11 +23,24 @@
                             <span v-if="r.mark.grade"> · Grade: {{ r.mark.grade }}</span>
                             <span v-if="r.mark.rank"> · Rank: {{ r.mark.rank }}</span>
                         </p>
+                        <p v-else-if="r.result_state === 'held'" class="text-xs text-amber-700 mt-0.5">
+                            Results not released yet
+                        </p>
+                        <p v-else-if="r.result_state === 'not_submitted' && r.status !== 'approved'" class="text-xs text-slate-500 mt-0.5">
+                            {{ r.result_message || 'Not submitted yet' }}
+                        </p>
+                        <p v-else-if="r.certificates_enabled && r.certificate_unavailable_reason && r.status === 'submitted'"
+                           class="text-xs text-slate-500 mt-0.5">
+                            {{ r.certificate_unavailable_reason }}
+                        </p>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
                         <a v-if="r.can_take_online"
                            :href="`/portal/student/${school.id}/mcq/${r.registration_route_id}/exam`"
                            class="text-xs font-semibold text-indigo-600">Take exam →</a>
+                        <a v-if="r.show_results"
+                           :href="`/portal/student/${school.id}/mcq/${r.registration_route_id}/exam`"
+                           class="text-xs font-semibold text-indigo-600">View result →</a>
                         <a v-if="r.show_hall_ticket"
                            :href="`/portal/student/${school.id}/mcq/${r.registration_route_id}/hall-ticket`"
                            target="_blank"
@@ -42,7 +56,7 @@
                     </div>
                 </li>
                 <li v-if="!mcqExams?.length" class="py-4 text-center text-gray-400">
-                    <p>No Talent Search registrations yet.</p>
+                    <p>No online exams yet.</p>
                     <a :href="`/portal/student/${school.id}`" class="text-xs text-indigo-600 font-semibold mt-2 inline-block">← Back to dashboard</a>
                 </li>
             </ul>

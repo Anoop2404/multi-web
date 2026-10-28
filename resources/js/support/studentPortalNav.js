@@ -4,7 +4,7 @@ export function studentPortalNavItems(schoolId) {
 
     return [
         { href: base, label: 'Home', exact: true },
-        { href: `${base}/mcq`, label: 'Talent Search Exams' },
+        { href: `${base}/mcq`, label: 'Online exams' },
         { href: `${base}/fest-registrations`, label: 'Registrations' },
         { href: `${base}/fest/schedule`, label: 'Fest schedule' },
         { href: `${base}/results`, label: 'Fest results' },

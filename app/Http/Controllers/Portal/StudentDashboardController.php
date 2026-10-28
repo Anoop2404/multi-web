@@ -265,24 +265,24 @@ class StudentDashboardController extends Controller
                     return null;
                 }
 
+                $certs = app(\App\Services\Mcq\McqCertificateService::class);
+                $certAvailable = $certs->isAvailableForStudent($reg);
+                $certReason = $certAvailable ? null : $certs->unavailableReason($reg);
+
                 return array_merge(
                     McqResultPresenter::forExamList($exam, $reg),
                     [
                         'id'               => $reg->id,
                         'exam'             => $exam->only('id', 'title'),
                         'lifecycle_status' => \App\Support\Mcq\McqRegistrationStatusPresenter::forRegistration($reg, $exam),
-                        'show_results'     => (bool) $exam->results_published,
+                        'show_results'     => (bool) $exam->results_published && $reg->status === 'submitted',
                         'show_hall_ticket' => (bool) $exam->hall_tickets_published && (bool) $reg->hall_ticket_no,
-                        'show_certificate' => (bool) $exam->results_published
-                            && $reg->status === 'submitted'
-                            && $reg->attendance_status !== 'absent'
-                            && $reg->mark,
-                        'certificate_url'  => (bool) $exam->results_published
-                            && $reg->status === 'submitted'
-                            && $reg->attendance_status !== 'absent'
-                            && $reg->mark
+                        'show_certificate' => $certAvailable,
+                        'certificate_url'  => $certAvailable
                             ? "/portal/student/{$reg->school_id}/mcq/{$reg->id}/certificate"
                             : null,
+                        'certificate_unavailable_reason' => $certReason,
+                        'certificates_enabled' => \App\Support\Mcq\McqResultReleaseSettings::certificatesEnabled($exam),
                         'invoice_url' => $exam->hasFee()
                             ? "/portal/student/{$reg->school_id}/mcq/{$reg->id}/invoice"
                             : null,

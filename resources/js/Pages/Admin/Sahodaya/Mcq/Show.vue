@@ -296,7 +296,7 @@
                         />
                     </template>
                 </FormField>
-                <FormField label="Hall ticket template">
+                <FormField v-if="form.product_mode !== 'sahodaya_model_exam'" label="Hall ticket template">
                     <template #default="{ id }">
                         <SearchableSelect
                             :id="id"
@@ -307,19 +307,17 @@
                         />
                     </template>
                 </FormField>
-                <FormField label="Certificate template">
-                    <template #default="{ id }">
-                        <SearchableSelect
-                            :id="id"
-                            v-model="form.certificate_template_id"
-                            :options="certificateTemplateOptions"
-                            :all-option="true"
-                            all-label="Default certificate template"
-                        />
-                    </template>
-                </FormField>
             </FormGrid>
             <p v-if="gradeBands?.length" class="text-xs text-slate-500">Active grade bands: {{ gradeBands.map(b => b.label).join(', ') }} — percentage-based, so they apply the same regardless of a class's max marks.</p>
+
+            <div class="border-t border-slate-100 pt-4 mt-2">
+                <McqResultReleaseSettingsForm
+                    v-model="releaseSettings"
+                    :results-published="!!exam.results_published"
+                    :certificate-templates="certificateTemplates"
+                    :grade-bands="gradeBands"
+                />
+            </div>
 
             <div class="border-t border-slate-100 pt-4">
                 <FormField label="Total marks / questions (default)" hint="Denominator for percentage/grade on offline mark entry when a class below has no override.">
@@ -378,7 +376,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { router, useForm, Link } from '@inertiajs/vue3';
 import SahodayaAdminLayout from '@/Layouts/SahodayaAdminLayout.vue';
 import McqSchoolCentreCodes from '@/Components/sahodaya/McqSchoolCentreCodes.vue';
@@ -387,6 +385,7 @@ import McqExamSubNav from '@/Components/sahodaya/McqExamSubNav.vue';
 import McqEligibilityPicker from '@/Components/sahodaya/McqEligibilityPicker.vue';
 import McqRegNoStartField from '@/Components/sahodaya/McqRegNoStartField.vue';
 import McqSahodayaWorkflowBanner from '@/Components/sahodaya/McqSahodayaWorkflowBanner.vue';
+import McqResultReleaseSettingsForm from '@/Components/mcq/McqResultReleaseSettingsForm.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -483,10 +482,33 @@ const form = useForm({
     },
     grade_master_id: props.exam.grade_master_id ?? '',
     hall_ticket_template_id: props.exam.hall_ticket_template_id ?? '',
-    certificate_template_id: props.exam.certificate_template_id ?? '',
+    certificate_template_id: props.exam.result_release?.certificate_template_id ?? props.exam.certificate_template_id ?? '',
     total_questions: props.exam.total_questions || '',
     class_max_marks: initialClassMaxMarks,
+    result_visibility: props.exam.result_release?.result_visibility ?? 'score_grade',
+    results_auto_release_at: props.exam.result_release?.results_auto_release_at
+        ? String(props.exam.result_release.results_auto_release_at).slice(0, 16)
+        : '',
+    certificates_enabled: props.exam.result_release?.certificates_enabled
+        ?? (props.exam.product_mode !== 'sahodaya_model_exam'),
+    certificates_auto_issue: !!props.exam.result_release?.certificates_auto_issue,
+    certificate_eligibility: props.exam.result_release?.certificate_eligibility ?? 'participation',
+    certificate_eligible_grades: [...(props.exam.result_release?.certificate_eligible_grades ?? [])],
 });
+
+const releaseSettings = reactive({
+    result_visibility: form.result_visibility,
+    results_auto_release_at: form.results_auto_release_at,
+    certificates_enabled: form.certificates_enabled,
+    certificates_auto_issue: form.certificates_auto_issue,
+    certificate_eligibility: form.certificate_eligibility,
+    certificate_eligible_grades: [...form.certificate_eligible_grades],
+    certificate_template_id: form.certificate_template_id,
+});
+
+watch(releaseSettings, (val) => {
+    Object.assign(form, val);
+}, { deep: true });
 
 const studentVerificationOptions = computed(() => [
     { value: 'inherit', label: `Use cluster default — ${props.clusterRequireStudentVerification ? 'verified students only' : 'unverified allowed'}` },
