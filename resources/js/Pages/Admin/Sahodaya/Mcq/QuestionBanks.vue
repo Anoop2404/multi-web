@@ -8,7 +8,9 @@
                 <Link :href="banksUrl" class="btn-secondary text-sm">Question banks</Link>
             </template>
         </PageHeader>
-        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" active="question-banks" :uses-engine="engine.enabled" />
+        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'"
+                       :results-published="!!exam.results_published" :is-model-exam="!!exam.is_model_exam"
+                       active="question-banks" :uses-engine="engine.enabled" />
 
         <div v-if="(exam.delivery_mode || 'offline') === 'offline'" class="card card--muted mb-4 !py-3 px-4 text-sm text-slate-700">
             This exam is <strong>offline</strong>. A paper is only used when delivery is switched to online on the Overview tab.
@@ -87,7 +89,10 @@
                 <li v-for="bank in available" :key="bank.id" class="flex items-center justify-between gap-3 py-3">
                     <div>
                         <p class="text-sm font-medium">{{ bank.title }}</p>
-                        <p class="text-xs text-slate-500">{{ bank.subject }} · {{ bank.questions_count }} question(s)</p>
+                        <p class="text-xs text-slate-500">
+                            {{ bank.subject }} · {{ bank.questions_count }} question(s)
+                            <span v-if="bank.owner_label"> · {{ bank.owner_label }}</span>
+                        </p>
                     </div>
                     <button type="button" class="btn-secondary text-xs" @click="attach(bank)">Add</button>
                 </li>
@@ -181,6 +186,9 @@
                     </label>
                 </div>
 
+                <div v-if="engine.force_message" class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    {{ engine.force_message }}
+                </div>
                 <div v-if="engineForm.enabled && engine.capacity.window_start" class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
                     Capacity: {{ engine.capacity.expected.toLocaleString() }} candidates here + {{ engine.capacity.others_at_peak.toLocaleString() }}
                     from other exams at the same time, of {{ engine.capacity.limit.toLocaleString() }} platform capacity

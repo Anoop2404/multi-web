@@ -1,11 +1,12 @@
 <template>
     <SahodayaAdminLayout :title="exam.title" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="exam.title" eyebrow="Talent Search exam"
+        <PageHeader :title="exam.title"
+                    :eyebrow="exam.is_model_exam ? 'Sahodaya model exam' : 'Talent Search exam'"
                     :description="`${registrationCounts.total} registrations · ${exam.status}`">
             <template #actions>
                 <span v-if="exam.series_title" class="text-xs text-slate-500 mr-2">{{ exam.series_title }}</span>
-                <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/hall-tickets/preview`"
+                <a v-if="!exam.is_model_exam" :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/hall-tickets/preview`"
                    target="_blank" rel="noopener" class="btn-secondary text-sm">Sample hall ticket ↗</a>
                 <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/certificates/preview`"
                    target="_blank" rel="noopener" class="btn-secondary text-sm">Sample certificate ↗</a>
@@ -13,8 +14,12 @@
             </template>
         </PageHeader>
 
-        <div v-if="exam.level_label" class="flex flex-wrap gap-2 mb-4">
-            <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-800">{{ exam.level_label }}</span>
+        <div class="flex flex-wrap gap-2 mb-4">
+            <span class="text-xs font-semibold px-2.5 py-1 rounded-full"
+                  :class="exam.is_model_exam ? 'bg-sky-100 text-sky-800' : 'bg-indigo-100 text-indigo-800'">
+                {{ exam.product_mode_label || 'Talent Search' }}
+            </span>
+            <span v-if="exam.level_label" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-800">{{ exam.level_label }}</span>
             <span class="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 capitalize">{{ exam.exam_type_label }}</span>
             <span v-if="(exam.exam_level ?? 1) > 1" class="text-xs px-2.5 py-1 rounded-full bg-amber-50 text-amber-800">
                 Promotion: {{ exam.eligibility_mode_label }}
@@ -24,9 +29,11 @@
             </span>
         </div>
 
-        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" active="overview" />
+        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'"
+                       :results-published="!!exam.results_published" :is-model-exam="!!exam.is_model_exam" active="overview" />
 
         <McqSahodayaWorkflowBanner
+            v-if="!exam.is_model_exam"
             :sahodaya-id="sahodaya.id"
             :exam-id="exam.id"
             :exam="exam"
@@ -35,12 +42,27 @@
             :registration-count="registrationCounts.total"
         />
 
+        <div v-if="capacityGate?.message" class="card mb-4 !border-amber-200 !bg-amber-50 !py-3 px-4 text-sm text-amber-900">
+            {{ capacityGate.message }}
+        </div>
+
+        <div v-if="membershipHealth?.length" class="card mb-4 !border-amber-200 !py-3 px-4 text-sm">
+            <p class="font-semibold text-amber-900 mb-2">Membership / roster flags ({{ membershipHealth.length }} school{{ membershipHealth.length === 1 ? '' : 's' }})</p>
+            <ul class="space-y-1 text-xs text-slate-700">
+                <li v-for="row in membershipHealth.slice(0, 12)" :key="row.school_id">
+                    <strong>{{ row.school_name }}</strong>
+                    — {{ row.flags.join(', ') }}
+                    <span class="text-slate-400">(roster {{ row.roster_students }}, registered {{ row.registered }})</span>
+                </li>
+            </ul>
+        </div>
+
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">
                 <p class="text-xl font-bold">{{ registrationCounts.total }}</p>
                 <p class="text-xs text-slate-500 mt-1">Registrations</p>
             </div>
-            <div class="card card--muted !py-4 text-center">
+            <div v-if="!exam.is_model_exam" class="card card--muted !py-4 text-center">
                 <p class="text-xl font-bold text-amber-700">{{ registrationCounts.pending_approval }}</p>
                 <p class="text-xs text-slate-500 mt-1">Candidates pending payment</p>
                 <p v-if="registrationCounts.approved > 0" class="text-[11px] text-emerald-700 font-medium mt-0.5">({{ registrationCounts.approved }} confirmed)</p>
@@ -61,20 +83,28 @@
             </div>
         </div>
 
-        <McqSchoolCentreCodes :sahodaya-id="sahodaya.id" :exam-id="exam.id" :schools="centreSchools" />
-        <McqRegistrationNumbering :sahodaya-id="sahodaya.id" :exam-id="exam.id" :ranges="classRollRanges" />
+        <template v-if="!exam.is_model_exam">
+            <McqSchoolCentreCodes :sahodaya-id="sahodaya.id" :exam-id="exam.id" :schools="centreSchools" />
+            <McqRegistrationNumbering :sahodaya-id="sahodaya.id" :exam-id="exam.id" :ranges="classRollRanges" />
+        </template>
 
         <p class="text-sm text-slate-600 mb-4">
             <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/results`" class="link-brand">
                 Manage marks and publish results → Results & marks
             </a>
+            <template v-if="!exam.is_model_exam">
+                ·
+                <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/payments`" class="link-brand">
+                    Approve school batch fees → Payments
+                </a>
+            </template>
             ·
-            <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/payments`" class="link-brand">
-                Approve school batch fees → Payments
+            <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/reports`" class="link-brand">
+                Association + per-school reports →
             </a>
         </p>
 
-        <form @submit.prevent="saveLedgerAccount" class="card mb-6 space-y-3">
+        <form v-if="!exam.is_model_exam" @submit.prevent="saveLedgerAccount" class="card mb-6 space-y-3">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h3 class="section-title">Ledger account</h3>
@@ -171,42 +201,63 @@
                 <p v-if="form.delivery_mode === 'online'" class="text-xs text-indigo-700 sm:col-span-2">
                     Online exams require question banks for auto-grading. Link banks under the Question banks tab before exam day.
                 </p>
+                <FormField label="Product mode" class-extra="sm:col-span-2">
+                    <template #default="{ id }">
+                        <SearchableSelect
+                            :id="id"
+                            v-model="form.product_mode"
+                            :options="[
+                                { value: 'talent_search', label: 'Talent Search (fees / hall tickets)' },
+                                { value: 'sahodaya_model_exam', label: 'Sahodaya model exam (slim)' },
+                            ]"
+                            :all-option="false"
+                        />
+                    </template>
+                </FormField>
                 <CheckboxField
-                    v-if="form.delivery_mode === 'online'"
+                    v-model="form.allow_member_banks"
+                    label="Allow member school question banks on this paper"
+                    hint="Off by default: only Sahodaya-owned Ready banks. On: schools’ Ready banks can be attached."
+                    class="sm:col-span-2"
+                />
+                <CheckboxField
+                    v-if="form.delivery_mode === 'online' && form.product_mode !== 'sahodaya_model_exam'"
                     v-model="form.requires_hall_ticket"
                     label="Require hall ticket before starting"
                     hint="When enabled, students must have a hall ticket issued and attendance marked present before the online exam can start."
                     class="sm:col-span-2"
                 />
-                <p v-else class="text-xs text-slate-500 sm:col-span-2">
+                <p v-else-if="form.delivery_mode !== 'online'" class="text-xs text-slate-500 sm:col-span-2">
                     Offline exams use hall tickets and manual mark entry. Question banks are optional.
                 </p>
-                <FormField label="Per-student fee (₹)" hint="Required when status is Published or Ongoing">
-                    <template #default="{ id }">
-                        <input :id="id" v-model.number="form.fee_amount" type="number" min="0" step="0.01" class="field" placeholder="0">
-                    </template>
-                </FormField>
-                <FormField label="School discount (₹)" hint="Amount Sahodaya discounts per student — school remits fee minus discount">
-                    <template #default="{ id }">
-                        <input :id="id" v-model.number="form.school_discount_amount" type="number" min="0" step="0.01" class="field" placeholder="0">
-                    </template>
-                </FormField>
-                <p class="text-xs text-slate-500 sm:col-span-2">Example: ₹150 student fee with ₹30 discount → school pays ₹120 per student to Sahodaya.</p>
-                <FormField label="Payment deadline" hint="Fee due date. Schools paying after this date are charged the late fee/penalty below.">
-                    <template #default="{ id }">
-                        <input :id="id" v-model="form.payment_deadline" type="date" class="field">
-                    </template>
-                </FormField>
-                <FormField label="Late fee (₹)" hint="Flat amount added to the total due if paid after the deadline">
-                    <template #default="{ id }">
-                        <input :id="id" v-model.number="form.late_fee_amount" type="number" min="0" step="0.01" class="field" placeholder="0">
-                    </template>
-                </FormField>
-                <FormField label="Penalty (₹)" hint="Additional penalty amount added on top of the late fee, if any">
-                    <template #default="{ id }">
-                        <input :id="id" v-model.number="form.penalty_amount" type="number" min="0" step="0.01" class="field" placeholder="0">
-                    </template>
-                </FormField>
+                <template v-if="form.product_mode !== 'sahodaya_model_exam'">
+                    <FormField label="Per-student fee (₹)" hint="Required when status is Published or Ongoing">
+                        <template #default="{ id }">
+                            <input :id="id" v-model.number="form.fee_amount" type="number" min="0" step="0.01" class="field" placeholder="0">
+                        </template>
+                    </FormField>
+                    <FormField label="School discount (₹)" hint="Amount Sahodaya discounts per student — school remits fee minus discount">
+                        <template #default="{ id }">
+                            <input :id="id" v-model.number="form.school_discount_amount" type="number" min="0" step="0.01" class="field" placeholder="0">
+                        </template>
+                    </FormField>
+                    <p class="text-xs text-slate-500 sm:col-span-2">Example: ₹150 student fee with ₹30 discount → school pays ₹120 per student to Sahodaya.</p>
+                    <FormField label="Payment deadline" hint="Fee due date. Schools paying after this date are charged the late fee/penalty below.">
+                        <template #default="{ id }">
+                            <input :id="id" v-model="form.payment_deadline" type="date" class="field">
+                        </template>
+                    </FormField>
+                    <FormField label="Late fee (₹)" hint="Flat amount added to the total due if paid after the deadline">
+                        <template #default="{ id }">
+                            <input :id="id" v-model.number="form.late_fee_amount" type="number" min="0" step="0.01" class="field" placeholder="0">
+                        </template>
+                    </FormField>
+                    <FormField label="Penalty (₹)" hint="Additional penalty amount added on top of the late fee, if any">
+                        <template #default="{ id }">
+                            <input :id="id" v-model.number="form.penalty_amount" type="number" min="0" step="0.01" class="field" placeholder="0">
+                        </template>
+                    </FormField>
+                </template>
                 <p class="text-xs text-slate-500 sm:col-span-2">Late fee and penalty only apply once a payment deadline is set; they're re-checked every time a school's fee is (re)synced.</p>
                 <FormField label="Reg. no. starts at" hint="First hall-ticket number when tickets are issued. Use presets or enter any number from 1. Locked after any ticket is issued.">
                     <template #default="{ id }">
@@ -359,6 +410,8 @@ const props = defineProps({
     centreSchools: { type: Array, default: () => [] },
     classRollRanges: { type: Array, default: () => [] },
     classOptions: { type: Array, default: () => [] },
+    membershipHealth: { type: Array, default: () => [] },
+    capacityGate: { type: Object, default: null },
 });
 
 const { confirm } = useConfirm();
@@ -397,6 +450,8 @@ const form = useForm({
     title: props.exam.title,
     code: props.exam.code ?? '',
     status: props.exam.status,
+    product_mode: props.exam.product_mode ?? 'talent_search',
+    allow_member_banks: !!(props.exam.allow_member_banks ?? props.exam.settings_json?.allow_member_banks),
     delivery_mode: props.exam.delivery_mode ?? 'offline',
     requires_hall_ticket: !!(props.exam.settings_json?.requires_hall_ticket),
     student_verification_mode: studentVerificationModeFromExam(props.exam),

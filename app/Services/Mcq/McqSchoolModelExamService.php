@@ -159,9 +159,15 @@ class McqSchoolModelExamService
         }
 
         $exam->update(['status' => 'published']);
+        $exam = $exam->fresh();
 
         if ($autoEnroll) {
-            $this->enrollEligible($exam->fresh(), $school);
+            $this->enrollEligible($exam, $school);
+            $exam = $exam->fresh();
+        }
+
+        if ($exam->isOnlineDelivery()) {
+            app(\App\Services\ExamEngine\ExamEngineCapacityGate::class)->ensureEnginePreferred($exam);
         }
 
         return $exam->fresh();

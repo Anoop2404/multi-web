@@ -873,17 +873,34 @@ class McqExamOpsController extends SahodayaAdminController
         $this->assertStaffCan('mcq.manage');
 
         $linkedIds = $exam->questionBanks()->pluck('mcq_question_banks.id');
-        $available = McqQuestionBank::where('sahodaya_id', $this->sahodaya->id)
+        $availableQuery = McqQuestionBank::where('sahodaya_id', $this->sahodaya->id)
             ->where('status', 'active')
-            ->whereNotIn('id', $linkedIds)
+            ->whereNotIn('id', $linkedIds);
+        // Association papers use Sahodaya-owned banks by default; member school banks only when allowed.
+        if (! $exam->allowsMemberBanks()) {
+            $availableQuery->whereNull('school_id');
+        }
+        $available = $availableQuery
             ->withCount('questions')
+            ->with(['school:id,name'])
             ->orderBy('title')
-            ->get(['id', 'title', 'subject', 'class_group']);
+            ->get(['id', 'title', 'subject', 'class_group', 'school_id']);
 
         return $this->inertia('Sahodaya/Mcq/QuestionBanks', [
-            'exam'      => $exam->only('id', 'title', 'delivery_mode', 'results_published', 'total_questions', 'status'),
+            'exam'      => array_merge($exam->only('id', 'title', 'delivery_mode', 'results_published', 'total_questions', 'status'), [
+                'product_mode' => $exam->productMode(),
+                'is_model_exam' => $exam->isModelExam(),
+                'allow_member_banks' => $exam->allowsMemberBanks(),
+            ]),
             'paper'     => $papers->summary($exam),
-            'available' => $available,
+            'available' => $available->map(fn (McqQuestionBank $bank) => [
+                'id' => $bank->id,
+                'title' => $bank->title,
+                'subject' => $bank->subject,
+                'class_group' => $bank->class_group,
+                'questions_count' => $bank->questions_count,
+                'owner_label' => $bank->school_id ? ($bank->school?->name ?? 'Member school') : 'Sahodaya',
+            ]),
             'paperTemplates' => \App\Models\McqPaperTemplate::where('tenant_id', $exam->tenant_id)->orderBy('title')->get()->map(fn ($t) => [
                 'id' => $t->id, 'title' => $t->title, 'version' => $t->version, 'sections' => $t->definition_json,
                 'total_marks' => $t->total_marks, 'question_count' => count($t->questions_json), 'is_active' => $t->is_active,
@@ -900,6 +917,7 @@ class McqExamOpsController extends SahodayaAdminController
             ],
             'banksUrl'  => "/sahodaya-admin/{$this->sahodaya->id}/mcq/question-banks",
             'engine'    => $this->enginePanel($exam),
+            'capacityGate' => app(\App\Services\ExamEngine\ExamEngineCapacityGate::class)->panel($exam),
         ]);
     }
 
@@ -908,6 +926,7 @@ class McqExamOpsController extends SahodayaAdminController
     {
         $bookings = app(\App\Services\ExamEngine\ExamEngineBookingService::class);
         $window = $exam->scheduled_at && \App\Services\ExamEngine\ExamEngineRun::usesEngine($exam) ? $bookings->window($exam) : null;
+        $capacityGate = app(\App\Services\ExamEngine\ExamEngineCapacityGate::class)->panel($exam);
 
         return [
             'enabled'          => \App\Services\ExamEngine\ExamEngineRun::usesEngine($exam),
@@ -927,6 +946,9 @@ class McqExamOpsController extends SahodayaAdminController
                 'window_start'   => $window ? $window[0]->toIso8601String() : null,
                 'window_end'     => $window ? $window[1]->toIso8601String() : null,
             ],
+            'force_threshold'  => $capacityGate['threshold'],
+            'force_required'   => $capacityGate['required'],
+            'force_message'    => $capacityGate['message'],
         ];
     }
 
@@ -1033,6 +1055,9 @@ class McqExamOpsController extends SahodayaAdminController
         $bank = McqQuestionBank::where('sahodaya_id', $this->sahodaya->id)->findOrFail($data['bank_id']);
         if ($bank->status !== 'active') {
             return back()->with('error', 'Only banks marked Ready can be added to a paper.');
+        }
+        if ($bank->school_id && ! $exam->allowsMemberBanks()) {
+            return back()->with('error', 'Member school banks are not allowed on this exam. Enable “Allow member school banks” on Overview first.');
         }
 
         $nextOrder = ((int) DB::table('mcq_exam_question_banks')->where('exam_id', $exam->id)->max('display_order')) + 1;

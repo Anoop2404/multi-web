@@ -175,7 +175,29 @@ class McqExam extends Model
     /** In-school model exam (not Sahodaya Talent Search). */
     public function isSchoolModelExam(): bool
     {
-        return ($this->conductor_level ?? 'sahodaya') === 'school';
+        return \App\Support\Mcq\McqProductMode::of($this) === \App\Support\Mcq\McqProductMode::SCHOOL_MODEL
+            || ($this->conductor_level ?? 'sahodaya') === 'school';
+    }
+
+    /** Association-level model exam (not competitive Talent Search). */
+    public function isSahodayaModelExam(): bool
+    {
+        return \App\Support\Mcq\McqProductMode::of($this) === \App\Support\Mcq\McqProductMode::SAHODAYA_MODEL;
+    }
+
+    public function isModelExam(): bool
+    {
+        return \App\Support\Mcq\McqProductMode::isModelExam($this);
+    }
+
+    public function productMode(): string
+    {
+        return \App\Support\Mcq\McqProductMode::of($this);
+    }
+
+    public function allowsMemberBanks(): bool
+    {
+        return (bool) ($this->settings_json['allow_member_banks'] ?? false);
     }
 
     public function owningSchoolId(): ?string

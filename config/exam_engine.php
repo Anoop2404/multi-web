@@ -20,6 +20,8 @@ return [
     'capacity' => (int) env('EXAM_ENGINE_CAPACITY', 2000),
     // A slot above this many booked students triggers scale-out (plan §9.2).
     'scale_out_threshold' => (int) env('EXAM_ENGINE_SCALE_OUT_THRESHOLD', 2000),
+    // Online exams at/above this enrolled count should use the Go engine, not Laravel draft autosave.
+    'force_engine_threshold' => (int) env('EXAM_ENGINE_FORCE_THRESHOLD', 500),
 
     // Defaults for new engine exams (plan §4, §11.2).
     'defaults' => [

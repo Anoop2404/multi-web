@@ -55,6 +55,9 @@ class McqExamController extends SahodayaAdminController
                     $exam->top_rank_count,
                 ),
                 'series_title' => $exam->series?->title,
+                'product_mode' => $exam->productMode(),
+                'product_mode_label' => \App\Support\Mcq\McqProductMode::label($exam->productMode()),
+                'is_model_exam' => $exam->isModelExam(),
             ]));
 
         $activeStatuses = ['published', 'registration_open', 'ongoing'];
@@ -89,6 +92,7 @@ class McqExamController extends SahodayaAdminController
             'title'             => 'required|string|max:255',
             'code'              => 'nullable|string|max:64',
             'exam_type'         => 'nullable|in:practice,assessment,competitive',
+            'product_mode'      => 'nullable|in:talent_search,sahodaya_model_exam',
             'scheduled_at'      => 'nullable|date',
             'registration_opens_at'  => 'nullable|date',
             'registration_closes_at' => 'nullable|date|after_or_equal:registration_opens_at',
@@ -118,8 +122,15 @@ class McqExamController extends SahodayaAdminController
             $data['code'] = null;
         }
 
+        $productMode = $data['product_mode'] ?? \App\Support\Mcq\McqProductMode::TALENT_SEARCH;
+        unset($data['product_mode']);
+
         $fee = (float) ($data['fee_amount'] ?? 0);
         $discount = (float) ($data['school_discount_amount'] ?? 0);
+        if ($productMode === \App\Support\Mcq\McqProductMode::SAHODAYA_MODEL) {
+            $fee = 0;
+            $discount = 0;
+        }
         if ($discount > $fee && $fee > 0) {
             return back()->withErrors(['school_discount_amount' => 'School discount cannot exceed the student fee.']);
         }
@@ -128,12 +139,17 @@ class McqExamController extends SahodayaAdminController
         $data['conductor_level'] = 'sahodaya';
         $data['status'] = 'draft';
         $data['exam_type'] = $data['exam_type'] ?? 'assessment';
-        $data['delivery_mode'] = $data['delivery_mode'] ?? 'offline';
+        $data['delivery_mode'] = $data['delivery_mode']
+            ?? ($productMode === \App\Support\Mcq\McqProductMode::SAHODAYA_MODEL ? 'online' : 'offline');
         $data['academic_year_id'] = AcademicYear::activeId();
         $data['fee_type'] = $fee > 0 ? 'flat' : 'none';
         $data['fee_amount'] = $fee > 0 ? $fee : null;
         $data['school_discount_amount'] = $fee > 0 && $discount > 0 ? $discount : null;
         $data['next_hall_ticket_no'] = 100;
+        $data['settings_json'] = array_merge(
+            $data['settings_json'] ?? [],
+            \App\Support\Mcq\McqProductMode::presetSettings($productMode),
+        );
         $data = McqExamPayload::applyDefaults($data);
 
         if ($error = McqExamPayload::eligibilityError($data)) {
@@ -193,6 +209,12 @@ class McqExamController extends SahodayaAdminController
             'tickets_issued'   => McqRegistration::where('exam_id', $exam->id)->whereNotNull('hall_ticket_no')->exists(),
             'has_fee'          => $exam->hasFee(),
             'tickets_issued_count' => McqRegistration::where('exam_id', $exam->id)->whereNotNull('hall_ticket_no')->count(),
+            'product_mode'     => $exam->productMode(),
+            'product_mode_label' => \App\Support\Mcq\McqProductMode::label($exam->productMode()),
+            'is_model_exam'    => $exam->isModelExam(),
+            'shows_fees'       => \App\Support\Mcq\McqProductMode::showsFees($exam),
+            'shows_hall_tickets' => \App\Support\Mcq\McqProductMode::showsHallTickets($exam),
+            'allow_member_banks' => $exam->allowsMemberBanks(),
         ]);
 
         $pendingPaymentApprovals = $schoolFees->filter(
@@ -232,17 +254,22 @@ class McqExamController extends SahodayaAdminController
             'classRollRanges' => app(\App\Services\Mcq\McqClassRollRangeService::class)->preview($exam),
             'clusterRequireStudentVerification' => app(StudentVerificationGate::class)
                 ->requiredGlobally($this->sahodaya->id),
+            'membershipHealth' => app(\App\Services\Mcq\McqMembershipHealthService::class)->problemSchools($exam)->values(),
+            'capacityGate' => app(\App\Services\ExamEngine\ExamEngineCapacityGate::class)->panel($exam),
         ]);
     }
 
     public function update(Request $request, string $tenantId, McqExam $exam)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($exam->isSchoolModelExam(), 404);
 
         $data = $request->validate([
             'title'            => 'required|string|max:255',
             'code'             => 'nullable|string|max:64',
             'exam_type'        => 'nullable|in:practice,assessment,competitive',
+            'product_mode'     => 'nullable|in:talent_search,sahodaya_model_exam',
+            'allow_member_banks' => 'nullable|boolean',
             'scheduled_at'     => 'nullable|date',
             'class_schedules' => 'sometimes|array|max:100',
             'class_schedules.*.class_name' => 'required|string|max:100|distinct:ignore_case',
@@ -311,8 +338,23 @@ class McqExamController extends SahodayaAdminController
             $data['code'] = $code;
         }
 
+        $productMode = $data['product_mode'] ?? $exam->productMode();
+        unset($data['product_mode']);
+        if (! in_array($productMode, [\App\Support\Mcq\McqProductMode::TALENT_SEARCH, \App\Support\Mcq\McqProductMode::SAHODAYA_MODEL], true)) {
+            $productMode = \App\Support\Mcq\McqProductMode::TALENT_SEARCH;
+        }
+
+        $allowMemberBanks = array_key_exists('allow_member_banks', $data)
+            ? (bool) $data['allow_member_banks']
+            : $exam->allowsMemberBanks();
+        unset($data['allow_member_banks']);
+
         $fee = (float) ($data['fee_amount'] ?? 0);
         $discount = (float) ($data['school_discount_amount'] ?? 0);
+        if ($productMode === \App\Support\Mcq\McqProductMode::SAHODAYA_MODEL) {
+            $fee = 0;
+            $discount = 0;
+        }
         if ($discount > $fee && $fee > 0) {
             return back()->withErrors(['school_discount_amount' => 'School discount cannot exceed the student fee.']);
         }
@@ -330,10 +372,19 @@ class McqExamController extends SahodayaAdminController
             return back()->withErrors(['eligibility_config' => $error]);
         }
 
+        // Talent Search competitive/assessment exams require a fee before opening; model exams do not.
         if (in_array($data['status'], ['published', 'ongoing'], true) && $fee <= 0
+            && $productMode === \App\Support\Mcq\McqProductMode::TALENT_SEARCH
             && ($data['exam_type'] ?? $exam->exam_type ?? 'assessment') !== 'practice') {
             return back()->withErrors(['fee_amount' => 'Set a per-student fee before opening registration.']);
         }
+
+        $data['settings_json'] = array_merge(
+            $exam->settings_json ?? [],
+            $data['settings_json'] ?? [],
+            \App\Support\Mcq\McqProductMode::presetSettings($productMode),
+            ['allow_member_banks' => $allowMemberBanks],
+        );
 
         if (array_key_exists('next_hall_ticket_no', $data) && $data['next_hall_ticket_no'] !== null) {
             $newNextHallTicketNo = McqExamPayload::nextHallTicketNo($data['next_hall_ticket_no']);
@@ -405,9 +456,9 @@ class McqExamController extends SahodayaAdminController
         }
 
         $exam->update($data);
+        $exam->refresh();
 
         if (array_key_exists('fee_amount', $data) || array_key_exists('fee_type', $data) || array_key_exists('school_discount_amount', $data)) {
-            $exam->refresh();
             $feeService = app(McqSchoolFeeService::class);
             McqRegistration::where('exam_id', $exam->id)
                 ->distinct()
@@ -420,11 +471,20 @@ class McqExamController extends SahodayaAdminController
                 });
         }
 
+        $capacityNote = null;
+        if (in_array($exam->status, ['published', 'ongoing'], true) && $exam->isOnlineDelivery()) {
+            $gate = app(\App\Services\ExamEngine\ExamEngineCapacityGate::class)->ensureEnginePreferred($exam);
+            if ($gate['forced']) {
+                $capacityNote = " Exam engine enabled automatically ({$gate['count']} enrolled ≥ {$gate['threshold']}). Arm before T0.";
+            }
+        }
+
         app(PlatformAuditLogger::class)->mcq($exam, 'mcq.exam.updated', "Talent Search exam updated: {$exam->title}", [
             'status' => $data['status'] ?? $exam->status,
+            'product_mode' => $exam->productMode(),
         ]);
 
-        return back()->with('success', 'Exam updated.');
+        return back()->with('success', 'Exam updated.'.$capacityNote);
     }
 
     public function publishResults(string $tenantId, McqExam $exam, McqRankingService $ranking)
