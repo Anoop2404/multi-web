@@ -20,9 +20,8 @@ use Illuminate\Support\Str;
 
 /**
  * Question bank authoring for Talent Search (MCQ) exams, shared by the Sahodaya admin
- * panel and the exam portal (exam controllers). The using controller supplies the
- * Sahodaya, the URL base and how to render a page. See
- * docs/ONLINE_EXAM_ENGINE_PLAN_2026_10_15.md §7.
+ * panel, the exam portal, and school model-exam authoring. The using controller supplies
+ * the Sahodaya, optional school scope, the URL base and how to render a page.
  */
 trait ManagesMcqQuestionBanks
 {
@@ -32,6 +31,28 @@ trait ManagesMcqQuestionBanks
 
     /** @param  'index'|'show'  $page */
     abstract protected function renderBankPage(Request $request, string $page, array $props);
+
+    /** When set, banks are scoped to this school (school model exams). */
+    protected function bankSchoolId(Request $request): ?string
+    {
+        return null;
+    }
+
+    protected function bankTeacherId(Request $request): ?string
+    {
+        return null;
+    }
+
+    /** @param  \Illuminate\Database\Eloquent\Builder<\App\Models\McqQuestionBank>  $query */
+    protected function scopeBanksQuery($query, Request $request)
+    {
+        $schoolId = $this->bankSchoolId($request);
+        if ($schoolId !== null) {
+            $query->where('school_id', $schoolId);
+        }
+
+        return $query;
+    }
 
     public function index(Request $request)
     {
@@ -43,7 +64,7 @@ trait ManagesMcqQuestionBanks
 
         $classGroups = FestClassGroupScheme::labelsForSahodaya($sahodayaId);
 
-        $banks = McqQuestionBank::where('sahodaya_id', $sahodayaId)
+        $banks = $this->scopeBanksQuery(McqQuestionBank::where('sahodaya_id', $sahodayaId), $request)
             ->with(['school:id,name', 'teacher:id,name'])
             ->withCount(['questions', 'exams'])
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
@@ -68,7 +89,7 @@ trait ManagesMcqQuestionBanks
                 'updated_at'        => $bank->updated_at?->toIso8601String(),
             ]);
 
-        $allBanks = McqQuestionBank::where('sahodaya_id', $sahodayaId);
+        $allBanks = $this->scopeBanksQuery(McqQuestionBank::where('sahodaya_id', $sahodayaId), $request);
 
         return $this->renderBankPage($request, 'index', [
             'banks'       => $banks,
@@ -92,6 +113,8 @@ trait ManagesMcqQuestionBanks
         $bank = McqQuestionBank::create([
             ...$data,
             'sahodaya_id'        => $sahodayaId,
+            'school_id'          => $this->bankSchoolId($request),
+            'teacher_id'         => $this->bankTeacherId($request),
             'status'             => 'draft',
             'created_by_user_id' => $request->user()->id,
         ]);
@@ -390,6 +413,11 @@ trait ManagesMcqQuestionBanks
     private function assertBankInSahodaya(Request $request, McqQuestionBank $bank): void
     {
         abort_unless($bank->sahodaya_id === $this->bankSahodayaId($request), 404);
+
+        $schoolId = $this->bankSchoolId($request);
+        if ($schoolId !== null) {
+            abort_unless($bank->school_id === $schoolId, 404);
+        }
     }
 
     private function rejectIfLocked(McqQuestionBank $bank): ?RedirectResponse

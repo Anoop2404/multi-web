@@ -26,6 +26,7 @@ class McqController extends SchoolAdminController
     {
         $sahodayaId = $this->school->parent_id;
         $exams = McqExam::where('tenant_id', $sahodayaId)
+            ->where('conductor_level', '!=', 'school')
             ->whereIn('status', ['published', 'ongoing', 'completed'])
             ->orderByDesc('scheduled_at')
             ->get();

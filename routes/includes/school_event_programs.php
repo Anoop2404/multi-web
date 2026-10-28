@@ -14,6 +14,8 @@ use App\Http\Controllers\SchoolAdmin\FestSubstitutionRequestController;
 use App\Http\Controllers\SchoolAdmin\KalotsavController;
 use App\Http\Controllers\SchoolAdmin\KidsFestController;
 use App\Http\Controllers\SchoolAdmin\McqController;
+use App\Http\Controllers\SchoolAdmin\McqModelExamController;
+use App\Http\Controllers\SchoolAdmin\McqModelExamQuestionBankController;
 use App\Http\Controllers\SchoolAdmin\McqRegistrationController;
 use App\Http\Controllers\SchoolAdmin\McqReportController;
 use App\Http\Controllers\SchoolAdmin\ScienceFestController;
@@ -367,6 +369,40 @@ Route::prefix('sports')->name('sports.')->group(function () {
     Route::post('/my-event/{event}/toggle-record-tracking', [SportsMeetController::class, 'toggleRecordTracking'])->name('my-event.records.toggle-tracking');
     Route::get('/submit-winners', [SportsMeetController::class, 'submitWinners'])->name('submit-winners');
     Route::post('/submit-winners', [SportsMeetController::class, 'storeWinners'])->name('submit-winners.store');
+});
+
+// School-owned model exams (not Sahodaya Talent Search). Slim fee/hall-ticket-free flow.
+Route::prefix('model-exams')->name('model-exams.')->group(function () {
+    Route::get('/', [McqModelExamController::class, 'index'])->name('index');
+    Route::post('/', [McqModelExamController::class, 'store'])->name('store');
+
+    Route::get('/question-banks', [McqModelExamQuestionBankController::class, 'index'])->name('question-banks');
+    Route::post('/question-banks', [McqModelExamQuestionBankController::class, 'storeBank'])->name('question-banks.store');
+    Route::get('/question-banks/import-template', [McqModelExamQuestionBankController::class, 'importTemplate'])->name('question-banks.import-template');
+    Route::get('/question-banks/{bank}', [McqModelExamQuestionBankController::class, 'show'])->name('question-banks.show');
+    Route::put('/question-banks/{bank}', [McqModelExamQuestionBankController::class, 'updateBank'])->name('question-banks.update');
+    Route::delete('/question-banks/{bank}', [McqModelExamQuestionBankController::class, 'destroyBank'])->name('question-banks.destroy');
+    Route::post('/question-banks/{bank}/questions', [McqModelExamQuestionBankController::class, 'storeQuestion'])->name('question-banks.questions.store');
+    Route::put('/question-banks/{bank}/questions/{question}', [McqModelExamQuestionBankController::class, 'updateQuestion'])->name('question-banks.questions.update');
+    Route::delete('/question-banks/{bank}/questions/{question}', [McqModelExamQuestionBankController::class, 'destroyQuestion'])->name('question-banks.questions.destroy');
+    Route::post('/question-banks/{bank}/questions/{question}/move', [McqModelExamQuestionBankController::class, 'moveQuestion'])->name('question-banks.questions.move');
+    Route::get('/question-banks/{bank}/questions/{question}/image', [McqModelExamQuestionBankController::class, 'questionImage'])->name('question-banks.questions.image');
+    Route::post('/question-banks/{bank}/import/preview', [McqModelExamQuestionBankController::class, 'importPreview'])->name('question-banks.import.preview');
+    Route::post('/question-banks/{bank}/import/commit', [McqModelExamQuestionBankController::class, 'importCommit'])->name('question-banks.import.commit');
+
+    Route::get('/{exam}', [McqModelExamController::class, 'show'])->name('show');
+    Route::put('/{exam}', [McqModelExamController::class, 'update'])->name('update');
+    Route::post('/{exam}/publish', [McqModelExamController::class, 'publish'])->name('publish');
+    Route::post('/{exam}/enroll-eligible', [McqModelExamController::class, 'enrollEligible'])->name('enroll-eligible');
+    Route::post('/{exam}/publish-results', [McqModelExamController::class, 'publishResults'])->name('publish-results');
+    Route::post('/{exam}/unpublish-results', [McqModelExamController::class, 'unpublishResults'])->name('unpublish-results');
+
+    Route::get('/{exam}/paper', [McqModelExamController::class, 'paper'])->name('paper');
+    Route::post('/{exam}/paper/banks', [McqModelExamController::class, 'attachBank'])->name('paper.banks.attach');
+    Route::put('/{exam}/paper/banks/{bank}', [McqModelExamController::class, 'updateSection'])->name('paper.banks.update');
+    Route::delete('/{exam}/paper/banks/{bank}', [McqModelExamController::class, 'detachBank'])->name('paper.banks.detach');
+    Route::post('/{exam}/paper/banks/{bank}/move', [McqModelExamController::class, 'moveSection'])->name('paper.banks.move');
+    Route::put('/{exam}/paper/settings', [McqModelExamController::class, 'updatePaperSettings'])->name('paper.settings');
 });
 
 Route::prefix('mcq')->name('mcq.')->group(function () {

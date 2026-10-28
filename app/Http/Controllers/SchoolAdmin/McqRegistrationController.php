@@ -37,6 +37,7 @@ class McqRegistrationController extends SchoolAdminController
         $sahodayaId = $this->school->parent_id;
 
         $examModels = McqExam::where('tenant_id', $sahodayaId)
+            ->where('conductor_level', '!=', 'school')
             ->whereIn('status', ['published', 'ongoing', 'completed'])
             ->with(['series:id,title', 'parentExam:id,title,exam_level'])
             ->orderByDesc('scheduled_at')

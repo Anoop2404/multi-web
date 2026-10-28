@@ -41,6 +41,7 @@ class McqExamController extends SahodayaAdminController
     {
         // Active = excludes cancelled registrations, matching the per-exam Overview/Reports stats.
         $exams = McqExam::where('tenant_id', $this->sahodaya->id)
+            ->where('conductor_level', '!=', 'school')
             ->with(['series:id,title', 'parentExam:id,title,exam_level'])
             ->withCount(['registrations' => fn ($q) => $q->active()])
             ->orderByDesc('scheduled_at')
@@ -150,6 +151,7 @@ class McqExamController extends SahodayaAdminController
     public function show(string $tenantId, McqExam $exam, \App\Services\Mcq\McqReportService $reports)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($exam->isSchoolModelExam(), 404);
 
         $exam->load(['series:id,title', 'parentExam:id,title,exam_level']);
 

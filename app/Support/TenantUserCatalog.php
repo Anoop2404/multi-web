@@ -475,7 +475,7 @@ class TenantUserCatalog
             return 'training.manage';
         }
 
-        if (str_contains($path, '/mcq')) {
+        if (str_contains($path, '/model-exams') || str_contains($path, '/mcq')) {
             if (str_contains($path, '/attendance')) {
                 return 'mcq.attendance';
             }

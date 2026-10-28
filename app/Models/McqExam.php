@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class McqExam extends Model
 {
     protected $fillable = [
-        'tenant_id', 'academic_year_id', 'series_id', 'exam_level', 'parent_exam_id',
+        'tenant_id', 'school_id', 'academic_year_id', 'series_id', 'exam_level', 'parent_exam_id',
         'eligibility_mode', 'cutoff_score', 'top_rank_count', 'promotion_locked', 'promoted_student_ids',
         'title', 'code', 'exam_type', 'delivery_mode', 'conductor_level',
         'scheduled_at', 'registration_opens_at', 'registration_closes_at', 'result_date',
@@ -170,6 +170,22 @@ class McqExam extends Model
     public function isOfflineDelivery(): bool
     {
         return ! $this->isOnlineDelivery();
+    }
+
+    /** In-school model exam (not Sahodaya Talent Search). */
+    public function isSchoolModelExam(): bool
+    {
+        return ($this->conductor_level ?? 'sahodaya') === 'school';
+    }
+
+    public function owningSchoolId(): ?string
+    {
+        return $this->school_id ?: null;
+    }
+
+    public function belongsToSchool(string $schoolId): bool
+    {
+        return $this->isSchoolModelExam() && $this->owningSchoolId() === $schoolId;
     }
 
     /** How multiple-correct questions are marked: `all_or_nothing` (default) or `partial`. */
