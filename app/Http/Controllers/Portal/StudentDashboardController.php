@@ -66,8 +66,21 @@ class StudentDashboardController extends Controller
 
         return inertia('Portal/Student/McqHub', [
             'school'   => $school->only('id', 'name'),
-            'student'  => $student->only('id', 'name', 'reg_no'),
+            'student'  => $this->studentPayload($student),
             'mcqExams' => $this->mcqExamsFor($student),
+        ]);
+    }
+
+    public function documents(Request $request, string $tenantId)
+    {
+        [$student, $school] = $this->portalContext($request, $tenantId);
+
+        return inertia('Portal/Student/Documents', [
+            'school'          => $school->only('id', 'name'),
+            'student'         => $this->studentPayload($student),
+            'mcqExams'        => $this->mcqExamsFor($student),
+            'festCerts'       => $this->festCertificatesFor($student, $tenantId),
+            'admitCardEvents' => $this->admitCardEvents($student, $tenantId),
         ]);
     }
 
@@ -156,7 +169,7 @@ class StudentDashboardController extends Controller
 
         return inertia('Portal/Student/Dashboard', [
             'school'        => $school->only('id', 'name'),
-            'student'       => $student->only('id', 'name', 'reg_no', 'email'),
+            'student'       => $this->studentPayload($student),
             'logoUrl'       => TenantBranding::logoUrl($school),
             'registrations' => $registrations,
             'sportsProfile' => $sportsProfile,
@@ -297,6 +310,9 @@ class StudentDashboardController extends Controller
                         'uses_exam_engine' => \App\Services\ExamEngine\ExamEngineRun::usesEngine($exam),
                         'delivery_mode'         => $exam->delivery_mode ?? 'offline',
                         'registration_route_id' => $reg->id,
+                        'scheduled_at'          => $exam->scheduled_at?->toIso8601String(),
+                        'duration_minutes'      => (int) ($exam->duration_minutes ?: 0) ?: null,
+                        'status'                => $reg->status,
                     ]
                 );
             })
@@ -311,6 +327,18 @@ class StudentDashboardController extends Controller
         $school = Tenant::findOrFail($tenantId);
 
         return [$student, $school];
+    }
+
+    /** @return array<string, mixed> */
+    private function studentPayload($student): array
+    {
+        return [
+            'id'        => $student->id,
+            'name'      => $student->name,
+            'reg_no'    => $student->reg_no,
+            'email'     => $student->email,
+            'photo_url' => method_exists($student, 'photoUrl') ? $student->photoUrl() : null,
+        ];
     }
 
     /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */

@@ -42,8 +42,17 @@
             <p v-if="exam.require_fullscreen" class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                 This exam requires fullscreen after you start. Leaving fullscreen is recorded as a signal — not an automatic fail. Extra monitors are not detected.
             </p>
+            <label class="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800 cursor-pointer">
+                <input v-model="acceptedRules" type="checkbox" class="mt-1 rounded border-slate-300 text-[#0f3d7a] focus:ring-[#0f3d7a]">
+                <span>I have read and accept the exam rules and instructions.</span>
+            </label>
             <div class="text-center pt-2">
-                <button type="button" class="btn-primary min-h-12 px-8" :disabled="starting" @click="startExam">Start exam</button>
+                <button
+                    type="button"
+                    class="btn-primary min-h-12 px-8 disabled:opacity-50 disabled:cursor-not-allowed"
+                    :disabled="starting || !acceptedRules"
+                    @click="startExam"
+                >Start exam</button>
             </div>
         </div>
 
@@ -494,6 +503,7 @@ const answers = reactive({});
 const markedForReview = ref(new Set());
 const submitting = ref(false);
 const starting = ref(false);
+const acceptedRules = ref(false);
 const confirmOpen = ref(false);
 const mobileDrawerOpen = ref(false);
 const saveStatus = ref('');
@@ -829,6 +839,7 @@ function tickTimer() {
 }
 
 function startExam() {
+    if (!acceptedRules.value || starting.value) return;
     starting.value = true;
     router.post(`/portal/student/${props.school.id}/mcq/${props.registration.id}/start`, {}, {
         onFinish: () => { starting.value = false; },

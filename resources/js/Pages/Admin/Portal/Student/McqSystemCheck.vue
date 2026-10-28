@@ -3,7 +3,7 @@
         role-label="Student Portal"
         title="Device check"
         :subtitle="`${school.name} · practice before exam day`"
-        accent="indigo"
+        accent="navy"
         :nav-items="navItems"
     >
         <div class="card max-w-xl mx-auto space-y-4">

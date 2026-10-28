@@ -2422,6 +2422,7 @@ Route::prefix('portal/student/{tenantId}')
     ->group(function () {
         Route::get('/', [StudentDashboardController::class, 'index'])->name('dashboard');
         Route::get('/mcq', [StudentDashboardController::class, 'mcqHub'])->name('mcq');
+        Route::get('/documents', [StudentDashboardController::class, 'documents'])->name('documents');
         Route::get('/mcq/system-check', [\App\Http\Controllers\Portal\StudentMcqController::class, 'systemCheck'])->name('mcq.system-check');
         Route::get('/fest/schedule', [StudentDashboardController::class, 'festSchedule'])->name('fest.schedule');
         Route::get('/results', [StudentDashboardController::class, 'festResultsPage'])->name('results');
