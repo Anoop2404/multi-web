@@ -35,6 +35,11 @@ class McqExamSessionService
         $this->assertCandidateEligible($registration);
 
         if ($registration->status === 'submitted') {
+            if ($registration->canReattempt()) {
+                throw ValidationException::withMessages([
+                    'exam' => 'This attempt is complete. Start a reattempt from your exam list when ready.',
+                ]);
+            }
             throw ValidationException::withMessages(['exam' => 'Exam already submitted.']);
         }
 
@@ -230,9 +235,65 @@ class McqExamSessionService
         $registration->update([
             'status'       => 'submitted',
             'submitted_at' => now(),
+            'submit_mode'  => $registration->submit_mode ?: 'manual',
         ]);
 
         return $mark;
+    }
+
+    /**
+     * Archive the completed attempt and clear session fields so the student can start again.
+     * McqMark is updated on the next submit (latest) or kept when scoring is "best" until beaten.
+     */
+    public function beginReattempt(McqRegistration $registration): McqRegistration
+    {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($registration) {
+            $registration = McqRegistration::whereKey($registration->id)->lockForUpdate()->firstOrFail();
+            $registration->loadMissing(['exam', 'mark']);
+
+            if (! $registration->canReattempt()) {
+                throw ValidationException::withMessages([
+                    'exam' => 'No reattempts remain for this exam.',
+                ]);
+            }
+
+            $exam = $registration->exam;
+            $mark = $registration->mark;
+            $history = $registration->attempt_history ?? [];
+            $history[] = [
+                'attempt'      => $registration->attemptNumber(),
+                'started_at'   => $registration->started_at?->toIso8601String(),
+                'submitted_at' => $registration->submitted_at?->toIso8601String(),
+                'submit_mode'  => $registration->submit_mode,
+                'score'        => $mark?->score,
+                'percentage'   => $mark?->percentage,
+                'grade'        => $mark?->grade,
+                'correct'      => $mark?->correct_count,
+                'wrong'        => $mark?->wrong_count,
+                'unanswered'   => $mark?->unanswered_count,
+            ];
+
+            $keepMark = $exam->reattemptScoring() === 'best' && $mark;
+
+            $registration->forceFill([
+                'status'          => 'registered',
+                'started_at'      => null,
+                'submitted_at'    => null,
+                'submit_mode'     => null,
+                'draft_answers'   => null,
+                'paper_snapshot'  => null,
+                'attempt_number'  => $registration->attemptNumber() + 1,
+                'attempt_history' => $history,
+            ])->save();
+
+            if (! $keepMark && $mark) {
+                $mark->delete();
+            }
+
+            McqProctorEvent::where('registration_id', $registration->id)->delete();
+
+            return $registration->fresh(['exam', 'mark']);
+        });
     }
 
     /**
@@ -254,18 +315,30 @@ class McqExamSessionService
             $grade = $failBand['label'] ?? 'F';
         }
 
+        $payload = [
+            'correct_count'    => $result['correct'],
+            'wrong_count'      => $result['wrong'],
+            'unanswered_count' => $result['unanswered'],
+            'score'            => $result['score'],
+            'percentage'       => $percentage,
+            'grade'            => $grade,
+            'answers_json'     => $result['answers'],
+            'locked_at'        => now(),
+        ];
+
+        $existing = McqMark::where('registration_id', $registration->id)->first();
+        if (
+            $existing
+            && $registration->exam->reattemptScoring() === 'best'
+            && (float) $existing->percentage >= (float) $percentage
+        ) {
+            // Keep the stronger attempt's official mark; history already archived the prior run.
+            return $existing;
+        }
+
         $mark = McqMark::updateOrCreate(
             ['registration_id' => $registration->id],
-            [
-                'correct_count'    => $result['correct'],
-                'wrong_count'      => $result['wrong'],
-                'unanswered_count' => $result['unanswered'],
-                'score'            => $result['score'],
-                'percentage'       => $percentage,
-                'grade'            => $grade,
-                'answers_json'     => $result['answers'],
-                'locked_at'        => now(),
-            ],
+            $payload,
         );
 
         if ($registration->exam->results_published) {
@@ -277,33 +350,58 @@ class McqExamSessionService
     }
 
     /**
-     * Record a client-reported proctoring event (tab switch / window blur / fullscreen exit)
-     * for an active exam session. Detect-and-log only: this never mutates the registration's
-     * status, score, or attendance -- it is purely visibility for staff reviewing the session
-     * afterward. Silently ignores events once the session is no longer active/started, or once
-     * the per-registration cap is reached, so a flaky or malicious client cannot spam the table
-     * or record events outside a real session window.
+     * Record a client-reported proctoring event (tab switch / window blur / fullscreen exit).
+     * Default mode is log-only. With proctor_mode=strict_tab, tab_hidden events past the
+     * configured limit auto-submit the exam from draft answers (server-authoritative).
+     *
+     * @return array{event: ?McqProctorEvent, auto_submitted: bool, mark: ?McqMark}
      */
-    public function recordProctorEvent(McqRegistration $registration, string $eventType, ?\Carbon\Carbon $occurredAt = null): ?McqProctorEvent
+    public function recordProctorEvent(McqRegistration $registration, string $eventType, ?\Carbon\Carbon $occurredAt = null): array
     {
+        $empty = ['event' => null, 'auto_submitted' => false, 'mark' => null];
+
         if (! in_array($eventType, McqProctorEvent::TYPES, true)) {
-            return null;
+            return $empty;
         }
 
         if (! $registration->started_at || $registration->status === 'submitted') {
-            return null;
+            return $empty;
         }
 
         $existingCount = McqProctorEvent::where('registration_id', $registration->id)->count();
         if ($existingCount >= McqProctorEvent::MAX_PER_REGISTRATION) {
-            return null;
+            return $empty;
         }
 
-        return McqProctorEvent::create([
+        $event = McqProctorEvent::create([
             'registration_id' => $registration->id,
             'event_type'      => $eventType,
             'occurred_at'     => $occurredAt ?? now(),
         ]);
+
+        $registration->loadMissing('exam');
+        $exam = $registration->exam;
+        if (! $exam || $exam->proctorMode() !== 'strict_tab' || $eventType !== 'tab_hidden') {
+            return ['event' => $event, 'auto_submitted' => false, 'mark' => null];
+        }
+
+        $tabCount = McqProctorEvent::where('registration_id', $registration->id)
+            ->where('event_type', 'tab_hidden')
+            ->count();
+
+        if ($tabCount < $exam->proctorMaxTabViolations()) {
+            return ['event' => $event, 'auto_submitted' => false, 'mark' => null];
+        }
+
+        $registration->refresh();
+        if ($registration->status === 'submitted') {
+            return ['event' => $event, 'auto_submitted' => false, 'mark' => null];
+        }
+
+        $registration->forceFill(['submit_mode' => 'auto_tab'])->save();
+        $mark = $this->submit($registration, $registration->draft_answers ?? []);
+
+        return ['event' => $event, 'auto_submitted' => true, 'mark' => $mark];
     }
 
     /**

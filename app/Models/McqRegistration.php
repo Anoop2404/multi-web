@@ -23,7 +23,8 @@ class McqRegistration extends Model
         'started_at', 'submitted_at', 'draft_answers', 'paper_snapshot',
         'cancelled_at', 'cancelled_by_user_id',
         'school_marked_paid_at', 'school_marked_paid_by_user_id', 'school_paid_note',
-        'exam_passcode', 'exam_passcode_lookup',
+        'exam_passcode', 'exam_passcode_lookup', 'venue_keycode',
+        'attempt_number', 'attempt_history',
         'checked_in_at', 'submit_mode', 'engine_receipt', 'extra_time_minutes', 'device_info', 'last_ip',
     ];
 
@@ -35,6 +36,8 @@ class McqRegistration extends Model
         'submitted_at'          => 'datetime',
         'draft_answers'         => 'array',
         'paper_snapshot'        => 'array',
+        'attempt_history'       => 'array',
+        'attempt_number'        => 'integer',
         'approved_at'           => 'datetime',
         'attendance_marked_at'  => 'datetime',
         'cancelled_at'          => 'datetime',
@@ -187,10 +190,36 @@ class McqRegistration extends Model
         return $this->hasOne(McqMark::class, 'registration_id');
     }
 
-    /** Client-reported tab-switch / window-blur / fullscreen-exit events during this exam session (detect-and-log only). */
+    /** Client-reported tab-switch / window-blur / fullscreen-exit events during this exam session. */
     public function proctorEvents(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(McqProctorEvent::class, 'registration_id')->orderBy('occurred_at');
+    }
+
+    public function attemptNumber(): int
+    {
+        return max(1, (int) ($this->attempt_number ?: 1));
+    }
+
+    /** True when this registration may start another attempt after a prior submit. */
+    public function canReattempt(): bool
+    {
+        $this->loadMissing('exam');
+        $exam = $this->exam;
+        if (! $exam || ! $exam->allowsReattempt()) {
+            return false;
+        }
+        if ($this->status !== 'submitted') {
+            return false;
+        }
+        if (! in_array($exam->status, ['published', 'ongoing'], true) || $exam->isOfflineDelivery()) {
+            return false;
+        }
+        if (\App\Services\ExamEngine\ExamEngineRun::usesEngine($exam)) {
+            return false;
+        }
+
+        return $this->attemptNumber() < $exam->maxAttempts();
     }
 
     public function feeReceipt(): BelongsTo

@@ -94,17 +94,21 @@ const rows = computed(() => {
         if (exam.invoice_url) {
             links.push({ label: 'Invoice', href: exam.invoice_url, external: true });
         }
-        if (exam.show_results || exam.can_take_online) {
+        if (exam.show_results || exam.can_take_online || exam.can_reattempt) {
             links.push({
-                label: exam.show_results ? 'Result' : 'Exam',
+                label: exam.show_results && !exam.can_reattempt ? 'Result' : (exam.can_reattempt ? 'Reattempt' : 'Exam'),
                 href: `/portal/student/${props.school.id}/mcq/${id}/exam`,
             });
+        }
+        const metaBits = [exam.lifecycle_status?.label, exam.delivery_mode];
+        if (exam.venue_keycode) {
+            metaBits.push(`Keycode ${exam.venue_keycode}`);
         }
         return {
             key: `mcq-${id}`,
             kind: 'Online exam',
             title: exam.exam?.title ?? exam.title ?? 'Exam',
-            meta: [exam.lifecycle_status?.label, exam.delivery_mode].filter(Boolean).join(' · '),
+            meta: metaBits.filter(Boolean).join(' · '),
             status: links.length ? 'ready' : (exam.status === 'submitted' ? 'submitted' : 'pending'),
             links,
         };

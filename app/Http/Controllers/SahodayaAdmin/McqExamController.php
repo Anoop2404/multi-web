@@ -217,6 +217,11 @@ class McqExamController extends SahodayaAdminController
             'shows_hall_tickets' => \App\Support\Mcq\McqProductMode::showsHallTickets($exam),
             'allow_member_banks' => $exam->allowsMemberBanks(),
             'require_fullscreen' => $exam->requiresFullscreen(),
+            'venue_keycode_join' => $exam->allowsVenueKeycodeJoin(),
+            'allow_reattempt' => $exam->allowsReattempt(),
+            'max_attempts' => $exam->maxAttempts(),
+            'proctor_mode' => $exam->proctorMode(),
+            'proctor_max_tab_violations' => $exam->proctorMaxTabViolations(),
             'result_release' => \App\Support\Mcq\McqResultReleaseSettings::forInertia($exam),
         ]);
 
@@ -274,6 +279,11 @@ class McqExamController extends SahodayaAdminController
             'product_mode'     => 'nullable|in:talent_search,sahodaya_model_exam',
             'allow_member_banks' => 'nullable|boolean',
             'require_fullscreen' => 'nullable|boolean',
+            'venue_keycode_join' => 'nullable|boolean',
+            'allow_reattempt' => 'nullable|boolean',
+            'max_attempts' => 'nullable|integer|min:1|max:10',
+            'proctor_mode' => 'nullable|in:log,strict_tab',
+            'proctor_max_tab_violations' => 'nullable|integer|min:1|max:10',
             'scheduled_at'     => 'nullable|date',
             'class_schedules' => 'sometimes|array|max:100',
             'class_schedules.*.class_name' => 'required|string|max:100|distinct:ignore_case',
@@ -433,6 +443,37 @@ class McqExamController extends SahodayaAdminController
             unset($data['require_fullscreen']);
         }
 
+        if (array_key_exists('venue_keycode_join', $data)) {
+            $settings = $data['settings_json'] ?? ($exam->settings_json ?? []);
+            $settings['venue_keycode_join'] = (bool) $data['venue_keycode_join'];
+            $data['settings_json'] = $settings;
+            unset($data['venue_keycode_join']);
+        }
+
+        if (array_key_exists('allow_reattempt', $data) || array_key_exists('max_attempts', $data)) {
+            $settings = $data['settings_json'] ?? ($exam->settings_json ?? []);
+            if (array_key_exists('allow_reattempt', $data)) {
+                $settings['allow_reattempt'] = (bool) $data['allow_reattempt'];
+            }
+            if (array_key_exists('max_attempts', $data) && $data['max_attempts'] !== null) {
+                $settings['max_attempts'] = max(1, min(10, (int) $data['max_attempts']));
+            }
+            $data['settings_json'] = $settings;
+            unset($data['allow_reattempt'], $data['max_attempts']);
+        }
+
+        if (array_key_exists('proctor_mode', $data) || array_key_exists('proctor_max_tab_violations', $data)) {
+            $settings = $data['settings_json'] ?? ($exam->settings_json ?? []);
+            if (array_key_exists('proctor_mode', $data) && $data['proctor_mode'] !== null) {
+                $settings['proctor_mode'] = $data['proctor_mode'] === 'strict_tab' ? 'strict_tab' : 'log';
+            }
+            if (array_key_exists('proctor_max_tab_violations', $data) && $data['proctor_max_tab_violations'] !== null) {
+                $settings['proctor_max_tab_violations'] = max(1, min(10, (int) $data['proctor_max_tab_violations']));
+            }
+            $data['settings_json'] = $settings;
+            unset($data['proctor_mode'], $data['proctor_max_tab_violations']);
+        }
+
         $verificationMode = $data['student_verification_mode'] ?? null;
         unset($data['student_verification_mode']);
         if ($verificationMode !== null) {
@@ -481,6 +522,10 @@ class McqExamController extends SahodayaAdminController
 
         $exam->update($data);
         $exam->refresh();
+
+        if ($exam->allowsVenueKeycodeJoin()) {
+            app(\App\Services\Mcq\McqVenueKeycodeService::class)->ensureForExam($exam);
+        }
 
         if (array_key_exists('fee_amount', $data) || array_key_exists('fee_type', $data) || array_key_exists('school_discount_amount', $data)) {
             $feeService = app(McqSchoolFeeService::class);

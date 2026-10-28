@@ -79,12 +79,13 @@ class StudentMcqController extends Controller
         if ($registration->status === 'submitted') {
             $certs = app(\App\Services\Mcq\McqCertificateService::class);
             $certAvailable = $certs->isAvailableForStudent($registration);
+            $canReattempt = $registration->canReattempt();
 
             return inertia('Portal/Student/McqResult', [
                 'school'       => Tenant::findOrFail($tenantId)->only('id', 'name'),
                 'student'      => $student->only('id', 'name', 'admission_number', 'reg_no'),
                 'registration' => array_merge(
-                    $registration->only('id', 'status', 'submitted_at', 'attendance_status'),
+                    $registration->only('id', 'status', 'submitted_at', 'attendance_status', 'attempt_number'),
                     ['exam' => $registration->exam?->only('id', 'title', 'results_published')],
                 ),
                 'mark'         => McqResultPresenter::forRegistration($registration, $registration->mark),
@@ -99,6 +100,13 @@ class StudentMcqController extends Controller
                 'certificatesEnabled' => $registration->exam
                     ? \App\Support\Mcq\McqResultReleaseSettings::certificatesEnabled($registration->exam)
                     : false,
+                'canReattempt' => $canReattempt,
+                'reattemptUrl' => $canReattempt
+                    ? route('portal.student.mcq.reattempt', ['tenantId' => $tenantId, 'registration' => $registration->id])
+                    : null,
+                'attemptsRemaining' => $canReattempt
+                    ? max(0, $registration->exam->maxAttempts() - $registration->attemptNumber())
+                    : 0,
             ]);
         }
 
@@ -134,6 +142,8 @@ class StudentMcqController extends Controller
                 'is_model_exam' => $exam->isModelExam(),
                 'requires_hall_ticket' => $exam->requiresHallTicket(),
                 'require_fullscreen' => $exam->requiresFullscreen(),
+                'proctor_mode' => $exam->proctorMode(),
+                'proctor_max_tab_violations' => $exam->proctorMaxTabViolations(),
                 'no_pin_required' => $exam->isModelExam() || ! $exam->requiresHallTicket(),
                 'has_negative_marking' => $hasNegative,
             ]),
@@ -141,6 +151,7 @@ class StudentMcqController extends Controller
             'savedAnswers' => $registration->draft_answers ?? [],
             'expiresAt'    => $sessions->expiresAt($registration)?->toIso8601String(),
             'started'      => (bool) $registration->started_at,
+            'attemptNumber' => $registration->attemptNumber(),
             'systemCheckUrl' => route('portal.student.mcq.system-check', ['tenantId' => $tenantId]),
         ]);
     }
@@ -238,10 +249,28 @@ class StudentMcqController extends Controller
         return response()->json(['saved' => true, 'saved_at' => now()->toIso8601String()]);
     }
 
+    public function reattemptExam(Request $request, string $tenantId, McqRegistration $registration, McqExamSessionService $sessions)
+    {
+        $student = $request->attributes->get('portalStudent');
+        abort_if($registration->school_id !== $tenantId || $registration->student_id !== $student->id, 403);
+
+        $sessions->beginReattempt($registration);
+
+        app(PlatformAuditLogger::class)->mcqRegistration(
+            $registration->fresh(['exam']),
+            'mcq.exam.reattempt_started',
+            'Student started a reattempt of the online exam',
+        );
+
+        return redirect()->route('portal.student.mcq.exam', [
+            'tenantId'     => $tenantId,
+            'registration' => $registration->id,
+        ]);
+    }
+
     /**
-     * Record a client-reported proctoring event (tab hidden / window blur / fullscreen exit)
-     * for the student's own active session. Detect-and-log only -- never auto-submits or
-     * penalizes; the recorded events are surfaced to Sahodaya staff for later review.
+     * Record a client-reported proctoring event. In strict_tab mode the server may
+     * auto-submit after enough tab_hidden events.
      */
     public function recordProctorEvent(Request $request, string $tenantId, McqRegistration $registration, McqExamSessionService $sessions)
     {
@@ -252,9 +281,26 @@ class StudentMcqController extends Controller
             'type' => ['required', 'string', \Illuminate\Validation\Rule::in(\App\Models\McqProctorEvent::TYPES)],
         ]);
 
-        $sessions->recordProctorEvent($registration, $data['type']);
+        $result = $sessions->recordProctorEvent($registration, $data['type']);
 
-        return response()->json(['recorded' => true]);
+        if ($result['auto_submitted']) {
+            app(PlatformAuditLogger::class)->mcqRegistration(
+                $registration->fresh(['exam']),
+                'mcq.exam.auto_submitted',
+                'Online exam auto-submitted after tab-switch limit (strict_tab)',
+            );
+
+            return response()->json([
+                'recorded' => true,
+                'auto_submitted' => true,
+                'redirect' => route('portal.student.mcq.exam', [
+                    'tenantId' => $tenantId,
+                    'registration' => $registration->id,
+                ]),
+            ]);
+        }
+
+        return response()->json(['recorded' => true, 'auto_submitted' => false]);
     }
 
     public function submitExam(Request $request, string $tenantId, McqRegistration $registration, McqExamSessionService $sessions)

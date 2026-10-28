@@ -19,7 +19,12 @@
                 <li>Answers <strong>autosave</strong> while you work — keep this tab open</li>
                 <li>Refresh or closing the tab may interrupt you; use <strong>Submit</strong> when finished</li>
                 <li>Use a stable connection; wait for “Saved” before submitting if you see an offline warning</li>
-                <li>Tab switches and leaving this window are <strong>recorded</strong> for review (not auto-disqualification)</li>
+                <li v-if="exam.proctor_mode === 'strict_tab'">
+                    Leaving this tab is a <strong>violation</strong>. After
+                    <strong>{{ exam.proctor_max_tab_violations || 3 }}</strong> times, your exam is
+                    <strong>auto-submitted</strong> from saved answers.
+                </li>
+                <li v-else>Tab switches and leaving this window are <strong>recorded</strong> for review (not auto-disqualification)</li>
                 <li v-if="exam.no_pin_required">No hall ticket or Start PIN — you start from this page</li>
                 <li v-else>If your venue uses a Start PIN, an invigilator will give it on the exam site — not your portal password</li>
             </ul>
@@ -579,7 +584,17 @@ const syncDotClass = computed(() => {
     if (saveStatus.value === 'saving') return 'bg-slate-400 animate-pulse';
     return 'bg-slate-300';
 });
+const maxTabViolations = computed(() => Number(props.exam?.proctor_max_tab_violations) || 3);
+const strictTab = computed(() => props.exam?.proctor_mode === 'strict_tab');
+
 const proctorMessage = computed(() => {
+    if (strictTab.value) {
+        const left = Math.max(0, maxTabViolations.value - proctorEventCount.value);
+        if (left <= 0) {
+            return 'Tab-switch limit reached — submitting your saved answers.';
+        }
+        return `Tab leave recorded (${proctorEventCount.value}/${maxTabViolations.value}). ${left} warning${left === 1 ? '' : 's'} left before auto-submit.`;
+    }
     if (proctorEventCount.value <= 1) {
         return 'Leaving this tab during the exam is being recorded for review — not an automatic fail.';
     }
@@ -791,10 +806,14 @@ async function reportProctorEvent(type) {
     const now = Date.now();
     if (now - lastProctorEventAt < PROCTOR_EVENT_THROTTLE_MS) return;
     lastProctorEventAt = now;
-    proctorEventCount.value += 1;
-    proctorWarningVisible.value = true;
+    if (type === 'tab_hidden' || !strictTab.value) {
+        proctorEventCount.value += 1;
+        proctorWarningVisible.value = true;
+    } else {
+        proctorWarningVisible.value = true;
+    }
     try {
-        await fetch(
+        const res = await fetch(
             `/portal/student/${props.school.id}/mcq/${props.registration.id}/proctor-event`,
             {
                 method: 'POST',
@@ -806,6 +825,14 @@ async function reportProctorEvent(type) {
                 body: JSON.stringify({ type }),
             },
         );
+        if (res.ok) {
+            const body = await res.json().catch(() => ({}));
+            if (body.auto_submitted) {
+                submitting.value = true;
+                window.location.href = body.redirect
+                    || `/portal/student/${props.school.id}/mcq/${props.registration.id}/exam`;
+            }
+        }
     } catch { /* best-effort */ }
 }
 
@@ -813,6 +840,8 @@ function handleVisibilityChange() {
     if (document.visibilityState === 'hidden') reportProctorEvent('tab_hidden');
 }
 function handleWindowBlur() {
+    // Strict mode counts visibility only (mcq_v2 parity); blur stays advisory.
+    if (strictTab.value) return;
     reportProctorEvent('window_blur');
 }
 function handleOnline() {

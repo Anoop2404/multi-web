@@ -307,6 +307,15 @@ class StudentDashboardController extends Controller
                                 // Engine exams open on the exam site once armed (check-in window).
                                 ? \App\Services\ExamEngine\ExamEngineRun::state($exam) === 'armed' && $reg->isApproved() && ! $reg->blocksScoring()
                                 : app(\App\Services\Mcq\McqExamSessionService::class)->canTakeOnline($reg)),
+                        'can_reattempt' => $reg->canReattempt(),
+                        'attempt_number' => $reg->attemptNumber(),
+                        'max_attempts' => $exam->maxAttempts(),
+                        'venue_keycode' => $exam->allowsVenueKeycodeJoin()
+                            ? \App\Services\Mcq\McqVenueKeycodeService::format(
+                                $reg->venue_keycode
+                                    ?: app(\App\Services\Mcq\McqVenueKeycodeService::class)->ensure($reg)
+                            )
+                            : null,
                         'uses_exam_engine' => \App\Services\ExamEngine\ExamEngineRun::usesEngine($exam),
                         'delivery_mode'         => $exam->delivery_mode ?? 'offline',
                         'registration_route_id' => $reg->id,

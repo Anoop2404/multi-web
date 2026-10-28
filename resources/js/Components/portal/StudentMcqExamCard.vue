@@ -18,6 +18,9 @@
                     >{{ exam.delivery_mode }}</span>
                 </div>
                 <p v-if="exam.product_label" class="text-xs text-slate-500">{{ exam.product_label }}</p>
+                <p v-if="exam.venue_keycode" class="text-xs text-slate-600">
+                    Venue keycode <span class="font-mono font-semibold tracking-wide">{{ exam.venue_keycode }}</span>
+                </p>
                 <p v-if="metaLine" class="text-xs text-slate-500">{{ metaLine }}</p>
                 <p v-if="exam.show_results && exam.mark" class="text-xs font-semibold text-[#0f3d7a]">
                     Score {{ exam.mark.score }}
@@ -32,6 +35,13 @@
                     :href="examUrl"
                     class="inline-flex items-center justify-center rounded-xl bg-[#0f3d7a] px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#1e5aa8]"
                 >Take exam</a>
+                <button
+                    v-else-if="exam.can_reattempt"
+                    type="button"
+                    class="inline-flex items-center justify-center rounded-xl bg-[#0f3d7a] px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#1e5aa8]"
+                    :disabled="reattempting"
+                    @click="startReattempt"
+                >{{ reattempting ? 'Starting…' : `Reattempt (${exam.attempt_number || 1}/${exam.max_attempts || 1})` }}</button>
                 <a
                     v-else-if="exam.show_results"
                     :href="examUrl"
@@ -64,16 +74,26 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import { router } from '@inertiajs/vue3';
 
 const props = defineProps({
     schoolId: { type: [String, Number], required: true },
     exam: { type: Object, required: true },
 });
 
+const reattempting = ref(false);
 const regId = computed(() => props.exam.registration_route_id ?? props.exam.id);
 const examUrl = computed(() => `/portal/student/${props.schoolId}/mcq/${regId.value}/exam`);
 const hallTicketUrl = computed(() => `/portal/student/${props.schoolId}/mcq/${regId.value}/hall-ticket`);
+
+function startReattempt() {
+    if (reattempting.value) return;
+    reattempting.value = true;
+    router.post(`/portal/student/${props.schoolId}/mcq/${regId.value}/reattempt`, {}, {
+        onFinish: () => { reattempting.value = false; },
+    });
+}
 
 const metaLine = computed(() => {
     const bits = [];

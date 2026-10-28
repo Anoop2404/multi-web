@@ -25,6 +25,16 @@
                 {{ certificateUnavailableReason }}
             </p>
 
+            <div v-if="canReattempt && reattemptUrl" class="rounded-xl border border-sky-200 bg-sky-50 px-3 py-3 space-y-2">
+                <p class="text-sm text-sky-900 font-medium">
+                    You can take this exam again
+                    <span v-if="attemptsRemaining"> · {{ attemptsRemaining }} attempt{{ attemptsRemaining === 1 ? '' : 's' }} left</span>
+                </p>
+                <button type="button" class="btn-primary text-sm" :disabled="reattempting" @click="startReattempt">
+                    {{ reattempting ? 'Starting…' : 'Start reattempt' }}
+                </button>
+            </div>
+
             <ul v-if="showResults && mark?.answers_json?.length" class="text-sm divide-y border-t border-slate-100 pt-2">
                 <li class="py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">Question review</li>
                 <li v-for="(a, i) in mark.answers_json" :key="i" class="py-2 flex justify-between gap-2">
@@ -49,7 +59,8 @@
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import { studentPortalNavItems } from '@/support/studentPortalNav.js';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import { router } from '@inertiajs/vue3';
 
 const props = defineProps({
     school: Object,
@@ -61,9 +72,21 @@ const props = defineProps({
     certificateUrl: { type: String, default: null },
     certificateUnavailableReason: { type: String, default: null },
     certificatesEnabled: { type: Boolean, default: false },
+    canReattempt: { type: Boolean, default: false },
+    reattemptUrl: { type: String, default: null },
+    attemptsRemaining: { type: Number, default: 0 },
 });
 
+const reattempting = ref(false);
 const navItems = computed(() => studentPortalNavItems(props.school.id));
+
+function startReattempt() {
+    if (!props.reattemptUrl || reattempting.value) return;
+    reattempting.value = true;
+    router.post(props.reattemptUrl, {}, {
+        onFinish: () => { reattempting.value = false; },
+    });
+}
 
 function formatKey(value) {
     if (Array.isArray(value)) return value.join(', ');

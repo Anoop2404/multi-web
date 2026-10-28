@@ -2437,6 +2437,7 @@ Route::prefix('portal/student/{tenantId}')
         Route::get('/mcq/{registration}/exam', [\App\Http\Controllers\Portal\StudentMcqController::class, 'showExam'])->name('mcq.exam');
         Route::get('/mcq/{registration}/questions/{question}/image', [\App\Http\Controllers\Portal\StudentMcqController::class, 'questionImage'])->name('mcq.question-image');
         Route::post('/mcq/{registration}/start', [\App\Http\Controllers\Portal\StudentMcqController::class, 'startExam'])->name('mcq.start');
+        Route::post('/mcq/{registration}/reattempt', [\App\Http\Controllers\Portal\StudentMcqController::class, 'reattemptExam'])->name('mcq.reattempt');
         Route::post('/mcq/{registration}/save-answers', [\App\Http\Controllers\Portal\StudentMcqController::class, 'saveAnswer'])->name('mcq.save-answers');
         Route::post('/mcq/{registration}/proctor-event', [\App\Http\Controllers\Portal\StudentMcqController::class, 'recordProctorEvent'])->middleware('throttle:30,1')->name('mcq.proctor-event');
         Route::post('/mcq/{registration}/submit', [\App\Http\Controllers\Portal\StudentMcqController::class, 'submitExam'])->name('mcq.submit');

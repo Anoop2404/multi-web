@@ -254,6 +254,43 @@ class McqExam extends Model
         return (bool) ($this->settings_json['require_fullscreen'] ?? false);
     }
 
+    /** Per-candidate venue keycodes for public /attend-exam join (built-in portal exams). */
+    public function allowsVenueKeycodeJoin(): bool
+    {
+        return $this->isOnlineDelivery() && (bool) ($this->settings_json['venue_keycode_join'] ?? false);
+    }
+
+    public function allowsReattempt(): bool
+    {
+        return (bool) ($this->settings_json['allow_reattempt'] ?? false);
+    }
+
+    public function maxAttempts(): int
+    {
+        $max = (int) ($this->settings_json['max_attempts'] ?? 1);
+
+        return max(1, min(10, $max > 0 ? $max : 1));
+    }
+
+    /** How McqMark is kept across reattempts: `latest` (default) or `best`. */
+    public function reattemptScoring(): string
+    {
+        return ($this->settings_json['reattempt_scoring'] ?? null) === 'best' ? 'best' : 'latest';
+    }
+
+    /** `log` (default) or `strict_tab` (auto-submit after N tab_hidden events). */
+    public function proctorMode(): string
+    {
+        return ($this->settings_json['proctor_mode'] ?? null) === 'strict_tab' ? 'strict_tab' : 'log';
+    }
+
+    public function proctorMaxTabViolations(): int
+    {
+        $max = (int) ($this->settings_json['proctor_max_tab_violations'] ?? 3);
+
+        return max(1, min(10, $max > 0 ? $max : 3));
+    }
+
     /** @return array<string, int> class name (or "Teacher") => total questions/max marks override */
     public function classMaxMarks(): array
     {

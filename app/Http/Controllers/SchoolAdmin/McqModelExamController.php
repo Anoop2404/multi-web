@@ -183,6 +183,11 @@ class McqModelExamController extends SchoolAdminController
                     'shuffle_options'   => (bool) ($exam->settings_json['shuffle_options'] ?? true),
                     'multi_marking'     => $exam->multiMarkingMode(),
                     'require_fullscreen' => $exam->requiresFullscreen(),
+                    'venue_keycode_join' => $exam->allowsVenueKeycodeJoin(),
+                    'allow_reattempt' => $exam->allowsReattempt(),
+                    'max_attempts' => $exam->maxAttempts(),
+                    'proctor_mode' => $exam->proctorMode(),
+                    'proctor_max_tab_violations' => $exam->proctorMaxTabViolations(),
                 ],
                 'result_release' => \App\Support\Mcq\McqResultReleaseSettings::forInertia($exam),
             ]),
@@ -236,6 +241,11 @@ class McqModelExamController extends SchoolAdminController
             'shuffle_options'        => 'nullable|boolean',
             'multi_marking'          => 'nullable|in:all_or_nothing,partial',
             'require_fullscreen'     => 'nullable|boolean',
+            'venue_keycode_join'     => 'nullable|boolean',
+            'allow_reattempt'        => 'nullable|boolean',
+            'max_attempts'           => 'nullable|integer|min:1|max:10',
+            'proctor_mode'           => 'nullable|in:log,strict_tab',
+            'proctor_max_tab_violations' => 'nullable|integer|min:1|max:10',
             ...\App\Support\Mcq\McqResultReleaseSettings::validationRules(),
         ]);
 
@@ -283,17 +293,29 @@ class McqModelExamController extends SchoolAdminController
             'shuffle_options'      => (bool) ($data['shuffle_options'] ?? $exam->settings_json['shuffle_options'] ?? true),
             'multi_marking'        => $data['multi_marking'] ?? $exam->multiMarkingMode(),
             'require_fullscreen'   => (bool) ($data['require_fullscreen'] ?? $exam->settings_json['require_fullscreen'] ?? false),
+            'venue_keycode_join'   => (bool) ($data['venue_keycode_join'] ?? $exam->settings_json['venue_keycode_join'] ?? false),
+            'allow_reattempt'      => (bool) ($data['allow_reattempt'] ?? $exam->settings_json['allow_reattempt'] ?? false),
+            'max_attempts'         => max(1, min(10, (int) ($data['max_attempts'] ?? $exam->settings_json['max_attempts'] ?? 1))),
+            'proctor_mode'         => ($data['proctor_mode'] ?? $exam->settings_json['proctor_mode'] ?? 'log') === 'strict_tab' ? 'strict_tab' : 'log',
+            'proctor_max_tab_violations' => max(1, min(10, (int) ($data['proctor_max_tab_violations'] ?? $exam->settings_json['proctor_max_tab_violations'] ?? 3))),
             'result_release'       => $releasePatch['result_release'],
             'certificates'         => $releasePatch['certificates'],
         ]);
         unset(
             $data['shuffle_questions'], $data['shuffle_options'], $data['multi_marking'], $data['require_fullscreen'],
+            $data['venue_keycode_join'], $data['allow_reattempt'], $data['max_attempts'],
+            $data['proctor_mode'], $data['proctor_max_tab_violations'],
             $data['result_visibility'], $data['results_auto_release_at'],
             $data['certificates_enabled'], $data['certificates_auto_issue'],
             $data['certificate_eligibility'], $data['certificate_eligible_grades'],
         );
 
         $exam->update($data);
+        $exam->refresh();
+
+        if ($exam->allowsVenueKeycodeJoin()) {
+            app(\App\Services\Mcq\McqVenueKeycodeService::class)->ensureForExam($exam);
+        }
 
         app(PlatformAuditLogger::class)->mcq($exam, 'mcq.exam.updated', "School model exam updated: {$exam->title}", [
             'school_id' => $this->school->id,

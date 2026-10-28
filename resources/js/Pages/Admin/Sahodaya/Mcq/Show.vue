@@ -251,6 +251,45 @@
                     hint="Students must enter fullscreen to continue writing. Leaving fullscreen is recorded as a signal — not auto-fail. Does not detect extra monitors."
                     class="sm:col-span-2"
                 />
+                <CheckboxField
+                    v-if="form.delivery_mode === 'online'"
+                    v-model="form.venue_keycode_join"
+                    label="Venue keycode join"
+                    hint="Issue a unique keycode per candidate. Students open /attend-exam, enter the code, and jump straight into the exam (no portal password)."
+                    class="sm:col-span-2"
+                />
+                <CheckboxField
+                    v-if="form.delivery_mode === 'online'"
+                    v-model="form.allow_reattempt"
+                    label="Allow reattempts"
+                    hint="After submitting, students may start another attempt while the exam is still open."
+                    class="sm:col-span-2"
+                />
+                <FormField
+                    v-if="form.delivery_mode === 'online' && form.allow_reattempt"
+                    label="Max attempts"
+                    hint="Including the first attempt (1–10)."
+                >
+                    <template #default="{ id }">
+                        <input :id="id" v-model.number="form.max_attempts" type="number" min="1" max="10" class="field">
+                    </template>
+                </FormField>
+                <CheckboxField
+                    v-if="form.delivery_mode === 'online'"
+                    v-model="strictTabProctor"
+                    label="Hard tab-switch auto-submit"
+                    hint="Leaving the exam tab counts as a violation. After the limit, the exam is submitted automatically from saved answers."
+                    class="sm:col-span-2"
+                />
+                <FormField
+                    v-if="form.delivery_mode === 'online' && strictTabProctor"
+                    label="Tab violations before auto-submit"
+                    hint="Default 3 (same as typical venue policy)."
+                >
+                    <template #default="{ id }">
+                        <input :id="id" v-model.number="form.proctor_max_tab_violations" type="number" min="1" max="10" class="field">
+                    </template>
+                </FormField>
                 <p v-else-if="form.delivery_mode !== 'online'" class="text-xs text-slate-500 sm:col-span-2">
                     Offline exams use hall tickets and manual mark entry. Question banks are optional.
                 </p>
@@ -504,6 +543,11 @@ const form = useForm({
     allow_member_banks: !!(props.exam.allow_member_banks ?? props.exam.settings_json?.allow_member_banks),
     delivery_mode: props.exam.delivery_mode ?? 'offline',
     require_fullscreen: !!(props.exam.require_fullscreen ?? props.exam.settings_json?.require_fullscreen),
+    venue_keycode_join: !!(props.exam.venue_keycode_join ?? props.exam.settings_json?.venue_keycode_join),
+    allow_reattempt: !!(props.exam.allow_reattempt ?? props.exam.settings_json?.allow_reattempt),
+    max_attempts: props.exam.max_attempts ?? props.exam.settings_json?.max_attempts ?? 1,
+    proctor_mode: props.exam.proctor_mode ?? props.exam.settings_json?.proctor_mode ?? 'log',
+    proctor_max_tab_violations: props.exam.proctor_max_tab_violations ?? props.exam.settings_json?.proctor_max_tab_violations ?? 3,
     requires_hall_ticket: !!(props.exam.settings_json?.requires_hall_ticket),
     student_verification_mode: studentVerificationModeFromExam(props.exam),
     scheduled_at: props.exam.scheduled_at ? props.exam.scheduled_at.slice(0, 16) : '',
@@ -546,6 +590,11 @@ const form = useForm({
     certificates_auto_issue: !!props.exam.result_release?.certificates_auto_issue,
     certificate_eligibility: props.exam.result_release?.certificate_eligibility ?? 'participation',
     certificate_eligible_grades: [...(props.exam.result_release?.certificate_eligible_grades ?? [])],
+});
+
+const strictTabProctor = computed({
+    get: () => form.proctor_mode === 'strict_tab',
+    set: (on) => { form.proctor_mode = on ? 'strict_tab' : 'log'; },
 });
 
 const releaseSettings = reactive({

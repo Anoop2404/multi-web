@@ -108,6 +108,13 @@ Route::middleware([
         Route::get('/papers/{exam}/download', [McqArchiveController::class, 'download'])->name('archive.download');
     });
 
+    // Venue keycode join for built-in online exams (lab / supervised room).
+    Route::get('/attend-exam', [\App\Http\Controllers\Public\AttendExamController::class, 'show'])
+        ->name('tenant.attend-exam');
+    Route::post('/attend-exam', [\App\Http\Controllers\Public\AttendExamController::class, 'store'])
+        ->middleware('throttle:20,1')
+        ->name('tenant.attend-exam.store');
+
     // Question bank downloads (always available on Sahodaya tenants — not gated by the
     // public-website toggle, same as the fest portal and MCQ archive above, since a
     // Sahodaya that hasn't set up a full public site should still be able to share this

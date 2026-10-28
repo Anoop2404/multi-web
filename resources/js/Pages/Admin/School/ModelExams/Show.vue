@@ -118,13 +118,44 @@
                     <input v-model.number="form.pass_mark" type="number" min="0" class="field">
                 </FormField>
             </FormGrid>
-            <label v-if="form.delivery_mode === 'online'" class="flex items-start gap-2 text-sm text-slate-700">
-                <input v-model="form.require_fullscreen" type="checkbox" class="mt-1 rounded border-slate-300">
-                <span>
-                    <span class="font-medium">Require fullscreen during the exam</span>
-                    <span class="block text-xs text-slate-500">Students must enter fullscreen to continue. Exit is recorded as a signal — not auto-fail. Does not detect extra monitors.</span>
-                </span>
-            </label>
+            <div v-if="form.delivery_mode === 'online'" class="space-y-3">
+                <label class="flex items-start gap-2 text-sm text-slate-700">
+                    <input v-model="form.require_fullscreen" type="checkbox" class="mt-1 rounded border-slate-300">
+                    <span>
+                        <span class="font-medium">Require fullscreen during the exam</span>
+                        <span class="block text-xs text-slate-500">Students must enter fullscreen to continue. Exit is recorded as a signal — not auto-fail. Does not detect extra monitors.</span>
+                    </span>
+                </label>
+                <label class="flex items-start gap-2 text-sm text-slate-700">
+                    <input v-model="form.venue_keycode_join" type="checkbox" class="mt-1 rounded border-slate-300">
+                    <span>
+                        <span class="font-medium">Venue keycode join</span>
+                        <span class="block text-xs text-slate-500">Issue unique keycodes. Students open /attend-exam and join without a portal password.</span>
+                    </span>
+                </label>
+                <label class="flex items-start gap-2 text-sm text-slate-700">
+                    <input v-model="form.allow_reattempt" type="checkbox" class="mt-1 rounded border-slate-300">
+                    <span>
+                        <span class="font-medium">Allow reattempts</span>
+                        <span class="block text-xs text-slate-500">Students may start another attempt after submitting while the exam is open.</span>
+                    </span>
+                </label>
+                <label v-if="form.allow_reattempt" class="flex items-center gap-2 text-sm text-slate-700">
+                    <span class="font-medium w-28">Max attempts</span>
+                    <input v-model.number="form.max_attempts" type="number" min="1" max="10" class="field w-24">
+                </label>
+                <label class="flex items-start gap-2 text-sm text-slate-700">
+                    <input v-model="strictTabProctor" type="checkbox" class="mt-1 rounded border-slate-300">
+                    <span>
+                        <span class="font-medium">Hard tab-switch auto-submit</span>
+                        <span class="block text-xs text-slate-500">After enough tab leaves, submit automatically from saved answers.</span>
+                    </span>
+                </label>
+                <label v-if="strictTabProctor" class="flex items-center gap-2 text-sm text-slate-700">
+                    <span class="font-medium w-28">Tab limit</span>
+                    <input v-model.number="form.proctor_max_tab_violations" type="number" min="1" max="10" class="field w-24">
+                </label>
+            </div>
             <div class="border-t border-slate-100 pt-4">
                 <McqEligibilityPicker mode="school_model" v-model="form.eligibility_config" :class-categories="classCategories" :master-classes="masterClasses" />
             </div>
@@ -282,6 +313,11 @@ const form = useForm({
     shuffle_options: props.exam.settings?.shuffle_options ?? true,
     multi_marking: props.exam.settings?.multi_marking ?? 'partial',
     require_fullscreen: !!props.exam.settings?.require_fullscreen,
+    venue_keycode_join: !!props.exam.settings?.venue_keycode_join,
+    allow_reattempt: !!props.exam.settings?.allow_reattempt,
+    max_attempts: props.exam.settings?.max_attempts ?? 1,
+    proctor_mode: props.exam.settings?.proctor_mode ?? 'log',
+    proctor_max_tab_violations: props.exam.settings?.proctor_max_tab_violations ?? 3,
     result_visibility: release.result_visibility ?? 'score_grade',
     results_auto_release_at: toLocalInput(release.results_auto_release_at),
     certificates_enabled: !!release.certificates_enabled,
@@ -289,6 +325,11 @@ const form = useForm({
     certificate_eligibility: release.certificate_eligibility ?? 'participation',
     certificate_eligible_grades: [...(release.certificate_eligible_grades ?? [])],
     certificate_template_id: release.certificate_template_id ?? props.exam.certificate_template_id ?? null,
+});
+
+const strictTabProctor = computed({
+    get: () => form.proctor_mode === 'strict_tab',
+    set: (on) => { form.proctor_mode = on ? 'strict_tab' : 'log'; },
 });
 
 const releaseSettings = reactive({
