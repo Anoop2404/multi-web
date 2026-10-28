@@ -244,6 +244,13 @@
                     hint="When enabled, students must have a hall ticket issued and attendance marked present before the online exam can start."
                     class="sm:col-span-2"
                 />
+                <CheckboxField
+                    v-if="form.delivery_mode === 'online'"
+                    v-model="form.require_fullscreen"
+                    label="Require fullscreen during the exam"
+                    hint="Students must enter fullscreen to continue writing. Leaving fullscreen is recorded as a signal — not auto-fail. Does not detect extra monitors."
+                    class="sm:col-span-2"
+                />
                 <p v-else-if="form.delivery_mode !== 'online'" class="text-xs text-slate-500 sm:col-span-2">
                     Offline exams use hall tickets and manual mark entry. Question banks are optional.
                 </p>
@@ -496,6 +503,7 @@ const form = useForm({
     product_mode: props.exam.product_mode ?? 'talent_search',
     allow_member_banks: !!(props.exam.allow_member_banks ?? props.exam.settings_json?.allow_member_banks),
     delivery_mode: props.exam.delivery_mode ?? 'offline',
+    require_fullscreen: !!(props.exam.require_fullscreen ?? props.exam.settings_json?.require_fullscreen),
     requires_hall_ticket: !!(props.exam.settings_json?.requires_hall_ticket),
     student_verification_mode: studentVerificationModeFromExam(props.exam),
     scheduled_at: props.exam.scheduled_at ? props.exam.scheduled_at.slice(0, 16) : '',

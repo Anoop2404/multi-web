@@ -182,6 +182,7 @@ class McqModelExamController extends SchoolAdminController
                     'shuffle_questions' => (bool) ($exam->settings_json['shuffle_questions'] ?? true),
                     'shuffle_options'   => (bool) ($exam->settings_json['shuffle_options'] ?? true),
                     'multi_marking'     => $exam->multiMarkingMode(),
+                    'require_fullscreen' => $exam->requiresFullscreen(),
                 ],
                 'result_release' => \App\Support\Mcq\McqResultReleaseSettings::forInertia($exam),
             ]),
@@ -234,6 +235,7 @@ class McqModelExamController extends SchoolAdminController
             'shuffle_questions'      => 'nullable|boolean',
             'shuffle_options'        => 'nullable|boolean',
             'multi_marking'          => 'nullable|in:all_or_nothing,partial',
+            'require_fullscreen'     => 'nullable|boolean',
             ...\App\Support\Mcq\McqResultReleaseSettings::validationRules(),
         ]);
 
@@ -280,11 +282,12 @@ class McqModelExamController extends SchoolAdminController
             'shuffle_questions'    => (bool) ($data['shuffle_questions'] ?? $exam->settings_json['shuffle_questions'] ?? true),
             'shuffle_options'      => (bool) ($data['shuffle_options'] ?? $exam->settings_json['shuffle_options'] ?? true),
             'multi_marking'        => $data['multi_marking'] ?? $exam->multiMarkingMode(),
+            'require_fullscreen'   => (bool) ($data['require_fullscreen'] ?? $exam->settings_json['require_fullscreen'] ?? false),
             'result_release'       => $releasePatch['result_release'],
             'certificates'         => $releasePatch['certificates'],
         ]);
         unset(
-            $data['shuffle_questions'], $data['shuffle_options'], $data['multi_marking'],
+            $data['shuffle_questions'], $data['shuffle_options'], $data['multi_marking'], $data['require_fullscreen'],
             $data['result_visibility'], $data['results_auto_release_at'],
             $data['certificates_enabled'], $data['certificates_auto_issue'],
             $data['certificate_eligibility'], $data['certificate_eligible_grades'],

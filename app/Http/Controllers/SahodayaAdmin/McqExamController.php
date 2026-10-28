@@ -216,6 +216,7 @@ class McqExamController extends SahodayaAdminController
             'shows_fees'       => \App\Support\Mcq\McqProductMode::showsFees($exam),
             'shows_hall_tickets' => \App\Support\Mcq\McqProductMode::showsHallTickets($exam),
             'allow_member_banks' => $exam->allowsMemberBanks(),
+            'require_fullscreen' => $exam->requiresFullscreen(),
             'result_release' => \App\Support\Mcq\McqResultReleaseSettings::forInertia($exam),
         ]);
 
@@ -272,6 +273,7 @@ class McqExamController extends SahodayaAdminController
             'exam_type'        => 'nullable|in:practice,assessment,competitive',
             'product_mode'     => 'nullable|in:talent_search,sahodaya_model_exam',
             'allow_member_banks' => 'nullable|boolean',
+            'require_fullscreen' => 'nullable|boolean',
             'scheduled_at'     => 'nullable|date',
             'class_schedules' => 'sometimes|array|max:100',
             'class_schedules.*.class_name' => 'required|string|max:100|distinct:ignore_case',
@@ -422,6 +424,13 @@ class McqExamController extends SahodayaAdminController
             $settings['requires_hall_ticket'] = (bool) $data['requires_hall_ticket'];
             $data['settings_json'] = $settings;
             unset($data['requires_hall_ticket']);
+        }
+
+        if (array_key_exists('require_fullscreen', $data)) {
+            $settings = $data['settings_json'] ?? ($exam->settings_json ?? []);
+            $settings['require_fullscreen'] = (bool) $data['require_fullscreen'];
+            $data['settings_json'] = $settings;
+            unset($data['require_fullscreen']);
         }
 
         $verificationMode = $data['student_verification_mode'] ?? null;
@@ -973,7 +982,9 @@ class McqExamController extends SahodayaAdminController
     public function leaderboard(string $tenantId, McqExam $exam)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
-        abort_unless($exam->results_published, 403, 'Publish results first.');
+        // Staff with sahodaya.admin / mcq.view may preview ranks before publish.
+        // Students and school portals remain gated on results_published elsewhere.
+        $this->assertStaffCan('mcq.view');
 
         $rows = McqMark::query()
             ->whereHas('registration', fn ($q) => $q->where('exam_id', $exam->id))
@@ -996,6 +1007,7 @@ class McqExamController extends SahodayaAdminController
                 'is_model_exam' => $exam->isModelExam(),
             ]),
             'rows' => $rows,
+            'isPreview' => ! $exam->results_published,
         ]);
     }
 

@@ -108,6 +108,7 @@
                 <li>Mark a question <b>for review</b> to come back to it. Marked questions are still counted if answered.</li>
                 <li>Each answer is saved on this device at once and sent automatically. If the internet drops, keep writing.</li>
                 <li>Don’t open the exam on another device. Leaving the exam screen is recorded.</li>
+                <li v-if="st.require_fullscreen">This exam requires <b>fullscreen</b> while writing. Leaving fullscreen is recorded for review — not an automatic fail. Extra monitors are not detected.</li>
                 <li>When the time is up, your answers are submitted automatically.</li>
             </ul>
             <div class="row" style="margin-top: 6px">
@@ -177,6 +178,18 @@ async function start() {
     starting.value = true;
     startError.value = null;
     try {
+        if (st.value.require_fullscreen) {
+            try {
+                await document.documentElement.requestFullscreen?.();
+            } catch {
+                startError.value = {
+                    kind: 'warn',
+                    text: 'Allow fullscreen to continue — this exam requires it while writing.',
+                };
+                starting.value = false;
+                return;
+            }
+        }
         // Plan §3: spread the T0 key requests — a click in the first 10 s waits 0–5 s first.
         if (msToStart.value > -10000 && !retriedStart) await new Promise((r) => setTimeout(r, Math.random() * 5000));
         retriedStart = true;

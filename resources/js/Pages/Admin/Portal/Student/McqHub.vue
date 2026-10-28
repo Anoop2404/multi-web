@@ -6,6 +6,11 @@
         accent="indigo"
         :nav-items="navItems"
     >
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <p class="text-sm text-slate-600">Before exam day, check your device browser, storage, and network.</p>
+            <a :href="`/portal/student/${school.id}/mcq/system-check`" class="btn-secondary text-sm">Practice system check</a>
+        </div>
+
         <section class="card">
             <h2 class="font-semibold text-sm mb-2">Your exams</h2>
             <ul class="text-sm divide-y">

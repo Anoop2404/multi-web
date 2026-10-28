@@ -74,6 +74,8 @@ export interface ExamState {
     messages: BroadcastMessage[];
     next_sync_in: number;
     show_score_on_submit: boolean;
+    /** When true, client blocks writing until fullscreen (signals only — no multi-monitor). */
+    require_fullscreen?: boolean;
     submitted_at: string | null;
     receipt: string | null;
     /** Optional (not in contract v1); the client assumes 90 when absent. */

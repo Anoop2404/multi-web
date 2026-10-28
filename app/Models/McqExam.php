@@ -248,6 +248,12 @@ class McqExam extends Model
         return (bool) ($this->settings_json['requires_hall_ticket'] ?? false);
     }
 
+    /** Soft/hard fullscreen policy for online take-exam (portal + engine). Default soft. */
+    public function requiresFullscreen(): bool
+    {
+        return (bool) ($this->settings_json['require_fullscreen'] ?? false);
+    }
+
     /** @return array<string, int> class name (or "Teacher") => total questions/max marks override */
     public function classMaxMarks(): array
     {

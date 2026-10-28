@@ -133,6 +133,20 @@
             <button class="btn" type="button" @click.stop="zoomSrc = null">Close</button>
         </div>
 
+        <div
+            v-if="requireFullscreen && !status.fullscreen && !status.submitted && !status.timeUp && !status.submitting"
+            class="blocker"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="fs-req-title"
+        >
+            <div class="card stack">
+                <h2 id="fs-req-title">Fullscreen required</h2>
+                <p class="muted">Stay in fullscreen while writing. Leaving fullscreen is recorded for review — not an automatic fail. Extra monitors are not detected.</p>
+                <button class="btn primary" type="button" @click="goFullscreen">Enter fullscreen to continue</button>
+            </div>
+        </div>
+
         <!-- Blocking states -->
         <div v-if="status.locked && !status.submitted" class="blocker" role="alertdialog" aria-modal="true" aria-labelledby="lock-title">
             <div class="card stack">
@@ -189,7 +203,16 @@ const now = useServerNow();
 const msLeft = computed(() => (parseTime(status.deadline) ?? Infinity) - now.value);
 const timerClass = computed(() => (msLeft.value <= 60000 ? 'bad' : msLeft.value <= 300000 ? 'warn' : ''));
 
-const canAnswer = computed(() => !status.locked && !status.timeUp && !status.submitting && !status.submitted && !status.signedOut);
+const requireFullscreen = computed(() => !!st.value.require_fullscreen);
+const canAnswer = computed(
+    () =>
+        !status.locked &&
+        !status.timeUp &&
+        !status.submitting &&
+        !status.submitted &&
+        !status.signedOut &&
+        (!requireFullscreen.value || status.fullscreen),
+);
 const canSubmit = computed(() => canAnswer.value);
 const flagged = computed(() => (q.value ? ledger.flagged.includes(q.value.qid) : false));
 const answered = computed(() => questions.value.filter((x) => isAnswered(x.qid)).length);

@@ -116,9 +116,12 @@ const tabs = computed(() => {
         }
     }
 
-    if (props.resultsPublished) {
-        list.push({ key: 'leaderboard', label: 'Leaderboard', href: `${base.value}/leaderboard` });
-    }
+    // Staff may preview ranks before publish (permission-gated on the server).
+    list.push({
+        key: 'leaderboard',
+        label: props.resultsPublished ? 'Leaderboard' : 'Leaderboard (preview)',
+        href: `${base.value}/leaderboard`,
+    });
 
     list.push(
         { key: 'staff', label: 'Exam staff', href: `${base.value}/staff` },

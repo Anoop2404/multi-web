@@ -118,6 +118,13 @@
                     <input v-model.number="form.pass_mark" type="number" min="0" class="field">
                 </FormField>
             </FormGrid>
+            <label v-if="form.delivery_mode === 'online'" class="flex items-start gap-2 text-sm text-slate-700">
+                <input v-model="form.require_fullscreen" type="checkbox" class="mt-1 rounded border-slate-300">
+                <span>
+                    <span class="font-medium">Require fullscreen during the exam</span>
+                    <span class="block text-xs text-slate-500">Students must enter fullscreen to continue. Exit is recorded as a signal — not auto-fail. Does not detect extra monitors.</span>
+                </span>
+            </label>
             <div class="border-t border-slate-100 pt-4">
                 <McqEligibilityPicker mode="school_model" v-model="form.eligibility_config" :class-categories="classCategories" :master-classes="masterClasses" />
             </div>
@@ -274,6 +281,7 @@ const form = useForm({
     shuffle_questions: props.exam.settings?.shuffle_questions ?? true,
     shuffle_options: props.exam.settings?.shuffle_options ?? true,
     multi_marking: props.exam.settings?.multi_marking ?? 'partial',
+    require_fullscreen: !!props.exam.settings?.require_fullscreen,
     result_visibility: release.result_visibility ?? 'score_grade',
     results_auto_release_at: toLocalInput(release.results_auto_release_at),
     certificates_enabled: !!release.certificates_enabled,

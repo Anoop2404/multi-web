@@ -133,6 +133,7 @@ class StudentMcqController extends Controller
                 'product_mode' => $exam->productMode(),
                 'is_model_exam' => $exam->isModelExam(),
                 'requires_hall_ticket' => $exam->requiresHallTicket(),
+                'require_fullscreen' => $exam->requiresFullscreen(),
                 'no_pin_required' => $exam->isModelExam() || ! $exam->requiresHallTicket(),
                 'has_negative_marking' => $hasNegative,
             ]),
@@ -140,6 +141,19 @@ class StudentMcqController extends Controller
             'savedAnswers' => $registration->draft_answers ?? [],
             'expiresAt'    => $sessions->expiresAt($registration)?->toIso8601String(),
             'started'      => (bool) $registration->started_at,
+            'systemCheckUrl' => route('portal.student.mcq.system-check', ['tenantId' => $tenantId]),
+        ]);
+    }
+
+    /** Standalone practice device check before exam day (portal take-exam path). */
+    public function systemCheck(Request $request, string $tenantId)
+    {
+        $student = $request->attributes->get('portalStudent');
+
+        return inertia('Portal/Student/McqSystemCheck', [
+            'school'  => Tenant::findOrFail($tenantId)->only('id', 'name'),
+            'student' => $student->only('id', 'name', 'admission_number', 'reg_no'),
+            'hubUrl'  => route('portal.student.mcq', ['tenantId' => $tenantId]),
         ]);
     }
 

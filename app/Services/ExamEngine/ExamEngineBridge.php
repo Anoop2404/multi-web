@@ -160,6 +160,7 @@ class ExamEngineBridge
             'start_pin'                      => $settings['supervision'] === 'supervised' ? (filled($settings['start_pin'] ?? null) ? (string) $settings['start_pin'] : null) : null,
             'show_score_on_submit'           => (bool) $settings['show_score_on_submit'],
             'shuffle_questions'              => (bool) ($exam->settings_json['shuffle_questions'] ?? false),
+            'require_fullscreen'             => $exam->requiresFullscreen(),
             'device_idle_minutes'            => (int) $settings['device_idle_minutes'],
             'sync_interval_seconds'          => (int) $settings['sync_interval_seconds'],
             'heartbeat_seconds'              => (int) $settings['heartbeat_seconds'],

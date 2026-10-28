@@ -23,6 +23,24 @@
                 <li v-else>If your venue uses a Start PIN, an invigilator will give it on the exam site — not your portal password</li>
             </ul>
             <p v-if="pageErrors" class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2" role="alert">{{ pageErrors }}</p>
+            <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm space-y-2">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <p class="font-medium text-slate-800">Device check</p>
+                    <a v-if="systemCheckUrl" :href="systemCheckUrl" class="text-xs font-semibold text-indigo-700 underline" target="_blank" rel="noopener">Full practice check ↗</a>
+                </div>
+                <button type="button" class="btn-secondary text-xs" :disabled="sysCheckRunning" @click="runInlineSystemCheck">
+                    {{ sysCheckRunning ? 'Checking…' : (sysCheckResult ? 'Run again' : 'Run quick check') }}
+                </button>
+                <ul v-if="sysCheckResult" class="text-xs space-y-1">
+                    <li v-for="item in sysCheckResult.items" :key="item.id">
+                        <span :class="item.status === 'fail' ? 'text-red-700' : (item.status === 'warn' ? 'text-amber-700' : 'text-emerald-700')">{{ item.label }}:</span>
+                        {{ item.detail }}
+                    </li>
+                </ul>
+            </div>
+            <p v-if="exam.require_fullscreen" class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                This exam requires fullscreen after you start. Leaving fullscreen is recorded as a signal — not an automatic fail.
+            </p>
             <div class="text-center pt-2">
                 <button type="button" class="btn-primary" :disabled="starting" @click="startExam">Start exam</button>
             </div>
@@ -68,12 +86,17 @@
                     <span>{{ proctorMessage }}</span>
                     <button type="button" class="text-xs font-semibold underline shrink-0" @click="proctorWarningVisible = false">Dismiss</button>
                 </div>
-                <div v-if="!fullscreenActive && !fullscreenDismissed" class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 flex flex-wrap justify-between gap-2 items-center">
+                <div v-if="!fullscreenActive && !exam.require_fullscreen && !fullscreenDismissed" class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 flex flex-wrap justify-between gap-2 items-center">
                     <span>Optional: use fullscreen for fewer distractions. Leaving fullscreen is recorded as a signal — not an automatic fail.</span>
                     <div class="flex gap-2 shrink-0">
                         <button type="button" class="btn-secondary text-xs" @click="enterFullscreen">Enter fullscreen</button>
                         <button type="button" class="text-xs font-semibold text-slate-500 underline" @click="fullscreenDismissed = true">Not now</button>
                     </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 text-xs">
+                    <span class="text-slate-500">Text size</span>
+                    <button type="button" class="btn-secondary !px-2 !py-1 text-xs" @click="changeFont(-1)" aria-label="Decrease text size">A−</button>
+                    <button type="button" class="btn-secondary !px-2 !py-1 text-xs" @click="changeFont(1)" aria-label="Increase text size">A+</button>
                 </div>
             </div>
 
@@ -87,7 +110,7 @@
                     />
                 </aside>
 
-                <div class="space-y-4 min-w-0">
+                <div class="space-y-4 min-w-0" :style="{ fontSize: fontSizeRem + 'rem' }">
                     <article
                         v-for="q in questions"
                         :key="q.id"
@@ -116,8 +139,15 @@
                             <span v-else-if="q.type === 'numeric'"> · Enter a number</span>
                             <span v-else-if="q.type === 'true_false'"> · True or false</span>
                         </p>
-                        <McqRichText v-if="q.body_text" :text="q.body_text" tag="p" class="text-sm text-gray-700" />
-                        <img v-if="q.image_url" :src="q.image_url" :alt="`Question ${q.number} image`" class="max-h-80 max-w-full rounded-lg border bg-white object-contain">
+                        <McqRichText v-if="q.body_text" :text="q.body_text" tag="p" class="text-gray-700" />
+                        <button
+                            v-if="q.image_url"
+                            type="button"
+                            class="block max-w-full text-left"
+                            @click="zoomSrc = q.image_url"
+                        >
+                            <img :src="q.image_url" :alt="`Question ${q.number} image — click to enlarge`" class="max-h-80 max-w-full rounded-lg border bg-white object-contain cursor-zoom-in">
+                        </button>
 
                         <!-- Numeric -->
                         <div v-if="q.type === 'numeric'" class="max-w-xs">
@@ -151,7 +181,13 @@
                                 >
                                 <span class="min-w-0 space-y-1.5">
                                     <span class="flex gap-1"><strong class="uppercase">{{ opt.display_key || opt.key }}.</strong> <McqRichText :text="opt.label" /></span>
-                                    <img v-if="opt.image_url" :src="opt.image_url" :alt="`Option ${(opt.display_key || opt.key).toUpperCase()}`" class="block max-h-40 max-w-full rounded border bg-white object-contain">
+                                    <img
+                                        v-if="opt.image_url"
+                                        :src="opt.image_url"
+                                        :alt="`Option ${(opt.display_key || opt.key).toUpperCase()} — click to enlarge`"
+                                        class="block max-h-40 max-w-full rounded border bg-white object-contain cursor-zoom-in"
+                                        @click.prevent="zoomSrc = opt.image_url"
+                                    >
                                 </span>
                             </label>
                         </div>
@@ -175,7 +211,13 @@
                                 >
                                 <span class="min-w-0 space-y-1.5">
                                     <span class="flex gap-1"><strong class="uppercase">{{ opt.display_key || opt.key }}.</strong> <McqRichText :text="opt.label" /></span>
-                                    <img v-if="opt.image_url" :src="opt.image_url" :alt="`Option ${(opt.display_key || opt.key).toUpperCase()}`" class="block max-h-40 max-w-full rounded border bg-white object-contain">
+                                    <img
+                                        v-if="opt.image_url"
+                                        :src="opt.image_url"
+                                        :alt="`Option ${(opt.display_key || opt.key).toUpperCase()} — click to enlarge`"
+                                        class="block max-h-40 max-w-full rounded border bg-white object-contain cursor-zoom-in"
+                                        @click.prevent="zoomSrc = opt.image_url"
+                                    >
                                 </span>
                             </label>
                         </div>
@@ -216,6 +258,35 @@
             </div>
         </div>
 
+        <div
+            v-if="started && exam.require_fullscreen && !fullscreenActive"
+            class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="fs-require-title"
+        >
+            <div class="card max-w-md w-full space-y-3 shadow-xl text-center">
+                <h2 id="fs-require-title" class="font-semibold text-base">Fullscreen required</h2>
+                <p class="text-sm text-slate-600">
+                    This exam asks you to stay in fullscreen while writing. Leaving fullscreen is recorded for review — not an automatic fail. Extra monitors are not detected.
+                </p>
+                <button type="button" class="btn-primary" @click="enterFullscreen">Enter fullscreen to continue</button>
+            </div>
+        </div>
+
+        <div
+            v-if="zoomSrc"
+            class="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-3 p-4 bg-black/80"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Enlarged picture"
+            @click="zoomSrc = null"
+            @keydown.esc="zoomSrc = null"
+        >
+            <img :src="zoomSrc" alt="Enlarged picture" class="max-h-[85vh] max-w-full object-contain" @click.stop>
+            <button type="button" class="btn-secondary text-sm" @click.stop="zoomSrc = null">Close</button>
+        </div>
+
         <div v-if="confirmOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" @click.self="confirmOpen = false">
             <div
                 ref="confirmPanelRef"
@@ -249,8 +320,14 @@ import McqRichText from '@/Components/mcq/McqRichText.vue';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import QuestionNavGrid from '@/Components/portal/QuestionNavGrid.vue';
 import { studentPortalNavItems } from '@/support/studentPortalNav.js';
+import { runPortalSystemCheck } from '@/support/portalSystemCheck.js';
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
+
+const FONT_KEY = 'mcq:portal-font';
+const FONT_MIN = 0.875;
+const FONT_MAX = 1.5;
+const FONT_STEP = 0.125;
 
 const props = defineProps({
     school: Object,
@@ -261,6 +338,7 @@ const props = defineProps({
     savedAnswers: { type: Object, default: () => ({}) },
     expiresAt: String,
     started: Boolean,
+    systemCheckUrl: { type: String, default: null },
 });
 
 const page = usePage();
@@ -282,6 +360,10 @@ const fullscreenActive = ref(false);
 const fullscreenDismissed = ref(false);
 const confirmPanelRef = ref(null);
 const confirmCancelRef = ref(null);
+const zoomSrc = ref(null);
+const fontSizeRem = ref(1);
+const sysCheckRunning = ref(false);
+const sysCheckResult = ref(null);
 let timerId = null;
 let autoSubmitRequested = false;
 let saveTimerId = null;
@@ -520,7 +602,10 @@ async function enterFullscreen() {
         fullscreenActive.value = true;
         fullscreenDismissed.value = true;
     } catch {
-        fullscreenDismissed.value = true;
+        // Soft mode can dismiss; hard require keeps the blocking overlay.
+        if (! props.exam?.require_fullscreen) {
+            fullscreenDismissed.value = true;
+        }
     }
 }
 
@@ -530,6 +615,25 @@ function handleFullscreenChange() {
         reportProctorEvent('fullscreen_exit');
     }
     fullscreenActive.value = nowFs;
+}
+
+function changeFont(delta) {
+    const next = Math.min(FONT_MAX, Math.max(FONT_MIN, fontSizeRem.value + delta * FONT_STEP));
+    fontSizeRem.value = Math.round(next * 1000) / 1000;
+    try {
+        localStorage.setItem(FONT_KEY, String(fontSizeRem.value));
+    } catch {
+        /* ignore */
+    }
+}
+
+async function runInlineSystemCheck() {
+    sysCheckRunning.value = true;
+    try {
+        sysCheckResult.value = await runPortalSystemCheck();
+    } finally {
+        sysCheckRunning.value = false;
+    }
 }
 
 function submit() {
@@ -569,6 +673,12 @@ onMounted(() => {
     window.addEventListener('beforeunload', handleBeforeUnload);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     fullscreenActive.value = !!document.fullscreenElement;
+    try {
+        const saved = Number(localStorage.getItem(FONT_KEY));
+        if (saved >= FONT_MIN && saved <= FONT_MAX) fontSizeRem.value = saved;
+    } catch {
+        /* ignore */
+    }
 });
 
 onUnmounted(() => {
