@@ -89,7 +89,7 @@
                             </div>
                             <a v-if="systemCheckUrl" :href="systemCheckUrl" target="_blank" rel="noopener" class="text-[10px] font-bold text-[#0f3d7a] hover:underline">Full check ↗</a>
                         </div>
-                        <p class="text-[11px] text-slate-500">Verify your browser &amp; connection before starting.</p>
+                        <p class="text-[11px] text-slate-500">Verify your browser &amp; connection before starting. Extra monitors are not detected automatically.</p>
                         <button
                             type="button"
                             class="w-full btn-secondary text-xs !py-1.5"
@@ -259,6 +259,7 @@
                             >
                                 {{ submitting ? 'Submitting…' : (submitBlocked ? 'Waiting for answers to save…' : 'Review & Submit Exam') }}
                             </button>
+                            <p v-if="submitBlocked" class="text-xs text-amber-700">Wait until answers are saved before submitting.</p>
                         </div>
                     </aside>
 
@@ -517,8 +518,7 @@
                         :disabled="currentIndex <= 0"
                         @click="go(currentIndex - 1)"
                     >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                        <span>Previous</span>
+                        <span>← Prev</span>
                     </button>
 
                     <!-- Mobile Drawer Question Navigator Trigger -->
@@ -540,8 +540,7 @@
                         class="btn-primary min-h-12 px-5 text-xs sm:text-sm font-extrabold flex items-center gap-1.5 shadow-sm"
                         @click="go(currentIndex + 1)"
                     >
-                        <span>Next</span>
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                        <span>Next →</span>
                     </button>
                     <button
                         v-else
@@ -702,6 +701,7 @@
                     >
                         {{ submitting ? 'Finalizing submission…' : 'Yes, Submit My Exam' }}
                     </button>
+                    <p v-if="submitBlocked" class="w-full text-xs text-amber-700 text-center sm:text-right">Wait until answers are saved before submitting.</p>
                 </div>
             </div>
         </div>
