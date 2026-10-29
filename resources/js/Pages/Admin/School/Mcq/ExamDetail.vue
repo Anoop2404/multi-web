@@ -688,12 +688,27 @@
                 </div>
                 <div class="flex flex-wrap gap-2 items-center justify-between">
                     <div class="flex items-center gap-2">
-                        <button type="button" class="btn-secondary text-xs" @click="markAll('present')">Mark all present</button>
-                        <button type="button" class="btn-secondary text-xs" @click="markAll('absent')">Mark all absent</button>
+                        <button type="button" class="btn-secondary text-xs" @click="markAll('present')">
+                            Mark {{ attendanceClassFilter ? 'filtered' : 'all' }} present
+                        </button>
+                        <button type="button" class="btn-secondary text-xs" @click="markAll('absent')">
+                            Mark {{ attendanceClassFilter ? 'filtered' : 'all' }} absent
+                        </button>
                     </div>
-                    <div class="flex items-center gap-3">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <SearchableSelect v-model="attendanceClassFilter" class="min-w-[160px]" :options="classNameOptions"
+                                          :all-option="true" all-label="All classes" placeholder="All classes" />
                         <input v-model="attendanceSearchQuery" type="text" placeholder="Search student or ticket..." class="field text-xs min-w-[220px] bg-slate-50 border-slate-300 py-1.5 rounded-lg" />
-                        <a :href="reportExports.attendance" class="btn-secondary text-xs">Export attendance ↓</a>
+                        <button v-if="attendanceClassFilter || attendanceSearchQuery" type="button"
+                                class="text-xs text-slate-400 hover:underline"
+                                @click="attendanceClassFilter = ''; attendanceSearchQuery = ''">Clear</button>
+                        <a :href="attendanceExportUrl(reportExports.attendance)" class="btn-secondary text-xs">
+                            Export attendance{{ attendanceClassFilter ? ' (filtered)' : '' }} CSV ↓
+                        </a>
+                        <a v-if="reportExports.attendancePdf" :href="attendanceExportUrl(reportExports.attendancePdf)"
+                           target="_blank" class="btn-secondary text-xs">
+                            Class-wise attendance PDF ↓
+                        </a>
                     </div>
                 </div>
                 <p v-if="exam.results_published" class="text-xs text-amber-700">
@@ -739,6 +754,9 @@
                                         Pending approval → {{ row.pending_correction_status }}
                                     </span>
                                 </td>
+                            </tr>
+                            <tr v-if="!paginatedAttendanceState.length">
+                                <td colspan="7" class="p-6 text-center text-slate-400">No matching candidates for this filter.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1418,17 +1436,25 @@ const paginatedRegisteredStudents = computed(() => {
     return filteredRegisteredStudents.value.slice(start, start + registeredPageSize.value);
 });
 
-// Attendance tab search & pagination
+// Attendance tab search, class filter & pagination
 const attendanceSearchQuery = ref('');
+const attendanceClassFilter = ref('');
 const attendancePage = ref(1);
 const attendancePageSize = ref(50);
 
-watch(attendanceSearchQuery, () => {
+watch([attendanceSearchQuery, attendanceClassFilter], () => {
     attendancePage.value = 1;
 });
 
 const filteredAttendanceState = computed(() => {
     let list = attendanceState.value || [];
+    if (attendanceClassFilter.value) {
+        const clean = String(attendanceClassFilter.value).toLowerCase().replace(/^class\s*/i, '').trim();
+        list = list.filter((r) => {
+            const cls = String(r.class_name || r.student?.class_name || '').toLowerCase().replace(/^class\s*/i, '').trim();
+            return cls === clean;
+        });
+    }
     if (attendanceSearchQuery.value.trim()) {
         const q = attendanceSearchQuery.value.trim().toLowerCase();
         list = list.filter(r => {
@@ -1441,6 +1467,13 @@ const filteredAttendanceState = computed(() => {
     }
     return list;
 });
+
+/** Pass class filter into CSV/PDF downloads (search is list-only). */
+function attendanceExportUrl(baseUrl) {
+    if (!baseUrl) return '#';
+    if (!attendanceClassFilter.value) return baseUrl;
+    return baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'class=' + encodeURIComponent(attendanceClassFilter.value);
+}
 
 const totalAttendancePages = computed(() => Math.ceil(filteredAttendanceState.value.length / attendancePageSize.value) || 1);
 
@@ -1932,14 +1965,14 @@ function uploadBatchFee() {
 // --- Attendance ---
 const alertMessage = ref('');
 const attendanceState = ref(props.attendanceRows.map(r => ({ ...r, attendance_status: r.attendance_status || 'pending', attendance_note: r.attendance_note || '' })));
-const presentCount = computed(() => attendanceState.value.filter(r => r.attendance_status === 'present').length);
-const absentCount = computed(() => attendanceState.value.filter(r => r.attendance_status === 'absent').length);
-const malpracticeCount = computed(() => attendanceState.value.filter(r => r.attendance_status === 'malpractice').length);
-const withheldCount = computed(() => attendanceState.value.filter(r => r.attendance_status === 'withheld').length);
-const pendingCount = computed(() => attendanceState.value.filter(r => !r.attendance_status || r.attendance_status === 'pending').length);
+const presentCount = computed(() => filteredAttendanceState.value.filter(r => r.attendance_status === 'present').length);
+const absentCount = computed(() => filteredAttendanceState.value.filter(r => r.attendance_status === 'absent').length);
+const malpracticeCount = computed(() => filteredAttendanceState.value.filter(r => r.attendance_status === 'malpractice').length);
+const withheldCount = computed(() => filteredAttendanceState.value.filter(r => r.attendance_status === 'withheld').length);
+const pendingCount = computed(() => filteredAttendanceState.value.filter(r => !r.attendance_status || r.attendance_status === 'pending').length);
 
 function markAll(status) {
-    attendanceState.value.forEach(r => { if (!r.pending_correction_status) r.attendance_status = status; });
+    filteredAttendanceState.value.forEach(r => { if (!r.pending_correction_status) r.attendance_status = status; });
 }
 
 function saveAttendance() {
