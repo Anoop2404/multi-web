@@ -36,3 +36,17 @@ test('participants with separate registrations for one item share one section', 
     assert.equal(view.sections.value.length, 1);
     assert.equal(view.sections.value[0].rows.length, 2);
 });
+
+
+test('mark entry can keep chest order stable while assigning performance order', () => {
+    const props = { event: { event_type: 'kalolsavam' }, registrations: [
+        { item: { id: 1 }, participants: [
+            { id: 11, chest_no: '500', order_no: 2 },
+            { id: 12, chest_no: '501', order_no: 1 },
+        ] },
+    ] };
+    const stable = useFestMarkEntryDisplay(props, null, { sortByOrder: false });
+    assert.deepEqual(stable.sections.value[0].rows.map(row => row.participant.id), [11, 12]);
+    const ordered = useFestMarkEntryDisplay(props);
+    assert.deepEqual(ordered.sections.value[0].rows.map(row => row.participant.id), [12, 11]);
+});

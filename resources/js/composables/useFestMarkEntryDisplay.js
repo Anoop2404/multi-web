@@ -2,7 +2,7 @@ import { computed, reactive } from 'vue';
 
 const GROUP_PARTICIPANT_TYPES = ['team', 'group', 'pair', 'trio'];
 
-export function useFestMarkEntryDisplay(props, isSportsParam = null) {
+export function useFestMarkEntryDisplay(props, isSportsParam = null, { sortByOrder = true } = {}) {
     const isSports = isSportsParam ?? computed(() => props.event?.event_type === 'sports');
     const bulkRank = reactive({});
 
@@ -80,9 +80,9 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
                 const hasOrderA = orderA !== null && orderA !== undefined;
                 const hasOrderB = orderB !== null && orderB !== undefined;
 
-                if (hasOrderA && hasOrderB && orderA !== orderB) return orderA - orderB;
-                if (hasOrderA && !hasOrderB) return -1;
-                if (!hasOrderA && hasOrderB) return 1;
+                if (sortByOrder && hasOrderA && hasOrderB && orderA !== orderB) return orderA - orderB;
+                if (sortByOrder && hasOrderA && !hasOrderB) return -1;
+                if (sortByOrder && !hasOrderA && hasOrderB) return 1;
 
                 const chestAStr = String(a.participant?.group?.chest_no ?? a.participant?.chest_no ?? '');
                 const chestBStr = String(b.participant?.group?.chest_no ?? b.participant?.chest_no ?? '');
