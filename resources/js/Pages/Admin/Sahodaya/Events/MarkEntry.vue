@@ -1,6 +1,6 @@
 <template>
     <SahodayaEventsLayout title="Mark entry" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
-                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
+                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false" :success-dialogs="false">
         
         <div v-if="validationMessages.length" role="alert" class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
             <p class="font-semibold">Result not saved. Please correct the following:</p>
@@ -146,7 +146,7 @@
                         Auto-rank &amp; Grade All
                     </button>
                     <button v-if="sections.length" type="button" class="btn-primary text-xs !py-1.5 !px-4 shrink-0 whitespace-nowrap"
-                            :disabled="bulkSaving || itemLocked" @click="saveAll">
+                            :disabled="bulkSaving || itemLocked || attendanceSavingId !== null || orderSavingId !== null || savingIds.size > 0" @click="saveAll">
                         {{ bulkSaving ? 'Saving all…' : (itemLocked ? 'Locked — unpublish to edit' : 'Save All Marks ✓') }}
                     </button>
                 </div>
@@ -232,9 +232,9 @@
                             <tr>
                                 <th class="px-2.5 py-3 w-10 text-center sticky left-0 z-20 bg-slate-50 border-r border-slate-200">#</th>
                                 <th class="px-2.5 py-3 min-w-[5rem] w-20">Chest No.</th>
-                                <th class="px-2.5 py-3 min-w-[4.5rem] w-20">Order</th>
+                                <th class="px-2.5 py-3 min-w-[5.5rem] w-24">Order <span class="block normal-case font-normal tracking-normal">Saves automatically</span></th>
                                 <th class="px-2.5 py-3 min-w-[5.5rem] w-24">Fest ID</th>
-                                <th class="px-2.5 py-3 min-w-[6.5rem] w-28">Attendance</th>
+                                <th class="px-2.5 py-3 min-w-[10rem] w-40">Attendance</th>
                                 <th v-if="showMeasurement(section.item)" class="px-2.5 py-3 min-w-[7.5rem] w-32">{{ measurementUnitHint(section.item) === 'm' ? 'Distance (m)' : 'Time / Distance' }}</th>
                                 <th v-if="showRankColumn(section.item)" class="px-2.5 py-3 min-w-[6.5rem] w-28">Rank</th>
                                 <template v-if="hasJudgePanel && !isSports && !rankEntryOnly(section.item)">
@@ -268,10 +268,13 @@
                                 <!-- Order No. -->
                                 <td class="px-2.5 py-2">
                                     <SearchableSelect :model-value="participant.order_no ?? ''"
-                                            :disabled="itemLocked"
-                                            :options="orderOptionsFor(section, participant.id).map((n) => ({ value: n, label: String(n) }))"
-                                            :all-option="true" all-label="—" escape-overflow
-                                            @update:model-value="(value) => saveOrderNo(participant, value)" />
+                                            :aria-label="`Order number for chest ${participant.chest_no || participant.id}`"
+                                            :disabled="itemLocked || attendanceSavingId !== null || orderSavingId !== null || bulkSaving || savingIds.size > 0"
+                                            :options="orderOptionsFor(section, participant.id)"
+                                            :all-option="true" all-label="—" search-placeholder="Find order number…" escape-overflow
+                                            @update:model-value="saveOrderNo(participant, $event)" />
+                                    <span v-if="orderStatus[participant.id]" role="status" aria-live="polite" class="block mt-1 text-[11px]"
+                                          :class="orderStatus[participant.id] === 'Not saved' ? 'text-rose-600' : 'text-slate-500'">{{ orderStatus[participant.id] }}</span>
                                 </td>
 
                                 <!-- Fest ID -->
@@ -286,12 +289,22 @@
 
                                 <!-- Attendance -->
                                 <td class="px-2.5 py-2">
-                                    <SearchableSelect :model-value="attendanceStatus(participant, item)"
-                                            :class="isAbsent(participant, item) ? '!border-rose-300 !bg-rose-50 !text-rose-700' : ''"
-                                            :disabled="itemLocked"
-                                            :options="[{ value: 'present', label: 'Present ✓' }, { value: 'absent', label: 'Absent ✕' }]"
-                                            :all-option="false" placeholder="Not marked" :searchable="false" escape-overflow
-                                            @update:model-value="(value) => markAttendance(participant, item, value)" />
+                                    <div class="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 gap-0.5"
+                                         role="group" :aria-label="`Attendance for chest ${participant.chest_no || participant.id}`"
+                                         :aria-busy="attendanceSavingId === participant.id">
+                                        <button v-for="status in ['present', 'absent']" :key="status" type="button"
+                                                class="rounded-md px-2 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                                                :aria-pressed="attendanceStatus(participant, item) === status"
+                                                :class="attendanceStatus(participant, item) === status
+                                                    ? (status === 'present' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800')
+                                                    : 'text-slate-500 hover:bg-slate-100'"
+                                                :disabled="itemLocked || attendanceSavingId !== null || orderSavingId !== null || bulkSaving || savingIds.size > 0"
+                                                @click="markAttendance(participant, item, status)">
+                                            {{ status === 'present' ? 'Present' : 'Absent' }}
+                                        </button>
+                                    </div>
+                                    <span class="block min-h-4 mt-0.5 text-[11px]" role="status" aria-live="polite"
+                                          :class="attendanceSaveStatus[participant.id] === 'Not saved' ? 'text-rose-600' : 'text-slate-500'">{{ attendanceSaveStatus[participant.id] || '' }}</span>
                                 </td>
 
                                 <!-- Time / Distance (when the item is measured, per result_method) -->
@@ -353,7 +366,7 @@
                                         <span v-if="savedIds.has(participant.id)" class="text-xs font-bold text-emerald-600">Saved ✓</span>
                                         <span v-else-if="failedIds.has(participant.id)" class="text-xs font-bold text-rose-600" title="Not saved — see message above">Failed ✕</span>
                                         <button type="button" class="btn-primary text-xs !py-1 !px-2.5 whitespace-nowrap shadow-xs"
-                                                :disabled="savingIds.has(participant.id) || isAbsent(participant, item) || itemLocked"
+                                                :disabled="savingIds.size > 0 || bulkSaving || attendanceSavingId !== null || orderSavingId !== null || isAbsent(participant, item) || itemLocked"
                                                 @click="saveMark(participant, item)">
                                             {{ savingIds.has(participant.id) ? '…' : 'Save' }}
                                         </button>
@@ -530,7 +543,7 @@ const markSettingsUrl = computed(() => {
     return url;
 });
 
-const displayCtx = useFestMarkEntryDisplay(props, isSports);
+const displayCtx = useFestMarkEntryDisplay(props, isSports, { sortByOrder: false });
 const {
     bulkRank,
     sections,
@@ -808,12 +821,30 @@ function participantRegNo(participant) {
     return participant.level_registration_number ?? null;
 }
 
+const attendanceSavingId = ref(null);
+const attendanceSaveStatus = reactive({});
+
 function markAttendance(participant, item, status) {
+    if (attendanceSavingId.value !== null || itemLocked.value) return;
+    const key = `${item.id}-${participant.id}`;
+    if (props.attendance?.[key]?.status === status) return;
+    attendanceSavingId.value = participant.id;
+    attendanceSaveStatus[participant.id] = 'Saving…';
     router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/attendance`, {
         participant_id: participant.id,
         item_id: item.id,
         status,
-    }, { preserveScroll: true });
+    }, {
+        preserveScroll: true,
+        preserveState: true,
+        only: ['attendance', 'flash', 'errors'],
+        onSuccess: (page) => {
+            attendanceSaveStatus[participant.id] = page.props.flash?.error ? 'Not saved' : 'Saved ✓';
+        },
+        onError: () => { attendanceSaveStatus[participant.id] = 'Not saved'; },
+        onCancel: () => { attendanceSaveStatus[participant.id] = 'Not saved'; },
+        onFinish: () => { attendanceSavingId.value = null; },
+    });
 }
 
 const savedIds = ref(new Set());
@@ -844,17 +875,10 @@ function markSaveOutcome(participantId) {
 }
 const bulkSaving = ref(false);
 
-// Order No: unlike Rank (which allows ties and lives on the FestMark), this is a strict,
-// unique-per-item sequence stored on the participant/group and validated server-side —
-// see FestMarkEntryController::setOrderNo(). Options run 1..N for however many entries
-// this item currently has (dynamic, not a fixed list like Rank's padded-to-6 options).
-// Selecting a value saves immediately, same as Attendance — no separate Save click —
-// and changes useFestMarkEntryDisplay's sort, so the row visibly moves once applied.
-// Already-taken numbers (by any OTHER row in this item) are dropped from the list so
-// picking a colliding value isn't even offered — only this row's own current value (if
-// any) stays in its own dropdown. preserveState on the save below keeps this component
-// mounted so the pick disappears from every other row's list immediately, without a
-// full page reload.
+// Order saves immediately. Keep chest-number order stable while entering values;
+// only offer unused numbers, and prevent overlapping Inertia visits cancelling saves.
+const orderSavingId = ref(null);
+const orderStatus = reactive({});
 function orderOptionsFor(section, currentParticipantId) {
     const count = section?.rows?.length ?? 0;
     const taken = new Set(
@@ -869,9 +893,9 @@ function orderOptionsFor(section, currentParticipantId) {
 
 function saveOrderNo(participant, value) {
     const orderNo = value === '' || value === null || value === undefined ? null : Number(value);
-    if (participant) {
-        participant.order_no = orderNo;
-    }
+    if (orderSavingId.value !== null || orderNo === (participant.order_no ?? null)) return;
+    orderSavingId.value = participant.id;
+    orderStatus[participant.id] = 'Saving…';
     router.post(
         `${marksBaseUrl.value}/${participant.id}/order-no`,
         { order_no: orderNo },
@@ -879,6 +903,12 @@ function saveOrderNo(participant, value) {
             preserveScroll: true,
             preserveState: true,
             only: ['registrations', 'flash', 'errors'],
+            onSuccess: (page) => {
+                orderStatus[participant.id] = page.props.flash?.error ? 'Not saved' : 'Saved ✓';
+            },
+            onError: () => { orderStatus[participant.id] = 'Not saved'; },
+            onCancel: () => { orderStatus[participant.id] = 'Not saved'; },
+            onFinish: () => { orderSavingId.value = null; },
         }
     );
 }

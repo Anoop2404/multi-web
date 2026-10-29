@@ -4,6 +4,12 @@
         <button
             :id="id"
             type="button"
+            ref="triggerRef"
+            aria-haspopup="listbox"
+            :aria-label="ariaLabel"
+            :aria-expanded="isOpen"
+            :aria-controls="menuId"
+            @keydown="onTriggerKeydown"
             class="form-input text-sm w-full bg-slate-50 border-slate-200 rounded-lg text-left flex items-center justify-between gap-2 px-3 py-2 border transition"
             :class="disabled ? 'opacity-60 cursor-not-allowed' : 'hover:bg-white cursor-pointer'"
             :disabled="disabled"
@@ -40,7 +46,11 @@
             <div
                 v-if="isOpen && !disabled"
                 ref="menuRef"
-                class="absolute left-0 top-full mt-1 min-w-full w-max max-w-sm bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-hidden flex flex-col max-h-64"
+                class="absolute left-0 top-full mt-1 w-max max-w-sm bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-hidden flex flex-col max-h-64"
+                :id="menuId"
+                role="listbox"
+                :class="escapeOverflow ? '' : 'min-w-full'"
+                @keydown="onMenuKeydown"
                 :style="escapeOverflow ? menuStyle : undefined"
             >
                 <!-- Search input inside dropdown -->
@@ -52,13 +62,20 @@
                         class="w-full text-xs px-2.5 py-1.5 bg-white border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                         :placeholder="searchPlaceholder"
                         @click.stop
+                        role="combobox"
+                        :aria-expanded="isOpen"
+                        :aria-controls="menuId"
+                        aria-label="Search options"
                     />
                 </div>
 
                 <!-- Options list -->
-                <div class="overflow-y-auto flex-1 p-1">
+                <div class="overflow-y-auto overscroll-contain min-h-0 flex-1 p-1">
                     <button
                         v-if="allOption"
+                        data-select-option
+                        role="option"
+                        :aria-selected="!modelValue"
                         type="button"
                         class="w-full text-left text-xs px-2.5 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition flex items-center justify-between"
                         :class="!modelValue ? 'bg-indigo-50/80 text-indigo-700 font-bold' : 'text-slate-700'"
@@ -74,6 +91,9 @@
 
                     <button
                         v-for="opt in filteredOptions"
+                        data-select-option
+                        role="option"
+                        :aria-selected="isOptionSelected(opt)"
                         :key="opt.value"
                         type="button"
                         class="w-full text-left text-xs px-2.5 py-2 rounded-md transition flex items-center justify-between"
@@ -91,7 +111,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount, useId } from 'vue';
 import { genderLabel } from '@/support/festItemEligibility.js';
 
 const props = defineProps({
@@ -133,6 +153,7 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    ariaLabel: { type: String, default: undefined },
     id: {
         type: String,
         default: undefined,
@@ -151,6 +172,8 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'change']);
 
 const isOpen = ref(false);
+const triggerRef = ref(null);
+const menuId = `select-${useId()}`;
 const searchQuery = ref('');
 const containerRef = ref(null);
 const searchInputRef = ref(null);
@@ -212,6 +235,7 @@ function selectOption(val) {
     emit('change', val);
     isOpen.value = false;
     searchQuery.value = '';
+    triggerRef.value?.focus({ preventScroll: true });
 }
 
 function handleClickOutside(event) {
@@ -229,14 +253,26 @@ function updateMenuPosition() {
     if (!props.escapeOverflow || !containerRef.value) return;
 
     const rect = containerRef.value.getBoundingClientRect();
-    const estimatedHeight = menuRef.value?.offsetHeight || 256;
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const openUpward = spaceBelow < estimatedHeight + 8 && rect.top > spaceBelow;
-
+    // A menu teleported out of a dialog must stay above that dialog's backdrop.
+    let layer = 50;
+    for (let ancestor = containerRef.value; ancestor; ancestor = ancestor.parentElement) {
+        const z = Number.parseInt(window.getComputedStyle(ancestor).zIndex, 10);
+        if (Number.isFinite(z)) layer = Math.max(layer, z + 1);
+    }
+    const gap = 8;
+    const spaceBelow = window.innerHeight - rect.bottom - gap;
+    const spaceAbove = rect.top - gap;
+    const openUpward = spaceBelow < 256 && spaceAbove > spaceBelow;
+    const width = Math.min(Math.max(rect.width, 160), window.innerWidth - gap * 2);
     menuStyle.value = {
         position: 'fixed',
-        left: `${rect.left}px`,
-        width: `${rect.width}px`,
+        zIndex: layer,
+        marginTop: '0',
+        minWidth: '0',
+        maxWidth: `${window.innerWidth - gap * 2}px`,
+        maxHeight: `${Math.max(0, Math.min(256, openUpward ? spaceAbove : spaceBelow))}px`,
+        left: `${Math.max(gap, Math.min(rect.left, window.innerWidth - width - gap))}px`,
+        width: `${width}px`,
         top: openUpward ? 'auto' : `${rect.bottom + 4}px`,
         bottom: openUpward ? `${window.innerHeight - rect.top + 4}px` : 'auto',
     };
@@ -250,16 +286,70 @@ watch(() => props.disabled, (isDisabled) => {
     if (isDisabled) isOpen.value = false;
 });
 
-watch(isOpen, (newVal) => {
-    if (newVal && props.searchable) {
-        nextTick(() => searchInputRef.value?.focus());
-    } else {
-        searchQuery.value = '';
+function optionButtons() {
+    return [...(menuRef.value?.querySelectorAll('[data-select-option]:not(:disabled)') ?? [])];
+}
+
+// Scroll only the option list, never the document or the surrounding marks table.
+function revealOption(option) {
+    const list = option?.parentElement;
+    if (!list) return;
+    const bounds = list.getBoundingClientRect();
+    const target = option.getBoundingClientRect();
+    if (target.top < bounds.top) list.scrollTop -= bounds.top - target.top;
+    else if (target.bottom > bounds.bottom) list.scrollTop += target.bottom - bounds.bottom;
+}
+
+function onTriggerKeydown(event) {
+    if (props.disabled || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    isOpen.value = true;
+    nextTick(() => {
+        const options = optionButtons();
+        const target = event.key === 'End' || event.key === 'ArrowUp' ? options.at(-1) : options[0];
+        target?.focus({ preventScroll: true });
+        revealOption(target);
+    });
+}
+
+function onMenuKeydown(event) {
+    if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        isOpen.value = false;
+        triggerRef.value?.focus({ preventScroll: true });
+        return;
     }
-    if (newVal && props.escapeOverflow) {
-        nextTick(updateMenuPosition);
+    if (event.key === 'Tab') { isOpen.value = false; return; }
+    const options = optionButtons();
+    if (event.key === 'Enter' && event.target === searchInputRef.value) {
+        event.preventDefault();
+        const firstMatch = props.allOption && searchQuery.value.trim() ? options[1] : options[0];
+        firstMatch?.click();
+        return;
     }
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    if (event.target === searchInputRef.value && ['Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const current = options.indexOf(document.activeElement);
+    const index = event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1
+        : event.key === 'ArrowDown' ? Math.min(options.length - 1, current + 1)
+        : current < 0 ? options.length - 1 : Math.max(0, current - 1);
+    options[index]?.focus({ preventScroll: true });
+    revealOption(options[index]);
+}
+
+watch(isOpen, async (newVal) => {
+    if (!newVal) { searchQuery.value = ''; return; }
+    await nextTick();
+    updateMenuPosition();
+    await nextTick();
+    if (props.searchable) searchInputRef.value?.focus({ preventScroll: true });
+    else menuRef.value?.querySelector('[aria-selected="true"]')?.focus({ preventScroll: true });
+    revealOption(menuRef.value?.querySelector('[aria-selected="true"]'));
 });
+
+watch(filteredOptions, () => { if (isOpen.value) nextTick(updateMenuPosition); });
 
 onMounted(() => {
     document.addEventListener('click', handleClickOutside);

@@ -270,14 +270,14 @@
                 <h3 class="font-semibold mb-3">Substitute performer</h3>
                 <p class="text-xs text-gray-500 mb-3">{{ substituteReg.item?.title }}</p>
                 <FormField label="Performer (out)">
-                    <SearchableSelect
+                    <SearchableSelect escape-overflow
                         v-model="substituteForm.performer_id"
                         :options="substitutePerformerOptions"
                         :all-option="false"
                     />
                 </FormField>
                 <FormField label="Standby (in)" class-extra="mt-2">
-                    <SearchableSelect
+                    <SearchableSelect escape-overflow
                         v-model="substituteForm.standby_id"
                         :options="substituteStandbyOptions"
                         :all-option="false"
@@ -299,7 +299,7 @@
                     </div>
                     <button type="button" class="text-gray-400 hover:text-gray-600 text-2xl leading-none shrink-0" @click="closeManageParticipants">&times;</button>
                 </div>
-                <div class="flex-1 overflow-y-auto space-y-2 mt-3">
+                <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-2 mt-3">
                     <div v-for="p in manageReg.participants" :key="p.id"
                          class="flex items-center justify-between gap-2 border border-slate-100 rounded-lg px-3 py-2">
                         <div class="min-w-0">
@@ -316,15 +316,16 @@
                     </div>
                     <p v-if="!manageReg.participants?.length" class="text-xs text-slate-400 text-center py-4">No participants left.</p>
                 </div>
-                <div class="border-t border-gray-100 mt-3 pt-3">
+                <div class="shrink-0 border-t border-gray-100 mt-3 pt-3">
                     <label class="text-xs font-semibold text-gray-600">Add participant as</label>
-                    <div class="flex items-center gap-3 mt-1">
-                        <SearchableSelect
-                            v-model="addParticipantRole"
-                            :options="[{ value: 'performer', label: 'Performer' }, { value: 'standby', label: 'Standby' }]"
-                            :all-option="false"
-                            class="w-36"
-                        />
+                    <div class="flex flex-wrap items-center gap-3 mt-1">
+                        <div class="inline-flex rounded-lg border border-slate-200 bg-white p-0.5" role="group" aria-label="Add participant as">
+                            <button v-for="role in ['performer', 'standby']" :key="role" type="button"
+                                    class="rounded-md px-3 py-2 text-xs font-semibold focus-visible:ring-2 focus-visible:ring-indigo-500"
+                                    :aria-pressed="addParticipantRole === role"
+                                    :class="addParticipantRole === role ? 'bg-indigo-100 text-indigo-800' : 'text-slate-600 hover:bg-slate-100'"
+                                    @click="addParticipantRole = role">{{ role === 'performer' ? 'Participant' : 'Standby' }}</button>
+                        </div>
                         <button type="button" class="btn-secondary text-xs" @click="openAddParticipantPicker">Pick student</button>
                     </div>
                 </div>
@@ -356,9 +357,9 @@
                     </div>
                     <button type="button" class="text-gray-400 hover:text-gray-600 text-2xl leading-none" @click="onBehalfOpen = false">&times;</button>
                 </div>
-                <form @submit.prevent="submitOnBehalf" class="p-5 space-y-4 overflow-y-auto">
+                <form @submit.prevent="submitOnBehalf" class="p-5 min-h-0 space-y-4 overflow-y-auto overscroll-contain">
                     <FormField label="School" required>
-                        <SearchableSelect
+                        <SearchableSelect escape-overflow
                             v-model="onBehalfForm.school_id"
                             :options="onBehalfSchoolOptions"
                             :all-option="true"
@@ -379,7 +380,7 @@
                         </p>
                     </div>
                     <FormField label="Event item" required>
-                        <SearchableSelect
+                        <SearchableSelect escape-overflow
                             v-model="onBehalfForm.item_id"
                             :options="eventItemOptions"
                             placeholder="Select item"
@@ -537,7 +538,7 @@
         <!-- Quick Add Student Modal -->
         <div v-if="quickAddStudentOpen" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-[#041525]/60 backdrop-blur-sm" @click="cancelQuickAddStudent"></div>
-            <div class="relative modal-shell max-w-md w-full flex flex-col overflow-hidden bg-white shadow-2xl rounded-2xl">
+            <div class="relative modal-shell max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden bg-white shadow-2xl rounded-2xl">
                 <div class="modal-head shrink-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between z-10">
                     <div>
                         <h3 class="font-bold text-[#041525] text-base">Quick Add Student</h3>
@@ -545,14 +546,14 @@
                     </div>
                     <button type="button" class="text-slate-400 hover:text-slate-600 text-2xl leading-none px-1" @click="cancelQuickAddStudent">&times;</button>
                 </div>
-                <form @submit.prevent="submitQuickAddStudent" class="p-6 space-y-4 overflow-y-auto">
+                <form @submit.prevent="submitQuickAddStudent" class="p-6 min-h-0 space-y-4 overflow-y-auto overscroll-contain">
                     <FormField label="Full Name" required>
                         <input v-model="quickAddStudentForm.name" type="text" class="field text-sm" placeholder="Full name of student" required autocomplete="off">
                     </FormField>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <FormField label="Gender" required>
-                            <SearchableSelect
+                            <SearchableSelect escape-overflow
                                 v-model="quickAddStudentForm.gender"
                                 :options="[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'other', label: 'Other' }]"
                                 :all-option="false"
@@ -566,7 +567,7 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <FormField label="Class / Grade">
-                            <SearchableSelect
+                            <SearchableSelect escape-overflow
                                 v-model="quickAddStudentForm.school_class_id"
                                 :options="quickAddStudentClasses.map(c => ({ value: c.id, label: c.name }))"
                                 all-label="Select class"

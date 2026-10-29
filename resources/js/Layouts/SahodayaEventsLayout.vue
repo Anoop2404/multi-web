@@ -170,6 +170,7 @@ const props = defineProps({
     programEvents: { type: Array, default: null },
     /** When false, the top bar shows only menu + badges — use PageHeader in page body for the title. */
     showHeaderTitle: { type: Boolean, default: true },
+    successDialogs: { type: Boolean, default: true },
     maxWidth: { type: String, default: 'max-w-[96rem]' },
 });
 
@@ -242,7 +243,7 @@ watch(() => page.url, () => {
 // fresh page's initial mount.
 const { showSuccess, showError } = useSweetAlert();
 watch(() => page.props.flash?.success, (message) => {
-    if (message) showSuccess(message);
+    if (message && props.successDialogs) showSuccess(message);
 });
 watch(() => page.props.flash?.error, (message) => {
     if (message) showError(message, 'Error');
