@@ -2,7 +2,7 @@
     <SahodayaAdminLayout :title="`Attendance — ${exam.title}`" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="exam.title" eyebrow="Talent Search exam" description="Mark hall attendance before entering scores." />
-        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" active="attendance" />
+        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" :is-model-exam="!!exam.is_model_exam" active="attendance" />
 
         <InlineAlert :message="alertMessage" type="error" @dismiss="alertMessage = ''" />
 

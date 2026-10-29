@@ -24,7 +24,11 @@
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/reports`" class="btn-secondary text-sm">← Reports</Link>
             </template>
         </PageHeader>
-        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" active="reports" />
+        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id"
+                       :delivery-mode="exam.delivery_mode || 'offline'"
+                       :results-published="!!exam.results_published"
+                       :is-model-exam="!!exam.is_model_exam"
+                       active="reports" />
 
         <div class="flex flex-wrap gap-2 mb-4 items-center">
             <input v-model="filterForm.search" type="search" class="field max-w-xs" placeholder="Search ticket, student, or school…">

@@ -1,17 +1,21 @@
 <template>
     <SahodayaAdminLayout :title="series.title" :sahodaya="sahodaya">
-        <PageHeader :title="series.title" eyebrow="Talent Search series"
-                    description="Create level-based exams with class/category assignment, dates, and direct links to manage each level.">
+        <PageHeader :title="series.title" eyebrow="Exam series"
+                    description="Create level-based exams with class/category assignment, dates, and links to manage each level.">
             <template #actions>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-series`" class="btn-secondary text-sm">← Series list</Link>
-                <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq`" class="btn-secondary text-sm">All exams</Link>
+                <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams`" class="btn-secondary text-sm">All exams</Link>
             </template>
         </PageHeader>
 
         <section class="card mb-6 overflow-hidden !p-0">
             <div class="p-4 border-b border-slate-100">
                 <h2 class="section-title !mb-0">Exam levels</h2>
-                <p class="section-desc">Each level opens in its own exam workspace — registrations, fees, hall tickets, results.</p>
+                <p class="section-desc">
+                    {{ hasModelExams
+                        ? 'Each level opens in its own exam workspace — registrations, papers, and results.'
+                        : 'Each level opens in its own exam workspace — registrations, fees, hall tickets, and results.' }}
+                </p>
             </div>
             <EmptyState v-if="!series.exams?.length" title="No levels yet" description="Add Level 1 and Level 2 below, or add one level at a time." icon="📚" class="py-8" />
             <div v-else class="overflow-x-auto">
@@ -20,8 +24,9 @@
                         <tr>
                             <th>Level</th>
                             <th>Title</th>
+                            <th>Mode</th>
                             <th>Schedule</th>
-                            <th>Fee</th>
+                            <th v-if="showsFeeColumn">Fee</th>
                             <th>Class / category</th>
                             <th>Promotion</th>
                             <th>Status</th>
@@ -32,9 +37,16 @@
                         <tr v-for="exam in series.exams" :key="exam.id">
                             <td><span class="font-semibold text-indigo-700">{{ exam.level_label || `L${exam.exam_level}` }}</span></td>
                             <td class="font-medium">{{ exam.title }}</td>
+                            <td>
+                                <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap"
+                                      :class="exam.is_model_exam ? 'bg-sky-50 text-sky-800' : 'bg-indigo-50 text-indigo-800'">
+                                    {{ exam.product_mode_label || (exam.is_model_exam ? 'Model exam' : 'Talent Search') }}
+                                </span>
+                            </td>
                             <td class="text-xs whitespace-nowrap">{{ formatSchedule(exam.scheduled_at) }}</td>
-                            <td class="text-xs whitespace-nowrap" :class="formatFee(exam) === 'Free' ? 'text-slate-400' : 'font-semibold text-emerald-700'">
-                                {{ formatFee(exam) }}
+                            <td v-if="showsFeeColumn" class="text-xs whitespace-nowrap"
+                                :class="exam.is_model_exam || formatFee(exam) === 'Free' ? 'text-slate-400' : 'font-semibold text-emerald-700'">
+                                {{ exam.is_model_exam ? '—' : formatFee(exam) }}
                             </td>
                             <td class="text-xs text-slate-600 max-w-[200px]">{{ exam.eligibility_summary || 'All classes' }}</td>
                             <td class="text-xs text-slate-600">{{ (exam.exam_level ?? 1) > 1 ? (exam.eligibility_mode_label || exam.eligibility_mode) : 'Open registration' }}</td>
@@ -141,7 +153,7 @@
             <h2 class="section-title">Add one level</h2>
             <FormGrid>
                 <FormField label="Exam title" class-extra="sm:col-span-2" required>
-                    <input v-model="levelForm.title" class="field" placeholder="e.g. Sahodaya Talent Search Level 1" required>
+                    <input v-model="levelForm.title" class="field" placeholder="e.g. Level 1 — Mathematics" required>
                 </FormField>
                 <FormField label="Level">
                     <input v-model.number="levelForm.exam_level" type="number" min="1" max="10" class="field">
@@ -250,6 +262,17 @@ const parentSelectOptions = computed(() =>
 const promotionExams = computed(() =>
     (props.series.exams ?? []).filter((e) => (e.exam_level ?? 1) > 1 && e.promotion),
 );
+
+const hasModelExams = computed(() =>
+    (props.series.exams ?? []).some((e) => e.is_model_exam),
+);
+
+/** Hide fee column only when every level is a model exam (no Talent Search fees). */
+const showsFeeColumn = computed(() => {
+    const exams = props.series.exams ?? [];
+    if (!exams.length) return true;
+    return exams.some((e) => !e.is_model_exam);
+});
 
 function formatSchedule(value) {
     if (!value) return '—';

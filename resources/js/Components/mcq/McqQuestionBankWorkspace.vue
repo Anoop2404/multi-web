@@ -14,7 +14,9 @@
                         <span v-if="bank.locked" class="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">Locked — exam started</span>
                     </div>
                     <p class="mt-1 text-sm text-slate-500">
-                        {{ bank.subject }}<span v-if="bank.class_group_label"> · {{ bank.class_group_label }}</span> · by {{ bank.owner_label }}
+                        {{ bank.subject }}
+                        <span v-if="bank.scope_label || bank.class_group_label"> · {{ bank.scope_label || bank.class_group_label }}</span>
+                        · by {{ bank.owner_label }}
                     </p>
                     <p v-if="bank.description" class="mt-2 text-sm text-slate-600">{{ bank.description }}</p>
                     <p v-if="bank.exams.length" class="mt-2 text-xs text-slate-500">
@@ -24,6 +26,7 @@
                 <div class="flex flex-wrap gap-2">
                     <button v-if="bank.status !== 'active'" type="button" class="btn-primary text-sm" @click="setStatus('active')">Mark Ready</button>
                     <button v-if="bank.status === 'active'" type="button" class="btn-secondary text-sm" @click="setStatus('draft')">Back to draft</button>
+                    <button v-if="canContribute" type="button" class="btn-secondary text-sm" @click="contribute">Contribute copy to Sahodaya</button>
                     <button type="button" class="btn-secondary text-sm" @click="editingBank = !editingBank">Edit details</button>
                     <button v-if="bank.status !== 'archived'" type="button" class="btn-secondary text-sm" @click="setStatus('archived')">Archive</button>
                     <button v-if="!bank.exams.length" type="button" class="btn-secondary text-sm !text-red-600" @click="destroyBank">Delete</button>
@@ -43,6 +46,20 @@
                     <InputError :message="bankForm.errors.subject" />
                 </div>
                 <div>
+                    <label class="form-label">Class category</label>
+                    <select v-model="bankForm.class_category_id" class="field">
+                        <option :value="null">Any / not scoped</option>
+                        <option v-for="c in classCategories" :key="c.id" :value="c.id">{{ c.label }}</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">Class</label>
+                    <select v-model="bankForm.master_class_id" class="field">
+                        <option :value="null">Any / not scoped</option>
+                        <option v-for="c in masterClasses" :key="c.id" :value="c.id">{{ c.name }}</option>
+                    </select>
+                </div>
+                <div v-if="classGroups.length">
                     <label class="form-label">Class group</label>
                     <select v-model="bankForm.class_group" class="field">
                         <option :value="null">Any</option>
@@ -142,6 +159,9 @@ const props = defineProps({
     difficulties: { type: Array, default: () => [] },
     subjects: { type: Array, default: () => [] },
     classGroups: { type: Array, default: () => [] },
+    classCategories: { type: Array, default: () => [] },
+    masterClasses: { type: Array, default: () => [] },
+    canContribute: { type: Boolean, default: false },
     baseUrl: { type: String, required: true },
 });
 
@@ -153,6 +173,8 @@ const bankForm = useForm({
     title: props.bank.title,
     subject: props.bank.subject,
     class_group: props.bank.class_group,
+    class_category_id: props.bank.class_category_id ?? null,
+    master_class_id: props.bank.master_class_id ?? null,
     description: props.bank.description ?? '',
     status: props.bank.status,
 });
@@ -179,9 +201,15 @@ function setStatus(status) {
         title: props.bank.title,
         subject: props.bank.subject,
         class_group: props.bank.class_group,
+        class_category_id: props.bank.class_category_id,
+        master_class_id: props.bank.master_class_id,
         description: props.bank.description,
         status,
     }, { preserveScroll: true });
+}
+
+function contribute() {
+    router.post(`${bankUrl}/contribute`, {}, { preserveScroll: true });
 }
 
 async function destroyBank() {

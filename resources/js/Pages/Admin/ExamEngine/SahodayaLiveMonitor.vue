@@ -15,6 +15,7 @@
             :exam-id="exam.id"
             :delivery-mode="exam.delivery_mode || 'offline'"
             :results-published="!!exam.results_published"
+            :is-model-exam="!!exam.is_model_exam"
             :uses-engine="!!engine.uses_engine"
             active="live"
         />

@@ -125,6 +125,7 @@ type Meta struct {
 	StartPin                    *string    `json:"start_pin"`
 	ShowScoreOnSubmit           bool       `json:"show_score_on_submit"`
 	ShuffleQuestions            bool       `json:"shuffle_questions"`
+	RequireFullscreen           bool       `json:"require_fullscreen"`
 	DeviceIdleMinutes           int        `json:"device_idle_minutes"`
 	SyncIntervalSeconds         int        `json:"sync_interval_seconds"`
 	HeartbeatSeconds            int        `json:"heartbeat_seconds"`

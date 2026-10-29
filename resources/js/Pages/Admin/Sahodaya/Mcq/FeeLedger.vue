@@ -8,7 +8,11 @@
             </template>
         </PageHeader>
 
-        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" active="ledger" />
+        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id"
+                       :delivery-mode="exam.delivery_mode || 'offline'"
+                       :results-published="!!exam.results_published"
+                       :is-model-exam="!!exam.is_model_exam"
+                       active="ledger" />
 
         <div class="card mb-4 bg-indigo-50 border-indigo-100 text-sm text-indigo-900">
             <p class="font-semibold">Ledger account head</p>

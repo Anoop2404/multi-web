@@ -16,9 +16,13 @@ class McqReportController extends SahodayaAdminController
         $feeSummary = $reports->feeSummaryRows($exam);
 
         return $this->inertia('Sahodaya/Mcq/Reports', [
-            'exam'         => $exam->only('id', 'title', 'exam_level', 'status', 'results_published', 'delivery_mode'),
+            'exam'         => array_merge($exam->only('id', 'title', 'exam_level', 'status', 'results_published', 'delivery_mode'), [
+                'product_mode' => $exam->productMode(),
+                'is_model_exam' => $exam->isModelExam(),
+                'product_mode_label' => \App\Support\Mcq\McqProductMode::label($exam->productMode()),
+            ]),
             'registrations'=> $reports->registrationPreviewRows($exam),
-            'feeSummary'   => $feeSummary,
+            'feeSummary'   => $exam->isModelExam() ? [] : $feeSummary,
             'classWiseCounts' => $reports->classWiseCountMatrix($exam),
             'resultAnalysis' => $exam->results_published ? $reports->resultAnalysis($exam) : null,
             'schoolPerformance' => $exam->results_published ? $reports->schoolPerformanceRows($exam) : [],
@@ -27,11 +31,13 @@ class McqReportController extends SahodayaAdminController
                 'registrations' => McqRegistration::where('exam_id', $exam->id)->active()->count(),
                 'present'       => McqRegistration::where('exam_id', $exam->id)->active()->where('attendance_status', 'present')->count(),
                 'malpractice'   => McqRegistration::where('exam_id', $exam->id)->active()->whereIn('attendance_status', ['malpractice', 'withheld'])->count(),
-                'fee_collected' => (float) collect($feeSummary)->sum('amount_paid'),
-                'fee_pending'   => (float) collect($feeSummary)->sum('outstanding'),
+                'fee_collected' => $exam->isModelExam() ? 0 : (float) collect($feeSummary)->sum('amount_paid'),
+                'fee_pending'   => $exam->isModelExam() ? 0 : (float) collect($feeSummary)->sum('outstanding'),
+                'schools'       => McqRegistration::where('exam_id', $exam->id)->active()->distinct('school_id')->count('school_id'),
             ],
             'schoolOptions' => $reports->schoolFilterOptions($exam),
             'classOptions'  => $reports->classFilterOptions($exam),
+            'membershipHealth' => app(\App\Services\Mcq\McqMembershipHealthService::class)->problemSchools($exam)->values(),
         ]);
     }
 
@@ -65,7 +71,9 @@ class McqReportController extends SahodayaAdminController
             ->values();
 
         return $this->inertia('Sahodaya/Mcq/Reports/Registration', [
-            'exam'          => $exam->only('id', 'title', 'exam_level', 'status', 'delivery_mode', 'results_published'),
+            'exam'          => array_merge($exam->only('id', 'title', 'exam_level', 'status', 'delivery_mode', 'results_published'), [
+                'is_model_exam' => $exam->isModelExam(),
+            ]),
             'registrations' => $registrations,
             'filters'       => $filters,
             'schoolOptions' => $reports->schoolFilterOptions($exam),
@@ -96,7 +104,9 @@ class McqReportController extends SahodayaAdminController
             ->withQueryString();
 
         return $this->inertia('Sahodaya/Mcq/Reports/AttendanceSheet', [
-            'exam'          => $exam->only('id', 'title', 'exam_level', 'status'),
+            'exam'          => array_merge($exam->only('id', 'title', 'exam_level', 'status', 'delivery_mode', 'results_published'), [
+                'is_model_exam' => $exam->isModelExam(),
+            ]),
             'registrations' => $registrations,
             'filters'       => $filters,
             'schoolOptions' => $reports->schoolFilterOptions($exam),
@@ -123,7 +133,9 @@ class McqReportController extends SahodayaAdminController
             ->all();
 
         return $this->inertia('Sahodaya/Mcq/Reports/FeeSummary', [
-            'exam'       => $exam->only('id', 'title', 'exam_level', 'status'),
+            'exam'       => array_merge($exam->only('id', 'title', 'exam_level', 'status', 'delivery_mode', 'results_published'), [
+                'is_model_exam' => $exam->isModelExam(),
+            ]),
             'feeSummary' => $rows,
             'filters'    => $filters,
         ]);
@@ -139,7 +151,9 @@ class McqReportController extends SahodayaAdminController
         ]);
 
         return $this->inertia('Sahodaya/Mcq/Reports/ClassWiseCounts', [
-            'exam'            => $exam->only('id', 'title', 'exam_level', 'status'),
+            'exam'            => array_merge($exam->only('id', 'title', 'exam_level', 'status', 'delivery_mode', 'results_published'), [
+                'is_model_exam' => $exam->isModelExam(),
+            ]),
             'classWiseCounts' => $reports->classWiseCountMatrix($exam, $filters['school_id'] ?? null),
             'filters'         => $filters,
             'schoolOptions'   => $reports->schoolFilterOptions($exam),

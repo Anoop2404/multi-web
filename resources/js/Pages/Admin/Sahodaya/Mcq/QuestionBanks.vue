@@ -8,7 +8,9 @@
                 <Link :href="banksUrl" class="btn-secondary text-sm">Question banks</Link>
             </template>
         </PageHeader>
-        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'" :results-published="!!exam.results_published" active="question-banks" :uses-engine="engine.enabled" />
+        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'"
+                       :results-published="!!exam.results_published" :is-model-exam="!!exam.is_model_exam"
+                       active="question-banks" :uses-engine="engine.enabled" />
 
         <div v-if="(exam.delivery_mode || 'offline') === 'offline'" class="card card--muted mb-4 !py-3 px-4 text-sm text-slate-700">
             This exam is <strong>offline</strong>. A paper is only used when delivery is switched to online on the Overview tab.
@@ -81,13 +83,25 @@
         <!-- Add bank -->
         <section v-if="!paper.locked" class="card mb-6">
             <h3 class="section-title">Add a section</h3>
+            <p class="section-desc mb-2">
+                {{ exam.allow_member_banks
+                    ? 'Member school Ready banks are allowed on this paper (allow_member_banks is on).'
+                    : 'Only Sahodaya-owned Ready banks are listed (allow_member_banks is off on Overview).' }}
+                <template v-if="exam.eligibility_filter?.assignment_type && exam.eligibility_filter.assignment_type !== 'all'">
+                    Showing banks matching this exam’s {{ exam.eligibility_filter.assignment_type }} eligibility, plus unscoped banks.
+                </template>
+            </p>
             <EmptyState v-if="!available.length" title="No Ready banks to add"
-                        description="Mark a question bank Ready (Question banks → open a bank → Mark Ready) to add it here." icon="📝" class="py-6" />
+                        :description="emptyBanksDescription" icon="📝" class="py-6" />
             <ul v-else class="divide-y divide-slate-100">
                 <li v-for="bank in available" :key="bank.id" class="flex items-center justify-between gap-3 py-3">
                     <div>
                         <p class="text-sm font-medium">{{ bank.title }}</p>
-                        <p class="text-xs text-slate-500">{{ bank.subject }} · {{ bank.questions_count }} question(s)</p>
+                        <p class="text-xs text-slate-500">
+                            {{ bank.subject }} · {{ bank.questions_count }} question(s)
+                            <span v-if="bank.scope_label"> · {{ bank.scope_label }}</span>
+                            <span v-if="bank.owner_label"> · {{ bank.owner_label }}</span>
+                        </p>
                     </div>
                     <button type="button" class="btn-secondary text-xs" @click="attach(bank)">Add</button>
                 </li>
@@ -181,6 +195,9 @@
                     </label>
                 </div>
 
+                <div v-if="engine.force_message" class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    {{ engine.force_message }}
+                </div>
                 <div v-if="engineForm.enabled && engine.capacity.window_start" class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
                     Capacity: {{ engine.capacity.expected.toLocaleString() }} candidates here + {{ engine.capacity.others_at_peak.toLocaleString() }}
                     from other exams at the same time, of {{ engine.capacity.limit.toLocaleString() }} platform capacity
@@ -262,6 +279,18 @@ const props = defineProps({
 const typeLabels = { single: 'Single correct', multiple: 'Multiple correct', true_false: 'True / False', numeric: 'Numeric' };
 const examUrl = `/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}`;
 const { confirm } = useConfirm();
+
+const emptyBanksDescription = computed(() => {
+    const parts = ['Mark a question bank Ready (Question banks → open a bank → Mark Ready) to add it here.'];
+    if (!props.exam.allow_member_banks) {
+        parts.push('Turn on “Allow member school question banks” on Overview if schools should contribute.');
+    }
+    const filter = props.exam.eligibility_filter;
+    if (filter?.assignment_type && filter.assignment_type !== 'all') {
+        parts.push(`Banks must match this exam’s ${filter.assignment_type} eligibility (or be unscoped).`);
+    }
+    return parts.join(' ');
+});
 
 const drafts = reactive({});
 watch(() => props.paper.sections, (sections) => {

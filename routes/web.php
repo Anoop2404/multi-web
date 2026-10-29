@@ -2089,6 +2089,13 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{exam}/engine/arm', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'armEngine'])->name('engine.arm');
             Route::post('/{exam}/engine/disarm', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'disarmEngine'])->name('engine.disarm');
             Route::get('/{exam}/session', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'sessionMonitor'])->name('session');
+            // Alias for bookmarks / old docs that used session-monitor.
+            Route::get('/{exam}/session-monitor', function (string $tenantId, \App\Models\McqExam $exam) {
+                return redirect()->route('sahodaya.mcq.session', [
+                    'tenantId' => $tenantId,
+                    'exam' => $exam,
+                ], 301);
+            })->name('session-monitor');
             Route::get('/{exam}/activity', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'activity'])->name('activity');
             Route::post('/{exam}/marks/bulk-import', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'bulkImportMarks'])->name('marks.bulk-import');
             Route::post('/{exam}/ranking/compute', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'computeRanking'])->name('ranking.compute');
@@ -2415,6 +2422,8 @@ Route::prefix('portal/student/{tenantId}')
     ->group(function () {
         Route::get('/', [StudentDashboardController::class, 'index'])->name('dashboard');
         Route::get('/mcq', [StudentDashboardController::class, 'mcqHub'])->name('mcq');
+        Route::get('/documents', [StudentDashboardController::class, 'documents'])->name('documents');
+        Route::get('/mcq/system-check', [\App\Http\Controllers\Portal\StudentMcqController::class, 'systemCheck'])->name('mcq.system-check');
         Route::get('/fest/schedule', [StudentDashboardController::class, 'festSchedule'])->name('fest.schedule');
         Route::get('/results', [StudentDashboardController::class, 'festResultsPage'])->name('results');
         Route::get('/certificates', [StudentDashboardController::class, 'festCertificates'])->name('certificates');
@@ -2428,6 +2437,7 @@ Route::prefix('portal/student/{tenantId}')
         Route::get('/mcq/{registration}/exam', [\App\Http\Controllers\Portal\StudentMcqController::class, 'showExam'])->name('mcq.exam');
         Route::get('/mcq/{registration}/questions/{question}/image', [\App\Http\Controllers\Portal\StudentMcqController::class, 'questionImage'])->name('mcq.question-image');
         Route::post('/mcq/{registration}/start', [\App\Http\Controllers\Portal\StudentMcqController::class, 'startExam'])->name('mcq.start');
+        Route::post('/mcq/{registration}/reattempt', [\App\Http\Controllers\Portal\StudentMcqController::class, 'reattemptExam'])->name('mcq.reattempt');
         Route::post('/mcq/{registration}/save-answers', [\App\Http\Controllers\Portal\StudentMcqController::class, 'saveAnswer'])->name('mcq.save-answers');
         Route::post('/mcq/{registration}/proctor-event', [\App\Http\Controllers\Portal\StudentMcqController::class, 'recordProctorEvent'])->middleware('throttle:30,1')->name('mcq.proctor-event');
         Route::post('/mcq/{registration}/submit', [\App\Http\Controllers\Portal\StudentMcqController::class, 'submitExam'])->name('mcq.submit');

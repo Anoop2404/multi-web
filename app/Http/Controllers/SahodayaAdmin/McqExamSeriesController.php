@@ -11,6 +11,7 @@ use App\Support\AcademicYear;
 use App\Support\Mcq\McqExamEligibilityConfig;
 use App\Support\Mcq\McqExamPayload;
 use App\Support\Mcq\McqExamLevelLabels;
+use App\Support\Mcq\McqProductMode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -21,7 +22,26 @@ class McqExamSeriesController extends SahodayaAdminController
         $series = McqExamSeries::where('tenant_id', $this->sahodaya->id)
             ->with(['exams' => fn ($q) => $q->orderBy('exam_level')])
             ->orderByDesc('id')
-            ->get();
+            ->get()
+            ->map(function (McqExamSeries $row) {
+                $exams = $row->exams->map(fn (McqExam $exam) => [
+                    'id' => $exam->id,
+                    'title' => $exam->title,
+                    'exam_level' => $exam->exam_level,
+                    'status' => $exam->status,
+                    'product_mode' => $exam->productMode(),
+                    'product_mode_label' => McqProductMode::label($exam->productMode()),
+                    'is_model_exam' => $exam->isModelExam(),
+                ]);
+
+                return [
+                    'id' => $row->id,
+                    'title' => $row->title,
+                    'description' => $row->description,
+                    'status' => $row->status,
+                    'exams' => $exams,
+                ];
+            });
 
         return $this->inertia('Sahodaya/Mcq/Series/Index', [
             'series' => $series,
@@ -43,7 +63,7 @@ class McqExamSeriesController extends SahodayaAdminController
             'status'           => 'draft',
         ]);
 
-        return back()->with('success', 'Talent Search series created.');
+        return back()->with('success', 'Exam series created.');
     }
 
     public function show(string $tenantId, McqExamSeries $series)
@@ -60,6 +80,9 @@ class McqExamSeriesController extends SahodayaAdminController
                 $exam->cutoff_score !== null ? (float) $exam->cutoff_score : null,
                 $exam->top_rank_count,
             ),
+            'product_mode' => $exam->productMode(),
+            'product_mode_label' => McqProductMode::label($exam->productMode()),
+            'is_model_exam' => $exam->isModelExam(),
             'exam_url' => "/sahodaya-admin/{$this->sahodaya->id}/mcq-exams/{$exam->id}",
             'promotion' => (int) ($exam->exam_level ?? 1) > 1
                 ? app(McqSeriesPromotionService::class)->promotionSummary($exam)

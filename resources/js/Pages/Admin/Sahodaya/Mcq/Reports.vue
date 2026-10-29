@@ -1,8 +1,16 @@
 <template>
     <SahodayaAdminLayout :title="`Reports — ${exam.title}`" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="exam.title" eyebrow="Talent Search exam" description="Registration register, fee summary, and attendance exports." />
-        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" active="reports" />
+        <PageHeader :title="exam.title"
+                    :eyebrow="exam.is_model_exam ? (exam.product_mode_label || 'Model exam') : 'Talent Search exam'"
+                    :description="exam.is_model_exam
+                        ? 'Association rollup and per-school result sheets for this model exam.'
+                        : 'Registration register, fee summary, and attendance exports.'" />
+        <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id"
+                       :delivery-mode="exam.delivery_mode || 'offline'"
+                       :results-published="!!exam.results_published"
+                       :is-model-exam="!!exam.is_model_exam"
+                       active="reports" />
 
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">
@@ -13,14 +21,24 @@
                 <p class="text-xl font-bold text-emerald-700">{{ stats.present }}</p>
                 <p class="text-xs text-slate-500 mt-1">Present</p>
             </div>
-            <div class="card card--muted !py-4 text-center">
-                <p class="text-xl font-bold">₹{{ stats.fee_collected }}</p>
-                <p class="text-xs text-slate-500 mt-1">Fees collected</p>
+            <div v-if="exam.is_model_exam" class="card card--muted !py-4 text-center">
+                <p class="text-xl font-bold">{{ stats.schools ?? schoolPerformance?.length ?? 0 }}</p>
+                <p class="text-xs text-slate-500 mt-1">Schools in rollup</p>
             </div>
-            <div class="card card--muted !py-4 text-center">
-                <p class="text-xl font-bold text-amber-700">₹{{ stats.fee_pending }}</p>
-                <p class="text-xs text-slate-500 mt-1">Fees pending</p>
-            </div>
+            <template v-else>
+                <div class="card card--muted !py-4 text-center">
+                    <p class="text-xl font-bold">₹{{ stats.fee_collected }}</p>
+                    <p class="text-xs text-slate-500 mt-1">Fees collected</p>
+                </div>
+                <div class="card card--muted !py-4 text-center">
+                    <p class="text-xl font-bold text-amber-700">₹{{ stats.fee_pending }}</p>
+                    <p class="text-xs text-slate-500 mt-1">Fees pending</p>
+                </div>
+            </template>
+        </div>
+
+        <div v-if="membershipHealth?.length" class="card mb-4 !border-amber-200 !py-3 px-4 text-sm text-amber-900">
+            {{ membershipHealth.length }} member school(s) have membership/roster flags — see Overview for details.
         </div>
 
         <div class="card mb-6 flex flex-wrap items-center gap-3">
@@ -51,12 +69,18 @@
                     <a :href="reportUrl(exportBase + '/class-wise-counts/pdf')" class="btn-secondary text-sm" target="_blank">Download PDF ↓</a>
                 </div>
             </div>
-            <div class="card">
+            <div v-if="!exam.is_model_exam" class="card">
                 <h3 class="section-title">Fee summary</h3>
                 <p class="section-desc">Per-school batch fees and payment status.</p>
                 <a :href="exportBase + '/fees/export'" class="btn-secondary text-sm mt-3 inline-block">Export Excel ↓</a>
                 <a :href="exportBase + '/fees-pending/export'" class="btn-secondary text-sm mt-2 inline-block">Pending fees ↓</a>
                 <a :href="exportBase + '/fees-rejected/export'" class="btn-secondary text-sm mt-2 inline-block">Rejected fees ↓</a>
+            </div>
+            <div v-else class="card">
+                <h3 class="section-title">Association rollup</h3>
+                <p class="section-desc">Per-school participation and scores for this model exam. Export after results are released.</p>
+                <a v-if="exam.results_published" :href="exportBase + '/school-performance/export'" class="btn-secondary text-sm mt-3 inline-block">School performance ↓</a>
+                <a :href="reportUrl(exportBase + '/class-wise-counts/export')" class="btn-secondary text-sm mt-2 inline-block">Class-wise counts ↓</a>
             </div>
             <div class="card">
                 <h3 class="section-title">Attendance sheet</h3>
@@ -182,7 +206,7 @@
             </div>
         </section>
 
-        <section class="card card--flush overflow-hidden mb-6">
+        <section v-if="!exam.is_model_exam" class="card card--flush overflow-hidden mb-6">
             <div class="p-4 border-b border-slate-100">
                 <h3 class="section-title !mb-0">Fee summary preview</h3>
             </div>
@@ -243,6 +267,7 @@ const props = defineProps({
     stats: { type: Object, default: () => ({}) },
     schoolOptions: { type: Array, default: () => [] },
     classOptions: { type: Array, default: () => [] },
+    membershipHealth: { type: Array, default: () => [] },
 });
 
 const exportBase = computed(() => `/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/reports`);

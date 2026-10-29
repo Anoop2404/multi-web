@@ -50,6 +50,7 @@ note it in the "Decisions made while building" list at the end.
   "start_pin": null,                       // string when supervision = supervised
   "show_score_on_submit": false,
   "shuffle_questions": true,
+  "require_fullscreen": false,             // soft recommend when false; blocking overlay when true (signals only — no multi-monitor)
   "device_idle_minutes": 2,
   "sync_interval_seconds": 10,
   "heartbeat_seconds": 30,
@@ -143,7 +144,8 @@ The engine stores `iv`+`ciphertext` as the public bundle and the `key` separatel
     "system_check": { "ok": true } | null,
     "messages": [ { "id": 3, "at": "…", "text": "…" } ],
     "next_sync_in": 10,
-    "show_score_on_submit": false, "submitted_at": null, "receipt": null }
+    "show_score_on_submit": false, "require_fullscreen": false,
+    "submitted_at": null, "receipt": null }
   ```
 - `POST /api/system-check` `{ "user_agent": "…", "screen": "390x844", "online": true, "latency_ms": 120, "storage_ok": true, "crypto_ok": true }` → `{ "ok": true }` (stored on the attempt; emits nothing).
 - `GET /api/bundle/{run}/{version}` → `{ "version": 3, "iv": "…", "ciphertext": "…" }` with `Cache-Control: public, max-age=31536000, immutable`. No auth needed (it's encrypted); in Stage B this file is also on the CDN.

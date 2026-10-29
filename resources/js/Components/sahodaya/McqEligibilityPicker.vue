@@ -16,7 +16,7 @@
         </div>
 
         <div v-if="showsStudentFilters">
-            <p class="text-xs font-semibold text-slate-600 mb-2">Who can register (students)</p>
+            <p class="text-xs font-semibold text-slate-600 mb-2">{{ studentFiltersHeading }}</p>
             <div class="flex flex-wrap gap-2">
                 <button v-for="opt in assignmentOptions" :key="opt.value" type="button"
                         class="px-3 py-1.5 rounded-lg text-sm font-semibold border transition-colors"
@@ -81,7 +81,7 @@
                            class="field max-w-xs" placeholder="Optional" @change="emitUpdate">
                 </template>
             </FormField>
-            <label class="flex items-center gap-2 text-sm">
+            <label v-if="!isSchoolModel" class="flex items-center gap-2 text-sm">
                 <input v-model="local.allow_teacher_self_registration" type="checkbox" @change="emitUpdate">
                 Allow teacher self-registration in portal
             </label>
@@ -112,17 +112,13 @@ const props = defineProps({
             excluded_designation_ids: [],
         }),
     },
+    /** 'talent_search' (default) or 'school_model' — enroll wording for school/model surfaces. */
+    mode: { type: String, default: 'talent_search' },
     classCategories: { type: Array, default: () => [] },
     masterClasses: { type: Array, default: () => [] },
 });
 
 const emit = defineEmits(['update:modelValue']);
-
-const audienceOptions = [
-    { value: 'students', label: 'Students' },
-    { value: 'teachers', label: 'Teachers' },
-    { value: 'both', label: 'Students & teachers' },
-];
 
 const assignmentOptions = [
     { value: 'all', label: 'All classes' },
@@ -173,8 +169,25 @@ watch(() => props.modelValue, (val) => {
     local.excluded_designation_ids = [...(val.excluded_designation_ids ?? [])];
 }, { deep: true });
 
+const isSchoolModel = computed(() => props.mode === 'school_model');
+
 const showsStudentFilters = computed(() => ['students', 'both'].includes(local.audience));
-const showsTeacherFilters = computed(() => ['teachers', 'both'].includes(local.audience));
+const showsTeacherFilters = computed(() => !isSchoolModel.value && ['teachers', 'both'].includes(local.audience));
+
+const audienceOptions = computed(() => {
+    if (isSchoolModel.value) {
+        return [{ value: 'students', label: 'Students' }];
+    }
+    return [
+        { value: 'students', label: 'Students' },
+        { value: 'teachers', label: 'Teachers' },
+        { value: 'both', label: 'Students & teachers' },
+    ];
+});
+
+const studentFiltersHeading = computed(() => (
+    isSchoolModel.value ? 'Who can take this exam (students)' : 'Who can register (students)'
+));
 
 const masterClassesByCategory = computed(() => {
     const map = new Map();
@@ -193,19 +206,27 @@ const masterClassesByCategory = computed(() => {
 });
 
 const audienceHint = computed(() => {
+    if (isSchoolModel.value) {
+        return 'Students in this school who match the class filters below can be enrolled.';
+    }
     if (local.audience === 'teachers') return 'Schools nominate teachers; teachers may also self-register if enabled.';
     if (local.audience === 'both') return 'Both students and teachers can be registered for this exam.';
     return 'Standard student Talent Search registration.';
 });
 
 const assignmentHint = computed(() => {
+    if (isSchoolModel.value) {
+        if (local.assignment_type === 'all') return 'Every student in this school can enroll (subject to gender).';
+        if (local.assignment_type === 'category') return 'Students in any selected category (e.g. Primary, Secondary) can enroll.';
+        return 'Only students in the selected classes can enroll — pick individual standards.';
+    }
     if (local.assignment_type === 'all') return 'Every student in member schools can register (subject to gender).';
     if (local.assignment_type === 'category') return 'Students in any selected category (e.g. Primary, Secondary) can register.';
     return 'Only students in the selected classes can register — pick individual standards.';
 });
 
 function setAudience(value) {
-    local.audience = value;
+    local.audience = isSchoolModel.value ? 'students' : value;
     emitUpdate();
 }
 
@@ -253,8 +274,9 @@ function clearClasses() {
 
 function emitUpdate() {
     const assignment_type = local.assignment_type;
+    const audience = isSchoolModel.value ? 'students' : local.audience;
     emit('update:modelValue', {
-        audience: local.audience,
+        audience,
         scope: assignment_type === 'all' ? 'all' : 'filtered',
         assignment_type,
         class_category_ids: assignment_type === 'category' ? [...local.class_category_ids] : [],
@@ -262,7 +284,7 @@ function emitUpdate() {
         class_groups: [...local.class_groups],
         gender: local.gender,
         min_experience_years: local.min_experience_years || null,
-        allow_teacher_self_registration: !!local.allow_teacher_self_registration,
+        allow_teacher_self_registration: isSchoolModel.value ? false : !!local.allow_teacher_self_registration,
         teaching_type_ids: [...local.teaching_type_ids],
         subject_ids: [...local.subject_ids],
         excluded_designation_ids: [...local.excluded_designation_ids],

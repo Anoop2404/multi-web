@@ -8,7 +8,7 @@
             <ul class="list-disc pl-4 space-y-1 text-indigo-900/80 leading-relaxed">
                 <li><strong>Event Reg ID</strong>: Unique ID per student across the whole event (1, 2, 3…).</li>
                 <li><strong>Item Reg ID</strong>: Per-item sequential number (1, 2, 3… per competition item).</li>
-                <li><strong>Chest Number</strong>: Assigned upon registration approval (e.g. 100, 101… for Athletics; 50, 51… for Chess).</li>
+                <li><strong>Chest Number</strong>: By default left blank at approval, then assigned in shuffled order via Assign missing chest (optional: auto-assign serially on approve).</li>
             </ul>
         </div>
 
@@ -44,10 +44,10 @@
                     <span>
                         Also auto-assign chest numbers at the same time
                         <span class="block text-slate-400 font-normal mt-0.5">
-                            Uncheck this to leave chest numbers unassigned at approval — an item's numbers
-                            then get handed out later, all at once and in shuffled order, from the
-                            "Assign missing chest" button on the Chest Numbers page. Item Reg IDs above
-                            are unaffected either way.
+                            Off by default. Leave unchecked so an item's chest numbers are handed out
+                            later, all at once and in shuffled order, from "Assign missing chest" on
+                            the Chest Numbers page. Turn on only if you want serial numbers at
+                            approval (ordered by registration). Item Reg IDs above are unaffected.
                         </span>
                     </span>
                 </label>

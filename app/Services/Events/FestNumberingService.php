@@ -28,6 +28,9 @@ class FestNumberingService
             'chest_no_prefix' => '',
             'auto_assign_on_approve' => true,
             'auto_assign_chest_on_create' => false,
+            // Off by default so chests wait for bulk "Assign missing" (shuffled),
+            // instead of serial issue-on-approve ordered by registration id.
+            'auto_assign_chest_on_approve' => false,
         ];
 
         $stored = is_array($event->numbering_settings) ? $event->numbering_settings : [];

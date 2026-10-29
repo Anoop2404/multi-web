@@ -305,7 +305,7 @@ export function sahodayaTrainingProgramScopedNav(sahodayaId, programId, options 
 
 function mcqHubItems(base) {
     return [
-        { label: 'Talent Search dashboard', href: `${base}/mcq`, icon: 'grid' },
+        { label: 'MCQ dashboard', href: `${base}/mcq`, icon: 'grid' },
         { label: 'All exams', href: `${base}/mcq-exams`, icon: 'clipboard' },
         { label: 'Exam series', href: `${base}/mcq-series`, icon: 'layers' },
         { label: 'Grade masters', href: `${base}/mcq/grade-masters`, icon: 'bar-chart' },
@@ -316,7 +316,7 @@ function mcqHubItems(base) {
     ];
 }
 
-/** Sidebar when browsing Talent Search hub pages (dashboard, list, series index). */
+/** Sidebar when browsing MCQ hub pages (dashboard, list, series index). */
 export function sahodayaMcqHubNav(sahodayaId, options = {}) {
     const { canNav = () => true } = options;
     if (!canNav('mcq')) {
@@ -331,21 +331,72 @@ export function sahodayaMcqHubNav(sahodayaId, options = {}) {
             items: [{ label: 'Main dashboard', href: base, icon: 'grid', exact: true }],
         },
         {
-            section: 'Talent Search',
+            section: 'MCQ exams',
             items: mcqHubItems(base),
         },
     ];
 }
 
-/** Sidebar when managing a single Talent Search exam workspace. */
+/** Sidebar when managing a single MCQ exam workspace. */
 export function sahodayaMcqExamScopedNav(sahodayaId, examId, options = {}) {
-    const { canNav = () => true } = options;
+    const {
+        canNav = () => true,
+        isModelExam = false,
+        usesEngine = null,
+        deliveryMode = null,
+    } = options;
     if (!canNav('mcq')) {
         return [];
     }
 
     const base = `/sahodaya-admin/${sahodayaId}`;
     const examBase = `${base}/mcq-exams/${examId}`;
+    const online = deliveryMode === 'online';
+
+    const items = [
+        { label: 'Overview', href: examBase, icon: 'file-text' },
+    ];
+
+    if (!isModelExam) {
+        items.push(
+            { label: 'Payments', href: `${examBase}/payments`, icon: 'credit-card' },
+            { label: 'Ledger', href: `${examBase}/ledger`, icon: 'layers' },
+        );
+    }
+
+    items.push({ label: 'Paper', href: `${examBase}/question-banks`, icon: 'book-open' });
+
+    if (!isModelExam) {
+        items.push({ label: 'Hall tickets', href: `${examBase}/hall-tickets`, icon: 'clipboard' });
+    }
+
+    items.push(
+        { label: 'Attendance', href: `${examBase}/attendance`, icon: 'users' },
+        { label: 'Results', href: `${examBase}/results`, icon: 'bar-chart' },
+        { label: 'Reports', href: `${examBase}/reports`, icon: 'inbox' },
+        { label: 'Registration report', href: `${examBase}/reports/registration`, icon: 'clipboard' },
+        { label: 'Class-wise counts', href: `${examBase}/reports/class-wise-counts`, icon: 'bar-chart' },
+    );
+
+    if (!isModelExam) {
+        items.push({ label: 'Fee summary report', href: `${examBase}/reports/fees`, icon: 'credit-card' });
+    }
+
+    items.push({ label: 'Attendance sheet report', href: `${examBase}/reports/attendance`, icon: 'users' });
+
+    if (online) {
+        if (usesEngine === true) {
+            items.push({ label: 'Live monitor', href: `${examBase}/live`, icon: 'monitor' });
+        } else {
+            items.push({ label: 'Live session', href: `${examBase}/session`, icon: 'monitor' });
+        }
+    }
+
+    items.push(
+        { label: 'Leaderboard', href: `${examBase}/leaderboard`, icon: 'star' },
+        { label: 'Exam staff', href: `${examBase}/staff`, icon: 'users' },
+        { label: 'Activity log', href: `${examBase}/activity`, icon: 'inbox' },
+    );
 
     return [
         {
@@ -353,26 +404,8 @@ export function sahodayaMcqExamScopedNav(sahodayaId, examId, options = {}) {
             items: [{ label: '← Dashboard', href: base, icon: 'grid', exact: true }],
         },
         {
-            section: 'This exam',
-            items: [
-                { label: 'Overview', href: examBase, icon: 'file-text' },
-                { label: 'Payments', href: `${examBase}/payments`, icon: 'credit-card' },
-                { label: 'Ledger', href: `${examBase}/ledger`, icon: 'layers' },
-                { label: 'Paper', href: `${examBase}/question-banks`, icon: 'book-open' },
-                { label: 'Hall tickets', href: `${examBase}/hall-tickets`, icon: 'clipboard' },
-                { label: 'Attendance', href: `${examBase}/attendance`, icon: 'users' },
-                { label: 'Results', href: `${examBase}/results`, icon: 'bar-chart' },
-                { label: 'Reports', href: `${examBase}/reports`, icon: 'inbox' },
-                { label: 'Registration report', href: `${examBase}/reports/registration`, icon: 'clipboard' },
-                { label: 'Class-wise counts', href: `${examBase}/reports/class-wise-counts`, icon: 'bar-chart' },
-                { label: 'Fee summary report', href: `${examBase}/reports/fees`, icon: 'credit-card' },
-                { label: 'Attendance sheet report', href: `${examBase}/reports/attendance`, icon: 'users' },
-                { label: 'Live session', href: `${examBase}/session`, icon: 'monitor' },
-                { label: 'Live monitor (online engine)', href: `${examBase}/live`, icon: 'monitor' },
-                { label: 'Leaderboard', href: `${examBase}/leaderboard`, icon: 'star' },
-                { label: 'Exam staff', href: `${examBase}/staff`, icon: 'users' },
-                { label: 'Activity log', href: `${examBase}/activity`, icon: 'inbox' },
-            ],
+            section: isModelExam ? 'Model exam' : 'This exam',
+            items,
         },
     ];
 }
@@ -392,7 +425,7 @@ export function sahodayaMcqSeriesScopedNav(sahodayaId, seriesId, options = {}) {
             items: [{ label: 'Main dashboard', href: base, icon: 'grid', exact: true }],
         },
         {
-            section: 'Talent Search',
+            section: 'MCQ exams',
             items: mcqHubItems(base),
         },
         {
@@ -564,11 +597,11 @@ export function sahodayaAdminNav(sahodayaId, options = {}) {
     // ── Exams & training ──────────────────────────────────────────────
     const examItems = [];
     if (canNav('mcq') && menuOn('mcq')) {
-        examItems.push({ label: 'Talent Search exams', href: `${base}/mcq`, icon: 'clipboard' });
-        examItems.push({ label: 'Talent Search payments', href: `${base}/mcq/payments`, icon: 'credit-card' });
-        examItems.push({ label: 'Talent Search question banks', href: `${base}/mcq/question-banks`, icon: 'book-open' });
-        examItems.push({ label: 'Talent Search series', href: `${base}/mcq-series`, icon: 'layers' });
-        examItems.push({ label: 'All Talent Search exams', href: `${base}/mcq-exams`, icon: 'clipboard' });
+        examItems.push({ label: 'MCQ exams', href: `${base}/mcq`, icon: 'clipboard' });
+        examItems.push({ label: 'MCQ payments', href: `${base}/mcq/payments`, icon: 'credit-card' });
+        examItems.push({ label: 'MCQ question banks', href: `${base}/mcq/question-banks`, icon: 'book-open' });
+        examItems.push({ label: 'MCQ series', href: `${base}/mcq-series`, icon: 'layers' });
+        examItems.push({ label: 'All MCQ exams', href: `${base}/mcq-exams`, icon: 'clipboard' });
     }
     if (canNav('training') && menuOn('training')) {
         examItems.push({ label: 'Training programs', href: `${base}/training`, icon: 'users' });

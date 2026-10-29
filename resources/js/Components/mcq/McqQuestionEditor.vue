@@ -135,17 +135,26 @@
             <McqQuestionView :question="previewQuestion" show-key />
         </div>
 
-        <div class="flex justify-end gap-2">
-            <button type="button" class="btn-secondary" @click="$emit('close')">Cancel</button>
-            <button type="submit" class="btn-primary" :disabled="form.processing">
-                {{ form.processing ? 'Saving…' : (question ? 'Save question' : 'Add question') }}
-            </button>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-xs" :class="draftStatus === 'failed' ? 'text-amber-700' : 'text-slate-500'" role="status">
+                <span v-if="draftStatus === 'saving'">Saving draft…</span>
+                <span v-else-if="draftStatus === 'saved'">Draft saved locally{{ draftSavedLabel ? ` · ${draftSavedLabel}` : '' }}</span>
+                <span v-else-if="draftStatus === 'restored'" class="text-sky-700">Restored unsaved draft from this browser</span>
+                <span v-else-if="draftStatus === 'failed'">Could not save draft in this browser</span>
+                <span v-else class="text-slate-400">Draft autosaves as you type</span>
+            </p>
+            <div class="flex justify-end gap-2">
+                <button type="button" class="btn-secondary" @click="closeEditor">Cancel</button>
+                <button type="submit" class="btn-primary" :disabled="form.processing">
+                    {{ form.processing ? 'Saving…' : (question ? 'Save question' : 'Add question') }}
+                </button>
+            </div>
         </div>
     </form>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, reactive, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import McqTextField from '@/Components/mcq/McqTextField.vue';
 import McqImagePicker from '@/Components/mcq/McqImagePicker.vue';
@@ -160,6 +169,12 @@ const props = defineProps({
     difficulties: { type: Array, default: () => [] },
 });
 const emit = defineEmits(['close']);
+
+const DRAFT_DEBOUNCE_MS = 600;
+const draftStatus = ref('');
+const draftSavedAt = ref(null);
+let draftTimer = null;
+let skipNextDraftSave = false;
 
 const KEYS = ['a', 'b', 'c', 'd', 'e', 'f'];
 const uid = Math.random().toString(36).slice(2);
@@ -249,8 +264,6 @@ function urlFor(file) {
     if (!previewUrls.has(file)) previewUrls.set(file, URL.createObjectURL(file));
     return previewUrls.get(file);
 }
-onBeforeUnmount(() => previewUrls.forEach((url) => URL.revokeObjectURL(url)));
-
 const previewQuestion = computed(() => {
     const options = form.type === 'true_false'
         ? trueFalse.map((o) => ({ key: o.key, label: o.label, image_url: null }))
@@ -278,6 +291,142 @@ const previewQuestion = computed(() => {
 
 watch(() => form.type, () => form.clearErrors());
 
+function draftStorageKey() {
+    const qid = props.question?.id ?? 'new';
+    return `mcq:bank-draft:${props.bankId}:${qid}`;
+}
+
+function draftPayload() {
+    return {
+        type: form.type,
+        title: form.title,
+        body_text: form.body_text,
+        options: form.options.map((o) => ({
+            key: o.key,
+            label: o.label ?? '',
+            existing_url: o.existing_url,
+            removed: !!o.removed,
+            // Files cannot be persisted in localStorage.
+        })),
+        correct_keys: [...form.correct_keys],
+        show_count: form.show_count,
+        answer_value: form.answer_value,
+        answer_tolerance: form.answer_tolerance,
+        marks: form.marks,
+        negative_mark: form.negative_mark,
+        explanation: form.explanation,
+        difficulty: form.difficulty,
+        remove_image: form.remove_image,
+        saved_at: Date.now(),
+    };
+}
+
+function applyDraft(draft) {
+    // Suppress autosave while hydrating; watchers may fire more than once.
+    skipNextDraftSave = true;
+    form.type = draft.type ?? form.type;
+    form.title = draft.title ?? '';
+    form.body_text = draft.body_text ?? '';
+    form.correct_keys = [...(draft.correct_keys ?? [])];
+    form.show_count = draft.show_count ?? true;
+    form.answer_value = draft.answer_value ?? '';
+    form.answer_tolerance = draft.answer_tolerance ?? '';
+    form.marks = draft.marks ?? 1;
+    form.negative_mark = draft.negative_mark ?? 0;
+    form.explanation = draft.explanation ?? '';
+    form.difficulty = draft.difficulty ?? null;
+    form.remove_image = !!draft.remove_image;
+    if (Array.isArray(draft.options) && draft.options.length) {
+        form.options = draft.options.map((o) => optionRow(o.key, o.label ?? '', o.existing_url ?? null));
+        form.options.forEach((o, i) => {
+            o.removed = !!draft.options[i]?.removed;
+        });
+    }
+    draftSavedAt.value = draft.saved_at ? new Date(draft.saved_at) : null;
+    draftStatus.value = 'restored';
+}
+
+function clearDraft() {
+    try {
+        localStorage.removeItem(draftStorageKey());
+    } catch {
+        /* ignore */
+    }
+    draftStatus.value = '';
+    draftSavedAt.value = null;
+}
+
+function persistDraft() {
+    if (skipNextDraftSave) {
+        return;
+    }
+    draftStatus.value = 'saving';
+    try {
+        const payload = draftPayload();
+        localStorage.setItem(draftStorageKey(), JSON.stringify(payload));
+        draftSavedAt.value = new Date(payload.saved_at);
+        draftStatus.value = 'saved';
+    } catch {
+        draftStatus.value = 'failed';
+    }
+}
+
+function scheduleDraftSave() {
+    if (skipNextDraftSave) return;
+    if (draftTimer) clearTimeout(draftTimer);
+    draftTimer = setTimeout(persistDraft, DRAFT_DEBOUNCE_MS);
+}
+
+const draftSavedLabel = computed(() => {
+    if (! draftSavedAt.value) return '';
+    try {
+        return draftSavedAt.value.toLocaleTimeString();
+    } catch {
+        return '';
+    }
+});
+
+watch(
+    () => [
+        form.type, form.title, form.body_text, form.correct_keys, form.show_count,
+        form.answer_value, form.answer_tolerance, form.marks, form.negative_mark,
+        form.explanation, form.difficulty, form.remove_image,
+        form.options.map((o) => `${o.key}:${o.label}:${o.removed}`).join('|'),
+    ],
+    () => scheduleDraftSave(),
+    { deep: true },
+);
+
+onMounted(async () => {
+    try {
+        const raw = localStorage.getItem(draftStorageKey());
+        if (! raw) return;
+        const draft = JSON.parse(raw);
+        if (! draft || typeof draft !== 'object') return;
+        // Only restore if there is something typed (avoid clobbering empty new forms with empty drafts).
+        const hasContent = (draft.body_text || '').trim()
+            || (draft.explanation || '').trim()
+            || (draft.answer_value !== '' && draft.answer_value != null)
+            || (draft.options || []).some((o) => (o.label || '').trim());
+        if (hasContent) {
+            applyDraft(draft);
+            await nextTick();
+            skipNextDraftSave = false;
+        }
+    } catch {
+        /* ignore corrupt drafts */
+    }
+});
+
+onBeforeUnmount(() => {
+    if (draftTimer) clearTimeout(draftTimer);
+    previewUrls.forEach((url) => URL.revokeObjectURL(url));
+});
+
+function closeEditor() {
+    emit('close');
+}
+
 function submit() {
     const url = props.question
         ? `${props.baseUrl}/${props.bankId}/questions/${props.question.id}`
@@ -300,7 +449,10 @@ function submit() {
         .post(url, {
             forceFormData: true,
             preserveScroll: true,
-            onSuccess: () => emit('close'),
+            onSuccess: () => {
+                clearDraft();
+                emit('close');
+            },
         });
 }
 </script>

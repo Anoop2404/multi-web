@@ -50,6 +50,10 @@ class McqHallTicketService
             // Every hall ticket carries an online exam passcode (printed only for online exams).
             app(McqExamPasscodeService::class)->ensure($registration);
 
+            if ($exam->allowsVenueKeycodeJoin()) {
+                app(McqVenueKeycodeService::class)->ensure($registration->fresh());
+            }
+
             return $registration->fresh();
         });
     }

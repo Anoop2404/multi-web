@@ -181,6 +181,7 @@ class LiveMonitor
                 'status'            => $exam->status,
                 'delivery_mode'     => $exam->delivery_mode,
                 'results_published' => (bool) $exam->results_published,
+                'is_model_exam'     => $exam->isModelExam(),
                 'scheduled_at'      => $exam->scheduled_at?->toIso8601String(),
                 'duration_minutes'  => (int) $exam->duration_minutes,
             ],

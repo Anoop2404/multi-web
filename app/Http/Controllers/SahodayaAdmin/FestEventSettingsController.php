@@ -1985,12 +1985,10 @@ class FestEventSettingsController extends SahodayaAdminController
             'auto_assign_on_approve' => 'nullable|boolean',
             'auto_assign_chest_on_create' => 'nullable|boolean',
             // Independent from auto_assign_on_approve (which still unconditionally
-            // controls item-reg-number assignment on approval): lets an event stop
-            // handing out CHEST numbers at approval time specifically, without touching
-            // item-reg numbering, so chest numbers can instead wait for a shuffled bulk
-            // assignment later (see FestNumberingService::assignMissingChestNumbers()).
-            // Null (unset) falls back to auto_assign_on_approve's value, so every event
-            // that has never touched this keeps its exact current behavior.
+            // controls item-reg-number assignment on approval): lets an event opt into
+            // handing out CHEST numbers at approval time. Default is off so chests wait
+            // for shuffled bulk assignment later
+            // (see FestNumberingService::assignMissingChestNumbers()).
             'auto_assign_chest_on_approve' => 'nullable|boolean',
         ]);
 

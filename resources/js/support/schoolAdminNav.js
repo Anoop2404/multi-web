@@ -36,6 +36,7 @@ export function detectSchoolMcqHubFromUrl(url) {
 function examsTrainingItems(schoolId, canNav) {
     const items = [];
     if (canNav('mcq')) {
+        items.push({ label: 'Model exams', href: schoolAdminHref(schoolId, 'model-exams'), icon: 'edit' });
         items.push({ label: TALENT_SEARCH_EXAMS_LABEL, href: schoolAdminHref(schoolId, 'mcq'), icon: 'book-open' });
     }
     if (canNav('training')) {
@@ -220,8 +221,11 @@ export function schoolMcqHubNav(schoolId, options = {}) {
             items: [{ label: 'Dashboard', href: base, icon: 'grid', exact: true }],
         },
         {
-            section: TALENT_SEARCH_LABEL,
-            items: [{ label: 'Available exams', href: schoolAdminHref(schoolId, 'mcq'), icon: 'clipboard' }],
+            section: 'Online exams',
+            items: [
+                { label: 'Model exams', href: schoolAdminHref(schoolId, 'model-exams'), icon: 'edit' },
+                { label: `${TALENT_SEARCH_LABEL} exams`, href: schoolAdminHref(schoolId, 'mcq'), icon: 'clipboard' },
+            ],
         },
     ];
 }
@@ -461,6 +465,10 @@ export function schoolAdminNav(schoolId, options = {}) {
 
     // ── Exams & training ──────────────────────────────────────────────
     const examItems = [];
+    // School model exams are in-school (no Sahodaya fee/hall-ticket ceremony); show without membership gate.
+    if (canNav('mcq')) {
+        examItems.push({ label: 'Model exams', href: schoolAdminHref(schoolId, 'model-exams'), icon: 'edit' });
+    }
     if (membershipPaid && canNav('mcq') && isNavMenuVisible(navVisibility, 'mcq')) {
         examItems.push({ label: TALENT_SEARCH_EXAMS_LABEL, href: schoolAdminHref(schoolId, 'mcq'), icon: 'book-open' });
     }

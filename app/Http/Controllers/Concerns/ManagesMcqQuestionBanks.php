@@ -8,8 +8,10 @@ use App\Models\Subject;
 use App\Services\Audit\PlatformAuditLogger;
 use App\Services\Mcq\McqQuestionImporter;
 use App\Services\Mcq\McqQuestionInput;
+use App\Services\Membership\EffectiveMasterDataResolver;
 use App\Services\Spreadsheet\SpreadsheetWriter;
 use App\Support\FestClassGroupScheme;
+use App\Support\Mcq\McqQuestionBankScope;
 use App\Support\TenantStorage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,12 +19,12 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Question bank authoring for Talent Search (MCQ) exams, shared by the Sahodaya admin
- * panel and the exam portal (exam controllers). The using controller supplies the
- * Sahodaya, the URL base and how to render a page. See
- * docs/ONLINE_EXAM_ENGINE_PLAN_2026_10_15.md §7.
+ * panel, the exam portal, and school model-exam authoring. The using controller supplies
+ * the Sahodaya, optional school scope, the URL base and how to render a page.
  */
 trait ManagesMcqQuestionBanks
 {
@@ -33,20 +35,46 @@ trait ManagesMcqQuestionBanks
     /** @param  'index'|'show'  $page */
     abstract protected function renderBankPage(Request $request, string $page, array $props);
 
+    /** When set, banks are scoped to this school (school model exams). */
+    protected function bankSchoolId(Request $request): ?string
+    {
+        return null;
+    }
+
+    protected function bankTeacherId(Request $request): ?string
+    {
+        return null;
+    }
+
+    /** @param  \Illuminate\Database\Eloquent\Builder<\App\Models\McqQuestionBank>  $query */
+    protected function scopeBanksQuery($query, Request $request)
+    {
+        $schoolId = $this->bankSchoolId($request);
+        if ($schoolId !== null) {
+            $query->where('school_id', $schoolId);
+        }
+
+        return $query;
+    }
+
     public function index(Request $request)
     {
         $sahodayaId = $this->bankSahodayaId($request);
         $filters = $request->validate([
             'search' => 'nullable|string|max:100',
             'status' => 'nullable|in:'.implode(',', McqQuestionBank::STATUSES),
+            'class_category_id' => 'nullable|integer',
+            'master_class_id' => 'nullable|integer',
         ]);
 
         $classGroups = FestClassGroupScheme::labelsForSahodaya($sahodayaId);
 
-        $banks = McqQuestionBank::where('sahodaya_id', $sahodayaId)
-            ->with(['school:id,name', 'teacher:id,name'])
+        $banks = $this->scopeBanksQuery(McqQuestionBank::where('sahodaya_id', $sahodayaId), $request)
+            ->with(['school:id,name', 'teacher:id,name', 'classCategory:id,label', 'masterClass:id,name,class_category_id'])
             ->withCount(['questions', 'exams'])
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
+            ->when($filters['class_category_id'] ?? null, fn ($q, $id) => $q->where('class_category_id', $id))
+            ->when($filters['master_class_id'] ?? null, fn ($q, $id) => $q->where('master_class_id', $id))
             ->when($filters['search'] ?? null, function ($q, $search) {
                 $needle = '%'.mb_strtolower($search).'%';
                 $q->where(fn ($inner) => $inner->whereRaw('LOWER(title) LIKE ?', [$needle])->orWhereRaw('LOWER(subject) LIKE ?', [$needle]));
@@ -54,21 +82,10 @@ trait ManagesMcqQuestionBanks
             ->orderByRaw("CASE status WHEN 'active' THEN 0 WHEN 'draft' THEN 1 ELSE 2 END")
             ->orderByDesc('updated_at')
             ->get()
-            ->map(fn (McqQuestionBank $bank) => [
-                'id'                => $bank->id,
-                'title'             => $bank->title,
-                'subject'           => $bank->subject,
-                'class_group'       => $bank->class_group,
-                'class_group_label' => $bank->class_group ? FestClassGroupScheme::resolveItemLabel($classGroups, $bank->class_group) : null,
-                'status'            => $bank->status,
-                'status_label'      => McqQuestionBank::STATUS_LABELS[$bank->status] ?? $bank->status,
-                'owner_label'       => $this->bankOwnerLabel($bank),
-                'questions_count'   => $bank->questions_count,
-                'exams_count'       => $bank->exams_count,
-                'updated_at'        => $bank->updated_at?->toIso8601String(),
-            ]);
+            ->map(fn (McqQuestionBank $bank) => $this->presentBankRow($bank, $classGroups));
 
-        $allBanks = McqQuestionBank::where('sahodaya_id', $sahodayaId);
+        $allBanks = $this->scopeBanksQuery(McqQuestionBank::where('sahodaya_id', $sahodayaId), $request);
+        $masterData = app(EffectiveMasterDataResolver::class);
 
         return $this->renderBankPage($request, 'index', [
             'banks'       => $banks,
@@ -80,6 +97,12 @@ trait ManagesMcqQuestionBanks
             ],
             'subjects'    => $this->subjectOptions($sahodayaId),
             'classGroups' => collect($classGroups)->map(fn ($label, $value) => ['value' => (string) $value, 'label' => $label])->values(),
+            'classCategories' => $masterData->classCategories($sahodayaId)->map(fn ($c) => [
+                'id' => $c->id, 'label' => $c->label,
+            ])->values(),
+            'masterClasses' => $masterData->masterClasses($sahodayaId)->map(fn ($c) => [
+                'id' => $c->id, 'name' => $c->name, 'class_category_id' => $c->class_category_id,
+            ])->values(),
             'baseUrl'     => $this->bankBaseUrl($request),
         ]);
     }
@@ -92,6 +115,8 @@ trait ManagesMcqQuestionBanks
         $bank = McqQuestionBank::create([
             ...$data,
             'sahodaya_id'        => $sahodayaId,
+            'school_id'          => $this->bankSchoolId($request),
+            'teacher_id'         => $this->bankTeacherId($request),
             'status'             => 'draft',
             'created_by_user_id' => $request->user()->id,
         ]);
@@ -104,9 +129,10 @@ trait ManagesMcqQuestionBanks
     public function show(Request $request, string $tenantId, McqQuestionBank $bank)
     {
         $this->assertBankInSahodaya($request, $bank);
-        $bank->load(['questions', 'exams:id,title,status', 'school:id,name', 'teacher:id,name']);
+        $bank->load(['questions', 'exams:id,title,status', 'school:id,name', 'teacher:id,name', 'classCategory:id,label', 'masterClass:id,name,class_category_id']);
         $classGroups = FestClassGroupScheme::labelsForSahodaya($bank->sahodaya_id);
         $baseUrl = $this->bankBaseUrl($request);
+        $masterData = app(EffectiveMasterDataResolver::class);
 
         $questions = $bank->questions->values()->map(fn (McqQuestion $q, int $i) => [
             'id'            => $q->id,
@@ -129,19 +155,11 @@ trait ManagesMcqQuestionBanks
         ]);
 
         return $this->renderBankPage($request, 'show', [
-            'bank'        => [
-                'id'                => $bank->id,
-                'title'             => $bank->title,
-                'subject'           => $bank->subject,
-                'class_group'       => $bank->class_group,
-                'class_group_label' => $bank->class_group ? FestClassGroupScheme::resolveItemLabel($classGroups, $bank->class_group) : null,
-                'description'       => $bank->description,
-                'status'            => $bank->status,
-                'status_label'      => McqQuestionBank::STATUS_LABELS[$bank->status] ?? $bank->status,
-                'owner_label'       => $this->bankOwnerLabel($bank),
-                'locked'            => $bank->isLockedByExam(),
-                'exams'             => $bank->exams->map(fn ($exam) => $exam->only('id', 'title', 'status'))->values(),
-            ],
+            'bank'        => array_merge($this->presentBankRow($bank, $classGroups), [
+                'description' => $bank->description,
+                'locked'      => $bank->isLockedByExam(),
+                'exams'       => $bank->exams->map(fn ($exam) => $exam->only('id', 'title', 'status'))->values(),
+            ]),
             'questions'   => $questions,
             'stats'       => [
                 'total'      => $questions->count(),
@@ -153,6 +171,12 @@ trait ManagesMcqQuestionBanks
             'difficulties' => McqQuestion::DIFFICULTIES,
             'subjects'     => $this->subjectOptions($bank->sahodaya_id),
             'classGroups'  => collect($classGroups)->map(fn ($label, $value) => ['value' => (string) $value, 'label' => $label])->values(),
+            'classCategories' => $masterData->classCategories($bank->sahodaya_id)->map(fn ($c) => [
+                'id' => $c->id, 'label' => $c->label,
+            ])->values(),
+            'masterClasses' => $masterData->masterClasses($bank->sahodaya_id)->map(fn ($c) => [
+                'id' => $c->id, 'name' => $c->name, 'class_category_id' => $c->class_category_id,
+            ])->values(),
             'baseUrl'      => $baseUrl,
         ]);
     }
@@ -390,6 +414,11 @@ trait ManagesMcqQuestionBanks
     private function assertBankInSahodaya(Request $request, McqQuestionBank $bank): void
     {
         abort_unless($bank->sahodaya_id === $this->bankSahodayaId($request), 404);
+
+        $schoolId = $this->bankSchoolId($request);
+        if ($schoolId !== null) {
+            abort_unless($bank->school_id === $schoolId, 404);
+        }
     }
 
     private function rejectIfLocked(McqQuestionBank $bank): ?RedirectResponse
@@ -402,12 +431,76 @@ trait ManagesMcqQuestionBanks
     /** @return array<string, mixed> */
     private function validateBank(Request $request, bool $withStatus = false): array
     {
-        return $request->validate([
-            'title'       => 'required|string|max:255',
-            'subject'     => 'required|string|max:120',
-            'class_group' => 'nullable|string|max:80',
-            'description' => 'nullable|string|max:2000',
+        $data = $request->validate([
+            'title'              => 'required|string|max:255',
+            'subject'            => 'required|string|max:120',
+            'class_group'        => 'nullable|string|max:80',
+            'class_category_id'  => 'nullable|integer',
+            'master_class_id'    => 'nullable|integer',
+            'description'        => 'nullable|string|max:2000',
         ] + ($withStatus ? ['status' => 'required|in:'.implode(',', McqQuestionBank::STATUSES)] : []));
+
+        $sahodayaId = $this->bankSahodayaId($request);
+        $masterData = app(EffectiveMasterDataResolver::class);
+
+        if (! empty($data['class_category_id'])) {
+            $ok = $masterData->classCategories($sahodayaId)->contains('id', (int) $data['class_category_id']);
+            if (! $ok) {
+                throw ValidationException::withMessages(['class_category_id' => 'Choose a class category from this Sahodaya.']);
+            }
+        } else {
+            $data['class_category_id'] = null;
+        }
+
+        if (! empty($data['master_class_id'])) {
+            $master = $masterData->masterClasses($sahodayaId)->firstWhere('id', (int) $data['master_class_id']);
+            if (! $master) {
+                throw ValidationException::withMessages(['master_class_id' => 'Choose a class from this Sahodaya.']);
+            }
+            // If both set, class must belong to the chosen category (or fill category from class).
+            if ($data['class_category_id'] !== null && (int) $master->class_category_id !== (int) $data['class_category_id']) {
+                throw ValidationException::withMessages([
+                    'master_class_id' => 'That class is not in the selected class category.',
+                ]);
+            }
+            if ($data['class_category_id'] === null && $master->class_category_id) {
+                $data['class_category_id'] = (int) $master->class_category_id;
+            }
+        } else {
+            $data['master_class_id'] = null;
+        }
+
+        if (($data['class_group'] ?? null) === '') {
+            $data['class_group'] = null;
+        }
+
+        return $data;
+    }
+
+    /** @param  array<string|int, string>  $classGroups */
+    private function presentBankRow(McqQuestionBank $bank, array $classGroups): array
+    {
+        $scopeLabel = McqQuestionBankScope::label($bank);
+        $groupLabel = $bank->class_group ? FestClassGroupScheme::resolveItemLabel($classGroups, $bank->class_group) : null;
+
+        return [
+            'id'                   => $bank->id,
+            'title'                => $bank->title,
+            'subject'              => $bank->subject,
+            'class_group'          => $bank->class_group,
+            'class_group_label'    => $groupLabel,
+            'class_category_id'    => $bank->class_category_id,
+            'master_class_id'      => $bank->master_class_id,
+            'class_category_label' => $bank->classCategory?->label,
+            'master_class_label'   => $bank->masterClass?->name,
+            'scope_label'          => $scopeLabel ?? $groupLabel,
+            'status'               => $bank->status,
+            'status_label'         => McqQuestionBank::STATUS_LABELS[$bank->status] ?? $bank->status,
+            'owner_label'          => $this->bankOwnerLabel($bank),
+            'questions_count'      => $bank->questions_count ?? $bank->questions()->count(),
+            'exams_count'          => $bank->exams_count ?? $bank->exams()->count(),
+            'updated_at'           => $bank->updated_at?->toIso8601String(),
+        ];
     }
 
     /**

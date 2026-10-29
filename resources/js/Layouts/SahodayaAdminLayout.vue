@@ -216,7 +216,16 @@ const navGroups = computed(() => {
 
     const examId = detectSahodayaMcqExamIdFromUrl(page.url);
     if (examId) {
-        return sahodayaMcqExamScopedNav(props.sahodaya.id, examId, options);
+        const exam = page.props.exam ?? null;
+        const engine = page.props.engine ?? null;
+        return sahodayaMcqExamScopedNav(props.sahodaya.id, examId, {
+            ...options,
+            isModelExam: !!(exam?.is_model_exam),
+            deliveryMode: exam?.delivery_mode ?? null,
+            usesEngine: typeof engine?.uses_engine === 'boolean'
+                ? engine.uses_engine
+                : (typeof engine?.enabled === 'boolean' ? engine.enabled : null),
+        });
     }
 
     const seriesId = detectSahodayaMcqSeriesIdFromUrl(page.url);

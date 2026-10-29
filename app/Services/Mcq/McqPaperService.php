@@ -167,7 +167,7 @@ class McqPaperService
             $warnings[] = "The exam's \"total questions\" setting ({$limit}) cuts the paper from {$uncapped} to {$limit} questions.";
         }
         if ($this->needsExamEngine($paper) && $exam->isOnlineDelivery() && ! \App\Services\ExamEngine\ExamEngineRun::usesEngine($exam)) {
-            $warnings[] = 'This paper has multiple-correct or numeric questions, which need the online exam engine. Turn on "Use the online exam engine" below, or use only single-correct and true/false questions.';
+            $warnings[] = 'This paper has multiple-correct or numeric questions. Students can take it in the student portal; for large concurrent sittings prefer the online exam engine.';
         }
         foreach ($exam->questionBanks as $bank) {
             if ($bank->status !== 'active') {

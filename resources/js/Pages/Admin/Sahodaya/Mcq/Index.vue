@@ -1,8 +1,8 @@
 <template>
     <SahodayaAdminLayout title="Talent Search Exams" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader title="All Talent Search exams" eyebrow="Talent Search exams"
-                    description="Create standalone Level 1 exams or use exam series for multi-level promotion.">
+        <PageHeader title="All exams" eyebrow="Talent Search & model exams"
+                    description="Create Talent Search (fees/hall tickets) or Sahodaya model exams (slim multi-school MCQ). Multi-level promotion still uses exam series.">
             <template #actions>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq`" class="btn-secondary text-sm">← Talent Search dashboard</Link>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-series`" class="btn-secondary text-sm">Exam series</Link>
@@ -40,6 +40,12 @@
                 <FormField label="Exam code" hint="Optional unique code">
                     <input v-model="form.code" class="field font-mono uppercase" maxlength="64" placeholder="e.g. TS-2026">
                 </FormField>
+                <FormField label="Product mode" hint="Model exams hide fees & hall tickets">
+                    <SearchableSelect v-model="form.product_mode" :options="[
+                        { value: 'talent_search', label: 'Talent Search' },
+                        { value: 'sahodaya_model_exam', label: 'Sahodaya model exam' },
+                    ]" :all-option="false" />
+                </FormField>
                 <FormField label="Type">
                     <SearchableSelect v-model="form.exam_type" :options="[{ value: 'assessment', label: 'Assessment' }, { value: 'practice', label: 'Practice' }, { value: 'competitive', label: 'Competitive' }]" :all-option="false" />
                 </FormField>
@@ -61,12 +67,17 @@
                 <FormField label="Delivery mode">
                     <SearchableSelect v-model="form.delivery_mode" :options="[{ value: 'offline', label: 'Offline (paper / venue)' }, { value: 'online', label: 'Online (student portal)' }]" :all-option="false" />
                 </FormField>
-                <FormField label="Per-student fee (₹)" hint="Optional while draft">
+                <FormField v-if="form.product_mode !== 'sahodaya_model_exam'" label="Per-student fee (₹)" hint="Optional while draft">
                     <input v-model.number="form.fee_amount" type="number" min="0" step="0.01" class="field" placeholder="0">
                 </FormField>
             </FormGrid>
             <div class="border-t border-slate-100 pt-4">
-                <McqEligibilityPicker v-model="form.eligibility_config" :class-categories="classCategories" :master-classes="masterClasses" />
+                <McqEligibilityPicker
+                    :mode="form.product_mode === 'sahodaya_model_exam' ? 'school_model' : 'talent_search'"
+                    v-model="form.eligibility_config"
+                    :class-categories="classCategories"
+                    :master-classes="masterClasses"
+                />
             </div>
             <FormActions>
                 <button type="submit" class="btn-primary" :disabled="form.processing">Create exam</button>
@@ -74,12 +85,14 @@
         </form>
 
         <div class="card overflow-hidden p-0">
-            <EmptyState v-if="!exams.length" title="No Talent Search exams yet" description="Create your first exam using the form above." icon="📝" />
-            <table v-else class="data-table">
+            <EmptyState v-if="!exams.length" title="No MCQ exams yet" description="Create a Talent Search or Sahodaya model exam using the form above." icon="📝" />
+            <div v-else class="overflow-x-auto">
+            <table class="data-table min-w-[720px]">
                 <thead>
                     <tr>
                         <th>Title</th>
                         <th>Code</th>
+                        <th>Mode</th>
                         <th>Schedule</th>
                         <th>Fee</th>
                         <th>Level</th>
@@ -95,9 +108,14 @@
                     <tr v-for="exam in exams" :key="exam.id">
                         <td class="font-medium text-slate-900">{{ exam.title }}</td>
                         <td class="font-mono text-xs text-slate-600">{{ exam.code || '—' }}</td>
+                        <td class="text-xs">
+                            <span class="px-2 py-0.5 rounded-full" :class="exam.is_model_exam ? 'bg-sky-50 text-sky-800' : 'bg-indigo-50 text-indigo-800'">
+                                {{ exam.product_mode_label || 'Talent Search' }}
+                            </span>
+                        </td>
                         <td class="text-xs text-slate-600 whitespace-nowrap">{{ formatSchedule(exam.scheduled_at) }}</td>
                         <td class="text-xs whitespace-nowrap" :class="formatFee(exam) === 'Free' ? 'text-slate-400' : 'font-semibold text-emerald-700'">
-                            {{ formatFee(exam) }}
+                            {{ exam.is_model_exam ? '—' : formatFee(exam) }}
                         </td>
                         <td class="text-xs">
                             <span class="font-semibold text-indigo-700">{{ exam.level_label || 'Level 1' }}</span>
@@ -111,11 +129,12 @@
                         <td>{{ exam.registrations_count ?? 0 }}</td>
                         <td class="text-right whitespace-nowrap space-x-2">
                             <button type="button" class="text-xs font-semibold text-indigo-600 hover:underline" @click="openEdit(exam)">Edit</button>
-                            <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}`" class="link-brand text-xs font-semibold">Open →</Link>
+                            <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}`" class="link-brand text-xs font-semibold">View →</Link>
                         </td>
                     </tr>
                 </tbody>
             </table>
+            </div>
         </div>
 
         <div v-if="editingExam" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="closeEdit">
@@ -161,7 +180,12 @@
                 </FormGrid>
                 <div class="border-t border-slate-100 pt-4">
                     <h4 class="text-sm font-semibold mb-2">Class / category assignment</h4>
-                    <McqEligibilityPicker v-model="editForm.eligibility_config" :class-categories="classCategories" :master-classes="masterClasses" />
+                    <McqEligibilityPicker
+                        :mode="editingExam?.product_mode === 'sahodaya_model_exam' ? 'school_model' : 'talent_search'"
+                        v-model="editForm.eligibility_config"
+                        :class-categories="classCategories"
+                        :master-classes="masterClasses"
+                    />
                 </div>
                 <p v-if="editForm.errors.fee_amount" class="text-xs text-red-600">{{ editForm.errors.fee_amount }}</p>
                 <FormActions>
@@ -209,6 +233,7 @@ const form = useForm({
     title: '',
     code: '',
     exam_type: 'assessment',
+    product_mode: 'talent_search',
     delivery_mode: 'offline',
     scheduled_at: '',
     registration_opens_at: '',

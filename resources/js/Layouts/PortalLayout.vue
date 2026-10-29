@@ -1,7 +1,10 @@
 <template>
     <div class="min-h-screen bg-slate-50 flex font-sans text-slate-900 portal-shell">
-        <!-- Desktop Fixed/Sticky Left Sidebar Navigation -->
-        <aside class="hidden lg:flex w-64 bg-[#041525] text-white flex-col shrink-0 border-r border-slate-800/80 sticky top-0 h-screen overflow-y-auto shadow-xl">
+        <!-- Desktop Fixed/Sticky Left Sidebar Navigation (hidden in exam focus mode) -->
+        <aside
+            v-if="!focusMode"
+            class="hidden lg:flex w-64 bg-[#041525] text-white flex-col shrink-0 border-r border-slate-800/80 sticky top-0 h-screen overflow-y-auto shadow-xl"
+        >
             <!-- Top Vibrant Accent Strip -->
             <div class="h-1 bg-gradient-to-r from-[#041525] via-[#0f3d7a] via-40% via-[#1e5aa8] to-[#d4a017]" />
 
@@ -18,7 +21,7 @@
                     </div>
                     <div v-else class="shrink-0 relative">
                         <div class="h-11 w-11 rounded-2xl bg-gradient-to-br from-[#0f3d7a] to-[#1e5aa8] text-white flex items-center justify-center text-xs font-extrabold shadow-md ring-2 ring-[#0f3d7a]/30">
-                            TP
+                            {{ initials }}
                         </div>
                         <span class="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-[#041525]" />
                     </div>
@@ -26,7 +29,7 @@
                         <span class="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-white/10 text-amber-400">
                             {{ roleLabel }}
                         </span>
-                        <h2 class="text-sm font-bold text-white truncate mt-0.5 leading-tight">{{ headerTitle || 'Teacher Portal' }}</h2>
+                        <h2 class="text-sm font-bold text-white truncate mt-0.5 leading-tight">{{ brandTitle }}</h2>
                         <p v-if="subtitle" class="text-xs text-slate-400 truncate mt-0.5" :title="subtitle">{{ subtitle }}</p>
                     </div>
                 </div>
@@ -34,8 +37,8 @@
 
             <!-- Navigation Links -->
             <nav v-if="navItems.length" class="flex-1 p-3 space-y-1 overflow-y-auto">
-                <p class="px-3 pt-2 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Portal Navigation</p>
-                <Link v-for="item in navItems" :key="item.href"
+                <p class="px-3 pt-2 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Portal</p>
+                <Link v-for="item in primaryNavItems" :key="item.href"
                       :href="item.href"
                       class="flex items-center gap-3 text-xs font-semibold px-3.5 py-2.5 rounded-xl transition duration-150 group"
                       :class="isActive(item)
@@ -44,6 +47,18 @@
                     <span v-if="getNavIcon(item.icon)" class="w-4 h-4 shrink-0 opacity-80 group-hover:opacity-100" v-html="getNavIcon(item.icon)" />
                     <span class="truncate">{{ item.label }}</span>
                 </Link>
+                <template v-if="moreNavItems.length">
+                    <p class="px-3 pt-4 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">More</p>
+                    <Link v-for="item in moreNavItems" :key="item.href"
+                          :href="item.href"
+                          class="flex items-center gap-3 text-xs font-semibold px-3.5 py-2.5 rounded-xl transition duration-150 group"
+                          :class="isActive(item)
+                              ? 'bg-[#0f3d7a] text-white font-bold shadow-md ring-1 ring-white/10'
+                              : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'">
+                        <span v-if="getNavIcon(item.icon)" class="w-4 h-4 shrink-0 opacity-80 group-hover:opacity-100" v-html="getNavIcon(item.icon)" />
+                        <span class="truncate">{{ item.label }}</span>
+                    </Link>
+                </template>
             </nav>
 
             <!-- Bottom Sign Out Action -->
@@ -54,11 +69,14 @@
 
         <!-- Main Workspace (Content + Mobile Topbar) -->
         <div class="flex-1 flex flex-col min-w-0 min-h-screen">
-            <!-- Mobile Top Header Bar -->
-            <header class="lg:hidden sticky top-0 z-40 bg-[#041525] text-white border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-md">
+            <!-- Mobile Top Header Bar (skipped in exam focus — attempt chrome owns the top) -->
+            <header
+                v-if="!focusMode"
+                class="lg:hidden sticky top-0 z-40 bg-[#041525] text-white border-b border-slate-800 px-4 py-3 flex items-center justify-between shadow-md"
+            >
                 <div class="flex items-center gap-3 min-w-0">
                     <div class="h-9 w-9 rounded-xl bg-gradient-to-br from-[#0f3d7a] to-[#1e5aa8] text-white flex items-center justify-center font-bold text-xs shrink-0">
-                        TP
+                        {{ initials }}
                     </div>
                     <div class="min-w-0">
                         <span class="text-[10px] uppercase font-extrabold text-amber-400 tracking-wider">{{ roleLabel }}</span>
@@ -89,14 +107,14 @@
                     <div class="p-4 border-b border-slate-800 flex items-center justify-between">
                         <div class="min-w-0">
                             <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400">{{ roleLabel }}</span>
-                            <h2 class="text-sm font-bold text-white truncate">{{ headerTitle || 'Teacher Portal' }}</h2>
+                            <h2 class="text-sm font-bold text-white truncate">{{ brandTitle }}</h2>
                         </div>
                         <button type="button" class="p-1.5 text-slate-400 hover:text-white" @click="mobileMenuOpen = false">
                             ✕
                         </button>
                     </div>
                     <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
-                        <Link v-for="item in navItems" :key="item.href"
+                        <Link v-for="item in primaryNavItems" :key="item.href"
                               :href="item.href"
                               class="flex items-center gap-3 text-xs font-semibold px-3.5 py-2.5 rounded-xl transition"
                               :class="isActive(item) ? 'bg-[#0f3d7a] text-white font-bold' : 'text-slate-300 hover:bg-slate-800'"
@@ -104,6 +122,17 @@
                             <span v-if="getNavIcon(item.icon)" class="w-4 h-4 shrink-0" v-html="getNavIcon(item.icon)" />
                             {{ item.label }}
                         </Link>
+                        <template v-if="moreNavItems.length">
+                            <p class="px-3 pt-4 pb-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">More</p>
+                            <Link v-for="item in moreNavItems" :key="item.href"
+                                  :href="item.href"
+                                  class="flex items-center gap-3 text-xs font-semibold px-3.5 py-2.5 rounded-xl transition"
+                                  :class="isActive(item) ? 'bg-[#0f3d7a] text-white font-bold' : 'text-slate-300 hover:bg-slate-800'"
+                                  @click="mobileMenuOpen = false">
+                                <span v-if="getNavIcon(item.icon)" class="w-4 h-4 shrink-0" v-html="getNavIcon(item.icon)" />
+                                {{ item.label }}
+                            </Link>
+                        </template>
                     </nav>
                 </aside>
             </div>
@@ -112,9 +141,17 @@
             <FlashBanner class="max-w-7xl mx-auto px-4 sm:px-6 pt-4 w-full" />
 
             <!-- Main Page View Content -->
-            <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
-                <!-- Page Content Top Heading -->
-                <div v-if="title" class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-slate-200/60">
+            <main
+                class="flex-1 w-full mx-auto space-y-6"
+                :class="focusMode
+                    ? 'max-w-6xl px-3 sm:px-4 py-3'
+                    : 'max-w-7xl px-4 sm:px-6 py-6 pb-24 lg:pb-6'"
+            >
+                <!-- Page Content Top Heading (hidden in exam focus mode) -->
+                <div
+                    v-if="title && !focusMode"
+                    class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-slate-200/60"
+                >
                     <div>
                         <h1 class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">{{ title }}</h1>
                         <p v-if="subtitle" class="text-xs text-slate-500 mt-0.5">{{ subtitle }}</p>
@@ -123,6 +160,30 @@
 
                 <slot />
             </main>
+
+            <!-- Mobile bottom nav (student primary destinations) -->
+            <nav
+                v-if="!focusMode && primaryNavItems.length"
+                class="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 safe-bottom"
+                aria-label="Primary"
+            >
+                <ul class="grid grid-cols-4 max-w-lg mx-auto">
+                    <li v-for="item in primaryNavItems" :key="item.href">
+                        <Link
+                            :href="item.href"
+                            class="flex flex-col items-center justify-center gap-0.5 py-2.5 text-[10px] font-bold tracking-wide"
+                            :class="isActive(item) ? 'text-[#0f3d7a]' : 'text-slate-500'"
+                        >
+                            <span
+                                class="w-5 h-5"
+                                :class="isActive(item) ? 'opacity-100' : 'opacity-70'"
+                                v-html="getNavIcon(item.icon) || getNavIcon('home')"
+                            />
+                            {{ item.label }}
+                        </Link>
+                    </li>
+                </ul>
+            </nav>
         </div>
     </div>
 </template>
@@ -135,21 +196,38 @@ import { computed, ref } from 'vue';
 
 const props = defineProps({
     title: { type: String, required: true },
-    headerTitle: { type: String, default: 'Teacher Portal' },
+    /** Sidebar brand under the role badge. Defaults to roleLabel (e.g. Student Portal) — never hardcode Teacher. */
+    headerTitle: { type: String, default: null },
     subtitle: { type: String, default: '' },
     roleLabel: { type: String, required: true },
     accent: { type: String, default: 'navy' },
     navItems: { type: Array, default: () => [] },
     avatarUrl: { type: String, default: '' },
     showAvatarPlaceholder: { type: Boolean, default: false },
+    /** Exam attempt: hide page H1, tighten padding so the paper owns the viewport. */
+    focusMode: { type: Boolean, default: false },
 });
 
 const page = usePage();
 const mobileMenuOpen = ref(false);
 
+const brandTitle = computed(() => (props.headerTitle && props.headerTitle.trim()) || props.roleLabel);
+
+const primaryNavItems = computed(() => {
+    const primary = props.navItems.filter((item) => item.primary);
+    return primary.length ? primary : props.navItems.slice(0, 4);
+});
+
+const moreNavItems = computed(() => {
+    if (!props.navItems.some((item) => item.primary)) {
+        return [];
+    }
+    return props.navItems.filter((item) => !item.primary);
+});
+
 const initials = computed(() => {
-    const parts = (props.headerTitle || props.roleLabel || '').trim().split(/\s+/).filter(Boolean);
-    if (!parts.length) return 'TP';
+    const parts = brandTitle.value.trim().split(/\s+/).filter(Boolean);
+    if (! parts.length) return 'P';
     if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
     return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 });
@@ -185,6 +263,8 @@ function getNavIcon(name) {
         banks: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>`,
         papers: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>`,
         profile: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>`,
+        documents: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>`,
+        check: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
     };
     return icons[name] || null;
 }
@@ -196,6 +276,9 @@ function getNavIcon(name) {
 }
 .scrollbar-none::-webkit-scrollbar {
     display: none;
+}
+.safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
 }
 </style>
 

@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class McqExam extends Model
 {
     protected $fillable = [
-        'tenant_id', 'academic_year_id', 'series_id', 'exam_level', 'parent_exam_id',
+        'tenant_id', 'school_id', 'academic_year_id', 'series_id', 'exam_level', 'parent_exam_id',
         'eligibility_mode', 'cutoff_score', 'top_rank_count', 'promotion_locked', 'promoted_student_ids',
         'title', 'code', 'exam_type', 'delivery_mode', 'conductor_level',
         'scheduled_at', 'registration_opens_at', 'registration_closes_at', 'result_date',
@@ -64,6 +64,16 @@ class McqExam extends Model
         'hall_tickets_published'    => 'boolean',
         'hall_tickets_published_at' => 'datetime',
     ];
+
+    /** Exposed on Inertia payloads when the full model (or toArray) is sent. */
+    protected $appends = [
+        'is_model_exam',
+    ];
+
+    public function getIsModelExamAttribute(): bool
+    {
+        return $this->isModelExam();
+    }
 
     /** Resolve a class override without changing the exam's shared schedule. */
     public function scheduleForClass(?string $className): array
@@ -172,6 +182,61 @@ class McqExam extends Model
         return ! $this->isOnlineDelivery();
     }
 
+    /** In-school model exam (not Sahodaya Talent Search). */
+    public function isSchoolModelExam(): bool
+    {
+        return \App\Support\Mcq\McqProductMode::of($this) === \App\Support\Mcq\McqProductMode::SCHOOL_MODEL
+            || ($this->conductor_level ?? 'sahodaya') === 'school';
+    }
+
+    /** Association-level model exam (not competitive Talent Search). */
+    public function isSahodayaModelExam(): bool
+    {
+        return \App\Support\Mcq\McqProductMode::of($this) === \App\Support\Mcq\McqProductMode::SAHODAYA_MODEL;
+    }
+
+    public function isModelExam(): bool
+    {
+        return \App\Support\Mcq\McqProductMode::isModelExam($this);
+    }
+
+    public function productMode(): string
+    {
+        return \App\Support\Mcq\McqProductMode::of($this);
+    }
+
+    public function allowsMemberBanks(): bool
+    {
+        return (bool) ($this->settings_json['allow_member_banks'] ?? false);
+    }
+
+    /** What students see after results are released: score | score_grade | review */
+    public function resultVisibility(): string
+    {
+        return \App\Support\Mcq\McqResultReleaseSettings::visibility($this);
+    }
+
+    public function certificatesEnabled(): bool
+    {
+        return \App\Support\Mcq\McqResultReleaseSettings::certificatesEnabled($this);
+    }
+
+    /** @return array<string, mixed> */
+    public function resultReleaseSettings(): array
+    {
+        return \App\Support\Mcq\McqResultReleaseSettings::forInertia($this);
+    }
+
+    public function owningSchoolId(): ?string
+    {
+        return $this->school_id ?: null;
+    }
+
+    public function belongsToSchool(string $schoolId): bool
+    {
+        return $this->isSchoolModelExam() && $this->owningSchoolId() === $schoolId;
+    }
+
     /** How multiple-correct questions are marked: `all_or_nothing` (default) or `partial`. */
     public function multiMarkingMode(): string
     {
@@ -181,6 +246,49 @@ class McqExam extends Model
     public function requiresHallTicket(): bool
     {
         return (bool) ($this->settings_json['requires_hall_ticket'] ?? false);
+    }
+
+    /** Soft/hard fullscreen policy for online take-exam (portal + engine). Default soft. */
+    public function requiresFullscreen(): bool
+    {
+        return (bool) ($this->settings_json['require_fullscreen'] ?? false);
+    }
+
+    /** Per-candidate venue keycodes for public /attend-exam join (built-in portal exams). */
+    public function allowsVenueKeycodeJoin(): bool
+    {
+        return $this->isOnlineDelivery() && (bool) ($this->settings_json['venue_keycode_join'] ?? false);
+    }
+
+    public function allowsReattempt(): bool
+    {
+        return (bool) ($this->settings_json['allow_reattempt'] ?? false);
+    }
+
+    public function maxAttempts(): int
+    {
+        $max = (int) ($this->settings_json['max_attempts'] ?? 1);
+
+        return max(1, min(10, $max > 0 ? $max : 1));
+    }
+
+    /** How McqMark is kept across reattempts: `latest` (default) or `best`. */
+    public function reattemptScoring(): string
+    {
+        return ($this->settings_json['reattempt_scoring'] ?? null) === 'best' ? 'best' : 'latest';
+    }
+
+    /** `log` (default) or `strict_tab` (auto-submit after N tab_hidden events). */
+    public function proctorMode(): string
+    {
+        return ($this->settings_json['proctor_mode'] ?? null) === 'strict_tab' ? 'strict_tab' : 'log';
+    }
+
+    public function proctorMaxTabViolations(): int
+    {
+        $max = (int) ($this->settings_json['proctor_max_tab_violations'] ?? 3);
+
+        return max(1, min(10, $max > 0 ? $max : 3));
     }
 
     /** @return array<string, int> class name (or "Teacher") => total questions/max marks override */

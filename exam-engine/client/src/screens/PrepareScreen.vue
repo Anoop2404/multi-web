@@ -54,7 +54,7 @@
 
             <form v-if="phase === 'waiting' || phase === 'open'" class="stack" style="text-align: left" @submit.prevent="start">
                 <label v-if="st.start_pin_required" class="field">
-                    <span>Start PIN</span>
+                    <span>Start PIN — from your invigilator</span>
                     <input
                         v-model.trim="pin"
                         class="input code"
@@ -63,9 +63,15 @@
                         maxlength="12"
                         :disabled="starting"
                         aria-describedby="pin-help"
+                        :aria-invalid="startError?.kind === 'bad' ? 'true' : undefined"
                     />
+                    <small id="pin-help" class="help">
+                        Told by the invigilator at the venue when the exam starts — not your hall-ticket passcode or portal password.
+                    </small>
                 </label>
-                <small id="pin-help" class="help">Your invigilator will tell you the PIN when the exam starts.</small>
+                <p v-else class="help" style="margin: 0">
+                    No Start PIN for this exam — tap Start when the waiting room opens.
+                </p>
                 <div v-if="startError" class="notice" :class="startError.kind" role="alert">
                     {{ startError.text }}<span v-if="retryIn > 0"> ({{ retryIn }} s)</span>
                 </div>
@@ -106,6 +112,7 @@
                 <li>Mark a question <b>for review</b> to come back to it. Marked questions are still counted if answered.</li>
                 <li>Each answer is saved on this device at once and sent automatically. If the internet drops, keep writing.</li>
                 <li>Don’t open the exam on another device. Leaving the exam screen is recorded.</li>
+                <li v-if="st.require_fullscreen">This exam requires <b>fullscreen</b> while writing. Leaving fullscreen is recorded for review — not an automatic fail. Extra monitors are not detected.</li>
                 <li>When the time is up, your answers are submitted automatically.</li>
             </ul>
             <div class="row" style="margin-top: 6px">
@@ -175,6 +182,18 @@ async function start() {
     starting.value = true;
     startError.value = null;
     try {
+        if (st.value.require_fullscreen) {
+            try {
+                await document.documentElement.requestFullscreen?.();
+            } catch {
+                startError.value = {
+                    kind: 'warn',
+                    text: 'Allow fullscreen to continue — this exam requires it while writing.',
+                };
+                starting.value = false;
+                return;
+            }
+        }
         // Plan §3: spread the T0 key requests — a click in the first 10 s waits 0–5 s first.
         if (msToStart.value > -10000 && !retriedStart) await new Promise((r) => setTimeout(r, Math.random() * 5000));
         retriedStart = true;

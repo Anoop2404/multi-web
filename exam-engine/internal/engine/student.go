@@ -55,6 +55,7 @@ type StateResp struct {
 	Messages          []model.Message `json:"messages"`
 	NextSyncIn        int             `json:"next_sync_in"`
 	ShowScoreOnSubmit bool            `json:"show_score_on_submit"`
+	RequireFullscreen bool            `json:"require_fullscreen"`
 	SubmittedAt       *string         `json:"submitted_at"`
 	Receipt           *string         `json:"receipt"`
 	GraceSeconds      int             `json:"grace_seconds"`
@@ -121,7 +122,8 @@ func (e *Engine) State(ctx context.Context, rc *RunCtx, s *Session, touch bool) 
 		BundleURL: e.BundleURL(rc.Run, rc.BundleVersion), BundleVersion: rc.BundleVersion,
 		ShuffleQuestions: m.ShuffleQuestions, Seed: s.RegID,
 		Rev: msInt(a["rev"]), Messages: messages(rc), NextSyncIn: e.NextSyncIn(rc),
-		ShowScoreOnSubmit: m.ShowScoreOnSubmit, GraceSeconds: m.GraceSeconds, HeartbeatSeconds: m.HeartbeatSeconds,
+		ShowScoreOnSubmit: m.ShowScoreOnSubmit, RequireFullscreen: m.RequireFullscreen,
+		GraceSeconds: m.GraceSeconds, HeartbeatSeconds: m.HeartbeatSeconds,
 		EntryMode: m.EntryMode,
 	}
 	if m.SahodayaName != nil {

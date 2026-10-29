@@ -23,6 +23,7 @@ class McqQuestionBank extends Model
 
     protected $fillable = [
         'sahodaya_id', 'school_id', 'teacher_id', 'subject', 'class_group',
+        'class_category_id', 'master_class_id', 'source_bank_id', 'contributed_by_school_id',
         'title', 'description', 'status', 'created_by_user_id',
     ];
 
@@ -34,6 +35,26 @@ class McqQuestionBank extends Model
     public function school(): BelongsTo
     {
         return $this->belongsToCentralTenant('school_id');
+    }
+
+    public function classCategory(): BelongsTo
+    {
+        return $this->belongsTo(ClassCategory::class, 'class_category_id');
+    }
+
+    public function masterClass(): BelongsTo
+    {
+        return $this->belongsTo(MasterClass::class, 'master_class_id');
+    }
+
+    public function sourceBank(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'source_bank_id');
+    }
+
+    public function contributedBySchool(): BelongsTo
+    {
+        return $this->belongsToCentralTenant('contributed_by_school_id');
     }
 
     public function questions(): HasMany

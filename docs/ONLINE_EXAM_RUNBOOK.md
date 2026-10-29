@@ -419,6 +419,15 @@ Write down for each drill: start/end time, what you saw, and the gate result. An
 
 ## 8. Go-live gates (plan §10)
 
+Automatable Laravel config checks (capacity, force threshold, bridge, keys):
+
+```bash
+php artisan exam-engine:stage-gates --stage=A
+php artisan exam-engine:stage-gates --stage=B --json
+```
+
+Project-store companion checklist (commands + honest infra blockers): `online-exam-stage-ab-checklist.md`.
+
 ### Stage A (2,000 platform-wide, always-on footprint)
 - [ ] Engine unit tests (clock, state machine, seed, diff/checksum, pacing, login queue, answer shapes): all transitions covered
 - [ ] Contract: OpenAPI + pack schema validate the same fixtures in Go, vitest and PHPUnit

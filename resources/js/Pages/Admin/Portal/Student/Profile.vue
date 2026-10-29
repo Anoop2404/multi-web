@@ -3,8 +3,9 @@
         role-label="Student Portal"
         title="My profile"
         :subtitle="school.name"
-        accent="indigo"
+        accent="navy"
         :nav-items="navItems"
+        :avatar-url="student.photo_url || ''"
     >
         <div v-if="studentEditLock?.locked" class="notice-banner notice-banner--warning mb-4 text-sm">
             <p class="font-semibold text-amber-900">Student records locked</p>
@@ -14,7 +15,7 @@
             </p>
         </div>
 
-        <section class="card mb-4">
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm mb-4">
             <h2 class="font-semibold text-sm mb-3">Student details</h2>
             <div class="flex items-start gap-4">
                 <div class="shrink-0">
@@ -22,26 +23,29 @@
                         v-if="student.photo_url"
                         :src="student.photo_url"
                         :alt="student.name"
-                        class="h-20 w-20 rounded-lg object-cover border border-gray-200"
+                        class="h-20 w-20 rounded-2xl object-cover border-2 border-[#0f3d7a]/30 shadow-sm"
                     >
                     <div
                         v-else
-                        class="h-20 w-20 rounded-lg border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center text-xs text-gray-400 text-center px-1"
+                        class="h-20 w-20 rounded-2xl border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center text-xs text-slate-400 text-center px-1"
                     >
                         No photo
                     </div>
                 </div>
                 <dl class="flex-1 grid gap-3 sm:grid-cols-2 text-sm min-w-0">
                     <div>
-                        <dt class="text-gray-500">Name</dt>
-                        <dd class="mt-0.5 font-medium text-gray-900">{{ student.name }}</dd>
+                        <dt class="text-slate-500">Name</dt>
+                        <dd class="mt-0.5 font-bold text-slate-900">{{ student.name }}</dd>
                     </div>
                     <div>
-                        <dt class="text-gray-500">Register no.</dt>
-                        <dd class="mt-0.5 font-medium text-gray-900">{{ student.reg_no }}</dd>
+                        <dt class="text-slate-500">Register no.</dt>
+                        <dd class="mt-0.5 font-bold text-slate-900">{{ student.reg_no }}</dd>
                     </div>
                 </dl>
             </div>
+            <p class="mt-3 text-xs text-slate-500">
+                Photo updates are managed by your school office (used on hall tickets). Contact them if your photo needs changing.
+            </p>
         </section>
 
         <form @submit.prevent="saveProfile" class="card mb-4 space-y-3">

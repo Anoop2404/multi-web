@@ -103,7 +103,8 @@
                             />
                         </label>
                         <small id="passcode-help" class="help">
-                            10 letters and numbers from your hall ticket.
+                            10 letters and numbers printed on your hall ticket (exam passcode for sign-in).
+                            This is not the Start PIN an invigilator may give later.
                             <template v-if="lookalike"> Passcodes never use I, L, O, 0 or 1 — check those characters.</template>
                         </small>
                     </template>
@@ -122,6 +123,33 @@
                     <button v-if="retrying" class="btn block" type="button" @click="cancelRetry">Cancel</button>
                 </div>
             </form>
+
+            <section class="card" style="margin-top: 14px" aria-label="Before you sign in">
+                <h2 style="font-size: 0.95rem; margin-bottom: 8px">Quick checklist</h2>
+                <ul class="checks">
+                    <li>
+                        <span class="icon ok" aria-hidden="true">✓</span>
+                        <div>
+                            <div style="font-weight: 600">Chrome or Edge</div>
+                            <div class="faint">Use a current desktop browser — avoid outdated or unsupported apps.</div>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="icon ok" aria-hidden="true">✓</span>
+                        <div>
+                            <div style="font-weight: 600">Stable power</div>
+                            <div class="faint">Plug in the device; don’t rely on a low battery mid-exam.</div>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="icon ok" aria-hidden="true">✓</span>
+                        <div>
+                            <div style="font-weight: 600">One device only</div>
+                            <div class="faint">Sign in and stay on this computer for the whole exam.</div>
+                        </div>
+                    </li>
+                </ul>
+            </section>
 
             <p class="center faint" style="margin-top: 16px">
                 Not your Sahodaya? <a href="/" @click.prevent="changeCode">Change code</a>

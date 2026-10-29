@@ -3,7 +3,7 @@
         <PageHeader :title="`${exam.title} — School centre codes`" eyebrow="Talent Search exam" description="List, assign and edit examination centre codes for this exam.">
             <template #actions><a :href="base" class="btn-secondary">← Exam overview</a><button class="btn-secondary" @click="print">Print list</button></template>
         </PageHeader>
-        <McqExamSubNav class="no-print" :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode" active="centre-codes" />
+        <McqExamSubNav class="no-print" :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode" :results-published="!!exam.results_published" :is-model-exam="!!exam.is_model_exam" active="centre-codes" />
         <section class="card mb-5 no-print">
             <h3 class="section-title">Auto-assign centre codes</h3>
             <p class="section-desc">Schools are numbered alphabetically. Existing codes are preserved by default; occupied codes are skipped.</p>

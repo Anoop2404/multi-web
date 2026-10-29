@@ -66,8 +66,21 @@ class StudentDashboardController extends Controller
 
         return inertia('Portal/Student/McqHub', [
             'school'   => $school->only('id', 'name'),
-            'student'  => $student->only('id', 'name', 'reg_no'),
+            'student'  => $this->studentPayload($student),
             'mcqExams' => $this->mcqExamsFor($student),
+        ]);
+    }
+
+    public function documents(Request $request, string $tenantId)
+    {
+        [$student, $school] = $this->portalContext($request, $tenantId);
+
+        return inertia('Portal/Student/Documents', [
+            'school'          => $school->only('id', 'name'),
+            'student'         => $this->studentPayload($student),
+            'mcqExams'        => $this->mcqExamsFor($student),
+            'festCerts'       => $this->festCertificatesFor($student, $tenantId),
+            'admitCardEvents' => $this->admitCardEvents($student, $tenantId),
         ]);
     }
 
@@ -156,7 +169,7 @@ class StudentDashboardController extends Controller
 
         return inertia('Portal/Student/Dashboard', [
             'school'        => $school->only('id', 'name'),
-            'student'       => $student->only('id', 'name', 'reg_no', 'email'),
+            'student'       => $this->studentPayload($student),
             'logoUrl'       => TenantBranding::logoUrl($school),
             'registrations' => $registrations,
             'sportsProfile' => $sportsProfile,
@@ -265,24 +278,24 @@ class StudentDashboardController extends Controller
                     return null;
                 }
 
+                $certs = app(\App\Services\Mcq\McqCertificateService::class);
+                $certAvailable = $certs->isAvailableForStudent($reg);
+                $certReason = $certAvailable ? null : $certs->unavailableReason($reg);
+
                 return array_merge(
                     McqResultPresenter::forExamList($exam, $reg),
                     [
                         'id'               => $reg->id,
                         'exam'             => $exam->only('id', 'title'),
                         'lifecycle_status' => \App\Support\Mcq\McqRegistrationStatusPresenter::forRegistration($reg, $exam),
-                        'show_results'     => (bool) $exam->results_published,
+                        'show_results'     => (bool) $exam->results_published && $reg->status === 'submitted',
                         'show_hall_ticket' => (bool) $exam->hall_tickets_published && (bool) $reg->hall_ticket_no,
-                        'show_certificate' => (bool) $exam->results_published
-                            && $reg->status === 'submitted'
-                            && $reg->attendance_status !== 'absent'
-                            && $reg->mark,
-                        'certificate_url'  => (bool) $exam->results_published
-                            && $reg->status === 'submitted'
-                            && $reg->attendance_status !== 'absent'
-                            && $reg->mark
+                        'show_certificate' => $certAvailable,
+                        'certificate_url'  => $certAvailable
                             ? "/portal/student/{$reg->school_id}/mcq/{$reg->id}/certificate"
                             : null,
+                        'certificate_unavailable_reason' => $certReason,
+                        'certificates_enabled' => \App\Support\Mcq\McqResultReleaseSettings::certificatesEnabled($exam),
                         'invoice_url' => $exam->hasFee()
                             ? "/portal/student/{$reg->school_id}/mcq/{$reg->id}/invoice"
                             : null,
@@ -294,9 +307,21 @@ class StudentDashboardController extends Controller
                                 // Engine exams open on the exam site once armed (check-in window).
                                 ? \App\Services\ExamEngine\ExamEngineRun::state($exam) === 'armed' && $reg->isApproved() && ! $reg->blocksScoring()
                                 : app(\App\Services\Mcq\McqExamSessionService::class)->canTakeOnline($reg)),
+                        'can_reattempt' => $reg->canReattempt(),
+                        'attempt_number' => $reg->attemptNumber(),
+                        'max_attempts' => $exam->maxAttempts(),
+                        'venue_keycode' => $exam->allowsVenueKeycodeJoin()
+                            ? \App\Services\Mcq\McqVenueKeycodeService::format(
+                                $reg->venue_keycode
+                                    ?: app(\App\Services\Mcq\McqVenueKeycodeService::class)->ensure($reg)
+                            )
+                            : null,
                         'uses_exam_engine' => \App\Services\ExamEngine\ExamEngineRun::usesEngine($exam),
                         'delivery_mode'         => $exam->delivery_mode ?? 'offline',
                         'registration_route_id' => $reg->id,
+                        'scheduled_at'          => $exam->scheduled_at?->toIso8601String(),
+                        'duration_minutes'      => (int) ($exam->duration_minutes ?: 0) ?: null,
+                        'status'                => $reg->status,
                     ]
                 );
             })
@@ -311,6 +336,18 @@ class StudentDashboardController extends Controller
         $school = Tenant::findOrFail($tenantId);
 
         return [$student, $school];
+    }
+
+    /** @return array<string, mixed> */
+    private function studentPayload($student): array
+    {
+        return [
+            'id'        => $student->id,
+            'name'      => $student->name,
+            'reg_no'    => $student->reg_no,
+            'email'     => $student->email,
+            'photo_url' => method_exists($student, 'photoUrl') ? $student->photoUrl() : null,
+        ];
     }
 
     /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */

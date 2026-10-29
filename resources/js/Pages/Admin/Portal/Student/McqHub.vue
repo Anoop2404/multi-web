@@ -1,58 +1,52 @@
 <template>
     <PortalLayout
         role-label="Student Portal"
-        title="Talent Search Exams"
+        title="Online exams"
         :subtitle="`${school.name} · ${student.reg_no}`"
-        accent="indigo"
+        accent="navy"
         :nav-items="navItems"
+        :avatar-url="student.photo_url || ''"
     >
-        <section class="card">
-            <h2 class="font-semibold text-sm mb-2">Your Talent Search registrations</h2>
-            <ul class="text-sm divide-y">
-                <li v-for="r in mcqExams" :key="r.registration_route_id ?? r.id" class="py-3 flex justify-between items-center gap-2 flex-wrap">
-                    <div>
-                        <span class="font-medium">{{ r.exam?.title ?? r.title }}</span>
-                        <span v-if="r.lifecycle_status?.label" class="text-xs ml-2 px-2 py-0.5 rounded-full"
-                              :class="lifecycleClass(r.lifecycle_status)">{{ r.lifecycle_status.label }}</span>
-                        <span v-else class="text-xs text-gray-400 ml-1">({{ r.status }})</span>
-                        <span v-if="r.delivery_mode === 'offline'" class="text-xs text-slate-500 ml-1">· offline</span>
-                        <span v-else-if="r.delivery_mode === 'online'" class="text-xs text-indigo-600 ml-1">· online</span>
-                        <p v-if="r.show_results && r.mark" class="text-xs text-indigo-700 mt-0.5">
-                            Score: {{ r.mark.score }}
-                            <span v-if="r.mark.grade"> · Grade: {{ r.mark.grade }}</span>
-                            <span v-if="r.mark.rank"> · Rank: {{ r.mark.rank }}</span>
-                        </p>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                        <a v-if="r.can_take_online"
-                           :href="`/portal/student/${school.id}/mcq/${r.registration_route_id}/exam`"
-                           class="text-xs font-semibold text-indigo-600">Take exam →</a>
-                        <a v-if="r.show_hall_ticket"
-                           :href="`/portal/student/${school.id}/mcq/${r.registration_route_id}/hall-ticket`"
-                           target="_blank"
-                           class="text-xs font-semibold text-slate-600">Hall ticket ↗</a>
-                        <a v-if="r.invoice_url"
-                           :href="r.invoice_url"
-                           target="_blank"
-                           class="text-xs font-semibold text-slate-600">Invoice ↗</a>
-                        <a v-if="r.certificate_url"
-                           :href="r.certificate_url"
-                           target="_blank"
-                           class="text-xs font-semibold text-emerald-700">Certificate ↗</a>
-                    </div>
-                </li>
-                <li v-if="!mcqExams?.length" class="py-4 text-center text-gray-400">
-                    <p>No Talent Search registrations yet.</p>
-                    <a :href="`/portal/student/${school.id}`" class="text-xs text-indigo-600 font-semibold mt-2 inline-block">← Back to dashboard</a>
-                </li>
-            </ul>
+        <div class="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div>
+                <p class="text-sm font-semibold text-slate-900">Before exam day</p>
+                <p class="text-xs text-slate-500 mt-0.5">Check browser, storage, and network on this device.</p>
+            </div>
+            <a :href="`/portal/student/${school.id}/mcq/system-check`" class="btn-secondary text-sm">Practice system check</a>
+        </div>
+
+        <div class="flex flex-wrap gap-2 mb-4">
+            <button
+                v-for="tab in tabs"
+                :key="tab.id"
+                type="button"
+                class="rounded-full px-3.5 py-1.5 text-xs font-bold transition"
+                :class="filter === tab.id
+                    ? 'bg-[#0f3d7a] text-white shadow-sm'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'"
+                @click="filter = tab.id"
+            >{{ tab.label }} ({{ tab.count }})</button>
+        </div>
+
+        <section class="space-y-3">
+            <StudentMcqExamCard
+                v-for="exam in filteredExams"
+                :key="exam.registration_route_id ?? exam.id"
+                :school-id="school.id"
+                :exam="exam"
+            />
+            <div v-if="!filteredExams.length" class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center">
+                <p class="text-sm text-slate-400">No exams in this list.</p>
+                <a :href="`/portal/student/${school.id}`" class="text-xs font-bold text-[#0f3d7a] mt-2 inline-block">← Back to home</a>
+            </div>
         </section>
     </PortalLayout>
 </template>
 
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
-import { computed } from 'vue';
+import StudentMcqExamCard from '@/Components/portal/StudentMcqExamCard.vue';
+import { computed, ref } from 'vue';
 import { studentPortalNavItems } from '@/support/studentPortalNav.js';
 
 const props = defineProps({
@@ -62,13 +56,23 @@ const props = defineProps({
 });
 
 const navItems = computed(() => studentPortalNavItems(props.school.id));
+const filter = ref('all');
 
-function lifecycleClass(status) {
-    const tone = status?.tone ?? 'neutral';
-    if (tone === 'success') return 'bg-emerald-50 text-emerald-800';
-    if (tone === 'warning') return 'bg-amber-50 text-amber-800';
-    if (tone === 'danger') return 'bg-red-50 text-red-800';
-    if (tone === 'info') return 'bg-sky-50 text-sky-800';
-    return 'bg-slate-100 text-slate-700';
-}
+const actionable = computed(() => (props.mcqExams ?? []).filter((e) => e.can_take_online));
+const submitted = computed(() => (props.mcqExams ?? []).filter((e) => e.status === 'submitted' || e.show_results));
+const other = computed(() => (props.mcqExams ?? []).filter((e) => !e.can_take_online && e.status !== 'submitted' && !e.show_results));
+
+const tabs = computed(() => [
+    { id: 'all', label: 'All', count: (props.mcqExams ?? []).length },
+    { id: 'actionable', label: 'Take now', count: actionable.value.length },
+    { id: 'submitted', label: 'Submitted', count: submitted.value.length },
+    { id: 'other', label: 'Upcoming / offline', count: other.value.length },
+]);
+
+const filteredExams = computed(() => {
+    if (filter.value === 'actionable') return actionable.value;
+    if (filter.value === 'submitted') return submitted.value;
+    if (filter.value === 'other') return other.value;
+    return props.mcqExams ?? [];
+});
 </script>
