@@ -31,9 +31,9 @@
         </div>
 
         <div class="flex flex-wrap gap-2 mb-4">
-            <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/attendance/export`" class="btn-secondary text-sm">Export attendance CSV ↓</a>
-            <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/attendance/sheet.pdf`" class="btn-secondary text-sm" target="_blank">Attendance sheet PDF ↓</a>
-            <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/mark-sheet.pdf`" class="btn-secondary text-sm" target="_blank">Mark sheet PDF ↓</a>
+            <a :href="exportUrl(`${examBase}/attendance/export`)" class="btn-secondary text-sm">Export attendance {{ hasExportFilters ? 'filtered' : '' }} CSV ↓</a>
+            <a :href="exportUrl(`${examBase}/attendance/sheet.pdf`)" class="btn-secondary text-sm" target="_blank">Class-wise attendance PDF ↓</a>
+            <a :href="`${examBase}/mark-sheet.pdf`" class="btn-secondary text-sm" target="_blank">Mark sheet PDF ↓</a>
             <form @submit.prevent="importAttendance" class="flex flex-wrap gap-2 items-center">
                 <input ref="importFile" type="file" accept=".csv,.txt,.xlsx,.xls" class="text-sm" required>
                 <button type="submit" class="btn-secondary text-sm">Import attendance (CSV/Excel)</button>
@@ -55,6 +55,7 @@
                             <th class="w-12">#</th>
                             <th>Reg. no.</th>
                             <th>Student</th>
+                            <th>Class</th>
                             <th>School</th>
                             <th>Attendance</th>
                             <th>Note</th>
@@ -66,6 +67,7 @@
                             <td class="text-xs font-bold text-slate-400">{{ (registrations.current_page - 1) * registrations.per_page + i + 1 }}</td>
                             <td class="font-mono text-xs">{{ r.hall_ticket_no || '—' }}</td>
                             <td class="font-bold text-slate-900">{{ r.student?.name || r.participant_name || '—' }}</td>
+                            <td class="text-xs">{{ r.student?.school_class?.name || '—' }}</td>
                             <td class="text-xs">{{ r.school?.name || '—' }}</td>
                             <td>
                                 <SearchableSelect v-model="forms[r.id].attendance_status"
@@ -82,7 +84,7 @@
                             <td><button type="button" @click="save(r)" class="link-brand text-xs">Save</button></td>
                         </tr>
                         <tr v-if="!registrations.data?.length">
-                            <td colspan="7" class="p-6 text-center text-slate-400">No matching registrations.</td>
+                            <td colspan="8" class="p-6 text-center text-slate-400">No matching registrations.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -126,9 +128,11 @@ const filterForm = reactive({
 });
 
 const hasFilters = computed(() => !!(filterForm.search || filterForm.school_id || filterForm.class));
+const hasExportFilters = computed(() => !!(filterForm.school_id || filterForm.class));
+const examBase = `/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}`;
 
 function applyFilters() {
-    router.get(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/attendance`, { ...filterForm }, { preserveState: true, preserveScroll: true });
+    router.get(`${examBase}/attendance`, { ...filterForm }, { preserveState: true, preserveScroll: true });
 }
 
 useDebouncedInertiaFilters(filterForm, applyFilters, () => props.filters);
@@ -138,6 +142,15 @@ function clearFilters() {
     filterForm.school_id = null;
     filterForm.class = null;
     applyFilters();
+}
+
+/** Pass school/class filters into CSV/PDF downloads (search is list-only). */
+function exportUrl(baseUrl) {
+    const params = [];
+    if (filterForm.school_id) params.push('school_id=' + encodeURIComponent(filterForm.school_id));
+    if (filterForm.class) params.push('class=' + encodeURIComponent(filterForm.class));
+    if (!params.length) return baseUrl;
+    return baseUrl + (baseUrl.includes('?') ? '&' : '?') + params.join('&');
 }
 
 const importErrors = computed(() => page.props.flash?.import_errors ?? []);

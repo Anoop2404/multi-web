@@ -931,7 +931,7 @@
                                 <span class="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 uppercase tracking-wider">PDF & Excel</span>
                             </div>
                             <h3 class="font-bold text-slate-900 text-base mb-1 group-hover:text-emerald-600 transition-colors">Attendance Sheet</h3>
-                            <p class="text-xs text-slate-500 leading-relaxed">Invigilator checklist & hall ticket verification sheet for exam day physical attendance marking.</p>
+                            <p class="text-xs text-slate-500 leading-relaxed">Class-wise invigilator checklist for exam-day marking. Use the class filter above to download one class only.</p>
                         </div>
                         <div class="space-y-2 mt-6 pt-4 border-t border-slate-100">
                             <div class="grid grid-cols-2 gap-2">
@@ -939,7 +939,7 @@
                                     📊 Excel ↓
                                 </a>
                                 <a v-if="reportExports.attendancePdf" :href="reportUrlWithClass(reportExports.attendancePdf)" target="_blank" class="btn-secondary text-xs justify-center py-2 bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 font-semibold">
-                                    📄 PDF ↓
+                                    📄 Class-wise PDF ↓
                                 </a>
                             </div>
                             <div class="grid grid-cols-2 gap-2">

@@ -29,7 +29,7 @@ class McqExamOpsController extends SahodayaAdminController
 
         $query = McqRegistration::where('exam_id', $exam->id)
             ->active()
-            ->with(['student', 'school', 'mark']);
+            ->with(['student.schoolClass', 'school', 'mark']);
 
         $this->applyRegistrationFilters($query, $filters);
 
@@ -152,11 +152,15 @@ class McqExamOpsController extends SahodayaAdminController
         return back()->with('success', "Imported attendance for {$result['imported']} registration(s).");
     }
 
-    public function exportAttendance(string $tenantId, McqExam $exam, \App\Services\Mcq\McqReportService $reports)
+    public function exportAttendance(Request $request, string $tenantId, McqExam $exam, \App\Services\Mcq\McqReportService $reports)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
-        return $reports->exportAttendance($exam);
+        return $reports->exportAttendance(
+            $exam,
+            $request->input('school_id'),
+            $request->input('class'),
+        );
     }
 
     public function attendanceSheetPdf(Request $request, string $tenantId, McqExam $exam, \App\Services\Mcq\McqPrintableDocumentService $docs)
