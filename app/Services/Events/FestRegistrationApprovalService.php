@@ -198,16 +198,12 @@ class FestRegistrationApprovalService
         $settings = $numbering->settings($event);
         $autoAssign = (bool) ($settings['auto_assign_on_approve'] ?? true);
         // Independent of $autoAssign above (which still unconditionally governs item-reg
-        // numbers): lets chest-number assignment specifically stop happening live at
-        // approval time, so numbers can instead be handed out later in one shuffled batch
-        // via assignMissingChestNumbers() -- see that method's docblock for why a live,
-        // one-at-a-time assignment can't itself be made random without either leaving
-        // gaps in the numbering or renumbering already-issued numbers later. Falls back
-        // to $autoAssign when unset, so any event that has never touched this setting
-        // keeps its exact current behavior.
-        $autoAssignChest = array_key_exists('auto_assign_chest_on_approve', $settings)
-            ? (bool) $settings['auto_assign_chest_on_approve']
-            : $autoAssign;
+        // numbers): chest numbers stay off at approval by default so they can be handed
+        // out later in one shuffled batch via assignMissingChestNumbers() -- see that
+        // method's docblock for why a live, one-at-a-time assignment can't itself be
+        // made random without either leaving gaps or renumbering already-issued numbers.
+        // Events that explicitly opt in keep auto_assign_chest_on_approve = true.
+        $autoAssignChest = (bool) ($settings['auto_assign_chest_on_approve'] ?? false);
 
         foreach ($registration->participants as $participant) {
             if ($participant->participant_role === 'standby') {
