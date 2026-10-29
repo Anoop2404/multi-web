@@ -3,10 +3,42 @@
         role-label="Student Portal"
         title="My event registrations"
         :subtitle="school.name"
-        accent="indigo"
+        accent="navy"
         :nav-items="navItems"
     >
-        <PageHeader title="Fest & sports registrations" eyebrow="Student portal" :description="`Registrations for ${student.name}`" />
+        <!-- Activity Sub-navigation Tabs -->
+        <div class="flex flex-wrap items-center gap-2 mb-6 border-b border-slate-200/80 pb-3">
+            <a
+                :href="`/portal/student/${school.id}/fest/schedule`"
+                class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:text-slate-900 transition"
+            >
+                📅 Timetable &amp; Stages
+            </a>
+            <a
+                :href="`/portal/student/${school.id}/results`"
+                class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:text-slate-900 transition"
+            >
+                🏆 Fest Results
+            </a>
+            <a
+                :href="`/portal/student/${school.id}/sports-results`"
+                class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:text-slate-900 transition"
+            >
+                🏃 Sports Results
+            </a>
+            <a
+                :href="`/portal/student/${school.id}/fest-registrations`"
+                class="px-4 py-2 rounded-xl text-xs font-extrabold bg-[#0f3d7a] text-white shadow-sm"
+            >
+                📝 Registrations
+            </a>
+            <a
+                :href="`/portal/student/${school.id}/certificates`"
+                class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:text-slate-900 transition"
+            >
+                📜 Certificates
+            </a>
+        </div>
 
         <div v-for="ev in events" :key="ev.id" class="card mb-4 space-y-3">
             <div class="flex flex-wrap items-center justify-between gap-2">

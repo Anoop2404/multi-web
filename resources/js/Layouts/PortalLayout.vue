@@ -164,22 +164,29 @@
             <!-- Mobile bottom nav (student primary destinations) -->
             <nav
                 v-if="!focusMode && primaryNavItems.length"
-                class="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 safe-bottom"
+                class="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-slate-200/90 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 shadow-[0_-4px_16px_rgba(15,23,42,0.06)] safe-bottom"
                 aria-label="Primary"
             >
-                <ul class="grid grid-cols-4 max-w-lg mx-auto">
+                <ul
+                    class="grid max-w-lg mx-auto"
+                    :style="{ gridTemplateColumns: `repeat(${primaryNavItems.length}, minmax(0, 1fr))` }"
+                >
                     <li v-for="item in primaryNavItems" :key="item.href">
                         <Link
                             :href="item.href"
-                            class="flex flex-col items-center justify-center gap-0.5 py-2.5 text-[10px] font-bold tracking-wide"
-                            :class="isActive(item) ? 'text-[#0f3d7a]' : 'text-slate-500'"
+                            class="flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-bold tracking-wide transition relative group"
+                            :class="isActive(item) ? 'text-[#0f3d7a]' : 'text-slate-500 hover:text-slate-700'"
                         >
                             <span
-                                class="w-5 h-5"
-                                :class="isActive(item) ? 'opacity-100' : 'opacity-70'"
+                                v-if="isActive(item)"
+                                class="absolute top-0 inset-x-4 h-0.5 bg-[#0f3d7a] rounded-full"
+                            />
+                            <span
+                                class="w-5 h-5 transition duration-150"
+                                :class="isActive(item) ? 'opacity-100 scale-105' : 'opacity-70 group-hover:opacity-90'"
                                 v-html="getNavIcon(item.icon) || getNavIcon('home')"
                             />
-                            {{ item.label }}
+                            <span class="truncate max-w-[4rem] sm:max-w-none">{{ item.label }}</span>
                         </Link>
                     </li>
                 </ul>
@@ -265,6 +272,7 @@ function getNavIcon(name) {
         profile: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>`,
         documents: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>`,
         check: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+        trophy: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>`,
     };
     return icons[name] || null;
 }

@@ -1,33 +1,49 @@
 <template>
     <div class="space-y-3">
-        <div class="flex items-center justify-between gap-2">
-            <h2 class="font-semibold text-xs uppercase tracking-wide text-slate-500">Questions</h2>
-            <span class="text-xs text-slate-500 tabular-nums">{{ answeredCount }}/{{ questions.length }}</span>
+        <div class="flex items-center justify-between gap-2 pb-1 border-b border-slate-100">
+            <h2 class="font-extrabold text-xs uppercase tracking-wider text-slate-800">Question Palette</h2>
+            <span class="text-xs font-bold text-slate-600 tabular-nums bg-slate-100 px-2 py-0.5 rounded-full">
+                {{ answeredCount }}/{{ questions.length }} done
+            </span>
         </div>
+
         <div class="grid grid-cols-5 lg:grid-cols-4 gap-1.5" role="list">
             <button
                 v-for="q in questions"
                 :key="`nav-${q.id}`"
                 type="button"
                 role="listitem"
-                class="h-10 min-w-[2.25rem] rounded-md text-xs font-semibold border transition"
+                class="h-10 min-w-[2.25rem] rounded-xl text-xs font-bold border transition flex items-center justify-center relative cursor-pointer"
                 :class="[
                     navClass(q),
-                    isCurrent(q) ? 'ring-2 ring-offset-1 ring-slate-800' : '',
+                    isCurrent(q) ? 'ring-2 ring-offset-2 ring-[#0f3d7a] !border-[#0f3d7a] shadow-sm font-extrabold scale-105 z-10' : '',
                 ]"
                 :aria-current="isCurrent(q) ? 'true' : undefined"
                 :aria-label="labelFor(q)"
                 @click="$emit('select', q.id)"
             >
-                {{ q.number }}
+                <span>{{ q.number }}</span>
             </button>
         </div>
-        <ul class="text-[11px] text-slate-500 space-y-1 pt-1 border-t border-slate-100">
-            <li class="flex items-center gap-2"><span class="inline-block h-3 w-3 rounded border-2 border-slate-800 ring-1 ring-slate-800/30" aria-hidden="true" /> Current</li>
-            <li class="flex items-center gap-2"><span class="inline-block h-3 w-3 rounded border border-indigo-400 bg-indigo-100" aria-hidden="true" /> Answered</li>
-            <li class="flex items-center gap-2"><span class="inline-block h-3 w-3 rounded border border-slate-300 bg-white" aria-hidden="true" /> Not answered</li>
-            <li class="flex items-center gap-2"><span class="inline-block h-3 w-3 rounded border border-amber-400 bg-amber-100" aria-hidden="true" /> Marked for review</li>
-        </ul>
+
+        <div class="grid grid-cols-2 gap-2 text-[11px] font-semibold pt-2 border-t border-slate-100">
+            <div class="flex items-center gap-1.5 text-emerald-800">
+                <span class="h-2.5 w-2.5 rounded-md bg-emerald-500 shrink-0" aria-hidden="true" />
+                <span>Answered</span>
+            </div>
+            <div class="flex items-center gap-1.5 text-amber-800">
+                <span class="h-2.5 w-2.5 rounded-md bg-amber-400 shrink-0" aria-hidden="true" />
+                <span>Review</span>
+            </div>
+            <div class="flex items-center gap-1.5 text-slate-600">
+                <span class="h-2.5 w-2.5 rounded-md border border-slate-300 bg-white shrink-0" aria-hidden="true" />
+                <span>Unanswered</span>
+            </div>
+            <div class="flex items-center gap-1.5 text-[#0f3d7a]">
+                <span class="h-2.5 w-2.5 rounded-md border-2 border-[#0f3d7a] bg-blue-50 shrink-0" aria-hidden="true" />
+                <span>Current Q</span>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -48,6 +64,6 @@ function isCurrent(q) {
 
 function labelFor(q) {
     const base = typeof props.navLabel === 'function' ? props.navLabel(q) : `Question ${q.number}`;
-    return isCurrent(q) ? `${base}, current` : base;
+    return isCurrent(q) ? `${base}, current question` : base;
 }
 </script>

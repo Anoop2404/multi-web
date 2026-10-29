@@ -3,145 +3,245 @@
         role-label="Student Portal"
         :title="exam.title"
         :subtitle="[school.name, student.reg_no].filter(Boolean).join(' · ')"
-        accent="indigo"
+        accent="navy"
         :nav-items="started ? [] : navItems"
         :focus-mode="started"
     >
-        <div v-if="!started" class="card py-8 px-5 space-y-4 max-w-2xl mx-auto">
-            <div class="text-center space-y-2">
-                <h2 class="font-semibold text-base text-slate-900">Before you start</h2>
-                <p class="text-sm text-gray-600">Read these instructions, then start when you are ready.</p>
-            </div>
-            <ul class="text-sm text-slate-700 space-y-2 list-disc pl-5">
-                <li><strong>{{ questions.length }}</strong> question(s) · <strong>{{ gradableCount }}</strong> graded · <strong>{{ totalMarks }}</strong> marks</li>
-                <li v-if="exam.duration_minutes">Duration: <strong>{{ exam.duration_minutes }} minutes</strong> — timer starts when you click Start</li>
-                <li v-if="exam.has_negative_marking">Some questions have <strong>negative marking</strong> for wrong answers</li>
-                <li>Answers <strong>autosave</strong> while you work — keep this tab open</li>
-                <li>Refresh or closing the tab may interrupt you; use <strong>Submit</strong> when finished</li>
-                <li>Use a stable connection; wait for “Saved” before submitting if you see an offline warning</li>
-                <li v-if="exam.proctor_mode === 'strict_tab'">
-                    Leaving this tab is a <strong>violation</strong>. After
-                    <strong>{{ exam.proctor_max_tab_violations || 3 }}</strong> times, your exam is
-                    <strong>auto-submitted</strong> from saved answers.
-                </li>
-                <li v-else>Tab switches and leaving this window are <strong>recorded</strong> for review (not auto-disqualification)</li>
-                <li v-if="exam.no_pin_required">No hall ticket or Start PIN — you start from this page</li>
-                <li v-else>If your venue uses a Start PIN, an invigilator will give it on the exam site — not your portal password</li>
-            </ul>
-            <p v-if="pageErrors" class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2" role="alert">{{ pageErrors }}</p>
-            <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm space-y-2">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                    <p class="font-medium text-slate-800">Device check</p>
-                    <a v-if="systemCheckUrl" :href="systemCheckUrl" class="text-xs font-semibold text-indigo-700 underline" target="_blank" rel="noopener">Full practice check ↗</a>
+        <!-- Pre-exam Instructions & Flight Checklist -->
+        <div v-if="!started" class="max-w-3xl mx-auto space-y-5 py-4">
+            <div class="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-sm space-y-6">
+                <!-- Header -->
+                <div class="text-center space-y-2 border-b border-slate-100 pb-5">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-blue-50 text-[#0f3d7a] border border-blue-200">
+                        Assessment Briefing
+                    </span>
+                    <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                        {{ exam.title }}
+                    </h1>
+                    <p class="text-sm text-slate-500 max-w-lg mx-auto">
+                        Please review the exam structure, rules, and device status before starting your timer.
+                    </p>
                 </div>
-                <button type="button" class="btn-secondary text-xs" :disabled="sysCheckRunning" @click="runInlineSystemCheck">
-                    {{ sysCheckRunning ? 'Checking…' : (sysCheckResult ? 'Run again' : 'Run quick check') }}
-                </button>
-                <ul v-if="sysCheckResult" class="text-xs space-y-1">
-                    <li v-for="item in sysCheckResult.items" :key="item.id">
-                        <span :class="item.status === 'fail' ? 'text-red-700' : (item.status === 'warn' ? 'text-amber-700' : 'text-emerald-700')">{{ item.label }}:</span>
-                        {{ item.detail }}
-                    </li>
-                </ul>
-            </div>
-            <p v-if="exam.require_fullscreen" class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                This exam requires fullscreen after you start. Leaving fullscreen is recorded as a signal — not an automatic fail. Extra monitors are not detected.
-            </p>
-            <label class="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800 cursor-pointer">
-                <input v-model="acceptedRules" type="checkbox" class="mt-1 rounded border-slate-300 text-[#0f3d7a] focus:ring-[#0f3d7a]">
-                <span>I have read and accept the exam rules and instructions.</span>
-            </label>
-            <div class="text-center pt-2">
-                <button
-                    type="button"
-                    class="btn-primary min-h-12 px-8 disabled:opacity-50 disabled:cursor-not-allowed"
-                    :disabled="starting || !acceptedRules"
-                    @click="startExam"
-                >Start exam</button>
+
+                <!-- 3-Column Structured Checklist -->
+                <div class="grid gap-4 sm:grid-cols-3">
+                    <!-- 1. Structure & Marks -->
+                    <div class="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 space-y-2.5">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">📊</span>
+                            <h2 class="text-xs font-extrabold uppercase tracking-wider text-slate-800">Exam Specs</h2>
+                        </div>
+                        <ul class="text-xs text-slate-600 space-y-1.5">
+                            <li class="flex justify-between">
+                                <span class="text-slate-500">Total Questions:</span>
+                                <span class="font-bold text-slate-900">{{ questions.length }}</span>
+                            </li>
+                            <li class="flex justify-between">
+                                <span class="text-slate-500">Gradable items:</span>
+                                <span class="font-bold text-slate-900">{{ gradableCount }}</span>
+                            </li>
+                            <li class="flex justify-between">
+                                <span class="text-slate-500">Total Marks:</span>
+                                <span class="font-bold text-slate-900">{{ totalMarks }}</span>
+                            </li>
+                            <li v-if="exam.duration_minutes" class="flex justify-between border-t border-slate-200/60 pt-1.5">
+                                <span class="text-slate-500">Time Limit:</span>
+                                <span class="font-bold text-[#0f3d7a]">{{ exam.duration_minutes }} mins</span>
+                            </li>
+                            <li v-if="exam.has_negative_marking" class="text-amber-800 font-semibold pt-1">
+                                ⚠️ Negative marking applies to some questions
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- 2. Technical Safeguards -->
+                    <div class="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 space-y-2.5">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">🛡️</span>
+                            <h2 class="text-xs font-extrabold uppercase tracking-wider text-slate-800">Integrity &amp; Sync</h2>
+                        </div>
+                        <ul class="text-xs text-slate-600 space-y-1.5 leading-relaxed">
+                            <li class="flex items-start gap-1.5">
+                                <span class="text-emerald-600 font-bold">✓</span>
+                                <span>Answers <strong>autosave</strong> automatically while you work.</span>
+                            </li>
+                            <li class="flex items-start gap-1.5">
+                                <span class="text-emerald-600 font-bold">✓</span>
+                                <span>Free navigation between all questions anytime.</span>
+                            </li>
+                            <li v-if="exam.proctor_mode === 'strict_tab'" class="flex items-start gap-1.5 text-amber-800">
+                                <span>⚠️</span>
+                                <span>Keep tab open: max {{ exam.proctor_max_tab_violations || 3 }} switches before auto-submit.</span>
+                            </li>
+                            <li v-else class="flex items-start gap-1.5 text-slate-500">
+                                <span>ℹ️</span>
+                                <span>Tab switches and leaves are logged for review.</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- 3. Device Check -->
+                    <div class="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 space-y-2.5">
+                        <div class="flex items-center justify-between gap-1">
+                            <div class="flex items-center gap-2">
+                                <span class="text-lg">💻</span>
+                                <h2 class="text-xs font-extrabold uppercase tracking-wider text-slate-800">Device Health</h2>
+                            </div>
+                            <a v-if="systemCheckUrl" :href="systemCheckUrl" target="_blank" rel="noopener" class="text-[10px] font-bold text-[#0f3d7a] hover:underline">Full check ↗</a>
+                        </div>
+                        <p class="text-[11px] text-slate-500">Verify your browser &amp; connection before starting.</p>
+                        <button
+                            type="button"
+                            class="w-full btn-secondary text-xs !py-1.5"
+                            :disabled="sysCheckRunning"
+                            @click="runInlineSystemCheck"
+                        >
+                            {{ sysCheckRunning ? 'Testing device…' : (sysCheckResult ? 'Run again' : 'Quick device check') }}
+                        </button>
+                        <ul v-if="sysCheckResult" class="text-[11px] space-y-1 pt-1">
+                            <li v-for="item in sysCheckResult.items" :key="item.id" class="flex items-center justify-between">
+                                <span class="text-slate-600">{{ item.label }}:</span>
+                                <span :class="item.status === 'fail' ? 'text-red-700 font-bold' : (item.status === 'warn' ? 'text-amber-700 font-semibold' : 'text-emerald-700 font-bold')">
+                                    {{ item.status === 'fail' ? 'Fail' : (item.status === 'warn' ? 'Warning' : 'Pass') }}
+                                </span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Fullscreen requirement banner if applicable -->
+                <div v-if="exam.require_fullscreen" class="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900 flex items-start gap-2.5">
+                    <span class="text-base">🖥️</span>
+                    <div>
+                        <p class="font-bold">Fullscreen Mode Required</p>
+                        <p class="mt-0.5 text-amber-800">This exam requires you to stay in fullscreen mode after clicking Start. Leaving fullscreen will be logged as a proctoring signal.</p>
+                    </div>
+                </div>
+
+                <!-- Error banner if any -->
+                <div v-if="pageErrors" class="rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-800" role="alert">
+                    {{ pageErrors }}
+                </div>
+
+                <!-- Accept rules & CTA -->
+                <div class="pt-2 space-y-4">
+                    <label class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 cursor-pointer hover:border-slate-300 transition">
+                        <input
+                            v-model="acceptedRules"
+                            type="checkbox"
+                            class="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#0f3d7a] focus:ring-[#0f3d7a]"
+                        >
+                        <span class="text-xs sm:text-sm font-medium text-slate-800 leading-snug">
+                            I confirm that I am attending this examination independently, have reviewed the instructions, and accept all examination rules.
+                        </span>
+                    </label>
+
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                        <a :href="`/portal/student/${school.id}/mcq`" class="text-xs font-bold text-slate-500 hover:text-slate-800 order-2 sm:order-1">
+                            ← Return to exam center
+                        </a>
+                        <button
+                            type="button"
+                            class="w-full sm:w-auto btn-primary min-h-12 px-8 text-sm font-extrabold shadow-md disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-2"
+                            :disabled="starting || !acceptedRules"
+                            @click="startExam"
+                        >
+                            {{ starting ? 'Launching Exam Hall…' : 'Start Exam Now →' }}
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
+        <!-- Live Exam Hall View (started) -->
         <div v-else class="exam-hall -mx-1">
-            <!-- Sticky top: title · timer · save -->
+            <!-- Sticky Exam Hall Chrome -->
             <header
-                class="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90"
+                class="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 shadow-sm"
                 :class="timerUrgent ? 'border-red-200' : ''"
             >
-                <div class="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2.5">
+                <div class="flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-2.5 max-w-6xl mx-auto">
+                    <!-- Exam title & progress text -->
                     <div class="min-w-0 flex-1">
-                        <p class="text-sm font-bold text-slate-900 truncate leading-tight">{{ exam.title }}</p>
-                        <p class="text-[11px] text-slate-500 truncate tabular-nums">
-                            {{ currentQuestion ? `Q ${currentQuestion.number} of ${questions.length}` : '' }}
-                            · {{ answeredCount }}/{{ questions.length }} answered
-                            <span v-if="markedForReview.size"> · {{ markedForReview.size }} review</span>
-                            <span class="text-slate-400"> · {{ student.reg_no || school.name }}</span>
+                        <p class="text-sm font-extrabold text-slate-900 truncate leading-tight">{{ exam.title }}</p>
+                        <p class="text-[11px] text-slate-500 truncate tabular-nums flex items-center gap-1.5 mt-0.5">
+                            <span class="font-bold text-[#0f3d7a]">Q {{ currentIndex + 1 }} of {{ questions.length }}</span>
+                            <span>·</span>
+                            <span>{{ answeredCount }} answered</span>
+                            <span v-if="markedForReview.size" class="text-amber-800 font-semibold">· {{ markedForReview.size }} review</span>
+                            <span class="text-slate-400 hidden sm:inline">· ID {{ student.reg_no }}</span>
                         </p>
                     </div>
-                    <SignOutButton class="hidden sm:inline-flex text-[11px] font-semibold text-slate-500 hover:text-red-700 shrink-0" />
+
+                    <!-- Autosave sync indicator -->
                     <div
-                        v-if="expiresAt"
-                        class="shrink-0 rounded-lg px-2.5 py-1.5 text-center min-w-[4.75rem]"
-                        :class="timerUrgent ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-900'"
-                        role="timer"
-                        :aria-label="`Time remaining ${timerLabel}`"
-                    >
-                        <span class="block text-[10px] font-semibold uppercase tracking-wide opacity-70">Time left</span>
-                        <span class="block text-lg font-extrabold tabular-nums leading-none">{{ timerLabel }}</span>
-                    </div>
-                    <span
-                        class="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border shrink-0"
+                        class="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-xl border shrink-0"
                         :class="syncPillClass"
                         role="status"
                         aria-live="polite"
                     >
-                        <span class="h-1.5 w-1.5 rounded-full" :class="syncDotClass" aria-hidden="true" />
-                        {{ syncPillText }}
-                    </span>
-                    <span
-                        class="sm:hidden inline-flex items-center justify-center h-8 w-8 rounded-full border shrink-0"
-                        :class="syncPillClass"
-                        role="status"
-                        :aria-label="syncPillText"
-                        :title="syncPillText"
-                    >
                         <span class="h-2 w-2 rounded-full" :class="syncDotClass" aria-hidden="true" />
-                    </span>
+                        <span>{{ syncPillText }}</span>
+                    </div>
+
+                    <!-- Timer Pill -->
+                    <div
+                        v-if="expiresAt"
+                        class="shrink-0 rounded-xl px-3 py-1.5 text-center min-w-[5.25rem] border shadow-xs transition"
+                        :class="timerUrgent ? 'bg-red-50 text-red-700 border-red-300 animate-pulse' : 'bg-slate-100 text-slate-900 border-slate-200'"
+                        role="timer"
+                        :aria-label="`Time remaining ${timerLabel}`"
+                    >
+                        <span class="block text-[9px] font-extrabold uppercase tracking-wider opacity-70">Time Left</span>
+                        <span class="block text-lg font-black tabular-nums leading-none tracking-tight">{{ timerLabel }}</span>
+                    </div>
+
+                    <!-- Text size controls on desktop header -->
+                    <div class="hidden lg:flex items-center gap-1 shrink-0 pl-1 border-l border-slate-200">
+                        <button type="button" class="btn-secondary !px-2 !py-1 text-xs min-h-8" @click="changeFont(-1)" title="Decrease text size" aria-label="Decrease text size">A−</button>
+                        <button type="button" class="btn-secondary !px-2 !py-1 text-xs min-h-8" @click="changeFont(1)" title="Increase text size" aria-label="Increase text size">A+</button>
+                    </div>
                 </div>
 
-                <div v-if="resumeBanner" class="px-3 py-1.5 text-xs text-sky-900 bg-sky-50 border-t border-sky-100">
-                    Continuing your attempt — answers restored
+                <!-- Visual Progress Bar (Answered % of total) -->
+                <div class="h-1 w-full bg-slate-100">
+                    <div
+                        class="h-full bg-emerald-500 transition-all duration-300"
+                        :style="{ width: `${progressPercent}%` }"
+                        role="progressbar"
+                        :aria-valuenow="progressPercent"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                    />
+                </div>
+
+                <!-- Live alert strips -->
+                <div v-if="resumeBanner" class="px-3 py-1.5 text-xs text-sky-900 bg-sky-50 border-t border-sky-100 flex items-center gap-1.5">
+                    <span>🔄</span>
+                    <span>Continuing previous attempt — saved answers restored.</span>
                 </div>
                 <div
                     v-if="offline || saveStatus === 'failed'"
-                    class="px-3 py-2 text-sm text-amber-900 bg-amber-50 border-t border-amber-200"
+                    class="px-3 py-2 text-xs text-amber-900 bg-amber-50 border-t border-amber-200 flex items-center justify-between gap-2"
                     role="status"
                 >
-                    <span v-if="offline">You appear offline. Answers will retry when the connection returns.</span>
-                    <span v-else>Answers could not be saved. Check your connection — Submit stays disabled until they save.</span>
-                    <span v-if="lastSavedAt" class="block text-xs mt-0.5 opacity-80">Last saved: {{ lastSavedLabel }}</span>
+                    <span v-if="offline">⚠️ Network connection lost. Answers will automatically retry when reconnected.</span>
+                    <span v-else>⚠️ Cloud save failed. Keep tab open — your answers are kept locally and will sync shortly.</span>
+                    <span v-if="lastSavedAt" class="opacity-80 shrink-0">Last saved: {{ lastSavedLabel }}</span>
                 </div>
-                <div v-if="timerUrgent" class="px-3 py-1.5 text-xs text-red-800 bg-red-50 border-t border-red-100">
-                    Less than 5 minutes left. Your exam will submit automatically when the timer reaches zero.
+                <div v-if="timerUrgent" class="px-3 py-1.5 text-xs text-red-800 bg-red-50 border-t border-red-100 font-semibold text-center">
+                    ⏰ Less than 5 minutes remaining. Your exam will submit automatically when the countdown completes.
                 </div>
-                <div v-if="proctorWarningVisible" class="px-3 py-2 text-sm text-amber-800 bg-amber-50 border-t border-amber-200 flex justify-between gap-2 items-start">
-                    <span>{{ proctorMessage }}</span>
-                    <button type="button" class="text-xs font-semibold underline shrink-0" @click="proctorWarningVisible = false">Dismiss</button>
-                </div>
-                <div
-                    v-if="!fullscreenActive && !exam.require_fullscreen && !fullscreenDismissed"
-                    class="px-3 py-2 text-xs text-slate-700 bg-slate-50 border-t border-slate-200 flex flex-wrap justify-between gap-2 items-center"
-                >
-                    <span>Optional fullscreen reduces distractions. Leaving it is recorded as a signal — not an automatic fail.</span>
-                    <div class="flex gap-2 shrink-0">
-                        <button type="button" class="btn-secondary text-xs min-h-9 !py-1.5" @click="enterFullscreen">Enter fullscreen</button>
-                        <button type="button" class="text-xs font-semibold text-slate-500 underline" @click="fullscreenDismissed = true">Not now</button>
-                    </div>
+                <div v-if="proctorWarningVisible" class="px-3 py-2 text-xs text-amber-800 bg-amber-50 border-t border-amber-200 flex justify-between gap-2 items-center">
+                    <span>⚠️ {{ proctorMessage }}</span>
+                    <button type="button" class="text-xs font-bold underline shrink-0" @click="proctorWarningVisible = false">Dismiss</button>
                 </div>
             </header>
 
             <form @submit.prevent="requestSubmit" class="pb-28">
-                <div class="lg:grid lg:grid-cols-[11.5rem_minmax(0,1fr)] lg:gap-5 lg:items-start lg:pt-4">
-                    <aside class="hidden lg:block sticky top-[4.75rem] space-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                <div class="lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-6 lg:items-start lg:pt-4 max-w-6xl mx-auto">
+                    <!-- Desktop Question Palette Sidebar -->
+                    <aside class="hidden lg:block sticky top-[5rem] space-y-4 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm">
                         <QuestionNavGrid
                             :questions="questions"
                             :answered-count="answeredCount"
@@ -150,72 +250,104 @@
                             :nav-label="questionNavLabel"
                             @select="goToQuestionId"
                         />
-                        <div class="flex items-center gap-2 pt-2 border-t border-slate-100">
-                            <span class="text-[11px] text-slate-500">Text</span>
-                            <button type="button" class="btn-secondary !px-2.5 !py-1.5 text-xs min-h-9" @click="changeFont(-1)" aria-label="Decrease text size">A−</button>
-                            <button type="button" class="btn-secondary !px-2.5 !py-1.5 text-xs min-h-9" @click="changeFont(1)" aria-label="Increase text size">A+</button>
+
+                        <div class="pt-2 border-t border-slate-100 space-y-2">
+                            <button
+                                type="submit"
+                                class="btn-primary w-full min-h-11 text-xs font-extrabold shadow-sm"
+                                :disabled="submitting || submitBlocked"
+                            >
+                                {{ submitting ? 'Submitting…' : (submitBlocked ? 'Waiting for answers to save…' : 'Review & Submit Exam') }}
+                            </button>
                         </div>
-                        <button
-                            type="submit"
-                            class="btn-secondary w-full min-h-11 text-sm"
-                            :disabled="submitting || submitBlocked"
-                        >
-                            {{ submitting ? 'Submitting…' : (submitBlocked ? 'Wait until answers are saved' : 'Review & submit') }}
-                        </button>
                     </aside>
 
-                    <div v-if="currentQuestion" class="min-w-0 px-1 pt-4 lg:pt-0" :style="{ fontSize: fontSizeRem + 'rem' }">
-                        <article class="space-y-4" :aria-labelledby="qHeadingId">
-                            <div class="flex flex-wrap items-start justify-between gap-2">
+                    <!-- Active Question Canvas -->
+                    <div v-if="currentQuestion" class="min-w-0 px-2 pt-4 lg:pt-0" :style="{ fontSize: fontSizeRem + 'rem' }">
+                        <article class="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-7 shadow-sm space-y-5" :aria-labelledby="qHeadingId">
+                            <!-- Question Meta & Bookmark Header -->
+                            <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
                                 <div class="min-w-0">
-                                    <h2 :id="qHeadingId" ref="qHeadingRef" tabindex="-1" class="font-bold text-base text-slate-900 outline-none">
-                                        Question {{ currentQuestion.number }}
-                                        <span class="font-medium text-slate-400">of {{ questions.length }}</span>
-                                    </h2>
-                                    <p class="text-xs font-medium text-slate-500 mt-1">
-                                        {{ currentQuestion.marks }} mark{{ currentQuestion.marks === 1 ? '' : 's' }}
-                                        <span v-if="currentQuestion.negative_mark > 0"> · −{{ currentQuestion.negative_mark }} for a wrong answer</span>
-                                        <span v-if="currentQuestion.type === 'multiple' && currentQuestion.choose_count"> · Choose {{ currentQuestion.choose_count }}</span>
-                                        <span v-else-if="currentQuestion.type === 'multiple'"> · Select all that apply</span>
-                                        <span v-else-if="currentQuestion.type === 'numeric'"> · Enter a number</span>
-                                        <span v-else-if="currentQuestion.type === 'true_false'"> · True or false</span>
-                                    </p>
+                                    <div class="flex items-center gap-2">
+                                        <h2 :id="qHeadingId" ref="qHeadingRef" tabindex="-1" class="font-extrabold text-lg text-slate-900 outline-none">
+                                            Question {{ currentQuestion.number }}
+                                            <span class="text-sm font-semibold text-slate-400">of {{ questions.length }}</span>
+                                        </h2>
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-1.5 mt-1 text-xs">
+                                        <span class="font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                                            +{{ currentQuestion.marks }} Mark{{ currentQuestion.marks === 1 ? '' : 's' }}
+                                        </span>
+                                        <span v-if="currentQuestion.negative_mark > 0" class="font-bold text-red-800 bg-red-50 border border-red-200 px-2 py-0.5 rounded-md">
+                                            −{{ currentQuestion.negative_mark }} for wrong
+                                        </span>
+                                        <span v-if="currentQuestion.type === 'multiple' && currentQuestion.choose_count" class="font-semibold text-sky-800 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md">
+                                            Choose {{ currentQuestion.choose_count }}
+                                        </span>
+                                        <span v-else-if="currentQuestion.type === 'multiple'" class="font-semibold text-sky-800 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md">
+                                            Multiple answers
+                                        </span>
+                                        <span v-else-if="currentQuestion.type === 'numeric'" class="font-semibold text-purple-800 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md">
+                                            Enter number
+                                        </span>
+                                        <span v-else-if="currentQuestion.type === 'true_false'" class="font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                                            True or False
+                                        </span>
+                                    </div>
                                 </div>
+
+                                <!-- Mark for Review Toggle Button -->
                                 <button
                                     v-if="isAnswerable(currentQuestion)"
                                     type="button"
-                                    class="text-xs font-semibold px-3 py-2 min-h-10 rounded-lg border transition shrink-0"
+                                    class="inline-flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-xl border transition shrink-0 shadow-xs cursor-pointer"
                                     :class="markedForReview.has(currentQuestion.id)
-                                        ? 'border-amber-400 bg-amber-50 text-amber-900'
-                                        : 'border-slate-200 text-slate-600 hover:border-amber-300'"
+                                        ? 'border-amber-400 bg-amber-50 text-amber-900 ring-2 ring-amber-400/20'
+                                        : 'border-slate-200 text-slate-600 hover:border-amber-300 hover:bg-amber-50/50'"
                                     :aria-pressed="markedForReview.has(currentQuestion.id)"
                                     @click="toggleReview(currentQuestion.id)"
                                 >
-                                    {{ markedForReview.has(currentQuestion.id) ? 'Marked for review' : 'Mark for review' }}
+                                    <span v-if="markedForReview.has(currentQuestion.id)">⭐</span>
+                                    <span v-else>☆</span>
+                                    <span>{{ markedForReview.has(currentQuestion.id) ? 'Marked for review' : 'Mark for review' }}</span>
                                 </button>
                             </div>
 
-                            <McqRichText v-if="currentQuestion.body_text" :text="currentQuestion.body_text" tag="p" class="text-slate-800 leading-relaxed" />
-                            <button
-                                v-if="currentQuestion.image_url"
-                                type="button"
-                                class="block max-w-full text-left"
-                                @click="zoomSrc = currentQuestion.image_url"
-                            >
-                                <img
-                                    :src="currentQuestion.image_url"
-                                    :alt="`Question ${currentQuestion.number} image — click to enlarge`"
-                                    class="max-h-80 max-w-full rounded-lg border bg-white object-contain cursor-zoom-in"
-                                >
-                            </button>
+                            <!-- Question Statement -->
+                            <div class="space-y-4">
+                                <McqRichText
+                                    v-if="currentQuestion.body_text"
+                                    :text="currentQuestion.body_text"
+                                    tag="div"
+                                    class="text-slate-900 leading-relaxed font-medium text-base sm:text-lg"
+                                />
 
-                            <!-- Numeric -->
-                            <div v-if="currentQuestion.type === 'numeric'" class="max-w-sm space-y-1.5">
-                                <label :for="`num-${currentQuestion.id}`" class="text-xs font-semibold text-slate-600">Type your answer (a number)</label>
+                                <!-- Question Image Attachment -->
+                                <button
+                                    v-if="currentQuestion.image_url"
+                                    type="button"
+                                    class="block max-w-full text-left group"
+                                    @click="zoomSrc = currentQuestion.image_url"
+                                >
+                                    <img
+                                        :src="currentQuestion.image_url"
+                                        :alt="`Question ${currentQuestion.number} illustration — tap to enlarge`"
+                                        class="max-h-80 max-w-full rounded-2xl border border-slate-200 bg-slate-50 object-contain cursor-zoom-in group-hover:border-[#0f3d7a]/40 transition"
+                                    >
+                                    <span class="block text-[11px] font-semibold text-slate-400 mt-1">Tap image to zoom 🔍</span>
+                                </button>
+                            </div>
+
+                            <!-- Options Interactive Zone -->
+                            <!-- 1. Numeric Question Input -->
+                            <div v-if="currentQuestion.type === 'numeric'" class="max-w-md space-y-2 pt-2">
+                                <label :for="`num-${currentQuestion.id}`" class="block text-xs font-bold text-slate-700">
+                                    Type your numeric answer:
+                                </label>
                                 <div class="flex gap-2 items-stretch">
                                     <button
                                         type="button"
-                                        class="btn-secondary !px-3 min-h-14 shrink-0"
+                                        class="btn-secondary !px-4 min-h-14 font-extrabold text-lg shrink-0 rounded-2xl"
                                         aria-label="Switch between positive and negative"
                                         @click="flipNumericSign(currentQuestion.id)"
                                     >±</button>
@@ -225,62 +357,31 @@
                                         inputmode="decimal"
                                         autocomplete="off"
                                         spellcheck="false"
-                                        class="field min-h-14 text-lg tabular-nums"
-                                        placeholder="e.g. 12.5"
+                                        class="field min-h-14 text-xl font-bold tabular-nums rounded-2xl"
+                                        placeholder="e.g. 42 or 3.14"
                                         :value="answers[currentQuestion.id] ?? ''"
                                         @input="onNumericInput(currentQuestion.id, $event.target.value)"
                                     >
                                 </div>
-                                <p v-if="answers[currentQuestion.id] && !isNumericValid(answers[currentQuestion.id])" class="text-xs text-amber-700" role="status">
-                                    Enter a number such as 42, -3 or 0.75.
+                                <p v-if="answers[currentQuestion.id] && !isNumericValid(answers[currentQuestion.id])" class="text-xs text-amber-700 font-semibold" role="status">
+                                    Please enter a valid numeric value (e.g. 15, -4, or 0.85).
                                 </p>
                             </div>
 
-                            <!-- Multiple correct -->
-                            <div
-                                v-else-if="currentQuestion.type === 'multiple' && currentQuestion.options?.length"
-                                class="grid gap-3"
-                                :class="currentQuestion.options.some(o => o.image_url) ? 'sm:grid-cols-2' : ''"
-                                role="group"
-                            >
-                                <label
-                                    v-for="opt in currentQuestion.options"
-                                    :key="opt.key"
-                                    class="flex items-start gap-3 text-sm border-2 rounded-xl px-4 py-3.5 min-h-14 cursor-pointer transition hover:border-indigo-300"
-                                    :class="isMultiSelected(currentQuestion.id, opt.key) ? 'border-indigo-500 bg-indigo-50/80' : 'border-slate-200 bg-white'"
-                                >
-                                    <input
-                                        type="checkbox"
-                                        :aria-label="`Question ${currentQuestion.number}, option ${(opt.display_key || opt.key).toUpperCase()}`"
-                                        :checked="isMultiSelected(currentQuestion.id, opt.key)"
-                                        class="mt-1 h-4 w-4"
-                                        @change="toggleMulti(currentQuestion.id, opt.key)"
-                                    >
-                                    <span class="min-w-0 space-y-1.5">
-                                        <span class="flex gap-1.5"><strong class="uppercase shrink-0">{{ opt.display_key || opt.key }}.</strong> <McqRichText :text="opt.label" /></span>
-                                        <img
-                                            v-if="opt.image_url"
-                                            :src="opt.image_url"
-                                            :alt="`Option ${(opt.display_key || opt.key).toUpperCase()} — click to enlarge`"
-                                            class="block max-h-40 max-w-full rounded border bg-white object-contain cursor-zoom-in"
-                                            @click.prevent="zoomSrc = opt.image_url"
-                                        >
-                                    </span>
-                                </label>
-                            </div>
-
-                            <!-- True / false -->
+                            <!-- 2. True / False Choice Options -->
                             <div
                                 v-else-if="currentQuestion.type === 'true_false' && currentQuestion.options?.length"
-                                class="grid grid-cols-2 gap-3"
+                                class="grid grid-cols-2 gap-3 pt-2"
                                 role="radiogroup"
-                                :aria-label="`Question ${currentQuestion.number} true or false`"
+                                :aria-label="`Question ${currentQuestion.number} True or False`"
                             >
                                 <label
                                     v-for="opt in trueFalseOptions(currentQuestion)"
                                     :key="opt.key"
-                                    class="flex items-center justify-center gap-2 text-base font-bold border-2 rounded-xl px-4 py-4 min-h-[4.5rem] cursor-pointer transition"
-                                    :class="answers[currentQuestion.id] === opt.key ? 'border-indigo-500 bg-indigo-50 text-indigo-900' : 'border-slate-200 text-slate-800 bg-white hover:border-indigo-300'"
+                                    class="flex items-center justify-center gap-2.5 text-base font-extrabold border-2 rounded-2xl px-5 py-4 min-h-[4.5rem] cursor-pointer transition shadow-xs"
+                                    :class="answers[currentQuestion.id] === opt.key
+                                        ? 'border-[#0f3d7a] bg-blue-50/70 text-[#0f3d7a] ring-2 ring-[#0f3d7a]/20'
+                                        : 'border-slate-200 text-slate-700 bg-white hover:border-slate-300'"
                                 >
                                     <input
                                         type="radio"
@@ -290,108 +391,186 @@
                                         v-model="answers[currentQuestion.id]"
                                         @change="scheduleSave"
                                     >
-                                    {{ opt.text }}
+                                    <span class="h-6 w-6 rounded-full border-2 flex items-center justify-center text-xs"
+                                          :class="answers[currentQuestion.id] === opt.key ? 'border-[#0f3d7a] bg-[#0f3d7a] text-white' : 'border-slate-300'">
+                                        {{ opt.key.toUpperCase() }}
+                                    </span>
+                                    <span>{{ opt.text }}</span>
                                 </label>
                             </div>
 
-                            <!-- Single choice -->
+                            <!-- 3. Multiple Choice (Multi-select) -->
+                            <div
+                                v-else-if="currentQuestion.type === 'multiple' && currentQuestion.options?.length"
+                                class="grid gap-3 pt-2"
+                                :class="currentQuestion.options.some(o => o.image_url) ? 'sm:grid-cols-2' : ''"
+                                role="group"
+                            >
+                                <label
+                                    v-for="opt in currentQuestion.options"
+                                    :key="opt.key"
+                                    class="flex items-start gap-3.5 text-sm sm:text-base border-2 rounded-2xl p-4 min-h-14 cursor-pointer transition shadow-xs"
+                                    :class="isMultiSelected(currentQuestion.id, opt.key)
+                                        ? 'border-[#0f3d7a] bg-blue-50/60 ring-1 ring-[#0f3d7a]/20'
+                                        : 'border-slate-200 bg-white hover:border-slate-300'"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        :aria-label="`Question ${currentQuestion.number}, option ${(opt.display_key || opt.key).toUpperCase()}`"
+                                        :checked="isMultiSelected(currentQuestion.id, opt.key)"
+                                        class="mt-1 h-5 w-5 rounded border-slate-300 text-[#0f3d7a] focus:ring-[#0f3d7a]"
+                                        @change="toggleMulti(currentQuestion.id, opt.key)"
+                                    >
+                                    <div class="min-w-0 flex-1 space-y-1">
+                                        <div class="flex items-start gap-2">
+                                            <span class="h-6 w-6 rounded-lg bg-slate-100 text-slate-700 font-extrabold text-xs flex items-center justify-center shrink-0"
+                                                  :class="isMultiSelected(currentQuestion.id, opt.key) ? 'bg-[#0f3d7a] text-white' : ''">
+                                                {{ (opt.display_key || opt.key).toUpperCase() }}
+                                            </span>
+                                            <McqRichText :text="opt.label" class="text-slate-800 leading-snug pt-0.5" />
+                                        </div>
+                                        <img
+                                            v-if="opt.image_url"
+                                            :src="opt.image_url"
+                                            :alt="`Option ${(opt.display_key || opt.key).toUpperCase()} picture`"
+                                            class="block max-h-40 max-w-full rounded-xl border bg-white object-contain cursor-zoom-in mt-2"
+                                            @click.prevent="zoomSrc = opt.image_url"
+                                        >
+                                    </div>
+                                </label>
+                            </div>
+
+                            <!-- 4. Single Choice (Standard Radio) -->
                             <div
                                 v-else-if="currentQuestion.options?.length"
-                                class="grid gap-3"
+                                class="grid gap-3 pt-2"
                                 :class="currentQuestion.options.some(o => o.image_url) ? 'sm:grid-cols-2' : ''"
                                 role="radiogroup"
                             >
                                 <label
                                     v-for="opt in currentQuestion.options"
                                     :key="opt.key"
-                                    class="flex items-start gap-3 text-sm border-2 rounded-xl px-4 py-3.5 min-h-14 cursor-pointer transition hover:border-indigo-300"
-                                    :class="answers[currentQuestion.id] === opt.key ? 'border-indigo-500 bg-indigo-50/80' : 'border-slate-200 bg-white'"
+                                    class="flex items-start gap-3.5 text-sm sm:text-base border-2 rounded-2xl p-4 min-h-14 cursor-pointer transition shadow-xs group"
+                                    :class="answers[currentQuestion.id] === opt.key
+                                        ? 'border-[#0f3d7a] bg-blue-50/60 ring-2 ring-[#0f3d7a]/20'
+                                        : 'border-slate-200 bg-white hover:border-slate-300'"
                                 >
                                     <input
                                         type="radio"
                                         :name="`q-${currentQuestion.id}`"
-                                        :aria-label="`Question ${currentQuestion.number}, option ${(opt.display_key || opt.key).toUpperCase()}: ${opt.label || 'Image option'}`"
                                         :value="opt.key"
                                         v-model="answers[currentQuestion.id]"
-                                        class="mt-1 h-4 w-4"
+                                        class="mt-1 h-5 w-5 text-[#0f3d7a] border-slate-300 focus:ring-[#0f3d7a]"
                                         @change="scheduleSave"
                                     >
-                                    <span class="min-w-0 space-y-1.5">
-                                        <span class="flex gap-1.5"><strong class="uppercase shrink-0">{{ opt.display_key || opt.key }}.</strong> <McqRichText :text="opt.label" /></span>
+                                    <div class="min-w-0 flex-1 space-y-1">
+                                        <div class="flex items-start gap-2">
+                                            <span class="h-6 w-6 rounded-lg text-xs font-extrabold flex items-center justify-center shrink-0 transition"
+                                                  :class="answers[currentQuestion.id] === opt.key
+                                                      ? 'bg-[#0f3d7a] text-white shadow-xs'
+                                                      : 'bg-slate-100 text-slate-700 group-hover:bg-slate-200'">
+                                                {{ (opt.display_key || opt.key).toUpperCase() }}
+                                            </span>
+                                            <McqRichText :text="opt.label" class="text-slate-800 leading-snug pt-0.5" />
+                                        </div>
                                         <img
                                             v-if="opt.image_url"
                                             :src="opt.image_url"
-                                            :alt="`Option ${(opt.display_key || opt.key).toUpperCase()} — click to enlarge`"
-                                            class="block max-h-40 max-w-full rounded border bg-white object-contain cursor-zoom-in"
+                                            :alt="`Option ${(opt.display_key || opt.key).toUpperCase()} picture`"
+                                            class="block max-h-40 max-w-full rounded-xl border bg-white object-contain cursor-zoom-in mt-2"
                                             @click.prevent="zoomSrc = opt.image_url"
                                         >
-                                    </span>
+                                    </div>
                                 </label>
                             </div>
-                            <p v-else class="text-xs text-slate-400">Reference material — no online answer required.</p>
 
-                            <div v-if="isAnswerable(currentQuestion) && hasAnswer(currentQuestion.id)" class="pt-1">
-                                <button type="button" class="text-xs font-semibold text-slate-500 underline min-h-9" @click="clearAnswer(currentQuestion.id)">
-                                    Clear answer
+                            <!-- Clear selection action -->
+                            <div v-if="isAnswerable(currentQuestion) && hasAnswer(currentQuestion.id)" class="pt-2 flex justify-between items-center text-xs">
+                                <button
+                                    type="button"
+                                    class="text-xs font-semibold text-slate-500 hover:text-red-700 flex items-center gap-1 min-h-9 px-2 rounded-lg hover:bg-red-50 transition"
+                                    @click="clearAnswer(currentQuestion.id)"
+                                >
+                                    <span>✕</span>
+                                    <span>Clear answer for this question</span>
                                 </button>
+                                <span class="text-emerald-700 font-bold flex items-center gap-1">
+                                    <span>✓</span>
+                                    <span>Saved</span>
+                                </span>
                             </div>
                         </article>
                     </div>
                 </div>
             </form>
 
-            <!-- Bottom nav: Prev · palette · Next / Submit -->
+            <!-- Bottom Floating Action Bar: Prev · Palette Overview · Next/Submit -->
             <nav
-                class="fixed bottom-0 inset-x-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur px-3 py-2.5 pb-[max(0.65rem,env(safe-area-inset-bottom))]"
+                class="fixed bottom-0 inset-x-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur px-3 py-2.5 shadow-[0_-4px_16px_rgba(15,23,42,0.06)] pb-[max(0.65rem,env(safe-area-inset-bottom))]"
                 aria-label="Question navigation"
             >
-                <div class="max-w-6xl mx-auto grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
+                <div class="max-w-6xl mx-auto flex items-center justify-between gap-2">
+                    <!-- Previous button -->
                     <button
                         type="button"
-                        class="btn-secondary min-h-12 text-sm justify-self-start"
+                        class="btn-secondary min-h-12 px-4 text-xs sm:text-sm font-bold flex items-center gap-1.5"
                         :disabled="currentIndex <= 0"
                         @click="go(currentIndex - 1)"
                     >
-                        ← Prev
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                        <span>Previous</span>
                     </button>
+
+                    <!-- Mobile Drawer Question Navigator Trigger -->
                     <button
                         type="button"
-                        class="min-h-12 px-4 rounded-lg border border-slate-200 bg-slate-50 text-sm font-bold tabular-nums text-slate-800 lg:pointer-events-none"
-                        :class="{'hover:bg-slate-100': true}"
+                        class="min-h-12 px-3 sm:px-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs sm:text-sm font-extrabold tabular-nums text-slate-800 flex items-center gap-2 cursor-pointer shadow-xs transition"
                         @click="mobileDrawerOpen = true"
-                        :aria-label="`Question ${currentIndex + 1} of ${questions.length}. Open question list`"
+                        :aria-label="`Question ${currentIndex + 1} of ${questions.length}. Tap to open full question palette`"
                     >
-                        {{ currentIndex + 1 }}/{{ questions.length }}
+                        <span>📋</span>
+                        <span>Q {{ currentIndex + 1 }}/{{ questions.length }}</span>
+                        <span class="hidden sm:inline text-xs text-slate-400 font-normal">(Overview)</span>
                     </button>
+
+                    <!-- Next or Submit Button -->
                     <button
                         v-if="currentIndex < questions.length - 1"
                         type="button"
-                        class="btn-primary min-h-12 text-sm justify-self-end"
+                        class="btn-primary min-h-12 px-5 text-xs sm:text-sm font-extrabold flex items-center gap-1.5 shadow-sm"
                         @click="go(currentIndex + 1)"
                     >
-                        Next →
+                        <span>Next</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                     </button>
                     <button
                         v-else
                         type="button"
-                        class="btn-primary min-h-12 text-sm justify-self-end"
+                        class="btn-primary min-h-12 px-5 text-xs sm:text-sm font-extrabold bg-emerald-600 hover:bg-emerald-500 shadow-sm flex items-center gap-1.5"
                         :disabled="submitting || submitBlocked"
                         @click="requestSubmit"
                     >
-                        {{ submitting ? 'Submitting…' : (submitBlocked ? 'Wait to save' : 'Submit') }}
+                        <span>Review &amp; Submit</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                     </button>
                 </div>
             </nav>
         </div>
 
+        <!-- Mobile Question Palette Bottom Sheet Drawer -->
         <div v-if="mobileDrawerOpen" class="lg:hidden fixed inset-0 z-40" @click.self="mobileDrawerOpen = false">
-            <div class="absolute inset-0 bg-black/40" @click="mobileDrawerOpen = false" />
-            <div class="absolute inset-x-0 bottom-0 max-h-[75vh] rounded-t-2xl bg-white shadow-xl flex flex-col pb-[env(safe-area-inset-bottom)]">
-                <div class="flex items-center justify-between gap-2 px-4 py-3 border-b">
-                    <h2 class="font-semibold text-sm">Question navigator</h2>
-                    <button type="button" class="text-xs font-semibold text-slate-500 px-2 py-2 min-h-10" @click="mobileDrawerOpen = false">Close</button>
+            <div class="absolute inset-0 bg-black/50 backdrop-blur-xs" @click="mobileDrawerOpen = false" />
+            <div class="absolute inset-x-0 bottom-0 max-h-[80vh] rounded-t-3xl bg-white shadow-2xl flex flex-col pb-[env(safe-area-inset-bottom)]">
+                <div class="flex items-center justify-between gap-2 px-5 py-3.5 border-b border-slate-100">
+                    <div>
+                        <h2 class="font-extrabold text-sm text-slate-900">Question Navigator</h2>
+                        <p class="text-xs text-slate-500">{{ answeredCount }} of {{ questions.length }} answered</p>
+                    </div>
+                    <button type="button" class="text-xs font-bold text-slate-500 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200" @click="mobileDrawerOpen = false">
+                        Done ✕
+                    </button>
                 </div>
-                <div class="overflow-y-auto p-4 space-y-4">
+                <div class="overflow-y-auto p-5 space-y-5">
                     <QuestionNavGrid
                         :questions="questions"
                         :answered-count="answeredCount"
@@ -400,57 +579,68 @@
                         :nav-label="questionNavLabel"
                         @select="selectFromDrawer"
                     />
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs text-slate-500">Text size</span>
-                        <button type="button" class="btn-secondary !px-2.5 !py-1.5 text-xs min-h-9" @click="changeFont(-1)" aria-label="Decrease text size">A−</button>
-                        <button type="button" class="btn-secondary !px-2.5 !py-1.5 text-xs min-h-9" @click="changeFont(1)" aria-label="Increase text size">A+</button>
+
+                    <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                        <span class="text-xs text-slate-600 font-semibold">Text sizing:</span>
+                        <div class="flex items-center gap-1">
+                            <button type="button" class="btn-secondary !px-3 !py-1 text-xs" @click="changeFont(-1)">A−</button>
+                            <button type="button" class="btn-secondary !px-3 !py-1 text-xs" @click="changeFont(1)">A+</button>
+                        </div>
                     </div>
+
                     <button
                         type="button"
-                        class="btn-secondary w-full min-h-12"
+                        class="btn-primary w-full min-h-12 text-sm font-extrabold shadow-sm"
                         :disabled="submitting || submitBlocked"
                         @click="mobileDrawerOpen = false; requestSubmit()"
                     >
-                        {{ submitting ? 'Submitting…' : (submitBlocked ? 'Wait until answers are saved' : 'Review & submit') }}
+                        {{ submitting ? 'Submitting…' : 'Review & Submit Exam' }}
                     </button>
-                    <SignOutButton class="w-full justify-center text-xs font-semibold text-slate-500" />
                 </div>
             </div>
         </div>
 
+        <!-- Strict Fullscreen Modal -->
         <div
             v-if="started && exam.require_fullscreen && !fullscreenActive"
-            class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70"
+            class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
             role="alertdialog"
             aria-modal="true"
             aria-labelledby="fs-require-title"
         >
-            <div class="card max-w-md w-full space-y-3 shadow-xl text-center">
-                <h2 id="fs-require-title" class="font-semibold text-base">Fullscreen required</h2>
-                <p class="text-sm text-slate-600">
-                    This exam asks you to stay in fullscreen while writing. Leaving fullscreen is recorded for review — not an automatic fail. Extra monitors are not detected.
+            <div class="rounded-3xl border border-slate-200 bg-white max-w-md w-full p-6 space-y-4 shadow-2xl text-center">
+                <span class="text-3xl">🖥️</span>
+                <h2 id="fs-require-title" class="font-extrabold text-lg text-slate-900">Fullscreen Required</h2>
+                <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                    This examination requires your device to stay in fullscreen mode. Exiting fullscreen is recorded for the assessment committee.
                 </p>
-                <button type="button" class="btn-primary min-h-12" @click="enterFullscreen">Enter fullscreen to continue</button>
+                <button type="button" class="btn-primary w-full min-h-12 text-sm font-extrabold" @click="enterFullscreen">
+                    Return to Fullscreen Mode
+                </button>
             </div>
         </div>
 
+        <!-- Image Lightbox Zoom Modal -->
         <div
             v-if="zoomSrc"
-            class="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-3 p-4 bg-black/80"
+            class="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-3 p-4 bg-black/85 backdrop-blur-sm"
             role="dialog"
             aria-modal="true"
             aria-label="Enlarged picture"
             @click="zoomSrc = null"
             @keydown.esc="zoomSrc = null"
         >
-            <img :src="zoomSrc" alt="Enlarged picture" class="max-h-[85vh] max-w-full object-contain" @click.stop>
-            <button type="button" class="btn-secondary text-sm min-h-10" @click.stop="zoomSrc = null">Close</button>
+            <img :src="zoomSrc" alt="Enlarged diagram" class="max-h-[85vh] max-w-full rounded-2xl object-contain shadow-2xl" @click.stop>
+            <button type="button" class="btn-secondary text-xs min-h-10 px-5 font-bold" @click.stop="zoomSrc = null">
+                Close Zoom ✕
+            </button>
         </div>
 
-        <div v-if="confirmOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" @click.self="confirmOpen = false">
+        <!-- Pre-Submission Confirmation Summary Modal -->
+        <div v-if="confirmOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs" @click.self="confirmOpen = false">
             <div
                 ref="confirmPanelRef"
-                class="card max-w-md w-full space-y-4 shadow-xl"
+                class="rounded-3xl border border-slate-200 bg-white max-w-lg w-full p-6 space-y-5 shadow-2xl"
                 role="alertdialog"
                 aria-modal="true"
                 aria-labelledby="submit-exam-title"
@@ -458,16 +648,59 @@
                 tabindex="-1"
                 @keydown="onConfirmKeydown"
             >
-                <h2 id="submit-exam-title" class="font-semibold text-base">Submit exam?</h2>
-                <p id="submit-exam-desc" class="text-sm text-gray-600">
-                    You have answered {{ answeredCount }} of {{ gradableCount }} gradable questions.
-                    <span v-if="markedForReview.size"> {{ markedForReview.size }} question(s) are marked for review.</span>
-                    Once submitted, you cannot change your answers.
-                </p>
-                <div class="flex flex-wrap justify-end gap-2">
-                    <button ref="confirmCancelRef" type="button" class="btn-secondary text-sm min-h-10" @click="confirmOpen = false">Cancel</button>
-                    <button type="button" class="btn-primary text-sm min-h-10" :disabled="submitting || submitBlocked" @click="submit">
-                        {{ submitting ? 'Submitting…' : 'Submit now' }}
+                <div class="flex items-center gap-3 border-b border-slate-100 pb-3">
+                    <span class="text-2xl">📝</span>
+                    <div>
+                        <h2 id="submit-exam-title" class="font-extrabold text-lg text-slate-900">Ready to Submit Exam?</h2>
+                        <p class="text-xs text-slate-500">Please review your answer summary before final confirmation</p>
+                    </div>
+                </div>
+
+                <!-- Answer Summary Stat Pills -->
+                <div class="grid grid-cols-3 gap-2.5 text-center">
+                    <div class="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3">
+                        <span class="text-xl font-extrabold text-emerald-800">{{ answeredCount }}</span>
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-emerald-700 mt-0.5">Answered</span>
+                    </div>
+                    <div class="rounded-2xl border border-amber-200 bg-amber-50/70 p-3">
+                        <span class="text-xl font-extrabold text-amber-800">{{ markedForReview.size }}</span>
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-amber-700 mt-0.5">For Review</span>
+                    </div>
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                        <span class="text-xl font-extrabold text-slate-700">{{ unansweredCount }}</span>
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mt-0.5">Unanswered</span>
+                    </div>
+                </div>
+
+                <!-- Unanswered prompt warning if applicable -->
+                <div v-if="unansweredCount > 0" class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 flex items-start gap-2">
+                    <span class="text-base">⚠️</span>
+                    <div>
+                        <p class="font-bold">You still have {{ unansweredCount }} unanswered question{{ unansweredCount === 1 ? '' : 's' }}.</p>
+                        <p class="mt-0.5 text-amber-800">Once submitted, you cannot re-enter or change your responses.</p>
+                    </div>
+                </div>
+                <div v-else class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 flex items-center gap-2">
+                    <span class="text-base">🎉</span>
+                    <p class="font-semibold">All {{ gradableCount }} questions have been answered!</p>
+                </div>
+
+                <div class="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button
+                        ref="confirmCancelRef"
+                        type="button"
+                        class="btn-secondary text-xs font-bold min-h-11 px-4"
+                        @click="confirmOpen = false"
+                    >
+                        ← Continue writing / Review
+                    </button>
+                    <button
+                        type="button"
+                        class="btn-primary text-xs font-extrabold min-h-11 px-5 bg-emerald-600 hover:bg-emerald-500 shadow-sm"
+                        :disabled="submitting || submitBlocked"
+                        @click="submit"
+                    >
+                        {{ submitting ? 'Finalizing submission…' : 'Yes, Submit My Exam' }}
                     </button>
                 </div>
             </div>
@@ -477,7 +710,6 @@
 
 <script setup>
 import McqRichText from '@/Components/mcq/McqRichText.vue';
-import SignOutButton from '@/Components/SignOutButton.vue';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import QuestionNavGrid from '@/Components/portal/QuestionNavGrid.vue';
 import { studentPortalNavItems } from '@/support/studentPortalNav.js';
@@ -541,6 +773,13 @@ const posKey = computed(() => `mcq:pos:${props.school.id}:${props.registration.i
 const currentQuestion = computed(() => props.questions[currentIndex.value] ?? null);
 const totalMarks = computed(() => props.questions.reduce((total, q) => total + Number(q.marks || 0), 0));
 const gradableCount = computed(() => props.questions.filter(isAnswerable).length);
+const answeredCount = computed(() => props.questions.filter((q) => isAnswerable(q) && hasAnswer(q.id)).length);
+const unansweredCount = computed(() => Math.max(0, gradableCount.value - answeredCount.value));
+const progressPercent = computed(() => {
+    if (!gradableCount.value) return 0;
+    return Math.round((answeredCount.value / gradableCount.value) * 100);
+});
+
 const navItems = computed(() => studentPortalNavItems(props.school.id));
 const pageErrors = computed(() => {
     const errs = page.props.errors || {};
@@ -557,20 +796,20 @@ const timerUrgent = computed(() => props.started && props.expiresAt && remaining
 const lastSavedLabel = computed(() => {
     if (!lastSavedAt.value) return '';
     try {
-        return new Date(lastSavedAt.value).toLocaleTimeString();
+        return new Date(lastSavedAt.value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     } catch {
         return '';
     }
 });
 const submitBlocked = computed(() => dirtySinceSave && (saveStatus.value === 'failed' || saveStatus.value === 'saving' || offline.value));
 const syncPillText = computed(() => {
-    if (offline.value) return 'Offline — will retry';
+    if (offline.value) return 'Offline — retrying';
     if (saveStatus.value === 'saving') return 'Saving…';
     if (saveStatus.value === 'failed') return 'Save failed — retrying';
     if (saveStatus.value === 'saved') {
         return lastSavedLabel.value ? `Saved · ${lastSavedLabel.value}` : 'Saved';
     }
-    return 'Answers autosave';
+    return 'Autosave active';
 });
 const syncPillClass = computed(() => {
     if (offline.value || saveStatus.value === 'failed') return 'border-amber-300 bg-amber-50 text-amber-900';
@@ -596,12 +835,10 @@ const proctorMessage = computed(() => {
         return `Tab leave recorded (${proctorEventCount.value}/${maxTabViolations.value}). ${left} warning${left === 1 ? '' : 's'} left before auto-submit.`;
     }
     if (proctorEventCount.value <= 1) {
-        return 'Leaving this tab during the exam is being recorded for review — not an automatic fail.';
+        return 'Leaving this tab during the exam is being recorded for review.';
     }
-    return `${proctorEventCount.value} leave/blur signals recorded. Stay on this tab until you submit.`;
+    return `${proctorEventCount.value} leave/blur signals recorded. Please stay on this tab until you submit.`;
 });
-
-const answeredCount = computed(() => props.questions.filter((q) => isAnswerable(q) && hasAnswer(q.id)).length);
 
 function isAnswerable(q) {
     return q.type === 'numeric' || (q.options?.length >= 2);
@@ -689,9 +926,13 @@ function restoreSavedAnswers() {
 }
 
 function questionNavClass(q) {
-    if (markedForReview.value.has(q.id)) return 'border-amber-400 bg-amber-100 text-amber-900';
-    if (hasAnswer(q.id)) return 'border-indigo-400 bg-indigo-100 text-indigo-900';
-    return 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300';
+    if (markedForReview.value.has(q.id)) {
+        return 'border-amber-400 bg-amber-50 text-amber-900 font-extrabold shadow-2xs';
+    }
+    if (hasAnswer(q.id)) {
+        return 'border-emerald-300 bg-emerald-50 text-emerald-900 font-extrabold shadow-2xs';
+    }
+    return 'border-slate-200 bg-white text-slate-700 hover:border-[#0f3d7a]/50 hover:bg-slate-50';
 }
 
 function questionNavLabel(q) {
@@ -840,7 +1081,6 @@ function handleVisibilityChange() {
     if (document.visibilityState === 'hidden') reportProctorEvent('tab_hidden');
 }
 function handleWindowBlur() {
-    // Strict mode counts visibility only (mcq_v2 parity); blur stays advisory.
     if (strictTab.value) return;
     reportProctorEvent('window_blur');
 }
@@ -887,15 +1127,15 @@ function onConfirmKeydown(e) {
         confirmOpen.value = false;
         return;
     }
-    if (e.key !== 'Tab' || ! confirmPanelRef.value) return;
+    if (e.key !== 'Tab' || !confirmPanelRef.value) return;
     const nodes = [...confirmPanelRef.value.querySelectorAll('button:not([disabled])')];
-    if (! nodes.length) return;
+    if (!nodes.length) return;
     const first = nodes[0];
     const last = nodes[nodes.length - 1];
     if (e.shiftKey && document.activeElement === first) {
         e.preventDefault();
         last.focus();
-    } else if (! e.shiftKey && document.activeElement === last) {
+    } else if (!e.shiftKey && document.activeElement === last) {
         e.preventDefault();
         first.focus();
     }
@@ -907,7 +1147,7 @@ async function enterFullscreen() {
         fullscreenActive.value = true;
         fullscreenDismissed.value = true;
     } catch {
-        if (! props.exam?.require_fullscreen) {
+        if (!props.exam?.require_fullscreen) {
             fullscreenDismissed.value = true;
         }
     }
@@ -915,7 +1155,7 @@ async function enterFullscreen() {
 
 function handleFullscreenChange() {
     const nowFs = !!document.fullscreenElement;
-    if (fullscreenActive.value && ! nowFs && props.started && ! submitting.value) {
+    if (fullscreenActive.value && !nowFs && props.started && !submitting.value) {
         reportProctorEvent('fullscreen_exit');
     }
     fullscreenActive.value = nowFs;
