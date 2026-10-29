@@ -25,10 +25,42 @@ class McqPrintableDocumentService
         $sahodaya ??= Tenant::find($exam->tenant_id);
         $school = $schoolId ? Tenant::find($schoolId) : null;
 
+        $grouped = [];
+        foreach ($rows as $row) {
+            $className = filled($row['class'] ?? null) && ($row['class'] ?? '—') !== '—'
+                ? (string) $row['class']
+                : 'Unassigned Class';
+            $grouped[$className][] = $row;
+        }
+
+        $classNames = array_keys($grouped);
+        usort($classNames, function ($a, $b) {
+            $numA = (int) filter_var($a, FILTER_SANITIZE_NUMBER_INT);
+            $numB = (int) filter_var($b, FILTER_SANITIZE_NUMBER_INT);
+            if ($numA > 0 && $numB > 0 && $numA !== $numB) {
+                return $numA <=> $numB;
+            }
+
+            return strnatcasecmp($a, $b);
+        });
+
+        $groupedRows = [];
+        foreach ($classNames as $className) {
+            $groupedRows[$className] = collect($grouped[$className])
+                ->values()
+                ->map(function (array $row, int $index) {
+                    $row['sl'] = $index + 1;
+
+                    return $row;
+                })
+                ->all();
+        }
+
         $pdf = Pdf::loadView('mcq.attendance-sheet', [
             'exam'          => $exam,
             'school'        => $school,
-            'rows'          => $rows,
+            'groupedRows'   => $groupedRows,
+            'totalCount'    => count($rows),
             'selectedClass' => $selectedClass,
             'orgName'       => $sahodaya?->name ?? 'Sahodaya',
             'logoSrc'       => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
@@ -36,6 +68,9 @@ class McqPrintableDocumentService
         ])->setPaper('a4', 'portrait');
 
         $suffix = $schoolId ? '-school-'.substr($schoolId, 0, 8) : '';
+        if ($selectedClass) {
+            $suffix .= '-class-'.str($selectedClass)->slug()->limit(20, '')->toString();
+        }
         $filename = $this->slug($exam).'-attendance-sheet'.$suffix.'.pdf';
 
         return $inline ? $pdf->stream($filename, ['Attachment' => false]) : $pdf->download($filename);

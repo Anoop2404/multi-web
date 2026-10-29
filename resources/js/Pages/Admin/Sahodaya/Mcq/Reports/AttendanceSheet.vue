@@ -1,7 +1,7 @@
 <template>
     <SahodayaAdminLayout :title="`Attendance sheet report — ${exam.title}`" :sahodaya="sahodaya" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
-        <PageHeader :title="exam.title" eyebrow="Talent Search exam" description="Hall ticket list for exam-day attendance marking, with student photos on the PDF.">
+        <PageHeader :title="exam.title" eyebrow="Talent Search exam" description="Class-wise hall ticket roster for exam-day attendance marking. Filter by school or class, then download Excel or PDF.">
             <template #actions>
                 <Link :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/reports`" class="btn-secondary text-sm">← Reports</Link>
             </template>
@@ -19,7 +19,7 @@
             <button v-if="hasFilters" type="button" @click="clearFilters" class="text-sm text-slate-400 hover:underline">Clear</button>
             <div class="ml-auto flex flex-wrap gap-2">
                 <a :href="reportUrl(excelBase)" class="btn-secondary text-sm">Excel ↓</a>
-                <a :href="reportUrl(pdfBase)" target="_blank" class="btn-secondary text-sm">PDF ↓</a>
+                <a :href="reportUrl(pdfBase)" target="_blank" class="btn-secondary text-sm">Class-wise PDF ↓</a>
                 <button type="button" @click="openPdfPreview(pdfBase)" class="btn-secondary text-sm">👁 Preview PDF</button>
                 <a :href="reportUrl(absentBase)" class="btn-secondary text-sm">Absent list ↓</a>
                 <a :href="reportUrl(malpracticeBase)" class="btn-secondary text-sm">Malpractice register ↓</a>
