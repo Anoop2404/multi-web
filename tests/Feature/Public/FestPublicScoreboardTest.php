@@ -1590,6 +1590,43 @@ class FestPublicScoreboardTest extends TestCase
      * button actually shows (results_published_at set, not results_hidden) now sort
      * first.
      */
+    public function test_signed_in_admin_public_home_does_not_implicitly_preview_unpublished_results(): void
+    {
+        $this->north->update(['results_published' => false]);
+        $item = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'Hidden Storytelling',
+            'participant_type' => 'individual', 'is_enabled' => true,
+            'results_published_at' => null, 'results_hidden' => true,
+        ]);
+        $this->markItemWinner($this->north, $item, $this->northSchool);
+        $admin = \App\Models\User::factory()->create(['tenant_id' => $this->sahodaya->id]);
+        $url = "http://public-scoreboard.test/fest/{$this->north->id}";
+        $response = $this->actingAs($admin)->get($url)->assertOk();
+        $response->assertDontSee("/fest/{$this->north->id}/items/{$item->id}/results\"", false);
+        $response->assertDontSee('Admin preview — unpublished results');
+        $preview = $this->actingAs($admin)->get($url.'?preview=1')->assertOk();
+        $preview->assertSee('Admin preview — unpublished results');
+    }
+
+    public function test_cleared_mark_placeholders_do_not_enable_public_results_links(): void
+    {
+        $item = FestEventItem::create([
+            'event_id' => $this->north->id, 'title' => 'Cleared Storytelling',
+            'participant_type' => 'individual', 'is_enabled' => true,
+            'results_published_at' => now(), 'results_hidden' => false,
+        ]);
+        $participant = $this->markItemWinner($this->north, $item, $this->northSchool);
+        FestMark::where('participant_id', $participant->id)->update(['score' => null, 'position' => null, 'grade' => null]);
+        $admin = \App\Models\User::factory()->create(['tenant_id' => $this->sahodaya->id]);
+        $url = "http://public-scoreboard.test/fest/{$this->north->id}";
+        $this->actingAs($admin)->get($url)->assertOk()
+            ->assertDontSee("/fest/{$this->north->id}/items/{$item->id}/results\"", false);
+        // An entered zero must still count as real data.
+        FestMark::where('participant_id', $participant->id)->update(['score' => 0]);
+        $this->actingAs($admin)->get($url)->assertOk()
+            ->assertSee("/fest/{$this->north->id}/items/{$item->id}/results\"", false);
+    }
+
     public function test_event_item_finder_sorts_published_results_before_unpublished_items(): void
     {
         FestEventItem::create([
