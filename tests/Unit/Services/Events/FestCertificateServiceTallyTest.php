@@ -337,7 +337,7 @@ class FestCertificateServiceTallyTest extends TestCase
         $event = $this->makeEvent();
         $event->update(['event_type' => 'sports', 'participation_certificate_mode' => 'per_item']);
         $school = $this->makeSchool($event->tenant_id);
-        $a = FestEventItem::create(['event_id' => $event->id, 'title' => '100 m', 'participant_type' => 'individual']);
+        $a = FestEventItem::create(['event_id' => $event->id, 'title' => '100 m', 'participant_type' => 'individual', 'age_group' => 'u17']);
         $b = FestEventItem::create(['event_id' => $event->id, 'title' => 'Long jump', 'participant_type' => 'individual']);
         $first = $this->individualParticipant($event, $a, $school->id);
         $second = $this->individualParticipant($event, $b, $school->id);
@@ -351,6 +351,9 @@ class FestCertificateServiceTallyTest extends TestCase
             $payload = $service->payloadFor($cert);
             $context = $service->renderContext($cert);
             $this->assertSame($payload['item']->title, $context['fieldValues']['item_title']);
+            if ($payload['item']->id === $a->id) {
+                $this->assertSame(\App\Support\FestSportsAgeGroup::labels($event->tenant_id)['u17'], $context['fieldValues']['category_name']);
+            }
             $this->assertMatchesRegularExpression('/^\d{2}\/\d{2}\/\d{4}$/', $context['fieldValues']['certificate_date_short']);
         }
         $this->assertSame(2, $service->certificateTally($event)['totals']['participation_certs']);

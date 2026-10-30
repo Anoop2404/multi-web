@@ -1451,7 +1451,9 @@ class FestCertificateService
     {
         $classGroupLabels = FestClassGroupScheme::labels(null, $event->rootEvent());
 
-        $category = match (true) {
+        $category = $event->event_type === 'sports'
+            ? (FestItemCategoryLabel::resolve($item, $classGroupLabels) ?? 'Open')
+            : match (true) {
             (bool) $item?->class_group && $item->class_group !== 'open' => FestClassGroupScheme::resolveItemLabel($classGroupLabels, $item->class_group),
             (bool) $item?->age_group => $item->age_group,
             (bool) $item?->category && $item->category !== 'general' => ucwords(str_replace(['_', '-'], ' ', $item->category)),
