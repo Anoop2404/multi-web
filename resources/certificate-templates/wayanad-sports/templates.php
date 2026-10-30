@@ -5,7 +5,7 @@ $field = static fn ($text, $top, $left, $width, $size = 20) => [
     'font_size' => $size, 'font_family' => 'Arial', 'font_weight' => 'normal', 'align' => 'center',
 ];
 $base = [
-    'event_type' => 'sports', 'body' => '<div></div>',
+    'event_type' => 'fest', 'body' => '<div></div>',
     'dynamic_fields_json' => [], 'signatories' => [], 'is_active' => true,
 ];
 $layout = [

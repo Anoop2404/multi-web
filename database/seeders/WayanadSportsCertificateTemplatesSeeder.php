@@ -30,7 +30,7 @@ class WayanadSportsCertificateTemplatesSeeder extends Seeder
             DB::transaction(function () use ($tenant, $event, $presets, $paths) {
                 foreach ($presets as $type => $preset) {
                     CertificateTemplate::firstOrCreate([
-                        'tenant_id' => $tenant->id, 'event_type' => 'sports', 'event_id' => $event->id,
+                        'tenant_id' => $tenant->id, 'event_type' => 'fest', 'event_id' => $event->id,
                         'item_id' => null, 'certificate_type' => $type, 'title' => $preset['title'],
                     ], $preset + ['background_path' => $paths[$type]]);
                 }
