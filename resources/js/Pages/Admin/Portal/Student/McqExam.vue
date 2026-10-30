@@ -496,6 +496,7 @@
                                 >
                                     <input
                                         type="checkbox"
+                                        :value="opt.key"
                                         :aria-label="`Question ${currentQuestion.number}, option ${(opt.display_key || opt.key).toUpperCase()}`"
                                         :checked="isMultiSelected(currentQuestion.id, opt.key)"
                                         class="mt-1 h-5 w-5 rounded border-slate-300 text-[#0f3d7a] focus:ring-[#0f3d7a]"
