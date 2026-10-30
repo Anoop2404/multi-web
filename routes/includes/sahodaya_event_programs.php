@@ -134,6 +134,8 @@ Route::prefix('mcq')->name('mcq-hub.')->group(function () {
     Route::post('/question-banks/{bank}/questions', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'storeQuestion'])->name('question-banks.questions.store');
     Route::put('/question-banks/{bank}/questions/{question}', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'updateQuestion'])->name('question-banks.questions.update');
     Route::delete('/question-banks/{bank}/questions/{question}', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'destroyQuestion'])->name('question-banks.questions.destroy');
+    Route::post('/question-banks/{bank}/questions/{question}/clone', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'cloneQuestion'])->name('question-banks.questions.clone');
+    Route::post('/question-banks/{bank}/questions/bulk', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'bulkQuestions'])->name('question-banks.questions.bulk');
     Route::post('/question-banks/{bank}/questions/{question}/move', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'moveQuestion'])->name('question-banks.questions.move');
     Route::get('/question-banks/{bank}/questions/{question}/image', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'questionImage'])->name('question-banks.questions.image');
     Route::post('/question-banks/{bank}/import/preview', [\App\Http\Controllers\SahodayaAdmin\McqQuestionBankController::class, 'importPreview'])->name('question-banks.import.preview');

@@ -290,4 +290,64 @@ class McqQuestionBankAuthoringTest extends TestCase
 
         $this->assertDatabaseHas('audit_logs', ['action' => 'mcq.question.answer_changed', 'user_id' => $admin->id]);
     }
+
+    public function test_admin_can_clone_a_question(): void
+    {
+        $admin = $this->userWithRole('sahodaya_admin');
+        $bank = $this->makeBank('draft');
+        $question = $this->addSingle($bank, 'b');
+
+        $this->assertSame(1, $bank->questions()->count());
+
+        $res = $this->actingAs($admin)
+            ->post("{$this->banksUrl()}/{$bank->id}/questions/{$question->id}/clone");
+        $res->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame(2, $bank->fresh()->questions()->count());
+        $cloned = $bank->fresh()->questions()->reorder()->orderByDesc('id')->first();
+        $this->assertSame($question->body_text, $cloned->body_text);
+        $this->assertSame($question->correct_option_key, $cloned->correct_option_key);
+        $this->assertSame(2, (int) $cloned->display_order);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'mcq.question.cloned', 'user_id' => $admin->id]);
+    }
+
+    public function test_admin_can_bulk_delete_and_bulk_set_marks_for_questions(): void
+    {
+        $admin = $this->userWithRole('sahodaya_admin');
+        $bank = $this->makeBank('draft');
+        $q1 = $this->addSingle($bank, 'a');
+        $q2 = $this->addSingle($bank, 'b');
+        $q3 = $this->addSingle($bank, 'c');
+
+        $this->assertSame(3, $bank->questions()->count());
+
+        // Bulk update marks
+        $this->actingAs($admin)
+            ->post("{$this->banksUrl()}/{$bank->id}/questions/bulk", [
+                'action'        => 'set_marks',
+                'ids'           => [$q1->id, $q2->id],
+                'marks'         => 3.5,
+                'negative_mark' => 0.75,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertEquals(3.5, (float) $q1->fresh()->marks);
+        $this->assertEquals(0.75, (float) $q1->fresh()->negative_mark);
+        $this->assertEquals(3.5, (float) $q2->fresh()->marks);
+        $this->assertEquals(1.0, (float) $q3->fresh()->marks);
+
+        // Bulk delete
+        $this->actingAs($admin)
+            ->post("{$this->banksUrl()}/{$bank->id}/questions/bulk", [
+                'action' => 'delete',
+                'ids'    => [$q1->id, $q2->id],
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame(1, $bank->fresh()->questions()->count());
+        $this->assertSame(1, $q3->fresh()->display_order);
+    }
 }

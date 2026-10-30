@@ -162,10 +162,11 @@ trait ManagesMcqQuestionBanks
             ]),
             'questions'   => $questions,
             'stats'       => [
-                'total'      => $questions->count(),
-                'gradable'   => $questions->where('gradable', true)->count(),
-                'max_score'  => round($bank->questions->filter->isGradable()->sum(fn (McqQuestion $q) => $q->marksValue()), 2),
-                'by_type'    => collect(McqQuestion::TYPES)->mapWithKeys(fn ($t) => [$t => $questions->where('type', $t)->count()]),
+                'total'         => $questions->count(),
+                'gradable'      => $questions->where('gradable', true)->count(),
+                'max_score'     => round($bank->questions->filter->isGradable()->sum(fn (McqQuestion $q) => $q->marksValue()), 2),
+                'by_type'       => collect(McqQuestion::TYPES)->mapWithKeys(fn ($t) => [$t => $questions->where('type', $t)->count()]),
+                'by_difficulty' => collect(McqQuestion::DIFFICULTIES)->mapWithKeys(fn ($d) => [$d => $questions->where('difficulty', $d)->count()]),
             ],
             'typeLabels'   => McqQuestion::TYPE_LABELS,
             'difficulties' => McqQuestion::DIFFICULTIES,
@@ -301,6 +302,105 @@ trait ManagesMcqQuestionBanks
         $this->auditQuestion($bank, $question, 'mcq.question.deleted', 'Deleted a question', ['answer' => $question->answerKeyLabel()]);
 
         return back()->with('success', 'Question deleted.');
+    }
+
+    public function cloneQuestion(Request $request, string $tenantId, McqQuestionBank $bank, McqQuestion $question): RedirectResponse
+    {
+        $this->assertBankInSahodaya($request, $bank);
+        abort_unless($question->bank_id === $bank->id, 404);
+        if ($response = $this->rejectIfLocked($bank)) {
+            return $response;
+        }
+
+        $cloned = $question->replicate(['document_path', 'display_order', 'created_by_user_id']);
+        $cloned->display_order = ((int) $bank->questions()->max('display_order')) + 1;
+        $cloned->created_by_user_id = $request->user()?->id;
+
+        // Copy question diagram/image if present
+        if ($question->document_path && Storage::disk(TenantStorage::disk())->exists($question->document_path)) {
+            $ext = pathinfo($question->document_path, PATHINFO_EXTENSION);
+            $newPath = 'mcq-questions/'.Str::uuid().'.'.$ext;
+            Storage::disk(TenantStorage::disk())->copy($question->document_path, $newPath);
+            $cloned->document_path = $newPath;
+        }
+
+        // Copy option images if any
+        if (is_array($question->options_json)) {
+            $options = $question->options_json;
+            foreach ($options as &$opt) {
+                if (! empty($opt['image_path']) && Storage::disk(TenantStorage::disk())->exists($opt['image_path'])) {
+                    $ext = pathinfo($opt['image_path'], PATHINFO_EXTENSION);
+                    $newOptPath = 'mcq-questions/'.Str::uuid().'.'.$ext;
+                    Storage::disk(TenantStorage::disk())->copy($opt['image_path'], $newOptPath);
+                    $opt['image_path'] = $newOptPath;
+                }
+            }
+            $cloned->options_json = $options;
+        }
+
+        $cloned->save();
+        $bank->touch();
+
+        $this->auditQuestion($bank, $cloned, 'mcq.question.cloned', 'Cloned question', ['original_id' => $question->id]);
+
+        return back()->with('success', 'Question duplicated successfully.');
+    }
+
+    public function bulkQuestions(Request $request, string $tenantId, McqQuestionBank $bank): RedirectResponse
+    {
+        $this->assertBankInSahodaya($request, $bank);
+        if ($response = $this->rejectIfLocked($bank)) {
+            return $response;
+        }
+
+        $data = $request->validate([
+            'action'        => 'required|in:delete,set_marks',
+            'ids'           => 'required|array|min:1',
+            'ids.*'         => 'integer',
+            'marks'         => 'nullable|numeric|min:0.01',
+            'negative_mark' => 'nullable|numeric|min:0',
+        ]);
+
+        $questions = $bank->questions()->whereIn('id', $data['ids'])->get();
+        if ($questions->isEmpty()) {
+            return back()->withErrors(['ids' => 'No matching questions found.']);
+        }
+
+        if ($data['action'] === 'delete') {
+            DB::transaction(function () use ($questions, $bank) {
+                foreach ($questions as $q) {
+                    $this->deleteImages($q->imagePaths());
+                    $q->delete();
+                }
+                $remaining = $bank->questions()->orderBy('display_order')->orderBy('id')->get();
+                foreach ($remaining as $idx => $rem) {
+                    $rem->update(['display_order' => $idx + 1]);
+                }
+            });
+            $bank->touch();
+            $this->auditBank($bank, 'mcq.questions.bulk_deleted', "Bulk deleted {$questions->count()} questions");
+
+            return back()->with('success', "Deleted {$questions->count()} question(s).");
+        }
+
+        if ($data['action'] === 'set_marks') {
+            $updates = [];
+            if ($data['marks'] !== null) {
+                $updates['marks'] = $data['marks'];
+            }
+            if ($data['negative_mark'] !== null) {
+                $updates['negative_mark'] = $data['negative_mark'];
+            }
+            if (! empty($updates)) {
+                $bank->questions()->whereIn('id', $questions->pluck('id'))->update($updates);
+                $bank->touch();
+                $this->auditBank($bank, 'mcq.questions.bulk_marks_updated', "Updated marks for {$questions->count()} questions");
+            }
+
+            return back()->with('success', "Updated marks for {$questions->count()} question(s).");
+        }
+
+        return back();
     }
 
     public function moveQuestion(Request $request, string $tenantId, McqQuestionBank $bank, McqQuestion $question): RedirectResponse

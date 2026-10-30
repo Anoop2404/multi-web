@@ -387,6 +387,8 @@ Route::prefix('model-exams')->name('model-exams.')->group(function () {
     Route::post('/question-banks/{bank}/questions', [McqModelExamQuestionBankController::class, 'storeQuestion'])->name('question-banks.questions.store');
     Route::put('/question-banks/{bank}/questions/{question}', [McqModelExamQuestionBankController::class, 'updateQuestion'])->name('question-banks.questions.update');
     Route::delete('/question-banks/{bank}/questions/{question}', [McqModelExamQuestionBankController::class, 'destroyQuestion'])->name('question-banks.questions.destroy');
+    Route::post('/question-banks/{bank}/questions/{question}/clone', [McqModelExamQuestionBankController::class, 'cloneQuestion'])->name('question-banks.questions.clone');
+    Route::post('/question-banks/{bank}/questions/bulk', [McqModelExamQuestionBankController::class, 'bulkQuestions'])->name('question-banks.questions.bulk');
     Route::post('/question-banks/{bank}/questions/{question}/move', [McqModelExamQuestionBankController::class, 'moveQuestion'])->name('question-banks.questions.move');
     Route::get('/question-banks/{bank}/questions/{question}/image', [McqModelExamQuestionBankController::class, 'questionImage'])->name('question-banks.questions.image');
     Route::post('/question-banks/{bank}/import/preview', [McqModelExamQuestionBankController::class, 'importPreview'])->name('question-banks.import.preview');

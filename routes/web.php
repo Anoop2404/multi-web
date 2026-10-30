@@ -2381,6 +2381,8 @@ Route::prefix('portal/exam/{tenantId}')
         Route::post('/question-banks/{bank}/questions', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'storeQuestion'])->name('question-banks.questions.store');
         Route::put('/question-banks/{bank}/questions/{question}', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'updateQuestion'])->name('question-banks.questions.update');
         Route::delete('/question-banks/{bank}/questions/{question}', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'destroyQuestion'])->name('question-banks.questions.destroy');
+        Route::post('/question-banks/{bank}/questions/{question}/clone', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'cloneQuestion'])->name('question-banks.questions.clone');
+        Route::post('/question-banks/{bank}/questions/bulk', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'bulkQuestions'])->name('question-banks.questions.bulk');
         Route::post('/question-banks/{bank}/questions/{question}/move', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'moveQuestion'])->name('question-banks.questions.move');
         Route::get('/question-banks/{bank}/questions/{question}/image', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'questionImage'])->name('question-banks.questions.image');
         Route::post('/question-banks/{bank}/import/preview', [\App\Http\Controllers\Portal\ExamQuestionBankController::class, 'importPreview'])->name('question-banks.import.preview');

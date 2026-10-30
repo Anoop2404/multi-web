@@ -39,6 +39,13 @@
             </div>
         </div>
 
+        <div v-if="paper.difficulty_counts && paper.total > 0" class="flex flex-wrap items-center gap-2 mb-6 p-3 bg-slate-50 border border-slate-200/80 rounded-xl text-xs">
+            <span class="font-bold text-slate-700">Difficulty Blueprint:</span>
+            <span class="rounded-full bg-emerald-100 text-emerald-800 px-2.5 py-0.5 font-semibold">Easy: {{ paper.difficulty_counts.easy ?? 0 }}</span>
+            <span class="rounded-full bg-amber-100 text-amber-800 px-2.5 py-0.5 font-semibold">Medium: {{ paper.difficulty_counts.medium ?? 0 }}</span>
+            <span class="rounded-full bg-red-100 text-red-800 px-2.5 py-0.5 font-semibold">Hard: {{ paper.difficulty_counts.hard ?? 0 }}</span>
+        </div>
+
         <!-- Sections -->
         <section class="card mb-6">
             <h3 class="section-title">Default paper sections</h3>

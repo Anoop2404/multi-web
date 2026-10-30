@@ -182,6 +182,15 @@
                     >
                         <span class="h-2 w-2 rounded-full" :class="syncDotClass" aria-hidden="true" />
                         <span>{{ syncPillText }}</span>
+                        <button
+                            v-if="saveStatus === 'failed' || offline"
+                            type="button"
+                            class="ml-1 px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 font-bold hover:bg-amber-300 text-[10px] uppercase cursor-pointer"
+                            @click="saveDraft"
+                            title="Retry cloud autosave"
+                        >
+                            Retry
+                        </button>
                     </div>
 
                     <!-- Timer Pill -->
@@ -196,8 +205,18 @@
                         <span class="block text-lg font-black tabular-nums leading-none tracking-tight">{{ timerLabel }}</span>
                     </div>
 
-                    <!-- Text size controls on desktop header -->
+                    <!-- Tools & text size controls on desktop header -->
                     <div class="hidden lg:flex items-center gap-1 shrink-0 pl-1 border-l border-slate-200">
+                        <button
+                            type="button"
+                            class="btn-secondary !px-2.5 !py-1 text-xs min-h-8 flex items-center gap-1 font-semibold"
+                            @click="calculatorOpen = true"
+                            title="Open calculator"
+                            aria-label="Open on-screen calculator"
+                        >
+                            <span>🧮</span>
+                            <span>Calc</span>
+                        </button>
                         <button type="button" class="btn-secondary !px-2 !py-1 text-xs min-h-8" @click="changeFont(-1)" title="Decrease text size" aria-label="Decrease text size">A−</button>
                         <button type="button" class="btn-secondary !px-2 !py-1 text-xs min-h-8" @click="changeFont(1)" title="Increase text size" aria-label="Increase text size">A+</button>
                     </div>
@@ -222,12 +241,21 @@
                 </div>
                 <div
                     v-if="offline || saveStatus === 'failed'"
-                    class="px-3 py-2 text-xs text-amber-900 bg-amber-50 border-t border-amber-200 flex items-center justify-between gap-2"
+                    class="px-3 py-2 text-xs text-amber-900 bg-amber-50 border-t border-amber-200 flex flex-wrap items-center justify-between gap-2"
                     role="status"
                 >
-                    <span v-if="offline">⚠️ Network connection lost. Answers will automatically retry when reconnected.</span>
-                    <span v-else>⚠️ Cloud save failed. Keep tab open — your answers are kept locally and will sync shortly.</span>
-                    <span v-if="lastSavedAt" class="opacity-80 shrink-0">Last saved: {{ lastSavedLabel }}</span>
+                    <span v-if="offline">⚠️ Network connection lost. Answers are kept locally.</span>
+                    <span v-else>⚠️ Cloud save failed. Keep tab open — your answers are kept locally.</span>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span v-if="lastSavedAt" class="opacity-80">Last saved: {{ lastSavedLabel }}</span>
+                        <button
+                            type="button"
+                            class="px-2 py-0.5 rounded bg-amber-200 hover:bg-amber-300 text-amber-950 font-bold text-[11px] cursor-pointer"
+                            @click="saveDraft"
+                        >
+                            Retry sync
+                        </button>
+                    </div>
                 </div>
                 <div v-if="timerUrgent" class="px-3 py-1.5 text-xs text-red-800 bg-red-50 border-t border-red-100 font-semibold text-center">
                     ⏰ Less than 5 minutes remaining. Your exam will submit automatically when the countdown completes.
@@ -245,9 +273,11 @@
                         <QuestionNavGrid
                             :questions="questions"
                             :answered-count="answeredCount"
+                            :review-count="markedForReview.size"
                             :current-id="currentQuestion?.id"
                             :nav-class="questionNavClass"
                             :nav-label="questionNavLabel"
+                            :nav-status="questionNavStatus"
                             @select="goToQuestionId"
                         />
 
@@ -573,17 +603,27 @@
                     <QuestionNavGrid
                         :questions="questions"
                         :answered-count="answeredCount"
+                        :review-count="markedForReview.size"
                         :current-id="currentQuestion?.id"
                         :nav-class="questionNavClass"
                         :nav-label="questionNavLabel"
+                        :nav-status="questionNavStatus"
                         @select="selectFromDrawer"
                     />
 
                     <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                        <span class="text-xs text-slate-600 font-semibold">Text sizing:</span>
+                        <button
+                            type="button"
+                            class="btn-secondary !px-3 !py-1 text-xs flex items-center gap-1 font-semibold"
+                            @click="calculatorOpen = true; mobileDrawerOpen = false"
+                        >
+                            <span>🧮</span>
+                            <span>Calculator</span>
+                        </button>
                         <div class="flex items-center gap-1">
-                            <button type="button" class="btn-secondary !px-3 !py-1 text-xs" @click="changeFont(-1)">A−</button>
-                            <button type="button" class="btn-secondary !px-3 !py-1 text-xs" @click="changeFont(1)">A+</button>
+                            <span class="text-xs text-slate-500 mr-1">Text:</span>
+                            <button type="button" class="btn-secondary !px-2.5 !py-1 text-xs" @click="changeFont(-1)">A−</button>
+                            <button type="button" class="btn-secondary !px-2.5 !py-1 text-xs" @click="changeFont(1)">A+</button>
                         </div>
                     </div>
 
@@ -705,10 +745,48 @@
                 </div>
             </div>
         </div>
+
+        <!-- On-Screen Calculator Modal -->
+        <Modal :show="calculatorOpen" title="On-Screen Calculator" size="sm" @close="calculatorOpen = false">
+            <div class="space-y-3 p-1">
+                <div class="rounded-xl border border-slate-700 bg-slate-900 text-white p-3 text-right">
+                    <div class="text-[11px] text-slate-400 font-mono min-h-[1rem] truncate">{{ calcExpression || ' ' }}</div>
+                    <div class="text-2xl font-bold font-mono tracking-wider tabular-nums">{{ calcDisplay }}</div>
+                </div>
+
+                <div class="grid grid-cols-4 gap-2 text-sm font-bold">
+                    <button type="button" class="btn-secondary !py-2.5 !text-red-600" @click="calcClear">C</button>
+                    <button type="button" class="btn-secondary !py-2.5" @click="calcAppend('(')">(</button>
+                    <button type="button" class="btn-secondary !py-2.5" @click="calcAppend(')')">)</button>
+                    <button type="button" class="btn-secondary !py-2.5 !bg-indigo-50 !text-indigo-800" @click="calcAppend('/')">÷</button>
+
+                    <button type="button" class="btn-secondary !py-2.5 bg-white text-slate-900" @click="calcAppend('7')">7</button>
+                    <button type="button" class="btn-secondary !py-2.5 bg-white text-slate-900" @click="calcAppend('8')">8</button>
+                    <button type="button" class="btn-secondary !py-2.5 bg-white text-slate-900" @click="calcAppend('9')">9</button>
+                    <button type="button" class="btn-secondary !py-2.5 !bg-indigo-50 !text-indigo-800" @click="calcAppend('*')">×</button>
+
+                    <button type="button" class="btn-secondary !py-2.5 bg-white text-slate-900" @click="calcAppend('4')">4</button>
+                    <button type="button" class="btn-secondary !py-2.5 bg-white text-slate-900" @click="calcAppend('5')">5</button>
+                    <button type="button" class="btn-secondary !py-2.5 bg-white text-slate-900" @click="calcAppend('6')">6</button>
+                    <button type="button" class="btn-secondary !py-2.5 !bg-indigo-50 !text-indigo-800" @click="calcAppend('-')">−</button>
+
+                    <button type="button" class="btn-secondary !py-2.5 bg-white text-slate-900" @click="calcAppend('1')">1</button>
+                    <button type="button" class="btn-secondary !py-2.5 bg-white text-slate-900" @click="calcAppend('2')">2</button>
+                    <button type="button" class="btn-secondary !py-2.5 bg-white text-slate-900" @click="calcAppend('3')">3</button>
+                    <button type="button" class="btn-secondary !py-2.5 !bg-indigo-50 !text-indigo-800" @click="calcAppend('+')">+</button>
+
+                    <button type="button" class="btn-secondary !py-2.5 bg-white text-slate-900" @click="calcAppend('0')">0</button>
+                    <button type="button" class="btn-secondary !py-2.5 bg-white text-slate-900" @click="calcAppend('.')">.</button>
+                    <button type="button" class="btn-secondary !py-2.5" @click="calcSqrt">√</button>
+                    <button type="button" class="btn-primary !py-2.5 !bg-emerald-600 hover:!bg-emerald-500 text-white" @click="calcEquals">=</button>
+                </div>
+            </div>
+        </Modal>
     </PortalLayout>
 </template>
 
 <script setup>
+import Modal from '@/Components/ui/Modal.vue';
 import McqRichText from '@/Components/mcq/McqRichText.vue';
 import PortalLayout from '@/Layouts/PortalLayout.vue';
 import QuestionNavGrid from '@/Components/portal/QuestionNavGrid.vue';
@@ -743,6 +821,9 @@ const starting = ref(false);
 const acceptedRules = ref(false);
 const confirmOpen = ref(false);
 const mobileDrawerOpen = ref(false);
+const calculatorOpen = ref(false);
+const calcDisplay = ref('0');
+const calcExpression = ref('');
 const saveStatus = ref('');
 const lastSavedAt = ref(null);
 const offline = ref(typeof navigator !== 'undefined' ? !navigator.onLine : false);
@@ -941,6 +1022,57 @@ function questionNavLabel(q) {
     else if (hasAnswer(q.id)) parts.push('answered');
     else parts.push('not answered');
     return parts.join(', ');
+}
+
+function questionNavStatus(q) {
+    if (markedForReview.value.has(q.id)) return 'review';
+    if (hasAnswer(q.id)) return 'answered';
+    return 'unanswered';
+}
+
+function calcAppend(val) {
+    if (calcDisplay.value === '0' && !isNaN(val)) {
+        calcDisplay.value = val;
+    } else {
+        calcDisplay.value += val;
+    }
+}
+
+function calcClear() {
+    calcDisplay.value = '0';
+    calcExpression.value = '';
+}
+
+function calcSqrt() {
+    try {
+        const num = parseFloat(calcDisplay.value);
+        if (num < 0) {
+            calcDisplay.value = 'Error';
+        } else {
+            calcExpression.value = `√(${calcDisplay.value})`;
+            const res = Math.sqrt(num);
+            calcDisplay.value = String(Math.round(res * 100000) / 100000);
+        }
+    } catch {
+        calcDisplay.value = 'Error';
+    }
+}
+
+function calcEquals() {
+    try {
+        calcExpression.value = calcDisplay.value + ' =';
+        const sanitized = calcDisplay.value.replace(/[^0-9.+\-*/()]/g, '');
+        if (!sanitized) return;
+        const fn = new Function(`return (${sanitized})`);
+        const res = fn();
+        if (Number.isFinite(res)) {
+            calcDisplay.value = String(Math.round(res * 100000) / 100000);
+        } else {
+            calcDisplay.value = 'Error';
+        }
+    } catch {
+        calcDisplay.value = 'Error';
+    }
 }
 
 function readPos() {

@@ -13,6 +13,13 @@
 
         <div v-for="(warning, i) in paper.warnings" :key="i" class="card mb-3 !border-amber-200 !py-3 px-4 text-sm text-amber-900">{{ warning }}</div>
 
+        <div v-if="paper.difficulty_counts && paper.total > 0" class="flex flex-wrap items-center gap-2 mb-4 p-3 bg-white border border-slate-200/90 rounded-xl text-xs shadow-xs">
+            <span class="font-bold text-slate-700">Difficulty Blueprint:</span>
+            <span class="rounded-full bg-emerald-100 text-emerald-800 px-2.5 py-0.5 font-semibold">Easy: {{ paper.difficulty_counts.easy ?? 0 }}</span>
+            <span class="rounded-full bg-amber-100 text-amber-800 px-2.5 py-0.5 font-semibold">Medium: {{ paper.difficulty_counts.medium ?? 0 }}</span>
+            <span class="rounded-full bg-red-100 text-red-800 px-2.5 py-0.5 font-semibold">Hard: {{ paper.difficulty_counts.hard ?? 0 }}</span>
+        </div>
+
         <EmptyState v-if="!questions.length" title="The paper is empty" description="Add sections on the Paper tab." icon="📄" class="card py-10" />
 
         <div class="space-y-4">

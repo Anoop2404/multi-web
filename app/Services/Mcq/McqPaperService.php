@@ -156,6 +156,10 @@ class McqPaperService
             ->mapWithKeys(fn ($type) => [$type => $paper->filter(fn (McqQuestion $q) => $q->typeValue() === $type)->count()])
             ->all();
 
+        $difficultyCounts = collect(McqQuestion::DIFFICULTIES)
+            ->mapWithKeys(fn ($diff) => [$diff => $paper->filter(fn (McqQuestion $q) => $q->difficulty === $diff)->count()])
+            ->all();
+
         $warnings = [];
         $ungradable = $paper->count() - $gradable->count();
         if ($ungradable > 0) {
@@ -180,8 +184,9 @@ class McqPaperService
             'total'         => $paper->count(),
             'gradable'      => $gradable->count(),
             'max_score'     => round($gradable->sum(fn (McqQuestion $q) => $q->marksValue()), 2),
-            'type_counts'   => $typeCounts,
-            'warnings'      => $warnings,
+            'type_counts'       => $typeCounts,
+            'difficulty_counts' => $difficultyCounts,
+            'warnings'          => $warnings,
             'locked'        => McqRegistration::where('exam_id', $exam->id)->whereNotNull('started_at')->exists(),
         ];
     }
