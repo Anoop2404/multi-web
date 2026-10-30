@@ -75,6 +75,12 @@
                 :certificate-templates="certificateTemplates"
                 :grade-bands="gradeBands"
             />
+            <div class="border-t border-slate-100 pt-4 mt-2">
+                <McqConcurrencySettingsForm
+                    v-model="form.concurrency_limits"
+                    :effective-limits="exam.concurrency_effective"
+                />
+            </div>
             <FormActions>
                 <button type="submit" class="btn-primary" :disabled="form.processing">Save result & certificate settings</button>
             </FormActions>
@@ -229,6 +235,7 @@ import { Link, useForm } from '@inertiajs/vue3';
 import SchoolAdminLayout from '@/Layouts/SchoolAdminLayout.vue';
 import McqEligibilityPicker from '@/Components/sahodaya/McqEligibilityPicker.vue';
 import McqResultReleaseSettingsForm from '@/Components/mcq/McqResultReleaseSettingsForm.vue';
+import McqConcurrencySettingsForm from '@/Components/mcq/McqConcurrencySettingsForm.vue';
 
 const props = defineProps({
     school: Object,
@@ -326,6 +333,10 @@ const form = useForm({
     certificate_eligibility: release.certificate_eligibility ?? 'participation',
     certificate_eligible_grades: [...(release.certificate_eligible_grades ?? [])],
     certificate_template_id: release.certificate_template_id ?? props.exam.certificate_template_id ?? null,
+    concurrency_limits: {
+        enabled: Boolean(props.exam.concurrency_limits?.enabled),
+        max_concurrent_per_school: props.exam.concurrency_limits?.max_concurrent_per_school ?? null,
+    },
 });
 
 const strictTabProctor = computed({

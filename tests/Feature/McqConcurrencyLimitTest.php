@@ -267,4 +267,32 @@ class McqConcurrencyLimitTest extends TestCase
         $sessions->assertCanStart($reg2);
         $this->assertTrue(true);
     }
+
+    public function test_exam_level_concurrency_override_takes_precedence(): void
+    {
+        $service = app(McqConcurrencyLimitService::class);
+        $service->saveGlobalSettings([
+            'enabled'                   => true,
+            'max_concurrent_per_school' => 10, // Global allows 10
+        ]);
+
+        // Exam overrides max_concurrent_per_school to 1
+        $exam = $this->createOnlineExam([
+            'settings_json' => [
+                'concurrency_limits' => [
+                    'enabled' => true,
+                    'max_concurrent_per_school' => 1,
+                ],
+            ],
+        ]);
+
+        $reg1 = $this->createStudentRegistration($exam);
+        $reg1->update(['status' => 'started', 'started_at' => now()->subMinutes(5)]);
+
+        $reg2 = $this->createStudentRegistration($exam);
+        $sessions = app(McqExamSessionService::class);
+
+        $this->expectException(ValidationException::class);
+        $sessions->assertCanStart($reg2);
+    }
 }

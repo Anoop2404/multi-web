@@ -114,41 +114,133 @@
 
             <!-- Answer Evaluation Breakdown -->
             <section v-if="showResults && mark?.answers_json?.length" class="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-sm space-y-4">
-                <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
                     <div>
                         <h2 class="text-base font-extrabold text-slate-900">Question-by-Question Review</h2>
-                        <p class="text-xs text-slate-500 mt-0.5">Summary of your submitted responses vs correct answers</p>
+                        <p class="text-xs text-slate-500 mt-0.5">Detailed examination breakdown with correct answers and explanations</p>
+                    </div>
+
+                    <!-- Filter Chips: All, Correct, Incorrect, Unanswered -->
+                    <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                        <button
+                            type="button"
+                            @click="reviewFilter = 'all'"
+                            class="px-2.5 py-1 rounded-lg font-bold transition"
+                            :class="reviewFilter === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                        >
+                            All ({{ mark.answers_json.length }})
+                        </button>
+                        <button
+                            type="button"
+                            @click="reviewFilter = 'correct'"
+                            class="px-2.5 py-1 rounded-lg font-bold transition"
+                            :class="reviewFilter === 'correct' ? 'bg-emerald-700 text-white' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'"
+                        >
+                            Correct ({{ mark.correct_count ?? 0 }})
+                        </button>
+                        <button
+                            type="button"
+                            @click="reviewFilter = 'wrong'"
+                            class="px-2.5 py-1 rounded-lg font-bold transition"
+                            :class="reviewFilter === 'wrong' ? 'bg-red-700 text-white' : 'bg-red-50 text-red-800 hover:bg-red-100'"
+                        >
+                            Incorrect ({{ mark.wrong_count ?? 0 }})
+                        </button>
+                        <button
+                            v-if="mark.unanswered_count"
+                            type="button"
+                            @click="reviewFilter = 'unanswered'"
+                            class="px-2.5 py-1 rounded-lg font-bold transition"
+                            :class="reviewFilter === 'unanswered' ? 'bg-amber-700 text-white' : 'bg-amber-50 text-amber-800 hover:bg-amber-100'"
+                        >
+                            Unanswered ({{ mark.unanswered_count }})
+                        </button>
                     </div>
                 </div>
 
-                <ul class="divide-y divide-slate-100 text-xs sm:text-sm">
-                    <li
-                        v-for="(a, i) in mark.answers_json"
-                        :key="i"
-                        class="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                <div class="space-y-4">
+                    <div
+                        v-for="(a, i) in filteredAnswers"
+                        :key="a.question_id ?? i"
+                        class="rounded-2xl border p-4 sm:p-5 transition"
+                        :class="a.is_correct ? 'border-emerald-200 bg-emerald-50/20' : (a.chosen ? 'border-red-200 bg-red-50/20' : 'border-slate-200 bg-slate-50/30')"
                     >
-                        <div class="flex items-center gap-2">
-                            <span class="font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md text-xs">
-                                Q{{ a.index ?? (i + 1) }}
-                            </span>
-                            <span v-if="a.correct != null" class="text-xs text-slate-500">
-                                (Key: <strong class="text-slate-800 uppercase">{{ formatKey(a.correct) }}</strong>)
-                            </span>
+                        <!-- Question Header -->
+                        <div class="flex items-start justify-between gap-3 mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="font-mono font-black text-xs px-2.5 py-1 rounded-lg"
+                                      :class="a.is_correct ? 'bg-emerald-600 text-white' : (a.chosen ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-700')">
+                                    Q{{ a.index }}
+                                </span>
+                                <span class="text-xs font-extrabold uppercase tracking-wide px-2.5 py-0.5 rounded-full"
+                                      :class="a.is_correct ? 'bg-emerald-100 text-emerald-900' : (a.chosen ? 'bg-red-100 text-red-900' : 'bg-slate-200 text-slate-700')">
+                                    {{ a.is_correct ? '✓ Correct' : (a.chosen ? '✕ Incorrect' : '⚪ Unanswered') }}
+                                </span>
+                            </div>
+
+                            <div class="text-right text-xs">
+                                <span class="font-bold text-slate-700">
+                                    Marks: <strong :class="a.awarded > 0 ? 'text-emerald-700' : (a.awarded < 0 ? 'text-red-700' : 'text-slate-500')">{{ a.awarded > 0 ? `+${a.awarded}` : (a.awarded ?? 0) }}</strong> / {{ a.marks ?? 1 }}
+                                </span>
+                                <span v-if="a.negative_mark > 0" class="block text-[10px] text-slate-400">
+                                    Negative: -{{ a.negative_mark }}
+                                </span>
+                            </div>
                         </div>
 
-                        <div class="flex items-center gap-2 text-xs">
-                            <span
-                                class="font-extrabold uppercase tracking-wide px-2 py-0.5 rounded-full"
-                                :class="a.is_correct ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : (a.chosen ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-slate-100 text-slate-600')"
-                            >
-                                {{ a.is_correct ? '✓ Correct' : (a.chosen ? '✕ Incorrect' : '⚪ Unanswered') }}
-                            </span>
-                            <span v-if="a.chosen" class="text-slate-600 font-medium">
-                                Your answer: <strong class="uppercase text-slate-900">{{ formatKey(a.chosen) }}</strong>
-                            </span>
+                        <!-- Question Body (if provided in review mode) -->
+                        <div v-if="a.question_body" class="mb-3">
+                            <McqRichText :text="a.question_body" class="text-slate-900 font-medium text-sm leading-relaxed" />
+                            <div v-if="a.question_image_url" class="mt-2 max-w-sm rounded-lg overflow-hidden border border-slate-200">
+                                <img :src="a.question_image_url" alt="Question illustration" class="max-h-48 object-contain">
+                            </div>
                         </div>
-                    </li>
-                </ul>
+
+                        <!-- Options List (if options exist) -->
+                        <div v-if="a.options?.length" class="grid grid-cols-1 gap-2 my-3">
+                            <div
+                                v-for="opt in a.options"
+                                :key="opt.key"
+                                class="flex items-center gap-2.5 p-2.5 rounded-xl border text-xs"
+                                :class="getOptionClass(a, opt.key)"
+                            >
+                                <span class="h-6 w-6 rounded-lg font-bold flex items-center justify-center shrink-0 uppercase text-xs"
+                                      :class="getOptionBadgeClass(a, opt.key)">
+                                    {{ opt.key }}
+                                </span>
+                                <McqRichText :text="opt.label" class="flex-1 font-medium leading-snug" />
+                                <span v-if="isCorrectOption(a, opt.key)" class="text-[11px] font-extrabold text-emerald-700 shrink-0">
+                                    ✓ Correct
+                                </span>
+                                <span v-else-if="isChosenOption(a, opt.key) && !a.is_correct" class="text-[11px] font-extrabold text-red-700 shrink-0">
+                                    ✕ Your choice
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Simple Answer Row when options not hydrated -->
+                        <div v-else class="flex flex-wrap items-center gap-4 text-xs pt-1 border-t border-slate-100">
+                            <div v-if="a.chosen">
+                                <span class="text-slate-500">Your answer: </span>
+                                <strong class="uppercase text-slate-900">{{ formatKey(a.chosen) }}</strong>
+                            </div>
+                            <div v-if="a.correct != null">
+                                <span class="text-slate-500">Correct key: </span>
+                                <strong class="uppercase text-emerald-700">{{ formatKey(a.correct) }}</strong>
+                            </div>
+                        </div>
+
+                        <!-- Explanation Box -->
+                        <div v-if="a.explanation" class="mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-300/40 text-xs text-amber-950">
+                            <span class="font-bold text-amber-900 block mb-0.5">💡 Explanation:</span>
+                            <McqRichText :text="a.explanation" class="leading-relaxed" />
+                        </div>
+                    </div>
+
+                    <div v-if="!filteredAnswers.length" class="text-center py-6 text-xs text-slate-400">
+                        No questions in this filter view.
+                    </div>
+                </div>
             </section>
 
             <!-- Footer actions -->
@@ -166,6 +258,7 @@
 
 <script setup>
 import PortalLayout from '@/Layouts/PortalLayout.vue';
+import McqRichText from '@/Components/mcq/McqRichText.vue';
 import { studentPortalNavItems } from '@/support/studentPortalNav.js';
 import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
@@ -186,7 +279,62 @@ const props = defineProps({
 });
 
 const reattempting = ref(false);
+const reviewFilter = ref('all');
 const navItems = computed(() => studentPortalNavItems(props.school.id));
+
+const filteredAnswers = computed(() => {
+    const list = props.mark?.answers_json ?? [];
+    if (reviewFilter.value === 'correct') {
+        return list.filter((a) => a.is_correct);
+    }
+    if (reviewFilter.value === 'wrong') {
+        return list.filter((a) => !a.is_correct && a.chosen != null);
+    }
+    if (reviewFilter.value === 'unanswered') {
+        return list.filter((a) => a.chosen == null || a.chosen === '');
+    }
+    return list;
+});
+
+function isCorrectOption(answer, optKey) {
+    if (Array.isArray(answer.correct)) {
+        return answer.correct.map(String).includes(String(optKey));
+    }
+    return String(answer.correct ?? '').toLowerCase() === String(optKey).toLowerCase();
+}
+
+function isChosenOption(answer, optKey) {
+    if (Array.isArray(answer.chosen)) {
+        return answer.chosen.map(String).includes(String(optKey));
+    }
+    return String(answer.chosen ?? '').toLowerCase() === String(optKey).toLowerCase();
+}
+
+function getOptionClass(answer, optKey) {
+    const isCorrect = isCorrectOption(answer, optKey);
+    const isChosen = isChosenOption(answer, optKey);
+
+    if (isCorrect) {
+        return 'border-emerald-300 bg-emerald-50/80 text-emerald-950 font-semibold';
+    }
+    if (isChosen && !answer.is_correct) {
+        return 'border-red-300 bg-red-50/80 text-red-950 font-semibold';
+    }
+    return 'border-slate-200 bg-white text-slate-700';
+}
+
+function getOptionBadgeClass(answer, optKey) {
+    const isCorrect = isCorrectOption(answer, optKey);
+    const isChosen = isChosenOption(answer, optKey);
+
+    if (isCorrect) {
+        return 'bg-emerald-600 text-white';
+    }
+    if (isChosen && !answer.is_correct) {
+        return 'bg-red-600 text-white';
+    }
+    return 'bg-slate-100 text-slate-700';
+}
 
 function startReattempt() {
     if (!props.reattemptUrl || reattempting.value) return;

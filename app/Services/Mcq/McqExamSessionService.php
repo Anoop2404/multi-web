@@ -139,6 +139,7 @@ class McqExamSessionService
             ->map(fn (McqQuestion $q, int $index) => [
                 'id'            => $q->id,
                 'number'        => $index + 1,
+                'section'       => $q->section_title ?: ($q->bank?->subject ?: ($q->bank?->title ?: 'General')),
                 'type'          => $q->typeValue(),
                 'marks'         => $q->marksValue(),
                 'negative_mark' => $q->negativeMarkValue(),
@@ -191,6 +192,12 @@ class McqExamSessionService
 
         $normalized = [];
         foreach ($answers as $questionId => $value) {
+            if ($questionId === '_marked_for_review') {
+                if (is_array($value)) {
+                    $normalized['_marked_for_review'] = array_values(array_filter(array_map('strval', $value)));
+                }
+                continue;
+            }
             $clean = $this->normalizeAnswerValue($value);
             if ($clean !== null) {
                 $normalized[(string) $questionId] = $clean;

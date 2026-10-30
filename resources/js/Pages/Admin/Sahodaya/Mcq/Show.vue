@@ -387,6 +387,13 @@
                 />
             </div>
 
+            <div class="border-t border-slate-100 pt-4 mt-2">
+                <McqConcurrencySettingsForm
+                    v-model="form.concurrency_limits"
+                    :effective-limits="exam.concurrency_effective"
+                />
+            </div>
+
             <div class="border-t border-slate-100 pt-4">
                 <FormField label="Total marks / questions (default)" hint="Denominator for percentage/grade on offline mark entry when a class below has no override.">
                     <template #default="{ id }">
@@ -454,6 +461,7 @@ import McqEligibilityPicker from '@/Components/sahodaya/McqEligibilityPicker.vue
 import McqRegNoStartField from '@/Components/sahodaya/McqRegNoStartField.vue';
 import McqSahodayaWorkflowBanner from '@/Components/sahodaya/McqSahodayaWorkflowBanner.vue';
 import McqResultReleaseSettingsForm from '@/Components/mcq/McqResultReleaseSettingsForm.vue';
+import McqConcurrencySettingsForm from '@/Components/mcq/McqConcurrencySettingsForm.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -591,6 +599,10 @@ const form = useForm({
     certificates_auto_issue: !!props.exam.result_release?.certificates_auto_issue,
     certificate_eligibility: props.exam.result_release?.certificate_eligibility ?? 'participation',
     certificate_eligible_grades: [...(props.exam.result_release?.certificate_eligible_grades ?? [])],
+    concurrency_limits: {
+        enabled: Boolean(props.exam.concurrency_limits?.enabled),
+        max_concurrent_per_school: props.exam.concurrency_limits?.max_concurrent_per_school ?? null,
+    },
 });
 
 const strictTabProctor = computed({

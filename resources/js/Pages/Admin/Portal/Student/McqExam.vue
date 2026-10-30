@@ -155,6 +155,26 @@
 
         <!-- Live Exam Hall View (started) -->
         <div v-else class="exam-hall -mx-1">
+            <!-- Dynamic Anti-Cheating Watermark Overlay -->
+            <div
+                class="pointer-events-none fixed inset-0 z-30 select-none overflow-hidden opacity-[0.035] sm:opacity-[0.045]"
+                aria-hidden="true"
+            >
+                <svg class="h-full w-full" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <pattern id="candidate-watermark" width="340" height="170" patternUnits="userSpaceOnUse" patternTransform="rotate(-20)">
+                            <text x="15" y="45" font-size="13" font-weight="800" fill="currentColor" letter-spacing="1.5">
+                                {{ student.reg_no || student.admission_number || 'CANDIDATE' }} · {{ student.name }}
+                            </text>
+                            <text x="15" y="85" font-size="11" font-weight="600" fill="currentColor" letter-spacing="1">
+                                {{ exam.title }}
+                            </text>
+                        </pattern>
+                    </defs>
+                    <rect width="100%" height="100%" fill="url(#candidate-watermark)" class="text-slate-900" />
+                </svg>
+            </div>
+
             <!-- Sticky Exam Hall Chrome -->
             <header
                 class="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 shadow-sm"
@@ -295,6 +315,32 @@
 
                     <!-- Active Question Canvas -->
                     <div v-if="currentQuestion" class="min-w-0 px-2 pt-4 lg:pt-0" :style="{ fontSize: fontSizeRem + 'rem' }">
+                        <!-- Multi-Section / Subject Switcher Bar -->
+                        <nav
+                            v-if="distinctSections.length > 1"
+                            class="mb-3 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none"
+                            aria-label="Exam Sections"
+                        >
+                            <button
+                                v-for="sec in distinctSections"
+                                :key="sec.name"
+                                type="button"
+                                class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-2 border shadow-2xs"
+                                :class="currentQuestion.section === sec.name
+                                    ? 'bg-[#0f3d7a] text-white border-[#0f3d7a]'
+                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'"
+                                @click="go(sec.firstIndex)"
+                            >
+                                <span>{{ sec.name }}</span>
+                                <span
+                                    class="text-[10px] px-1.5 py-0.5 rounded-md font-extrabold"
+                                    :class="currentQuestion.section === sec.name ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'"
+                                >
+                                    {{ sec.count }}
+                                </span>
+                            </button>
+                        </nav>
+
                         <article class="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-7 shadow-sm space-y-5" :aria-labelledby="qHeadingId">
                             <!-- Question Meta & Bookmark Header -->
                             <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
@@ -306,6 +352,9 @@
                                         </h2>
                                     </div>
                                     <div class="flex flex-wrap items-center gap-1.5 mt-1 text-xs">
+                                        <span v-if="currentQuestion.section" class="font-extrabold text-[#0f3d7a] bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
+                                            {{ currentQuestion.section }}
+                                        </span>
                                         <span class="font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
                                             +{{ currentQuestion.marks }} Mark{{ currentQuestion.marks === 1 ? '' : 's' }}
                                         </span>
@@ -852,6 +901,17 @@ const PROCTOR_EVENT_THROTTLE_MS = 2000;
 const posKey = computed(() => `mcq:pos:${props.school.id}:${props.registration.id}`);
 
 const currentQuestion = computed(() => props.questions[currentIndex.value] ?? null);
+const distinctSections = computed(() => {
+    const map = new Map();
+    props.questions.forEach((q, index) => {
+        const sec = q.section || 'General';
+        if (!map.has(sec)) {
+            map.set(sec, { name: sec, firstIndex: index, count: 0 });
+        }
+        map.get(sec).count++;
+    });
+    return Array.from(map.values());
+});
 const totalMarks = computed(() => props.questions.reduce((total, q) => total + Number(q.marks || 0), 0));
 const gradableCount = computed(() => props.questions.filter(isAnswerable).length);
 const answeredCount = computed(() => props.questions.filter((q) => isAnswerable(q) && hasAnswer(q.id)).length);
@@ -996,6 +1056,9 @@ function csrfToken() {
 function restoreSavedAnswers() {
     Object.keys(answers).forEach((k) => delete answers[k]);
     for (const [questionId, value] of Object.entries(props.savedAnswers ?? {})) {
+        if (questionId === '_marked_for_review') {
+            continue;
+        }
         if (Array.isArray(value)) {
             answers[questionId] = [...value];
         } else if (typeof value === 'string' && value.includes(',')) {
@@ -1136,6 +1199,7 @@ function toggleReview(questionId) {
     else next.add(questionId);
     markedForReview.value = next;
     try { sessionStorage.setItem(`mcq-review-${props.school.id}-${props.registration.id}`, JSON.stringify([...next])); } catch { /* optional */ }
+    scheduleSave();
 }
 
 function scheduleSave() {
@@ -1149,6 +1213,10 @@ function scheduleSave() {
 async function saveDraft() {
     if (!props.started || submitting.value) return;
     try {
+        const payload = {
+            ...answers,
+            _marked_for_review: Array.from(markedForReview.value),
+        };
         const res = await fetch(
             `/portal/student/${props.school.id}/mcq/${props.registration.id}/save-answers`,
             {
@@ -1158,7 +1226,7 @@ async function saveDraft() {
                     Accept: 'application/json',
                     'X-CSRF-TOKEN': csrfToken(),
                 },
-                body: JSON.stringify({ answers }),
+                body: JSON.stringify({ answers: payload }),
             },
         );
         if (res.ok) {
@@ -1316,8 +1384,10 @@ function submit() {
     if (submitting.value || submitBlocked.value) return;
     confirmOpen.value = false;
     submitting.value = true;
+    const submissionAnswers = { ...answers };
+    delete submissionAnswers._marked_for_review;
     router.post(`/portal/student/${props.school.id}/mcq/${props.registration.id}/submit`, {
-        answers,
+        answers: submissionAnswers,
     }, {
         preserveScroll: true,
         onSuccess: () => {
@@ -1344,10 +1414,14 @@ onMounted(() => {
         resumeBanner.value = true;
         window.setTimeout(() => { resumeBanner.value = false; }, 8000);
     }
-    try {
-        const ids = JSON.parse(sessionStorage.getItem(`mcq-review-${props.school.id}-${props.registration.id}`) || '[]');
-        markedForReview.value = new Set(Array.isArray(ids) ? ids.filter((id) => props.questions.some((q) => q.id === id)) : []);
-    } catch { /* */ }
+    if (Array.isArray(props.savedAnswers?._marked_for_review)) {
+        markedForReview.value = new Set(props.savedAnswers._marked_for_review.map(Number));
+    } else {
+        try {
+            const ids = JSON.parse(sessionStorage.getItem(`mcq-review-${props.school.id}-${props.registration.id}`) || '[]');
+            markedForReview.value = new Set(Array.isArray(ids) ? ids.filter((id) => props.questions.some((q) => q.id === id)) : []);
+        } catch { /* */ }
+    }
     tickTimer();
     timerId = window.setInterval(tickTimer, 1000);
     document.addEventListener('visibilitychange', handleVisibilityChange);

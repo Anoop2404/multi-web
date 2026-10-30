@@ -54,6 +54,10 @@ class McqExamTakeUxTest extends TestCase
                 'require_verified_students' => false,
                 'shuffle_questions' => false,
                 'shuffle_options' => false,
+                'result_release' => [
+                    'visibility' => 'review',
+                    'release_mode' => 'after_completion',
+                ],
             ]),
         ]);
         $exam->questionBanks()->attach($bank->id, ['pick_mode' => 'all', 'display_order' => 1]);
@@ -88,6 +92,77 @@ class McqExamTakeUxTest extends TestCase
         $this->assertStringContainsString('← Prev', $src);
         $this->assertStringContainsString('Next →', $src);
         $this->assertStringContainsString('Extra monitors are not detected', $src);
+        $this->assertStringContainsString('candidate-watermark', $src);
+        $this->assertStringContainsString('_marked_for_review', $src);
+        $this->assertStringContainsString('distinctSections', $src);
+    }
+
+    public function test_paper_for_student_includes_sections_and_server_persists_review_flags(): void
+    {
+        $bankA = $this->makeBank('active', 'Physics Section');
+        $bankA->update(['school_id' => $this->school->id, 'subject' => 'Physics']);
+        $qA = $this->addSingle($bankA);
+        $qA->update(['body_text' => 'What is velocity?', 'explanation' => 'Speed in a given direction']);
+
+        $bankB = $this->makeBank('active', 'Chemistry Section');
+        $bankB->update(['school_id' => $this->school->id, 'subject' => 'Chemistry']);
+        $qB = $this->addSingle($bankB);
+
+        $exam = McqExam::create([
+            'tenant_id' => $this->sahodaya->id,
+            'school_id' => $this->school->id,
+            'conductor_level' => 'school',
+            'title' => 'Multi-Section Model',
+            'status' => 'published',
+            'delivery_mode' => 'online',
+            'fee_type' => 'none',
+            'scheduled_at' => now()->subMinute(),
+            'duration_minutes' => 60,
+            'settings_json' => array_merge(McqProductMode::presetSettings(McqProductMode::SCHOOL_MODEL), [
+                'require_verified_students' => false,
+                'shuffle_questions' => false,
+                'shuffle_options' => false,
+                'result_release' => [
+                    'visibility' => 'review',
+                    'release_mode' => 'after_completion',
+                ],
+            ]),
+        ]);
+        $exam->questionBanks()->attach($bankA->id, ['pick_mode' => 'all', 'display_order' => 1]);
+        $exam->questionBanks()->attach($bankB->id, ['pick_mode' => 'all', 'display_order' => 2]);
+
+        [$user, $registration] = $this->registerStudent($exam);
+
+        $sessionService = app(\App\Services\Mcq\McqExamSessionService::class);
+        $sessionService->start($registration);
+        $registration->refresh();
+
+        $paper = $sessionService->paperForStudent($registration);
+        $this->assertCount(2, $paper);
+        $this->assertSame('Physics', $paper[0]['section']);
+        $this->assertSame('Chemistry', $paper[1]['section']);
+
+        // Persist review flags via draft save
+        $sessionService->saveDraftAnswers($registration, [
+            (string) $qA->id => 'a',
+            '_marked_for_review' => [(string) $qB->id],
+        ]);
+        $registration->refresh();
+
+        $this->assertSame('a', $registration->draft_answers[(string) $qA->id]);
+        $this->assertSame([(string) $qB->id], $registration->draft_answers['_marked_for_review']);
+
+        // Submitting with _marked_for_review grades safely
+        $mark = $sessionService->submit($registration, $registration->draft_answers);
+        $this->assertNotNull($mark->score);
+
+        // Result presentation hydrates question bodies, options, and explanations
+        $presented = \App\Support\Mcq\McqResultPresenter::forRegistration($registration, $mark);
+        $this->assertNotEmpty($presented['answers_json']);
+        $first = $presented['answers_json'][0];
+        $this->assertSame('What is velocity?', $first['question_body']);
+        $this->assertSame('Speed in a given direction', $first['explanation']);
+        $this->assertNotEmpty($first['options']);
     }
 
     public function test_exam_engine_screens_have_pin_and_proctor_copy(): void

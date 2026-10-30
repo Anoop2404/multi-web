@@ -7,6 +7,32 @@
             </span>
         </div>
 
+        <!-- Section Filter (when multiple sections/subjects exist) -->
+        <div v-if="distinctSections.length > 1" class="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none" role="tablist" aria-label="Section selector">
+            <button
+                type="button"
+                role="tab"
+                :aria-selected="selectedSection === 'all'"
+                class="px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap transition cursor-pointer"
+                :class="selectedSection === 'all' ? 'bg-[#0f3d7a] text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                @click="selectedSection = 'all'"
+            >
+                All ({{ questions.length }})
+            </button>
+            <button
+                v-for="sec in distinctSections"
+                :key="sec.name"
+                type="button"
+                role="tab"
+                :aria-selected="selectedSection === sec.name"
+                class="px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap transition cursor-pointer"
+                :class="selectedSection === sec.name ? 'bg-[#0f3d7a] text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                @click="selectedSection = sec.name"
+            >
+                {{ sec.name }} ({{ sec.count }})
+            </button>
+        </div>
+
         <!-- Filter Chips -->
         <div v-if="navStatus" class="flex flex-wrap gap-1 text-[11px] font-semibold" role="tablist" aria-label="Question status filters">
             <button
@@ -102,12 +128,26 @@ const props = defineProps({
 defineEmits(['select']);
 
 const activeFilter = ref('all');
+const selectedSection = ref('all');
+
+const distinctSections = computed(() => {
+    const map = new Map();
+    for (const q of props.questions) {
+        const sec = q.section || 'General';
+        map.set(sec, (map.get(sec) || 0) + 1);
+    }
+    return Array.from(map.entries()).map(([name, count]) => ({ name, count }));
+});
 
 const displayQuestions = computed(() => {
-    if (!props.navStatus || activeFilter.value === 'all') {
-        return props.questions;
+    let list = props.questions;
+    if (selectedSection.value !== 'all') {
+        list = list.filter((q) => (q.section || 'General') === selectedSection.value);
     }
-    return props.questions.filter(q => props.navStatus(q) === activeFilter.value);
+    if (!props.navStatus || activeFilter.value === 'all') {
+        return list;
+    }
+    return list.filter((q) => props.navStatus(q) === activeFilter.value);
 });
 
 function isCurrent(q) {

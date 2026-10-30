@@ -223,6 +223,8 @@ class McqExamController extends SahodayaAdminController
             'proctor_mode' => $exam->proctorMode(),
             'proctor_max_tab_violations' => $exam->proctorMaxTabViolations(),
             'result_release' => \App\Support\Mcq\McqResultReleaseSettings::forInertia($exam),
+            'concurrency_limits' => $exam->settings_json['concurrency_limits'] ?? ['enabled' => false, 'max_concurrent_per_school' => null],
+            'concurrency_effective' => app(\App\Services\Mcq\McqConcurrencyLimitService::class)->effectiveLimits($exam),
         ]);
 
         $pendingPaymentApprovals = $schoolFees->filter(
@@ -336,6 +338,9 @@ class McqExamController extends SahodayaAdminController
             'hall_ticket_template_id' => 'nullable|integer|exists:mcq_hall_ticket_templates,id',
             'certificate_template_id' => 'nullable|integer|exists:mcq_certificate_templates,id',
             'student_verification_mode' => 'nullable|in:inherit,required,optional',
+            'concurrency_limits' => 'nullable|array',
+            'concurrency_limits.enabled' => 'nullable|boolean',
+            'concurrency_limits.max_concurrent_per_school' => 'nullable|integer|min:1',
             ...\App\Support\Mcq\McqResultReleaseSettings::validationRules(),
         ]);
 
@@ -492,6 +497,23 @@ class McqExamController extends SahodayaAdminController
             $settings['class_schedules'] = $data['class_schedules'];
             $data['settings_json'] = $settings;
             unset($data['class_schedules']);
+        }
+
+        if (array_key_exists('concurrency_limits', $data)) {
+            $settings = $data['settings_json'] ?? ($exam->settings_json ?? []);
+            $cl = $data['concurrency_limits'];
+            if (is_array($cl) && ! empty($cl['enabled'])) {
+                $settings['concurrency_limits'] = [
+                    'enabled' => true,
+                    'max_concurrent_per_school' => isset($cl['max_concurrent_per_school']) && is_numeric($cl['max_concurrent_per_school']) && (int) $cl['max_concurrent_per_school'] > 0
+                        ? (int) $cl['max_concurrent_per_school']
+                        : null,
+                ];
+            } else {
+                unset($settings['concurrency_limits']);
+            }
+            $data['settings_json'] = $settings;
+            unset($data['concurrency_limits']);
         }
 
         $releasePatch = \App\Support\Mcq\McqResultReleaseSettings::normalizeInput($data, $exam);

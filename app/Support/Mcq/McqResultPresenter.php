@@ -60,7 +60,7 @@ class McqResultPresenter
         }
 
         if ($showsReview && is_array($mark?->answers_json)) {
-            $payload['answers_json'] = self::sanitizeAnswersForStudent($mark->answers_json);
+            $payload['answers_json'] = self::sanitizeAnswersForStudent($mark->answers_json, $registration);
         }
 
         return $payload;
@@ -101,26 +101,62 @@ class McqResultPresenter
     }
 
     /**
-     * Student-safe answer review rows (correct key only when review visibility is on).
+     * Student-safe answer review rows (hydrated with question statement, options, and explanation).
      *
      * @param  list<array<string, mixed>>  $answers
      * @return list<array<string, mixed>>
      */
-    private static function sanitizeAnswersForStudent(array $answers): array
+    private static function sanitizeAnswersForStudent(array $answers, ?McqRegistration $registration = null): array
     {
+        $questionsById = collect();
+        $imageBase = null;
+
+        if ($registration) {
+            try {
+                $questionsById = app(\App\Services\Mcq\McqPaperService::class)
+                    ->questionsForRegistration($registration)
+                    ->keyBy('id');
+                $imageBase = "/portal/student/{$registration->school_id}/mcq/{$registration->id}/questions";
+            } catch (\Throwable) {
+                $questionsById = collect();
+            }
+        }
+
         $out = [];
         foreach ($answers as $index => $row) {
             if (! is_array($row)) {
                 continue;
             }
+            $qid = $row['question_id'] ?? null;
+            $q = $qid ? $questionsById->get($qid) : null;
+
+            $options = [];
+            if ($q && is_array($q->options_json)) {
+                foreach ($q->options_json as $opt) {
+                    $options[] = [
+                        'key' => $opt['key'] ?? '',
+                        'label' => $opt['label'] ?? '',
+                        'image_url' => filled($opt['image_path'] ?? null) && $imageBase
+                            ? "{$imageBase}/{$q->id}/image?option={$opt['key']}"
+                            : null,
+                    ];
+                }
+            }
+
             $out[] = [
                 'index' => $index + 1,
-                'question_id' => $row['question_id'] ?? null,
+                'question_id' => $qid,
+                'type' => $row['type'] ?? $q?->typeValue() ?? 'single',
+                'question_body' => $q?->body_text ?? null,
+                'question_image_url' => $q?->document_path && $imageBase ? "{$imageBase}/{$q->id}/image" : null,
+                'options' => $options,
+                'explanation' => $q?->explanation ?? null,
                 'chosen' => $row['chosen'] ?? null,
                 'correct' => $row['correct'] ?? null,
                 'is_correct' => (bool) ($row['is_correct'] ?? false),
                 'awarded' => $row['awarded'] ?? null,
-                'marks' => $row['marks'] ?? null,
+                'marks' => $row['marks'] ?? $q?->marksValue() ?? 1,
+                'negative_mark' => $row['negative_mark'] ?? (float) ($q?->negative_mark ?? 0),
             ];
         }
 

@@ -190,6 +190,8 @@ class McqModelExamController extends SchoolAdminController
                     'proctor_max_tab_violations' => $exam->proctorMaxTabViolations(),
                 ],
                 'result_release' => \App\Support\Mcq\McqResultReleaseSettings::forInertia($exam),
+                'concurrency_limits' => $exam->settings_json['concurrency_limits'] ?? ['enabled' => false, 'max_concurrent_per_school' => null],
+                'concurrency_effective' => app(\App\Services\Mcq\McqConcurrencyLimitService::class)->effectiveLimits($exam, $this->school->id),
             ]),
             'certificateTemplates' => \App\Models\McqCertificateTemplate::where('tenant_id', $this->school->parent_id)
                 ->where('is_active', true)
@@ -246,6 +248,9 @@ class McqModelExamController extends SchoolAdminController
             'max_attempts'           => 'nullable|integer|min:1|max:10',
             'proctor_mode'           => 'nullable|in:log,strict_tab',
             'proctor_max_tab_violations' => 'nullable|integer|min:1|max:10',
+            'concurrency_limits'     => 'nullable|array',
+            'concurrency_limits.enabled' => 'nullable|boolean',
+            'concurrency_limits.max_concurrent_per_school' => 'nullable|integer|min:1',
             ...\App\Support\Mcq\McqResultReleaseSettings::validationRules(),
         ]);
 
@@ -309,6 +314,21 @@ class McqModelExamController extends SchoolAdminController
             $data['certificates_enabled'], $data['certificates_auto_issue'],
             $data['certificate_eligibility'], $data['certificate_eligible_grades'],
         );
+
+        if (array_key_exists('concurrency_limits', $data)) {
+            $cl = $data['concurrency_limits'];
+            if (is_array($cl) && ! empty($cl['enabled'])) {
+                $data['settings_json']['concurrency_limits'] = [
+                    'enabled' => true,
+                    'max_concurrent_per_school' => isset($cl['max_concurrent_per_school']) && is_numeric($cl['max_concurrent_per_school']) && (int) $cl['max_concurrent_per_school'] > 0
+                        ? (int) $cl['max_concurrent_per_school']
+                        : null,
+                ];
+            } else {
+                unset($data['settings_json']['concurrency_limits']);
+            }
+            unset($data['concurrency_limits']);
+        }
 
         $exam->update($data);
         $exam->refresh();

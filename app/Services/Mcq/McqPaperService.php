@@ -55,7 +55,13 @@ class McqPaperService
         if ($registration->paper_snapshot) return;
         $paper = $this->buildForRegistration($registration);
         $registration->update(['paper_snapshot' => [
-            'questions' => $paper['questions']->map->toArray()->all(),
+            'questions' => $paper['questions']->map(function (McqQuestion $q) {
+                $arr = $q->toArray();
+                if (! isset($arr['section_title']) && ! empty($q->section_title)) {
+                    $arr['section_title'] = $q->section_title;
+                }
+                return $arr;
+            })->all(),
             'template_title' => $paper['title'], 'template_version' => $paper['version'],
             'total_marks' => $paper['questions']->sum(fn ($q) => $q->marksValue()),
             'pass_mark' => $paper['pass_mark'], 'multi_marking' => $registration->exam->multiMarkingMode(),
@@ -106,20 +112,24 @@ class McqPaperService
         $count = (int) ($bank->pivot?->pick_count ?? 0);
 
         if ($mode === 'all' || $count <= 0 || $count >= $questions->count()) {
-            return $questions;
+            $picked = $questions;
+        } elseif ($mode === 'first') {
+            $picked = $questions->take($count)->values();
+        } else {
+            // Random N, kept in the bank's own order so numbering stays readable.
+            $pickedIds = collect(self::seededShuffle($questions->all(), "exam:{$exam->id}:bank:{$bank->id}"))
+                ->take($count)
+                ->pluck('id')
+                ->all();
+
+            $picked = $questions->filter(fn (McqQuestion $q) => in_array($q->id, $pickedIds, true))->values();
         }
 
-        if ($mode === 'first') {
-            return $questions->take($count)->values();
-        }
-
-        // Random N, kept in the bank's own order so numbering stays readable.
-        $picked = collect(self::seededShuffle($questions->all(), "exam:{$exam->id}:bank:{$bank->id}"))
-            ->take($count)
-            ->pluck('id')
-            ->all();
-
-        return $questions->filter(fn (McqQuestion $q) => in_array($q->id, $picked, true))->values();
+        $sectionTitle = $bank->pivot?->section_title ?: ($bank->subject ?: ($bank->title ?: 'General'));
+        return $picked->map(function (McqQuestion $q) use ($sectionTitle) {
+            $q->setAttribute('section_title', $sectionTitle);
+            return $q;
+        });
     }
 
     /**
