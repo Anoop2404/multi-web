@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { reactive } from 'vue';
 import { useFestMarkEntryDisplay } from '../../resources/js/composables/useFestMarkEntryDisplay.js';
 
 const display = event => useFestMarkEntryDisplay({ event, registrations: [] });
@@ -38,15 +39,22 @@ test('participants with separate registrations for one item share one section', 
 });
 
 
-test('mark entry can keep chest order stable while assigning performance order', () => {
-    const props = { event: { event_type: 'kalolsavam' }, registrations: [
+test('saved order numbers rearrange rows ahead of unnumbered participants', () => {
+    const props = reactive({ event: { event_type: 'kalolsavam' }, registrations: [
         { item: { id: 1 }, participants: [
-            { id: 11, chest_no: '500', order_no: 2 },
-            { id: 12, chest_no: '501', order_no: 1 },
+            { id: 11, chest_no: '500', order_no: null },
+            { id: 12, chest_no: '501', order_no: null },
+            { id: 13, chest_no: '537', order_no: null },
         ] },
-    ] };
-    const stable = useFestMarkEntryDisplay(props, null, { sortByOrder: false });
-    assert.deepEqual(stable.sections.value[0].rows.map(row => row.participant.id), [11, 12]);
-    const ordered = useFestMarkEntryDisplay(props);
-    assert.deepEqual(ordered.sections.value[0].rows.map(row => row.participant.id), [12, 11]);
+    ] });
+    const view = useFestMarkEntryDisplay(props);
+    const ids = () => view.sections.value[0].rows.map(row => row.participant.id);
+    assert.deepEqual(ids(), [11, 12, 13]);
+    // Simulate refreshed registrations after the server accepts the last row's order.
+    props.registrations[0].participants[2].order_no = 1;
+    assert.deepEqual(ids(), [13, 11, 12]);
+    props.registrations[0].participants[0].order_no = 2;
+    assert.deepEqual(ids(), [13, 11, 12]);
+    props.registrations[0].participants[2].order_no = null;
+    assert.deepEqual(ids(), [11, 12, 13]);
 });

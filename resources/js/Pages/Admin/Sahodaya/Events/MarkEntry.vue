@@ -543,7 +543,7 @@ const markSettingsUrl = computed(() => {
     return url;
 });
 
-const displayCtx = useFestMarkEntryDisplay(props, isSports, { sortByOrder: false });
+const displayCtx = useFestMarkEntryDisplay(props, isSports);
 const {
     bulkRank,
     sections,
@@ -875,7 +875,7 @@ function markSaveOutcome(participantId) {
 }
 const bulkSaving = ref(false);
 
-// Order saves immediately. Keep chest-number order stable while entering values;
+// Order saves immediately. Reorder rows only after the server accepts the number;
 // only offer unused numbers, and prevent overlapping Inertia visits cancelling saves.
 const orderSavingId = ref(null);
 const orderStatus = reactive({});
