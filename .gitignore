@@ -52,3 +52,7 @@ Thumbs.db
 # Local traffic monitoring state and diagnostic logs
 /storage/framework/monitoring-until
 /storage/logs/monitoring-*.jsonl
+
+# Generated test and preview outputs
+/output/
+database/sahodaya_*
