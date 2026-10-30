@@ -89,7 +89,9 @@ class StudentMcqController extends Controller
                     ['exam' => $registration->exam?->only('id', 'title', 'results_published')],
                 ),
                 'mark'         => McqResultPresenter::forRegistration($registration, $registration->mark),
-                'showResults'  => (bool) $registration->exam?->results_published,
+                'showResults'  => $registration->exam
+                    ? \App\Support\Mcq\McqResultReleaseSettings::isResultVisible($registration->exam, $registration)
+                    : false,
                 'resultVisibility' => $registration->exam
                     ? \App\Support\Mcq\McqResultReleaseSettings::visibility($registration->exam)
                     : 'score_grade',
@@ -329,7 +331,7 @@ class StudentMcqController extends Controller
         $message = $autoSubmitted
             ? 'Time expired — your answers were auto-submitted.'
             : 'Exam submitted.';
-        if ($registration->exam->results_published) {
+        if ($registration->exam && \App\Support\Mcq\McqResultReleaseSettings::isResultVisible($registration->exam, $registration)) {
             $message .= " Score: {$mark->score}";
         }
 

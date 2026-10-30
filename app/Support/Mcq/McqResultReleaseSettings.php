@@ -30,6 +30,15 @@ final class McqResultReleaseSettings
         self::VISIBILITY_REVIEW,
     ];
 
+    public const RELEASE_MODE_ON_PUBLISH = 'on_publish';
+
+    public const RELEASE_MODE_AFTER_COMPLETION = 'after_completion';
+
+    public const RELEASE_MODES = [
+        self::RELEASE_MODE_ON_PUBLISH,
+        self::RELEASE_MODE_AFTER_COMPLETION,
+    ];
+
     public const CERT_ELIGIBILITY_PARTICIPATION = 'participation';
 
     public const CERT_ELIGIBILITY_PASS = 'pass';
@@ -42,7 +51,7 @@ final class McqResultReleaseSettings
         self::CERT_ELIGIBILITY_GRADE_BANDS,
     ];
 
-    /** @return array{visibility: string, auto_release_at: ?string} */
+    /** @return array{visibility: string, release_mode: string, auto_release_at: ?string} */
     public static function resultRelease(McqExam $exam): array
     {
         $block = $exam->settings_json['result_release'] ?? [];
@@ -50,6 +59,11 @@ final class McqResultReleaseSettings
         $visibility = $block['visibility'] ?? self::VISIBILITY_SCORE_GRADE;
         if (! in_array($visibility, self::VISIBILITIES, true)) {
             $visibility = self::VISIBILITY_SCORE_GRADE;
+        }
+
+        $releaseMode = $block['release_mode'] ?? self::RELEASE_MODE_ON_PUBLISH;
+        if (! in_array($releaseMode, self::RELEASE_MODES, true)) {
+            $releaseMode = self::RELEASE_MODE_ON_PUBLISH;
         }
 
         $auto = $block['auto_release_at'] ?? null;
@@ -65,6 +79,7 @@ final class McqResultReleaseSettings
 
         return [
             'visibility' => $visibility,
+            'release_mode' => $releaseMode,
             'auto_release_at' => $auto,
         ];
     }
@@ -113,6 +128,29 @@ final class McqResultReleaseSettings
     public static function visibility(McqExam $exam): string
     {
         return self::resultRelease($exam)['visibility'];
+    }
+
+    public static function releaseMode(McqExam $exam): string
+    {
+        return self::resultRelease($exam)['release_mode'];
+    }
+
+    /**
+     * Determines whether results (scores/feedback) are accessible to students.
+     * When release_mode is `after_completion`, any student with status `submitted` sees their result immediately.
+     * Otherwise, results require results_published = true (manual publish or auto-release schedule).
+     */
+    public static function isResultVisible(McqExam $exam, ?\App\Models\McqRegistration $registration = null): bool
+    {
+        if ((bool) $exam->results_published) {
+            return true;
+        }
+
+        if (self::releaseMode($exam) === self::RELEASE_MODE_AFTER_COMPLETION) {
+            return $registration ? $registration->status === 'submitted' : true;
+        }
+
+        return false;
     }
 
     public static function showsGrade(McqExam $exam): bool
@@ -165,6 +203,11 @@ final class McqResultReleaseSettings
             $visibility = self::VISIBILITY_SCORE_GRADE;
         }
 
+        $releaseMode = $input['results_release_mode'] ?? $input['release_mode'] ?? $currentRelease['release_mode'];
+        if (! in_array($releaseMode, self::RELEASE_MODES, true)) {
+            $releaseMode = self::RELEASE_MODE_ON_PUBLISH;
+        }
+
         $autoRelease = $input['results_auto_release_at'] ?? null;
         if (is_string($autoRelease) && trim($autoRelease) !== '') {
             try {
@@ -201,6 +244,7 @@ final class McqResultReleaseSettings
         return [
             'result_release' => [
                 'visibility' => $visibility,
+                'release_mode' => $releaseMode,
                 'auto_release_at' => $autoRelease,
             ],
             'certificates' => [
@@ -217,6 +261,7 @@ final class McqResultReleaseSettings
     {
         return [
             'result_visibility' => 'nullable|in:'.implode(',', self::VISIBILITIES),
+            'results_release_mode' => 'nullable|in:'.implode(',', self::RELEASE_MODES),
             'results_auto_release_at' => 'nullable|date',
             'certificates_enabled' => 'nullable|boolean',
             'certificates_auto_issue' => 'nullable|boolean',
@@ -235,6 +280,7 @@ final class McqResultReleaseSettings
 
         return [
             'result_visibility' => $release['visibility'],
+            'results_release_mode' => $release['release_mode'],
             'results_auto_release_at' => $release['auto_release_at'],
             'certificates_enabled' => $certs['enabled'],
             'certificates_auto_issue' => $certs['auto_issue_on_publish'],
@@ -250,6 +296,14 @@ final class McqResultReleaseSettings
             self::VISIBILITY_SCORE => 'Score only',
             self::VISIBILITY_REVIEW => 'Score, grade & per-question review',
             default => 'Score & grade',
+        };
+    }
+
+    public static function releaseModeLabel(string $mode): string
+    {
+        return match ($mode) {
+            self::RELEASE_MODE_AFTER_COMPLETION => 'Immediately after completion of exam',
+            default => 'When results are published (manual release)',
         };
     }
 }

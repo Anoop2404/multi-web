@@ -26,7 +26,7 @@ class McqResultPresenter
             ];
         }
 
-        if (! $exam->results_published) {
+        if (! McqResultReleaseSettings::isResultVisible($exam, $registration)) {
             return [
                 'status' => 'submitted',
                 'submitted_at' => $registration->submitted_at?->toIso8601String(),
@@ -69,15 +69,15 @@ class McqResultPresenter
     /** @return array<string, mixed> */
     public static function forExamList(McqExam $exam, McqRegistration $registration): array
     {
-        $published = (bool) $exam->results_published;
+        $visible = McqResultReleaseSettings::isResultVisible($exam, $registration);
         $submitted = $registration->status === 'submitted';
 
         $resultState = 'not_submitted';
         $resultMessage = 'Not submitted yet.';
-        if ($submitted && ! $published) {
+        if ($submitted && ! $visible) {
             $resultState = 'held';
             $resultMessage = 'Results not released yet.';
-        } elseif ($submitted && $published) {
+        } elseif ($submitted && $visible) {
             $resultState = 'released';
             $resultMessage = null;
         }
@@ -88,13 +88,13 @@ class McqResultPresenter
             'title' => $exam->title,
             'status' => $registration->status,
             'scheduled_at' => $exam->scheduled_at?->toIso8601String(),
-            'results_published' => $published,
+            'results_published' => (bool) $exam->results_published,
             'result_state' => $resultState,
             'result_message' => $resultMessage,
             'result_visibility' => McqResultReleaseSettings::visibility($exam),
             'product_mode' => $exam->productMode(),
             'product_label' => McqProductMode::label($exam->productMode()),
-            'mark' => $published && $submitted
+            'mark' => $visible && $submitted
                 ? self::forRegistration($registration)
                 : null,
         ];

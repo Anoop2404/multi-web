@@ -320,4 +320,108 @@ class McqResultReleaseSettingsTest extends TestCase
             'settings_json' => McqProductMode::presetSettings(McqProductMode::SCHOOL_MODEL),
         ])));
     }
+
+    public function test_admin_can_save_release_mode_settings(): void
+    {
+        $admin = $this->userWithRole('school_admin', $this->school->id);
+        $exam = McqExam::create([
+            'tenant_id' => $this->sahodaya->id,
+            'school_id' => $this->school->id,
+            'conductor_level' => 'school',
+            'title' => 'Release mode exam',
+            'status' => 'published',
+            'delivery_mode' => 'online',
+            'fee_type' => 'none',
+            'settings_json' => McqProductMode::presetSettings(McqProductMode::SCHOOL_MODEL),
+        ]);
+
+        $this->actingAs($admin)->put("{$this->schoolBase()}/{$exam->id}", [
+            'title' => 'Release mode exam',
+            'status' => 'published',
+            'delivery_mode' => 'online',
+            'results_release_mode' => 'after_completion',
+            'result_visibility' => 'score_grade',
+        ])->assertSessionHas('success');
+
+        $exam->refresh();
+        $this->assertSame('after_completion', McqResultReleaseSettings::releaseMode($exam));
+
+        // Switch back to on_publish
+        $this->actingAs($admin)->put("{$this->schoolBase()}/{$exam->id}", [
+            'title' => 'Release mode exam',
+            'status' => 'published',
+            'delivery_mode' => 'online',
+            'results_release_mode' => 'on_publish',
+            'result_visibility' => 'score_grade',
+        ])->assertSessionHas('success');
+
+        $exam->refresh();
+        $this->assertSame('on_publish', McqResultReleaseSettings::releaseMode($exam));
+    }
+
+    public function test_results_visibility_respects_release_mode_on_publish_vs_after_completion(): void
+    {
+        $exam = McqExam::create([
+            'tenant_id' => $this->sahodaya->id,
+            'school_id' => $this->school->id,
+            'conductor_level' => 'school',
+            'title' => 'Instant vs Publish',
+            'status' => 'published',
+            'delivery_mode' => 'online',
+            'fee_type' => 'none',
+            'results_published' => false,
+            'settings_json' => array_merge(McqProductMode::presetSettings(McqProductMode::SCHOOL_MODEL), [
+                'result_release' => [
+                    'release_mode' => 'on_publish',
+                    'visibility' => 'score_grade',
+                ],
+            ]),
+        ]);
+
+        $class = SchoolClass::firstOrCreate(['tenant_id' => $this->school->id, 'name' => 'Class 8']);
+        $student = Student::create([
+            'tenant_id' => $this->school->id,
+            'school_class_id' => $class->id,
+            'name' => 'Instant Student',
+        ]);
+        $reg = McqRegistration::create([
+            'exam_id' => $exam->id,
+            'school_id' => $this->school->id,
+            'student_id' => $student->id,
+            'status' => 'submitted',
+            'submitted_at' => now(),
+            'approval_status' => 'approved',
+        ]);
+        McqMark::create([
+            'registration_id' => $reg->id,
+            'score' => 25,
+            'percentage' => 83.33,
+            'grade' => 'A+',
+            'correct_count' => 25,
+            'wrong_count' => 5,
+            'unanswered_count' => 0,
+        ]);
+
+        // In on_publish mode with results_published=false: results are held
+        $this->assertFalse(McqResultReleaseSettings::isResultVisible($exam, $reg));
+        $held = McqResultPresenter::forRegistration($reg->fresh(['exam', 'mark']));
+        $this->assertSame('held', $held['result_state']);
+        $this->assertSame('Results not released yet.', $held['result_message']);
+
+        // Switch to after_completion: results become immediately visible upon submission
+        $exam->update([
+            'settings_json' => array_merge($exam->settings_json, [
+                'result_release' => [
+                    'release_mode' => 'after_completion',
+                    'visibility' => 'score_grade',
+                ],
+            ]),
+        ]);
+
+        $this->assertTrue(McqResultReleaseSettings::isResultVisible($exam, $reg));
+        $released = McqResultPresenter::forRegistration($reg->fresh(['exam', 'mark']));
+        $this->assertSame('released', $released['result_state']);
+        $this->assertSame(25.0, (float) $released['score']);
+        $this->assertSame('A+', $released['grade']);
+    }
 }

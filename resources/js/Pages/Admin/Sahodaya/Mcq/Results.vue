@@ -46,9 +46,10 @@
                     {{ exam.results_published ? 'Results published' : 'Results not published' }}
                 </p>
                 <p class="text-xs text-slate-600 mt-0.5">
-                    Students {{ exam.results_published ? 'can' : 'cannot' }} view scores
+                    Mode: <span class="font-semibold">{{ isInstantRelease ? 'After completion of exam' : 'When published' }}</span> ·
+                    Students {{ (exam.results_published || isInstantRelease) ? 'can' : 'cannot' }} view scores
                     ({{ visibilityLabel }}).
-                    Configure visibility & certificates on Overview.
+                    Configure release timing, visibility & certificates on Overview.
                 </p>
                 <p v-if="exam.result_release?.results_auto_release_at && !exam.results_published" class="text-xs text-slate-500 mt-1">
                     Auto-release scheduled: {{ exam.result_release.results_auto_release_at }}
@@ -238,6 +239,10 @@ syncMarkForms(props.registrations);
 watch(() => props.registrations, syncMarkForms);
 
 const gradeOptions = computed(() => props.gradeBands?.length ? props.gradeBands.map((b) => b.label) : ['A+', 'A', 'B', 'C', 'D', 'F']);
+
+const isInstantRelease = computed(() => {
+    return props.exam?.result_release?.results_release_mode === 'after_completion';
+});
 
 const visibilityLabel = computed(() => {
     const v = props.exam?.result_release?.result_visibility ?? 'score_grade';

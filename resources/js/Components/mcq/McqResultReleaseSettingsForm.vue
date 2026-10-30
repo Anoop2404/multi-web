@@ -6,12 +6,49 @@
         </div>
 
         <div class="rounded-lg border px-3 py-2 text-sm flex flex-wrap items-center justify-between gap-2"
-             :class="resultsPublished ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-900'">
-            <span class="font-semibold">{{ resultsPublished ? 'Results released to students' : 'Results held — students cannot see scores' }}</span>
+             :class="statusBadgeClass">
+            <span class="font-semibold">{{ statusBadgeTitle }}</span>
             <span class="text-xs opacity-80">{{ visibilityHint }}</span>
         </div>
 
         <FormGrid>
+            <FormField label="When students see results" class-extra="sm:col-span-2"
+                       hint="Choose whether students see results immediately after completion of exam or when authorized/published.">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+                    <label
+                        class="flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition"
+                        :class="local.results_release_mode === 'on_publish' ? 'border-primary-500 bg-primary-50/40 ring-1 ring-primary-500' : 'border-slate-200 bg-white hover:border-slate-300'"
+                    >
+                        <input
+                            type="radio"
+                            v-model="local.results_release_mode"
+                            value="on_publish"
+                            class="mt-1 text-primary-600 focus:ring-primary-500"
+                        />
+                        <div class="text-xs">
+                            <span class="font-bold text-slate-800 block text-sm">When published</span>
+                            <span class="text-slate-500 mt-0.5 block">Held until coordinator publishes results (or scheduled auto-release). Recommended for competitive / official tests.</span>
+                        </div>
+                    </label>
+
+                    <label
+                        class="flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition"
+                        :class="local.results_release_mode === 'after_completion' ? 'border-primary-500 bg-primary-50/40 ring-1 ring-primary-500' : 'border-slate-200 bg-white hover:border-slate-300'"
+                    >
+                        <input
+                            type="radio"
+                            v-model="local.results_release_mode"
+                            value="after_completion"
+                            class="mt-1 text-primary-600 focus:ring-primary-500"
+                        />
+                        <div class="text-xs">
+                            <span class="font-bold text-slate-800 block text-sm">After completion of exam</span>
+                            <span class="text-slate-500 mt-0.5 block">Shown immediately when the candidate submits their exam. Recommended for practice & school model exams.</span>
+                        </div>
+                    </label>
+                </div>
+            </FormField>
+
             <FormField label="What students see when released" class-extra="sm:col-span-2"
                        hint="Use Score only for high-stakes exams. Review reveals correct answers.">
                 <SearchableSelect
@@ -20,7 +57,10 @@
                     :all-option="false"
                 />
             </FormField>
-            <FormField label="Auto-release at" hint="Optional. Releases scores automatically at this time (server schedule). Leave blank for manual release only.">
+            <FormField v-if="local.results_release_mode === 'on_publish'"
+                       label="Auto-release at"
+                       class-extra="sm:col-span-2"
+                       hint="Optional. Releases scores automatically at this time (server schedule). Leave blank for manual release only.">
                 <input v-model="local.results_auto_release_at" type="datetime-local" class="field">
             </FormField>
         </FormGrid>
@@ -58,9 +98,9 @@
                     <label v-for="band in gradeBands" :key="band.label"
                            class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded border border-slate-200 bg-white">
                         <input type="checkbox" class="rounded border-slate-300"
-                               :value="band.label"
-                               :checked="local.certificate_eligible_grades.includes(band.label)"
-                               @change="toggleGrade(band.label, $event.target.checked)">
+                                :value="band.label"
+                                :checked="local.certificate_eligible_grades.includes(band.label)"
+                                @change="toggleGrade(band.label, $event.target.checked)">
                         {{ band.label }}
                     </label>
                     <p v-if="!gradeBands?.length" class="text-xs text-slate-500">No grade bands configured — set a grade master first.</p>
@@ -97,6 +137,7 @@ const emit = defineEmits(['update:modelValue']);
 
 const local = reactive({
     result_visibility: props.modelValue.result_visibility ?? 'score_grade',
+    results_release_mode: props.modelValue.results_release_mode ?? 'on_publish',
     results_auto_release_at: props.modelValue.results_auto_release_at ?? '',
     certificates_enabled: !!props.modelValue.certificates_enabled,
     certificates_auto_issue: !!props.modelValue.certificates_auto_issue,
@@ -108,6 +149,39 @@ const local = reactive({
 watch(local, () => {
     emit('update:modelValue', { ...local, certificate_eligible_grades: [...local.certificate_eligible_grades] });
 }, { deep: true });
+
+watch(() => props.modelValue, (next) => {
+    if (!next) return;
+    if (next.results_release_mode !== undefined && next.results_release_mode !== local.results_release_mode) {
+        local.results_release_mode = next.results_release_mode;
+    }
+    if (next.result_visibility !== undefined && next.result_visibility !== local.result_visibility) {
+        local.result_visibility = next.result_visibility;
+    }
+    if (next.results_auto_release_at !== undefined && next.results_auto_release_at !== local.results_auto_release_at) {
+        local.results_auto_release_at = next.results_auto_release_at ?? '';
+    }
+}, { deep: true });
+
+const statusBadgeClass = computed(() => {
+    if (props.resultsPublished) {
+        return 'border-emerald-200 bg-emerald-50 text-emerald-900';
+    }
+    if (local.results_release_mode === 'after_completion') {
+        return 'border-sky-200 bg-sky-50 text-sky-900';
+    }
+    return 'border-amber-200 bg-amber-50 text-amber-900';
+});
+
+const statusBadgeTitle = computed(() => {
+    if (props.resultsPublished) {
+        return 'Results published — all students can see scores';
+    }
+    if (local.results_release_mode === 'after_completion') {
+        return 'Instant release — students see results immediately after completion of exam';
+    }
+    return 'Results held — students cannot see scores until published';
+});
 
 const visibilityOptions = [
     { value: 'score', label: 'Score only (no grade / rank / review)' },

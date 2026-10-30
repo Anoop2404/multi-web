@@ -319,6 +319,7 @@ const form = useForm({
     proctor_mode: props.exam.settings?.proctor_mode ?? 'log',
     proctor_max_tab_violations: props.exam.settings?.proctor_max_tab_violations ?? 3,
     result_visibility: release.result_visibility ?? 'score_grade',
+    results_release_mode: release.results_release_mode ?? 'on_publish',
     results_auto_release_at: toLocalInput(release.results_auto_release_at),
     certificates_enabled: !!release.certificates_enabled,
     certificates_auto_issue: !!release.certificates_auto_issue,
@@ -334,6 +335,7 @@ const strictTabProctor = computed({
 
 const releaseSettings = reactive({
     result_visibility: form.result_visibility,
+    results_release_mode: form.results_release_mode,
     results_auto_release_at: form.results_auto_release_at,
     certificates_enabled: form.certificates_enabled,
     certificates_auto_issue: form.certificates_auto_issue,

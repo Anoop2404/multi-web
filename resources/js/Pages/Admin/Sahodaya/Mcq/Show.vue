@@ -582,6 +582,7 @@ const form = useForm({
     total_questions: props.exam.total_questions || '',
     class_max_marks: initialClassMaxMarks,
     result_visibility: props.exam.result_release?.result_visibility ?? 'score_grade',
+    results_release_mode: props.exam.result_release?.results_release_mode ?? 'on_publish',
     results_auto_release_at: props.exam.result_release?.results_auto_release_at
         ? String(props.exam.result_release.results_auto_release_at).slice(0, 16)
         : '',
@@ -599,6 +600,7 @@ const strictTabProctor = computed({
 
 const releaseSettings = reactive({
     result_visibility: form.result_visibility,
+    results_release_mode: form.results_release_mode,
     results_auto_release_at: form.results_auto_release_at,
     certificates_enabled: form.certificates_enabled,
     certificates_auto_issue: form.certificates_auto_issue,

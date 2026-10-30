@@ -54,8 +54,12 @@
 
                         <div class="rounded-2xl bg-white/10 backdrop-blur p-3.5 border border-white/15 text-center">
                             <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-300">Status</span>
-                            <span class="block text-lg sm:text-xl font-black text-emerald-300 mt-1">Published</span>
-                            <span class="text-[10px] font-semibold text-slate-300">Official</span>
+                            <span class="block text-lg sm:text-xl font-black text-emerald-300 mt-1">
+                                {{ registration.exam?.results_published ? 'Published' : 'Completed' }}
+                            </span>
+                            <span class="text-[10px] font-semibold text-slate-300">
+                                {{ registration.exam?.results_published ? 'Official' : 'Instant Score' }}
+                            </span>
                         </div>
                     </div>
 
