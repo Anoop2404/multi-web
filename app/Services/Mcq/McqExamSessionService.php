@@ -108,6 +108,8 @@ class McqExamSessionService
                 'exam' => 'No gradable questions are attached to this exam.',
             ]);
         }
+
+        app(McqConcurrencyLimitService::class)->assertCapacityAvailable($registration);
     }
 
     public function start(McqRegistration $registration): McqRegistration

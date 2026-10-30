@@ -52,6 +52,7 @@ export function superadminNav(options = {}) {
                 { label: 'Announcements', href: '/admin/announcements', icon: 'bell' },
                 { label: 'Audit Log', href: '/admin/audit-logs', icon: 'file-text' },
                 { label: 'Online exam bookings', href: '/admin/exam-engine/bookings', icon: 'calendar' },
+                { label: 'Exam Concurrency & Limits', href: '/admin/mcq/concurrency-settings', icon: 'sliders' },
                 { label: 'Reports', href: '/admin/reports', icon: 'bar-chart' },
                 { label: 'S3 Migration', href: '/admin/storage-migration', icon: 'cloud' },
                 { label: 'Dev Pass Token', href: '/admin/dev-pass-token', icon: 'key' },

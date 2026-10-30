@@ -115,9 +115,11 @@ class StudentMcqController extends Controller
         try {
             $sessions->assertCanStart($registration);
         } catch (ValidationException $e) {
+            $msg = collect($e->errors())->flatten()->first() ?: 'Unable to start exam.';
             return redirect()
                 ->route('portal.student.dashboard', ['tenantId' => $tenantId])
-                ->withErrors($e->errors());
+                ->withErrors($e->errors())
+                ->with('error', $msg);
         }
 
         if ($registration->started_at && $sessions->isExpired($registration)) {
