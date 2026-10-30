@@ -141,6 +141,7 @@ class CertificateTemplateController extends SahodayaAdminController
                     // FestCertificateService::resolveFieldValues()'s real ordinal-suffix
                     // format exactly, so the admin's live preview shows the same "14th
                     // October 2026" styling actual certificates get.
+                    'certificate_date_short' => '14/10/2026',
                     'certificate_date' => '<strong>14</strong><sup>th</sup> October <strong>2026</strong>',
                 ],
                 'logoUrl'       => $template->logo_path ? TenantStorage::logoUrl($this->sahodaya, $template->logo_path) : TenantBranding::logoUrl($this->sahodaya),

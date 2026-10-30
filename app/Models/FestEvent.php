@@ -70,7 +70,7 @@ class FestEvent extends Model
         'food_payee_type', 'food_host_school_id', 'food_coupon_bg_image', 'food_coupon_layout', 'require_payment_for_coupons', 'food_order_opens_at', 'food_order_closes_at', 'food_order_day_windows',
         'phase_mode_enabled', 'workflow_mode', 'source_phase_id', 'registration_batch_id', 'workflow_leaf_key',
         'reporting_batch_min_registrations', 'reporting_batch_size',
-        'certificate_signatories',
+        'certificate_signatories', 'participation_certificate_mode',
         'state_slot_collection_open', 'state_slot_collection_opened_at',
         'state_slot_collection_approved_at', 'state_slot_collection_approved_by',
         // sahodaya_customized_at was stamped via updateQuietly() since 2026-08-13 but was
@@ -80,6 +80,13 @@ class FestEvent extends Model
         // the start so it doesn't repeat that mistake.
         'sahodaya_customized_at', 'fee_customized_at',
     ];
+
+    public function participationCertificateMode(): string
+    {
+        $owner = $this->usesPhasedRegionalBilling() && $this->parent_event_id ? $this->rootEvent() : $this;
+
+        return $owner->participation_certificate_mode === 'per_item' ? 'per_item' : 'per_person';
+    }
 
     protected $attributes = [
         'approval_policy' => 'auto',

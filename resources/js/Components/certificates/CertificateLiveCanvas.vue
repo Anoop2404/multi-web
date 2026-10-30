@@ -295,6 +295,7 @@ const sampleData = computed(() => {
         event_dates: '21st - 23rd July 2026',
         conducted_on: '22nd July 2026',
         certificate_date: '22nd July 2026',
+        certificate_date_short: '22/07/2026',
         venue: `${pageSahodaya} Central Complex`,
         days_attended: '2',
         training_hours: '12',
