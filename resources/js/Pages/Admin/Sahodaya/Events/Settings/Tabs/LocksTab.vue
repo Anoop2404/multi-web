@@ -26,12 +26,14 @@
                 <FormField label="Approval policy" hint="Auto-approve submitted registrations, or hold every registration for manual Sahodaya review. Falls back to this event-level setting for any item with no Event Head.">
                     <SearchableSelect v-model="settingsForm.approval_policy" :options="[{ value: 'auto', label: 'Auto (on submission / full payment)' }, { value: 'manual', label: 'Manual review' }]" :all-option="false" />
                 </FormField>
-                <FormField label="Capacity caps" hint="Maximum total participants / team entries per school for this event (leave blank for no limit).">
-                    <div class="grid grid-cols-2 gap-3">
-                        <input v-model.number="settingsForm.max_participants" type="number" min="0" class="field" placeholder="Max participants">
-                        <input v-model.number="settingsForm.max_teams" type="number" min="0" class="field" placeholder="Max teams">
-                    </div>
-                </FormField>
+                <div>
+                    <p class="form-label">Capacity caps</p>
+                    <p class="form-hint mb-2">Maximum entries per school, per item. Blank or zero means no cap.</p>
+                    <FormGrid>
+                        <FormField label="Individual entries"><input v-model.number="settingsForm.max_participants" type="number" min="0" class="field" placeholder="No cap"></FormField>
+                        <FormField label="Team entries"><input v-model.number="settingsForm.max_teams" type="number" min="0" class="field" placeholder="No cap"></FormField>
+                    </FormGrid>
+                </div>
                 <FormField label="Certificate collection">
                     <label class="flex items-center gap-2 text-sm text-slate-700">
                         <input type="checkbox" v-model="settingsForm.certificate_collection_open"> Allow certificate pickup
@@ -74,7 +76,7 @@
                     </template>
                 </FormField>
                 <div class="rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-600">
-                    {{ isSports ? 'Mark entry progress' : 'Judge gate' }}: {{ judgeGate.complete }}/{{ judgeGate.total }} items complete
+                    {{ isSports ? 'Mark entry progress' : 'Judge gate' }}: {{ judgeGate.complete }}/{{ judgeGate.total }} {{ isSports ? 'entries' : 'items' }} complete
                 </div>
                 <button type="submit" class="btn-primary">Save locks & gates</button>
             </form>

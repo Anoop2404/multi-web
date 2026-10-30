@@ -51,7 +51,17 @@ class FestEventSettingsController extends SahodayaAdminController
         }
 
         $allowed = ['lifecycle', 'locks', 'venues', 'combo', 'grades', 'points', 'participation', 'eligibility', 'fees', 'registration', 'numbering', 'volunteers', 'records', 'clone'];
+        $tab = $tab === 'public-overlays' ? 'overlays' : $tab;
+        $allowed[] = 'overlays';
         $initialTab = ($tab && in_array($tab, $allowed, true)) ? $tab : 'lifecycle';
+
+        if ($initialTab === 'overlays' && $event->event_type === 'sports') {
+            $initialTab = 'lifecycle';
+        }
+
+        if ($initialTab === 'combo' && $event->event_type === 'sports') {
+            $initialTab = 'eligibility';
+        }
 
         if ($initialTab === 'eligibility' && $event->event_type !== 'sports') {
             $initialTab = 'lifecycle';
@@ -107,7 +117,7 @@ class FestEventSettingsController extends SahodayaAdminController
             // cbse/sahodaya/cluster/custom dropdown) — auto-seeded once per tenant from
             // those same presets/live Class Master data so nothing already configured
             // breaks. See FestClassCategoryScheme::ensureDefaultsForTenant().
-            'classCategorySchemes' => (function () {
+            'classCategorySchemes' => $event->event_type === 'sports' ? [] : (function () {
                 \App\Models\FestClassCategoryScheme::ensureDefaultsForTenant($this->sahodaya->id);
 
                 $schemes = \App\Models\FestClassCategoryScheme::forTenant($this->sahodaya->id)
@@ -179,21 +189,21 @@ class FestEventSettingsController extends SahodayaAdminController
             ]),
             'volunteers'   => FestVolunteer::where('event_id', $event->id)->orderBy('name')->get(),
             'schools'      => $schools,
-            'judgeGate'    => app(FestJudgeGateService::class)->status($event),
-            'lifecycle'    => FestLifecycleService::for($event)->checklist(),
-            'suggestedStatus' => FestLifecycleService::for($event)->suggestedStatus(),
+            'judgeGate'    => $initialTab === 'locks' ? app(FestJudgeGateService::class)->status($event) : ['complete' => 0, 'total' => 0, 'items' => []],
+            'lifecycle'    => $initialTab === 'lifecycle' ? FestLifecycleService::for($event)->checklist() : [],
+            'suggestedStatus' => $initialTab === 'lifecycle' ? FestLifecycleService::for($event)->suggestedStatus() : null,
             'classGroups'  => FestClassGroupScheme::labels(null, $event->rootEvent()),
             'initialTab'   => $initialTab,
             'participationPolicy' => \App\Models\FestParticipationPolicy::where('event_id', $event->id)->whereNull('class_group')->first(),
-            'participationPresets' => app(\App\Services\Events\FestParticipationPolicyService::class)->presetOptions(),
+            'participationPresets' => $event->event_type === 'sports' ? [] : app(\App\Services\Events\FestParticipationPolicyService::class)->presetOptions(),
             'ageRuleSummary' => $event->event_type === 'sports' ? FestSportsAgeGroup::ageRuleSummary($event) : null,
             'suggestedAgeCutoff' => $event->event_type === 'sports'
-                ? FestSportsAgeGroup::cutoffDate($event)->format('Y-m-d')
+                ? $this->inheritedAgeCutoff($event)->format('Y-m-d')
                 : null,
             'defaultCutoffLabel' => $this->defaultCutoffLabel($event),
             'ageGroupHelp' => $event->event_type === 'sports' ? $this->ageGroupHelp($event) : [],
-            'schoolVerifications' => $this->schoolVerificationRows($event, $schools),
-            'mandatoryGaps' => app(FestMandatoryItemService::class)->schoolsWithMissing($event),
+            'schoolVerifications' => $initialTab === 'lifecycle' ? $this->schoolVerificationRows($event, $schools) : [],
+            'mandatoryGaps' => $initialTab === 'lifecycle' ? app(FestMandatoryItemService::class)->schoolsWithMissing($event) : [],
             'activityLogs' => $this->pageActivityLogs($event, FestPageActivity::settingsTab($initialTab)),
             'clusterRequireStudentVerification' => (bool) (
                 SahodayaProfile::where('tenant_id', $this->sahodaya->id)->value('require_student_verification') ?? true
@@ -376,17 +386,15 @@ class FestEventSettingsController extends SahodayaAdminController
             return '';
         }
 
-        $temp = new FestEvent([
-            'event_type' => 'sports',
-            'event_start' => $event->event_start,
-            'event_end' => $event->event_end,
-            'registration_close' => $event->registration_close,
-            'sports_age_cutoff_date' => null,
-        ]);
+        return $this->inheritedAgeCutoff($event)->format('j M Y');
+    }
 
-        $cutoff = FestSportsAgeGroup::cutoffDate($temp);
+    private function inheritedAgeCutoff(FestEvent $event): \Carbon\Carbon
+    {
+        $inherited = clone $event;
+        $inherited->sports_age_cutoff_date = null;
 
-        return $cutoff->format('j M Y');
+        return FestSportsAgeGroup::cutoffDate($inherited);
     }
 
     public function updateSettings(Request $request, string $tenantId, FestEvent $event)
@@ -424,7 +432,9 @@ class FestEventSettingsController extends SahodayaAdminController
             'tv_public_override'                 => 'nullable|boolean',
         ]);
 
-        $data = FestEventSettingsPayload::applyDefaults($data);
+        // Section forms submit only their own fields. Default explicit null booleans,
+        // but do not write or cascade any setting omitted by this request.
+        $data = array_intersect_key(FestEventSettingsPayload::applyDefaults($data), array_flip(array_keys($data)));
         $verificationMode = $data['student_verification_mode'] ?? null;
         unset($data['student_verification_mode']);
 
@@ -453,7 +463,9 @@ class FestEventSettingsController extends SahodayaAdminController
         $data = $request->validate([
             'show_individual_championship' => 'nullable|boolean',
             'category_filter' => 'nullable|array',
-            'category_filter.*' => 'string|in:lp,up,hs,hss,open',
+            'category_filter.*' => ['string', Rule::in(array_keys($event->event_type === 'sports'
+                ? FestSportsAgeGroup::labels($event->tenant_id)
+                : FestClassGroupScheme::labels(null, $event->rootEvent())))],
         ]);
 
         $root = $event->rootEvent();
@@ -1159,6 +1171,11 @@ class FestEventSettingsController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($venue->event_id !== $event->id, 404);
+        if ($venue->stages()->exists()
+            || \App\Models\FestSchedule::where('venue_id', $venue->id)->exists()
+            || \App\Models\FestEventStaff::where('venue_id', $venue->id)->exists()) {
+            return back()->withErrors(['venue' => 'This venue is used by stages, schedules or staff. Reassign them before removing it.']);
+        }
         $name = $venue->name;
         $venue->delete();
 
@@ -1212,6 +1229,9 @@ class FestEventSettingsController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
         abort_if($stage->event_id !== $event->id, 404);
+        if ($stage->schedules()->exists() || \App\Models\FestEventStaff::where('stage_id', $stage->id)->exists()) {
+            return back()->withErrors(['stage' => 'This stage is used by schedules or staff. Reassign them before removing it.']);
+        }
         $name = $stage->name;
         $stage->delete();
 
@@ -2044,9 +2064,9 @@ class FestEventSettingsController extends SahodayaAdminController
 
         $data = $request->validate([
             'schools' => 'required|array',
-            'schools.*.school_id' => 'required|string',
-            'schools.*.chest_no_start' => 'nullable|integer|min:1',
-            'schools.*.chest_no_end' => 'nullable|integer|min:1',
+            'schools.*.school_id' => ['required', 'string', 'distinct', Rule::exists('central.tenants', 'id')->where('parent_id', $this->sahodaya->id)->where('type', 'school')],
+            'schools.*.chest_no_start' => 'nullable|integer|min:1|required_with:schools.*.chest_no_end',
+            'schools.*.chest_no_end' => 'nullable|integer|min:1|gte:schools.*.chest_no_start',
         ]);
 
         $count = 0;
@@ -2145,7 +2165,7 @@ class FestEventSettingsController extends SahodayaAdminController
                     'reg_end' => $row['reg_end'] ?? null,
                     'competition_start' => $row['competition_start'] ?? null,
                     'competition_end' => $row['competition_end'] ?? null,
-                    'head_id' => $row['head_id'] ?? null,
+                    ...array_intersect_key($row, array_flip(['head_id'])),
                 ]);
                 $updated++;
             }

@@ -2,9 +2,9 @@
     <SahodayaEventsLayout :title="`${event.title} — Student item limits`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Student Item Limits`" eyebrow="Reports"
-                    description="Per-student on-stage, off-stage, Individual (on-stage + off-stage) and Group item usage vs limits, plus Total (Individual + Group combined) — combined across every phase and region of this fest.">
+                    :description="isSports ? 'Individual, pair and team item usage against the configured sports limits.' : 'Per-student on-stage, off-stage, Individual (on-stage + off-stage) and Group item usage vs limits, plus Total (Individual + Group combined) — combined across every phase and region of this fest.'">
             <template #actions>
-                <ReportDownloadButtons :pdf-url="pdfUrl" :xls-url="xlsUrl" />
+                <ReportDownloadButtons :pdf-url="filteredPdfUrl" :xls-url="filteredXlsUrl" />
             </template>
         </PageHeader>
 
@@ -23,7 +23,7 @@
             <button type="submit" class="btn-primary text-sm">Apply</button>
         </form>
 
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+        <div class="grid grid-cols-2 gap-3 mb-4" :class="isSports ? 'lg:grid-cols-4' : 'sm:grid-cols-3 lg:grid-cols-6'">
             <div class="card text-center">
                 <p class="text-2xl font-bold text-slate-900">{{ summary.total_students }}</p>
                 <p class="text-xs text-gray-500">Students</p>
@@ -32,17 +32,17 @@
                 <p class="text-2xl font-bold" :class="summary.exceeding_students ? 'text-rose-600' : 'text-slate-900'">{{ summary.exceeding_students }}</p>
                 <p class="text-xs text-gray-500">Exceeding a limit</p>
             </div>
-            <div class="card text-center">
+            <div v-if="!isSports" class="card text-center">
                 <p class="text-2xl font-bold" :class="summary.exceeding_on_stage ? 'text-rose-600' : 'text-slate-900'">{{ summary.exceeding_on_stage }}</p>
                 <p class="text-xs text-gray-500">Over on-stage</p>
             </div>
-            <div class="card text-center">
+            <div v-if="!isSports" class="card text-center">
                 <p class="text-2xl font-bold" :class="summary.exceeding_off_stage ? 'text-rose-600' : 'text-slate-900'">{{ summary.exceeding_off_stage }}</p>
                 <p class="text-xs text-gray-500">Over off-stage</p>
             </div>
             <div class="card text-center">
                 <p class="text-2xl font-bold" :class="summary.exceeding_individual ? 'text-rose-600' : 'text-slate-900'">{{ summary.exceeding_individual }}</p>
-                <p class="text-xs text-gray-500">Over individual (combined)</p>
+                <p class="text-xs text-gray-500">{{ isSports ? 'Over individual' : 'Over individual (combined)' }}</p>
             </div>
             <div class="card text-center">
                 <p class="text-2xl font-bold" :class="summary.exceeding_group ? 'text-rose-600' : 'text-slate-900'">{{ summary.exceeding_group }}</p>
@@ -87,11 +87,12 @@
                         </h4>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
-                        <LimitBadge label="On-stage" :dim="st.on_stage" />
-                        <LimitBadge label="Off-stage" :dim="st.off_stage" />
-                        <LimitBadge label="Individual" :dim="st.individual" emphasize title="On-stage + off-stage combined" />
-                        <LimitBadge label="Group" :dim="st.group" />
-                        <LimitBadge label="Total" :dim="st.total" emphasize title="Individual + Group combined" />
+                        <LimitBadge v-if="!isSports" label="On-stage" :dim="st.on_stage" />
+                        <LimitBadge v-if="!isSports" label="Off-stage" :dim="st.off_stage" />
+                        <LimitBadge label="Individual" :dim="st.individual" emphasize :title="isSports ? 'Individual sports items' : 'On-stage + off-stage combined'" />
+                        <LimitBadge v-if="isSports" label="Pair" :dim="st.pair" />
+                        <LimitBadge :label="isSports ? 'Team' : 'Group'" :dim="st.group" />
+                        <LimitBadge label="Total" :dim="st.total" emphasize title="All registered items" />
                         <button type="button"
                                 class="px-2.5 py-1 rounded-full text-xs font-bold border inline-flex items-center gap-1.5 bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                                 @click="toggleExpanded(st.student_id)">
@@ -186,6 +187,8 @@ const schoolFilter = ref(props.filterSchoolId ?? '');
 
 // Category → item is a narrowing cascade — see Students.vue's class-category → class
 // filter, the reference pattern in this codebase for this kind of dependent dropdown.
+const isSports = computed(() => props.event?.event_type === 'sports');
+
 const categoryOptions = computed(() => Object.entries(props.categories).map(([value, label]) => ({ value, label })));
 const categoryFilter = ref(props.filterCategory ?? '');
 const itemFilter = ref(props.filterItemId ? String(props.filterItemId) : '');
@@ -218,6 +221,17 @@ const searchQuery = ref('');
 // actually need an admin's attention are the ones over a limit -- opening on the
 // full unfiltered list buried that handful of rows under everyone else every time.
 const onlyExceeding = ref(true);
+function filteredExportUrl(source) {
+    if (!source) return source;
+    const url = new URL(source, window.location.origin);
+    if (searchQuery.value.trim()) url.searchParams.set('search', searchQuery.value.trim());
+    else url.searchParams.delete('search');
+    url.searchParams.set('only_exceeding', onlyExceeding.value ? '1' : '0');
+    return url.pathname + url.search;
+}
+const filteredPdfUrl = computed(() => filteredExportUrl(props.pdfUrl));
+const filteredXlsUrl = computed(() => filteredExportUrl(props.xlsUrl));
+
 const expandedIds = ref(new Set());
 
 function isExpanded(studentId) {
@@ -277,7 +291,7 @@ function goToPage(page) {
 }
 
 function dimensionLabel(dimension) {
-    return { on_stage: 'On-stage', off_stage: 'Off-stage', group: 'Group' }[dimension] ?? '—';
+    return { individual: 'Individual', pair: 'Pair', on_stage: 'On-stage', off_stage: 'Off-stage', group: 'Group / team' }[dimension] ?? '—';
 }
 
 const LimitBadge = {

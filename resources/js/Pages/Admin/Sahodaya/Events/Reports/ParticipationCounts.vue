@@ -14,8 +14,8 @@
                 <h3 class="font-semibold text-sm mb-2">Used</h3>
                 <ul class="text-sm space-y-1">
                     <li>Total entries: <strong>{{ used.total }}</strong></li>
-                    <li>On-stage: {{ used.on_stage }}</li>
-                    <li>Off-stage: {{ used.off_stage }}</li>
+                    <li v-if="event.event_type !== 'sports'">On-stage: {{ used.on_stage }}</li>
+                    <li v-if="event.event_type !== 'sports'">Off-stage: {{ used.off_stage }}</li>
                     <li>Individual: {{ used.individual }}</li>
                     <li>Group/team: {{ used.group }}</li>
                 </ul>
@@ -23,8 +23,10 @@
             <div class="card">
                 <h3 class="font-semibold text-sm mb-2">Limits (if set)</h3>
                 <ul v-if="hasLimits" class="text-sm space-y-1 text-gray-600">
-                    <li v-if="limits.max_onstage_per_student != null">Max on-stage / student: {{ limits.max_onstage_per_student }}</li>
-                    <li v-if="limits.max_offstage_per_student != null">Max off-stage / student: {{ limits.max_offstage_per_student }}</li>
+                    <li v-if="event.event_type !== 'sports' && limits.max_onstage_per_student != null">Max on-stage / student: {{ limits.max_onstage_per_student }}</li>
+                    <li v-if="event.event_type !== 'sports' && limits.max_offstage_per_student != null">Max off-stage / student: {{ limits.max_offstage_per_student }}</li>
+                    <li v-if="limits.max_total_per_student">Max individual / student: {{ limits.max_total_per_student }}</li>
+                    <li v-if="limits.max_overall_per_student">Max total / student: {{ limits.max_overall_per_student }}</li>
                     <li v-if="limits.max_group_per_student != null">Max group / student: {{ limits.max_group_per_student }}</li>
                 </ul>
                 <p v-else class="text-gray-400 text-sm">No participation limits set — configure under Event settings → Participation.</p>
@@ -45,7 +47,7 @@ const props = defineProps({ sahodaya: Object, publicUrl: String, pendingPayments
 });
 
 const hasLimits = computed(() => props.limits && (
-    props.limits.max_onstage_per_student != null
+    props.limits.max_total_per_student != null || props.limits.max_overall_per_student != null || props.limits.max_onstage_per_student != null
     || props.limits.max_offstage_per_student != null
     || props.limits.max_group_per_student != null
 ));

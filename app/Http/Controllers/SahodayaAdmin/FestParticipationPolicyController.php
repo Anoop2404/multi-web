@@ -48,7 +48,7 @@ class FestParticipationPolicyController extends SahodayaAdminController
         // Re-saving the form while the same preset is still shown — e.g. just toggling a
         // checkbox or tweaking one number field — must not silently discard those edits and
         // reset everything back to the preset's raw defaults.
-        if (! empty($data['preset_key']) && $data['preset_key'] !== $existing?->preset_key) {
+        if ($event->event_type !== 'sports' && ! empty($data['preset_key']) && $data['preset_key'] !== $existing?->preset_key) {
             $service->applyPresetToEvent($event, $data['preset_key'], $data['class_group'] ?? null);
 
             $audit->festEvent($event, FestPageActivity::settingsTab('participation'), 'fest.participation.preset', "Participation preset applied: {$data['preset_key']}");
@@ -57,7 +57,8 @@ class FestParticipationPolicyController extends SahodayaAdminController
                 ->with('success', 'Participation policy preset applied.');
         }
 
-        $data = FestParticipationPolicyPayload::applyDefaults($data);
+        $defaults = FestParticipationPolicyPayload::applyDefaults($data);
+        $data = $existing ? array_intersect_key($defaults, array_flip(array_keys($data))) : $defaults;
 
         FestParticipationPolicy::updateOrCreate(
             ['event_id' => $event->id, 'class_group' => $data['class_group'] ?? null],

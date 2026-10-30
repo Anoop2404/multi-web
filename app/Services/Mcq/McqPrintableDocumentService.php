@@ -384,7 +384,7 @@ class McqPrintableDocumentService
             return $student->photo;
         }
 
-        $cacheKey = 'student-photo-thumb:'.$student->id.':'.($student->updated_at?->timestamp ?? 0);
+        $cacheKey = $student->photoDataUriCacheKey();
 
         return \Illuminate\Support\Facades\Cache::remember(
             $cacheKey,

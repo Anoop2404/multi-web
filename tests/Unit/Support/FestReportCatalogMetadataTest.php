@@ -14,6 +14,17 @@ use Tests\TestCase;
  */
 class FestReportCatalogMetadataTest extends TestCase
 {
+    public function test_sports_exports_hide_arts_operations_and_championship_links_resolve_to_the_event_workspace(): void
+    {
+        $ids = array_column(FestReportCatalog::exports('tenant', 9, 'sports'), 'id');
+        $this->assertNotContains('green-room-list', $ids);
+        $this->assertNotContains('judge-sheet', $ids);
+        $this->assertContains('student-limits-pdf', $ids);
+        $this->assertContains('green-room-list', array_column(FestReportCatalog::exports('tenant', 9), 'id'));
+        $page = collect(FestReportCatalog::interactivePages('tenant', 9, 'sports'))->firstWhere('id', 'championship');
+        $this->assertSame('/sahodaya-admin/tenant/events/9/championship', $page['href']);
+    }
+
     public function test_every_export_has_complete_scope_metadata(): void
     {
         $exports = FestReportCatalog::exports('tenant-fixture', 1);

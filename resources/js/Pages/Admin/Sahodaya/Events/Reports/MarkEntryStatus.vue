@@ -49,7 +49,7 @@
                         <th>Category</th>
                         <th>Competition</th>
                         <th>Progress</th>
-                        <th>Judges</th>
+                        <th v-if="event.event_type !== 'sports'">Judges</th>
                         <th>Participants</th>
                         <th>Marked</th>
                         <th>Pending</th>
@@ -79,7 +79,7 @@
                                     <span class="text-xs text-slate-500 font-medium">{{ progressPercentage(row)}}%</span>
                                 </div>
                             </td>
-                            <td>{{ row.judges }}</td>
+                            <td v-if="event.event_type !== 'sports'">{{ row.judges }}</td>
                             <td>{{ row.participants }}</td>
                             <td>{{ row.marked }}</td>
                             <td>{{ row.pending }}</td>

@@ -1773,7 +1773,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/id-cards/die/continuous-pdf', [\App\Http\Controllers\SahodayaAdmin\FestIdCardController::class, 'downloadContinuousPdf'])->name('id-cards.die-continuous-pdf');
             Route::get('/{event}/id-cards/die/master-file', [\App\Http\Controllers\SahodayaAdmin\FestIdCardController::class, 'downloadContinuousPdf'])->name('id-cards.die-master-file');
             Route::get('/{event}/settings/{tab?}', [FestEventSettingsController::class, 'settings'])
-                ->where('tab', 'lifecycle|locks|venues|combo|grades|points|participation|eligibility|fees|registration|numbering|volunteers|records|clone')
+                ->where('tab', 'lifecycle|locks|venues|combo|grades|points|participation|eligibility|fees|registration|numbering|volunteers|records|clone|overlays')
                 ->name('settings');
             Route::put('/{event}/settings', [FestEventSettingsController::class, 'updateSettings'])->name('settings.update');
             Route::get('/{event}/settings/public-overlays', [FestEventSettingsController::class, 'getPublicOverlays'])->name('settings.public-overlays.show');

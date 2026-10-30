@@ -29,7 +29,7 @@
                             <th>Category</th>
                             <th>Performers</th>
                             <th>Marks entered</th>
-                            <th>Judges assigned</th>
+                            <th v-if="event.event_type !== 'sports'">Judges assigned</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -43,7 +43,7 @@
                             <td class="text-xs">{{ row.category_label ?? '—' }}</td>
                             <td>{{ row.performers }}</td>
                             <td class="text-emerald-700 font-medium">{{ row.marks_entered }}</td>
-                            <td>{{ row.judges_assigned }}</td>
+                            <td v-if="event.event_type !== 'sports'">{{ row.judges_assigned }}</td>
                             <td>
                                 <Link :href="resultsPageHref" class="btn-primary text-xs">Publish →</Link>
                             </td>

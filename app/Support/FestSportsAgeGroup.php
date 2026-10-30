@@ -36,6 +36,11 @@ class FestSportsAgeGroup
         return self::$registryCache[$tenantId] ??= app(FestSportsAgeGroupRegistry::class)->forTenant($tenantId);
     }
 
+    public static function forgetTenantCache(string $tenantId): void
+    {
+        unset(self::$registryCache[$tenantId], self::$globalCutoffCache[$tenantId]);
+    }
+
     /** @return array<string, string> */
     public static function labels(?string $tenantId = null): array
     {

@@ -5,7 +5,7 @@
             <p class="section-desc">
                 Control which content appears on the public-facing event results page.
                 Enable or disable the Individual Championship section and filter which
-                class categories are included in the rankings.
+                event categories are included in the rankings.
             </p>
         </div>
 
@@ -56,10 +56,10 @@
 </template>
 
 <script setup>
-import { ref, inject, onMounted } from 'vue';
+import { ref, inject, onMounted, computed } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 
-const { sahodaya, event } = inject('eventSettings');
+const { sahodaya, event, ageGroupLabels, classGroups } = inject('eventSettings');
 
 const overlaysForm = useForm({
     show_individual_championship: true,
@@ -69,13 +69,7 @@ const overlaysForm = useForm({
 const successMessage = ref('');
 const loading = ref(true);
 
-const categoryOptions = [
-    { value: 'lp', label: 'LP' },
-    { value: 'up', label: 'UP' },
-    { value: 'hs', label: 'HS' },
-    { value: 'hss', label: 'HSS' },
-    { value: 'open', label: 'Open' },
-];
+const categoryOptions = computed(() => Object.entries(event.value.event_type === 'sports' ? (ageGroupLabels.value ?? {}) : (classGroups.value ?? {})).map(([value, label]) => ({ value, label })));
 
 async function fetchConfig() {
     loading.value = true;

@@ -16,7 +16,7 @@
                 <p class="font-bold text-indigo-900 text-sm">Currently Effective Cutoff</p>
                 <p class="text-indigo-900/90 font-medium">{{ ageRuleSummary }}</p>
                 <p v-if="!eligibilityForm.sports_age_cutoff_date" class="text-[11px] text-indigo-700/80">
-                    No custom date set — using CBSE default standard ({{ defaultCutoffLabel }}).
+                    No event override — using the inherited cutoff ({{ defaultCutoffLabel }}).
                 </p>
             </div>
 
@@ -24,17 +24,18 @@
                 <div>
                     <label class="form-label text-xs">Custom Age Reference Date</label>
                     <input v-model="eligibilityForm.sports_age_cutoff_date" type="date" class="field text-xs max-w-sm">
+                    <p v-if="eligibilityForm.errors.sports_age_cutoff_date" class="mt-1 text-xs text-rose-600">{{ eligibilityForm.errors.sports_age_cutoff_date }}</p>
                     <p class="text-[11px] text-slate-500 mt-1">
-                        CBSE Default: 31 December of the competition year (e.g. 31 Dec 2026 for a 2026 meet).
+                        Leave blank to use the Sahodaya cutoff. If no Sahodaya cutoff is set, the competition-year default applies.
                     </p>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2 pt-1">
                     <button type="button" class="btn-secondary text-xs" @click="applyDefault">
-                        Use Suggested Cutoff ({{ suggestedAgeCutoff }})
+                        Copy Inherited Cutoff ({{ suggestedAgeCutoff }})
                     </button>
                     <button type="button" class="btn-secondary text-xs text-slate-600" @click="clearCustom">
-                        Reset to System Default
+                        Use Inherited Cutoff
                     </button>
                 </div>
 

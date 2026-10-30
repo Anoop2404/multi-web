@@ -36,7 +36,7 @@ class FestParticipationPolicyService
 
         if ($policy) {
             $limits = $policy->toLimitArray();
-            if ($policy->preset_key) {
+            if ($policy->preset_key && $event->event_type !== 'sports') {
                 $preset = $this->preset($policy->preset_key);
                 unset($preset['label']);
                 foreach ($preset as $k => $v) {
@@ -46,7 +46,7 @@ class FestParticipationPolicyService
                 }
             }
 
-            return $limits;
+            return $event->event_type === 'sports' ? $this->forEventType($event, $limits) : $limits;
         }
 
         if ($event->state_program_id) {
@@ -54,8 +54,12 @@ class FestParticipationPolicyService
             $level = $event->level_round ?? 'sahodaya';
             $levelPolicy = $program?->level_policies[$level] ?? null;
             if (is_array($levelPolicy)) {
-                return $this->mergePreset($levelPolicy);
+                return $this->forEventType($event, $levelPolicy);
             }
+        }
+
+        if ($event->event_type === 'sports') {
+            return []; // No implicit arts quotas for sports events.
         }
 
         $presetKey = match ($event->level_round) {
@@ -64,6 +68,21 @@ class FestParticipationPolicyService
         };
 
         return $this->mergePreset(['preset_key' => $presetKey]);
+    }
+
+    private function forEventType(FestEvent $event, array $limits): array
+    {
+        if ($event->event_type !== 'sports') {
+            return $this->mergePreset($limits);
+        }
+
+        foreach (['preset_key', 'combo_profiles', 'max_onstage_per_student', 'max_offstage_per_student',
+            'max_offstage_writing_per_student', 'max_offstage_drawing_per_student',
+            'max_onstage_per_school', 'max_offstage_per_school', 'max_common_per_student'] as $key) {
+            unset($limits[$key]);
+        }
+
+        return $limits;
     }
 
     private function eventPolicy(int $eventId, ?string $classGroup): ?FestParticipationPolicy

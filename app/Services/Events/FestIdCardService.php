@@ -1348,7 +1348,7 @@ class FestIdCardService
                 return $photo;
             }
 
-            $cacheKey = 'student-photo-thumb:'.$p->student->id.':'.($p->student->updated_at?->timestamp ?? 0);
+            $cacheKey = $p->student->photoDataUriCacheKey();
 
             return \Illuminate\Support\Facades\Cache::remember(
                 $cacheKey,

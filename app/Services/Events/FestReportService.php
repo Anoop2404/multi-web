@@ -430,10 +430,10 @@ class FestReportService
      *
      * @return array{rows: list<array<string, mixed>>, summary: array<string, int>}
      */
-    private function studentLimitsReport(?string $schoolId, ?string $category = null, ?int $itemId = null, bool $includePhotoDataUri = false): array
+    private function studentLimitsReport(?string $schoolId, ?string $category = null, ?int $itemId = null, bool $includePhotoDataUri = false, ?string $search = null, bool $onlyExceeding = false): array
     {
         $service = new FestParticipationLimitService($this->event->rootEvent());
-        $rows = $service->studentLimitReportRows($schoolId, null, $category, $itemId, $includePhotoDataUri);
+        $rows = $service->studentLimitReportRows($schoolId, $search, $category, $itemId, $includePhotoDataUri, onlyExceeding: $onlyExceeding);
 
         return ['rows' => $rows, 'summary' => $service->summarizeStudentLimitRows($rows)];
     }
@@ -445,6 +445,8 @@ class FestReportService
             $request->input('category') ?: null,
             $request->filled('item_id') ? (int) $request->input('item_id') : null,
             includePhotoDataUri: true,
+            search: $request->input('search'),
+            onlyExceeding: $request->boolean('only_exceeding'),
         );
 
         return $this->renderPdf('fest.reports.student-limits', [
@@ -461,17 +463,22 @@ class FestReportService
             $request->input('school_id') ?: null,
             $request->input('category') ?: null,
             $request->filled('item_id') ? (int) $request->input('item_id') : null,
+            search: $request->input('search'),
+            onlyExceeding: $request->boolean('only_exceeding'),
         );
         $fmt = fn (array $dim) => $dim['limit'] !== null ? "{$dim['used']}/{$dim['limit']}" : (string) $dim['used'];
 
+        $dimensions = $this->event->event_type === 'sports'
+            ? ['individual' => 'Individual', 'pair' => 'Pair', 'group' => 'Team', 'total' => 'Total']
+            : ['on_stage' => 'On-stage', 'off_stage' => 'Off-stage', 'individual' => 'Individual', 'group' => 'Group', 'total' => 'Total'];
         $rows = collect($report['rows'])->map(fn ($r) => [
             $r['name'], $r['reg_no'] ?? '', $r['school_name'] ?? '',
-            $fmt($r['on_stage']), $fmt($r['off_stage']), $fmt($r['individual']), $fmt($r['group']), $fmt($r['total']),
+            ...array_map(fn ($key) => $fmt($r[$key]), array_keys($dimensions)),
             $r['exceeds_any'] ? 'Yes' : 'No',
         ]);
 
         return ExcelExport::download($this->slug().'-student-limits', [
-            'Student', 'Reg No', 'School', 'On-stage', 'Off-stage', 'Individual', 'Group', 'Total', 'Exceeds limit?',
+            'Student', 'Reg No', 'School', ...array_values($dimensions), 'Exceeds limit?',
         ], $rows, ExcelExport::generatedOnNote());
     }
 
@@ -1735,7 +1742,7 @@ class FestReportService
                 continue;
             }
 
-            $cacheKey = 'student-photo-thumb:'.$sid.':'.($student->updated_at?->timestamp ?? 0);
+            $cacheKey = $student->photoDataUriCacheKey();
             $photoMap[$sid] = \Illuminate\Support\Facades\Cache::remember(
                 $cacheKey,
                 now()->addDays(30),
@@ -2052,7 +2059,7 @@ class FestReportService
                 continue;
             }
 
-            $cacheKey = 'student-photo-thumb:'.$id.':'.($student->updated_at?->timestamp ?? 0);
+            $cacheKey = $student->photoDataUriCacheKey();
             $studentRows[$id]['photo_url'] = \Illuminate\Support\Facades\Cache::remember(
                 $cacheKey,
                 now()->addDays(30),
@@ -2143,14 +2150,14 @@ class FestReportService
         $rows = array_map(fn ($r) => [
             $r['title'],
             $r['category_label'] ?? $r['class_group'] ?? '',
-            $r['judges'],
+            ...($this->event->event_type === 'sports' ? [] : [$r['judges']]),
             $r['participants'],
             $r['marked'],
             $r['pending'],
         ], $data);
 
         return ExcelExport::download($this->slug().'-mark-entry-status', [
-            'Item', 'Class', 'Judges Assigned', 'Participants', 'Marked', 'Pending',
+            'Item', 'Category', ...($this->event->event_type === 'sports' ? [] : ['Judges Assigned']), 'Participants', 'Marked', 'Pending',
         ], $rows, ExcelExport::generatedOnNote());
     }
 
@@ -2158,11 +2165,11 @@ class FestReportService
     {
         $rows = array_map(fn (array $r) => [
             $r['title'], $r['item_code'] ?? '', $r['category_label'] ?? '', $r['head_name'] ?? '',
-            $r['performers'], $r['marks_entered'], $r['judges_assigned'],
+            $r['performers'], $r['marks_entered'], ...($this->event->event_type === 'sports' ? [] : [$r['judges_assigned']]),
         ], $this->resultsPendingRows());
 
         return ExcelExport::download($this->slug().'-results-pending', [
-            'Item', 'Item Code', 'Category', 'Head', 'Performers', 'Marks Entered', 'Judges Assigned',
+            'Item', 'Item Code', 'Category', 'Head', 'Performers', 'Marks Entered', ...($this->event->event_type === 'sports' ? [] : ['Judges Assigned']),
         ], $rows, ExcelExport::generatedOnNote());
     }
 

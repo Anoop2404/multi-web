@@ -329,7 +329,7 @@
                             <h5 class="text-xs font-bold uppercase tracking-wider text-indigo-950 flex items-center gap-1.5">
                                 <span>⚡</span> Event Phases
                             </h5>
-                            <p class="text-[11px] text-slate-500 mt-0.5">Split items into named phases (Off-stage, On-stage...)</p>
+                            <p class="text-[11px] text-slate-500 mt-0.5">{{ event.event_type === 'sports' ? 'Split items into sport disciplines or competition sessions' : 'Split items into named phases (Off-stage, On-stage...)' }}</p>
                         </div>
                         <Link :href="`${base}/phases`" class="btn-secondary text-xs shrink-0">
                             Manage Phases →

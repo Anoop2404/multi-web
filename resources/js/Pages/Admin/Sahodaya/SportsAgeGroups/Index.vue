@@ -12,10 +12,12 @@
             </template>
         </PageHeader>
 
+        <ValidationBanner class="mb-4" />
         <div class="max-w-4xl space-y-6">
             <div class="notice-banner notice-banner--info text-sm">
                 <p class="font-semibold text-[#0f3d7a] mb-1">How this works</p>
                 <ul class="list-disc pl-4 space-y-1 text-slate-700">
+                    <li>Category default fees apply to category-priced fee models. Sports composite billing uses event fees and per-item overrides.</li>
                     <li><strong>Under age</strong> is the maximum age on the reference date (U17 → under 17).</li>
                     <li>Students can register for any item whose band they qualify for (under-N rule).</li>
                     <li>A specific Sports Meet event can still override the reference date under its own Settings → Eligibility — otherwise the Sahodaya-wide date below applies everywhere, including the student roster's age-category column.</li>
@@ -124,7 +126,8 @@
                                 </template>
                                 <template v-else>
                                     <button type="button" class="text-xs font-semibold text-[#0f3d7a] mr-2" @click="startEdit(group)">Edit</button>
-                                    <button type="button" class="text-xs text-red-600" @click="removeGroup(group)">Remove</button>
+                                    <span v-if="group.items_count" class="text-xs text-slate-500">Used by {{ group.items_count }} item(s)</span>
+                                    <button v-else type="button" class="text-xs text-red-600" @click="removeGroup(group)">Remove</button>
                                 </template>
                             </td>
                         </tr>
@@ -138,6 +141,7 @@
 <script setup>
 import { reactive, ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
+import ValidationBanner from '@/Components/ui/ValidationBanner.vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import { useConfirm } from '@/composables/useConfirm';
 

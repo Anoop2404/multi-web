@@ -525,6 +525,70 @@ class TenantStorage
         }
     }
 
+    /**
+     * Warm private photo embeds in bounded S3 batches instead of one blocking read per
+     * student. Missing legacy thumbnails fall back to originals; local storage and
+     * individual failures retain the normal photoDataUri() fallback.
+     *
+     * @param array<string, string> $photos Cache key => stored photo path
+     */
+    public static function warmPhotoDataUris(array $photos): void
+    {
+        if ($photos === [] || ! function_exists('imagecreatefromstring') || self::uploadDisk() !== 's3') {
+            return;
+        }
+
+        $cached = Cache::many(array_keys($photos));
+        $pending = array_filter($photos, fn ($path, $key) => ($cached[$key] ?? null) === null
+            && $path !== '' && ! preg_match('~^(https?://|data:)~i', $path), ARRAY_FILTER_USE_BOTH);
+        if ($pending === []) {
+            return;
+        }
+
+        try {
+            $disk = Storage::disk('s3');
+            $client = $disk->getClient();
+            $config = $disk->getConfig();
+            $prefix = trim((string) ($config['root'] ?? ''), '/');
+            foreach ([true, false] as $thumbnail) {
+                $requests = (function () use (&$pending, $thumbnail, $client, $config, $prefix) {
+                    foreach ($pending as $key => $path) {
+                        $path = ltrim($path, '/');
+                        $object = $thumbnail ? self::thumbnailPath($path) : $path;
+                        yield $key => $client->getObjectAsync([
+                            'Bucket' => $config['bucket'],
+                            'Key' => ($prefix !== '' ? $prefix.'/' : '').$object,
+                            '@http' => ['connect_timeout' => 3, 'timeout' => 8],
+                        ]);
+                    }
+                })();
+                (new \GuzzleHttp\Promise\EachPromise($requests, [
+                    'concurrency' => 8,
+                    'fulfilled' => function ($result, $key) use (&$pending) {
+                        $bytes = (string) $result['Body'];
+                        if ($bytes === '') {
+                            return;
+                        }
+                        $info = @getimagesizefromstring($bytes);
+                        if (! $info) {
+                            return;
+                        }
+                        $image = self::shrinkImageForEmbed($bytes, self::PHOTO_THUMBNAIL_MAX_DIMENSION)
+                            ?? [$bytes, $info['mime'] ?? 'image/jpeg'];
+                        Cache::put($key, 'data:'.$image[1].';base64,'.base64_encode($image[0]), now()->addDays(30));
+                        unset($pending[$key]);
+                    },
+                    'rejected' => static function () { /* Keep the normal per-photo fallback. */ },
+                ]))->promise()->wait();
+                if ($pending === []) {
+                    break;
+                }
+            }
+        } catch (\Throwable) {
+            // A report must still work on local disks or when a batch cannot be warmed.
+        }
+    }
+
     public static function downloadResponse(Tenant $tenant, string $relativePath): BinaryFileResponse|StreamedResponse|Response|RedirectResponse
     {
         $relativePath = ltrim($relativePath, '/');

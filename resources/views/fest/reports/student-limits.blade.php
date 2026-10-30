@@ -157,14 +157,19 @@
         <p style="text-align:center;font-size:14px;font-weight:bold;color:#0f172a;margin:0 0 2px;">{{ $school['name'] ?? $school->name }}</p>
     @endif
 
+    @php
+        $isSports = ($event->event_type ?? null) === 'sports';
+    @endphp
     <h2>{{ $event->title }} — Student Item Limits Report</h2>
-    <p class="meta">Per-student on-stage, off-stage, individual and group item usage vs limits · Generated on {{ date('d M Y, h:i A') }}</p>
+    <p class="meta">{{ $isSports ? 'Individual, pair and team sports item usage vs configured limits' : 'Per-student on-stage, off-stage, individual and group item usage vs limits' }} · Generated on {{ date('d M Y, h:i A') }}</p>
 
     <div class="summary-row">
         <div class="summary-cell"><div class="num">{{ $summary['total_students'] ?? 0 }}</div><div class="label">Students</div></div>
         <div class="summary-cell"><div class="num">{{ $summary['exceeding_students'] ?? 0 }}</div><div class="label">Exceeding a limit</div></div>
+        @unless($isSports)
         <div class="summary-cell"><div class="num">{{ $summary['exceeding_on_stage'] ?? 0 }}</div><div class="label">Over on-stage</div></div>
         <div class="summary-cell"><div class="num">{{ $summary['exceeding_off_stage'] ?? 0 }}</div><div class="label">Over off-stage</div></div>
+        @endunless
         <div class="summary-cell"><div class="num">{{ $summary['exceeding_individual'] ?? 0 }}</div><div class="label">Over individual</div></div>
         <div class="summary-cell"><div class="num">{{ $summary['exceeding_group'] ?? 0 }}</div><div class="label">Over group</div></div>
     </div>
@@ -196,7 +201,12 @@
                 </div>
             </div>
             <div class="badges">
-                @foreach(['on_stage' => 'On-stage', 'off_stage' => 'Off-stage', 'individual' => 'Individual', 'group' => 'Group', 'total' => 'Total'] as $key => $label)
+                @php
+                    $dimensions = $isSports
+                        ? ['individual' => 'Individual', 'pair' => 'Pair', 'group' => 'Team', 'total' => 'Total']
+                        : ['on_stage' => 'On-stage', 'off_stage' => 'Off-stage', 'individual' => 'Individual', 'group' => 'Group', 'total' => 'Total'];
+                @endphp
+                @foreach($dimensions as $key => $label)
                     @php $dim = $st[$key] ?? ['used' => 0, 'limit' => null, 'exceeds' => false]; @endphp
                     <span class="badge {{ ($dim['exceeds'] ?? false) ? 'badge-exceeds' : '' }}">
                         {{ $label }}: {{ $dim['used'] ?? 0 }}{{ isset($dim['limit']) && $dim['limit'] !== null ? ' / '.$dim['limit'] : '' }}
@@ -222,7 +232,7 @@
                     <td>{{ $item['category_label'] ?? '—' }}</td>
                     <td style="text-align: center;">
                         @php
-                            $dimensionLabels = ['on_stage' => 'On-stage', 'off_stage' => 'Off-stage', 'group' => 'Group'];
+                            $dimensionLabels = ['individual' => 'Individual', 'pair' => 'Pair', 'on_stage' => 'On-stage', 'off_stage' => 'Off-stage', 'group' => 'Group'];
                         @endphp
                         {{ $dimensionLabels[$item['dimension'] ?? null] ?? '—' }}
                     </td>

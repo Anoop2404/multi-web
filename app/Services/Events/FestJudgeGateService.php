@@ -145,22 +145,21 @@ class FestJudgeGateService
         $complete = 0;
         $total = 0;
 
-        foreach (FestEventItem::where('event_id', $event->id)->where('is_enabled', true)->get() as $item) {
-            $participants = FestRegistration::where('event_id', $event->id)
-                ->where('item_id', $item->id)
-                ->where('status', 'approved')
-                ->count();
+        $items = FestEventItem::where('event_id', $event->id)->where('is_enabled', true)->get();
+        $participantsByItem = FestRegistration::where('event_id', $event->id)
+            ->whereIn('item_id', $items->modelKeys())->where('status', 'approved')
+            ->selectRaw('item_id, COUNT(*) as total')->groupBy('item_id')->pluck('total', 'item_id');
+        $marksByItem = FestMark::where('event_id', $event->id)
+            ->whereIn('item_id', $items->modelKeys())
+            ->where(fn ($q) => $q->whereNotNull('score')->orWhereNotNull('grade')->orWhereNotNull('position'))
+            ->selectRaw('item_id, COUNT(*) as total')->groupBy('item_id')->pluck('total', 'item_id');
 
+        foreach ($items as $item) {
+            $participants = (int) ($participantsByItem[$item->id] ?? 0);
             if ($participants === 0) {
                 continue;
             }
-
-            $marked = FestMark::where('event_id', $event->id)
-                ->where('item_id', $item->id)
-                ->where(function ($q) {
-                    $q->whereNotNull('score')->orWhereNotNull('grade')->orWhereNotNull('position');
-                })
-                ->count();
+            $marked = (int) ($marksByItem[$item->id] ?? 0);
 
             $itemComplete = min($marked, $participants);
             $total += $participants;

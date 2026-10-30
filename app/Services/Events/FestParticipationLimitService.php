@@ -70,10 +70,11 @@ class FestParticipationLimitService
         $isIndividual = ! $isGroup && ! $isPair;
         $isCommon = ($item->category ?? '') === 'common'
             || (($item->criteria_json['arts_category'] ?? null) === 'common');
-        $isOffStage = $isIndividual && ($item->stage_type ?? '') === 'off_stage';
+        $isArts = $this->event->event_type !== 'sports';
+        $isOffStage = $isArts && $isIndividual && ($item->stage_type ?? '') === 'off_stage';
 
         return [
-            'on_stage' => $isIndividual && ($item->stage_type ?? '') === 'on_stage',
+            'on_stage' => $isArts && $isIndividual && ($item->stage_type ?? '') === 'on_stage',
             'off_stage' => $isOffStage,
             'individual' => $isIndividual,
             'pair' => $isPair,
@@ -124,7 +125,7 @@ class FestParticipationLimitService
      */
     public static function categoryFilterOptions(FestEvent $rootEvent): array
     {
-        $options = \App\Support\FestClassGroupScheme::labels(null, $rootEvent);
+        $options = $rootEvent->event_type === 'sports' ? [] : \App\Support\FestClassGroupScheme::labels(null, $rootEvent);
 
         if ($rootEvent->event_type === 'sports') {
             foreach (\App\Support\FestSportsAgeGroup::labels($rootEvent->tenant_id) as $key => $label) {
@@ -152,6 +153,7 @@ class FestParticipationLimitService
         ?int $itemId = null,
         bool $includePhotoDataUri = false,
         bool $photoForSchoolAdmin = false,
+        bool $onlyExceeding = false,
     ): array {
         // $this->event is already the root event (the controller constructs this service
         // with $event->rootEvent()) — the scheme itself is configured on the root's
@@ -167,7 +169,7 @@ class FestParticipationLimitService
                 'participants' => fn ($q) => $q
                 ->where('participant_role', 'performer')
                 ->whereNotNull('student_id')
-                ->with('student:id,name,reg_no,tenant_id,photo'),
+                ->with(['student:id,name,reg_no,tenant_id,photo,updated_at', 'student.tenant']),
             ])
             ->get();
 
@@ -186,6 +188,7 @@ class FestParticipationLimitService
         }
 
         $rows = [];
+        $photoStudents = [];
         foreach ($byStudent as $studentId => $entry) {
             $student = $entry['student'];
             if ($search) {
@@ -285,7 +288,7 @@ class FestParticipationLimitService
             $offStage = $dimension($offStageUsed, $offStageLimit);
             $groupLimit = $policy['max_group_per_student'] ?? null;
             $pairLimit = $policy['max_pair_per_student'] ?? null;
-            $individual = $dimension($onStageUsed + $offStageUsed, $individualLimit);
+            $individual = $dimension($this->event->event_type === 'sports' ? $totalUsed : $onStageUsed + $offStageUsed, $individualLimit);
             $group = $dimension($groupUsed, $groupLimit);
             $pair = $dimension($pairUsed, $pairLimit);
             // Total is either max_overall_per_student (if configured) or the sum across buckets.
@@ -296,6 +299,17 @@ class FestParticipationLimitService
                     ? (int) ($individualLimit ?: 0) + (int) ($groupLimit ?: 0) + (int) ($pairLimit ?: 0)
                     : null);
             $total = $dimension($allCountableUsed, $totalLimit);
+            if ($this->event->event_type === 'sports') {
+                $total = $dimension($allCountableUsed, $overallLimit);
+            }
+
+            $exceedsAny = $onStage['exceeds'] || $offStage['exceeds'] || $individual['exceeds'] || $group['exceeds'] || $pair['exceeds'] || $total['exceeds'];
+            if ($onlyExceeding && ! $exceedsAny) {
+                continue;
+            }
+            if ($includePhotoDataUri) {
+                $photoStudents[$studentId] = $student;
+            }
 
             $rows[] = [
                 'student_id'  => (int) $studentId,
@@ -304,16 +318,30 @@ class FestParticipationLimitService
                 'school_id'   => $entry['school_id'] ?? null,
                 'school_name' => $entry['school_name'] ?? null,
                 'photo_url'      => $photoForSchoolAdmin ? $student->photoUrl() : $student->sahodayaPhotoUrl($this->event->tenant_id),
-                'photo_data_uri' => $includePhotoDataUri ? $student->photoDataUri() : null,
+                'photo_data_uri' => null,
                 'on_stage'    => $onStage,
                 'off_stage'   => $offStage,
                 'individual'  => $individual,
                 'group'       => $group,
                 'pair'        => $pair,
                 'total'       => $total,
-                'exceeds_any' => $onStage['exceeds'] || $offStage['exceeds'] || $individual['exceeds'] || $group['exceeds'] || $pair['exceeds'] || $total['exceeds'],
+                'exceeds_any' => $exceedsAny,
                 'items'       => $items,
             ];
+        }
+
+        if ($includePhotoDataUri && $photoStudents !== []) {
+            $photos = [];
+            foreach ($photoStudents as $student) {
+                if ($student->photo) {
+                    $photos[$student->photoDataUriCacheKey()] = $student->photo;
+                }
+            }
+            \App\Support\TenantStorage::warmPhotoDataUris($photos);
+            foreach ($rows as &$row) {
+                $row['photo_data_uri'] = $photoStudents[$row['student_id']]->photoDataUri();
+            }
+            unset($row);
         }
 
         usort($rows, fn ($a, $b) => strcasecmp($a['name'] ?? '', $b['name'] ?? ''));
@@ -377,6 +405,7 @@ class FestParticipationLimitService
         return [
             'used' => [
                 'total' => $regs->count(),
+                'individual' => $this->filterRegs($regs, 'individual')->count(),
                 'on_stage' => $this->filterRegs($regs, 'on_stage')->count(),
                 'off_stage' => $this->filterRegs($regs, 'off_stage')->count(),
                 'group' => $this->filterRegs($regs, 'group')->count(),
