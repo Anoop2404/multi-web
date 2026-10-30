@@ -814,12 +814,12 @@ class FestCertificateController extends SahodayaAdminController
                 'category_label' => FestItemCategoryLabel::shortLabel($item, $classGroupLabels, $artsCategoryLabels),
             ])->values()->all());
 
-        return $certificates->map(function (array $c) use ($itemsByPerson) {
+        return $certificates->map(function (array $c) use ($itemsByPerson, $event) {
             if (($c['cert_type'] ?? null) !== 'participation' || empty($c['participant'])) {
                 return $c;
             }
 
-            $c['participation_items'] = $itemsByPerson->get(FestCertificateService::participationPersonKey($c['participant']), []);
+            $c['participation_items'] = $itemsByPerson->get(FestCertificateService::participationCertificateKey($c['participant'], $event), []);
 
             return $c;
         });
@@ -1030,6 +1030,21 @@ class FestCertificateController extends SahodayaAdminController
      * lazy, scheduled staleness check every other upstream-data change already relies on
      * (see contentHash()'s docblock) rather than a special case for this one field.
      */
+    public function updateParticipationSettings(Request $request, string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        $data = $request->validate(['participation_certificate_mode' => 'required|in:per_person,per_item']);
+        $owner = $event->usesPhasedRegionalBilling() ? $event->rootEvent() : $event;
+        if ($owner->participationCertificateMode() !== $data['participation_certificate_mode']) {
+            $owner->update($data);
+            $participantIds = FestParticipant::whereHas('registration', fn ($q) => $q->whereIn('event_id', $owner->reportableEventIds()))->pluck('id');
+            Certificate::where('entity_type', FestParticipant::class)->whereIn('entity_id', $participantIds)
+                ->where('cert_type', 'participation')->update(['is_stale' => true]);
+        }
+
+        return back()->with('success', 'Participation settings saved. Generate participation certificates to apply the new grouping.');
+    }
+
     public function updateCertificateDate(Request $request, string $tenantId, FestEvent $event)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);

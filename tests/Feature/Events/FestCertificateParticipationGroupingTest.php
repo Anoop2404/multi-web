@@ -74,6 +74,18 @@ class FestCertificateParticipationGroupingTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_save_separate_participation_settings(): void
+    {
+        ['admin' => $admin, 'event' => $event, 'sahodaya' => $sahodaya] = $this->makeSahodayaAdminEventAndSchool();
+        $url = "/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/certificates/participation-settings";
+        $this->actingAs($admin)->post($url, ['participation_certificate_mode' => 'per_item'])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('per_item', $event->fresh()->participationCertificateMode());
+        $this->actingAs($admin)->post($url, ['participation_certificate_mode' => 'invalid'])
+            ->assertSessionHasErrors('participation_certificate_mode');
+        $this->assertSame('per_item', $event->fresh()->participationCertificateMode());
+    }
+
     public function test_participation_groups_by_school_independently_of_winners(): void
     {
         ['admin' => $admin, 'event' => $event, 'school' => $school] = $this->makeSahodayaAdminEventAndSchool();

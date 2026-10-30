@@ -62,6 +62,8 @@
             </div>
         </section>
 
+        <ParticipationCertificateSettings v-if="!participationHeld" :base="base" :mode="event.participation_certificate_mode || 'per_person'" />
+
         <!-- Certificate date -->
         <div class="card !p-3 mb-6 flex flex-wrap items-center gap-3 text-xs">
             <span class="font-semibold text-gray-700">📅 Certificate date:</span>
@@ -892,6 +894,7 @@
 </template>
 
 <script setup>
+import ParticipationCertificateSettings from '@/Components/events/ParticipationCertificateSettings.vue';
 import { sortByPublication } from '@/support/certificatePublicationSort.js';
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';

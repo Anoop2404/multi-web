@@ -2,7 +2,7 @@
     <SahodayaEventsLayout :title="`${event.title} — Participation Certificates`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl"
                          :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Participation Certificates`" eyebrow="Operations"
-                    description="One certificate per person for the whole event, filterable by item or school." />
+                    :description="event.participation_certificate_mode === 'per_item' ? 'One participation certificate per student per item.' : 'One certificate per student listing all items.'" />
 
         <div class="mb-4 flex flex-wrap items-center gap-3 text-xs">
             <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/school-list`" class="btn-secondary text-xs">Download school list PDF</a>
@@ -14,14 +14,12 @@
             </Link>
         </div>
 
+        <ParticipationCertificateSettings :base="base" :mode="event.participation_certificate_mode || 'per_person'" />
+
         <EventSignatoriesCard :base="base" :initial-signatories="certificateSignatories" :label-suggestions="signatoryLabelSuggestions" />
 
-        <!-- Filter + pipeline: item/school here drive both the list below and every
-             bulk action (render/download/preview). Generation itself isn't item-scoped
-             (a participation certificate is issued once per person for the whole event,
-             see FestCertificateService::generateParticipationForEvent()) — the item
-             filter here narrows to people who registered for that item, not a
-             per-item generate action. -->
+        <!-- Item/school filters scope the list and bulk exports. Generate runs all eligible
+             entries using the selected per-student or per-item grouping. -->
         <div class="card !p-4 mb-6">
             <div class="grid gap-4 lg:grid-cols-2">
                 <div class="min-w-0">
@@ -121,7 +119,7 @@
 
         <div class="card p-4">
             <div class="mb-3 flex flex-wrap items-center gap-3">
-                <button type="button" @click="selectedCertIds = filteredCertificates.map(c => c.id)" :disabled="!filteredCertificates.length" class="btn-secondary text-xs">Select all matching students ({{ filteredCertificates.length }})</button>
+                <button type="button" @click="selectedCertIds = filteredCertificates.map(c => c.id)" :disabled="!filteredCertificates.length" class="btn-secondary text-xs">Select all matching certificates ({{ filteredCertificates.length }})</button>
                 <div class="relative min-w-[200px] flex-1">
                     <input v-model="searchQuery" type="text" placeholder="Search student or item..."
                            class="w-full text-xs py-2 pl-8 pr-3 rounded border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
@@ -188,6 +186,7 @@
 </template>
 
 <script setup>
+import ParticipationCertificateSettings from '@/Components/events/ParticipationCertificateSettings.vue';
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
@@ -228,7 +227,7 @@ const itemOptions = computed(() => props.publishedItems.map(item => {
     return { id: item.id, name };
 }));
 
-// One certificate per student listing every item they entered (c.items, from the controller).
+// The controller supplies the items printed on each certificate for the configured grouping.
 function itemsText(c) {
     const items = c.items?.length ? c.items : (c.item ? [c.item] : []);
     if (!items.length) return 'Event Participant';

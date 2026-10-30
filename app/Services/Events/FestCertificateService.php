@@ -227,9 +227,10 @@ class FestCertificateService
         $created = [];
         $currentAnchorIds = [];
 
-        // itemId is deliberately null: an aggregate cert must resolve the event-level
-        // (or tenant-wide) participation template, never one item's narrow one.
+        // Combined certificates use the event template; per-item certificates may
+        // resolve a more specific participation template for the anchor item.
         $template = $this->resolveTemplate($event, null, 'participation');
+        $perItem = $event->participationCertificateMode() === 'per_item';
 
         // What already exists for this hub, per person. A person must only ever end up with
         // ONE participation certificate: if one exists (anchored on any of their participant
@@ -239,7 +240,7 @@ class FestCertificateService
         $scopeParticipants = FestParticipant::where(function ($q) use ($event) {
             $q->whereIn('event_id', $event->reportableEventIds())
                 ->orWhereHas('registration', fn ($rq) => $rq->whereIn('event_id', $event->reportableEventIds()));
-        })->get(['id', 'student_id', 'teacher_id']);
+        })->with('registration:id,item_id')->get(['id', 'student_id', 'teacher_id', 'registration_id']);
         $existingByParticipant = Certificate::where('entity_type', FestParticipant::class)
             ->where('cert_type', 'participation')
             ->whereIn('entity_id', $scopeParticipants->pluck('id'))
@@ -247,12 +248,13 @@ class FestCertificateService
             ->keyBy('entity_id');
         $existingByPerson = $scopeParticipants
             ->filter(fn (FestParticipant $p) => $existingByParticipant->has($p->id))
-            ->groupBy(fn (FestParticipant $p) => self::participationPersonKey($p))
+            ->groupBy(fn (FestParticipant $p) => self::participationCertificateKey($p, $event))
             ->map(fn (\Illuminate\Support\Collection $g) => $g->map(fn (FestParticipant $p) => $existingByParticipant->get($p->id))->sortBy('id')->values());
 
         foreach ($this->participationGroupsForEvent($event) as $personKey => $group) {
             $anchor = $group->sortBy('id')->first();
             $currentAnchorIds[] = $anchor->id;
+            $selectedTemplate = $perItem ? $this->resolveTemplate($event, $anchor->registration?->item_id, 'participation') : $template;
 
             $cert = $existingByParticipant->get($anchor->id) ?? $existingByPerson->get($personKey)?->first();
 
@@ -268,15 +270,15 @@ class FestCertificateService
                         'cert_type'   => 'participation',
                     ],
                     [
-                        'template_id'        => $template?->id,
+                        'template_id'        => $selectedTemplate?->id,
                         'verification_uuid' => (string) Str::uuid(),
                         'generated_at'      => now(),
                     ]
                 );
             }
 
-            if ($template && $cert->template_id !== $template->id) {
-                $cert->update(['template_id' => $template->id]);
+            if ($selectedTemplate && $cert->template_id !== $selectedTemplate->id) {
+                $cert->update(['template_id' => $selectedTemplate->id]);
             }
 
             $created[] = $cert;
@@ -344,8 +346,7 @@ class FestCertificateService
     }
 
     /**
-     * Eligible participants grouped by person (student or teacher) — the unit a single
-     * aggregated participation certificate is issued to. One FestParticipant row is
+     * Eligible participants grouped by the configured certificate unit: person, or person/item. One FestParticipant row is
      * scoped to a single item (via FestRegistration), but one person can enter several.
      *
      * @return \Illuminate\Support\Collection<string, \Illuminate\Support\Collection<int, FestParticipant>>
@@ -353,7 +354,7 @@ class FestCertificateService
     private function participationGroupsForEvent(FestEvent $event): \Illuminate\Support\Collection
     {
         return $this->eligibleParticipantsForEvent($event)
-            ->groupBy(fn (FestParticipant $p) => self::participationPersonKey($p));
+            ->groupBy(fn (FestParticipant $p) => self::participationCertificateKey($p, $event));
     }
 
     /**
@@ -424,9 +425,7 @@ class FestCertificateService
         $participants = $this->eligibleParticipantsForEvent($event)
             ->filter(fn (FestParticipant $p) => $p->registration?->item);
 
-        // Participation certificates are now issued once per person for the whole event
-        // (see generateParticipationForEvent()), not once per item — so the grand total
-        // below must count distinct people, not sum the per-item entry counts.
+        // Count the configured issue units: people, or person/item pairs.
         $participationCertificateCount = $this->participationGroupsForEvent($event)->count();
 
         // Standbys never get a certificate (see the filters above) but a team's admin
@@ -1284,6 +1283,7 @@ class FestCertificateService
             // of their own), so giving numbers a distinct accent color made them read as
             // a mismatched, separate style rather than consistent emphasis. Bold alone
             // matches how every other emphasized token in the sentence is already styled.
+            'certificate_date_short' => $certDate->format('d/m/Y'),
             'certificate_date'    => '<strong>'.$certDate->format('j').'</strong><sup>'.$certDate->format('S').'</sup> '.$certDate->format('F').' <strong>'.$certDate->format('Y').'</strong>',
         ];
     }
@@ -1297,6 +1297,10 @@ class FestCertificateService
      */
     private function participationItems(FestParticipant $participant, FestEvent $event, ?\Illuminate\Support\Collection $eventParticipants = null): \Illuminate\Support\Collection
     {
+        if ($event->participationCertificateMode() === 'per_item') {
+            return collect($participant->registration?->item ? [$participant->registration->item] : []);
+        }
+
         $eventParticipants ??= $this->eligibleParticipantsForEvent($event);
 
         return $this->distinctItemsOf($eventParticipants
@@ -1320,6 +1324,15 @@ class FestCertificateService
 
         return $this->participationGroupsForEvent($event)
             ->map(fn (\Illuminate\Support\Collection $group) => $this->distinctItemsOf($group));
+    }
+
+    public static function participationCertificateKey(FestParticipant $participant, FestEvent $event): string
+    {
+        $person = self::participationPersonKey($participant);
+
+        return $event->participationCertificateMode() === 'per_item'
+            ? $person.':item:'.$participant->registration?->item_id
+            : $person;
     }
 
     public static function participationPersonKey(FestParticipant $participant): string
@@ -1350,9 +1363,7 @@ class FestCertificateService
     {
         $eventParticipants ??= $this->eligibleParticipantsForEvent($event);
 
-        $group = $eventParticipants->filter(fn (FestParticipant $p) => $participant->student_id
-            ? $p->student_id === $participant->student_id
-            : $p->teacher_id === $participant->teacher_id);
+        $group = $eventParticipants->filter(fn (FestParticipant $p) => self::participationCertificateKey($p, $event) === self::participationCertificateKey($participant, $event));
 
         // Not pre-filtered to whereNotNull('grade') — a mark can carry a real score/
         // position with grade left blank (see effectiveGrade()'s own docblock), so
@@ -1727,7 +1738,7 @@ class FestCertificateService
     }
 
     /**
-     * One participation certificate per person, whatever is in the table: a person can end up
+     * Deduplicate within the configured person or person/item unit. A person can end up
      * with two Certificate rows anchored on different FestParticipant rows (e.g. left over
      * from before participation was issued from the parent event, or an anchor that shifted)
      * until the next Generate revokes the extra. Lists and exports must never show or print
@@ -1745,12 +1756,12 @@ class FestCertificateService
         }
 
         $participants = FestParticipant::whereIn('id', $participation->pluck('entity_id'))
-            ->get(['id', 'student_id', 'teacher_id'])
+            ->with('registration.event')->get(['id', 'student_id', 'teacher_id', 'registration_id'])
             ->keyBy('id');
 
         $duplicateIds = $participation
             ->groupBy(fn (Certificate $c) => $participants->has($c->entity_id)
-                ? self::participationPersonKey($participants->get($c->entity_id))
+                ? self::participationCertificateKey($participants->get($c->entity_id), $participants->get($c->entity_id)->registration->event)
                 : 'orphan:'.$c->id)
             ->flatMap(fn (\Illuminate\Support\Collection $group) => $group->sortBy('entity_id')->slice(1)->pluck('id'))
             ->flip();

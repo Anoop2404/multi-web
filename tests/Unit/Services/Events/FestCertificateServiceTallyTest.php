@@ -309,6 +309,56 @@ class FestCertificateServiceTallyTest extends TestCase
         $this->assertNotContains($standbyEntrant->id, $participationEntityIds, 'Standby participants must not receive participation certificates.');
     }
 
+    public function test_wayanad_sports_setup_installs_separate_templates_and_per_item_mode(): void
+    {
+        $event = $this->makeEvent();
+        $event->update(['event_type' => 'sports']);
+        config(['filesystems.upload_disk' => 'shared']);
+        \Illuminate\Support\Facades\Storage::fake('shared');
+        $seeder = new \Database\Seeders\WayanadSportsCertificateTemplatesSeeder;
+        $seeder->run($event->tenant_id, $event->id);
+        $seeder->run($event->tenant_id, $event->id);
+        $templates = \App\Models\CertificateTemplate::where('tenant_id', $event->tenant_id)->get();
+        $this->assertCount(2, $templates);
+        $this->assertSame('per_item', $event->fresh()->participationCertificateMode());
+        foreach ($templates as $template) {
+            $this->assertSame($event->id, $template->event_id);
+            \Illuminate\Support\Facades\Storage::disk('shared')->assertExists($template->background_path);
+            $this->assertNotEmpty($template->layout_json['custom_fields']);
+            foreach ($template->layout_json['custom_fields'] as $field) {
+                $this->assertSame('normal', $field['font_weight']);
+                $this->assertSame('Arial', $field['font_family']);
+            }
+        }
+    }
+
+    public function test_per_item_participation_generation_keeps_each_item_separate_and_is_idempotent(): void
+    {
+        $event = $this->makeEvent();
+        $event->update(['event_type' => 'sports', 'participation_certificate_mode' => 'per_item']);
+        $school = $this->makeSchool($event->tenant_id);
+        $a = FestEventItem::create(['event_id' => $event->id, 'title' => '100 m', 'participant_type' => 'individual']);
+        $b = FestEventItem::create(['event_id' => $event->id, 'title' => 'Long jump', 'participant_type' => 'individual']);
+        $first = $this->individualParticipant($event, $a, $school->id);
+        $second = $this->individualParticipant($event, $b, $school->id);
+        $second->update(['student_id' => $first->student_id]);
+        $service = app(\App\Services\Events\FestCertificateService::class);
+        $certs = collect($service->generateParticipationForEvent($event));
+        $this->assertCount(2, $certs);
+        $this->assertCount(2, $service->dedupeParticipationPerPerson($certs));
+        $this->assertSame($certs->pluck('id')->all(), collect($service->generateParticipationForEvent($event))->pluck('id')->all());
+        foreach ($certs as $cert) {
+            $payload = $service->payloadFor($cert);
+            $context = $service->renderContext($cert);
+            $this->assertSame($payload['item']->title, $context['fieldValues']['item_title']);
+            $this->assertMatchesRegularExpression('/^\d{2}\/\d{2}\/\d{4}$/', $context['fieldValues']['certificate_date_short']);
+        }
+        $this->assertSame(2, $service->certificateTally($event)['totals']['participation_certs']);
+        $this->assertCount(1, $service->resolveCertificateScope($event, $b->id, certType: 'participation'));
+        $event->update(['participation_certificate_mode' => 'per_person']);
+        $this->assertCount(1, $service->generateParticipationForEvent($event));
+    }
+
     public function test_participation_certificates_are_aggregated_one_per_student_across_items(): void
     {
         $event = $this->makeEvent();
