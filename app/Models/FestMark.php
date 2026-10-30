@@ -14,7 +14,18 @@ class FestMark extends Model
             ->where(fn ($role) => $role->where('participant_role', 'performer')->orWhereNull('participant_role')));
     }
 
+    /** Empty placeholders left by recalculation are not recorded results. Zero is a valid score. */
+    public function scopeWithRecordedResult(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->where(fn ($result) => $result
+            ->whereNotNull('score')
+            ->orWhereNotNull('position')
+            ->orWhere(fn ($grade) => $grade->whereNotNull('grade')->where('grade', '!=', ''))
+            ->orWhere(fn ($measurement) => $measurement->whereNotNull('measurement_value')->where('measurement_value', '!=', '')));
+    }
+
     protected $fillable = [
+
         'event_id', 'item_id', 'participant_id', 'grade', 'position',
         'score', 'measurement_value', 'measurement_unit',
         'ref_data_json', 'locked_by', 'locked_at',

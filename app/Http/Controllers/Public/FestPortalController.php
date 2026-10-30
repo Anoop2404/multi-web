@@ -106,7 +106,7 @@ class FestPortalController extends Controller
 
         $items = \App\Services\Events\FestHeadItemNavigationService::filterToOwnPhase($rawItems, $event);
 
-        $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
+        $isAdminPreview = $request->boolean('preview') && ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
         $isResultsPublished = (bool) $selectedScope['results_published'] || $isAdminPreview;
 
         // Same two gates item-finder.blade.php's own item grid uses (see itemFinder()
@@ -116,7 +116,7 @@ class FestPortalController extends Controller
         // (published too early, or a no-show item). Without both checks here, this
         // page's own item grid rendered a normal, inviting "Results" link into a page
         // that either 403s or just says "No published results for this item."
-        $resultedItemIds = FestMark::currentPerformers()->where('event_id', $targetEvent->id)
+        $resultedItemIds = FestMark::currentPerformers()->withRecordedResult()->where('event_id', $targetEvent->id)
             ->whereIn('item_id', $items->pluck('id'))
             ->distinct()
             ->pluck('item_id');
@@ -240,7 +240,7 @@ class FestPortalController extends Controller
         $event = $this->findEvent($tenant->id, $eventId);
         $selectedScope = $this->operationalEvents->directScope($event);
 
-        $isAdminPreview = ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
+        $isAdminPreview = $request->boolean('preview') && ! $selectedScope['results_published'] && $this->isAuthorizedAdminPreview($request, $event);
 
         // The full page payload is cached as a single array (30s TTL) so the
         // view-rendering loop and the four underlying queries all skip on a
@@ -272,7 +272,7 @@ class FestPortalController extends Controller
             // been entered for it (published too early, or a no-show item) — the Results
             // button must not render as a normal, inviting link into a page that can only
             // ever say "No published results for this item." in that case.
-            $resultedItemIds = FestMark::currentPerformers()->where('event_id', $targetEvent->id)
+            $resultedItemIds = FestMark::currentPerformers()->withRecordedResult()->where('event_id', $targetEvent->id)
                 ->whereIn('item_id', $allItems->pluck('id'))
                 ->distinct()
                 ->pluck('item_id');

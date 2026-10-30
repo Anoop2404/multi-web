@@ -1,6 +1,12 @@
 @extends('layouts.public-event')
 
 @section('content')
+@if($isAdminPreview ?? false)
+    <div role="status" class="bg-amber-100 text-amber-950 px-5 py-3 text-sm font-semibold">
+        Admin preview — unpublished results are visible only in this preview.
+        <a href="{{ request()->fullUrlWithoutQuery('preview') }}" class="underline ml-2">View public page</a>
+    </div>
+@endif
 <section class="py-8 sm:py-12 px-4 bg-slate-950 text-white min-h-screen">
     <div class="max-w-[100rem] mx-auto">
 
