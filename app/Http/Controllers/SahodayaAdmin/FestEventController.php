@@ -228,6 +228,8 @@ class FestEventController extends SahodayaAdminController
             ],
         ]);
 
+        \App\Support\Fest\FestEventDateRanges::validate($data);
+
         $data['food_payee_type'] = $data['food_payee_type'] ?? 'sahodaya';
         $data['food_host_school_id'] = $data['food_payee_type'] === 'host_school' ? ($data['food_host_school_id'] ?? null) : null;
 
@@ -702,6 +704,7 @@ class FestEventController extends SahodayaAdminController
         }
 
         $data = $request->validate($rules);
+        \App\Support\Fest\FestEventDateRanges::validate($data, $event);
 
         if ($event->isStateProgram()) {
             unset($data['event_type']);
@@ -890,6 +893,7 @@ class FestEventController extends SahodayaAdminController
             'event_start'   => 'nullable|date',
             'event_end'     => 'nullable|date',
         ]);
+        \App\Support\Fest\FestEventDateRanges::validate($data, $event);
 
         $child = app(\App\Services\Events\FestKidsFestClusterService::class)
             ->spawnCluster($event, $data);
@@ -917,6 +921,7 @@ class FestEventController extends SahodayaAdminController
             'event_start'    => 'nullable|date',
             'event_end'      => 'nullable|date',
         ]);
+        \App\Support\Fest\FestEventDateRanges::validate($data, $event);
 
         $child = app(\App\Services\Events\FestPartitionService::class)->spawnPartition($event, $data);
 
@@ -954,6 +959,7 @@ class FestEventController extends SahodayaAdminController
         }
 
         if ($partition) {
+            \App\Support\Fest\FestEventDateRanges::validate($data, $partition);
             $updateData = [];
             if (array_key_exists('venue', $data)) $updateData['venue'] = $data['venue'];
             if (array_key_exists('event_start', $data)) $updateData['event_start'] = $data['event_start'];

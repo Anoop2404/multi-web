@@ -1,7 +1,7 @@
 <template>
     <div class="space-y-6 max-w-4xl">
         <div class="rounded-xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-950">
-            <p class="font-semibold">Fest event fees</p>
+            <p class="font-semibold">{{ event.event_type === 'sports' ? 'Sports event fees' : 'Fest event fees' }}</p>
             <p class="mt-1 text-xs text-sky-900/90">
                 Charged per school for this event only — not annual Sahodaya membership.
                 Settings here override the state program defaults for this event.
@@ -670,7 +670,7 @@
             <!-- Class Category Schemes — named, Sahodaya-wide category setups (e.g. "CBSE
                  Kerala", "English Fest") shared across every event, picked here by id.
                  Superseded the old fixed cbse/sahodaya/cluster/custom choices. -->
-            <section class="card space-y-4">
+            <section v-if="event.event_type !== 'sports'" class="card space-y-4">
                 <div class="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-3">
                     <div class="border-b border-indigo-100 pb-2.5">
                         <h4 class="font-bold text-slate-900 text-xs flex items-center gap-1.5">
@@ -966,7 +966,7 @@
                     <div>
                         <h3 class="section-title">Per-item overrides</h3>
                         <p class="section-desc">
-                            Leave blank to use the category rate.
+                            {{ event.event_type === 'sports' ? 'Leave blank to use the event base rate. Free quotas and optional team surcharges are applied when billed.' : 'Leave blank to use the category rate.' }}
                             <span class="text-slate-600">{{ overrideCount }} custom override{{ overrideCount === 1 ? '' : 's' }} set.</span>
                         </p>
                     </div>
@@ -976,7 +976,7 @@
                     <input v-model="itemSearch" type="search" class="field flex-1 min-w-[12rem] max-w-md"
                            placeholder="Search items…" autocomplete="off">
                     <SearchableSelect v-model="itemFilter" class="w-44"
-                                      :options="[{ value: 'all', label: 'All items' }, { value: 'override', label: 'Overrides only' }, { value: 'category', label: 'Using category rate' }]"
+                                      :options="[{ value: 'all', label: 'All items' }, { value: 'override', label: 'Overrides only' }, { value: 'category', label: event.event_type === 'sports' ? 'Using event base rate' : 'Using category rate' }]"
                                       :all-option="false" placeholder="Filter items" />
                     <button v-if="itemSearch.trim() || itemFilter !== 'all'" type="button" class="btn-secondary text-sm"
                             @click="itemSearch = ''; itemFilter = 'all'">
@@ -1002,7 +1002,7 @@
                             <thead class="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_#e2e8f0]">
                                 <tr>
                                     <th>Item</th>
-                                    <th class="w-36">Category rate</th>
+                                    <th class="w-36">{{ event.event_type === 'sports' ? 'Event base rate' : 'Category rate' }}</th>
                                     <th class="w-40 text-right">Override (₹)</th>
                                     <th class="w-40 text-right">Group/team flat fee (₹)</th>
                                     <th class="w-40 text-right">Per-participant rate (₹)</th>
@@ -1018,6 +1018,7 @@
                                     <td>
                                         <span class="inline-flex items-center rounded-lg bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
                                             {{ formatAmount(categoryRateForRow(row)) }}
+                                            <span v-if="event.event_type === 'sports'" class="ml-1 font-normal">/ {{ sportsBaseRate(row, feeSettingsForm.sport_event_fees).unit }}</span>
                                         </span>
                                     </td>
                                     <td class="text-right">
@@ -1026,13 +1027,13 @@
                                                :placeholder="formatAmount(categoryRateForRow(row), true)">
                                     </td>
                                     <td class="text-right">
-                                        <input v-if="row.participant_type === 'group' || row.participant_type === 'team'"
+                                        <input v-if="isSportsTeamItem(row)"
                                                v-model.number="row.group_item_flat_fee" type="number" min="0"
                                                class="field w-full max-w-[8rem] ml-auto text-right" placeholder="₹0">
                                         <span v-else class="text-xs text-slate-300">—</span>
                                     </td>
                                     <td class="text-right">
-                                        <input v-if="row.participant_type === 'group' || row.participant_type === 'team'"
+                                        <input v-if="isSportsTeamItem(row)"
                                                v-model.number="row.group_item_per_participant_rate" type="number" min="0"
                                                class="field w-full max-w-[8rem] ml-auto text-right" placeholder="₹0">
                                         <span v-else class="text-xs text-slate-300">—</span>
@@ -1079,6 +1080,7 @@ import { useConfirm } from '@/composables/useConfirm';
 import ValidationBanner from '@/Components/ui/ValidationBanner.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 import StudentCountSlabTable from '@/Components/ui/StudentCountSlabTable.vue';
+import { sportsBaseRate, isSportsTeamItem } from '@/support/sportsEventFees.js';
 import { genderLabel } from '@/support/festItemEligibility.js';
 
 const {
@@ -1312,16 +1314,7 @@ function formatAmount(value, asPlaceholder = false) {
 
 function categoryRateForRow(row) {
     if (event.value.event_type === 'sports') {
-        // Composite billing has no per-age-group rate — the flat default/extra item
-        // fee from "Sport event billing" is what every non-overridden item bills at.
-        const flat = feeSettingsForm.sport_event_fees.default_item_fee;
-        if (flat !== '' && flat != null) {
-            return flat;
-        }
-        const ageFee = row.age_group ? feeSettingsForm.age_group_fees[row.age_group] : null;
-        if (ageFee !== '' && ageFee != null) {
-            return ageFee;
-        }
+        return sportsBaseRate(row, feeSettingsForm.sport_event_fees).amount;
     } else if (row.class_group) {
         const classFee = feeSettingsForm.class_group_fees[row.class_group];
         if (classFee !== '' && classFee != null) {

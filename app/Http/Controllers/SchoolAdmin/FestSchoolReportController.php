@@ -223,7 +223,7 @@ class FestSchoolReportController extends SchoolAdminController
         return $this->inertia('School/Events/ReportStudentLimits', [
             'program' => $program,
             'school'  => $this->school->only('id', 'name'),
-            'event'   => $event->only('id', 'title'),
+            'event'   => $event->only('id', 'title', 'event_type'),
             'rows'    => $rows,
             'summary' => $summary,
             'categories'     => \App\Services\Events\FestParticipationLimitService::categoryFilterOptions($event->rootEvent()),
@@ -248,6 +248,7 @@ class FestSchoolReportController extends SchoolAdminController
             $request->filled('item_id') ? (int) $request->input('item_id') : null,
             includePhotoDataUri: true,
             photoForSchoolAdmin: true,
+            onlyExceeding: $request->boolean('only_exceeding'),
         );
         $summary = $service->summarizeStudentLimitRows($rows);
 
@@ -275,19 +276,19 @@ class FestSchoolReportController extends SchoolAdminController
             $request->input('search'),
             $request->input('category') ?: null,
             $request->filled('item_id') ? (int) $request->input('item_id') : null,
+            onlyExceeding: $request->boolean('only_exceeding'),
         );
 
-        return response()->streamDownload(function () use ($rows) {
+        return response()->streamDownload(function () use ($rows, $event) {
             $out = fopen('php://output', 'w');
             CsvSafety::fputcsv($out, ['Generated on', now()->format('d M Y, h:i A')]);
             CsvSafety::fputcsv($out, []);
+            $dimensions = $event->event_type === 'sports'
+                ? ['individual' => 'Individual', 'pair' => 'Pair', 'group' => 'Team', 'total' => 'Total']
+                : ['on_stage' => 'On-stage', 'off_stage' => 'Off-stage', 'individual' => 'Individual', 'group' => 'Group', 'total' => 'Total'];
             CsvSafety::fputcsv($out, [
                 'Reg No', 'Name',
-                'On-stage used', 'On-stage limit',
-                'Off-stage used', 'Off-stage limit',
-                'Individual used', 'Individual limit',
-                'Group used', 'Group limit',
-                'Total used', 'Total limit',
+                ...collect($dimensions)->flatMap(fn ($label) => [$label.' used', $label.' limit'])->all(),
                 'Exceeds limit', 'Items',
             ]);
             foreach ($rows as $row) {
@@ -295,11 +296,7 @@ class FestSchoolReportController extends SchoolAdminController
                 CsvSafety::fputcsv($out, [
                     $row['reg_no'] ?? '',
                     $row['name'] ?? '',
-                    $row['on_stage']['used'], $row['on_stage']['limit'] ?? '',
-                    $row['off_stage']['used'], $row['off_stage']['limit'] ?? '',
-                    $row['individual']['used'], $row['individual']['limit'] ?? '',
-                    $row['group']['used'], $row['group']['limit'] ?? '',
-                    $row['total']['used'], $row['total']['limit'] ?? '',
+                    ...collect(array_keys($dimensions))->flatMap(fn ($key) => [$row[$key]['used'], $row[$key]['limit'] ?? ''])->all(),
                     $row['exceeds_any'] ? 'Yes' : 'No',
                     $itemTitles,
                 ]);

@@ -20,7 +20,6 @@ use Database\Seeders\SahodayaMasterDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 class FestSportsCompositeFeeServiceTest extends TestCase
@@ -300,7 +299,7 @@ class FestSportsCompositeFeeServiceTest extends TestCase
         // Let's verify the line label and quantity
         $line = collect($result['lines'])->firstWhere('line_type', 'team_fee');
         $this->assertNotNull($line);
-        $this->assertSame('U19 Chess Team — Hs (4 × ₹200)', $line['label']);
+        $this->assertSame('U19 Chess Team — Under 17 (4 × ₹200)', $line['label']);
         $this->assertSame(4, $line['quantity']);
         $this->assertSame(200.0, $line['unit_amount']);
     }
@@ -337,7 +336,7 @@ class FestSportsCompositeFeeServiceTest extends TestCase
         $this->assertSame(1, collect($after['lines'])->where('line_type', 'item_fee_waived')->count());
     }
 
-    public function test_cancel_blocked_when_head_payment_approved(): void
+    public function test_admin_cancellation_remains_available_after_payment_approval(): void
     {
         ['school' => $school, 'event' => $event, 'head' => $head] = $this->sportsContext([
             'school_registration_fee' => 100,
@@ -354,8 +353,10 @@ class FestSportsCompositeFeeServiceTest extends TestCase
             'amount_paid' => $fee->total_due,
         ]);
 
-        $this->expectException(HttpException::class);
+        // Current withdrawal policy permits cancellation after payment approval;
+        // billing is recalculated rather than using payment status as a roster lock.
         app(FestRegistrationService::class)->cancel($registration->fresh(), $event->fresh(), notify: false);
+        $this->assertSame('withdrawn', $registration->refresh()->status);
     }
 
     public function test_max_participants_cap_allows_waitlist_when_reached(): void

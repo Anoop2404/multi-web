@@ -2,6 +2,7 @@
     <nav class="mb-6 flex flex-wrap gap-1.5 bg-slate-100/80 p-1.5 rounded-xl border border-slate-200/80 shadow-inner overflow-x-auto" aria-label="Event settings navigation">
         <Link v-for="tab in tabs" :key="tab.id"
               :href="`${base}/settings/${tab.id}`"
+              :aria-current="currentTab === tab.id ? 'page' : undefined"
               :class="currentTab === tab.id
                   ? 'inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold bg-slate-900 text-white shadow-sm transition whitespace-nowrap'
                   : 'inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-white/70 transition whitespace-nowrap'">
@@ -32,9 +33,9 @@ const tabs = computed(() => settingsTabsForEvent(props.event).map(tab =>
 const currentTab = computed(() => {
     const a = props.activeTab;
     if (['fees', 'registration', 'participation'].includes(a)) return page.props.operationalEventAdmin ? 'registration' : 'fees';
-    if (['points', 'eligibility', 'grades', 'combo', 'records'].includes(a)) return 'points';
+    if (['points', 'eligibility', 'grades', 'combo', 'records'].includes(a)) return props.event.event_type === 'sports' ? 'eligibility' : 'combo';
     if (['venues', 'numbering', 'volunteers'].includes(a)) return 'venues';
-    if (['lifecycle', 'locks', 'clone', 'public-overlays'].includes(a)) return 'lifecycle';
+    if (['lifecycle', 'locks', 'clone', 'overlays', 'public-overlays'].includes(a)) return 'lifecycle';
     return a;
 });
 </script>

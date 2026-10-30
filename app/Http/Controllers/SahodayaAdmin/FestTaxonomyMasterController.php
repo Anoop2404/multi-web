@@ -20,13 +20,20 @@ class FestTaxonomyMasterController extends SahodayaAdminController
         abort_unless(array_key_exists($dimension, FestTaxonomyMaster::DIMENSIONS), 404);
 
         $programSlug = $request->input('program');
+        $dimensions = FestTaxonomyMaster::DIMENSIONS;
+        if ($programSlug === 'sports-meet') {
+            $dimensions = array_diff_key($dimensions, array_flip(['arts_category', 'class_group', 'stage_type']));
+            if (! array_key_exists($dimension, $dimensions)) {
+                $dimension = 'sport_discipline';
+            }
+        }
         $navProps = $programSlug && ProgramRouteMap::eventTypeFromSlug($programSlug)
             ? $this->programNavProps($programSlug)
             : [];
 
         return $this->inertia('Sahodaya/TaxonomyMasters/Index', $navProps + [
             'dimension'   => $dimension,
-            'dimensions'  => FestTaxonomyMaster::DIMENSIONS,
+            'dimensions'  => $dimensions,
             'entries'     => $registry->forTenant($this->sahodaya->id)->rowsForDimension($dimension),
             'sportsAgeGroupsUrl' => "/sahodaya-admin/{$this->sahodaya->id}/sports/age-groups",
         ]);

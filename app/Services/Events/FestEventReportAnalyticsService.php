@@ -1189,12 +1189,12 @@ class FestEventReportAnalyticsService
             $r['participants_scheduled'],
             $r['marks_entered'],
             $r['marks_pending'],
-            $r['judges_assigned'],
+            ...($this->event->event_type === 'sports' ? [] : [$r['judges_assigned']]),
         ]);
 
         return ExcelExport::download(
             str($this->event->title)->slug()->limit(40).'-assignment-completeness',
-            ['Head', 'Item', 'Approved', 'Pending', 'Performers', 'Chest OK', 'Chest missing', 'Item reg OK', 'Item reg missing', 'Item scheduled', 'Participants scheduled', 'Marks entered', 'Marks pending', 'Judges'],
+            ['Head', 'Item', 'Approved', 'Pending', 'Performers', 'Chest OK', 'Chest missing', 'Item reg OK', 'Item reg missing', 'Item scheduled', 'Participants scheduled', 'Marks entered', 'Marks pending', ...($this->event->event_type === 'sports' ? [] : ['Judges'])],
             $rows,
             ExcelExport::generatedOnNote(),
         );

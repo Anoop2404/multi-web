@@ -273,7 +273,7 @@ class FestReportController extends SahodayaAdminController
         // no interactive preview page of their own to carry a scope through instead.
         $exports = array_values(array_filter(
             FestReportCatalog::withScopeParams(
-                FestReportCatalog::exportsWithPreview($tenantId, $event->id),
+                FestReportCatalog::exportsWithPreview($tenantId, $event->id, $event->event_type),
                 [
                     'scope_mode' => $request->input('scope_mode'),
                     'competition_phase_id' => $request->integer('competition_phase_id') ?: null,
@@ -292,9 +292,9 @@ class FestReportController extends SahodayaAdminController
         // Downloads.vue uses this to render per-region export sections inline on the page.
         $regionChildrenWithExports = array_map(function (array $child) use ($tenantId, $event, $phase, $allowedPhases) {
             $childExports = FestReportCatalog::regionScopedRows(
-                FestReportCatalog::exportsWithPreview($tenantId, $child['id']),
+                FestReportCatalog::exportsWithPreview($tenantId, $child['id'], $event->event_type),
                 FestReportCatalog::withRegionParam(
-                    FestReportCatalog::exportsWithPreview($tenantId, $event->id),
+                    FestReportCatalog::exportsWithPreview($tenantId, $event->id, $event->event_type),
                     $child['region_id'],
                 ),
             );
@@ -1508,7 +1508,7 @@ class FestReportController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $catalog = collect(FestReportCatalog::exports($tenantId, $event->id))->firstWhere('id', $exportType);
+        $catalog = collect(FestReportCatalog::exports($tenantId, $event->id, $event->event_type))->firstWhere('id', $exportType);
         abort_unless(is_array($catalog), 404, 'Unknown report export.');
         $phase = $catalog['phase'] ?? 'before';
 

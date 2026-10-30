@@ -15,6 +15,29 @@ class FestParticipationPolicyServiceTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_sports_without_a_policy_does_not_inherit_arts_presets(): void
+    {
+        [$event] = $this->fixture();
+        $event->update(['event_type' => 'sports']);
+        $this->assertSame([], app(FestParticipationPolicyService::class)->resolveForEvent($event));
+    }
+
+    public function test_sports_keeps_explicit_sports_caps_but_ignores_arts_fields(): void
+    {
+        [$event] = $this->fixture();
+        $event->update(['event_type' => 'sports']);
+        FestParticipationPolicy::create([
+            'tenant_id' => $event->tenant_id, 'scope' => 'event', 'event_id' => $event->id, 'is_active' => true,
+            'preset_key' => 'cksc_sahodaya_cluster', 'max_total_per_student' => 3,
+            'max_group_per_student' => 2, 'max_onstage_per_student' => 1,
+        ]);
+        $limits = app(FestParticipationPolicyService::class)->resolveForEvent($event);
+        $this->assertSame(3, $limits['max_total_per_student']);
+        $this->assertSame(2, $limits['max_group_per_student']);
+        $this->assertArrayNotHasKey('max_onstage_per_student', $limits);
+        $this->assertArrayNotHasKey('preset_key', $limits);
+    }
+
     /**
      * Regression: eventPolicy()'s ->when($classGroup, ...) skipped the class_group
      * filter entirely for a null $classGroup (the whole-event student-limits report's

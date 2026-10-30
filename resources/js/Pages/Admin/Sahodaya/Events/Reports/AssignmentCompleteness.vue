@@ -2,7 +2,7 @@
     <SahodayaEventsLayout :title="`${event.title} — Assignment completeness`" :sahodaya="sahodaya" :event="event"
                          :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — Assignment completeness`" eyebrow="Reports"
-                    description="Per item: registrations, chest & item reg assignment, scheduling, judges and mark entry progress.">
+                    :description="event.event_type === 'sports' ? 'Per item: registrations, chest and item registration numbers, scheduling and results readiness.' : 'Per item: registrations, chest & item reg assignment, scheduling, judges and mark entry progress.'">
             <template #actions>
                 <a :href="xlsUrl" class="btn-secondary text-sm">Export Excel ↓</a>
             </template>
@@ -25,7 +25,7 @@
                 <thead>
                     <tr>
                         <th>Head</th><th>Item</th><th>Approved</th><th>Pending</th><th>Performers</th>
-                        <th>Chest</th><th>Item reg</th><th>Scheduled</th><th>Marks</th><th>Judges</th>
+                        <th>Chest</th><th>Item reg</th><th>Scheduled</th><th>Marks</th><th v-if="event.event_type !== 'sports'">Judges</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -39,7 +39,7 @@
                         <td>{{ row.item_reg_assigned }}<span v-if="row.item_reg_missing" class="text-red-600 text-xs"> (−{{ row.item_reg_missing }})</span></td>
                         <td>{{ row.item_scheduled ? '✓ item' : '—' }} · {{ row.participants_scheduled }} ppl</td>
                         <td>{{ row.marks_entered }}<span v-if="row.marks_pending" class="text-amber-700 text-xs"> / {{ row.marks_pending }} left</span></td>
-                        <td>{{ row.judges_assigned }}</td>
+                        <td v-if="event.event_type !== 'sports'">{{ row.judges_assigned }}</td>
                     </tr>
                     <tr v-if="!rows.length"><td colspan="10" class="p-6 text-center text-slate-400">No items on this event.</td></tr>
                 </tbody>

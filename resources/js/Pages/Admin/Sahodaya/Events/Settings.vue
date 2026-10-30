@@ -12,19 +12,27 @@
                            :event="event" active="settings" class="mb-4" />
         <EventSubNav v-else :sahodaya-id="sahodaya.id" :event-id="event.id" active="settings" class="mb-4" />
 
+        <ValidationBanner class="mb-4" />
+
         <EventSettingsSubNav :sahodaya-id="sahodaya.id" :event-id="event.id" :event="event" :active-tab="activeTab" />
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <nav class="mb-6 flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-3" aria-label="Settings sections">
+            <Link v-for="section in activeCategory.sections" :key="section.id" :href="section.href"
+                  :aria-current="activeTab === section.id ? 'page' : undefined"
+                  :class="activeTab === section.id ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200' : 'text-slate-600 hover:bg-slate-50'"
+                  class="rounded-xl px-4 py-2.5 text-sm font-semibold transition">{{ section.label }}</Link>
+        </nav>
+        <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_16rem] gap-6">
             <!-- Left Column: Active Settings Forms. min-w-0 lets this column's content
                  (tables, long form rows) shrink to fit instead of a grid item's default
                  min-width:auto letting a wide child force the whole grid track — and the
                  page along with it — wider than the viewport. -->
-            <div class="min-w-0 lg:col-span-2 space-y-6">
+            <div class="min-w-0 space-y-6">
                 <!-- Group Tab 1: Fees & Windows -->
                 <template v-if="['fees', 'registration', 'participation'].includes(activeTab)">
-                    <div v-if="!page.props.operationalEventAdmin" id="section-fees" class="scroll-mt-6"><FeesTab /></div>
-                    <div id="section-registration" class="scroll-mt-6"><RegistrationTab /></div>
-                    <div id="section-participation" class="scroll-mt-6"><ParticipationTab /></div>
+                    <div v-if="!page.props.operationalEventAdmin && activeTab === 'fees'" id="section-fees" class="scroll-mt-6"><FeesTab /></div>
+                    <div v-if="activeTab === 'registration'" id="section-registration" class="scroll-mt-6"><RegistrationTab /></div>
+                    <div v-if="activeTab === 'participation'" id="section-participation" class="scroll-mt-6"><ParticipationTab /></div>
                 </template>
 
                 <!-- Group Tab 2: Scoring & Rules. Rank Points and Grade Master used to live
@@ -32,58 +40,29 @@
                      FestEventSettingsController::settings() redirects the old
                      ?tab=points/?tab=grades URLs there instead of rendering this group. -->
                 <template v-else-if="['eligibility', 'combo', 'records'].includes(activeTab)">
-                    <div v-if="isSports" id="section-eligibility" class="scroll-mt-6"><EligibilityTab /></div>
-                    <div v-if="!isSports" id="section-combo" class="scroll-mt-6"><ComboTab /></div>
-                    <div v-if="isSports" id="section-records" class="scroll-mt-6"><RecordsTab /></div>
+                    <div v-if="isSports && activeTab === 'eligibility'" id="section-eligibility" class="scroll-mt-6"><EligibilityTab /></div>
+                    <div v-if="!isSports && activeTab === 'combo'" id="section-combo" class="scroll-mt-6"><ComboTab /></div>
+                    <div v-if="isSports && activeTab === 'records'" id="section-records" class="scroll-mt-6"><RecordsTab /></div>
                 </template>
 
                 <!-- Group Tab 3: Venues & Numbering -->
                 <template v-else-if="['venues', 'numbering', 'volunteers'].includes(activeTab)">
-                    <div id="section-venues" class="scroll-mt-6"><VenuesTab /></div>
-                    <div id="section-numbering" class="scroll-mt-6"><NumberingTab /></div>
-                    <div id="section-volunteers" class="scroll-mt-6"><VolunteersTab /></div>
+                    <div v-if="activeTab === 'venues'" id="section-venues" class="scroll-mt-6"><VenuesTab /></div>
+                    <div v-if="activeTab === 'numbering'" id="section-numbering" class="scroll-mt-6"><NumberingTab /></div>
+                    <div v-if="activeTab === 'volunteers'" id="section-volunteers" class="scroll-mt-6"><VolunteersTab /></div>
                 </template>
 
                 <!-- Group Tab 4: General & Operations -->
                 <template v-else>
-                    <div id="section-lifecycle" class="scroll-mt-6"><LifecycleTab /></div>
-                    <div id="section-locks" class="scroll-mt-6"><LocksTab /></div>
-                    <div id="section-overlays" class="scroll-mt-6"><OverlaysTab /></div>
-                    <div id="section-clone" class="scroll-mt-6"><CloneTab /></div>
+                    <div v-if="activeTab === 'lifecycle'" id="section-lifecycle" class="scroll-mt-6"><LifecycleTab /></div>
+                    <div v-if="activeTab === 'locks'" id="section-locks" class="scroll-mt-6"><LocksTab /></div>
+                    <div v-if="!isSports && activeTab === 'overlays'" id="section-overlays" class="scroll-mt-6"><OverlaysTab /></div>
+                    <div v-if="activeTab === 'clone'" id="section-clone" class="scroll-mt-6"><CloneTab /></div>
                 </template>
             </div>
 
             <!-- Right Column: Quick Navigation & Shortcuts -->
-            <aside class="min-w-0 lg:col-span-1 space-y-4">
-                <div class="card space-y-3">
-                    <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500">
-                            {{ activeCategory.title }} Sections
-                        </h4>
-                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
-                            {{ activeCategory.sections.length }} sections
-                        </span>
-                    </div>
-
-                    <p class="text-xs text-slate-500">Quickly navigate sections under this category:</p>
-
-                    <nav class="divide-y divide-slate-100 text-xs" aria-label="Settings section navigation">
-                        <Link v-for="sec in activeCategory.sections" :key="sec.id"
-                              :href="sec.href"
-                              class="py-2.5 flex items-center justify-between group transition">
-                            <div class="flex items-center gap-2">
-                                <span class="w-1.5 h-1.5 rounded-full transition"
-                                      :class="activeTab === sec.id ? 'bg-indigo-600 ring-2 ring-indigo-200' : 'bg-slate-300 group-hover:bg-indigo-400'"></span>
-                                <span class="font-medium text-slate-800 group-hover:text-indigo-600 transition"
-                                      :class="{ 'font-bold text-indigo-600': activeTab === sec.id }">
-                                    {{ sec.label }}
-                                </span>
-                            </div>
-                            <span class="text-slate-400 group-hover:text-indigo-600 text-xs transition">→</span>
-                        </Link>
-                    </nav>
-                </div>
-
+            <aside class="min-w-0 space-y-4">
                 <!-- Shortcuts Card -->
                 <div class="card space-y-2.5">
                     <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500">Quick Actions &amp; Navigation</h4>
@@ -110,12 +89,13 @@
 </template>
 
 <script setup>
-import { provide, computed, onMounted, watch, nextTick, toRefs } from 'vue';
+import { provide, computed, toRefs } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 const page = usePage();
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
+import ValidationBanner from '@/Components/ui/ValidationBanner.vue';
 import EventSettingsSubNav from '@/Components/sahodaya/EventSettingsSubNav.vue';
 import EventPageActivityLog from '@/Components/sahodaya/EventPageActivityLog.vue';
 import { useEventSettingsForms } from '@/composables/useEventSettingsForms.js';
@@ -225,27 +205,10 @@ const activeCategory = computed(() => {
         { id: 'locks', label: 'System Locks', href: `${base.value}/settings/locks` },
     ];
     if (!isSports.value) {
-        sections.push({ id: 'overlays', label: 'Public Display', href: `${base.value}/settings/public-overlays` });
+        sections.push({ id: 'overlays', label: 'Public Display', href: `${base.value}/settings/overlays` });
     }
     sections.push({ id: 'clone', label: 'Clone Event', href: `${base.value}/settings/clone` });
     return { title: isSports.value ? '⚙️ General & Operations' : '⚙️ General & Display', sections };
-});
-
-function scrollToCurrentSection() {
-    nextTick(() => {
-        const el = document.getElementById(`section-${activeTab.value}`);
-        if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    });
-}
-
-onMounted(() => {
-    scrollToCurrentSection();
-});
-
-watch(activeTab, () => {
-    scrollToCurrentSection();
 });
 
 // `props` is Inertia's reactive page-props object. Spreading it directly (`{...props}`)

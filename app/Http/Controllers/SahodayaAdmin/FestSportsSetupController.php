@@ -113,7 +113,7 @@ class FestSportsSetupController extends SahodayaAdminController
             [
                 'label' => 'Sport discipline taxonomy',
                 'hint'  => 'Athletics, Aquatics, Racket sports — used when creating sport events and items.',
-                'href'  => "{$tenantBase}/taxonomy-masters?dimension=sport_discipline",
+                'href'  => "{$tenantBase}/taxonomy-masters?dimension=sport_discipline&program=sports-meet",
             ],
         ];
 

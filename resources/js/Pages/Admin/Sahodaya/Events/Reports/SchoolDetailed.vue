@@ -1,7 +1,7 @@
 <template>
     <SahodayaEventsLayout :title="`${event.title} — School Results`" :sahodaya="sahodaya" :event="event" :publicUrl="publicUrl" :pendingPaymentsCount="pendingPaymentsCount" :show-header-title="false">
         <PageHeader :title="`${event.title} — School Results`" eyebrow="Reports"
-                    description="Choose full results or published results with grades and ranks.">
+                    :description="event.event_type === 'sports' ? 'Choose full or published sports results with ranks and performances.' : 'Choose full results or published results with grades and ranks.'">
             <template #actions>
                 <a v-if="pdfUrl" :href="pdfUrl" target="_blank" class="btn-primary text-sm">Download PDF ↓</a>
             </template>
@@ -14,21 +14,21 @@
             <SearchableSelect v-model="f.class_group" :options="classGroupOptions" :all-option="true" all-label="All classes" />
             <select v-model="f.result_mode" class="rounded-lg border-gray-300 text-sm" aria-label="Result report format">
                 <option value="full">Full results with marks</option>
-                <option value="published">Published results — grades and ranks</option>
+                <option value="published">{{ event.event_type === 'sports' ? 'Published results — ranks' : 'Published results — grades and ranks' }}</option>
             </select>
             <button class="btn-primary">Show</button>
         </form>
         <section v-for="school in schoolResults" :key="school.school_name" class="mb-6 bg-white border rounded-xl overflow-hidden">
             <h2 class="p-4 bg-slate-50 border-b font-bold text-lg">{{ school.school_name }}</h2>
             <table class="w-full text-sm">
-                <thead class="text-left bg-slate-50"><tr><th class="p-3 w-16">Sl No</th><th class="p-3">Student</th><th class="p-3">Item</th><th class="p-3 text-right">Rank</th><th class="p-3 text-right">Grade</th></tr></thead>
+                <thead class="text-left bg-slate-50"><tr><th class="p-3 w-16">Sl No</th><th class="p-3">Student</th><th class="p-3">Item</th><th class="p-3 text-right">Rank</th><th v-if="event.event_type !== 'sports'" class="p-3 text-right">Grade</th></tr></thead>
                 <tbody v-for="(student, studentIndex) in school.students" :key="student.key" class="border-t">
                     <tr v-for="(result, index) in student.results" :key="index">
                         <td v-if="index === 0" :rowspan="student.results.length" class="p-3 align-top">{{ studentIndex + 1 }}</td>
                         <td v-if="index === 0" :rowspan="student.results.length" class="p-3 align-top font-semibold">{{ student.name }}</td>
                         <td class="p-3">{{ result.item }}<span v-if="result.category" class="block text-xs text-slate-500">{{ result.category }}</span></td>
                         <td class="p-3 text-right">{{ result.rank ? `#${result.rank}` : '—' }}</td>
-                        <td class="p-3 text-right">{{ result.grade ?? '—' }}</td>
+                        <td v-if="event.event_type !== 'sports'" class="p-3 text-right">{{ result.grade ?? '—' }}</td>
                     </tr>
                 </tbody>
             </table>

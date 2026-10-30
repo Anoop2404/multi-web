@@ -133,7 +133,7 @@
                         <span>🏫</span> Per-School Starting Chest Numbers
                     </h3>
                     <p class="section-desc mt-0.5">
-                        Assign fixed chest number starting ranges per school (e.g., School A starting at 101, School B at 201). When chest numbers are generated, each student from that school receives continuous numbers within their school's allocated block.
+                        Assign fixed chest number starting ranges per school (e.g., School A starting at 101, School B at 201). Generation prefers each school's block. If it is exhausted, numbering continues using the event fallback sequence.
                     </p>
                 </div>
             </div>
@@ -171,11 +171,11 @@
                             <tr v-for="(row, idx) in schoolChestRangesForm.schools" :key="row.school_id" class="hover:bg-slate-50/70 transition">
                                 <td class="p-3.5 font-bold text-slate-900">{{ row.school_name }}</td>
                                 <td class="p-3.5">
-                                    <input v-model.number="schoolChestRangesForm.schools[idx].chest_no_start"
+                                    <input v-model.number="schoolChestRangesForm.schools[idx].chest_no_start" :aria-label="`${row.school_name} — chest start`"
                                            type="number" min="1" class="field text-xs w-full" placeholder="e.g. 101">
                                 </td>
                                 <td class="p-3.5">
-                                    <input v-model.number="schoolChestRangesForm.schools[idx].chest_no_end"
+                                    <input v-model.number="schoolChestRangesForm.schools[idx].chest_no_end" :aria-label="`${row.school_name} — chest end`"
                                            type="number" min="1" class="field text-xs w-full" placeholder="e.g. 150">
                                 </td>
                             </tr>

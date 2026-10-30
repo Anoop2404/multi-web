@@ -56,13 +56,13 @@
                     <tbody class="divide-y divide-slate-50">
                         <tr v-for="row in headRows" :key="row.id">
                             <td class="px-3 py-2 font-medium text-slate-900">{{ row.name }}</td>
-                            <td class="px-3 py-2"><input v-model="row.reg_start" type="date" class="field text-xs"></td>
-                            <td class="px-3 py-2"><input v-model="row.reg_end" type="date" class="field text-xs"></td>
-                            <td class="px-3 py-2"><input v-model="row.competition_start" type="date" class="field text-xs"></td>
-                            <td class="px-3 py-2"><input v-model="row.competition_end" type="date" class="field text-xs"></td>
+                            <td class="px-3 py-2"><input v-model="row.reg_start" :aria-label="`${row.title ?? row.name} — registration opens`" type="date" class="field text-xs"></td>
+                            <td class="px-3 py-2"><input v-model="row.reg_end" :aria-label="`${row.title ?? row.name} — registration closes`" type="date" class="field text-xs"></td>
+                            <td class="px-3 py-2"><input v-model="row.competition_start" :aria-label="`${row.title ?? row.name} — competition start`" type="date" class="field text-xs"></td>
+                            <td class="px-3 py-2"><input v-model="row.competition_end" :aria-label="`${row.title ?? row.name} — competition end`" type="date" class="field text-xs"></td>
                             <td class="px-3 py-2 text-right">
                                 <button type="button" class="btn-secondary text-xs py-1 px-2"
-                                        :disabled="savingHeadId === row.id"
+                                        :disabled="savingHeadId !== null || savingId !== null || bulkSavingItemWindows"
                                         @click="saveHeadWindowRow(row)">
                                     {{ savingHeadId === row.id ? '…' : 'Save' }}
                                 </button>
@@ -79,18 +79,23 @@
                     <h3 class="section-title">Per-item windows</h3>
                     <p class="section-desc text-xs">Optional per-item overrides. Leave blank to inherit from the event dates above.</p>
                 </div>
-                <div class="flex items-center gap-2 shrink-0">
+                <div class="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">
                     <button v-if="itemRows.length" type="button" class="btn-primary text-sm"
-                            :disabled="bulkSavingItemWindows"
+                            :disabled="bulkSavingItemWindows || savingId !== null || !filteredItemRows.length"
                             @click="saveAllRows">
-                        {{ bulkSavingItemWindows ? 'Saving…' : 'Save all' }}
+                        {{ bulkSavingItemWindows ? 'Saving…' : `Save shown items (${filteredItemRows.length})` }}
                     </button>
                     <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/competition`" class="btn-secondary text-sm">Competition hub →</Link>
                 </div>
             </div>
 
+            <div class="flex flex-wrap items-end gap-3">
+                <FormField label="Find an item" class-extra="mb-0 flex-1 min-w-[12rem]"><input v-model="itemSearch" type="search" class="field" placeholder="Item name or code"></FormField>
+                <FormField v-if="event.event_type === 'sports'" label="Age category" class-extra="mb-0 min-w-[12rem]"><SearchableSelect v-model="ageFilter" :options="ageOptions" :all-option="true" all-label="All age categories" /></FormField>
+                <p class="text-xs text-slate-500">{{ filteredItemRows.length }} of {{ itemRows.length }} items. Bulk fill and save apply to shown items.</p>
+            </div>
             <div v-if="itemRows.length" class="rounded-xl border border-amber-100 bg-amber-50/60 p-3 space-y-2">
-                <p class="text-xs font-semibold text-amber-800">Bulk fill — set a date once and apply it to every item row below</p>
+                <p class="text-xs font-semibold text-amber-800">Bulk fill — set a date once and apply it to the shown items below</p>
                 <div class="flex flex-wrap items-end gap-2">
                     <label class="text-xs text-slate-600">
                         Reg opens
@@ -112,13 +117,14 @@
                         Fill empty rows
                     </button>
                     <button type="button" class="btn-secondary text-xs py-1.5 px-2.5" @click="applyBulkDates('all')">
-                        Overwrite all rows
+                        Overwrite shown items
                     </button>
                 </div>
-                <p class="text-[11px] text-amber-700">Only fields you fill in above get applied — leave a field blank to skip it. Remember to click "Save all" after applying.</p>
+                <p class="text-[11px] text-amber-700">Only fields you fill in above get applied — leave a field blank to skip it. Remember to click "Save shown items" after applying.</p>
             </div>
 
-            <div v-if="itemRows.length" class="overflow-x-auto rounded-xl border border-slate-100">
+            <p v-if="itemRows.length" class="text-xs text-slate-500 sm:hidden">Swipe the table sideways to edit dates. The Save button stays visible.</p>
+            <div v-if="itemRows.length" class="overflow-x-auto rounded-xl border border-slate-100" role="region" tabindex="0" aria-label="Item registration dates — scroll horizontally for date columns">
                 <table class="data-table text-sm w-full" style="min-width: 1100px;">
                     <thead class="bg-slate-50">
                         <tr>
@@ -131,7 +137,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-50">
-                        <tr v-for="row in itemRows" :key="row.id">
+                        <tr v-for="row in filteredItemRows" :key="row.id">
                             <td class="px-3 py-2 font-medium text-slate-900 whitespace-normal">
                                 <div class="flex flex-wrap items-center gap-1.5">
                                     <span>{{ row.title }}</span>
@@ -139,18 +145,19 @@
                                 </div>
                                 <div v-if="itemMeta(row)" class="text-xs font-normal text-slate-500 mt-0.5">{{ itemMeta(row) }}</div>
                             </td>
-                            <td class="px-3 py-2"><input v-model="row.reg_start" type="date" class="field text-xs w-full min-w-[8.5rem]"></td>
-                            <td class="px-3 py-2"><input v-model="row.reg_end" type="date" class="field text-xs w-full min-w-[8.5rem]"></td>
-                            <td class="px-3 py-2"><input v-model="row.competition_start" type="date" class="field text-xs w-full min-w-[8.5rem]"></td>
-                            <td class="px-3 py-2"><input v-model="row.competition_end" type="date" class="field text-xs w-full min-w-[8.5rem]"></td>
+                            <td class="px-3 py-2"><input v-model="row.reg_start" :aria-label="`${row.title ?? row.name} — registration opens`" type="date" class="field text-xs w-full min-w-[8.5rem]"></td>
+                            <td class="px-3 py-2"><input v-model="row.reg_end" :aria-label="`${row.title ?? row.name} — registration closes`" type="date" class="field text-xs w-full min-w-[8.5rem]"></td>
+                            <td class="px-3 py-2"><input v-model="row.competition_start" :aria-label="`${row.title ?? row.name} — competition start`" type="date" class="field text-xs w-full min-w-[8.5rem]"></td>
+                            <td class="px-3 py-2"><input v-model="row.competition_end" :aria-label="`${row.title ?? row.name} — competition end`" type="date" class="field text-xs w-full min-w-[8.5rem]"></td>
                             <td class="px-3 py-2 text-right sticky right-0 bg-white">
                                 <button type="button" class="btn-secondary text-xs py-1 px-2"
-                                        :disabled="savingId === row.id"
+                                        :disabled="savingId !== null || savingHeadId !== null || bulkSavingItemWindows"
                                         @click="saveRow(row)">
                                     {{ savingId === row.id ? '…' : 'Save' }}
                                 </button>
                             </td>
                         </tr>
+                    <tr v-if="!filteredItemRows.length"><td colspan="6" class="p-5 text-center text-sm text-slate-500">No items match these filters.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -165,9 +172,10 @@ import { Link } from '@inertiajs/vue3';
 import ValidationBanner from '@/Components/ui/ValidationBanner.vue';
 import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
+import { mergeWindowRows, WINDOW_DATE_FIELDS } from '@/support/eventWindowSettings.js';
 import { genderLabel } from '@/support/festItemEligibility.js';
 
-const { registrationSettingsForm, saveRegistrationSettings, saveItemWindow, saveAllItemWindows, bulkSavingItemWindows, saveHeadWindow, sahodaya, event, itemHeads, clusterRequireStudentVerification } = inject('eventSettings');
+const { registrationSettingsForm, saveRegistrationSettings, saveItemWindow, saveAllItemWindows, bulkSavingItemWindows, saveHeadWindow, sahodaya, event, itemHeads, ageGroupLabels, clusterRequireStudentVerification } = inject('eventSettings');
 
 // event and itemHeads come from inject('eventSettings'), which Settings.vue provides
 // as `{ ...toRefs(props), ...ctx }` — every prop-sourced key is a real Vue Ref, not
@@ -215,7 +223,7 @@ function mapItem(item) {
 
 function itemMeta(row) {
     const parts = [];
-    const cat = row.category_label
+    const cat = (event.value?.event_type === 'sports' ? ageGroupLabels.value?.[row.age_group] : null) || row.category_label
         || (row.age_group && row.age_group !== 'open' ? String(row.age_group).toUpperCase() : null)
         || (row.class_group && row.class_group !== 'open' ? String(row.class_group).replace(/[_-]/g, ' ').toUpperCase() : null)
         || (row.category && row.category !== 'general' ? String(row.category).replace(/[_-]/g, ' ') : null);
@@ -228,6 +236,13 @@ function itemMeta(row) {
 }
 
 const itemRows = ref((eventVal.items ?? []).map(mapItem));
+let previousItems = itemRows.value.map(row => ({ ...row }));
+const itemSearch = ref('');
+const ageFilter = ref('');
+const ageOptions = computed(() => [...new Set(itemRows.value.map(row => row.age_group).filter(Boolean))].map(value => ({ value, label: ageGroupLabels.value?.[value] ?? value.toUpperCase() })));
+const filteredItemRows = computed(() => itemRows.value.filter(row =>
+    (!ageFilter.value || row.age_group === ageFilter.value)
+    && (!itemSearch.value.trim() || `${row.title} ${row.item_code ?? ''}`.toLowerCase().includes(itemSearch.value.trim().toLowerCase()))));
 
 const headRows = ref(itemHeadsVal.map((head) => ({
     id: head.id,
@@ -238,12 +253,16 @@ const headRows = ref(itemHeadsVal.map((head) => ({
     competition_end: toDateInput(head.competition_end),
 })));
 
+let previousHeads = headRows.value.map(row => ({ ...row }));
+
 watch(() => event.value?.items, (items) => {
-    itemRows.value = (items ?? []).map(mapItem);
+    const incoming = (items ?? []).map(mapItem);
+    itemRows.value = mergeWindowRows(itemRows.value, previousItems, incoming);
+    previousItems = incoming.map(row => ({ ...row }));
 }, { deep: true });
 
 watch(() => itemHeads.value, (heads) => {
-    headRows.value = (heads ?? []).map((head) => ({
+    const incoming = (heads ?? []).map((head) => ({
         id: head.id,
         name: head.name,
         reg_start: toDateInput(head.reg_start),
@@ -251,16 +270,17 @@ watch(() => itemHeads.value, (heads) => {
         competition_start: toDateInput(head.competition_start),
         competition_end: toDateInput(head.competition_end),
     }));
+    headRows.value = mergeWindowRows(headRows.value, previousHeads, incoming);
+    previousHeads = incoming.map(row => ({ ...row }));
 }, { deep: true });
 
-function saveRow(row) {
+async function saveRow(row) {
     savingId.value = row.id;
-    saveItemWindow(row.id, row);
-    setTimeout(() => { savingId.value = null; }, 600);
+    try { await saveItemWindow(row.id, row); } finally { savingId.value = null; }
 }
 
 function saveAllRows() {
-    saveAllItemWindows(itemRows.value);
+    saveAllItemWindows(filteredItemRows.value);
 }
 
 const bulkDates = ref({
@@ -270,13 +290,13 @@ const bulkDates = ref({
     competition_end: '',
 });
 
-const bulkDateFields = ['reg_start', 'reg_end', 'competition_start', 'competition_end'];
+const bulkDateFields = WINDOW_DATE_FIELDS;
 
 function applyBulkDates(mode) {
     const fieldsToApply = bulkDateFields.filter((field) => bulkDates.value[field]);
     if (!fieldsToApply.length) return;
 
-    itemRows.value.forEach((row) => {
+    filteredItemRows.value.forEach((row) => {
         fieldsToApply.forEach((field) => {
             if (mode === 'all' || !row[field]) {
                 row[field] = bulkDates.value[field];
@@ -285,9 +305,8 @@ function applyBulkDates(mode) {
     });
 }
 
-function saveHeadWindowRow(row) {
+async function saveHeadWindowRow(row) {
     savingHeadId.value = row.id;
-    saveHeadWindow(row.id, { ...row, apply_to_items: true });
-    setTimeout(() => { savingHeadId.value = null; }, 600);
+    try { await saveHeadWindow(row.id, { ...row, apply_to_items: true }); } finally { savingHeadId.value = null; }
 }
 </script>

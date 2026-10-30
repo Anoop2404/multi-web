@@ -134,6 +134,12 @@ class Student extends Model
             ?? TenantStorage::directPhotoUrl($this->photo, thumbnail: false, useCloudFront: false);
     }
 
+    public function photoDataUriCacheKey(): string
+    {
+        return 'student-photo-thumb:'.$this->tenant_id.':'.$this->id.':'
+            .($this->updated_at?->timestamp ?? 0).':'.sha1((string) $this->photo);
+    }
+
     /**
      * Cached, downscaled base64 data URI for this student's photo — usable regardless of
      * which portal/session is rendering the page (unlike photoUrl()/sahodayaPhotoUrl(),
@@ -152,7 +158,7 @@ class Student extends Model
             return $this->photo;
         }
 
-        $cacheKey = 'student-photo-thumb:'.$this->id.':'.($this->updated_at?->timestamp ?? 0);
+        $cacheKey = $this->photoDataUriCacheKey();
         $tenant = $this->relationLoaded('tenant') ? $this->tenant : Tenant::find($this->tenant_id);
 
         return TenantStorage::rememberPhotoDataUri($cacheKey, $tenant, $this->photo);

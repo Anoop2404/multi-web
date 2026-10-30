@@ -25,10 +25,12 @@ class SportsAgeGroupController extends SahodayaAdminController
     {
         $registry->forTenant($this->sahodaya->id)->ensureDefaults();
 
+        $usage = FestEventItem::whereHas('event', fn ($q) => $q->where('tenant_id', $this->sahodaya->id))
+            ->selectRaw('age_group, COUNT(*) as total')->groupBy('age_group')->pluck('total', 'age_group');
         $groups = FestSportsAgeGroupConfig::where('tenant_id', $this->sahodaya->id)
             ->orderBy('sort_order')
             ->orderBy('group_key')
-            ->get();
+            ->get()->each(fn ($group) => $group->setAttribute('items_count', (int) ($usage[$group->group_key] ?? 0)));
 
         return $this->inertia('Sahodaya/SportsAgeGroups/Index', [
             'groups'           => $groups,
@@ -47,6 +49,8 @@ class SportsAgeGroupController extends SahodayaAdminController
         SahodayaProfile::where('tenant_id', $this->sahodaya->id)->update([
             'sports_age_cutoff_date' => $data['sports_age_cutoff_date'] ?? null,
         ]);
+
+        \App\Support\FestSportsAgeGroup::forgetTenantCache($this->sahodaya->id);
 
         return back()->with('success', $data['sports_age_cutoff_date'] ?? null
             ? 'Sahodaya-wide age reference date saved.'
@@ -83,6 +87,8 @@ class SportsAgeGroupController extends SahodayaAdminController
             'is_active'   => true,
         ]);
 
+        \App\Support\FestSportsAgeGroup::forgetTenantCache($this->sahodaya->id);
+
         return back()->with('success', 'Age category added.');
     }
 
@@ -110,6 +116,8 @@ class SportsAgeGroupController extends SahodayaAdminController
 
         $sportsAgeGroup->update($data);
 
+        \App\Support\FestSportsAgeGroup::forgetTenantCache($this->sahodaya->id);
+
         return back()->with('success', 'Age category updated.');
     }
 
@@ -117,16 +125,37 @@ class SportsAgeGroupController extends SahodayaAdminController
     {
         abort_if($sportsAgeGroup->tenant_id !== $this->sahodaya->id, 403);
 
+        if ($this->categoryInUse($sportsAgeGroup->group_key)) {
+            return back()->withErrors(['age_category' => 'This category is used by event items. Reassign those items before removing it.']);
+        }
+
         $sportsAgeGroup->delete();
+
+        \App\Support\FestSportsAgeGroup::forgetTenantCache($this->sahodaya->id);
 
         return back()->with('success', 'Age category removed.');
     }
 
     public function resetDefaults(FestSportsAgeGroupRegistry $registry)
     {
+        $defaultKeys = array_keys(config('fest_co_curricular.sports.age_groups', []));
+        $customKeys = FestSportsAgeGroupConfig::where('tenant_id', $this->sahodaya->id)->whereNotIn('group_key', $defaultKeys)->pluck('group_key');
+        foreach ($customKeys as $key) {
+            if ($this->categoryInUse($key)) {
+                return back()->withErrors(['age_category' => 'Reset would remove a custom category used by event items. Reassign those items first.']);
+            }
+        }
         FestSportsAgeGroupConfig::where('tenant_id', $this->sahodaya->id)->delete();
         $registry->forTenant($this->sahodaya->id)->ensureDefaults();
 
+        \App\Support\FestSportsAgeGroup::forgetTenantCache($this->sahodaya->id);
+
         return back()->with('success', 'Age categories reset to system defaults.');
     }
+    private function categoryInUse(string $key): bool
+    {
+        return FestEventItem::where('age_group', $key)
+            ->whereHas('event', fn ($q) => $q->where('tenant_id', $this->sahodaya->id))->exists();
+    }
+
 }

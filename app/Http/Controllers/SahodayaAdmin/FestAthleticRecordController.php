@@ -76,7 +76,7 @@ class FestAthleticRecordController extends SahodayaAdminController
             [
                 'record_direction' => $data['record_direction'],
                 'record_value' => $parsedValue,
-                'record_unit' => $data['record_unit'] ?: ($data['record_direction'] === 'lower_better' ? 's' : 'm'),
+                'record_unit' => ($data['record_unit'] ?? null) ?: ($data['record_direction'] === 'lower_better' ? 's' : 'm'),
                 'holder_name' => $data['holder_name'],
                 'notes' => $data['notes'] ?? null,
                 'record_date' => $data['record_date'] ?? now()->toDateString(),

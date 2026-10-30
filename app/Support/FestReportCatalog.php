@@ -107,7 +107,7 @@ class FestReportCatalog
     }
 
     /** @return list<array<string, mixed>> */
-    public static function exports(string $tenantId, int $eventId): array
+    public static function exports(string $tenantId, int $eventId, ?string $eventType = null): array
     {
         $base = "/sahodaya-admin/{$tenantId}/events/{$eventId}/reports/export";
 
@@ -182,6 +182,12 @@ class FestReportCatalog
             ['id' => 'unique-participants-pdf', 'label' => 'Unique Participant Counts (PDF)', 'format' => 'pdf', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
             ['id' => 'unique-participants-xls', 'label' => 'Unique Participant Counts (Excel)', 'format' => 'xls', 'params' => ['school_id'], 'phase' => 'before', 'audience' => 'staff'],
         ];
+
+        if ($eventType === 'sports') {
+            $exports = array_values(array_filter($exports, fn ($row) => ! in_array($row['id'], [
+                'green-room-list', 'judge-sheet', 'area-wise-participants',
+            ], true)));
+        }
 
         return array_map(
             fn (array $exp) => array_merge($exp, self::scopeMetadata($exp['id']), ['href' => "{$base}/{$exp['id']}"]),
@@ -326,7 +332,7 @@ class FestReportCatalog
             ['id' => 'item-wise', 'label' => 'Item-wise browser', 'href' => "{$base}/item-wise"],
             ['id' => 'category-wise-points', 'label' => 'Category-wise Points', 'href' => "{$base}/category-wise-points"],
             ['id' => 'category-item-matrix', 'label' => 'Category & Item-wise Consolidated Report', 'href' => "{$base}/category-item-matrix"],
-            ['id' => 'championship', 'label' => 'Individual Championship', 'href' => "{$base}/championship"],
+            ['id' => 'championship', 'label' => 'Individual Championship', 'href' => "/sahodaya-admin/{$tenantId}/events/{$eventId}/championship"],
             ['id' => 'attendance', 'label' => 'Attendance Register', 'href' => "/sahodaya-admin/{$tenantId}/events/{$eventId}/attendance"],
             ['id' => 'id-cards', 'label' => 'Participant ID Cards', 'href' => "/sahodaya-admin/{$tenantId}/events/{$eventId}/id-cards"],
             ['id' => 'games-entry-form', 'label' => 'Entry Form', 'href' => "/school-admin/{$tenantId}/sports/events/{$eventId}/games-entry-form"],
@@ -558,17 +564,19 @@ class FestReportCatalog
     }
 
     /** Enrich export rows with optional preview href for Downloads UI. */
-    public static function exportsWithPreview(string $tenantId, int $eventId): array
+    public static function exportsWithPreview(string $tenantId, int $eventId, ?string $eventType = null): array
     {
         $reportsBase = "/sahodaya-admin/{$tenantId}/events/{$eventId}/reports";
 
-        return array_map(function (array $exp) use ($reportsBase) {
+        return array_map(function (array $exp) use ($reportsBase, $tenantId, $eventId) {
             $previewId = self::previewPageForExport($exp['id']);
             if ($previewId) {
-                $exp['previewHref'] = "{$reportsBase}/{$previewId}";
+                $exp['previewHref'] = $previewId === 'championship'
+                    ? "/sahodaya-admin/{$tenantId}/events/{$eventId}/championship"
+                    : "{$reportsBase}/{$previewId}";
             }
 
             return $exp;
-        }, self::exports($tenantId, $eventId));
+        }, self::exports($tenantId, $eventId, $eventType));
     }
 }

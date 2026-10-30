@@ -27,6 +27,63 @@ class FestParticipationLimitServiceTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_sports_report_counts_individual_items_without_stage_and_does_not_invent_an_overall_cap(): void
+    {
+        [$event, $schoolId] = $this->fixture(['max_total_per_student' => 1, 'max_group_per_student' => 2]);
+        $event->update(['event_type' => 'sports']);
+        foreach (['100 metres', 'Long jump'] as $title) {
+            $item = FestEventItem::create(['event_id' => $event->id, 'title' => $title, 'participant_type' => 'individual', 'is_enabled' => true]);
+            $this->registerStudentFor($event, $schoolId, 999, $item);
+        }
+        $row = (new FestParticipationLimitService($event))->studentLimitReportRows($schoolId)[0];
+        $this->assertSame(2, $row['individual']['used']);
+        $this->assertTrue($row['individual']['exceeds']);
+        $this->assertSame(0, $row['on_stage']['used']);
+        $this->assertNull($row['on_stage']['limit']);
+        $this->assertNull($row['total']['limit']);
+        $this->assertTrue($row['exceeds_any']);
+    }
+
+    public function test_only_exceeding_and_search_filters_apply_before_photo_preparation(): void
+    {
+        [$event, $schoolId] = $this->fixture(['max_total_per_student' => 1]);
+        $event->update(['event_type' => 'sports']);
+        $itemA = FestEventItem::create(['event_id' => $event->id, 'title' => '100m', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $itemB = FestEventItem::create(['event_id' => $event->id, 'title' => 'Long jump', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $this->registerStudentFor($event, $schoolId, 991, $itemA);
+        $this->registerStudentFor($event, $schoolId, 991, $itemB);
+        $this->registerStudentFor($event, $schoolId, 992, $itemA);
+        $service = new FestParticipationLimitService($event);
+        $rows = $service->studentLimitReportRows($schoolId, onlyExceeding: true);
+        $this->assertCount(1, $rows);
+        $this->assertSame(991, $rows[0]['student_id']);
+        $this->assertSame([], $service->studentLimitReportRows($schoolId, search: 'does not exist', onlyExceeding: true));
+    }
+
+    public function test_sports_mark_progress_uses_bounded_queries(): void
+    {
+        [$event, $schoolId] = $this->fixture();
+        $event->update(['event_type' => 'sports']);
+        for ($i = 0; $i < 5; $i++) {
+            $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Item '.$i, 'participant_type' => 'individual', 'is_enabled' => true]);
+            $this->registerStudentFor($event, $schoolId, 990, $item);
+        }
+        FestRegistration::where('event_id', $event->id)->update(['status' => 'approved']);
+        $participant = FestParticipant::whereHas('registration', fn ($q) => $q->where('event_id', $event->id))->first();
+        \App\Models\FestMark::create(['event_id' => $event->id, 'item_id' => $participant->registration->item_id,
+            'participant_id' => $participant->id, 'position' => 1]);
+        \Illuminate\Support\Facades\DB::enableQueryLog();
+        \Illuminate\Support\Facades\DB::flushQueryLog();
+        try {
+            $status = app(\App\Services\Events\FestJudgeGateService::class)->status($event);
+            $this->assertSame(5, $status['total']);
+            $this->assertSame(1, $status['complete']);
+            $this->assertLessThanOrEqual(3, count(\Illuminate\Support\Facades\DB::getQueryLog()));
+        } finally {
+            \Illuminate\Support\Facades\DB::disableQueryLog();
+        }
+    }
+
     private function fixture(array $policyOverrides = []): array
     {
         $sahodaya = Tenant::create([

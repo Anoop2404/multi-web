@@ -81,6 +81,17 @@ class FestStudentLimitsReportSchoolNameTest extends TestCase
         $response->assertOk();
     }
 
+    public function test_sports_pdf_uses_sports_dimensions_and_omits_stage_quotas(): void
+    {
+        $html = view('fest.reports.student-limits', [
+            'event' => (object) ['title' => 'Athletics', 'event_type' => 'sports'],
+            'rows' => [], 'summary' => [], 'orgName' => 'Sahodaya', 'logoSrc' => null,
+        ])->render();
+        $this->assertStringContainsString('sports item usage', $html);
+        $this->assertStringNotContainsString('Over on-stage', $html);
+        $this->assertStringNotContainsString('Over off-stage', $html);
+    }
+
     public function test_pdf_shows_each_students_school_name(): void
     {
         $html = view('fest.reports.student-limits', [

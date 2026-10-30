@@ -68,7 +68,7 @@
                     <div class="flex items-center justify-between">
                         <div>
                             <h3 class="section-title !mb-0">Setup Checklist</h3>
-                            <p class="section-desc mt-0.5">Step-by-step setup tasks for this sports meet.</p>
+                            <p class="section-desc mt-0.5">Complete the pending tasks below. Use Show all to review completed settings.</p>
                         </div>
                         <button type="button" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
                                 @click="showAllChecklist = !showAllChecklist">
@@ -86,11 +86,11 @@
                                 </span>
                                 <div class="min-w-0">
                                     <p class="font-semibold text-slate-900 group-hover:text-indigo-700 transition"
-                                       :class="{ 'line-through text-slate-400': step.done }">
+                                       :class="{ 'text-emerald-800': step.done }">
                                         {{ step.label }}
                                         <span v-if="step.optional" class="ml-1 text-[9px] font-normal uppercase tracking-wide text-slate-400 no-underline">(Optional)</span>
                                     </p>
-                                    <p class="text-[11px] text-slate-500 truncate mt-0.5">{{ step.hint }}</p>
+                                    <p class="text-xs text-slate-500 mt-1 leading-relaxed">{{ step.hint }}</p>
                                 </div>
                             </div>
                             <Link :href="step.href" class="btn-secondary text-[11px] !py-1 !px-2.5 shrink-0 group-hover:border-indigo-300">
@@ -301,7 +301,8 @@ function sportEventUrl(head) {
 
 function formatDate(iso) {
     if (!iso) return '—';
-    const d = new Date(`${iso}T12:00:00`);
+    const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso}T12:00:00` : iso);
+    if (Number.isNaN(d.getTime())) return '—';
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 

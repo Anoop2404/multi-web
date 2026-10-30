@@ -55,6 +55,7 @@ export function useEventSettingsForms(props) {
         max_onstage_per_school: props.participationPolicy?.max_onstage_per_school ?? '',
         max_offstage_per_school: props.participationPolicy?.max_offstage_per_school ?? '',
         max_group_per_school: props.participationPolicy?.max_group_per_school ?? '',
+        count_submitted_registrations: props.participationPolicy?.count_submitted_registrations ?? true,
         one_entry_per_item_per_school: props.participationPolicy?.one_entry_per_item_per_school ?? true,
         require_fee_before_approval: props.participationPolicy?.require_fee_before_approval ?? true,
     });
@@ -90,6 +91,15 @@ export function useEventSettingsForms(props) {
         tv_show_overall_standings: props.event.tv_show_overall_standings ?? true,
         tv_public_override: props.event.tv_public_override ?? false,
     });
+
+    const recordSettingsForm = useForm({
+        record_tracking_enabled: props.event.record_tracking_enabled ?? false,
+        default_record_prize_label: props.event.default_record_prize_label ?? 'Record Break Prize',
+    });
+
+    function saveRecordSettings() {
+        recordSettingsForm.put(`${base}/settings`, { preserveScroll: true });
+    }
 
     // Event-level notification gating — mirrors the per-head form in
     // FestHeadManagePanel.vue, but always available (that one is sports-only). See
@@ -371,13 +381,12 @@ export function useEventSettingsForms(props) {
     }
 
     function saveItemWindow(itemId, row) {
-        router.patch(`${base}/items/${itemId}/windows`, {
+        return new Promise(resolve => router.patch(`${base}/items/${itemId}/windows`, {
             reg_start: row.reg_start || null,
             reg_end: row.reg_end || null,
             competition_start: row.competition_start || null,
             competition_end: row.competition_end || null,
-            head_id: row.head_id || null,
-        }, { preserveScroll: true });
+        }, { preserveScroll: true, onFinish: resolve }));
     }
 
     const bulkSavingItemWindows = ref(false);
@@ -391,7 +400,6 @@ export function useEventSettingsForms(props) {
                 reg_end: row.reg_end || null,
                 competition_start: row.competition_start || null,
                 competition_end: row.competition_end || null,
-                head_id: row.head_id || null,
             })),
         }, {
             preserveScroll: true,
@@ -400,13 +408,13 @@ export function useEventSettingsForms(props) {
     }
 
     function saveHeadWindow(headId, row) {
-        router.patch(`${base}/item-heads/${headId}/windows`, {
+        return new Promise(resolve => router.patch(`${base}/item-heads/${headId}/windows`, {
             reg_start: row.reg_start || null,
             reg_end: row.reg_end || null,
             competition_start: row.competition_start || null,
             competition_end: row.competition_end || null,
             apply_to_items: row.apply_to_items ?? true,
-        }, { preserveScroll: true });
+        }, { preserveScroll: true, onFinish: resolve }));
     }
 
     function saveNumberingSettings() {
@@ -561,6 +569,8 @@ export function useEventSettingsForms(props) {
         policyForm,
         lifecycleLinks,
         settingsForm,
+        recordSettingsForm,
+        saveRecordSettings,
         eventNotifForm,
         savingEventNotifications,
         venueForm,
