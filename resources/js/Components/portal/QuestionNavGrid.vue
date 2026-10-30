@@ -8,64 +8,83 @@
         </div>
 
         <!-- Section Filter (when multiple sections/subjects exist) -->
-        <div v-if="distinctSections.length > 1" class="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none" role="tablist" aria-label="Section selector">
-            <button
-                type="button"
-                role="tab"
-                :aria-selected="selectedSection === 'all'"
-                class="px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap transition cursor-pointer"
-                :class="selectedSection === 'all' ? 'bg-[#0f3d7a] text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
-                @click="selectedSection = 'all'"
-            >
-                All ({{ questions.length }})
-            </button>
-            <button
-                v-for="sec in distinctSections"
-                :key="sec.name"
-                type="button"
-                role="tab"
-                :aria-selected="selectedSection === sec.name"
-                class="px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap transition cursor-pointer"
-                :class="selectedSection === sec.name ? 'bg-[#0f3d7a] text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
-                @click="selectedSection = sec.name"
-            >
-                {{ sec.name }} ({{ sec.count }})
-            </button>
+        <div v-if="distinctSections.length > 1" class="space-y-1">
+            <div class="flex items-center justify-between text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                <span>Subject / Section</span>
+                <button
+                    v-if="selectedSection !== 'all'"
+                    type="button"
+                    class="text-[10px] text-blue-600 hover:underline cursor-pointer lowercase"
+                    @click="selectedSection = 'all'"
+                >
+                    reset
+                </button>
+            </div>
+            <div class="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none" role="tablist" aria-label="Section selector">
+                <button
+                    type="button"
+                    role="tab"
+                    :aria-selected="selectedSection === 'all'"
+                    class="px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap transition cursor-pointer"
+                    :class="selectedSection === 'all' ? 'bg-[#0f3d7a] text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                    @click="selectedSection = 'all'"
+                >
+                    All
+                </button>
+                <button
+                    v-for="sec in distinctSections"
+                    :key="sec.name"
+                    type="button"
+                    role="tab"
+                    :aria-selected="selectedSection === sec.name"
+                    class="px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap transition cursor-pointer"
+                    :class="selectedSection === sec.name ? 'bg-[#0f3d7a] text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                    @click="selectedSection = sec.name"
+                >
+                    {{ sec.name }} ({{ sec.count }})
+                </button>
+            </div>
         </div>
 
         <!-- Filter Chips -->
-        <div v-if="navStatus" class="flex flex-wrap gap-1 text-[11px] font-semibold" role="tablist" aria-label="Question status filters">
-            <button
-                type="button"
-                role="tab"
-                :aria-selected="activeFilter === 'all'"
-                class="px-2 py-0.5 rounded-md transition cursor-pointer"
-                :class="activeFilter === 'all' ? 'bg-slate-900 text-white font-bold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
-                @click="activeFilter = 'all'"
-            >
-                All ({{ questions.length }})
-            </button>
-            <button
-                v-if="reviewCount > 0"
-                type="button"
-                role="tab"
-                :aria-selected="activeFilter === 'review'"
-                class="px-2 py-0.5 rounded-md transition cursor-pointer"
-                :class="activeFilter === 'review' ? 'bg-amber-400 text-amber-950 font-bold' : 'bg-amber-50 text-amber-800 hover:bg-amber-100'"
-                @click="activeFilter = 'review'"
-            >
-                Review ({{ reviewCount }})
-            </button>
-            <button
-                type="button"
-                role="tab"
-                :aria-selected="activeFilter === 'unanswered'"
-                class="px-2 py-0.5 rounded-md transition cursor-pointer"
-                :class="activeFilter === 'unanswered' ? 'bg-slate-700 text-white font-bold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
-                @click="activeFilter = 'unanswered'"
-            >
-                Unanswered ({{ questions.length - answeredCount }})
-            </button>
+        <div v-if="navStatus" class="space-y-1">
+            <div class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                <span>Filter Status</span>
+            </div>
+            <div class="flex flex-wrap gap-1 text-[11px] font-semibold" role="tablist" aria-label="Question status filters">
+                <button
+                    type="button"
+                    role="tab"
+                    :aria-selected="activeFilter === 'all'"
+                    class="px-2 py-0.5 rounded-md transition cursor-pointer"
+                    :class="activeFilter === 'all' ? 'bg-slate-800 text-white font-bold shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                    @click="activeFilter = 'all'"
+                >
+                    All Questions
+                </button>
+                <button
+                    v-if="reviewCount > 0"
+                    type="button"
+                    role="tab"
+                    :aria-selected="activeFilter === 'review'"
+                    class="px-2 py-0.5 rounded-md transition cursor-pointer flex items-center gap-1"
+                    :class="activeFilter === 'review' ? 'bg-amber-400 text-amber-950 font-bold shadow-xs' : 'bg-amber-50 text-amber-800 hover:bg-amber-100'"
+                    @click="activeFilter = 'review'"
+                >
+                    <span>⭐</span>
+                    <span>Review ({{ reviewCount }})</span>
+                </button>
+                <button
+                    type="button"
+                    role="tab"
+                    :aria-selected="activeFilter === 'unanswered'"
+                    class="px-2 py-0.5 rounded-md transition cursor-pointer"
+                    :class="activeFilter === 'unanswered' ? 'bg-slate-700 text-white font-bold shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                    @click="activeFilter = 'unanswered'"
+                >
+                    Unanswered ({{ questions.length - answeredCount }})
+                </button>
+            </div>
         </div>
 
         <div class="grid grid-cols-5 lg:grid-cols-4 gap-1.5" role="list">

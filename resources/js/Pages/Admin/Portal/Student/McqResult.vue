@@ -192,7 +192,12 @@
                         <div v-if="a.question_body" class="mb-3">
                             <McqRichText :text="a.question_body" class="text-slate-900 font-medium text-sm leading-relaxed" />
                             <div v-if="a.question_image_url" class="mt-2 max-w-sm rounded-lg overflow-hidden border border-slate-200">
-                                <img :src="a.question_image_url" alt="Question illustration" class="max-h-48 object-contain">
+                                <img
+                                    :src="a.question_image_url"
+                                    alt="Question illustration"
+                                    class="max-h-48 object-contain cursor-zoom-in hover:opacity-95 transition"
+                                    @click="zoomSrc = a.question_image_url"
+                                />
                             </div>
                         </div>
 
@@ -208,7 +213,17 @@
                                       :class="getOptionBadgeClass(a, opt.key)">
                                     {{ opt.key }}
                                 </span>
-                                <McqRichText :text="opt.label" class="flex-1 font-medium leading-snug" />
+                                <div class="flex-1 min-w-0 space-y-1">
+                                    <McqRichText :text="opt.label" class="font-medium leading-snug" />
+                                    <div v-if="opt.image_url" class="rounded-lg overflow-hidden border border-slate-200 max-w-xs bg-white p-1">
+                                        <img
+                                            :src="opt.image_url"
+                                            alt="Option illustration"
+                                            class="max-h-28 object-contain cursor-zoom-in hover:opacity-95 transition"
+                                            @click.stop="zoomSrc = opt.image_url"
+                                        />
+                                    </div>
+                                </div>
                                 <span v-if="isCorrectOption(a, opt.key)" class="text-[11px] font-extrabold text-emerald-700 shrink-0">
                                     ✓ Correct
                                 </span>
@@ -253,6 +268,26 @@
                 </a>
             </div>
         </div>
+
+        <!-- Image Zoom Lightbox Modal -->
+        <div
+            v-if="zoomSrc"
+            class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-zoom-out"
+            @click="zoomSrc = null"
+            @keydown.escape.window="zoomSrc = null"
+        >
+            <div class="relative max-w-4xl max-h-[90vh] bg-white rounded-2xl overflow-hidden shadow-2xl p-2" @click.stop>
+                <button
+                    type="button"
+                    class="absolute top-3 right-3 h-8 w-8 rounded-full bg-slate-900/70 text-white flex items-center justify-center text-xs font-bold hover:bg-slate-900 cursor-pointer"
+                    @click="zoomSrc = null"
+                    aria-label="Close zoom"
+                >
+                    ✕
+                </button>
+                <img :src="zoomSrc" alt="Enlarged view" class="max-h-[85vh] w-auto max-w-full object-contain mx-auto rounded-lg">
+            </div>
+        </div>
     </PortalLayout>
 </template>
 
@@ -280,6 +315,7 @@ const props = defineProps({
 
 const reattempting = ref(false);
 const reviewFilter = ref('all');
+const zoomSrc = ref(null);
 const navItems = computed(() => studentPortalNavItems(props.school.id));
 
 const filteredAnswers = computed(() => {
