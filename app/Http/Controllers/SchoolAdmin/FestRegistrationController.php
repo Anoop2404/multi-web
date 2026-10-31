@@ -1173,7 +1173,7 @@ class FestRegistrationController extends SchoolAdminController
             'student_ids.*' => 'exists:students,id',
             'teacher_ids' => $event->event_type === 'teacher_fest' ? 'required|array|min:1' : 'nullable|array',
             'teacher_ids.*' => 'exists:teachers,id',
-            'standby_ids' => 'nullable|array|max:2',
+            'standby_ids' => $event->event_type === 'sports' ? 'nullable|array' : 'nullable|array|max:2',
             'standby_ids.*' => 'exists:students,id',
         ];
 
@@ -1250,7 +1250,7 @@ class FestRegistrationController extends SchoolAdminController
             'student_ids.*' => 'exists:students,id',
             'teacher_ids' => $event->event_type === 'teacher_fest' ? 'required|array|min:1' : 'nullable|array',
             'teacher_ids.*' => 'exists:teachers,id',
-            'standby_ids' => 'nullable|array|max:2',
+            'standby_ids' => $event->event_type === 'sports' ? 'nullable|array' : 'nullable|array|max:2',
             'standby_ids.*' => 'exists:students,id',
         ];
 

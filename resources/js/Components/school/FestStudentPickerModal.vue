@@ -17,6 +17,10 @@
                 </div>
             </div>
 
+            <div v-if="$slots['selection-actions']" class="px-5 py-3 border-b border-slate-100 bg-slate-50 shrink-0">
+                <slot name="selection-actions" />
+            </div>
+
             <div class="flex-1 overflow-y-auto min-h-0 bg-white">
                 <div class="px-5 py-3 border-b border-slate-100 space-y-2.5 bg-slate-50/80 sticky top-0 z-10 backdrop-blur-sm">
                     <div class="flex flex-wrap gap-2 items-center">

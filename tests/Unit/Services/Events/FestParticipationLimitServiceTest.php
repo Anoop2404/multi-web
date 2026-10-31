@@ -27,15 +27,20 @@ class FestParticipationLimitServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_sports_individual_entries_allow_two_standbys_but_reject_three(): void
+    public function test_sports_defaults_to_one_standby_and_honors_an_explicit_item_limit(): void
     {
         [$event, $schoolId] = $this->fixture();
         $event->update(['event_type' => 'sports']);
         $item = FestEventItem::create(['event_id' => $event->id, 'title' => '100m', 'participant_type' => 'individual', 'is_enabled' => true]);
         $service = new FestParticipationLimitService($event);
-        $message = 'Maximum 2 standby participants allowed per item.';
-        $this->assertNotContains($message, $service->validateRegistration($item, $schoolId, [], [991, 992]));
-        $this->assertContains($message, $service->validateRegistration($item, $schoolId, [], [991, 992, 993]));
+        $message = 'Maximum 1 standby participants allowed per item.';
+        $this->assertNotContains($message, $service->validateRegistration($item, $schoolId, [], [991]));
+        $this->assertContains($message, $service->validateRegistration($item, $schoolId, [], [991, 992]));
+        $item->update(['criteria_json' => ['standbys' => 2]]);
+        $this->assertNotContains('Maximum 2 standby participants allowed per item.', $service->validateRegistration($item, $schoolId, [], [991, 992]));
+        $this->assertContains('Maximum 2 standby participants allowed per item.', $service->validateRegistration($item, $schoolId, [], [991, 992, 993]));
+        $event->update(['event_type' => 'kalolsavam']);
+        $this->assertSame(2, \App\Support\FestStandbyLimit::forItem($event, $item));
     }
 
     public function test_sports_report_counts_individual_items_without_stage_and_does_not_invent_an_overall_cap(): void

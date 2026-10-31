@@ -317,7 +317,7 @@ class FestRegistrationService
                 }
             } else {
                 $standbyCount = $registration->participants->where('participant_role', 'standby')->count();
-                $maxStandbys = $item->squadRules()?->standbys ?? 2;
+                $maxStandbys = $event->event_type === 'sports' ? \App\Support\FestStandbyLimit::forItem($event, $item) : ($item->squadRules()?->standbys ?? 2);
                 abort_if($standbyCount >= $maxStandbys, 422, "At most {$maxStandbys} standby(s) allowed.");
             }
 
@@ -344,7 +344,8 @@ class FestRegistrationService
                 abort_if($performerCount + 1 > $maxAllowed, 422,
                     "This item allows at most {$maxAllowed} performer".($maxAllowed === 1 ? '' : 's').' — remove an existing performer first, or add this student as a standby.');
             } else {
-                abort_if($registration->participants->where('participant_role', 'standby')->count() >= 2, 422, 'At most 2 standbys are allowed.');
+                $limit = \App\Support\FestStandbyLimit::forItem($event, $item);
+                abort_if($registration->participants->where('participant_role', 'standby')->count() >= $limit, 422, "At most {$limit} standby(s) allowed.");
             }
         }
 

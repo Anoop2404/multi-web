@@ -610,7 +610,7 @@
                                         :status-hint="itemStatusMeta(event, item).hint"
                                         performer-label="participants"
                                         :is-teacher-fest="false"
-                                        :event-type="eventType"
+                                        :event-type="isSports ? 'sports' : eventType"
                                         :teachers="teachers"
                                         :student-label="studentOptionLabel"
                                         :registered-names="registeredNames"
@@ -760,7 +760,7 @@
                                         :status-hint="itemStatusMeta(event, item).hint"
                                         :performer-label="isTeacherFest ? 'teachers' : (isSports ? 'participants' : 'students')"
                                         :is-teacher-fest="isTeacherFest"
-                                        :event-type="eventType"
+                                        :event-type="isSports ? 'sports' : eventType"
                                         :teachers="teachers"
                                         :student-label="studentOptionLabel"
                                         :registered-names="registeredNames"
@@ -2142,7 +2142,7 @@ function updateItem(event, item) {
     const registrationId = editingRegistrationId[key];
     if (!registrationId) return;
     const form = itemForms[key];
-    const standby = (form.standby_ids ?? []).slice(0, 2);
+    const standby = (form.standby_ids ?? []);
     delete itemErrors[key];
 
     if (!['team', 'group', 'pair', 'trio'].includes(item.participant_type) && (form.student_ids?.length ?? 0) > itemMaxPerSchool(item)) {
@@ -2408,7 +2408,7 @@ function scrollToItemRow(eventId, itemId) {
 function submitItem(event, item) {
     const key = itemFormKey(event.id, item.id);
     const form = itemForms[key];
-    const standby = (form.standby_ids ?? []).slice(0, 2);
+    const standby = (form.standby_ids ?? []);
 
     delete itemErrors[key];
 
