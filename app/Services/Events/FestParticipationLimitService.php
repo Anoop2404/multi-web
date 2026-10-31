@@ -488,8 +488,8 @@ class FestParticipationLimitService
             app(FestComboRuleService::class)->validate($this->event, $item, $schoolId, $performerIds)
         );
 
-        if ($isGroup && count($standbyIds) > 2) {
-            $errors[] = 'Maximum 2 standby participants allowed per group item.';
+        if (($isGroup || $this->event->event_type === 'sports') && count($standbyIds) > 2) {
+            $errors[] = 'Maximum 2 standby participants allowed per item.';
         }
 
         return $errors;

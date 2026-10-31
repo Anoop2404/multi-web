@@ -52,6 +52,15 @@
                 <label class="text-xs font-semibold text-slate-600">Category
                     <SearchableSelect v-model="categoryFilter" :options="categoryOptions" :all-option="true" all-label="All categories" class="mt-1 w-full" />
                 </label>
+                <label v-if="event.event_type === 'sports'" class="text-xs font-semibold text-slate-600">Roster
+                    <SearchableSelect v-model="roleFilter" class="mt-1 w-full" :options="roleOptions" />
+                </label>
+                <label v-if="event.event_type === 'sports'" class="text-xs font-semibold text-slate-600">Item
+                    <SearchableSelect v-model="itemFilter" class="mt-1 w-full" :options="itemOptions" :all-option="true" all-label="All items" />
+                </label>
+                <label v-if="event.event_type === 'sports'" class="text-xs font-semibold text-slate-600">School
+                    <SearchableSelect v-model="schoolFilter" class="mt-1 w-full" :options="schoolOptions" :all-option="true" all-label="All schools" />
+                </label>
                 <label class="text-xs font-semibold text-slate-600">Mark status
                     <SearchableSelect v-model="markStatusFilter" :options="markStatusOptions" :all-option="true" all-label="All" class="mt-1 w-full" />
                 </label>
@@ -97,7 +106,7 @@
                             <th v-if="competitionPhases.length">Phase</th>
                             <th v-if="hasAnyRegion">Region</th>
                             <th>School</th>
-                            <th>Participant</th>
+                            <th>Participant</th><th v-if="event.event_type === 'sports'">Role</th>
                             <th>Reg no</th>
                             <th>Fest ID</th>
                             <th>Item reg</th>
@@ -119,7 +128,7 @@
                             <td v-if="competitionPhases.length" class="text-xs">{{ r.phase_name ?? '—' }}</td>
                             <td v-if="hasAnyRegion" class="text-xs">{{ r.region_name ?? '—' }}</td>
                             <td class="text-xs">{{ (r.school_name || '').toUpperCase() }}</td>
-                            <td class="font-medium">{{ r.participant }}</td>
+                            <td class="font-medium">{{ r.participant }}</td><td v-if="event.event_type === 'sports'">{{ r.role === 'standby' ? 'Substitute' : 'Performer' }}</td>
                             <td class="font-mono text-xs">{{ r.reg_no ?? '—' }}</td>
                             <td class="font-mono text-xs">{{ r.fest_id ?? '—' }}</td>
                             <td class="font-mono text-xs">{{ r.item_reg ?? '—' }}</td>
@@ -201,6 +210,12 @@ watch(availableRegions, (newRegions) => {
     }
 });
 
+const roleFilter = ref('performer');
+const itemFilter = ref(props.filterItemId || '');
+const roleOptions = [{ value: 'performer', label: 'Performers' }, { value: 'standby', label: 'Substitutes' }, { value: 'all', label: 'Performers & substitutes' }];
+const itemOptions = computed(() => [...new Map(props.rows.map(r => [r.item_id, { value: r.item_id, label: r.item_title }])).values()]);
+const schoolFilter = ref('');
+const schoolOptions = computed(() => [...new Map(props.rows.map(r => [r.school_id, { value: r.school_id, label: r.school_name }])).values()]);
 const categoryFilter = ref(props.reportScopeSelection.category || '');
 const markStatusFilter = ref(props.reportScopeSelection.mark_status || '');
 const search = ref(props.reportScopeSelection.search || '');
@@ -208,6 +223,9 @@ const search = ref(props.reportScopeSelection.search || '');
 function scopeParams() {
     return {
         scope_mode: scopeRegionId.value ? 'region' : 'combined',
+        role: props.event.event_type === 'sports' ? roleFilter.value : undefined,
+        item_id: itemFilter.value || undefined,
+        school_id: schoolFilter.value || undefined,
         competition_phase_id: scopePhaseId.value || undefined,
         region_id: scopeRegionId.value || undefined,
         category: categoryFilter.value || undefined,
@@ -251,6 +269,10 @@ const filteredRows = computed(() => {
     const term = search.value.trim().toLowerCase();
 
     return props.rows.filter((r) => {
+        if (props.event.event_type === 'sports' && roleFilter.value !== 'all' && r.role !== roleFilter.value) return false;
+        if (itemFilter.value && Number(r.item_id) !== Number(itemFilter.value)) return false;
+        if (schoolFilter.value && r.school_id !== schoolFilter.value) return false;
+
         if (categoryFilter.value && r.category !== categoryFilter.value) return false;
         if (markStatusFilter.value === 'pending' && !isMarkPending(r)) return false;
         if (markStatusFilter.value === 'marked' && isMarkPending(r)) return false;

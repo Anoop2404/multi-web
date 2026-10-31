@@ -228,6 +228,7 @@
         v-model="standbyPickerOpen"
         :title="`${displayTitle} — pick standbys`"
         subtitle="Optional substitutes — max 2"
+        :max-selected="2"
         :entries="standbyEntries"
         v-model:selected-ids="standbyModel"
         confirm-label="Use standbys"
@@ -314,6 +315,7 @@ watch(() => props.editingRegistrationId, (id) => {
 
 const showStandbyPicker = computed(() => {
     if (props.isTeacherFest) return false;
+    if (props.eventType === 'sports') return true;
     const criteria = props.item.criteria_json ?? {};
     const maxSubs = props.item.max_subs ?? criteria.max_subs;
     const standbys = props.item.standbys ?? criteria.standbys;

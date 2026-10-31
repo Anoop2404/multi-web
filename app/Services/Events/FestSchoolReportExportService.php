@@ -121,8 +121,8 @@ class FestSchoolReportExportService
 
     /**
      * School-only twin of FestEventReportAnalyticsService::exportNumberingRegister() —
-     * same column layout minus the Chest column, since chest numbers are Sahodaya-admin-
-     * only information (see FestSchoolReportAnalyticsService::numberingRegisterRows()).
+     * Sports includes assigned chest and registration identifiers. Arts retains the
+     * school-only layout without chest numbers.
      *
      * @param  list<array<string, mixed>>  $rows
      */
@@ -135,11 +135,12 @@ class FestSchoolReportExportService
             $r['reg_no'] ?? '',
             $r['reg_status'] ?? '',
             $r['role'] ?? '',
+            ...($event->event_type === 'sports' ? [$r['fest_id'] ?? '', $r['item_reg'] ?? '', $r['chest_no'] ?? ''] : []),
         ]);
 
         return ExcelExport::download(
             str($event->title)->slug()->limit(40).'-numbering-register',
-            ['Head', 'Item', 'Participant', 'Reg no', 'Reg status', 'Role'],
+            ['Head', 'Item', 'Participant', 'Reg no', 'Reg status', 'Role', ...($event->event_type === 'sports' ? ['Fest ID', 'Item reg', 'Chest'] : [])],
             $data,
             ExcelExport::generatedOnNote(),
         );

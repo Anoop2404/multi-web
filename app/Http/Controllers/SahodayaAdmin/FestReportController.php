@@ -1070,7 +1070,7 @@ class FestReportController extends SahodayaAdminController
         // scopedAnalytics()'s FestReportScope (competition_phase_id/region_id query
         // params, same as every other report on this controller) since that's also an
         // authorization boundary for a region_admin/phase_admin actor, not just a filter.
-        $rows = $analytics->itemWiseReportRows();
+        $rows = $analytics->itemWiseReportRows(role: $event->event_type === 'sports' ? 'all' : 'performer');
 
         $itemId = $request->integer('item_id') ?: null;
 
@@ -1106,23 +1106,24 @@ class FestReportController extends SahodayaAdminController
         @set_time_limit(300);
 
         $rows = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event))->itemWiseReportRows(
-            schoolId: null,
+            schoolId: $request->input('school_id') ?: null,
             category: $request->input('category'),
             markStatus: $request->input('mark_status'),
             search: $request->input('search'),
             itemId: $request->integer('item_id') ?: null,
+            role: (string) $request->input('role', 'performer'),
         );
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
             CsvSafety::fputcsv($out, ['Generated on', now()->format('d M Y, h:i A')]);
             CsvSafety::fputcsv($out, []);
-            CsvSafety::fputcsv($out, ['Category', 'Item', 'Item Code', 'Phase', 'Region', 'School', 'Participant', 'Reg No', 'Chest', 'Status', 'Grade', 'Rank', 'Score']);
+            CsvSafety::fputcsv($out, ['Category', 'Item', 'Item Code', 'Phase', 'Region', 'School', 'Participant', 'Reg No', 'Role', 'Chest', 'Status', 'Grade', 'Rank', 'Score']);
             foreach ($rows as $row) {
                 CsvSafety::fputcsv($out, [
                     $row['category_label'], $row['item_title'], $row['item_code'],
                     $row['phase_name'], $row['region_name'], $row['school_name'],
-                    $row['participant'], $row['reg_no'], $row['chest_no'],
+                    $row['participant'], $row['reg_no'], ucfirst($row['role']), $row['chest_no'],
                     $row['status'], $row['grade'], $row['position'], $row['score'],
                 ]);
             }
@@ -1144,11 +1145,12 @@ class FestReportController extends SahodayaAdminController
         @set_time_limit(600);
 
         $rows = $this->scopedAnalytics($request, $this->regionAwareTargetEvent($request, $event))->itemWiseReportRows(
-            schoolId: null,
+            schoolId: $request->input('school_id') ?: null,
             category: $request->input('category'),
             markStatus: $request->input('mark_status'),
             search: $request->input('search'),
             itemId: $request->integer('item_id') ?: null,
+            role: (string) $request->input('role', 'performer'),
         );
 
         $html = view('fest.reports.item-wise-marks', [

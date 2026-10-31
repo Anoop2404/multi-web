@@ -7,7 +7,7 @@
         >
             <template #actions>
                 <Link :href="`${programBase}/reports/${event.id}`" class="btn-secondary text-sm">← All reports</Link>
-                <a :href="csvUrl" target="_blank" rel="noopener" class="btn-secondary text-sm">Download CSV ↓</a>
+                <a :href="csvExportUrl" target="_blank" rel="noopener" class="btn-secondary text-sm">Download CSV ↓</a>
                 <a :href="pdfExportUrl" target="_blank" rel="noopener" class="btn-primary text-sm">Download PDF ↓</a>
             </template>
         </PageHeader>
@@ -29,6 +29,12 @@
                 </label>
                 <label class="text-xs font-semibold text-slate-600">Category
                     <SearchableSelect v-model="categoryFilter" class="mt-1 w-full" :options="categoryOptions" :all-option="true" all-label="All categories" />
+                </label>
+                <label v-if="event.event_type === 'sports'" class="text-xs font-semibold text-slate-600">Roster
+                    <SearchableSelect v-model="roleFilter" class="mt-1 w-full" :options="roleOptions" />
+                </label>
+                <label v-if="event.event_type === 'sports'" class="text-xs font-semibold text-slate-600">Item
+                    <SearchableSelect v-model="itemFilter" class="mt-1 w-full" :options="itemOptions" :all-option="true" all-label="All items" />
                 </label>
                 <label class="text-xs font-semibold text-slate-600">Mark status
                     <SearchableSelect v-model="markStatusFilter" class="mt-1 w-full" :options="markStatusOptions" :all-option="true" all-label="All" />
@@ -53,7 +59,7 @@
                             <th v-if="usesPhases">Phase</th>
                             <th v-if="hasAnyRegion">Region</th>
                             <th>School</th>
-                            <th>Participant</th>
+                            <th>Participant</th><th v-if="event.event_type === 'sports'">Role</th>
                             <th>Reg no</th>
                             <th>Fest ID</th>
                             <th>Item reg</th>
@@ -73,7 +79,7 @@
                             <td v-if="usesPhases" class="text-xs">{{ r.phase_name ?? '—' }}</td>
                             <td v-if="hasAnyRegion" class="text-xs">{{ r.region_name ?? '—' }}</td>
                             <td class="text-xs">{{ (r.school_name || '').toUpperCase() }}</td>
-                            <td>{{ r.participant }}</td>
+                            <td>{{ r.participant }}</td><td v-if="event.event_type === 'sports'">{{ r.role === 'standby' ? 'Substitute' : 'Performer' }}</td>
                             <td class="font-mono text-xs">{{ r.reg_no ?? '—' }}</td>
                             <td class="font-mono text-xs">{{ r.fest_id ?? '—' }}</td>
                             <td class="font-mono text-xs">{{ r.item_reg ?? '—' }}</td>
@@ -112,6 +118,10 @@ const { programLabel, programBase } = useSchoolProgramContext(props);
 
 const phaseFilter = ref('');
 const regionFilter = ref('');
+const roleFilter = ref('performer');
+const itemFilter = ref('');
+const roleOptions = [{ value: 'performer', label: 'Performers' }, { value: 'standby', label: 'Substitutes' }, { value: 'all', label: 'Performers & substitutes' }];
+const itemOptions = computed(() => [...new Map(props.rows.map(r => [r.item_id, { value: r.item_id, label: r.item_title }])).values()]);
 const categoryFilter = ref('');
 const markStatusFilter = ref('');
 const search = ref('');
@@ -121,10 +131,16 @@ const markStatusOptions = [
     { value: 'marked', label: 'Marked' },
 ];
 
-const pdfExportUrl = computed(() => {
-    if (!forWhom.value.trim()) return props.pdfUrl;
-    return `${props.pdfUrl}?${new URLSearchParams({ for_whom: forWhom.value }).toString()}`;
-});
+function downloadUrl(base, extra = {}) {
+    const params = new URLSearchParams(Object.entries({
+        role: props.event.event_type === 'sports' ? roleFilter.value : '',
+        item_id: itemFilter.value, category: categoryFilter.value,
+        mark_status: markStatusFilter.value, search: search.value, ...extra,
+    }).filter(([, value]) => value !== '' && value != null));
+    return `${base}?${params}`;
+}
+const csvExportUrl = computed(() => downloadUrl(props.csvUrl));
+const pdfExportUrl = computed(() => downloadUrl(props.pdfUrl, { for_whom: forWhom.value }));
 
 const phases = computed(() => [...new Set(props.rows.map((r) => r.phase_name).filter(Boolean))]);
 const regionOptions = computed(() => [...new Set(props.rows.map((r) => r.region_name).filter(Boolean))]);
@@ -139,6 +155,9 @@ const filteredRows = computed(() => {
     const term = search.value.trim().toLowerCase();
 
     return props.rows.filter((r) => {
+        if (props.event.event_type === 'sports' && roleFilter.value !== 'all' && r.role !== roleFilter.value) return false;
+        if (itemFilter.value && Number(r.item_id) !== Number(itemFilter.value)) return false;
+
         if (phaseFilter.value && r.phase_name !== phaseFilter.value) return false;
         if (regionFilter.value && r.region_name !== regionFilter.value) return false;
         if (categoryFilter.value && r.category !== categoryFilter.value) return false;

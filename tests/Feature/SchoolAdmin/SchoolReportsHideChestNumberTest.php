@@ -128,6 +128,37 @@ class SchoolReportsHideChestNumberTest extends TestCase
         $response->assertOk();
     }
 
+    public function test_sports_item_roster_csv_filters_performers_and_substitutes(): void
+    {
+        $f = $this->fixture();
+        $f['event']->update(['event_type' => 'sports']);
+        $reserve = Student::create(['tenant_id' => $f['school']->id, 'school_class_id' => $f['student']->school_class_id, 'name' => 'Reserve Athlete']);
+        $registration = FestRegistration::where('item_id', $f['item']->id)->first();
+        FestParticipant::create(['registration_id' => $registration->id, 'student_id' => $reserve->id, 'participant_role' => 'standby']);
+        $url = route('school.sports.reports.item-wise.export', ['tenantId' => $f['school']->id, 'event' => $f['event']->id]);
+        $this->actingAs($f['admin']);
+        $substitutes = $this->get($url.'?role=standby&item_id='.$f['item']->id);
+        $substitutes->assertOk();
+        $this->assertStringContainsString('Reserve Athlete', $substitutes->streamedContent());
+        $this->assertStringNotContainsString('Chest Hide Student', $substitutes->streamedContent());
+        $performers = $this->get($url.'?role=performer');
+        $performers->assertOk();
+        $this->assertStringContainsString('Chest Hide Student', $performers->streamedContent());
+        $this->assertStringNotContainsString('Reserve Athlete', $performers->streamedContent());
+    }
+
+    public function test_sports_numbering_register_includes_assigned_chest_on_screen_and_export(): void
+    {
+        $f = $this->fixture();
+        $f['event']->update(['event_type' => 'sports']);
+        $params = ['tenantId' => $f['school']->id, 'event' => $f['event']->id];
+        $this->actingAs($f['admin'])->get(route('school.sports.reports.numbering-register', $params))
+            ->assertOk()->assertSee(self::CHEST_NO);
+        $response = $this->get(route('school.sports.reports.numbering-register.export', $params));
+        $response->assertOk();
+        $this->assertStringContainsString((string) self::CHEST_NO, $response->streamedContent());
+    }
+
     public function test_numbering_register_screen_does_not_leak_chest_number(): void
     {
         $f = $this->fixture();
