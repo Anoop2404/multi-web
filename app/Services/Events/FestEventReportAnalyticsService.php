@@ -2046,8 +2046,9 @@ class FestEventReportAnalyticsService
      *                             on the constructor's FestReportScope for authorization).
      * @return list<array<string, mixed>>
      */
-    public function itemWiseReportRows(?string $schoolId = null, ?string $category = null, ?string $markStatus = null, ?string $search = null, ?int $itemId = null): array
+    public function itemWiseReportRows(?string $schoolId = null, ?string $category = null, ?string $markStatus = null, ?string $search = null, ?int $itemId = null, string $role = 'performer'): array
     {
+        $role = $this->event->event_type === 'sports' && in_array($role, ['standby', 'all'], true) ? $role : 'performer';
         // "Category" here means class category (e.g. "Category 1 — Classes 3 & 4"), not the
         // item's arts genre — matches how the item catalog and Fees listing both group/label
         // by class category. The scheme itself is configured on fee_settings.
@@ -2067,9 +2068,10 @@ class FestEventReportAnalyticsService
             : null;
 
         $rows = FestParticipant::query()
-            // Standby (reserve) entrants aren't part of this report -- they haven't been put
-            // on the item. NULL role counts as a normal entrant.
-            ->where(fn ($q) => $q->whereNull('participant_role')->orWhere('participant_role', '!=', 'standby'))
+            // Performers remain the default. Sports roster reports can explicitly include
+            // substitutes; NULL role counts as a normal entrant.
+            ->when($role === 'performer', fn ($q) => $q->where(fn ($r) => $r->whereNull('participant_role')->orWhere('participant_role', '!=', 'standby')))
+            ->when($role === 'standby', fn ($q) => $q->where('participant_role', 'standby'))
             ->whereHas('registration', function ($q) use ($schoolId, $itemId, $categoryClassGroups) {
                 $q->whereIn('event_id', $this->eventIds())->active();
                 if ($schoolId) {
@@ -2091,7 +2093,7 @@ class FestEventReportAnalyticsService
                 }
             })
             // Only the columns this report reads -- fest_participants is a wide table.
-            ->select(['id', 'registration_id', 'student_id', 'teacher_id', 'chest_no', 'level_registration_number', 'item_registration_number'])
+            ->select(['id', 'registration_id', 'student_id', 'teacher_id', 'chest_no', 'participant_role', 'level_registration_number', 'item_registration_number'])
             ->with([
                 'student:id,name,reg_no',
                 'teacher:id,name,reg_no',
@@ -2128,7 +2130,7 @@ class FestEventReportAnalyticsService
                 // rows too (see the $markStatus 'pending' filter below, an admin-only
                 // mark-entry-progress view).
                 $itemPublished = $item->results_published_at !== null && ! $item->results_hidden;
-                $showMark = $schoolId === null || $itemPublished;
+                $showMark = $p->participant_role !== 'standby' && ($schoolId === null || $itemPublished);
                 $mark = $p->mark;
                 // Captured before pointsForMark(), which mutates $mark->grade in place —
                 // recalculating it from score against the event's grade-point config (see
@@ -2169,16 +2171,17 @@ class FestEventReportAnalyticsService
                     'school_id' => $registration->school_id,
                     'school_name' => $registration->school?->name,
                     'participant' => $p->student?->name ?? $p->teacher?->name,
+                    'role' => $p->participant_role === 'standby' ? 'standby' : 'performer',
                     'reg_no' => $p->student?->reg_no ?? $p->teacher?->reg_no,
                     'fest_id' => $p->level_registration_number,
                     'item_reg' => $p->item_registration_number,
                     'chest_no' => $p->chest_no,
                     'status' => $registration->status,
                     'grade' => $showMark ? $originalGrade : null,
-                    'position' => $position,
+                    'position' => $showMark ? $position : null,
                     // Raw marks/score are judge-facing working data — a school only ever
                     // sees the grade and the points it earns, never the underlying score.
-                    'score' => $schoolId === null ? $mark?->score : null,
+                    'score' => $showMark && $schoolId === null ? $mark?->score : null,
                     'points' => $points,
                 ];
             });

@@ -27,6 +27,17 @@ class FestParticipationLimitServiceTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_sports_individual_entries_allow_two_standbys_but_reject_three(): void
+    {
+        [$event, $schoolId] = $this->fixture();
+        $event->update(['event_type' => 'sports']);
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => '100m', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $service = new FestParticipationLimitService($event);
+        $message = 'Maximum 2 standby participants allowed per item.';
+        $this->assertNotContains($message, $service->validateRegistration($item, $schoolId, [], [991, 992]));
+        $this->assertContains($message, $service->validateRegistration($item, $schoolId, [], [991, 992, 993]));
+    }
+
     public function test_sports_report_counts_individual_items_without_stage_and_does_not_invent_an_overall_cap(): void
     {
         [$event, $schoolId] = $this->fixture(['max_total_per_student' => 1, 'max_group_per_student' => 2]);

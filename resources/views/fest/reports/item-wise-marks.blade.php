@@ -146,7 +146,8 @@
         @php
             // false = a plain participant list: no Chest, Grade, Rank or Score columns (print option).
             $showMarks = $showMarks ?? true;
-            $cols = $showMarks ? 8 : 4;
+            $showRole = $event->event_type === 'sports';
+            $cols = ($showMarks ? 8 : 4) + ($showRole ? 1 : 0);
             // Grouped by school inside each item: a school heading row, then that school's
             // participants (already in name order), so a school's entrants read together.
             $bySchool = $itemRows->groupBy(fn ($r) => strtoupper($r['school_name'] ?? '—'))->sortKeys(SORT_NATURAL | SORT_FLAG_CASE);
@@ -157,6 +158,7 @@
                 <tr>
                     <th style="width: {{ $showMarks ? 5 : 8 }}%;">#</th>
                     <th style="width: {{ $showMarks ? 35 : 52 }}%;">Participant</th>
+                    @if($showRole)<th>Role</th>@endif
                     <th style="width: {{ $showMarks ? 13 : 22 }}%;" class="text-center">Reg No</th>
                     @if($showMarks)
                         <th style="width: 9%;" class="text-center">Chest</th>
@@ -179,6 +181,7 @@
                 <tr>
                     <td class="text-center c-idx">{{ $n }}</td>
                     <td><strong>{{ $r['participant'] }}</strong></td>
+                    @if($showRole)<td>{{ ($r['role'] ?? 'performer') === 'standby' ? 'Substitute' : 'Performer' }}</td>@endif
                     <td class="text-center c-mono">{{ $r['reg_no'] ?? '—' }}</td>
                     @if($showMarks)
                         <td class="text-center font-bold">{{ $r['chest_no'] ?? '—' }}</td>

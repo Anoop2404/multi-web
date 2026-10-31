@@ -72,5 +72,26 @@ class FestItemWiseFilterQueryTest extends TestCase
         $service->itemWiseReportRows(itemId: $itemIds['Lower Item']);
         $participantQuery = collect(DB::getQueryLog())->first(fn ($q) => str_contains($q['query'], 'from "fest_participants"'));
         $this->assertStringContainsString('"item_id"', $participantQuery['query']);
+        DB::disableQueryLog();
+        // Arts callers cannot opt into sports substitute reports.
+        $this->assertCount(7, $service->itemWiseReportRows(role: 'all'));
+        $event->update(['event_type' => 'sports']);
+        $service = new FestEventReportAnalyticsService($event->fresh());
+        $this->assertCount(7, $service->itemWiseReportRows());
+        $this->assertCount(8, $service->itemWiseReportRows(role: 'all'));
+        $substitutes = $service->itemWiseReportRows(schoolId: $school->id, itemId: $itemIds['Lower Item'], role: 'standby');
+        $this->assertCount(1, $substitutes);
+        $this->assertSame($standbyParticipant->id, $substitutes[0]['id']);
+        $this->assertSame('standby', $substitutes[0]['role']);
+        $this->assertSame([], $service->itemWiseReportRows(itemId: $itemIds['Upper Item B'], role: 'standby'));
+        $this->assertSame([], $service->itemWiseReportRows(schoolId: 'other-school', role: 'standby'));
+        \App\Models\FestMark::create(['event_id' => $event->id, 'item_id' => $itemIds['Lower Item'], 'participant_id' => $standbyParticipant->id, 'score' => 99, 'position' => 1, 'grade' => 'A']);
+        $row = $service->itemWiseReportRows(role: 'standby')[0];
+        foreach (['score', 'position', 'grade', 'points'] as $field) {
+            $this->assertNull($row[$field], $field);
+        }
+        $html = view('fest.reports.item-wise-marks', ['event' => $event, 'rows' => [$row], 'showPhase' => false, 'showRegion' => false, 'showMarks' => false, 'showPoints' => false, 'generatedAt' => 'test', 'generatedBy' => 'test', 'forWhom' => null])->render();
+        $this->assertStringContainsString('Substitute', $html);
+
     }
 }

@@ -151,7 +151,8 @@ class FestSchoolReportAnalyticsService
     }
 
     /**
-     * Chest numbers are Sahodaya-admin-only information — schools don't see them until
+     * Arts chest numbers remain admin-only; sports schools can download their assigned chests.
+     * For arts, schools do not see them until
      * assigned on fest day (see FestRegistrationController::festDay(), a separate,
      * non-report page). numberingRegisterRows()/numberingRegisterPaginated() delegate to
      * the shared FestEventReportAnalyticsService (also used by Sahodaya-admin, which does
@@ -163,7 +164,7 @@ class FestSchoolReportAnalyticsService
     public function numberingRegisterRows(): array
     {
         return array_map(
-            fn (array $row) => \Illuminate\Support\Arr::except($row, ['chest_no']),
+            fn (array $row) => $this->event->event_type === 'sports' ? $row : \Illuminate\Support\Arr::except($row, ['chest_no']),
             app(FestEventReportAnalyticsService::class, ['event' => $this->event])
                 ->numberingRegisterRows($this->schoolId),
         );
@@ -174,7 +175,7 @@ class FestSchoolReportAnalyticsService
     {
         return app(FestEventReportAnalyticsService::class, ['event' => $this->event])
             ->numberingRegisterPaginated($this->schoolId, $page, $perPage)
-            ->through(fn (array $row) => \Illuminate\Support\Arr::except($row, ['chest_no']));
+            ->through(fn (array $row) => $this->event->event_type === 'sports' ? $row : \Illuminate\Support\Arr::except($row, ['chest_no']));
     }
 
     /** @return list<array<string, mixed>> */
