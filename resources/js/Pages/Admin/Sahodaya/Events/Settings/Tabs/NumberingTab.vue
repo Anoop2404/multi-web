@@ -64,10 +64,10 @@
         <form @submit.prevent="saveItemNumbering" class="card !p-5 space-y-4 border border-slate-200">
             <div class="border-b border-slate-100 pb-3">
                 <h3 class="section-title !mb-0 flex items-center gap-2 text-base">
-                    <span>🔢</span> Per-Item Chest &amp; Item Reg Starting Ranges
+                    <span>🔢</span> {{ event.event_type === 'sports' ? 'Item Registration Starting Numbers' : 'Per-Item Chest & Item Reg Starting Ranges' }}
                 </h3>
                 <p class="section-desc mt-0.5">
-                    Set starting chest and registration numbers per competition item. Default fallback chest start: <strong>{{ numberingSettingsForm.chest_no_start || 1 }}</strong>.
+                    {{ event.event_type === 'sports' ? 'Set registration numbers per competition item. Event chest fallback:' : 'Set starting chest and registration numbers per competition item. Default fallback chest start:' }} <strong>{{ numberingSettingsForm.chest_no_start || 1 }}</strong>.
                 </p>
             </div>
 
@@ -85,7 +85,7 @@
                         <tr>
                             <th class="p-3.5">Item Title</th>
                             <th class="p-3.5 w-28">Item Code</th>
-                            <th class="p-3.5 w-36">Chest Start #</th>
+                            <th v-if="event.event_type !== 'sports'" class="p-3.5 w-36">Chest Start #</th>
                             <th class="p-3.5 w-36">Item Reg Start #</th>
                         </tr>
                     </thead>
@@ -93,7 +93,7 @@
                         <tr v-for="(row, idx) in itemNumberingForm.items" :key="row.id" class="hover:bg-slate-50/70 transition">
                             <td class="p-3.5 font-bold text-slate-900">{{ row.title }}</td>
                             <td class="p-3.5 font-mono text-slate-500 text-[11px]">{{ row.item_code || '—' }}</td>
-                            <td class="p-3.5">
+                            <td v-if="event.event_type !== 'sports'" class="p-3.5">
                                 <input v-model.number="itemNumberingForm.items[idx].chest_no_start"
                                        :disabled="event.event_type === 'sports'" :title="event.event_type === 'sports' ? 'Sports uses student chest numbers and school ranges; item chest starts are inactive.' : ''"
                                        type="number" min="1" class="field text-xs w-full disabled:bg-slate-100 disabled:text-slate-400" placeholder="100">
@@ -163,7 +163,7 @@
                         <thead class="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase tracking-wider text-[10px] font-bold sticky top-0 z-10 shadow-sm">
                             <tr>
                                 <th class="p-3.5">School Name</th>
-                                <th class="p-3.5 w-36">Chest Start #</th>
+                                <th v-if="event.event_type !== 'sports'" class="p-3.5 w-36">Chest Start #</th>
                                 <th class="p-3.5 w-36">Chest End # (optional)</th>
                             </tr>
                         </thead>
