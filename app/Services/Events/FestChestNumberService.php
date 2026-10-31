@@ -16,7 +16,8 @@ class FestChestNumberService
     public function participantLabel(FestParticipant $participant): string
     {
         $item = $participant->registration?->item;
-        $isOffStage = ($item?->stage_type ?? '') === 'off_stage';
+        $event = $participant->registration?->event;
+        $isOffStage = $event?->event_type !== 'sports' && ($item?->stage_type ?? '') === 'off_stage';
 
         if ($isOffStage) {
             return $participant->level_registration_number

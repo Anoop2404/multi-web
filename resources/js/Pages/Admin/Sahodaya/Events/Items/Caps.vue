@@ -38,6 +38,8 @@
             </Link>
         </div>
 
+        <ValidationBanner class="mb-4" />
+
         <!-- EXPLANATION BANNER: Qualifier Count, School Limits & Squad Caps -->
         <div class="rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-5 text-white shadow-md border border-indigo-900/50 mb-5 space-y-3">
             <div class="flex items-center justify-between">
@@ -120,6 +122,15 @@
                     </div>
                 </div>
 
+                <div v-if="isSports" class="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
+                    <label for="batch-standbys" class="font-bold text-slate-800 block">Standbys per item</label>
+                    <p class="text-[11px] text-slate-500">Individual, team and relay items. Blank restores the default of 1; 0 disables standbys.</p>
+                    <div class="flex gap-2">
+                        <input id="batch-standbys" v-model.number="batchForm.standbys" type="number" min="0" step="1" class="field text-xs min-w-0" placeholder="Default: 1">
+                        <button type="button" class="btn-secondary text-xs" @click="applyBatch('standbys')">Apply</button>
+                    </div>
+                </div>
+
                 <!-- Preset: Team Squad Rules -->
                 <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm space-y-2 sm:col-span-2 lg:col-span-1">
                     <label class="font-bold text-slate-800 block">👥 Batch Set Team Squad & Sub Count</label>
@@ -176,6 +187,7 @@
                             <th class="py-3 px-3 w-32 text-center bg-amber-50/50 text-amber-950 border-r border-amber-100">
                                 Qualifiers Count<br><span class="normal-case text-[9px] font-normal text-slate-500">(State Promotion)</span>
                             </th>
+                            <th v-if="isSports" rowspan="2" class="py-3 px-3 text-center">Standbys<br><span class="text-[9px] font-normal">Default: 1</span></th>
                             <th class="py-3 px-3 text-center bg-emerald-50/50 text-emerald-950" colspan="3">
                                 Team Squad Rules<br><span class="normal-case text-[9px] font-normal text-slate-500">(Group / Team Items Only)</span>
                             </th>
@@ -234,6 +246,10 @@
                                        v-model.number="capsState[item.id].qualify_count" placeholder="2">
                             </td>
 
+                            <td v-if="isSports" class="py-2 px-3 text-center">
+                                <input v-model.number="capsState[item.id].standbys" type="number" min="0" step="1" :aria-label="`${item.title} — standby limit`" class="field text-xs w-20 text-center" placeholder="Default: 1">
+                            </td>
+
                             <!-- Team Squad Rule Inputs -->
                             <template v-if="isMultiPerson(item)">
                                 <td class="py-2 px-2 text-center bg-emerald-50/20">
@@ -283,6 +299,7 @@
 <script setup>
 import { Link, router } from '@inertiajs/vue3';
 import { computed, ref, reactive, watch } from 'vue';
+import ValidationBanner from '@/Components/ui/ValidationBanner.vue';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
 import EventSubNav from '@/Components/sahodaya/EventSubNav.vue';
 import SportsSetupSubNav from '@/Components/sahodaya/SportsSetupSubNav.vue';
@@ -345,7 +362,7 @@ function initCapsState() {
         const c = item.criteria_json ?? {};
         const minGroup = c.min_squad ?? (item.min_group_size ?? c.min_playing ?? null);
         const maxGroup = c.max_squad ?? (item.max_group_size ?? null);
-        const maxSubs = c.max_subs ?? (item.standbys ?? c.standbys ?? null);
+        const maxSubs = isSports.value ? (c.max_subs ?? null) : (c.max_subs ?? (item.standbys ?? c.standbys ?? null));
 
         const row = {
             max_per_school: item.max_per_school ?? null,
@@ -353,6 +370,7 @@ function initCapsState() {
             min_group_size: minGroup,
             max_group_size: maxGroup,
             max_subs: maxSubs,
+            standbys: c.standbys ?? null,
         };
         capsState[item.id] = { ...row };
         originalState[item.id] = { ...row };
@@ -360,7 +378,7 @@ function initCapsState() {
 }
 
 watch(itemsList, () => {
-    initCapsState();
+    if (!saving.value) initCapsState();
 }, { immediate: true });
 
 function resetCapsState() {
@@ -377,7 +395,8 @@ function isDirty(itemId) {
         (curr.qualify_count ?? null) !== (orig.qualify_count ?? null) ||
         (curr.min_group_size ?? null) !== (orig.min_group_size ?? null) ||
         (curr.max_group_size ?? null) !== (orig.max_group_size ?? null) ||
-        (curr.max_subs ?? null) !== (orig.max_subs ?? null)
+        (curr.max_subs ?? null) !== (orig.max_subs ?? null) ||
+        (curr.standbys ?? null) !== (orig.standbys ?? null)
     );
 }
 
@@ -422,6 +441,7 @@ function clearSelection() {
 }
 
 const batchForm = reactive({
+    standbys: null,
     max_per_school: null,
     qualify_count: null,
     min_group_size: null,
@@ -443,6 +463,9 @@ function applyBatch(field) {
         if (field === 'qualify_count' && batchForm.qualify_count !== null) {
             capsState[item.id].qualify_count = batchForm.qualify_count;
         }
+        if (field === 'standbys' && isSports.value) {
+            capsState[item.id].standbys = batchForm.standbys === '' ? null : batchForm.standbys;
+        }
         if (field === 'team_squad' && isMultiPerson(item)) {
             if (batchForm.min_group_size !== null) capsState[item.id].min_group_size = batchForm.min_group_size;
             if (batchForm.max_group_size !== null) capsState[item.id].max_group_size = batchForm.max_group_size;
@@ -456,22 +479,36 @@ function saveAll() {
 
     const dirtyRows = itemsList.value
         .filter(item => isDirty(item.id))
-        .map(item => ({
+        .map(item => {
+            if (isSports.value) {
+                const fields = ['max_per_school', 'qualify_count', 'standbys', ...(isMultiPerson(item) ? ['min_group_size', 'max_group_size', 'max_subs'] : [])];
+                const patch = { id: item.id };
+                for (const field of fields) {
+                    const value = capsState[item.id][field] === '' ? null : (capsState[item.id][field] ?? null);
+                    const original = originalState[item.id][field] ?? null;
+                    if (value !== original) patch[field] = value;
+                }
+                return patch;
+            }
+            return {
             id: item.id,
             max_per_school: capsState[item.id].max_per_school,
             qualify_count: capsState[item.id].qualify_count,
             min_group_size: capsState[item.id].min_group_size,
             max_group_size: capsState[item.id].max_group_size,
             max_subs: capsState[item.id].max_subs,
-            standbys: capsState[item.id].max_subs,
-        }));
+            standbys: isSports.value ? (capsState[item.id].standbys === '' ? null : capsState[item.id].standbys) : capsState[item.id].max_subs,
+            };
+        }).filter(row => Object.keys(row).length > 1);
 
+    if (!dirtyRows.length) return;
     saving.value = true;
 
     router.post(`${base}/items/bulk-caps`, {
         items: dirtyRows,
     }, {
         preserveScroll: true,
+        onSuccess: () => initCapsState(),
         onFinish: () => {
             saving.value = false;
         },

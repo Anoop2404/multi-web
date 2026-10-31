@@ -69,7 +69,9 @@ class FestIdCardService
         // Chess event with no item heads at all) has no head_id on its items, so
         // grouping by head would silently return zero participants. See the
         // matching hasItemHeads fix in FestHeadItemNavigationService/report hubs.
-        if ($event->event_type === 'sports' && FestEventItem::where('event_id', $event->id)->whereNotNull('head_id')->exists()) {
+        if ($event->event_type === 'sports'
+            && FestEventItem::where('event_id', $event->id)->whereNotNull('head_id')->exists()
+            && ! FestEventItem::whereIn('event_id', $event->reportableEventIds())->where('is_enabled', true)->whereNull('head_id')->exists()) {
             return collect($this->cardsGroupedByHead($event, $filters))
                 ->map(fn (array $section) => [
                     'item_title' => $section['head_title'],
@@ -91,7 +93,7 @@ class FestIdCardService
                 'scope'   => 'item',
             ]);
 
-            if ($layout === 'team' && FestTeamSquadRules::isMultiPerson($item->participant_type)) {
+            if ($event->event_type !== 'sports' && $layout === 'team' && FestTeamSquadRules::isMultiPerson($item->participant_type)) {
                 $cards = $this->teamCards($event, $itemFilters);
             } else {
                 $cards = $this->individualStudentCards($event, $itemFilters);
@@ -195,7 +197,7 @@ class FestIdCardService
 
         $participants = FestParticipant::query()
             ->whereIn('registration_id', $regMap->keys())
-            ->where('participant_role', '!=', 'standby')
+            ->when($event->event_type !== 'sports', fn ($q) => $q->where('participant_role', '!=', 'standby'))
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
             ->select(['registration_id', 'student_id', 'teacher_id'])
             ->get();
@@ -314,7 +316,7 @@ class FestIdCardService
                     $q->where('school_id', $filters['school_id']);
                 }
             })
-            ->where('participant_role', '!=', 'standby')
+            ->when($event->event_type !== 'sports', fn ($q) => $q->where('participant_role', '!=', 'standby'))
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
             ->join('fest_registrations', 'fest_participants.registration_id', '=', 'fest_registrations.id')
             ->selectRaw('fest_registrations.item_id, COUNT(*) as aggregate')
@@ -387,7 +389,7 @@ class FestIdCardService
             }
         })
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
-            ->where('participant_role', '!=', 'standby')
+            ->when($event->event_type !== 'sports', fn ($q) => $q->where('participant_role', '!=', 'standby'))
             ->count();
     }
 
@@ -422,7 +424,7 @@ class FestIdCardService
 
         $layout = $filters['layout'] ?? 'individual';
 
-        if ($layout === 'team') {
+        if ($layout === 'team' && $event->event_type !== 'sports') {
             return $this->teamCards($event, $filters);
         }
 
@@ -449,7 +451,7 @@ class FestIdCardService
             }
             $q->whereHas('item', fn ($q2) => $q2->whereNotNull('head_id'));
         })
-            ->where('participant_role', '!=', 'standby')
+            ->when($event->event_type !== 'sports', fn ($q) => $q->where('participant_role', '!=', 'standby'))
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
             ->with([
                 'student.tenant',
@@ -493,11 +495,11 @@ class FestIdCardService
             })
             ->map(function ($group) use ($event, $schedules, $includeDataUris) {
                 /** @var \Illuminate\Support\Collection<int, FestParticipant> $group */
-                $lead = $group->sortBy('id')->first();
+                $lead = $group->sortBy(fn ($p) => [$p->participant_role === 'standby' ? 1 : 0, $p->id])->first();
                 $head = $lead->registration?->item?->head;
                 $headName = $head?->name ?? 'Item head';
                 $items = $group
-                    ->map(fn (FestParticipant $p) => $p->registration?->item?->title)
+                    ->map(fn (FestParticipant $p) => ($p->registration?->item?->title ?? '').($event->event_type === 'sports' && $p->participant_role === 'standby' ? ' — Standby / Substitute' : ''))
                     ->filter()
                     ->unique()
                     ->sort()
@@ -511,6 +513,10 @@ class FestIdCardService
                     ->first();
 
                 $card = $this->participantCard($event, $lead, $schedule, $includeDataUris);
+                if ($event->event_type === 'sports' && $group->contains('participant_role', 'standby') && $group->contains(fn ($p) => $p->participant_role !== 'standby')) {
+                    $card['role_title'] = 'Participant / Standby';
+                    $card['role_label'] = 'PARTICIPANT / STANDBY';
+                }
                 $entityKey = $lead->student_id ? 's'.$lead->student_id : 't'.$lead->teacher_id;
 
                 $cleanItems = array_map(fn ($i) => $this->titleCase(str_replace('_', ' ', $i)), $items);
@@ -584,7 +590,7 @@ class FestIdCardService
         }
 
         $query = FestParticipant::whereIn('registration_id', $registrationIds)
-            ->where('participant_role', '!=', 'standby')
+            ->when($event->event_type !== 'sports', fn ($q) => $q->where('participant_role', '!=', 'standby'))
             ->where(fn ($q) => $q->whereNotNull('student_id')->orWhereNotNull('teacher_id'))
             ->with(['student.tenant', 'student.schoolClass', 'teacher.tenant', 'registration.item.head', 'registration.school', 'registration.event.sourcePhase', 'registration.event.region']);
 
@@ -604,9 +610,9 @@ class FestIdCardService
             ->groupBy(fn (FestParticipant $p) => $p->student_id ? 's:'.$p->student_id : 't:'.$p->teacher_id)
             ->map(function ($group) use ($event, $schedules, $includeDataUris) {
                 /** @var \Illuminate\Support\Collection<int, FestParticipant> $group */
-                $lead = $group->sortBy('id')->first();
+                $lead = $group->sortBy(fn ($p) => [$p->participant_role === 'standby' ? 1 : 0, $p->id])->first();
                 $items = $group
-                    ->map(fn (FestParticipant $p) => $p->registration?->item?->title)
+                    ->map(fn (FestParticipant $p) => ($p->registration?->item?->title ?? '').($event->event_type === 'sports' && $p->participant_role === 'standby' ? ' — Standby / Substitute' : ''))
                     ->filter()
                     ->unique()
                     ->sort()
@@ -622,11 +628,15 @@ class FestIdCardService
                     ->first();
 
                 $card = $this->participantCard($event, $lead, $schedule, $includeDataUris);
+                if ($event->event_type === 'sports' && $group->contains('participant_role', 'standby') && $group->contains(fn ($p) => $p->participant_role !== 'standby')) {
+                    $card['role_title'] = 'Participant / Standby';
+                    $card['role_label'] = 'PARTICIPANT / STANDBY';
+                }
                 $entityKey = $lead->student_id ? 's'.$lead->student_id : 't'.$lead->teacher_id;
 
                 return $this->withItemRows(array_merge($card, [
                     'card_type'       => 'event_participant',
-                    'role_label'      => 'PARTICIPANT',
+                    'role_label'      => $event->event_type === 'sports' ? $card['role_label'] : 'PARTICIPANT',
                     'role_class'      => 'student',
                     'detail'          => null,
                     'items'           => $cleanItems,
@@ -662,7 +672,7 @@ class FestIdCardService
                 $q->whereIn('item_id', $event->reportableItemIds([$itemId]));
             }
         })
-            ->where('participant_role', '!=', 'standby')
+            ->when($event->event_type !== 'sports', fn ($q) => $q->where('participant_role', '!=', 'standby'))
             ->with(['student.tenant', 'student.schoolClass', 'teacher.tenant', 'registration.item.head', 'registration.school', 'registration.event.sourcePhase', 'registration.event.region']);
 
         if (is_array($participantIds) && $participantIds !== []) {
@@ -704,7 +714,7 @@ class FestIdCardService
             ->when($itemId, fn ($q) => $q->whereIn('item_id', $event->reportableItemIds([$itemId])))
             ->when(! empty($filters['student_id']), fn ($q) => $q->whereHas(
                 'participants',
-                fn ($p) => $p->where('student_id', (int) $filters['student_id'])->where('participant_role', '!=', 'standby'),
+                fn ($p) => $p->where('student_id', (int) $filters['student_id'])->when($event->event_type !== 'sports', fn ($q) => $q->where('participant_role', '!=', 'standby')),
             ))
             ->whereHas('item', fn ($q) => $q->whereIn('participant_type', FestTeamSquadRules::MULTI_PERSON_TYPES))
             ->with([
@@ -714,7 +724,7 @@ class FestIdCardService
                 'school:id,name',
                 'groups',
                 'participants' => fn ($q) => $q
-                    ->where('participant_role', '!=', 'standby')
+                    ->when($event->event_type !== 'sports', fn ($q) => $q->where('participant_role', '!=', 'standby'))
                     ->with(['student.tenant', 'teacher.tenant']),
             ])
             ->orderBy('id');
@@ -961,8 +971,8 @@ class FestIdCardService
         return [
             'card_type'       => 'individual',
             'audience'        => 'student',
-            'role_label'      => $isTeacher ? 'TEACHER' : 'STUDENT',
-            'role_title'      => $isTeacher ? 'Teacher' : 'Participant',
+            'role_label'      => $event->event_type === 'sports' && $p->participant_role === 'standby' ? 'STANDBY / SUBSTITUTE' : ($isTeacher ? 'TEACHER' : 'STUDENT'),
+            'role_title'      => $event->event_type === 'sports' && $p->participant_role === 'standby' ? 'Standby / Substitute' : ($isTeacher ? 'Teacher' : 'Participant'),
             'role_class'      => $isTeacher ? 'staff' : 'student',
             'name'            => $name,
             'initials'        => $this->initials($name),
@@ -1066,7 +1076,7 @@ class FestIdCardService
                     $query->where('school_id', $filters['school_id']);
                 }
             })
-            ->where('participant_role', '!=', 'standby')
+            ->when($event->event_type !== 'sports', fn ($q) => $q->where('participant_role', '!=', 'standby'))
             ->where(function ($query) use ($studentIds, $teacherIds) {
                 if ($studentIds->isNotEmpty()) {
                     $query->whereIn('student_id', $studentIds);
@@ -1082,11 +1092,9 @@ class FestIdCardService
         return $query
             ->groupBy(fn (FestParticipant $participant) => $this->participantEntityKey($participant))
             ->map(fn ($group) => $group
-                ->map(fn (FestParticipant $participant) => $participant->registration?->item)
-                ->filter()
-                ->unique('id')
-                ->sortBy(fn (FestEventItem $item) => $item->display_order ?? PHP_INT_MAX)
-                ->map(fn (FestEventItem $item) => $this->titleCase(str_replace('_', ' ', $item->title)))
+                ->sortBy(fn (FestParticipant $p) => $p->registration?->item?->display_order ?? PHP_INT_MAX)
+                ->map(fn (FestParticipant $p) => $this->titleCase(str_replace('_', ' ', $p->registration?->item?->title ?? '')).($event->event_type === 'sports' && $p->participant_role === 'standby' ? ' — Standby / Substitute' : ''))
+                ->unique()
                 ->filter()
                 ->values()
                 ->all());

@@ -147,7 +147,7 @@ class FestNumberingServiceTest extends TestCase
         ]);
     }
 
-    public function test_sports_without_school_range_uses_event_start_for_active_performers_only(): void
+    public function test_sports_without_school_range_numbers_performers_then_standbys_for_identification(): void
     {
         ['event' => $event, 'itemA' => $itemA, 'itemB' => $itemB, 'school' => $school] = $this->sportsContext();
         $event->update(['numbering_settings' => ['chest_no_start' => 100]]);
@@ -164,10 +164,10 @@ class FestNumberingServiceTest extends TestCase
         $this->assertSame(100, $first->fresh()->chest_no);
         $this->assertSame(100, $sibling->fresh()->chest_no);
         $this->assertSame(101, $second->fresh()->chest_no);
-        $this->assertNull($standby->fresh()->getRawOriginal('chest_no'));
+        $this->assertSame(102, $standby->fresh()->chest_no);
         $this->assertNull($disqualified->fresh()->getRawOriginal('chest_no'));
         $service->assignParticipantNumbers($standby->fresh());
-        $this->assertNull($standby->fresh()->getRawOriginal('chest_no'));
+        $this->assertSame(102, $standby->fresh()->chest_no);
         $service->assignMissingChestNumbers($event, schoolId: $school->id);
         $this->assertSame(100, $first->fresh()->chest_no);
         $this->assertSame(101, $second->fresh()->chest_no);
@@ -231,8 +231,36 @@ class FestNumberingServiceTest extends TestCase
         $service->assignMissingChestNumbers($event);
         $this->assertSame(2351, $member->fresh()->chest_no);
         $this->assertSame(1, $newMember->fresh()->chest_no);
-        $this->assertNull($reserve->fresh()->chest_no);
+        $this->assertSame(2, $reserve->fresh()->chest_no);
         $this->assertSame('1, 2351', $service->entryChestLabel($member->fresh()));
+        $idCards = app(\App\Services\Events\FestIdCardService::class);
+        $cards = collect($idCards->cards($event, 'student', ['scope' => 'item', 'item_id' => $relay->id]));
+        $this->assertCount(3, $cards);
+        $card = $cards->firstWhere('role_label', 'STANDBY / SUBSTITUTE');
+        $this->assertNotNull($card, $cards->map(fn ($c) => [$c['name'], $c['role_label']])->toJson());
+        $this->assertSame('Standby / Substitute', $card['role_title']);
+        $this->assertSame('STANDBY / SUBSTITUTE', $card['role_label']);
+        $this->assertSame('2', $card['chest_number']);
+        foreach (['pass-card', 'pass-card-pdf'] as $view) {
+            $html = view('fest.id-cards.partials.'.$view, ['card' => $card, 'clusterLogoSrc' => null, 'clusterName' => 'Sports Sahodaya', 'eventTitle' => $event->title])->render();
+            $this->assertStringContainsString('Standby / Substitute', $html);
+            $this->assertStringContainsString('Chest #2', $html);
+        }
+
+        $grouped = collect($idCards->cardsGroupedByItem($event, ['layout' => 'team', 'item_id' => $relay->id]));
+        $this->assertCount(3, $grouped->firstWhere('item_id', $relay->id)['cards']);
+        $eventCard = collect($idCards->cards($event, 'student', ['scope' => 'event', 'student_id' => $reserve->student_id]))->first();
+        $this->assertSame('STANDBY / SUBSTITUTE', $eventCard['role_label']);
+        $this->assertStringContainsString('Standby', $eventCard['items'][0]);
+        $reserveItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'Long jump', 'participant_type' => 'individual', 'is_enabled' => true]);
+        $reserveReg = FestRegistration::create(['event_id' => $event->id, 'item_id' => $reserveItem->id, 'school_id' => $school->id, 'status' => 'approved']);
+        FestParticipant::create(['registration_id' => $reserveReg->id, 'event_id' => $event->id, 'student_id' => $student->id, 'participant_role' => 'standby']);
+        $mixedCard = collect($idCards->cards($event, 'student', ['scope' => 'event', 'student_id' => $student->id]))->first();
+        $this->assertSame('Participant / Standby', $mixedCard['role_title']);
+        $this->assertSame('2351', $mixedCard['chest_number']);
+        $this->assertStringContainsString('Standby', implode(' ', $mixedCard['items']));
+
+
         $report = new \App\Services\Events\FestEventReportAnalyticsService($event);
         $this->assertSame([2351, 1], collect($report->itemWiseReportRows(itemId: $relay->id))->sortBy('id')->pluck('chest_no')->all());
         ob_start();
@@ -272,6 +300,8 @@ class FestNumberingServiceTest extends TestCase
         $this->assertSame(1, $personal->fresh()->chest_no);
         $this->assertSame(1, $member->fresh()->chest_no);
         $this->assertSame(2, $newMember->fresh()->chest_no);
+        $event->update(['event_type' => 'kalolsavam']);
+        $this->assertCount(2, $idCards->cards($event, 'student', ['scope' => 'item', 'item_id' => $relay->id]));
     }
 
     public function test_next_chest_number_is_unique_within_item_head(): void

@@ -879,7 +879,7 @@ class FestSchoolReportController extends SchoolAdminController
             'ID card downloads have been disabled by your Sahodaya for this event.',
         );
 
-        $service->hideChestNo = true;
+        $service->hideChestNo = $event->event_type !== 'sports';
 
         $meta = SchoolFestProgram::meta($program);
         $event->load(['items' => fn ($q) => $q->where('is_enabled', true)->orderBy('title')]);
@@ -1121,7 +1121,7 @@ class FestSchoolReportController extends SchoolAdminController
     public function idCardsJson(Request $request, string $tenantId, FestEvent $event, string $program, FestIdCardService $service)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
-        $service->hideChestNo = true;
+        $service->hideChestNo = $event->event_type !== 'sports';
 
         $filters = array_merge($this->idCardFilters($request), [
             'school_id'        => $this->school->id,
@@ -1174,7 +1174,7 @@ class FestSchoolReportController extends SchoolAdminController
         @set_time_limit(300);
 
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
-        $service->hideChestNo = true;
+        $service->hideChestNo = $event->event_type !== 'sports';
 
         $filters = array_merge($this->idCardFilters($request), [
             'school_id'        => $this->school->id,
@@ -1210,7 +1210,7 @@ class FestSchoolReportController extends SchoolAdminController
     public function idCardsPdf(Request $request, string $tenantId, FestEvent $event, string $program, FestIdCardService $service)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
-        $service->hideChestNo = true;
+        $service->hideChestNo = $event->event_type !== 'sports';
 
         $filters = array_merge($this->idCardFilters($request), [
             'school_id'        => $this->school->id,
@@ -1261,7 +1261,7 @@ class FestSchoolReportController extends SchoolAdminController
     public function idCardsPdfAllHeads(Request $request, string $tenantId, FestEvent $event, string $program, FestIdCardService $service)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
-        $service->hideChestNo = true;
+        $service->hideChestNo = $event->event_type !== 'sports';
 
         $levelId = $this->resolveIdCardLevelId($request, $event);
 
@@ -1311,7 +1311,7 @@ class FestSchoolReportController extends SchoolAdminController
     public function idCardsPdfAllItems(Request $request, string $tenantId, FestEvent $event, string $program, FestIdCardService $service)
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
-        $service->hideChestNo = true;
+        $service->hideChestNo = $event->event_type !== 'sports';
 
         $levelId = $this->resolveIdCardLevelId($request, $event);
 

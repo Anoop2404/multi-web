@@ -219,7 +219,6 @@ class FestNumberingService
         $query = FestParticipant::whereHas('registration', fn ($q) => $q->whereIn('event_id', $eventIds))
             ->when($event->event_type === 'sports',
                 fn ($q) => $q->whereNull('disqualified_at')
-                    ->where(fn ($r) => $r->whereNull('participant_role')->orWhere('participant_role', '!=', 'standby'))
                     ->whereHas('registration', fn ($r) => $r->active()),
                 fn ($q) => $q->where('chest_head_id', $headScope))
             ->whereNotNull('chest_no')->orderBy('id');
@@ -383,7 +382,7 @@ class FestNumberingService
             $updates['item_registration_number'] = $this->nextItemRegistrationNumber($event, $item);
         }
 
-        $canAssignChest = $event->event_type !== 'sports' || ($participant->participant_role !== 'standby' && ! $participant->disqualified_at);
+        $canAssignChest = $event->event_type !== 'sports' || ! $participant->disqualified_at;
 
         if ($canAssignChest && $event->event_type !== 'sports' && $this->isGroupItem($item) && $participant->group_id && $participant->group) {
             // Team/group items: the number lives on the squad (FestGroup),
@@ -443,8 +442,7 @@ class FestNumberingService
             ->with('registration.item')
             ->whereNull('chest_no')
             ->when($event->event_type === 'sports', fn ($q) => $q->whereHas('participants', fn ($p) => $p
-                ->whereNull('disqualified_at')
-                ->where(fn ($role) => $role->whereNull('participant_role')->orWhere('participant_role', '!=', 'standby'))))
+                ->whereNull('disqualified_at')))
             ->get()
             ->pipe(fn ($rows) => $event->event_type === 'sports' ? $rows->sortBy([['registration.school_id', 'asc'], ['id', 'asc']]) : $rows->shuffle())
             ->each(function (FestGroup $group) use ($event, &$count) {
@@ -473,10 +471,9 @@ class FestNumberingService
             ->whereNull('chest_no')
             ->when($event->event_type !== 'sports', fn ($q) => $q->whereNull('group_id'))
             ->when($event->event_type === 'sports', fn ($q) => $q
-                ->whereNull('disqualified_at')
-                ->where(fn ($role) => $role->whereNull('participant_role')->orWhere('participant_role', '!=', 'standby')))
+                ->whereNull('disqualified_at'))
             ->get()
-            ->pipe(fn ($rows) => $event->event_type === 'sports' ? $rows->sortBy([['registration.school_id', 'asc'], ['student_id', 'asc'], ['id', 'asc']]) : $rows->shuffle())
+            ->pipe(fn ($rows) => $event->event_type === 'sports' ? $rows->sortBy(fn ($p) => [$p->registration->school_id, $p->participant_role === 'standby' ? 1 : 0, $p->student_id ?? $p->teacher_id ?? $p->id, $p->id]) : $rows->shuffle())
             ->each(function (FestParticipant $p) use ($event, &$count) {
                 if (! $p->registration?->item) {
                     return;
@@ -531,7 +528,6 @@ class FestNumberingService
                 ->where('event_id', $event->id)->active()
                 ->when($schoolId, fn ($r) => $r->where('school_id', $schoolId)))
                 ->whereNull('disqualified_at')
-                ->where(fn ($q) => $q->whereNull('participant_role')->orWhere('participant_role', '!=', 'standby'))
                 ->with('registration.item')->orderBy('id')->lockForUpdate()->get();
             foreach ($participants->groupBy(fn ($p) => $p->student_id ? 's'.$p->student_id : ($p->teacher_id ? 't'.$p->teacher_id : 'p'.$p->id)) as $rows) {
                 $owner = $rows->first(fn ($p) => $this->persistedChestNumber($p) !== null);
