@@ -171,6 +171,42 @@ class FestStateExportTest extends TestCase
         $this->assertSame($row1[14], $data['photos'][0]['filename']);
     }
 
+    public function test_team_export_includes_full_roster_and_substitute_photos(): void
+    {
+        $this->item->update(['participant_type' => 'group']);
+        $this->stateItem->update(['participant_type' => 'group', 'qualify_count' => 1]);
+        $mark = $this->winnerWithPhoto('Team Leader', 1, 95, 'school-1', 'leader-photo');
+        $leader = FestParticipant::findOrFail($mark->participant_id);
+        $reserve = Student::create([
+            'name' => 'Team Reserve', 'tenant_id' => 'school-1',
+            'school_class_id' => $leader->student->school_class_id,
+            'reg_no' => 'REG-RESERVE', 'photo' => 'data:image/png;base64,'.base64_encode('reserve-photo'),
+        ]);
+        FestParticipant::create([
+            'registration_id' => $leader->registration_id,
+            'student_id' => $reserve->id, 'participant_role' => 'standby',
+        ]);
+        app(FestStateSlotCollectionService::class)->open($this->program, $this->hubEvent, $this->admin);
+        // Legacy selections may contain only the representative participant reference.
+        \App\Models\FestStateNominationSelection::query()->update(['registration_id' => null]);
+        $export = app(FestStateExportService::class);
+        $data = $export->gatherData($this->program, $this->hubEvent);
+        $this->assertCount(2, $data['rows']);
+        $this->assertSame(['Team Leader', 'Team Reserve'], array_column($data['rows'], 8));
+        $this->assertSame('Standby / Substitute', $data['rows'][1][17]);
+        $this->assertSame('REG-RESERVE', $data['rows'][1][18]);
+        $this->assertSame($data['rows'][0][16], $data['rows'][1][16]);
+        $this->assertCount(2, $data['photos']);
+        $path = $export->generateZip($this->program, $this->hubEvent);
+        $zip = new ZipArchive;
+        $this->assertTrue($zip->open($path));
+        foreach ($data['photos'] as $photo) {
+            $this->assertSame($photo['bytes'], $zip->getFromName($photo['filename']));
+        }
+        $zip->close();
+        @unlink($path);
+    }
+
     public function test_export_zip_generates_valid_zip_with_excel_and_photos(): void
     {
         $this->winnerWithPhoto('Anoop S', 1, 95, 'school-1', 'fake-jpeg-binary-anoop');

@@ -297,6 +297,7 @@ class FestStateSlotCollectionService
     public function summary(FestStateProgram $program, FestEvent $hubEvent): Collection
     {
         $sheet = $this->sheets->sheet($program, $hubEvent, ['slot_collection' => true, 'include_pending_items' => true]);
+        $sheet = $this->withTeamRosters($sheet, $hubEvent);
         $batch = $this->nominations->openBatch($program, $hubEvent);
         $byItem = $batch->selections()
             ->where('nomination_type', 'primary')
@@ -369,6 +370,52 @@ class FestStateSlotCollectionService
         });
     }
 
+    /** Enrich team entries in one batch; a team remains one nomination/slot. */
+    private function withTeamRosters(Collection $sheet, FestEvent $event): Collection
+    {
+        $teamRows = $sheet->filter(fn ($r) => \App\Support\FestTeamSquadRules::isMultiPerson($r['participant_type'] ?? ''));
+        $entries = $teamRows->flatMap(fn ($r) => array_merge($r['candidates'] ?? [], $r['chosen'] ?? [], $r['declined'] ?? []));
+        $registrationIds = $entries->pluck('registration_id')->filter()->unique();
+        $participantIds = $entries->pluck('participant_id')->filter()->unique();
+        if ($entries->isEmpty()) return $sheet;
+        $registrations = \App\Models\FestRegistration::whereIn('event_id', $event->reportableEventIds())
+            ->where(fn ($q) => $q->whereIn('id', $registrationIds)->orWhereHas('participants', fn ($p) => $p->whereIn('id', $participantIds)))
+            ->with(['participants.student.tenant', 'participants.student.schoolClass', 'participants.teacher.tenant', 'participants.group'])
+            ->get();
+        $byParticipant = collect();
+        foreach ($registrations as $registration) {
+            foreach ($registration->participants as $participant) {
+                $byParticipant->put($participant->id, $registration->id);
+            }
+        }
+        $rosters = $registrations->mapWithKeys(function ($registration) use ($event) {
+            $members = $registration->participants->sortBy(fn ($p) => [$p->participant_role === 'standby' ? 1 : 0, $p->id])->map(fn ($p) => [
+                'id' => $p->id, 'student_id' => $p->student_id, 'name' => $p->student?->name ?? $p->teacher?->name ?? 'Participant',
+                'class_name' => $p->student?->schoolClass?->name,
+                'reg_no' => $p->student?->reg_no ?? $p->teacher?->reg_no,
+                'admission_number' => $p->student?->admission_number,
+                'role' => $p->participant_role === 'standby' ? 'Standby / Substitute' : 'Participant',
+                'disqualified' => (bool) $p->disqualified_at,
+                'photo_url' => $p->student ? $p->student->photoUrl() : null,
+                'sahodaya_photo_url' => $p->student ? $p->student->sahodayaPhotoUrl($event->tenant_id) : null,
+            ])->values()->all();
+            return [$registration->id => $members];
+        });
+        return $sheet->map(function ($row) use ($rosters, $byParticipant) {
+            if (! \App\Support\FestTeamSquadRules::isMultiPerson($row['participant_type'] ?? '')) return $row;
+            foreach (['candidates', 'chosen', 'declined'] as $key) {
+                $row[$key] = collect($row[$key] ?? [])->map(function ($entry) use ($rosters, $byParticipant) {
+                    $registrationId = ($entry['registration_id'] ?? null) ?: $byParticipant->get($entry['participant_id'] ?? 0);
+                    $entry['is_team'] = true;
+                    $entry['team_members'] = $rosters->get($registrationId, []);
+                    $entry['team_size'] = count($entry['team_members']);
+                    return $entry;
+                })->all();
+            }
+            return $row;
+        });
+    }
+
     /**
      * One school's own list: every slot it has been offered for this hub, in whatever state it is
      * in. Only rows created by this flow (school_response not null) show up — a Sahodaya hand-pick
@@ -418,6 +465,9 @@ class FestStateSlotCollectionService
                 || (! empty($offer['registration_id']) && ! empty($candidate['registration_id']) && $candidate['registration_id'] === $offer['registration_id']));
             $matchedChosen = collect($row['chosen'] ?? [])->firstWhere('id', $offer['id']);
             $offer['photo_url'] = $matchedCandidate['photo_url'] ?? $matchedChosen['photo_url'] ?? null;
+            $offer['is_team'] = $matchedCandidate['is_team'] ?? $matchedChosen['is_team'] ?? false;
+            $offer['team_members'] = $matchedCandidate['team_members'] ?? $matchedChosen['team_members'] ?? [];
+            $offer['team_size'] = count($offer['team_members']);
             $stillEligible = (bool) $matchedCandidate;
             $offer['can_respond'] = $stillEligible && $hubEvent->state_slot_collection_open && ! $hubEvent->state_slot_collection_approved_at
                 && $offer['status'] === 'selected' && $offer['school_response'] === 'pending';
@@ -451,6 +501,7 @@ class FestStateSlotCollectionService
                     'category_label' => $row['category_label'], 'gender_label' => $row['gender_label'],
                     'student_name' => $candidate['student_name'], 'class_name' => $candidate['class_name'],
                     'photo_url' => $candidate['photo_url'] ?? null,
+                    'is_team' => $candidate['is_team'] ?? false, 'team_members' => $candidate['team_members'] ?? [], 'team_size' => $candidate['team_size'] ?? 0,
                     'source_position' => $candidate['source_position'], 'direct_entry' => $candidate['direct_entry'],
                     'status' => 'waiting', 'school_response' => 'waiting', 'can_respond' => false,
                     'opt_out_reason' => null, 'responded_at' => null, 'responded_by_name' => null,
