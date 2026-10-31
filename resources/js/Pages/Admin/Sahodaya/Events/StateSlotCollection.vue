@@ -209,14 +209,15 @@
                                             </div>
                                             <div class="min-w-0">
                                                 <span class="text-xs font-bold text-slate-900 truncate block">{{ c.student_name }}</span>
-                                                <span v-if="c.class_name" class="text-[10px] text-slate-400 block truncate">Class: {{ c.class_name }}</span>
+                                                <span v-if="c.class_name && !c.is_team" class="text-[10px] text-slate-400 block truncate">Class: {{ c.class_name }}</span>
                                             </div>
                                         </div>
                                         <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200 shrink-0">
                                             Rank {{ c.source_position }} · {{ c.score ?? '—' }} pts
                                         </span>
                                     </div>
-                                    <p class="text-[11px] text-slate-500 truncate mt-1.5">{{ c.school_name }}</p>
+                                    <p class="text-[11px] text-slate-500 mt-1.5">{{ c.school_name }}</p>
+                                    <StateSlotTeamRoster :candidate="c" />
                                 </div>
                                 <div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
                                     <span class="text-[10px] text-slate-400">Position {{ c.source_position }} tie</span>
@@ -265,9 +266,10 @@
                                         </div>
                                         <div class="min-w-0">
                                             <span class="block truncate">{{ selection.student_name }}</span>
-                                            <span v-if="selection.class_name" class="block text-[11px] font-normal text-slate-400">Class: {{ selection.class_name }}</span>
+                                            <span v-if="selection.class_name && !selection.is_team" class="block text-[11px] font-normal text-slate-400">Class: {{ selection.class_name }}</span>
                                         </div>
                                     </div>
+                                <StateSlotTeamRoster :candidate="selection" />
                                 </td>
                                 <td class="px-4 py-3 text-xs text-slate-600 font-medium">
                                     {{ selection.school_name }}
@@ -345,7 +347,7 @@
                                         </div>
                                         <div class="min-w-0">
                                             <span class="text-xs font-bold text-slate-900 truncate block">{{ candidate.student_name }}</span>
-                                            <span v-if="candidate.class_name" class="text-[10px] text-slate-400 block truncate">Class: {{ candidate.class_name }}</span>
+                                            <span v-if="candidate.class_name && !candidate.is_team" class="text-[10px] text-slate-400 block truncate">Class: {{ candidate.class_name }}</span>
                                         </div>
                                     </div>
                                     <span class="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0"
@@ -353,7 +355,8 @@
                                         {{ candidate.direct_entry ? 'Direct' : 'Rank ' + candidate.source_position }}
                                     </span>
                                 </div>
-                                <p class="text-[11px] text-slate-500 truncate mt-1.5">{{ candidate.school_name }}</p>
+                                <p class="text-[11px] text-slate-500 mt-1.5">{{ candidate.school_name }}</p>
+                                    <StateSlotTeamRoster :candidate="candidate" />
                             </div>
                             <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px]">
                                 <div>
@@ -400,9 +403,10 @@
                                             Opted out · {{ row.direct_entry ? 'Direct' : 'Rank ' + (selection.source_position || '—') }}
                                         </span>
                                         <p class="font-bold text-slate-800 truncate">{{ selection.student_name }}</p>
-                                        <span v-if="selection.class_name" class="text-[10px] text-slate-400">({{ selection.class_name }})</span>
+                                        <span v-if="selection.class_name && !selection.is_team" class="text-[10px] text-slate-400">({{ selection.class_name }})</span>
                                     </div>
                                     <p class="text-[11px] text-slate-500 mt-0.5">{{ selection.school_name }}</p>
+                                    <StateSlotTeamRoster :candidate="selection" />
                                     <p class="mt-1 text-slate-600 font-medium">Reason: {{ selection.note || 'No reason recorded' }}</p>
                                     <p v-if="selection.school_responded_by_name" class="text-[10px] text-slate-400 mt-0.5">
                                         Recorded by {{ selection.school_responded_by_name }} {{ selection.school_responded_at ? '· ' + formatDate(selection.school_responded_at) : '' }}
@@ -676,6 +680,7 @@
 </template>
 
 <script setup>
+import StateSlotTeamRoster from '@/Components/sahodaya/StateSlotTeamRoster.vue';
 import { ref, reactive, computed, watch } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';

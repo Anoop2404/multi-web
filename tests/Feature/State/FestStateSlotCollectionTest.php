@@ -192,15 +192,52 @@ class FestStateSlotCollectionTest extends TestCase
     {
         $this->hubEvent->update(['results_published' => false]);
         $this->item->update(['participant_type' => 'group']);
+        $this->stateItem->update(['participant_type' => 'group']);
         $mark = $this->winner('Team leader', 1, 0);
         $registration = $mark->participant->registration;
         $mark->delete();
-        for ($i = 0; $i < 4; $i++) {
+        for ($i = 0; $i < 8; $i++) {
             $student = Student::create(['name' => 'Team member '.$i, 'tenant_id' => 'school-1', 'school_class_id' => $registration->participants()->first()->student->school_class_id]);
             FestParticipant::create(['registration_id' => $registration->id, 'student_id' => $student->id]);
         }
         $this->assertSame(1, $this->service()->open($this->program, $this->hubEvent, $this->user())['filled']);
         $this->assertCount(1, $this->primaries());
+        $row = $this->service()->summary($this->program, $this->hubEvent)->firstWhere('item_id', $this->stateItem->id);
+        $this->assertNotNull($row);
+        $this->assertTrue($row['candidates'][0]['is_team']);
+        $this->assertSame(9, $row['candidates'][0]['team_size']);
+        $this->assertCount(9, $row['candidates'][0]['team_members']);
+        $this->assertSame('Team leader', $row['candidates'][0]['team_members'][0]['name']);
+        $this->assertSame('Class 6', $row['candidates'][0]['team_members'][0]['class_name']);
+        $this->assertArrayHasKey('photo_url', $row['candidates'][0]['team_members'][0]);
+        $this->assertArrayHasKey('sahodaya_photo_url', $row['candidates'][0]['team_members'][0]);
+        $this->assertCount(9, $row['chosen'][0]['team_members']);
+        $schoolRows = $this->service()->forSchool($this->program, $this->hubEvent, 'school-1');
+        $this->assertCount(9, $schoolRows[0]['team_members']);
+    }
+
+    public function test_tied_group_candidates_receive_their_own_complete_rosters(): void
+    {
+        $this->item->update(['participant_type' => 'group']);
+        $this->stateItem->update(['participant_type' => 'group', 'qualify_count' => 1]);
+        $first = $this->winner('School One leader', 1, 272, 'school-1');
+        $second = $this->winner('School Two leader', 1, 272, 'school-2');
+        foreach ([$first, $second] as $mark) {
+            $registration = $mark->participant->registration;
+            $student = Student::create(['tenant_id' => $registration->school_id, 'name' => $registration->school_id.' reserve', 'school_class_id' => $mark->participant->student->school_class_id, 'photo' => 'https://example.test/student.jpg', 'reg_no' => 'TEST-'.$registration->id]);
+            FestParticipant::create(['registration_id' => $registration->id, 'student_id' => $student->id, 'participant_role' => 'standby']);
+        }
+        $row = $this->service()->summary($this->program, $this->hubEvent)->firstWhere('item_id', $this->stateItem->id);
+        $this->assertCount(2, $row['candidates']);
+        foreach ($row['candidates'] as $candidate) {
+            $this->assertSame(2, $candidate['team_size']);
+            $this->assertCount(2, $candidate['team_members']);
+            $reserve = collect($candidate['team_members'])->firstWhere('role', 'Standby / Substitute');
+            $this->assertNotNull($reserve);
+            $this->assertSame($candidate['school_id'].' reserve', $reserve['name']);
+            $this->assertSame('https://example.test/student.jpg', $reserve['photo_url']);
+            $this->assertNotEmpty($reserve['reg_no']);
+        }
     }
 
     public function test_rank_three_to_five_wait_and_promote_in_order_but_rank_six_never_appears(): void

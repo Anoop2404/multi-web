@@ -55,7 +55,10 @@ class FestStateExportService
 
         $labels = FestClassGroupScheme::labels(null, $hubEvent->rootEvent());
 
-        $regIds = $selections->pluck('registration_id')->filter()->unique();
+        $partIds = $selections->pluck('participant_id')->filter()->unique();
+        $regIds = $selections->pluck('registration_id')->filter()->merge(
+            FestParticipant::whereIn('id', $partIds)->pluck('registration_id')
+        )->unique();
         $registrations = FestRegistration::with(['participants.student.schoolClass', 'participants.student.tenant', 'item'])
             ->whereIn('id', $regIds)
             ->get()
@@ -87,15 +90,12 @@ class FestStateExportService
 
             $studentRecords = [];
 
-            if ($isMultiPerson && $selection->registration_id && $registrations->has($selection->registration_id)) {
-                $reg = $registrations->get($selection->registration_id);
-                $members = $reg->participants;
-                if ($selection->participant_id) {
-                    $selectedPart = $members->firstWhere('id', $selection->participant_id);
-                    if ($selectedPart?->group_id) {
-                        $members = $members->where('group_id', $selectedPart->group_id);
-                    }
-                }
+            $registrationId = $selection->registration_id ?: $participants->get($selection->participant_id)?->registration_id;
+            if ($isMultiPerson && $registrationId && $registrations->has($registrationId)) {
+                $reg = $registrations->get($registrationId);
+                $members = $reg->participants->sortBy(fn ($member) => [
+                    $member->participant_role === 'standby' ? 1 : 0, $member->id,
+                ]);
                 foreach ($members as $m) {
                     $studentRecords[] = [
                         'student' => $m->student,
@@ -104,7 +104,7 @@ class FestStateExportService
                         'roll_no' => $m->student?->roll_number ?? $selection->roll_number,
                         'class_name' => $m->student?->schoolClass?->name ?? $selection->class_name,
                         'school_name' => $m->student?->tenant?->name ?? $selection->school_name,
-                        'role' => $m->participant_role === 'standby' ? 'Standby' : ($m->is_leader ? 'Leader' : 'Member'),
+                        'role' => $m->participant_role === 'standby' ? 'Standby / Substitute' : ($m->is_leader ? 'Leader' : 'Member'),
                     ];
                 }
             } elseif ($selection->participant_id && $participants->has($selection->participant_id)) {
@@ -187,6 +187,9 @@ class FestStateExportService
                     $statusStr,
                     $photoCol,
                     $photoStatus,
+                    $isMultiPerson ? 'Team registration ' . ($registrationId ?? '—') : '—',
+                    $record['role'],
+                    $record['student']?->reg_no ?? '—',
                 ];
             }
         }
@@ -283,6 +286,9 @@ class FestStateExportService
             $sheet->setColumnWidth(16, 14); // School Status
             $sheet->setColumnWidth(42, 15); // Photo File Name
             $sheet->setColumnWidth(16, 16); // Photo Status
+            $sheet->setColumnWidth(24, 17); // Team
+            $sheet->setColumnWidth(24, 18); // Member role
+            $sheet->setColumnWidth(20, 19); // Registration number
 
             $writer->addRow(new Row([new StringCell($hubEvent->title . ' — State Nominations List', null)], $titleStyle));
             $writer->addRow(new Row([new StringCell('State Program: ' . $program->title . ' | Generated: ' . now()->format('d M Y, h:i A'), null)], $metaStyle));
@@ -294,6 +300,7 @@ class FestStateExportService
                 'Sl. No.', 'Item Code', 'Item Name', 'Category', 'Class Group', 'Gender',
                 'Participant Type', 'Rank / Position', 'Student Name', 'Admission / Reg No.',
                 'Roll No.', 'Class', 'School Name', 'School Status', 'Photo File Name', 'Photo Status',
+                'Team', 'Member Role', 'Student Registration No.',
             ];
             $writer->addRow(new Row(array_map(fn ($h) => new StringCell($h, null), $headers), $headerStyle));
 
@@ -345,7 +352,9 @@ PACKAGE CONTENTS:
    [ItemCode]_[Rank]_[StudentName]_[SchoolName]_[RollNo].[ext]
 
 INSTRUCTIONS FOR STATE SUBMISSION:
-- Each row in the Excel sheet corresponds to a nominated student qualifier.
+- Each row corresponds to one student. Team nominations include the full roster,
+  with a common team registration reference and a separate member role.
+  Standbys / substitutes are explicitly labelled and are not additional team slots.
 - The "Photo File Name" column in the Excel sheet gives the exact path to that 
   student's photograph inside the "student_photos/" folder.
 - If any student shows "No photo uploaded", you may collect their photo from the 
