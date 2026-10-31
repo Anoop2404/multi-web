@@ -26,7 +26,7 @@
 
         <div v-if="event.event_type === 'sports'" class="card mb-5 space-y-3">
             <h3 class="font-semibold">Generate chest numbers using school ranges</h3>
-            <p class="text-sm text-slate-600">School ranges take priority. Schools without a range use the custom fallback below. Existing numbers are preserved; only missing numbers are assigned for all items in this event/phase.</p>
+            <p class="text-sm text-slate-600">School ranges take priority. Schools without a range use the custom fallback below. Existing numbers are preserved. Missing numbers are assigned sequentially to active performers; standbys and disqualified participants are skipped.</p>
             <div class="flex flex-wrap items-end gap-3">
                 <button type="button" class="btn-secondary" @click="openSchoolRangesModal">Configure school ranges</button>
                 <label class="text-xs font-semibold">Custom fallback start
@@ -53,7 +53,7 @@
                     <a :href="`${base}/print?school_id=${selectedSchoolId}&download=1`" class="btn-secondary">School chest report (PDF)</a>
                     <a :href="`${base}/csv?school_id=${selectedSchoolId}`" class="btn-secondary">School chest report (CSV)</a>
                 </div>
-                <p class="text-xs text-slate-500">Uses the school's range, or the custom fallback above. Shared sports numbers are listed once per student and item head.</p>
+                <p class="text-xs text-slate-500">Uses the school's range when configured; otherwise starts at the event fallback and takes the next available number. Individual sports numbers are listed once per student across all items. Team chests remain separate.</p>
                 <div class="overflow-x-auto">
                     <table class="data-table">
                         <thead><tr><th>Student</th><th>Items</th><th>Chest number</th><th></th></tr></thead>

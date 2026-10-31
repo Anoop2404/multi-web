@@ -147,6 +147,75 @@ class FestNumberingServiceTest extends TestCase
         ]);
     }
 
+    public function test_sports_without_school_range_uses_event_start_for_active_performers_only(): void
+    {
+        ['event' => $event, 'itemA' => $itemA, 'itemB' => $itemB, 'school' => $school] = $this->sportsContext();
+        $event->update(['numbering_settings' => ['chest_no_start' => 100]]);
+        $firstStudent = $this->student($school, 'First Athlete');
+        $first = $this->participant($event, $itemA, $school, $firstStudent);
+        $sibling = $this->participant($event, $itemB, $school, $firstStudent);
+        $second = $this->participant($event, $itemA, $school, $this->student($school, 'Second Athlete'));
+        $standby = $this->participant($event, $itemA, $school, $this->student($school, 'Reserve Athlete'));
+        $standby->update(['participant_role' => 'standby']);
+        $disqualified = $this->participant($event, $itemA, $school, $this->student($school, 'Disqualified Athlete'));
+        $disqualified->update(['disqualified_at' => now()]);
+        $service = app(FestNumberingService::class);
+        $service->assignMissingChestNumbers($event, schoolId: $school->id);
+        $this->assertSame(100, $first->fresh()->chest_no);
+        $this->assertSame(100, $sibling->fresh()->chest_no);
+        $this->assertSame(101, $second->fresh()->chest_no);
+        $this->assertNull($standby->fresh()->getRawOriginal('chest_no'));
+        $this->assertNull($disqualified->fresh()->getRawOriginal('chest_no'));
+        $service->assignParticipantNumbers($standby->fresh());
+        $this->assertNull($standby->fresh()->getRawOriginal('chest_no'));
+        $service->assignMissingChestNumbers($event, schoolId: $school->id);
+        $this->assertSame(100, $first->fresh()->chest_no);
+        $this->assertSame(101, $second->fresh()->chest_no);
+    }
+
+    public function test_sports_configured_school_range_takes_priority_over_event_start(): void
+    {
+        ['event' => $event, 'itemA' => $itemA, 'school' => $school] = $this->sportsContext();
+        \App\Models\FestSchoolChestRange::create(['event_id' => $event->id, 'school_id' => $school->id, 'chest_no_start' => 500, 'chest_no_end' => 501]);
+        $first = $this->participant($event, $itemA, $school, $this->student($school, 'First Athlete'));
+        $second = $this->participant($event, $itemA, $school, $this->student($school, 'Second Athlete'));
+        app(FestNumberingService::class)->assignMissingChestNumbers($event, schoolId: $school->id);
+        $this->assertSame(500, $first->fresh()->chest_no);
+        $this->assertSame(501, $second->fresh()->chest_no);
+    }
+
+    public function test_bulk_assignment_reconciles_legacy_numbers_across_heads_without_duplicating_students(): void
+    {
+        ['event' => $event, 'itemA' => $itemA, 'itemC' => $itemC, 'school' => $school] = $this->sportsContext();
+        $student = $this->student($school);
+        $first = $this->participant($event, $itemA, $school, $student, 101, $itemA->head_id);
+        $second = $this->participant($event, $itemC, $school, $student, 202, $itemC->head_id);
+        $other = $this->participant($event, $itemC, $school, $this->student($school, 'Other Athlete'));
+        $service = app(FestNumberingService::class);
+        $service->assignMissingChestNumbers($event);
+        $this->assertSame(101, $first->fresh()->chest_no);
+        $this->assertSame(101, $second->fresh()->chest_no);
+        $this->assertNull($second->fresh()->getRawOriginal('chest_no'));
+        $this->assertNotEquals(101, $other->fresh()->chest_no);
+        $service->assignMissingChestNumbers($event);
+        $this->assertSame(101, $second->fresh()->chest_no);
+        $this->assertSame(1, FestParticipant::where('event_id', $event->id)->where('chest_no', 101)->count());
+    }
+
+    public function test_reconciling_legacy_head_numbers_does_not_assign_two_students_the_same_chest(): void
+    {
+        ['event' => $event, 'itemA' => $itemA, 'itemC' => $itemC, 'school' => $school] = $this->sportsContext();
+        $first = $this->participant($event, $itemA, $school, $this->student($school, 'First Athlete'), 101, $itemA->head_id);
+        $other = $this->participant($event, $itemC, $school, $this->student($school, 'Other Athlete'), 101, $itemC->head_id);
+        $service = app(FestNumberingService::class);
+        $service->assignMissingChestNumbers($event);
+        $assigned = [$first->fresh()->chest_no, $other->fresh()->chest_no];
+        $this->assertCount(2, array_unique($assigned));
+        $this->assertNotContains(null, $assigned);
+        $service->assignMissingChestNumbers($event);
+        $this->assertSame($assigned, [$first->fresh()->chest_no, $other->fresh()->chest_no]);
+    }
+
     public function test_next_chest_number_is_unique_within_item_head(): void
     {
         ['event' => $event, 'itemA' => $itemA, 'itemB' => $itemB, 'school' => $school] = $this->sportsContext();
@@ -227,7 +296,7 @@ class FestNumberingServiceTest extends TestCase
         $this->assertNull($second->fresh()->getRawOriginal('chest_no'), 'Display lookup must not copy or regenerate the stored number.');
     }
 
-    public function test_same_student_gets_new_chest_number_for_different_item_head(): void
+    public function test_same_student_reuses_chest_number_for_different_item_head(): void
     {
         ['event' => $event, 'itemA' => $itemA, 'itemC' => $itemC, 'school' => $school] = $this->sportsContext();
         $student = $this->student($school);
@@ -252,8 +321,8 @@ class FestNumberingServiceTest extends TestCase
 
         ['chest' => $chest, 'persist' => $persist] = $service->resolveChestAssignment($event, $itemC, $fieldParticipant);
 
-        $this->assertSame(1, $chest);
-        $this->assertTrue($persist);
+        $this->assertSame(7, $chest);
+        $this->assertFalse($persist);
     }
 
     /**
@@ -316,6 +385,6 @@ class FestNumberingServiceTest extends TestCase
 
         $participant->refresh();
         $this->assertSame(1, $participant->getAttributes()['chest_no']);
-        $this->assertSame($itemA->head_id, $participant->chest_head_id);
+        $this->assertSame(FestNumberingService::CHEST_SCOPE_EVENT, $participant->chest_head_id);
     }
 }

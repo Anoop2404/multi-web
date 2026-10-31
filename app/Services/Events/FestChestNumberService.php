@@ -193,7 +193,8 @@ class FestChestNumberService
         // failed, because every attempt re-created this exact self-collision.
         $query = FestParticipant::whereHas('registration', fn ($q) => $q->where('event_id', $eventId)
                 ->whereNotIn('status', ['rejected', 'withdrawn']))
-            ->where(fn ($q) => $q->where('chest_head_id', $headScope)->orWhere('id', $participant->id));
+            ->when($event->event_type === 'sports', fn ($q) => $q->whereNull('group_id'),
+                fn ($q) => $q->where(fn ($r) => $r->where('chest_head_id', $headScope)->orWhere('id', $participant->id)));
 
         if ($participant->student_id) {
             $query->where('student_id', $participant->student_id);
@@ -207,16 +208,19 @@ class FestChestNumberService
         $owner = (clone $query)->whereNotNull('chest_no')->orderBy('id')->first() ?? $participant;
         $taken = FestParticipant::query()
             ->where('event_id', $eventId)
-            ->where('chest_head_id', $headScope)
+            ->when($event->event_type !== 'sports', fn ($q) => $q->where('chest_head_id', $headScope))
             ->where('chest_no', $chestNo)
-            ->where('id', '!=', $owner->id)
+            ->whereNotIn('id', (clone $query)->pluck('id'))
             ->exists();
         if ($taken) {
             throw ValidationException::withMessages(['chest_no' => "Chest number {$chestNo} is already in use."]);
         }
 
         try {
-            $owner->update(['event_id' => $eventId, 'chest_head_id' => $headScope, 'chest_no' => $chestNo]);
+            \Illuminate\Support\Facades\DB::transaction(function () use ($query, $owner, $eventId, $headScope, $chestNo) {
+                (clone $query)->where('id', '!=', $owner->id)->update(['chest_no' => null]);
+                $owner->update(['event_id' => $eventId, 'chest_head_id' => $headScope, 'chest_no' => $chestNo]);
+            });
         } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
             // Same TOCTOU gap as the group branch above: the exists() check at line 162
             // and this write aren't atomic, so two near-simultaneous assignments of the
@@ -255,7 +259,7 @@ class FestChestNumberService
 
         $query = FestParticipant::query()
             ->where('event_id', $eventId)
-            ->where('chest_head_id', $headScope);
+            ->when($event?->event_type === 'sports', fn ($q) => $q->whereNull('group_id'), fn ($q) => $q->where('chest_head_id', $headScope));
 
         if ($participant->student_id) {
             $query->where('student_id', $participant->student_id);
