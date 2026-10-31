@@ -483,7 +483,7 @@
                     </div>
                     <div>
                         <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-                            <label class="text-xs font-semibold text-gray-600">Standbys (optional, max 2)</label>
+                            <label class="text-xs font-semibold text-gray-600">Standbys (optional, max {{ onBehalfStandbyLimit }})</label>
                             <button type="button" class="btn-secondary text-xs !min-h-0 !py-1"
                                     :disabled="!onBehalfForm.school_id || !onBehalfForm.item_id"
                                     @click="standbyPickerOpen = true">
@@ -528,7 +528,8 @@
         <FestStudentPickerModal
             v-model="standbyPickerOpen"
             title="Pick standbys"
-            subtitle="Optional substitutes — max 2"
+            :subtitle="`Optional substitutes — max ${onBehalfStandbyLimit}`"
+            :max-selected="onBehalfStandbyLimit"
             :entries="standbyRosterEntries"
             v-model:selected-ids="onBehalfForm.standby_ids"
             confirm-label="Use selection"
@@ -594,6 +595,7 @@
 </template>
 
 <script setup>
+import { standbyLimit } from '@/support/festStandbyLimit.js';
 import { computed, reactive, ref, watch } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import SahodayaEventsLayout from '@/Layouts/SahodayaEventsLayout.vue';
@@ -970,9 +972,10 @@ watch(() => props.registerStudents, () => {
 }, { deep: true });
 
 watch(() => onBehalfForm.standby_ids, (ids) => {
-    if (ids.length > 2) onBehalfForm.standby_ids = ids.slice(0, 2);
+    if (ids.length > onBehalfStandbyLimit.value) onBehalfForm.standby_ids = ids.slice(0, onBehalfStandbyLimit.value);
 }, { deep: true });
 
+const onBehalfStandbyLimit = computed(() => standbyLimit(selectedItem.value, props.event.event_type));
 const selectedItem = computed(() =>
     props.eventItems.find(i => String(i.id) === String(onBehalfForm.item_id)) ?? null,
 );
@@ -1373,7 +1376,7 @@ const addParticipantMaxSelected = computed(() => {
     if (role === 'standby') {
         const currentStandbysCount = (manageReg.value.participants || [])
             .filter(p => p.participant_role === 'standby').length;
-        const maxStandbys = item.criteria_json?.standbys ?? item.squad_rules?.standbys ?? 2;
+        const maxStandbys = props.event.event_type === 'sports' ? standbyLimit(item, 'sports') : (item.criteria_json?.standbys ?? item.squad_rules?.standbys ?? 2);
         return Math.max(1, maxStandbys - currentStandbysCount);
     }
 

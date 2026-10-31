@@ -221,20 +221,36 @@
         @confirm="handleMainPickerConfirm"
         @add-student="$emit('add-student')"
         @search="$emit('search-students', $event)"
-    />
+    >
+        <template v-if="eventType === 'sports'" #selection-actions>
+            <div role="group" aria-label="Registration role" class="flex flex-wrap gap-2">
+                <button type="button" class="btn-primary text-xs" aria-pressed="true">Participants ({{ selectedCount }})</button>
+                <button type="button" class="btn-secondary text-xs" aria-pressed="false" @click="pickerOpen = false; openStandbyPicker()">Standbys ({{ standbySelectedCount }}/{{ maxStandbys }})</button>
+            </div>
+            <p class="mt-2 text-xs text-slate-600">Choose participants here, or switch to Standbys to select up to {{ maxStandbys }} substitute(s) for this item.</p>
+        </template>
+    </FestStudentPickerModal>
 
     <FestStudentPickerModal
         v-if="!isTeacherFest && showStandbyPicker"
         v-model="standbyPickerOpen"
         :title="`${displayTitle} — pick standbys`"
-        subtitle="Optional substitutes — max 2"
-        :max-selected="2"
+        :subtitle="`Optional substitutes — max ${maxStandbys}`"
+        :max-selected="maxStandbys"
         :entries="standbyEntries"
         v-model:selected-ids="standbyModel"
         confirm-label="Use standbys"
         @add-student="$emit('add-student')"
         @search="$emit('search-students', $event)"
-    />
+    >
+        <template v-if="eventType === 'sports'" #selection-actions>
+            <div role="group" aria-label="Registration role" class="flex flex-wrap gap-2">
+                <button type="button" class="btn-secondary text-xs" aria-pressed="false" @click="standbyPickerOpen = false; openPicker()">Participants ({{ selectedCount }})</button>
+                <button type="button" class="btn-primary text-xs" aria-pressed="true">Standbys ({{ standbySelectedCount }}/{{ maxStandbys }})</button>
+            </div>
+            <p class="mt-2 text-xs text-slate-600">Standbys are substitutes. Choose “Use standbys”, then save the item registration.</p>
+        </template>
+    </FestStudentPickerModal>
 
     <FestStudentPickerModal
         v-else-if="isTeacherFest"
@@ -250,6 +266,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue';
+import { standbyLimit } from '@/support/festStandbyLimit.js';
 import FestStudentPickerModal from '@/Components/school/FestStudentPickerModal.vue';
 import { studentDisplayName } from '@/support/studentDisplay.js';
 import { ageGroupLabel, formatItemEligibility, formatSportsItemTitle } from '@/support/festItemEligibility.js';
@@ -313,9 +330,10 @@ watch(() => props.editingRegistrationId, (id) => {
     if (id != null && !standbyPickerOpen.value) pickerOpen.value = true;
 });
 
+const maxStandbys = computed(() => standbyLimit(props.item, props.eventType));
 const showStandbyPicker = computed(() => {
     if (props.isTeacherFest) return false;
-    if (props.eventType === 'sports') return true;
+    if (props.eventType === 'sports') return maxStandbys.value > 0;
     const criteria = props.item.criteria_json ?? {};
     const maxSubs = props.item.max_subs ?? criteria.max_subs;
     const standbys = props.item.standbys ?? criteria.standbys;
@@ -417,7 +435,7 @@ const savedStandbyCount = computed(() => {
     if (!reg) return 0;
     return (reg.participants ?? []).filter(p => p.participant_role === 'standby').length;
 });
-const standbySelectedCount = computed(() => isEditing.value ? (standbyModel.value?.length ?? 0) : savedStandbyCount.value);
+const standbySelectedCount = computed(() => isEditing.value || !props.registrations.length ? (standbyModel.value?.length ?? 0) : savedStandbyCount.value);
 
 const standbyEntries = computed(() => {
     const performerIds = props.form.student_ids ?? [];
@@ -566,13 +584,11 @@ const standbyModel = computed({
         return props.form.standby_ids ?? [];
     },
     set(value) {
-        props.form.standby_ids = (value ?? []).slice(0, 2);
+        props.form.standby_ids = (value ?? []).slice(0, maxStandbys.value);
     },
 });
 
-watch(() => props.form.standby_ids, (ids) => {
-    if ((ids ?? []).length > 2) props.form.standby_ids = ids.slice(0, 2);
-}, { deep: true });
+
 
 function formatMoney(value) {
     const n = Number(value);

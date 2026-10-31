@@ -309,7 +309,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
             'manager_phone' => 'nullable|string|max:40',
             'student_ids' => 'required|array|min:1',
             'student_ids.*' => 'integer|exists:students,id',
-            'standby_ids' => 'nullable|array|max:2',
+            'standby_ids' => $event->event_type === 'sports' ? 'nullable|array' : 'nullable|array|max:2',
             'standby_ids.*' => 'integer|exists:students,id',
             'auto_approve' => 'nullable|boolean',
         ]);
