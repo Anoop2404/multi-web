@@ -75,6 +75,22 @@ class FestChestNumberFestIdColumnTest extends TestCase
         return compact('sahodaya', 'admin', 'event');
     }
 
+    public function test_sports_rejects_item_chest_generation_but_keeps_event_assignment(): void
+    {
+        ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event] = $this->fixture();
+        $event->update(['event_type' => 'sports']);
+        $item = $event->items()->first();
+        $base = "/sahodaya-admin/{$sahodaya->id}/events/{$event->id}/chest-numbers";
+        $this->actingAs($admin);
+        foreach (['generate', 'assign-missing', 'assign-missing-all', 'bulk-update', 'clear-all'] as $action) {
+            $this->post("{$base}/{$action}", ['item_id' => $item->id])->assertStatus(422);
+        }
+        $this->assertSame(42, (int) FestParticipant::where('registration_id', FestRegistration::where('event_id', $event->id)->first()->id)->first()->getRawOriginal('chest_no'));
+        $this->post("{$base}/assign-missing-all", [])->assertRedirect();
+        $this->get("{$base}?item_id={$item->id}")->assertOk()->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page
+            ->where('selectedItemId', null)->where('selectedItem', null));
+    }
+
     public function test_csv_export_includes_a_fest_id_column(): void
     {
         ['sahodaya' => $sahodaya, 'admin' => $admin, 'event' => $event] = $this->fixture();

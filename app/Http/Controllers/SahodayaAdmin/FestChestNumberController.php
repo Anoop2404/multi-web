@@ -33,8 +33,8 @@ class FestChestNumberController extends SahodayaAdminController
         $navService = app(FestHeadItemNavigationService::class);
         $nav = $navService->navigationForEvent($event);
 
-        $headId = $this->resolveHeadQueryParam($request->query('head_id'));
-        $itemId = $request->integer('item_id') ?: null;
+        $headId = $event->event_type === 'sports' ? null : $this->resolveHeadQueryParam($request->query('head_id'));
+        $itemId = $event->event_type === 'sports' ? null : ($request->integer('item_id') ?: null);
         $includePending = $request->boolean('include_pending');
         $participants = [];
         $greenRoom = [];
@@ -112,6 +112,7 @@ class FestChestNumberController extends SahodayaAdminController
     public function generate(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($event->event_type === 'sports', 422, 'Sports chest numbers are assigned for the event or a school, not per item.');
 
         $data = $request->validate([
             'item_id' => 'required|integer|exists:fest_event_items,id',
@@ -131,6 +132,7 @@ class FestChestNumberController extends SahodayaAdminController
     public function assignMissing(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($event->event_type === 'sports', 422, 'Sports chest numbers are assigned for the event or a school, not per item.');
 
         $data = $request->validate([
             'item_id' => 'required|integer|exists:fest_event_items,id',
@@ -175,6 +177,7 @@ class FestChestNumberController extends SahodayaAdminController
     public function assignMissingAll(Request $request, string $tenantId, FestEvent $event, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($event->event_type === 'sports' && $request->filled('item_id'), 422, 'Sports chest numbers cannot be generated or reset per item. Use the event or school assignment.');
 
         if ($event->event_type === 'sports' && $request->has('fallback_start')) {
             $data = $request->validate(['fallback_start' => 'required|integer|min:1']);
@@ -240,6 +243,7 @@ class FestChestNumberController extends SahodayaAdminController
     public function clearAll(Request $request, string $tenantId, FestEvent $event, FestChestNumberService $service, PlatformAuditLogger $audit)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($event->event_type === 'sports' && $request->filled('item_id'), 422, 'Sports chest numbers cannot be generated or reset per item. Use the event or school assignment.');
 
         $itemId = $request->integer('item_id') ?: null;
         $item = $itemId ? FestEventItem::where('event_id', $event->id)->find($itemId) : null;
@@ -265,6 +269,7 @@ class FestChestNumberController extends SahodayaAdminController
         PlatformAuditLogger $audit
     ) {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_if($event->event_type === 'sports', 422, 'Sports chest numbers are assigned for the event or a school, not per item.');
 
         $data = $request->validate([
             'item_id' => 'required|exists:fest_event_items,id',

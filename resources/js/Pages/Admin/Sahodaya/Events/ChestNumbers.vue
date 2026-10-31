@@ -7,7 +7,7 @@
                             ? `Chest starts at ${selectedItem.chest_no_start} · one chest number per student, shared across sports items`
                             : `Chest starts at ${selectedItem.chest_no_start} · unique chest numbers assigned per item participant`)
                         : (event.event_type === 'sports'
-                            ? 'Pick an item — each student keeps a single chest number across the sports event.'
+                            ? 'Assign shared sports chest numbers for the event or a school, then download the chest report.'
                             : 'Pick an item — view or assign chest numbers per competition item.')">
             <template #actions>
                 <button v-if="event.event_type !== 'sports'" type="button" class="btn-primary text-sm" @click="assignAllMissingForEvent">
@@ -33,6 +33,10 @@
                     <input v-model.number="sportsFallbackStart" type="number" min="1" class="field mt-1 w-36">
                 </label>
                 <button type="button" class="btn-primary" :disabled="sportsGenerating || !sportsFallbackStart || sportsFallbackStart < 1" @click="generateSportsChests">Generate all using school ranges</button>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <a :href="`${base}/print?download=1`" class="btn-secondary text-sm">Full chest report (PDF)</a>
+                <a :href="`${base}/csv`" class="btn-secondary text-sm">Full chest report (CSV)</a>
             </div>
             <p class="text-xs text-slate-500">Fallback also applies when a school's range is full. To replace existing numbers, reset all chests first.</p>
         </div>
@@ -76,14 +80,14 @@
             </div>
         </div>
 
-        <div v-if="flatItems.length" class="card mb-4 !py-3">
+        <div v-if="event.event_type !== 'sports' && flatItems.length" class="card mb-4 !py-3">
             <ReportItemSearchSelect :items="flatItems" :model-value="selectedItemId"
                                     label="Jump to item" all-items-label="Select an item"
                                     search-placeholder="Search by item name or code…"
                                     @select="jumpToItem" />
         </div>
 
-        <ReportHeadItemNavigator :groups="headItemGroups"
+        <ReportHeadItemNavigator v-if="event.event_type !== 'sports'" :groups="headItemGroups"
                                  :base-url="base"
                                  :selected-head-id="selectedHeadId"
                                  :selected-item-id="selectedItemId"
