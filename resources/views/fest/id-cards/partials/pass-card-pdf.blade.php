@@ -78,6 +78,7 @@
                 @endif
             </div>
             <div class="pass-card-pdf__role-label">{{ $roleLabel }}</div>
+            @if(!empty($card['is_sports']) && !empty($card['chest_number']))<div style="font-size:12px;font-weight:700;">Chest #{{ $card['chest_number'] }}</div>@endif
         </div>
 
         <div class="pass-card-pdf__info-cell">

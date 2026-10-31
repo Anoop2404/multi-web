@@ -486,7 +486,7 @@ class FestEventController extends SahodayaAdminController
 
         $data = $request->validate([
             'items'                   => 'required|array',
-            'items.*.id'             => 'required|integer|exists:fest_event_items,id',
+            'items.*.id'             => ['required', 'integer', 'distinct', Rule::exists('fest_event_items', 'id')->where('event_id', $event->id)],
             'items.*.max_per_school' => 'nullable|integer|min:1',
             'items.*.qualify_count'  => 'nullable|integer|min:1',
             'items.*.min_group_size' => 'nullable|integer|min:1',
@@ -499,7 +499,7 @@ class FestEventController extends SahodayaAdminController
         $updatedCount = 0;
 
         DB::transaction(function () use ($data, $event, &$updatedCount) {
-            foreach ($data['items'] as $itemData) {
+            foreach ($data['items'] as $index => $itemData) {
                 $item = FestEventItem::where('event_id', $event->id)->find($itemData['id']);
                 if (! $item) {
                     continue;
@@ -515,7 +515,41 @@ class FestEventController extends SahodayaAdminController
                     $updates['qualify_count'] = ($val !== null && $val !== '') ? (int) $val : null;
                 }
 
-                if (FestTeamSquadRules::isMultiPerson($item->participant_type)) {
+                if ($event->event_type === 'sports') {
+                    $criteria = $item->criteria_json ?? [];
+                    $fields = ['standbys' => 'standbys'];
+                    if (FestTeamSquadRules::isMultiPerson($item->participant_type)) {
+                        $fields += ['max_subs' => 'max_subs', 'min_playing' => 'min_playing', 'min_group_size' => 'min_squad', 'max_group_size' => 'max_squad'];
+                    }
+                    foreach ($fields as $input => $key) {
+                        if (! array_key_exists($input, $itemData)) {
+                            continue;
+                        }
+                        $value = $itemData[$input];
+                        if ($value === null || $value === '') {
+                            unset($criteria[$key]);
+                        } else {
+                            $criteria[$key] = (int) $value;
+                        }
+                        if (in_array($input, ['min_group_size', 'max_group_size'], true)) {
+                            $updates[$input] = ($value === null || $value === '') ? null : (int) $value;
+                        }
+                    }
+                    if (FestTeamSquadRules::isMultiPerson($item->participant_type)) {
+                        $min = $criteria['min_squad'] ?? (array_key_exists('min_group_size', $updates) ? $updates['min_group_size'] : $item->min_group_size);
+                        $max = $criteria['max_squad'] ?? (array_key_exists('max_group_size', $updates) ? $updates['max_group_size'] : $item->max_group_size);
+                        if ($max !== null && $min !== null && $min > $max) {
+                            throw \Illuminate\Validation\ValidationException::withMessages(["items.{$index}.max_group_size" => "{$item->title}: maximum squad size must be at least the minimum."]);
+                        }
+                        if ($max !== null && ($criteria['min_playing'] ?? 0) > $max) {
+                            throw \Illuminate\Validation\ValidationException::withMessages(["items.{$index}.min_playing" => "{$item->title}: minimum playing count cannot exceed maximum squad size."]);
+                        }
+                        if ($max !== null && ($criteria['max_subs'] ?? 0) > $max) {
+                            throw \Illuminate\Validation\ValidationException::withMessages(["items.{$index}.max_subs" => "{$item->title}: substitutes cannot exceed maximum squad size."]);
+                        }
+                    }
+                    $updates['criteria_json'] = $criteria;
+                } elseif (FestTeamSquadRules::isMultiPerson($item->participant_type)) {
                     $squadInput = [
                         'min_playing' => $itemData['min_playing'] ?? null,
                         'max_subs'    => $itemData['max_subs'] ?? ($itemData['standbys'] ?? null),

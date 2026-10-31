@@ -26,7 +26,7 @@
 
         <div v-if="event.event_type === 'sports'" class="card mb-5 space-y-3">
             <h3 class="font-semibold">Generate chest numbers using school ranges</h3>
-            <p class="text-sm text-slate-600">School ranges take priority. Schools without a range use the custom fallback below. Existing numbers are preserved. Missing numbers are assigned sequentially to active performers; standbys and disqualified participants are skipped.</p>
+            <p class="text-sm text-slate-600">School ranges take priority. Schools without a range use the custom fallback below. Existing numbers are preserved. Missing numbers are assigned to performers first, then standbys for their ID cards. Disqualified participants are skipped.</p>
             <div class="flex flex-wrap items-end gap-3">
                 <button type="button" class="btn-secondary" @click="openSchoolRangesModal">Configure school ranges</button>
                 <label class="text-xs font-semibold">Custom fallback start
