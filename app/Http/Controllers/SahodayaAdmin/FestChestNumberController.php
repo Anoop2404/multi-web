@@ -536,7 +536,7 @@ class FestChestNumberController extends SahodayaAdminController
     private function participantRows(FestEvent $event, int $itemId, bool $includePending = false): array
     {
         $item = FestEventItem::find($itemId);
-        $isGroupItem = $item && app(FestNumberingService::class)->isGroupItem($item);
+        $isGroupItem = $event->event_type !== 'sports' && $item && app(FestNumberingService::class)->isGroupItem($item);
         $itemIds = $event->reportableItemIds([$itemId]);
 
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
@@ -609,7 +609,7 @@ class FestChestNumberController extends SahodayaAdminController
     private function greenRoomRows(FestEvent $event, int $itemId): array
     {
         $item = FestEventItem::find($itemId);
-        $isGroupItem = $item && app(FestNumberingService::class)->isGroupItem($item);
+        $isGroupItem = $event->event_type !== 'sports' && $item && app(FestNumberingService::class)->isGroupItem($item);
         $itemIds = $event->reportableItemIds([$itemId]);
 
         $participants = FestParticipant::whereHas('registration', fn ($q) => $q
@@ -693,15 +693,16 @@ class FestChestNumberController extends SahodayaAdminController
         return FestParticipant::whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)->where('school_id', $schoolId)
             ->whereNotIn('status', ['rejected', 'withdrawn']))
+            ->when($event->event_type === 'sports', fn ($q) => $q->whereNull('disqualified_at')->where(fn ($r) => $r->whereNull('participant_role')->orWhere('participant_role', '!=', 'standby')))
             ->with(['registration.item', 'registration.event', 'student', 'teacher', 'group'])
-            ->get()->groupBy(fn ($p) => ($p->group_id ? 'group-'.$p->group_id : 'person-'.($p->student_id ? 's'.$p->student_id : ($p->teacher_id ? 't'.$p->teacher_id : 'p'.$p->id)))
+            ->get()->groupBy(fn ($p) => ($event->event_type !== 'sports' && $p->group_id ? 'group-'.$p->group_id : 'person-'.($p->student_id ? 's'.$p->student_id : ($p->teacher_id ? 't'.$p->teacher_id : 'p'.$p->id)))
                 .'-'.app(FestNumberingService::class)->chestHeadScope($event, $p->registration->item))
             ->map(function ($rows) {
                 $p = $rows->first();
                 return [
                     'id' => $p->id,
                     'name' => $p->student?->name ?? $p->teacher?->name ?? 'Participant',
-                    'chest_no' => $p->group?->chest_no ?? $p->chest_no,
+                    'chest_no' => app(\App\Services\Events\FestNumberingService::class)->effectiveChestNumber($p),
                     'items' => $rows->pluck('registration.item.title')->unique()->implode(', '),
                 ];
             })->sortBy('name')->values()->all();
@@ -726,7 +727,7 @@ class FestChestNumberController extends SahodayaAdminController
         $categoryFor = fn (?FestEventItem $item) => \App\Support\FestItemCategoryLabel::resolve($item, $classGroupLabels);
 
         $individualRows = $participants->toBase()
-            ->filter(fn ($p) => ! $p->registration->item || ! $numbering->isGroupItem($p->registration->item))
+            ->filter(fn ($p) => $event->event_type === 'sports' || ! $p->registration->item || ! $numbering->isGroupItem($p->registration->item))
             ->whereNotNull('chest_no')
             ->map(fn (FestParticipant $p) => [
                 'chest_no' => $p->chest_no,
@@ -740,7 +741,7 @@ class FestChestNumberController extends SahodayaAdminController
             ]);
 
         $groupRows = $participants->toBase()
-            ->filter(fn ($p) => $p->registration->item && $numbering->isGroupItem($p->registration->item) && $p->group?->chest_no !== null)
+            ->filter(fn ($p) => $event->event_type !== 'sports' && $p->registration->item && $numbering->isGroupItem($p->registration->item) && $p->group?->chest_no !== null)
             ->groupBy('group_id')
             ->map(function ($members) use ($categoryFor) {
                 $first = $members->first();

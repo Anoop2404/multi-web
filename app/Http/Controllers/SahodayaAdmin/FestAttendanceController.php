@@ -164,7 +164,7 @@ class FestAttendanceController extends SahodayaAdminController
         $this->markCertificatesStaleFor($event, $participantIds);
 
         $personName = $participant->student?->name ?? $participant->teacher?->name ?? $participant->group?->name ?? "Participant #{$data['participant_id']}";
-        $chestNo = $participant->group?->chest_no ?? $participant->chest_no;
+        $chestNo = app(\App\Services\Events\FestNumberingService::class)->effectiveChestNumber($participant);
         $chestLabel = $chestNo ? "Chest #{$chestNo}" : "Participant #{$data['participant_id']}";
         $itemModel = FestEventItem::find($data['item_id']);
         $itemTitle = $itemModel?->title ? " in {$itemModel->title}" : '';

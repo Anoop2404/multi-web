@@ -738,7 +738,7 @@ class FestIdCardService
             // Team/group items carry ONE chest number for the whole squad
             // (on FestGroup, not per member) — show it on the team card
             // itself, not repeated per member.
-            $chestNumber = ($group && $group->chest_no !== null) ? (string) $group->chest_no : null;
+            $chestNumber = $event->event_type === 'sports' ? null : (($group && $group->chest_no !== null) ? (string) $group->chest_no : null);
             if ($chestNumber && ($this->hideChestNo || ($event->chest_reveal_mode === 'stage_entry' && ! $group->chest_revealed_at))) {
                 $chestNumber = null;
             }
@@ -751,6 +751,7 @@ class FestIdCardService
                 return [
                     'name'      => $name,
                     'fest_id'   => $p->level_registration_number ?? '—',
+                    'chest_no' => $event->event_type === 'sports' && ! $this->hideChestNo && ($event->chest_reveal_mode !== 'stage_entry' || $p->chest_revealed_at) ? app(FestNumberingService::class)->effectiveChestNumber($p) : null,
                     'initials'  => $this->initials($name),
                     'photo_url' => $photoUrl,
                     'photo_src' => $photoSrc,

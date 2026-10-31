@@ -30,6 +30,7 @@
                             <div class="card__member">
                                 {{ $member['name'] }}
                                 · {{ $member['fest_id'] }}
+                                @if(!empty($member['chest_no'])) · Chest {{ $member['chest_no'] }} @endif
                             </div>
                             @endforeach
                             @if(($card['member_count'] ?? 0) > 7)

@@ -129,7 +129,7 @@ class FestSchoolReportExportService
     public function numberingRegisterExcel(FestEvent $event, array $rows): StreamedResponse
     {
         $data = collect($rows)->map(fn (array $r) => [
-            $r['head_name'] ?? '—',
+            ...($event->event_type !== 'sports' ? [$r['head_name'] ?? '—'] : []),
             $r['item'] ?? '',
             $r['name'] ?? '',
             $r['reg_no'] ?? '',
@@ -140,7 +140,7 @@ class FestSchoolReportExportService
 
         return ExcelExport::download(
             str($event->title)->slug()->limit(40).'-numbering-register',
-            ['Head', 'Item', 'Participant', 'Reg no', 'Reg status', 'Role', ...($event->event_type === 'sports' ? ['Fest ID', 'Item reg', 'Chest'] : [])],
+            [...($event->event_type !== 'sports' ? ['Head'] : []), 'Item', 'Participant', 'Reg no', 'Reg status', 'Role', ...($event->event_type === 'sports' ? ['Fest ID', 'Item reg', 'Chest'] : [])],
             $data,
             ExcelExport::generatedOnNote(),
         );

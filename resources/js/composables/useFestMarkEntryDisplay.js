@@ -29,7 +29,7 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
             }
             byKey.set(key, {
                 ...p,
-                chest_no: p.group?.chest_no ?? p.chest_no,
+                chest_no: isSports.value ? source.filter(m => m.group_id === p.group_id).map(m => m.chest_no).filter(n => n != null).filter((n, i, a) => a.indexOf(n) === i).join(', ') || null : (p.group?.chest_no ?? p.chest_no),
                 order_no: p.group?.order_no ?? p.order_no,
                 _is_team: Boolean(p.group_id),
                 _member_count: 1,
@@ -84,8 +84,8 @@ export function useFestMarkEntryDisplay(props, isSportsParam = null) {
                 if (hasOrderA && !hasOrderB) return -1;
                 if (!hasOrderA && hasOrderB) return 1;
 
-                const chestAStr = String(a.participant?.group?.chest_no ?? a.participant?.chest_no ?? '');
-                const chestBStr = String(b.participant?.group?.chest_no ?? b.participant?.chest_no ?? '');
+                const chestAStr = String((isSports.value ? a.participant?.chest_no : (a.participant?.group?.chest_no ?? a.participant?.chest_no)) ?? '');
+                const chestBStr = String((isSports.value ? b.participant?.chest_no : (b.participant?.group?.chest_no ?? b.participant?.chest_no)) ?? '');
                 const numA = parseInt(chestAStr.replace(/\D/g, ''), 10);
                 const numB = parseInt(chestBStr.replace(/\D/g, ''), 10);
                 const validA = !isNaN(numA);

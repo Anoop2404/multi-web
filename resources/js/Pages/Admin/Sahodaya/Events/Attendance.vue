@@ -372,7 +372,7 @@ const displayRows = computed(() => {
                 is_team: true,
                 member_count: members.length,
                 name: p.group?.team_name || 'Team',
-                chest_no: p.group?.chest_no,
+                chest_no: props.event.event_type === 'sports' ? [...new Set(members.map(m => m.chest_no).filter(n => n != null))].join(', ') || null : p.group?.chest_no,
                 fest_id: p.group?.registration_number ?? p.level_registration_number ?? p.student?.reg_no ?? null,
                 school: p.registration?.school?.name ?? '—',
                 item_title: item?.title ?? '—',

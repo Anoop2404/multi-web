@@ -58,3 +58,17 @@ test('saved order numbers rearrange rows ahead of unnumbered participants', () =
     props.registrations[0].participants[2].order_no = null;
     assert.deepEqual(ids(), [11, 12, 13]);
 });
+
+
+test('sports relay rows show personal member chests while arts keeps a team chest', () => {
+    const registration = { item: { id: 1, participant_type: 'group' }, participants: [
+        { id: 1, group_id: 9, participant_role: 'performer', chest_no: 2351, group: { chest_no: 2350 } },
+        { id: 2, group_id: 9, participant_role: 'performer', chest_no: 2352, group: { chest_no: 2350 } },
+        { id: 3, group_id: 9, participant_role: 'standby', chest_no: null, group: { chest_no: 2350 } },
+    ] };
+    const sports = useFestMarkEntryDisplay({ event: { event_type: 'sports' }, registrations: [registration] });
+    assert.equal(sports.sections.value[0].rows.length, 1);
+    assert.equal(sports.sections.value[0].rows[0].participant.chest_no, '2351, 2352');
+    const arts = useFestMarkEntryDisplay({ event: { event_type: 'kalolsavam' }, registrations: [registration] });
+    assert.equal(arts.sections.value[0].rows[0].participant.chest_no, 2350);
+});

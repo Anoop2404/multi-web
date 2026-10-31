@@ -1203,7 +1203,7 @@ class FestEventReportAnalyticsService
     public function exportNumberingRegister(?string $schoolId = null): StreamedResponse
     {
         $rows = collect($this->numberingRegisterRows($schoolId))->map(fn ($r) => [
-            $r['head_name'] ?? '—',
+            ...($this->event->event_type !== 'sports' ? [$r['head_name'] ?? '—'] : []),
             $r['item'] ?? '',
             $r['category_label'] ?? '',
             $r['type_label'] ?? '',
@@ -1218,7 +1218,7 @@ class FestEventReportAnalyticsService
 
         return ExcelExport::download(
             str($this->event->title)->slug()->limit(40).'-numbering-register',
-            ['Head', 'Item', 'Category', 'Type', 'Gender', 'School', 'Participant', 'Reg no', 'Reg status', 'Role', 'Chest'],
+            [...($this->event->event_type !== 'sports' ? ['Head'] : []), 'Item', 'Category', 'Type', 'Gender', 'School', 'Participant', 'Reg no', 'Reg status', 'Role', 'Chest'],
             $rows,
             ExcelExport::generatedOnNote(),
         );
@@ -2299,7 +2299,7 @@ class FestEventReportAnalyticsService
                     'school_name' => $registration->school?->name,
                     'participant' => $p->student?->name ?? $p->teacher?->name,
                     'reg_no' => $p->student?->reg_no ?? $p->teacher?->reg_no,
-                    'chest_no' => $p->group?->chest_no ?? $p->chest_no,
+                    'chest_no' => app(\App\Services\Events\FestNumberingService::class)->effectiveChestNumber($p),
                     'marked_by' => $markedByNames->get($attendance->marked_by),
                     'marked_at' => $attendance->marked_at?->format('Y-m-d H:i'),
                 ];

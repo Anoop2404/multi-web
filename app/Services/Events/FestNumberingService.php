@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Log;
 
 class FestNumberingService
 {
-    /** Shared individual sports chest scope (team squads retain their own chest). */
+    /** Shared personal sports chest scope, including team and relay members. */
     public const CHEST_SCOPE_EVENT = 0;
 
     /** @return array<string, mixed> */
@@ -76,7 +76,7 @@ class FestNumberingService
     public function chestHeadScope(FestEvent $event, FestEventItem $item): int
     {
         if ($event->event_type === 'sports') {
-            return $this->isGroupItem($item) ? (int) ($item->head_id ?? self::CHEST_SCOPE_EVENT) : self::CHEST_SCOPE_EVENT;
+            return self::CHEST_SCOPE_EVENT;
         }
 
         return (int) $item->id;
@@ -187,7 +187,7 @@ class FestNumberingService
      */
     public function resolveGroupChestNumber(FestEvent $event, FestEventItem $item, FestGroup $group, ?string $schoolId = null): ?int
     {
-        if ($group->chest_no !== null) {
+        if ($event->event_type === 'sports' || $group->chest_no !== null) {
             return null;
         }
 
@@ -209,7 +209,7 @@ class FestNumberingService
     public function existingChestNumber(FestEvent $event, FestEventItem $item, FestParticipant $participant): ?int
     {
         $persisted = $this->persistedChestNumber($participant);
-        if ($persisted !== null && ! ($event->event_type === 'sports' && ! $this->isGroupItem($item))) {
+        if ($persisted !== null && $event->event_type !== 'sports') {
             return $persisted;
         }
 
@@ -217,11 +217,10 @@ class FestNumberingService
         $eventIds = $event->reportableEventIds();
 
         $query = FestParticipant::whereHas('registration', fn ($q) => $q->whereIn('event_id', $eventIds))
-            ->when($event->event_type === 'sports' && ! $this->isGroupItem($item),
-                fn ($q) => $q->whereNull('group_id')->whereNull('disqualified_at')
+            ->when($event->event_type === 'sports',
+                fn ($q) => $q->whereNull('disqualified_at')
                     ->where(fn ($r) => $r->whereNull('participant_role')->orWhere('participant_role', '!=', 'standby'))
-                    ->whereHas('registration', fn ($r) => $r->active())
-                    ->whereDoesntHave('registration.item', fn ($i) => $i->whereIn('participant_type', FestTeamSquadRules::MULTI_PERSON_TYPES)),
+                    ->whereHas('registration', fn ($r) => $r->active()),
                 fn ($q) => $q->where('chest_head_id', $headScope))
             ->whereNotNull('chest_no')->orderBy('id');
 
@@ -245,15 +244,6 @@ class FestNumberingService
     {
         $persisted = $this->persistedChestNumber($participant);
 
-        if ($participant->group_id) {
-            if (! $participant->relationLoaded('group')) {
-                $participant->loadMissing('group');
-            }
-            if ($participant->group?->chest_no !== null) {
-                return (int) $participant->group->chest_no;
-            }
-        }
-
         if (! $participant->relationLoaded('registration') || ! $participant->registration?->relationLoaded('event') || ! $participant->registration?->relationLoaded('item')) {
             $participant->loadMissing('registration.event', 'registration.item');
         }
@@ -275,11 +265,35 @@ class FestNumberingService
             $participant->registration->setRelation('item', $item);
         }
 
+        if ($event?->event_type !== 'sports' && $participant->group_id) {
+            if (! $participant->relationLoaded('group')) {
+                $participant->loadMissing('group');
+            }
+            if ($participant->group?->chest_no !== null) {
+                return (int) $participant->group->chest_no;
+            }
+        }
+
         return $event && $item ? $this->existingChestNumber($event, $item, $participant) : $persisted;
     }
 
+    /** A team result remains one row, labelled with its members' personal sports chests. */
+    public function entryChestLabel(FestParticipant $participant): ?string
+    {
+        $participant->loadMissing('registration.event', 'group');
+        if ($participant->registration?->event?->event_type === 'sports' && $participant->group_id && $participant->group) {
+            $members = $participant->group->participants()->whereNull('disqualified_at')
+                ->where(fn ($q) => $q->whereNull('participant_role')->orWhere('participant_role', '!=', 'standby'))
+                ->with('registration.event', 'registration.item')->get();
+            $numbers = $members->map(fn ($p) => $this->effectiveChestNumber($p))->filter(fn ($n) => $n !== null)->unique()->sort()->values();
+            return $numbers->isEmpty() ? null : $numbers->implode(', ');
+        }
+        $number = $this->effectiveChestNumber($participant);
+        return $number === null ? null : (string) $number;
+    }
+
     /**
-     * Resolve chest for assignment. Sports individuals keep one chest across all item heads in the event.
+     * Resolve chest for assignment. Sports participants keep one personal chest across all items.
      * Other programs retain their item-based chest scope.
      *
      * @param  string|null  $schoolId  When provided, the per-school chest range is preferred.
@@ -371,7 +385,7 @@ class FestNumberingService
 
         $canAssignChest = $event->event_type !== 'sports' || ($participant->participant_role !== 'standby' && ! $participant->disqualified_at);
 
-        if ($canAssignChest && $this->isGroupItem($item) && $participant->group_id && $participant->group) {
+        if ($canAssignChest && $event->event_type !== 'sports' && $this->isGroupItem($item) && $participant->group_id && $participant->group) {
             // Team/group items: the number lives on the squad (FestGroup),
             // never on the individual participant row.
             $this->resolveGroupChestNumber($event, $item, $participant->group, $schoolId);
@@ -419,7 +433,7 @@ class FestNumberingService
         // up front, so shuffling it first is safe (unlike auto-assign-on-approve, which
         // hands out numbers one at a time as registrations trickle in and can't know the
         // final headcount yet) -- nothing here gets renumbered later, it's a one-time batch.
-        FestGroup::whereHas('registration', fn ($q) => $q
+        FestGroup::when($event->event_type === 'sports', fn ($q) => $q->whereRaw('1 = 0'))->whereHas('registration', fn ($q) => $q
             ->where('event_id', $event->id)
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
             ->whereNotIn('status', ['rejected', 'withdrawn'])
@@ -454,10 +468,10 @@ class FestNumberingService
             ->whereNotIn('status', ['rejected', 'withdrawn'])
             ->when($event->event_type === 'sports', fn ($q) => $q->active())
             ->when($item, fn ($q2) => $q2->where('item_id', $item->id))
-            ->whereDoesntHave('item', fn ($qi) => $qi->whereIn('participant_type', FestTeamSquadRules::MULTI_PERSON_TYPES)))
+            ->when($event->event_type !== 'sports', fn ($q) => $q->whereDoesntHave('item', fn ($qi) => $qi->whereIn('participant_type', FestTeamSquadRules::MULTI_PERSON_TYPES))))
             ->with('registration.item')
             ->whereNull('chest_no')
-            ->whereNull('group_id')
+            ->when($event->event_type !== 'sports', fn ($q) => $q->whereNull('group_id'))
             ->when($event->event_type === 'sports', fn ($q) => $q
                 ->whereNull('disqualified_at')
                 ->where(fn ($role) => $role->whereNull('participant_role')->orWhere('participant_role', '!=', 'standby')))
@@ -508,16 +522,15 @@ class FestNumberingService
         return $count;
     }
 
-    /** Collapse legacy per-head numbers to one stored owner per individual athlete. */
+    /** Collapse legacy per-head numbers to one stored owner per sports athlete. */
     private function reconcileSportsStudentChests(FestEvent $event, ?string $schoolId): void
     {
         DB::transaction(function () use ($event, $schoolId) {
             FestEvent::whereKey($event->id)->lockForUpdate()->first();
             $participants = FestParticipant::whereHas('registration', fn ($q) => $q
                 ->where('event_id', $event->id)->active()
-                ->when($schoolId, fn ($r) => $r->where('school_id', $schoolId))
-                ->whereDoesntHave('item', fn ($i) => $i->whereIn('participant_type', FestTeamSquadRules::MULTI_PERSON_TYPES)))
-                ->whereNull('group_id')->whereNull('disqualified_at')
+                ->when($schoolId, fn ($r) => $r->where('school_id', $schoolId)))
+                ->whereNull('disqualified_at')
                 ->where(fn ($q) => $q->whereNull('participant_role')->orWhere('participant_role', '!=', 'standby'))
                 ->with('registration.item')->orderBy('id')->lockForUpdate()->get();
             foreach ($participants->groupBy(fn ($p) => $p->student_id ? 's'.$p->student_id : ($p->teacher_id ? 't'.$p->teacher_id : 'p'.$p->id)) as $rows) {

@@ -381,9 +381,7 @@ class FestPublicVisibilityService
             default           => 'General (Boys & Girls)',
         };
 
-        $chestNo = $participant->group?->chest_no
-            ?? $participant->chest_no
-            ?? app(FestNumberingService::class)->effectiveChestNumber($participant)
+        $chestNo = app(FestNumberingService::class)->effectiveChestNumber($participant)
             ?? $participant->level_registration_number;
 
         $reference = $public
