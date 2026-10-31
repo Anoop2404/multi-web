@@ -2012,7 +2012,7 @@ class FestReportService
             $studentRows[$id] ??= ['student' => $p->student, 'events' => []];
             $studentRows[$id]['events'][] = [
                 'event_name'   => $p->registration?->item?->title ?? '',
-                'chest_number' => $p->group?->chest_no ?? $p->chest_no ?? '—',
+                'chest_number' => app(\App\Services\Events\FestNumberingService::class)->effectiveChestNumber($p) ?? '—',
                 'fest_id'      => $p->level_registration_number ?? $p->student?->reg_no ?? '—',
             ];
         }

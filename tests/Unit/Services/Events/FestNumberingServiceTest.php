@@ -216,6 +216,64 @@ class FestNumberingServiceTest extends TestCase
         $this->assertSame($assigned, [$first->fresh()->chest_no, $other->fresh()->chest_no]);
     }
 
+    public function test_sports_relay_members_keep_personal_chests_in_assignment_reports_and_edits(): void
+    {
+        ['event' => $event, 'itemA' => $itemA, 'school' => $school] = $this->sportsContext();
+        $student = $this->student($school);
+        $personal = $this->participant($event, $itemA, $school, $student, 2351);
+        $relay = FestEventItem::create(['event_id' => $event->id, 'title' => 'Relay', 'participant_type' => 'group', 'is_enabled' => true]);
+        $registration = FestRegistration::create(['event_id' => $event->id, 'item_id' => $relay->id, 'school_id' => $school->id, 'status' => 'approved']);
+        $group = \App\Models\FestGroup::create(['event_id' => $event->id, 'registration_id' => $registration->id, 'chest_no' => 2350]);
+        $member = FestParticipant::create(['event_id' => $event->id, 'registration_id' => $registration->id, 'group_id' => $group->id, 'student_id' => $student->id, 'participant_role' => 'performer']);
+        $newMember = FestParticipant::create(['event_id' => $event->id, 'registration_id' => $registration->id, 'group_id' => $group->id, 'student_id' => $this->student($school, 'Relay Only')->id, 'participant_role' => 'performer']);
+        $reserve = FestParticipant::create(['event_id' => $event->id, 'registration_id' => $registration->id, 'group_id' => $group->id, 'student_id' => $this->student($school, 'Reserve')->id, 'participant_role' => 'standby']);
+        $service = app(FestNumberingService::class);
+        $service->assignMissingChestNumbers($event);
+        $this->assertSame(2351, $member->fresh()->chest_no);
+        $this->assertSame(1, $newMember->fresh()->chest_no);
+        $this->assertNull($reserve->fresh()->chest_no);
+        $this->assertSame('1, 2351', $service->entryChestLabel($member->fresh()));
+        $report = new \App\Services\Events\FestEventReportAnalyticsService($event);
+        $this->assertSame([2351, 1], collect($report->itemWiseReportRows(itemId: $relay->id))->sortBy('id')->pluck('chest_no')->all());
+        ob_start();
+        $report->exportNumberingRegister()->sendContent();
+        $xml = ob_get_clean();
+        $this->assertStringNotContainsString('>Head</Data>', $xml);
+        app(\App\Services\Events\FestChestNumberService::class)->setChest($member->fresh(), 777);
+        $this->assertSame(777, $personal->fresh()->chest_no);
+        $this->assertSame(777, $member->fresh()->chest_no);
+        $this->assertSame(1, $newMember->fresh()->chest_no);
+        $service->assignMissingChestNumbers($event);
+        $this->assertSame(777, $member->fresh()->chest_no);
+
+        $chests = app(\App\Services\Events\FestChestNumberService::class);
+        // Clear from the relay row, including the stored owner in an individual item.
+        $chests->clearChest($member->fresh());
+        $this->assertNull($personal->fresh()->chest_no);
+        $this->assertNull($member->fresh()->chest_no, 'Legacy team chest must not reappear as a fallback.');
+        $this->assertSame(1, $newMember->fresh()->chest_no);
+        FestParticipant::whereIn('id', [$personal->id, $member->id, $newMember->id])->update(['chest_revealed_at' => now()]);
+        $group->update(['event_id' => null, 'chest_revealed_at' => now()]);
+        \App\Models\FestMark::create(['event_id' => $event->id, 'item_id' => $itemA->id, 'participant_id' => $personal->id, 'score' => 75]);
+        $otherEvent = FestEvent::create(['tenant_id' => $event->tenant_id, 'title' => 'Other event', 'event_type' => 'sports', 'status' => 'ongoing']);
+        $otherItem = FestEventItem::create(['event_id' => $otherEvent->id, 'title' => 'Other item', 'participant_type' => 'individual']);
+        $untouched = $this->participant($otherEvent, $otherItem, $school, $student, 999);
+        $chests->clearAllForEvent($event);
+        foreach ([$personal, $member, $newMember, $reserve] as $row) {
+            $this->assertNull($row->fresh()->chest_no);
+            $this->assertNull($row->fresh()->chest_revealed_at);
+        }
+        $this->assertNull($group->fresh()->chest_no);
+        $this->assertNull($group->fresh()->chest_revealed_at);
+        $this->assertSame(999, $untouched->fresh()->chest_no);
+        $this->assertDatabaseHas('fest_marks', ['participant_id' => $personal->id, 'score' => 75]);
+        $this->assertDatabaseHas('fest_registrations', ['id' => $registration->id]);
+        $service->assignMissingChestNumbers($event);
+        $this->assertSame(1, $personal->fresh()->chest_no);
+        $this->assertSame(1, $member->fresh()->chest_no);
+        $this->assertSame(2, $newMember->fresh()->chest_no);
+    }
+
     public function test_next_chest_number_is_unique_within_item_head(): void
     {
         ['event' => $event, 'itemA' => $itemA, 'itemB' => $itemB, 'school' => $school] = $this->sportsContext();

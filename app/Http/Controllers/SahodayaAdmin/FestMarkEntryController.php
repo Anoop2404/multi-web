@@ -236,7 +236,7 @@ class FestMarkEntryController extends SahodayaAdminController
                         }
                         $seenGroups[$p->group_id] = true;
 
-                        return $p->group?->chest_no === null;
+                        return $numbering->entryChestLabel($p) === null;
                     }
 
                     return $numbering->effectiveChestNumber($p) === null;
@@ -377,7 +377,7 @@ class FestMarkEntryController extends SahodayaAdminController
 
         $participantModel = FestParticipant::with(['student', 'teacher', 'group', 'registration.school'])->find($data['participant_id']);
         $participantName = $participantModel?->student?->name ?? $participantModel?->teacher?->name ?? $participantModel?->group?->name ?? "Participant #{$data['participant_id']}";
-        $chestNo = $participantModel?->group?->chest_no ?? $participantModel?->chest_no;
+        $chestNo = $participantModel ? app(FestNumberingService::class)->entryChestLabel($participantModel) : null;
         $chestLabel = $chestNo ? "Chest #{$chestNo}" : "Participant #{$data['participant_id']}";
         $itemTitle = $item?->title ? " in {$item->title}" : '';
         $schoolName = $participantModel?->registration?->school?->name;
@@ -1224,7 +1224,7 @@ class FestMarkEntryController extends SahodayaAdminController
                         continue;
                     }
                     $seenGroups[$p->group_id] = true;
-                    $chest = $p->group?->chest_no;
+                    $chest = $numbering->entryChestLabel($p);
                 } else {
                     $chest = $numbering->effectiveChestNumber($p);
                 }
@@ -1379,7 +1379,7 @@ class FestMarkEntryController extends SahodayaAdminController
                         continue;
                     }
                     $seenGroups[$p->group_id] = true;
-                    $chest = $p->group?->chest_no;
+                    $chest = $numbering->entryChestLabel($p);
                 } else {
                     $chest = $numbering->effectiveChestNumber($p);
                 }
@@ -1544,7 +1544,7 @@ class FestMarkEntryController extends SahodayaAdminController
                         continue;
                     }
                     $seenGroups[$p->group_id] = true;
-                    $chest = $p->group?->chest_no;
+                    $chest = $numbering->entryChestLabel($p);
                 } else {
                     $chest = $numbering->effectiveChestNumber($p);
                 }

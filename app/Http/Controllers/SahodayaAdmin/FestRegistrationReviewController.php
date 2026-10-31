@@ -952,7 +952,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
                     continue;
                 }
 
-                $chest = ($isGroup && $p->group_id && $p->group)
+                $chest = ($event->event_type !== 'sports' && $isGroup && $p->group_id && $p->group)
                     ? $p->group->chest_no
                     : $numbering->effectiveChestNumber($p);
 

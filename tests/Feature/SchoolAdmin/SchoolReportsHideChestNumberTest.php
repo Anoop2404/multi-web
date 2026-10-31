@@ -157,6 +157,7 @@ class SchoolReportsHideChestNumberTest extends TestCase
         $response = $this->get(route('school.sports.reports.numbering-register.export', $params));
         $response->assertOk();
         $this->assertStringContainsString((string) self::CHEST_NO, $response->streamedContent());
+        $this->assertStringNotContainsString('>Head</Data>', $response->streamedContent());
     }
 
     public function test_numbering_register_screen_does_not_leak_chest_number(): void

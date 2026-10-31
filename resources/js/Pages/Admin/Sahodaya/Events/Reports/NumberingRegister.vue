@@ -22,13 +22,13 @@
                 <table class="data-table text-sm">
                     <thead>
                         <tr>
-                            <th>Head</th><th>Item</th><th>Category</th><th>Type</th><th>Gender</th><th>School</th>
+                            <th v-if="event.event_type !== 'sports'">Head</th><th>Item</th><th>Category</th><th>Type</th><th>Gender</th><th>School</th>
                             <th>Participant</th><th>Reg no</th><th>Status</th><th>Fest ID</th><th>Item reg</th><th>Chest</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-for="row in rows" :key="row.participant_id">
-                            <td class="text-xs text-slate-500">{{ row.head_name ?? '—' }}</td>
+                            <td v-if="event.event_type !== 'sports'" class="text-xs text-slate-500">{{ row.head_name ?? '—' }}</td>
                             <td>{{ row.item }}</td>
                             <td class="text-xs text-slate-500">{{ row.category_label ?? '—' }}</td>
                             <td class="text-xs text-slate-500">{{ row.type_label ?? '—' }}</td>
@@ -41,7 +41,7 @@
                             <td class="font-mono text-xs">{{ row.item_reg ?? '—' }}</td>
                             <td class="font-mono font-bold">{{ row.chest_no ?? '—' }}</td>
                         </tr>
-                        <tr v-if="!rows.length"><td colspan="12" class="p-6 text-center text-slate-400">No registrations yet.</td></tr>
+                        <tr v-if="!rows.length"><td :colspan="event.event_type === 'sports' ? 11 : 12" class="p-6 text-center text-slate-400">No registrations yet.</td></tr>
                     </tbody>
                 </table>
             </div>

@@ -113,7 +113,7 @@ class FestExportService
             ->get()
             ->sortBy([
                 fn (FestParticipant $p) => $p->registration?->item?->title ?? '',
-                fn (FestParticipant $p) => (int) preg_replace('/[^0-9]/', '', (string) ($p->group?->chest_no ?? $p->chest_no ?? 999999)),
+                fn (FestParticipant $p) => (int) preg_replace('/[^0-9]/', '', (string) (app(\App\Services\Events\FestNumberingService::class)->effectiveChestNumber($p) ?? 999999)),
                 fn (FestParticipant $p) => $p->id,
             ])
             ->values()
@@ -141,9 +141,7 @@ class FestExportService
                 $itemMetaStr = !empty($metaParts) ? ' (' . implode(' - ', $metaParts) . ')' : '';
                 $itemTitle = ($item?->title ?? '') . $itemMetaStr;
 
-                $chestNo = $p->group?->chest_no
-                    ?? $p->chest_no
-                    ?? $numbering->effectiveChestNumber($p)
+                $chestNo = $numbering->effectiveChestNumber($p)
                     ?? $p->level_registration_number
                     ?? '';
 

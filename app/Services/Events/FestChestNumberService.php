@@ -8,6 +8,7 @@ use App\Models\FestGroup;
 use App\Models\FestParticipant;
 use App\Models\FestSchedule;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class FestChestNumberService
@@ -36,7 +37,7 @@ class FestChestNumberService
 
     private function isRevealed(FestParticipant $participant): bool
     {
-        if ($participant->group_id) {
+        if ($participant->registration?->event?->event_type !== 'sports' && $participant->group_id) {
             if (! $participant->relationLoaded('group')) {
                 $participant->loadMissing('group');
             }
@@ -61,7 +62,7 @@ class FestChestNumberService
         $item = $participant->registration?->item;
         $numbering = app(FestNumberingService::class);
 
-        if ($item && $participant->group_id && $participant->group && $numbering->isGroupItem($item)) {
+        if ($event->event_type !== 'sports' && $item && $participant->group_id && $participant->group && $numbering->isGroupItem($item)) {
             $group = $participant->group;
             if ($group->chest_revealed_at) {
                 return;
@@ -135,7 +136,7 @@ class FestChestNumberService
         $eventIds = $event->reportableEventIds();
         $itemIds = $event->reportableItemIds([$item->id]);
 
-        if ($participant->group_id && $participant->group && $numbering->isGroupItem($item)) {
+        if ($event->event_type !== 'sports' && $participant->group_id && $participant->group && $numbering->isGroupItem($item)) {
             $group = $participant->group;
 
             $taken = FestGroup::whereIn('event_id', $eventIds)
@@ -193,7 +194,7 @@ class FestChestNumberService
         // failed, because every attempt re-created this exact self-collision.
         $query = FestParticipant::whereHas('registration', fn ($q) => $q->where('event_id', $eventId)
                 ->whereNotIn('status', ['rejected', 'withdrawn']))
-            ->when($event->event_type === 'sports', fn ($q) => $q->whereNull('group_id'),
+            ->when($event->event_type === 'sports', fn ($q) => $q,
                 fn ($q) => $q->where(fn ($r) => $r->where('chest_head_id', $headScope)->orWhere('id', $participant->id)));
 
         if ($participant->student_id) {
@@ -241,7 +242,7 @@ class FestChestNumberService
         $item = $participant->registration?->item;
 
         if ($item && $participant->group_id && $participant->group
-            && $event && app(FestNumberingService::class)->isGroupItem($item)) {
+            && $event && $event->event_type !== 'sports' && app(FestNumberingService::class)->isGroupItem($item)) {
             // Team/group items: clearing one member's chest clears the
             // whole squad's shared number.
             $participant->group->update([
@@ -258,8 +259,8 @@ class FestChestNumberService
             : (int) ($participant->chest_head_id ?? FestNumberingService::CHEST_SCOPE_EVENT);
 
         $query = FestParticipant::query()
-            ->where('event_id', $eventId)
-            ->when($event?->event_type === 'sports', fn ($q) => $q->whereNull('group_id'), fn ($q) => $q->where('chest_head_id', $headScope));
+            ->whereHas('registration', fn ($q) => $q->whereIn('event_id', $event?->event_type === 'sports' ? $event->reportableEventIds() : [$eventId]))
+            ->when($event?->event_type === 'sports', fn ($q) => $q, fn ($q) => $q->where('chest_head_id', $headScope));
 
         if ($participant->student_id) {
             $query->where('student_id', $participant->student_id);
@@ -269,40 +270,32 @@ class FestChestNumberService
             $query->where('id', $participant->id);
         }
 
-        $query->update([
-            'chest_no'          => null,
-            'chest_revealed_at' => null,
-        ]);
+        DB::transaction(function () use ($eventId, $query) {
+            FestEvent::whereKey($eventId)->lockForUpdate()->first();
+            $query->update(['chest_no' => null, 'chest_revealed_at' => null]);
+        });
     }
 
     public function clearAllForEvent(FestEvent $event, ?FestEventItem $item = null): int
     {
-        $participantQuery = FestParticipant::query()
-            ->whereHas('registration', fn ($q) => $q->where('event_id', $event->id));
-
-        if ($item) {
-            $participantQuery->whereHas('registration', fn ($q) => $q->where('item_id', $item->id));
+        if ($event->event_type === 'sports' && $item) {
+            throw ValidationException::withMessages(['item_id' => 'Sports chest numbers must be cleared for the event or participant, not per item.']);
         }
 
-        $clearedCount = $participantQuery->whereNotNull('chest_no')->count();
-
-        $participantQuery->update([
-            'chest_no'          => null,
-            'chest_revealed_at' => null,
-        ]);
-
-        $groupQuery = \App\Models\FestGroup::query()
-            ->where('event_id', $event->id);
-
-        if ($item) {
-            $groupQuery->whereHas('registration', fn ($q) => $q->where('item_id', $item->id));
-        }
-
-        $groupQuery->update([
-            'chest_no'          => null,
-            'chest_revealed_at' => null,
-        ]);
-
-        return $clearedCount;
+        return DB::transaction(function () use ($event, $item) {
+            FestEvent::whereKey($event->id)->lockForUpdate()->first();
+            $eventIds = $event->event_type === 'sports' ? $event->reportableEventIds() : [$event->id];
+            // Registration is authoritative; legacy participant/group event_id may be null.
+            $participants = FestParticipant::whereHas('registration', fn ($q) => $q->whereIn('event_id', $eventIds)
+                ->when($item, fn ($r) => $r->where('item_id', $item->id)));
+            $groups = FestGroup::whereHas('registration', fn ($q) => $q->whereIn('event_id', $eventIds)
+                ->when($item, fn ($r) => $r->where('item_id', $item->id)));
+            $cleared = (clone $participants)->whereNotNull('chest_no')->count()
+                + (clone $groups)->whereNotNull('chest_no')->count();
+            // Clear reveal flags even on sibling rows that never stored a number.
+            $participants->update(['chest_no' => null, 'chest_revealed_at' => null]);
+            $groups->update(['chest_no' => null, 'chest_revealed_at' => null]);
+            return $cleared;
+        });
     }
 }

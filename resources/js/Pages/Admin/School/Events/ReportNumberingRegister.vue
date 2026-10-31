@@ -12,11 +12,11 @@
             <div class="overflow-x-auto">
             <table class="data-table text-sm">
                 <thead>
-                    <tr><th>Head</th><th>Item</th><th>Participant</th><th>Admission No</th><th>Status</th><th>Fest ID</th><th>Item reg</th><th v-if="event.event_type === 'sports'">Chest</th></tr>
+                    <tr><th v-if="event.event_type !== 'sports'">Head</th><th>Item</th><th>Participant</th><th>Admission No</th><th>Status</th><th>Fest ID</th><th>Item reg</th><th v-if="event.event_type === 'sports'">Chest</th></tr>
                 </thead>
                 <tbody>
                     <tr v-for="row in rows.data" :key="row.participant_id">
-                        <td class="text-xs text-slate-500">{{ row.head_name ?? '—' }}</td>
+                        <td v-if="event.event_type !== 'sports'" class="text-xs text-slate-500">{{ row.head_name ?? '—' }}</td>
                         <td>{{ row.item }}</td>
                         <td class="font-medium">{{ row.name }}</td>
                         <td>{{ row.reg_no ?? '—' }}</td>
@@ -25,7 +25,7 @@
                         <td class="font-mono text-xs">{{ row.item_reg ?? '—' }}</td>
                         <td v-if="event.event_type === 'sports'" class="font-mono text-xs">{{ row.chest_no ?? '—' }}</td>
                     </tr>
-                    <tr v-if="!rows.data.length"><td :colspan="event.event_type === 'sports' ? 8 : 7" class="p-6 text-center text-slate-400">No registrations yet.</td></tr>
+                    <tr v-if="!rows.data.length"><td :colspan="7" class="p-6 text-center text-slate-400">No registrations yet.</td></tr>
                 </tbody>
             </table>
             </div>

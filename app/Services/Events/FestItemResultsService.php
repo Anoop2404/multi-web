@@ -208,7 +208,7 @@ class FestItemResultsService
                     return 'reg:' . $p->registration_id;
                 }
                 $schoolId = $p->registration?->school_id ?? 0;
-                $chest = $p->group?->chest_no ?? $p->chest_no ?? '1';
+                $chest = app(\App\Services\Events\FestNumberingService::class)->effectiveChestNumber($p) ?? '1';
                 return 'team:' . $schoolId . ':' . $chest;
             });
 
@@ -228,7 +228,7 @@ class FestItemResultsService
                     'school'           => $first->registration?->school?->name,
                     'name'             => $names ?: 'Team Entry',
                     'reg_no'           => $regNos ?: null,
-                    'chest_no'         => $first->group?->chest_no ?? $first->chest_no,
+                    'chest_no'         => app(\App\Services\Events\FestNumberingService::class)->entryChestLabel($first),
                     'grade'            => $effectiveGrade,
                     'position'         => $mark?->position,
                     'score'            => $mark?->score,
@@ -248,7 +248,7 @@ class FestItemResultsService
                     'school'           => $p->registration?->school?->name,
                     'name'             => $p->student?->name ?? $p->teacher?->name,
                     'reg_no'           => $p->student?->reg_no ?? $p->teacher?->reg_no,
-                    'chest_no'         => $p->group?->chest_no ?? $p->chest_no,
+                    'chest_no'         => app(\App\Services\Events\FestNumberingService::class)->effectiveChestNumber($p),
                     'grade'            => $effectiveGrade,
                     'position'         => $p->mark?->position,
                     'score'            => $p->mark?->score,
