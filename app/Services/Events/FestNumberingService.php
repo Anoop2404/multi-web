@@ -262,7 +262,18 @@ class FestNumberingService
             return null;
         }
 
-        return $this->existingChestNumber($event, $item, $participant);
+        // Report queries may eager-load only display columns. A loaded relation is
+        // not necessarily complete enough to determine the shared sports scope.
+        if (! array_key_exists('event_type', $event->getAttributes())) {
+            $event = FestEvent::find($event->id);
+            $participant->registration->setRelation('event', $event);
+        }
+        if ($event?->event_type === 'sports' && ! array_key_exists('head_id', $item->getAttributes())) {
+            $item = FestEventItem::find($item->id);
+            $participant->registration->setRelation('item', $item);
+        }
+
+        return $event && $item ? $this->existingChestNumber($event, $item, $participant) : null;
     }
 
     /**

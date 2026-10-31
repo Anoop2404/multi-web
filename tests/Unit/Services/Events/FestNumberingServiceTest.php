@@ -213,6 +213,20 @@ class FestNumberingServiceTest extends TestCase
         $this->assertSame(7, $first->fresh()->chest_no);
     }
 
+    public function test_shared_sports_chest_resolves_in_item_report_and_partially_loaded_relations(): void
+    {
+        ['event' => $event, 'itemA' => $itemA, 'itemB' => $itemB, 'school' => $school] = $this->sportsContext();
+        $student = $this->student($school);
+        $this->participant($event, $itemA, $school, $student, 2450);
+        $second = $this->participant($event, $itemB, $school, $student);
+        $partial = FestParticipant::with(['registration.event:id,title', 'registration.item:id,title'])->findOrFail($second->id);
+        $this->assertSame(2450, $partial->chest_no);
+        $rows = collect((new \App\Services\Events\FestEventReportAnalyticsService($event))->itemWiseReportRows());
+        $this->assertCount(2, $rows);
+        $this->assertSame([2450, 2450], $rows->pluck('chest_no')->all());
+        $this->assertNull($second->fresh()->getRawOriginal('chest_no'), 'Display lookup must not copy or regenerate the stored number.');
+    }
+
     public function test_same_student_gets_new_chest_number_for_different_item_head(): void
     {
         ['event' => $event, 'itemA' => $itemA, 'itemC' => $itemC, 'school' => $school] = $this->sportsContext();

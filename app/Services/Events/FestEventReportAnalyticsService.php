@@ -2093,7 +2093,7 @@ class FestEventReportAnalyticsService
                 }
             })
             // Only the columns this report reads -- fest_participants is a wide table.
-            ->select(['id', 'registration_id', 'student_id', 'teacher_id', 'chest_no', 'participant_role', 'level_registration_number', 'item_registration_number'])
+            ->select(['id', 'registration_id', 'group_id', 'event_id', 'chest_head_id', 'student_id', 'teacher_id', 'chest_no', 'participant_role', 'level_registration_number', 'item_registration_number'])
             ->with([
                 'student:id,name,reg_no',
                 'teacher:id,name,reg_no',
@@ -2107,8 +2107,8 @@ class FestEventReportAnalyticsService
                 // int-typed eventById() throws a TypeError the moment score-based grading
                 // needs it (a combined participation-certificate/hub-level view is exactly
                 // when $item->event_id genuinely differs from $event->id).
-                'registration.item:id,event_id,title,item_code,category,stage_type,participant_type,gender,class_group,age_group,results_published_at,results_hidden',
-                'registration.event:id,source_phase_id,region_id',
+                'registration.item:id,event_id,head_id,title,item_code,category,stage_type,participant_type,gender,class_group,age_group,results_published_at,results_hidden',
+                'registration.event:id,event_type,source_phase_id,region_id',
                 'registration.event.sourcePhase:id,name',
                 'registration.event.region:id,name,code',
                 'mark:id,participant_id,grade,position,score',
@@ -2272,8 +2272,8 @@ class FestEventReportAnalyticsService
                 'group:id,chest_no',
                 'registration:id,event_id,item_id,school_id,status',
                 'registration.school:id,name',
-                'registration.item:id,event_id,title,item_code,category,class_group,age_group',
-                'registration.event:id,source_phase_id,region_id',
+                'registration.item:id,event_id,head_id,title,item_code,category,class_group,age_group',
+                'registration.event:id,event_type,source_phase_id,region_id',
                 'registration.event.sourcePhase:id,name',
                 'registration.event.region:id,name,code',
             ])
