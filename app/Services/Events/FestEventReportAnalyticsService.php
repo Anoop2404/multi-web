@@ -1920,8 +1920,9 @@ class FestEventReportAnalyticsService
                 ->when($schoolId, fn ($q2) => $q2->where('school_id', $schoolId)))
             ->whereNotNull('student_id')
             ->with([
-                'student:id,tenant_id,name,reg_no,gender,photo,school_class_id',
+                'student:id,tenant_id,name,reg_no,gender,dob,photo,school_class_id',
                 'student.schoolClass:id,name',
+                'registration.event:id,title,event_type,level_round',
                 'registration.school:id,name,school_prefix',
                 'registration.item:id,title,head_id,event_id,class_group,age_group,category,stage_type,participant_type,results_published_at',
                 'registration.item.head:id,name',
@@ -1940,6 +1941,7 @@ class FestEventReportAnalyticsService
         $artsCategoryLabels = config('fest_item_taxonomy.arts_category', []);
 
         $rows = [];
+        $isSports = $this->event->event_type === 'sports';
         foreach ($participants->groupBy('student_id') as $studentId => $entries) {
             /** @var FestParticipant $first */
             $first = $entries->first();
@@ -1957,7 +1959,9 @@ class FestEventReportAnalyticsService
                 }
             }
 
-            $items = $entries->map(function (FestParticipant $p) use ($marksByParticipant, $classGroupLabels, $artsCategoryLabels) {
+            $studentChestNo = $entries->map(fn (FestParticipant $p) => $p->chest_no)->filter()->first();
+
+            $items = $entries->map(function (FestParticipant $p) use ($marksByParticipant, $classGroupLabels, $artsCategoryLabels, $isSports, $studentChestNo) {
                 $mark = $marksByParticipant->get($p->id);
                 $item = $p->registration?->item;
                 $itemEvent = $item?->event;
@@ -1967,6 +1971,8 @@ class FestEventReportAnalyticsService
                 // (which schools may receive as a PDF/Excel) never leaks a draft result.
                 $resultsPublished = $item && $itemEvent
                     && app(FestItemResultsService::class)->isItemVisible($item, $itemEvent);
+
+                $chestNo = $p->chest_no ?? ($isSports ? $studentChestNo : null);
 
                 return [
                     'item_id' => $p->registration?->item_id,
@@ -1978,7 +1984,7 @@ class FestEventReportAnalyticsService
                     'status' => $p->registration?->status,
                     'fest_id' => $p->level_registration_number,
                     'item_reg' => $p->item_registration_number,
-                    'chest_no' => $p->chest_no,
+                    'chest_no' => $chestNo,
                     'results_published' => $resultsPublished,
                     'grade' => $resultsPublished ? $mark?->grade : null,
                     'position' => $resultsPublished ? $mark?->position : null,
@@ -2011,6 +2017,9 @@ class FestEventReportAnalyticsService
                 'name' => $name,
                 'reg_no' => $regNo,
                 'gender' => $student->gender,
+                'dob' => $student->dob?->format('d M Y'),
+                'dob_raw' => $student->dob?->format('Y-m-d'),
+                'chest_no' => $studentChestNo,
                 'class_name' => $student->schoolClass?->name,
                 'photo_url' => $photoForSchoolAdmin ? $student->photoUrl() : $student->sahodayaPhotoUrl($this->event->tenant_id),
                 'photo_data_uri' => $includePhotoDataUri ? $student->photoDataUri() : null,

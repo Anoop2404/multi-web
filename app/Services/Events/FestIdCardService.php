@@ -628,9 +628,23 @@ class FestIdCardService
                     ->first();
 
                 $card = $this->participantCard($event, $lead, $schedule, $includeDataUris);
-                if ($event->event_type === 'sports' && $group->contains('participant_role', 'standby') && $group->contains(fn ($p) => $p->participant_role !== 'standby')) {
-                    $card['role_title'] = 'Participant / Standby';
-                    $card['role_label'] = 'PARTICIPANT / STANDBY';
+                if ($event->event_type === 'sports') {
+                    if (empty($card['chest_number']) && ! $this->hideChestNo) {
+                        foreach ($group as $gp) {
+                            $eff = $gp->chest_no ?? app(FestNumberingService::class)->effectiveChestNumber($gp);
+                            if ($eff !== null) {
+                                $card['chest_number'] = (string) $eff;
+                                $card['chest_no'] = (string) $eff;
+                                $card['secondary_label'] = 'Chest No';
+                                $card['secondary_value'] = (string) $eff;
+                                break;
+                            }
+                        }
+                    }
+                    if ($group->contains('participant_role', 'standby') && $group->contains(fn ($p) => $p->participant_role !== 'standby')) {
+                        $card['role_title'] = 'Participant / Standby';
+                        $card['role_label'] = 'PARTICIPANT / STANDBY';
+                    }
                 }
                 $entityKey = $lead->student_id ? 's'.$lead->student_id : 't'.$lead->teacher_id;
 
@@ -761,7 +775,7 @@ class FestIdCardService
                 return [
                     'name'      => $name,
                     'fest_id'   => $p->level_registration_number ?? '—',
-                    'chest_no' => $event->event_type === 'sports' && ! $this->hideChestNo && ($event->chest_reveal_mode !== 'stage_entry' || $p->chest_revealed_at) ? app(FestNumberingService::class)->effectiveChestNumber($p) : null,
+                    'chest_no' => $event->event_type === 'sports' && ! $this->hideChestNo ? app(FestNumberingService::class)->effectiveChestNumber($p) : null,
                     'initials'  => $this->initials($name),
                     'photo_url' => $photoUrl,
                     'photo_src' => $photoSrc,
@@ -831,8 +845,15 @@ class FestIdCardService
         // which items they're eligible for — both worth surfacing on the
         // printed card face, not just buried in reports.
         $isSports = $event->event_type === 'sports';
-        $chestLabel = $this->hideChestNo ? null : $this->chestService->participantLabel($p);
-        $chestNumber = ($chestLabel && $chestLabel !== '—') ? $chestLabel : null;
+        $chestNumber = null;
+        if (! $this->hideChestNo) {
+            $chestLabel = $this->chestService->participantLabel($p);
+            $chestNumber = ($chestLabel && $chestLabel !== '—') ? $chestLabel : null;
+            if ($isSports && ! $chestNumber) {
+                $eff = app(FestNumberingService::class)->effectiveChestNumber($p);
+                $chestNumber = $eff !== null ? (string) $eff : null;
+            }
+        }
         $ageGroupLabel = null;
 
         if ($isSports && $itemModel) {
@@ -1010,11 +1031,12 @@ class FestIdCardService
             'item_label'      => $itemTitleDisplay ?: ($headName ?: null),
             'age_group_label' => $ageGroupLabel,
             'chest_number'    => $chestNumber,
+            'chest_no'        => $chestNumber,
             'schedule'        => $scheduleLine,
             'id_label'        => 'Reg ID',
             'id_number'       => ($festId && $festId !== '—') ? $festId : ($studentRegNo ?: '—'),
-            'secondary_label' => null,
-            'secondary_value' => null,
+            'secondary_label' => $isSports && $chestNumber ? 'Chest No' : null,
+            'secondary_value' => $isSports && $chestNumber ? $chestNumber : null,
             'qr_src'          => $this->qrService->dataUri($qrPayload),
             'footer'          => null,
             'entity_id'       => (string) $p->id,

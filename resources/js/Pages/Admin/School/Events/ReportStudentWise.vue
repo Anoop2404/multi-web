@@ -50,10 +50,19 @@
                                 {{ st.name }}
                                 <span v-if="st.reg_no" class="text-xs font-mono font-normal text-slate-500">({{ st.reg_no }})</span>
                             </h4>
-                            <p class="text-xs text-slate-500 font-medium mt-0.5">🏫 {{ st.school_name || school?.name }}<span v-if="st.class_name"> · Class {{ st.class_name }}</span></p>
+                            <p class="text-xs text-slate-500 font-medium mt-0.5">
+                                🏫 {{ st.school_name || school?.name }}<span v-if="st.class_name"> · Class {{ st.class_name }}</span>
+                                <span v-if="st.dob"> · DOB: {{ st.dob }}</span>
+                            </p>
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
+                        <span v-if="st.chest_no" class="px-2.5 py-1 rounded-full bg-blue-50 text-blue-800 text-xs font-mono font-bold border border-blue-200">
+                            Chest #{{ st.chest_no }}
+                        </span>
+                        <span v-if="st.dob && event?.event_type === 'sports'" class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium border border-slate-200">
+                            DOB: {{ st.dob }}
+                        </span>
                         <span class="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100">
                             {{ st.item_count }} {{ st.item_count === 1 ? 'item' : 'items' }} registered
                         </span>
@@ -71,6 +80,7 @@
                                 <th class="w-10 text-center">#</th>
                                 <th>Item Title</th>
                                 <th>Category / Head</th>
+                                <th v-if="event?.event_type === 'sports'" class="text-center">Chest No</th>
                                 <th class="text-center">Stage / Type</th>
                                 <th class="text-center">Status</th>
                                 <th class="text-center">Grade / Rank</th>
@@ -87,6 +97,7 @@
                                     <span v-if="item.head_name">{{ item.head_name }}</span>
                                     <span v-if="!item.category_label && !item.head_name">—</span>
                                 </td>
+                                <td v-if="event?.event_type === 'sports'" class="text-center font-mono font-bold text-slate-800">{{ item.chest_no || st.chest_no || '—' }}</td>
                                 <td class="text-center text-slate-600 whitespace-nowrap">
                                     <span v-if="item.stage_type">{{ item.stage_type === 'on_stage' ? 'On stage' : 'Off stage' }}</span>
                                     <span v-if="item.stage_type && item.participant_type" class="text-slate-300"> · </span>

@@ -84,6 +84,13 @@
                                 <td class="pcard-pdf__meta-val">{{ $card['dob'] }}</td>
                             </tr>
                             @endif
+                            @if(!empty($card['chest_number']) || !empty($card['chest_no']))
+                            <tr>
+                                <td class="pcard-pdf__meta-label">Chest No</td>
+                                <td class="pcard-pdf__meta-sep">:</td>
+                                <td class="pcard-pdf__meta-val">{{ $card['chest_number'] ?? $card['chest_no'] }}</td>
+                            </tr>
+                            @endif
                             <tr>
                                 <td class="pcard-pdf__meta-label">Sahodaya</td>
                                 <td class="pcard-pdf__meta-sep">:</td>

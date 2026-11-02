@@ -20,6 +20,9 @@
                     <span v-else class="pass-tile__initials">{{ card.initials }}</span>
                 </div>
                 <div class="pass-tile__role">{{ passLabel }}</div>
+                <div v-if="(card.is_sports || card.event_type === 'sports') && (card.chest_number || card.chest_no)" class="pass-tile__chest">
+                    Chest #{{ card.chest_number || card.chest_no }}
+                </div>
             </div>
 
             <div class="pass-tile__info">
@@ -46,7 +49,10 @@
                 </div>
 
                 <template v-else>
-                    <div class="pass-tile__meta" :class="{ 'pass-tile__meta--3col': card.dob }">
+                    <div class="pass-tile__meta" :class="{
+                        'pass-tile__meta--4col': card.dob && (card.chest_number || card.chest_no),
+                        'pass-tile__meta--3col': (card.dob && !(card.chest_number || card.chest_no)) || (!card.dob && (card.chest_number || card.chest_no))
+                    }">
                         <div class="pass-tile__meta-box pass-tile__meta-box--venue">
                             <span class="pass-tile__meta-label">Venue</span>
                             <span class="pass-tile__meta-value">{{ card.venue || '—' }}</span>
@@ -58,6 +64,10 @@
                         <div class="pass-tile__meta-box">
                             <span class="pass-tile__meta-label">Category</span>
                             <span class="pass-tile__meta-value pass-tile__meta-value--accent">{{ card.category || card.class_category || '—' }}</span>
+                        </div>
+                        <div v-if="card.chest_number || card.chest_no" class="pass-tile__meta-box">
+                            <span class="pass-tile__meta-label">Chest No</span>
+                            <span class="pass-tile__meta-value pass-tile__meta-value--accent">{{ card.chest_number || card.chest_no }}</span>
                         </div>
                         <div v-if="card.dob" class="pass-tile__meta-box">
                             <span class="pass-tile__meta-label">DOB</span>
@@ -141,6 +151,11 @@
                         <td class="id-card-tile__meta-label">DOB</td>
                         <td class="id-card-tile__meta-sep">:</td>
                         <td class="id-card-tile__meta-val">{{ card.dob }}</td>
+                    </tr>
+                    <tr v-if="card.chest_number || card.chest_no">
+                        <td class="id-card-tile__meta-label">Chest No</td>
+                        <td class="id-card-tile__meta-sep">:</td>
+                        <td class="id-card-tile__meta-val font-bold text-[#073f82]">{{ card.chest_number || card.chest_no }}</td>
                     </tr>
                     <tr>
                         <td class="id-card-tile__meta-label">Shodaya</td>
@@ -321,6 +336,11 @@ const items = computed(() => {
     background: #ec1470; color: #fff; font-size: 0.4rem; font-weight: 800;
     text-transform: uppercase; letter-spacing: 0.03em;
 }
+.pass-tile__chest {
+    margin-top: 0.15rem; text-align: center; padding: 0.08rem 0.1rem; border-radius: 0.2rem;
+    background: #eef6ff; color: #073f82; font-size: 0.44rem; font-weight: 800;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 1px solid #c8daed;
+}
 
 .pass-tile__info { flex: 1; min-width: 0; }
 .pass-tile__name {
@@ -336,6 +356,10 @@ const items = computed(() => {
 .pass-tile__meta--3col .pass-tile__meta-box--venue,
 .pass-tile__meta--3col .pass-tile__meta-box--date { grid-column: span 3; }
 .pass-tile__meta--3col .pass-tile__meta-box:not(.pass-tile__meta-box--venue):not(.pass-tile__meta-box--date) { grid-column: span 2; }
+.pass-tile__meta--4col { grid-template-columns: repeat(12, 1fr); }
+.pass-tile__meta--4col .pass-tile__meta-box--venue,
+.pass-tile__meta--4col .pass-tile__meta-box--date { grid-column: span 6; }
+.pass-tile__meta--4col .pass-tile__meta-box:not(.pass-tile__meta-box--venue):not(.pass-tile__meta-box--date) { grid-column: span 3; }
 .pass-tile__meta-box { min-width: 0; padding: 0.12rem 0.2rem; background: #f2f7fc; border-radius: 0.2rem; }
 .pass-tile__meta-label { display: block; font-size: 0.4rem; font-weight: 700; text-transform: uppercase; color: #8391a4; }
 .pass-tile__meta-value {

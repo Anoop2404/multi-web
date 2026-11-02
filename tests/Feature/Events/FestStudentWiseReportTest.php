@@ -131,4 +131,65 @@ class FestStudentWiseReportTest extends TestCase
 
         $response->assertOk();
     }
+
+    public function test_sports_student_wise_rows_carry_dob_and_chest_no(): void
+    {
+        $f = $this->fixture();
+        $f['event']->update(['event_type' => 'sports']);
+        Student::where('name', 'Student Wise Kid')->update(['dob' => '2012-05-15']);
+
+        $response = $this->actingAs($f['admin'])->get(route('sahodaya.events.reports.student-wise', [
+            'tenantId' => $f['sahodaya']->id, 'event' => $f['event']->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertInertia(function ($page) {
+            $rows = $page->toArray()['props']['rows'];
+            $this->assertCount(1, $rows);
+            $this->assertSame('15 May 2012', $rows[0]['dob']);
+            $this->assertSame(501, $rows[0]['chest_no']);
+            $this->assertSame(501, $rows[0]['items'][0]['chest_no']);
+
+            return $page->has('rows', 1);
+        });
+    }
+
+    public function test_sports_student_wise_blade_view_shows_dob_and_chest_number(): void
+    {
+        $student = [
+            'student_id' => 1,
+            'school_id' => 'sch1',
+            'school_name' => 'Amrita Vidyalayam',
+            'school_code' => '75624',
+            'name' => 'Aaradhya Rajesh',
+            'reg_no' => 'STU/27/3479',
+            'dob' => '15 May 2012',
+            'chest_no' => 104,
+            'item_count' => 1,
+            'items' => [[
+                'item_id' => 10,
+                'item_title' => '100 M Girls',
+                'category_label' => 'Under 14',
+                'head_name' => null,
+                'stage_type' => 'off_stage',
+                'participant_type' => 'individual',
+                'status' => 'approved',
+                'chest_no' => 104,
+                'results_published' => false,
+            ]],
+        ];
+
+        $html = view('fest.reports.student-wise', [
+            'event' => (object) ['title' => 'Athletic Meet 2026-27', 'event_type' => 'sports'],
+            'students' => [$student],
+            'orgName' => 'Wayanad Sahodaya',
+            'logoSrc' => null,
+        ])->render();
+
+        $this->assertStringContainsString('Chest #104', $html);
+        $this->assertStringContainsString('DOB: 15 May 2012', $html);
+        $this->assertStringContainsString('Chest No', $html);
+        $this->assertStringContainsString('100 M Girls', $html);
+        $this->assertStringContainsString('Under 14', $html);
+    }
 }

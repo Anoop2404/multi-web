@@ -46,6 +46,10 @@
         ?? (!empty($card['is_sports']) || ($card['event_type'] ?? null) === 'sports'
             ? 'Sports Meet'
             : (\App\Support\ProgramRouteMap::labelForEventType($card['event_type'] ?? null) ?: 'Kalotsav'));
+    $chestNumber = $card['chest_number'] ?? $card['chest_no'] ?? null;
+    $chestNoDisplay = !empty($chestNumber) ? str((string)$chestNumber)->limit(12)->toString() : null;
+    $hasDob = !empty($card['dob']);
+    $hasChest = !empty($chestNoDisplay);
 @endphp
 <div class="pass-card-pdf">
     <div class="pass-card-pdf__header">
@@ -78,7 +82,9 @@
                 @endif
             </div>
             <div class="pass-card-pdf__role-label">{{ $roleLabel }}</div>
-            @if(!empty($card['is_sports']) && !empty($card['chest_number']))<div style="font-size:12px;font-weight:700;">Chest #{{ $card['chest_number'] }}</div>@endif
+            @if(!empty($card['is_sports']) && !empty($chestNumber))
+                <div class="pass-card-pdf__chest-label">Chest #{{ $chestNumber }}</div>
+            @endif
         </div>
 
         <div class="pass-card-pdf__info-cell">
@@ -111,27 +117,33 @@
             @else
                 <table class="pass-card-pdf__meta">
                     <tr>
-                        <td class="pass-card-pdf__meta-box" colspan="{{ !empty($card['dob']) ? '3' : '1' }}" style="width: 50%;">
+                        <td class="pass-card-pdf__meta-box" colspan="{{ ($hasDob && $hasChest) ? '2' : (($hasDob || $hasChest) ? '3' : '1') }}" style="width: 50%;">
                             <span class="pass-card-pdf__meta-label">Venue</span>
                             <span class="pass-card-pdf__meta-value">{{ $venueDisplay }}</span>
                         </td>
-                        <td class="pass-card-pdf__meta-box" colspan="{{ !empty($card['dob']) ? '3' : '1' }}" style="width: 50%;">
+                        <td class="pass-card-pdf__meta-box" colspan="{{ ($hasDob && $hasChest) ? '2' : (($hasDob || $hasChest) ? '3' : '1') }}" style="width: 50%;">
                             <span class="pass-card-pdf__meta-label">Event Date</span>
                             <span class="pass-card-pdf__meta-value">{{ $card['event_date'] ?? '—' }}</span>
                         </td>
                     </tr>
                     <tr>
-                        <td class="pass-card-pdf__meta-box" colspan="{{ !empty($card['dob']) ? '2' : '1' }}" style="width: {{ !empty($card['dob']) ? '34%' : '50%' }};">
+                        <td class="pass-card-pdf__meta-box" colspan="{{ ($hasDob && $hasChest) ? '1' : (($hasDob || $hasChest) ? '2' : '1') }}" style="width: {{ ($hasDob && $hasChest) ? '25%' : (($hasDob || $hasChest) ? '34%' : '50%') }};">
                             <span class="pass-card-pdf__meta-label">Category</span>
                             <span class="pass-card-pdf__meta-value pass-card-pdf__meta-value--accent">{{ $categoryDisplay }}</span>
                         </td>
-                        @if(!empty($card['dob']))
-                        <td class="pass-card-pdf__meta-box" colspan="2" style="width: 33%;">
+                        @if($hasChest)
+                        <td class="pass-card-pdf__meta-box" colspan="{{ ($hasDob && $hasChest) ? '1' : '2' }}" style="width: {{ ($hasDob && $hasChest) ? '25%' : '33%' }};">
+                            <span class="pass-card-pdf__meta-label">Chest No</span>
+                            <span class="pass-card-pdf__meta-value pass-card-pdf__meta-value--accent">{{ $chestNoDisplay }}</span>
+                        </td>
+                        @endif
+                        @if($hasDob)
+                        <td class="pass-card-pdf__meta-box" colspan="{{ ($hasDob && $hasChest) ? '1' : '2' }}" style="width: {{ ($hasDob && $hasChest) ? '25%' : '33%' }};">
                             <span class="pass-card-pdf__meta-label">DOB</span>
                             <span class="pass-card-pdf__meta-value">{{ $dobDisplay }}</span>
                         </td>
                         @endif
-                        <td class="pass-card-pdf__meta-box" colspan="{{ !empty($card['dob']) ? '2' : '1' }}" style="width: {{ !empty($card['dob']) ? '33%' : '50%' }};">
+                        <td class="pass-card-pdf__meta-box" colspan="{{ ($hasDob && $hasChest) ? '1' : (($hasDob || $hasChest) ? '2' : '1') }}" style="width: {{ ($hasDob && $hasChest) ? '25%' : (($hasDob || $hasChest) ? '33%' : '50%') }};">
                             <span class="pass-card-pdf__meta-label">{{ $idLabel }}</span>
                             <span class="pass-card-pdf__meta-value">{{ $idNumber }}</span>
                         </td>

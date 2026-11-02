@@ -83,6 +83,33 @@
             color: #475569;
             font-weight: 500;
         }
+        .student-badges-cell {
+            display: table-cell;
+            vertical-align: middle;
+            text-align: right;
+            white-space: nowrap;
+            padding-left: 10px;
+        }
+        .badge-pill {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 6px;
+        }
+        .badge-chest-pill {
+            background-color: #0f3d7a;
+            color: #ffffff;
+            font-family: monospace;
+            font-size: 11.5px;
+        }
+        .badge-dob-pill {
+            background-color: #e2e8f0;
+            color: #1e293b;
+            border: 1px solid #cbd5e1;
+            font-size: 10.5px;
+        }
         .items-table {
             width: 100%;
             border-collapse: collapse;
@@ -126,6 +153,9 @@
     @php
         // by_school: every school starts on its own page under a school heading, so the PDF
         // can be split/handed out per school. Rows arrive already sorted school -> student.
+        $isSports = ($event->event_type ?? null) === 'sports';
+        $showChestNo = $showChestNo ?? $isSports;
+        $showMarks = $showMarks ?? true;
         $bySchool = $bySchool ?? false;
         $groups = $bySchool
             ? collect($students)->groupBy(fn ($s) => ($s['school_id'] ?? '').'|'.($s['school_name'] ?? ''))->values()->all()
@@ -156,19 +186,33 @@
                             <span style="font-size: 11px; font-weight: normal; color: #64748b;">({{ $st['reg_no'] }})</span>
                         @endif
                     </div>
-                    <div class="school-name">{{ $st['school_name'] ?? '—' }}@if(!empty($st['school_code'])) ({{ $st['school_code'] }})@endif · {{ $st['item_count'] }} item(s) registered</div>
+                    <div class="school-name">
+                        {{ $st['school_name'] ?? '—' }}@if(!empty($st['school_code'])) ({{ $st['school_code'] }})@endif
+                        @if(!empty($st['dob'])) · <span style="color: #0f172a; font-weight: 600;">DOB:</span> {{ $st['dob'] }}@endif
+                        @if($showChestNo && !empty($st['chest_no'])) · <span style="color: #0f172a; font-weight: 600;">Chest:</span> #{{ $st['chest_no'] }}@endif
+                        · {{ $st['item_count'] }} item(s) registered
+                    </div>
                 </div>
+                @if(($showChestNo && !empty($st['chest_no'])) || !empty($st['dob']))
+                <div class="student-badges-cell">
+                    @if($showChestNo && !empty($st['chest_no']))
+                        <span class="badge-pill badge-chest-pill">Chest #{{ $st['chest_no'] }}</span>
+                    @endif
+                    @if(!empty($st['dob']))
+                        <span class="badge-pill badge-dob-pill">DOB: {{ $st['dob'] }}</span>
+                    @endif
+                </div>
+                @endif
             </div>
         </div>
-        @php $showMarks = $showMarks ?? true; @endphp
         <table class="items-table">
             <thead>
                 <tr>
                     <th style="width: 4%;">#</th>
-                    <th style="width: {{ ($showChestNo ?? true) ? '19' : ($showMarks ? '23' : '39') }}%;">Item Name</th>
+                    <th style="width: {{ $showChestNo ? '19' : ($showMarks ? '23' : '39') }}%;">Item Name</th>
                     <th style="width: 14%;">Category / Head</th>
                     <th style="width: 12%; text-align: center;">Stage / Type</th>
-                    @if($showChestNo ?? true)
+                    @if($showChestNo)
                     <th style="width: 9%; text-align: center;">Chest No</th>
                     @endif
                     <th style="width: 8%; text-align: center;">Status</th>
@@ -207,8 +251,8 @@
                             —
                         @endif
                     </td>
-                    @if($showChestNo ?? true)
-                    <td style="text-align: center; font-family: monospace; font-weight: bold;">{{ $item['chest_no'] ?? '—' }}</td>
+                    @if($showChestNo)
+                    <td style="text-align: center; font-family: monospace; font-weight: bold;">{{ $item['chest_no'] ?? ($st['chest_no'] ?? '—') }}</td>
                     @endif
                     <td style="text-align: center;">
                         <span class="badge {{ ($item['status'] ?? '') === 'approved' ? 'badge-approved' : 'badge-pending' }}">
