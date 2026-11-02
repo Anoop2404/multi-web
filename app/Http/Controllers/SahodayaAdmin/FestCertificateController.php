@@ -1317,7 +1317,11 @@ class FestCertificateController extends SahodayaAdminController
         $service = app(FestCertificateService::class);
         [$certificates, $payloads] = $service->exportScope($event, $publishedOnly, $itemId, $schoolId, $certType, $certIds);
 
-        if (! $schoolId && ($request->boolean('exclude_downloaded') || ($groupBy === 'school' && empty($certIds)))) {
+        $shouldExcludeDownloaded = $request->has('exclude_downloaded')
+            ? $request->boolean('exclude_downloaded')
+            : ($groupBy === 'school' && empty($certIds));
+
+        if (! $schoolId && $shouldExcludeDownloaded) {
             $downloadedMarks = $this->downloadMarks($event);
             $downloadedSchoolIds = $downloadedMarks
                 ->when($certType, fn ($c) => $c->filter(fn ($m) => $m->cert_type === $certType))
@@ -1434,7 +1438,11 @@ class FestCertificateController extends SahodayaAdminController
             $certificates = $service->publishedOnlyWinners($certificates, $payloads);
         }
 
-        if (! $schoolId && ($request->boolean('exclude_downloaded') || ($groupBy === 'school' && empty($certIds)))) {
+        $shouldExcludeDownloaded = $request->has('exclude_downloaded')
+            ? $request->boolean('exclude_downloaded')
+            : ($groupBy === 'school' && empty($certIds));
+
+        if (! $schoolId && $shouldExcludeDownloaded) {
             $downloadedMarks = $this->downloadMarks($event);
             $downloadedSchoolIds = $downloadedMarks
                 ->when($certType, fn ($c) => $c->filter(fn ($m) => $m->cert_type === $certType))

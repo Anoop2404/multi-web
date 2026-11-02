@@ -1878,6 +1878,33 @@ class FestCertificateService
                     $certificate->id,
                 ];
             })->values();
+        } elseif ($itemId === null && $schoolId === null) {
+            $certificates = $certificates->sortBy(function (Certificate $certificate) use ($payloads) {
+                $payload = $payloads->get($certificate->id);
+                $registration = $payload['registration'] ?? null;
+                $schoolName = mb_strtolower($registration?->originSchool?->name ?? $registration?->school?->name ?? '');
+                $itemName = mb_strtolower($payload['item']?->title ?? $payload['item']?->name ?? '');
+
+                return [
+                    $schoolName,
+                    $certificate->cert_type === 'winner' ? ($payload['mark']?->position ?? PHP_INT_MAX) : 99,
+                    $itemName,
+                    mb_strtolower($payload['participant']?->name ?? ''),
+                    $certificate->id,
+                ];
+            })->values();
+        } elseif ($itemId === null && $schoolId !== null) {
+            $certificates = $certificates->sortBy(function (Certificate $certificate) use ($payloads) {
+                $payload = $payloads->get($certificate->id);
+                $itemName = mb_strtolower($payload['item']?->title ?? $payload['item']?->name ?? '');
+
+                return [
+                    $certificate->cert_type === 'winner' ? ($payload['mark']?->position ?? PHP_INT_MAX) : 99,
+                    $itemName,
+                    mb_strtolower($payload['participant']?->name ?? ''),
+                    $certificate->id,
+                ];
+            })->values();
         }
         $buildContext = $this->exportContextBuilder($embedAssets, $plain, $sahodaya);
 

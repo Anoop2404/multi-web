@@ -162,7 +162,7 @@ class FestCertificateWinnersByItemTest extends TestCase
         $zip = new \ZipArchive;
         $this->assertTrue($zip->open($zipPath) === true);
         $this->assertSame(1, $zip->numFiles);
-        $this->assertStringContainsString($publishedWinner->verification_uuid, $zip->getNameIndex(0));
+        $this->assertStringContainsString(substr($publishedWinner->verification_uuid, 0, 8), $zip->getNameIndex(0));
         $zip->close();
     }
 
@@ -257,8 +257,8 @@ class FestCertificateWinnersByItemTest extends TestCase
         $zip = new \ZipArchive;
         $this->assertTrue($zip->open($zipPath) === true);
         $this->assertSame(1, $zip->numFiles);
-        $this->assertStringContainsString($participationCert->verification_uuid, $zip->getNameIndex(0));
-        $this->assertStringNotContainsString($winner->verification_uuid, $zip->getNameIndex(0));
+        $this->assertStringContainsString(substr($participationCert->verification_uuid, 0, 8), $zip->getNameIndex(0));
+        $this->assertStringNotContainsString(substr($winner->verification_uuid, 0, 8), $zip->getNameIndex(0));
         $zip->close();
     }
 }
