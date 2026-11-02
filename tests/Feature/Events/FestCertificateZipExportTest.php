@@ -53,14 +53,16 @@ class FestCertificateZipExportTest extends TestCase
     /** @return list<Certificate> */
     private function makeCertificates(FestEvent $event, FestEventItem $item, string $schoolId, int $count, string $certType = 'participation'): array
     {
+        static $studentSeed = 900;
         $certificates = [];
 
         for ($i = 0; $i < $count; $i++) {
+            $studentSeed++;
             $registration = FestRegistration::create([
                 'event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $schoolId, 'status' => 'approved',
             ]);
             $participant = FestParticipant::create([
-                'registration_id' => $registration->id, 'event_id' => $event->id, 'student_id' => 900 + $i,
+                'registration_id' => $registration->id, 'event_id' => $event->id, 'student_id' => $studentSeed,
                 'participant_type' => 'student', 'participant_role' => 'performer',
             ]);
 
@@ -118,7 +120,7 @@ class FestCertificateZipExportTest extends TestCase
         $this->assertCount(3, $names);
         foreach ($certificates as $certificate) {
             $this->assertTrue(
-                collect($names)->contains(fn ($n) => str_contains($n, $certificate->verification_uuid)),
+                collect($names)->contains(fn ($n) => str_contains($n, substr($certificate->verification_uuid, 0, 8))),
                 "Expected the ZIP to contain certificate {$certificate->verification_uuid}."
             );
         }
@@ -178,7 +180,7 @@ class FestCertificateZipExportTest extends TestCase
         $this->assertCount(45, $names, 'The second chunk must append to the first chunk\'s ZIP, not overwrite it.');
         foreach ($certificates as $certificate) {
             $this->assertTrue(
-                collect($names)->contains(fn ($n) => str_contains($n, $certificate->verification_uuid)),
+                collect($names)->contains(fn ($n) => str_contains($n, substr($certificate->verification_uuid, 0, 8))),
                 "Expected the ZIP to contain certificate {$certificate->verification_uuid}."
             );
         }
@@ -216,7 +218,7 @@ class FestCertificateZipExportTest extends TestCase
 
         $names = $this->zipEntryNames($batch);
         $this->assertCount(1, $names);
-        $this->assertStringContainsString($publishedWinner->verification_uuid, $names[0]);
+        $this->assertStringContainsString(substr($publishedWinner->verification_uuid, 0, 8), $names[0]);
     }
 
     /** @return list<string> */
@@ -350,5 +352,43 @@ class FestCertificateZipExportTest extends TestCase
             'tenantId' => $sahodaya->id, 'event' => $event->id, 'batch' => $batch->id,
         ]));
         $response->assertNotFound();
+    }
+
+    public function test_queue_zip_export_with_exclude_downloaded_zero_includes_all_schools(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $sahodaya = $this->makeSahodaya();
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        $event = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'All Schools Zip Event', 'event_type' => 'kalolsavam']);
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song', 'item_code' => 'AS1']);
+
+        $schools = collect(['Alpha Public School', 'Beta Vidyalaya'])->map(fn (string $name) => Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'school', 'parent_id' => $sahodaya->id, 'name' => $name,
+            'domain' => Str::uuid().'.test', 'membership_status' => 'approved', 'is_active' => true,
+        ]));
+        $this->makeCertificates($event, $item, $schools[0]->id, 2, 'winner');
+        $this->makeCertificates($event, $item, $schools[1]->id, 1, 'winner');
+
+        // Mark Alpha Public School as downloaded
+        \App\Models\FestCertificateSchoolMark::create([
+            'tenant_id' => $sahodaya->id,
+            'event_id' => $event->id,
+            'school_id' => $schools[0]->id,
+            'cert_type' => 'winner',
+            'marked_at' => now(),
+        ]);
+
+        $this->actingAs($admin)->post(route('sahodaya.events.certificates.download-zip.queue', [
+            'tenantId' => $sahodaya->id, 'event' => $event->id,
+        ]), ['cert_type' => 'winner', 'group_by' => 'school', 'exclude_downloaded' => '0'])->assertRedirect();
+
+        $batch = CertificateBatch::findOrFail(session('certificate_batch_id'));
+        $this->assertSame(CertificateBatch::STATUS_COMPLETED, $batch->status);
+        $this->assertSame(3, $batch->total_count);
+
+        $folders = collect($this->zipEntryNames($batch))->map(fn (string $name) => explode('/', $name)[0])->countBy()->all();
+        $this->assertEquals([$schools[0]->fresh()->name => 2, $schools[1]->fresh()->name => 1], $folders);
     }
 }

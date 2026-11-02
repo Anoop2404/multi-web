@@ -152,11 +152,19 @@
                                         class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                                     📦 Merit winners only — no background (ZIP)
                                 </button>
+                                <button v-if="winnersByItem.length" @click="queueZipDownload({ published_only: '1', group_by: 'item' }, $event)" :disabled="isBatchRunning"
+                                        class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                    📦 Merit winners — grouped by item (ZIP)
+                                </button>
                                 <button v-if="winnersByItem.length" @click="queueZipDownload({ published_only: '1', group_by: 'item', plain: '1' }, $event)" :disabled="isBatchRunning"
                                         class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                                     📦 Merit winners — grouped by item — no background (ZIP)
                                 </button>
-                                <button v-if="winnersByItem.length" @click="queueZipDownload({ published_only: '1', group_by: 'school', plain: '1' }, $event)" :disabled="isBatchRunning"
+                                <button v-if="winnersByItem.length" @click="queueZipDownload({ published_only: '1', group_by: 'school', exclude_downloaded: '0' }, $event)" :disabled="isBatchRunning"
+                                        class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                    📦 Merit winners — grouped by school (ZIP)
+                                </button>
+                                <button v-if="winnersByItem.length" @click="queueZipDownload({ published_only: '1', group_by: 'school', plain: '1', exclude_downloaded: '0' }, $event)" :disabled="isBatchRunning"
                                         class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                                     📦 Merit winners — grouped by school — no background (ZIP)
                                 </button>
@@ -177,8 +185,12 @@
                                     📦 Participation — grouped by school — no background (ZIP)
                                 </button>
                                 <div class="border-t border-gray-100 my-1"></div>
-                                <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all`" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">🖨️ Print all (with background) ↗</a>
-                                <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?plain=1`" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">🖨️ Print all (plain) ↗</a>
+                                <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all`" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">🖨️ Print all certificates (with background) ↗</a>
+                                <a :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?plain=1`" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50">🖨️ Print all certificates (plain) ↗</a>
+                                <a v-if="winnersByItem.length" :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?cert_type=winner&published_only=1`" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50 font-medium text-indigo-700">🖨️ Print merit winners — all schools ↗</a>
+                                <a v-if="winnersByItem.length" :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?cert_type=winner&published_only=1&plain=1`" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50 font-medium text-indigo-700">🖨️ Print merit winners — all schools (plain) ↗</a>
+                                <a v-if="participationBySchool.length" :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?cert_type=participation`" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50 font-medium text-sky-700">🖨️ Print participation — all schools ↗</a>
+                                <a v-if="participationBySchool.length" :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/print-all?cert_type=participation&plain=1`" target="_blank" class="block px-3 py-2 text-xs rounded hover:bg-gray-50 font-medium text-sky-700">🖨️ Print participation — all schools (plain) ↗</a>
                             </div>
                         </details>
                         <Link :href="`/sahodaya-admin/${sahodaya.id}/events/${event.id}/certificates/tally`" class="text-xs font-semibold text-gray-500 hover:text-gray-800">
@@ -356,21 +368,65 @@
                 <span v-if="schoolSearch.trim() || schoolReadiness !== 'all' || schoolDownloaded !== 'all'" class="text-xs text-gray-500">
                     {{ filteredWinnersBySchool.length }} of {{ winnersBySchool.length }} schools
                 </span>
-                <details v-if="readyCertificateIds(filteredWinnersBySchool).length" class="relative ml-auto">
-                    <summary class="btn-secondary py-1.5 px-3 text-xs inline-flex list-none cursor-pointer [&::-webkit-details-marker]:hidden">
-                        📦 Results-complete schools shown ({{ filteredWinnersBySchool.filter(isSchoolReadyForExport).length }}) ▾
+                <details v-if="filteredWinnersBySchool.length" class="relative ml-auto">
+                    <summary class="btn-primary py-1.5 px-3 text-xs inline-flex list-none cursor-pointer [&::-webkit-details-marker]:hidden flex items-center gap-1.5 shadow-sm">
+                        <span>📦 Bulk export & print ({{ allCertificateIds(filteredWinnersBySchool).length }})</span>
+                        <span class="text-xs opacity-75">▾</span>
                     </summary>
-                    <div class="absolute z-20 right-0 mt-1 w-72 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
-                        <p class="px-3 pt-2 pb-1 text-[11px] text-gray-500">One folder per school — only schools whose every registered item has published results<template v-if="schoolDownloaded !== 'yes'"> (excluding downloaded schools)</template>.</p>
-                        <button @click="queueZipDownload({ certificate_ids: readyCertificateIds(filteredWinnersBySchool).join(','), group_by: 'school', exclude_downloaded: '1' }, $event)" :disabled="isBatchRunning"
-                                class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
-                            📦 ZIP (with background)
+                    <div class="absolute z-20 right-0 mt-1 w-80 rounded-lg border border-gray-200 bg-white shadow-xl p-2 text-left">
+                        <!-- All schools section -->
+                        <div class="px-2.5 py-1.5 bg-indigo-50/70 rounded border border-indigo-100 mb-1.5">
+                            <p class="text-xs font-semibold text-indigo-950">
+                                All {{ filteredWinnersBySchool.length }} schools shown
+                                <span class="text-indigo-600 font-bold">({{ allCertificateIds(filteredWinnersBySchool).length }} certificates)</span>
+                            </p>
+                            <p class="text-[11px] text-gray-500">Includes all merit winners across schools (even if some items are still pending).</p>
+                        </div>
+                        <a :href="printWinnersUrl(false, false)" target="_blank"
+                           class="block px-3 py-1.5 text-xs font-medium text-slate-700 rounded hover:bg-indigo-50 hover:text-indigo-700">
+                            🖨️ Print all schools (with background) ↗
+                        </a>
+                        <a :href="printWinnersUrl(true, false)" target="_blank"
+                           class="block px-3 py-1.5 text-xs font-medium text-slate-700 rounded hover:bg-indigo-50 hover:text-indigo-700">
+                            🖨️ Print all schools (plain / no background) ↗
+                        </a>
+                        <button @click="downloadWinnersZip(false, false, $event)" :disabled="isBatchRunning"
+                                class="block w-full text-left px-3 py-1.5 text-xs text-slate-700 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                            📦 ZIP all schools (grouped by school)
                         </button>
-                        <button @click="queueZipDownload({ certificate_ids: readyCertificateIds(filteredWinnersBySchool).join(','), group_by: 'school', plain: '1', exclude_downloaded: '1' }, $event)" :disabled="isBatchRunning"
-                                class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
-                            📦 ZIP — no background
+                        <button @click="downloadWinnersZip(true, false, $event)" :disabled="isBatchRunning"
+                                class="block w-full text-left px-3 py-1.5 text-xs text-slate-700 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                            📦 ZIP all schools (grouped by school — plain)
                         </button>
-                        <p v-if="isBatchRunning" class="px-3 pb-2 text-[11px] text-amber-700">Available once the current run finishes.</p>
+
+                        <!-- Results-complete section if applicable -->
+                        <template v-if="readyCertificateIds(filteredWinnersBySchool).length && readyCertificateIds(filteredWinnersBySchool).length < allCertificateIds(filteredWinnersBySchool).length">
+                            <div class="border-t border-gray-200 my-2"></div>
+                            <div class="px-2.5 py-1.5 bg-emerald-50/70 rounded border border-emerald-100 mb-1.5">
+                                <p class="text-xs font-semibold text-emerald-950">
+                                    Results-complete schools only
+                                    <span class="font-bold text-emerald-700">({{ readyCertificateIds(filteredWinnersBySchool).length }} certificates)</span>
+                                </p>
+                                <p class="text-[11px] text-emerald-700">Only schools whose registered items are 100% published.</p>
+                            </div>
+                            <a :href="printWinnersUrl(false, true)" target="_blank"
+                               class="block px-3 py-1.5 text-xs font-medium text-slate-700 rounded hover:bg-emerald-50 hover:text-emerald-800">
+                                🖨️ Print complete only (with background) ↗
+                            </a>
+                            <a :href="printWinnersUrl(true, true)" target="_blank"
+                               class="block px-3 py-1.5 text-xs font-medium text-slate-700 rounded hover:bg-emerald-50 hover:text-emerald-800">
+                                🖨️ Print complete only (plain) ↗
+                            </a>
+                            <button @click="downloadWinnersZip(false, true, $event)" :disabled="isBatchRunning"
+                                    class="block w-full text-left px-3 py-1.5 text-xs text-slate-700 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                📦 ZIP complete only (grouped by school)
+                            </button>
+                            <button @click="downloadWinnersZip(true, true, $event)" :disabled="isBatchRunning"
+                                    class="block w-full text-left px-3 py-1.5 text-xs text-slate-700 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                📦 ZIP complete only (grouped by school — plain)
+                            </button>
+                        </template>
+                        <p v-if="isBatchRunning" class="px-3 pt-2 text-[11px] text-amber-700">ZIP export available once current run finishes.</p>
                     </div>
                 </details>
             </div>
@@ -585,21 +641,65 @@
                 <span v-if="schoolSearch.trim() || schoolReadiness !== 'all' || schoolDownloaded !== 'all'" class="text-xs text-gray-500">
                     {{ filteredParticipationBySchool.length }} of {{ participationBySchool.length }} schools
                 </span>
-                <details v-if="readyCertificateIds(filteredParticipationBySchool).length" class="relative ml-auto">
-                    <summary class="btn-secondary py-1.5 px-3 text-xs inline-flex list-none cursor-pointer [&::-webkit-details-marker]:hidden">
-                        📦 Results-complete schools shown ({{ filteredParticipationBySchool.filter(isSchoolReadyForExport).length }}) ▾
+                <details v-if="filteredParticipationBySchool.length" class="relative ml-auto">
+                    <summary class="btn-primary py-1.5 px-3 text-xs inline-flex list-none cursor-pointer [&::-webkit-details-marker]:hidden flex items-center gap-1.5 shadow-sm">
+                        <span>📦 Bulk export & print ({{ allCertificateIds(filteredParticipationBySchool).length }})</span>
+                        <span class="text-xs opacity-75">▾</span>
                     </summary>
-                    <div class="absolute z-20 right-0 mt-1 w-72 rounded-lg border border-gray-200 bg-white shadow-lg p-1 text-left">
-                        <p class="px-3 pt-2 pb-1 text-[11px] text-gray-500">One folder per school — only schools whose every registered item has published results<template v-if="schoolDownloaded !== 'yes'"> (excluding downloaded schools)</template>.</p>
-                        <button @click="queueZipDownload({ certificate_ids: readyCertificateIds(filteredParticipationBySchool).join(','), group_by: 'school', exclude_downloaded: '1' }, $event)" :disabled="isBatchRunning"
-                                class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
-                            📦 ZIP (with background)
+                    <div class="absolute z-20 right-0 mt-1 w-80 rounded-lg border border-gray-200 bg-white shadow-xl p-2 text-left">
+                        <!-- All schools section -->
+                        <div class="px-2.5 py-1.5 bg-sky-50/70 rounded border border-sky-100 mb-1.5">
+                            <p class="text-xs font-semibold text-sky-950">
+                                All {{ filteredParticipationBySchool.length }} schools shown
+                                <span class="text-sky-600 font-bold">({{ allCertificateIds(filteredParticipationBySchool).length }} certificates)</span>
+                            </p>
+                            <p class="text-[11px] text-gray-500">Includes all participants across schools.</p>
+                        </div>
+                        <a :href="printParticipationUrl(false, false)" target="_blank"
+                           class="block px-3 py-1.5 text-xs font-medium text-slate-700 rounded hover:bg-sky-50 hover:text-sky-700">
+                            🖨️ Print all schools (with background) ↗
+                        </a>
+                        <a :href="printParticipationUrl(true, false)" target="_blank"
+                           class="block px-3 py-1.5 text-xs font-medium text-slate-700 rounded hover:bg-sky-50 hover:text-sky-700">
+                            🖨️ Print all schools (plain / no background) ↗
+                        </a>
+                        <button @click="downloadParticipationZip(false, false, $event)" :disabled="isBatchRunning"
+                                class="block w-full text-left px-3 py-1.5 text-xs text-slate-700 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                            📦 ZIP all schools (grouped by school)
                         </button>
-                        <button @click="queueZipDownload({ certificate_ids: readyCertificateIds(filteredParticipationBySchool).join(','), group_by: 'school', plain: '1', exclude_downloaded: '1' }, $event)" :disabled="isBatchRunning"
-                                class="block w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
-                            📦 ZIP — no background
+                        <button @click="downloadParticipationZip(true, false, $event)" :disabled="isBatchRunning"
+                                class="block w-full text-left px-3 py-1.5 text-xs text-slate-700 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                            📦 ZIP all schools (grouped by school — plain)
                         </button>
-                        <p v-if="isBatchRunning" class="px-3 pb-2 text-[11px] text-amber-700">Available once the current run finishes.</p>
+
+                        <!-- Results-complete section if applicable -->
+                        <template v-if="readyCertificateIds(filteredParticipationBySchool).length && readyCertificateIds(filteredParticipationBySchool).length < allCertificateIds(filteredParticipationBySchool).length">
+                            <div class="border-t border-gray-200 my-2"></div>
+                            <div class="px-2.5 py-1.5 bg-emerald-50/70 rounded border border-emerald-100 mb-1.5">
+                                <p class="text-xs font-semibold text-emerald-950">
+                                    Results-complete schools only
+                                    <span class="font-bold text-emerald-700">({{ readyCertificateIds(filteredParticipationBySchool).length }} certificates)</span>
+                                </p>
+                                <p class="text-[11px] text-emerald-700">Only schools whose registered items are 100% published.</p>
+                            </div>
+                            <a :href="printParticipationUrl(false, true)" target="_blank"
+                               class="block px-3 py-1.5 text-xs font-medium text-slate-700 rounded hover:bg-emerald-50 hover:text-emerald-800">
+                                🖨️ Print complete only (with background) ↗
+                            </a>
+                            <a :href="printParticipationUrl(true, true)" target="_blank"
+                               class="block px-3 py-1.5 text-xs font-medium text-slate-700 rounded hover:bg-emerald-50 hover:text-emerald-800">
+                                🖨️ Print complete only (plain) ↗
+                            </a>
+                            <button @click="downloadParticipationZip(false, true, $event)" :disabled="isBatchRunning"
+                                    class="block w-full text-left px-3 py-1.5 text-xs text-slate-700 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                📦 ZIP complete only (grouped by school)
+                            </button>
+                            <button @click="downloadParticipationZip(true, true, $event)" :disabled="isBatchRunning"
+                                    class="block w-full text-left px-3 py-1.5 text-xs text-slate-700 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                📦 ZIP complete only (grouped by school — plain)
+                            </button>
+                        </template>
+                        <p v-if="isBatchRunning" class="px-3 pt-2 text-[11px] text-amber-700">ZIP export available once current run finishes.</p>
                     </div>
                 </details>
             </div>
@@ -1141,6 +1241,84 @@ function matchesSchoolSearch(group) {
 
 function readyCertificateIds(groups) {
     return groups.filter(isSchoolReadyForExport).flatMap(group => (group.winners ?? []).map(w => w.id));
+}
+
+function allCertificateIds(groups) {
+    return (groups ?? []).flatMap(group => (group.winners ?? []).map(w => w.id));
+}
+
+function printWinnersUrl(plain = false, completeOnly = false) {
+    const isFiltered = schoolSearch.value.trim() || schoolReadiness.value !== 'all' || schoolDownloaded.value !== 'all';
+    const params = new URLSearchParams();
+    params.set('cert_type', 'winner');
+    params.set('published_only', '1');
+    if (plain) params.set('plain', '1');
+
+    if (completeOnly) {
+        const ids = readyCertificateIds(filteredWinnersBySchool.value);
+        params.set('certificate_ids', ids.join(','));
+    } else if (isFiltered) {
+        const ids = allCertificateIds(filteredWinnersBySchool.value);
+        params.set('certificate_ids', ids.join(','));
+    }
+
+    return `${base}/print-all?${params.toString()}`;
+}
+
+function downloadWinnersZip(plain = false, completeOnly = false, event) {
+    const isFiltered = schoolSearch.value.trim() || schoolReadiness.value !== 'all' || schoolDownloaded.value !== 'all';
+    const payload = {
+        group_by: 'school',
+        cert_type: 'winner',
+        published_only: '1',
+        exclude_downloaded: '0',
+    };
+    if (plain) payload.plain = '1';
+
+    if (completeOnly) {
+        payload.certificate_ids = readyCertificateIds(filteredWinnersBySchool.value).join(',');
+        payload.exclude_downloaded = schoolDownloaded.value === 'yes' ? '0' : '1';
+    } else if (isFiltered) {
+        payload.certificate_ids = allCertificateIds(filteredWinnersBySchool.value).join(',');
+    }
+
+    queueZipDownload(payload, event);
+}
+
+function printParticipationUrl(plain = false, completeOnly = false) {
+    const isFiltered = schoolSearch.value.trim() || schoolReadiness.value !== 'all' || schoolDownloaded.value !== 'all';
+    const params = new URLSearchParams();
+    params.set('cert_type', 'participation');
+    if (plain) params.set('plain', '1');
+
+    if (completeOnly) {
+        const ids = readyCertificateIds(filteredParticipationBySchool.value);
+        params.set('certificate_ids', ids.join(','));
+    } else if (isFiltered) {
+        const ids = allCertificateIds(filteredParticipationBySchool.value);
+        params.set('certificate_ids', ids.join(','));
+    }
+
+    return `${base}/print-all?${params.toString()}`;
+}
+
+function downloadParticipationZip(plain = false, completeOnly = false, event) {
+    const isFiltered = schoolSearch.value.trim() || schoolReadiness.value !== 'all' || schoolDownloaded.value !== 'all';
+    const payload = {
+        group_by: 'school',
+        cert_type: 'participation',
+        exclude_downloaded: '0',
+    };
+    if (plain) payload.plain = '1';
+
+    if (completeOnly) {
+        payload.certificate_ids = readyCertificateIds(filteredParticipationBySchool.value).join(',');
+        payload.exclude_downloaded = schoolDownloaded.value === 'yes' ? '0' : '1';
+    } else if (isFiltered) {
+        payload.certificate_ids = allCertificateIds(filteredParticipationBySchool.value).join(',');
+    }
+
+    queueZipDownload(payload, event);
 }
 
 function allNonDownloadedCertificateIds() {

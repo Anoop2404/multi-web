@@ -310,4 +310,72 @@ class FestCertificateExportTest extends TestCase
         $this->assertSame('Master/Miss', $certifyFor('other'));
         $this->assertSame('Master/Miss', $certifyFor(null));
     }
+
+    public function test_print_all_winners_across_all_schools_is_sorted_by_school_then_position(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $sahodaya = $this->makeSahodaya();
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        $schoolBeta = Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'school', 'parent_id' => $sahodaya->id,
+            'name' => 'Beta School', 'domain' => Str::uuid().'.test',
+            'membership_status' => 'approved', 'is_active' => true,
+        ]);
+        $schoolAlpha = Tenant::create([
+            'id' => (string) Str::uuid(), 'type' => 'school', 'parent_id' => $sahodaya->id,
+            'name' => 'Alpha School', 'domain' => Str::uuid().'.test',
+            'membership_status' => 'approved', 'is_active' => true,
+        ]);
+
+        $event = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Sort Event', 'event_type' => 'kalolsavam']);
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Singing', 'item_code' => 'SG1']);
+
+        // Create winners: Beta 1st, Alpha 2nd, Alpha 1st
+        static $seed = 800;
+        $createWinner = function (Tenant $school, int $position) use ($event, $item, &$seed) {
+            $seed++;
+            $reg = FestRegistration::create([
+                'event_id' => $event->id, 'item_id' => $item->id, 'school_id' => $school->id, 'status' => 'approved',
+            ]);
+            $part = FestParticipant::create([
+                'registration_id' => $reg->id, 'event_id' => $event->id, 'student_id' => $seed,
+                'participant_type' => 'student', 'participant_role' => 'performer',
+            ]);
+            \App\Models\FestMark::create([
+                'event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $part->id, 'position' => $position,
+            ]);
+            return Certificate::create([
+                'entity_type' => FestParticipant::class, 'entity_id' => $part->id,
+                'cert_type' => 'winner', 'verification_uuid' => (string) Str::uuid(), 'generated_at' => now(),
+            ]);
+        };
+
+        $betaWinner1 = $createWinner($schoolBeta, 1);
+        $alphaWinner2 = $createWinner($schoolAlpha, 2);
+        $alphaWinner1 = $createWinner($schoolAlpha, 1);
+
+        $response = $this->actingAs($admin)->get(route('sahodaya.events.certificates.print-all', [
+            'tenantId' => $sahodaya->id,
+            'event' => $event->id,
+        ]).'?cert_type=winner');
+
+        $response->assertOk();
+        $content = $response->getContent();
+
+        $posAlpha1 = strpos($content, $alphaWinner1->verification_uuid);
+        $posAlpha2 = strpos($content, $alphaWinner2->verification_uuid);
+        $posBeta1 = strpos($content, $betaWinner1->verification_uuid);
+
+        $this->assertNotFalse($posAlpha1);
+        $this->assertNotFalse($posAlpha2);
+        $this->assertNotFalse($posBeta1);
+
+        // Alpha School comes before Beta School alphabetically
+        // And within Alpha School, 1st place comes before 2nd place
+        $this->assertTrue($posAlpha1 < $posAlpha2, 'Alpha 1st place should appear before Alpha 2nd place.');
+        $this->assertTrue($posAlpha2 < $posBeta1, 'Alpha School should appear before Beta School.');
+    }
 }
