@@ -1829,8 +1829,10 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::post('/{event}/point-rules', [FestEventSettingsController::class, 'storePointRule'])->name('point-rules.store');
             Route::delete('/{event}/point-rules/{pointRule}', [FestEventSettingsController::class, 'destroyPointRule'])->name('point-rules.destroy');
             Route::post('/{event}/point-rules/seed-confed-kalotsav', [FestEventSettingsController::class, 'seedConfedKalotsavPoints'])->name('point-rules.seed-confed-kalotsav');
+            Route::post('/{event}/point-rules/seed-place-points', [FestEventSettingsController::class, 'seedIndividualGroupPlacePoints'])->name('point-rules.seed-place-points');
             Route::post('/{event}/point-rules/sync-to-regions', [FestEventSettingsController::class, 'syncPointRulesToRegions'])->name('point-rules.sync-to-regions');
             Route::post('/{event}/rank-point-templates', [FestEventSettingsController::class, 'storeRankTemplate'])->name('rank-point-templates.store');
+            Route::post('/{event}/rank-point-templates/seed-individual-group', [FestEventSettingsController::class, 'seedIndividualGroupRankPoints'])->name('rank-point-templates.seed-individual-group');
             Route::put('/{event}/rank-point-templates/{template}', [FestEventSettingsController::class, 'updateRankTemplate'])->name('rank-point-templates.update');
             Route::delete('/{event}/rank-point-templates/{template}', [FestEventSettingsController::class, 'destroyRankTemplate'])->name('rank-point-templates.destroy');
             Route::put('/{event}/rank-point-templates/{template}/points', [FestEventSettingsController::class, 'updateRankPoints'])->name('rank-point-templates.points');

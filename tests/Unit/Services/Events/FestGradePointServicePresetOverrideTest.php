@@ -129,10 +129,34 @@ class FestGradePointServicePresetOverrideTest extends TestCase
         $this->assertSame(['A', 'B', 'C'], $this->service()->validGradesForEvent($event));
     }
 
-    /** @return array{0: FestParticipant} */
-    private function makeParticipant(FestEvent $event, FestEventItem $item): array
+    public function test_any_grade_place_rules_apply_when_no_grade_specific_rule_exists(): void
     {
-        $schoolClass = SchoolClass::create(['tenant_id' => $event->tenant_id, 'name' => '10']);
+        $event = $this->makeEvent('');
+        $item = FestEventItem::create(['event_id' => $event->id, 'title' => 'Solo Song', 'participant_type' => 'individual']);
+        $groupItem = FestEventItem::create(['event_id' => $event->id, 'title' => 'Group Song', 'participant_type' => 'group']);
+        [$solo] = $this->makeParticipant($event, $item, '10A');
+        [$groupMember] = $this->makeParticipant($event, $groupItem, '10B');
+
+        FestPointRule::create(['event_id' => $event->id, 'grade' => null, 'position' => 1, 'points' => 5, 'is_group' => false]);
+        FestPointRule::create(['event_id' => $event->id, 'grade' => null, 'position' => 2, 'points' => 3, 'is_group' => false]);
+        FestPointRule::create(['event_id' => $event->id, 'grade' => null, 'position' => 3, 'points' => 1, 'is_group' => false]);
+        FestPointRule::create(['event_id' => $event->id, 'grade' => null, 'position' => 1, 'points' => 10, 'is_group' => true]);
+        FestPointRule::create(['event_id' => $event->id, 'grade' => null, 'position' => 2, 'points' => 6, 'is_group' => true]);
+        FestPointRule::create(['event_id' => $event->id, 'grade' => null, 'position' => 3, 'points' => 2, 'is_group' => true]);
+
+        $soloMark = FestMark::create(['event_id' => $event->id, 'item_id' => $item->id, 'participant_id' => $solo->id, 'position' => 1, 'grade' => 'A']);
+        $groupMark = FestMark::create(['event_id' => $event->id, 'item_id' => $groupItem->id, 'participant_id' => $groupMember->id, 'position' => 2, 'grade' => 'B']);
+
+        $this->assertSame(5, $this->service()->pointsForMark($event, $soloMark));
+        $this->assertSame(6, $this->service()->pointsForMark($event, $groupMark));
+    }
+
+    /** @return array{0: FestParticipant} */
+    private function makeParticipant(FestEvent $event, FestEventItem $item, string $className = '10'): array
+    {
+        $schoolClass = SchoolClass::firstOrCreate(
+            ['tenant_id' => $event->tenant_id, 'name' => $className],
+        );
         $student = Student::create([
             'tenant_id' => $event->tenant_id, 'school_class_id' => $schoolClass->id,
             'name' => 'Test Student', 'admission_no' => 'S'.random_int(1000, 9999),

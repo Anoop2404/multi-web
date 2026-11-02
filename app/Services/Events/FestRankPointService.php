@@ -20,6 +20,20 @@ class FestRankPointService
         6 => 3,
     ];
 
+    /** Common school-meet place points: Individual 1st/2nd/3rd. */
+    public const INDIVIDUAL_PLACE_STANDARD = [
+        1 => 5,
+        2 => 3,
+        3 => 1,
+    ];
+
+    /** Common school-meet place points: Group/team 1st/2nd/3rd (double individual). */
+    public const GROUP_PLACE_STANDARD = [
+        1 => 10,
+        2 => 6,
+        3 => 2,
+    ];
+
     /** @return Collection<int, FestRankPointTemplate> */
     public function templatesForEvent(FestEvent $event): Collection
     {
@@ -137,6 +151,40 @@ class FestRankPointService
             ->all();
 
         return $this->replaceRows($template, $rows);
+    }
+
+    /**
+     * Ensure Individual (5/3/1) and Group (10/6/2) place-point templates exist and are
+     * assigned to the usual participant types. Re-clicking resets the rank rows.
+     *
+     * @return array{individual: int, group: int}
+     */
+    public function seedIndividualAndGroupPlaceStandards(FestEvent $event): array
+    {
+        $individual = $this->templateForType($event, 'individual')
+            ?? $this->createTemplate($event, 'Individual', ['individual']);
+        $this->assignTypes($individual, ['individual']);
+        $individualCount = $this->replaceRows(
+            $individual,
+            collect(self::INDIVIDUAL_PLACE_STANDARD)
+                ->map(fn (int $points, int $rank) => ['rank' => $rank, 'points' => $points])
+                ->values()
+                ->all(),
+        );
+
+        // Pair scores as group (10/6/2), same as team/trio — not the individual scale.
+        $group = $this->templateForType($event, 'group')
+            ?? $this->createTemplate($event, 'Group', ['group', 'team', 'trio', 'pair']);
+        $this->assignTypes($group, ['group', 'team', 'trio', 'pair']);
+        $groupCount = $this->replaceRows(
+            $group,
+            collect(self::GROUP_PLACE_STANDARD)
+                ->map(fn (int $points, int $rank) => ['rank' => $rank, 'points' => $points])
+                ->values()
+                ->all(),
+        );
+
+        return ['individual' => $individualCount, 'group' => $groupCount];
     }
 
     public function pointsForRank(FestEvent $event, int $rank, string $participantType): int

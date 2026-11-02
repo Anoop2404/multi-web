@@ -165,4 +165,20 @@ class FestRankPointServiceTest extends TestCase
 
         $this->assertSame(0, $points);
     }
+
+    public function test_seed_individual_and_group_place_standards_loads_5_3_1_and_10_6_2(): void
+    {
+        $event = $this->makeEvent();
+        $service = app(FestRankPointService::class);
+
+        $counts = $service->seedIndividualAndGroupPlaceStandards($event);
+
+        $this->assertSame(['individual' => 3, 'group' => 3], $counts);
+        $this->assertSame(5, $service->pointsForRank($event, 1, 'individual'));
+        $this->assertSame(1, $service->pointsForRank($event, 3, 'individual'));
+        $this->assertSame(10, $service->pointsForRank($event, 1, 'group'));
+        $this->assertSame(6, $service->pointsForRank($event, 2, 'team'));
+        $this->assertSame(2, $service->pointsForRank($event, 3, 'trio'));
+        $this->assertSame(10, $service->pointsForRank($event, 1, 'pair'), 'Pair uses the Group place scale.');
+    }
 }

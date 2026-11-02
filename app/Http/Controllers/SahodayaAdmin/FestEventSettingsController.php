@@ -1562,6 +1562,49 @@ class FestEventSettingsController extends SahodayaAdminController
     }
 
     /**
+     * Place-only championship points: Individual 1st/2nd/3rd = 5/3/1, Group = 10/6/2
+     * (config/fest_confed_kalotsav_scoring.php place_points). Stored as Any Grade rules
+     * so they apply regardless of the mark's grade band. Re-clicking resets cleanly.
+     */
+    public function seedIndividualGroupPlacePoints(string $tenantId, FestEvent $event)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+
+        $tables = [
+            false => config('fest_confed_kalotsav_scoring.place_points.individual', [1 => 5, 2 => 3, 3 => 1]),
+            true => config('fest_confed_kalotsav_scoring.place_points.group', [1 => 10, 2 => 6, 3 => 2]),
+        ];
+
+        $count = 0;
+        foreach ($tables as $isGroup => $positions) {
+            foreach ($positions as $position => $points) {
+                FestPointRule::updateOrCreate(
+                    [
+                        'event_id'  => $event->id,
+                        'grade'     => null,
+                        'position'  => (int) $position,
+                        'is_group'  => $isGroup,
+                    ],
+                    ['points' => (int) $points],
+                );
+                $count++;
+            }
+        }
+
+        EventContext::for($event)->recalculateSchoolPoints();
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            FestPageActivity::settingsTab('points'),
+            'fest.settings.place_points_seeded',
+            'Loaded Individual 5/3/1 and Group 10/6/2 place points',
+            ['count' => $count],
+        );
+
+        return back()->with('success', 'Place points loaded — Individual 5/3/1, Group 10/6/2.');
+    }
+
+    /**
      * One-click fill for BOTH Grade Master bands and Grade Points Master rules from
      * config/fest_default_kalotsav_grading.php -- the standard Kalotsav grade+points
      * table any Sahodaya admin can self-service load onto their own event (and, via
@@ -1885,6 +1928,26 @@ class FestEventSettingsController extends SahodayaAdminController
         );
 
         return back()->with('success', "Loaded athletics standard ({$count} ranks).");
+    }
+
+    /** Sports: create/reset Individual 5/3/1 and Group 10/6/2 rank-point templates. */
+    public function seedIndividualGroupRankPoints(string $tenantId, FestEvent $event, FestRankPointService $rankPoints)
+    {
+        abort_if($event->tenant_id !== $this->sahodaya->id, 403);
+        abort_unless($event->event_type === 'sports', 422, 'Individual/Group place templates apply to sports events only.');
+
+        $counts = $rankPoints->seedIndividualAndGroupPlaceStandards($event);
+        $this->recalculateRankPointEvents($event);
+
+        app(PlatformAuditLogger::class)->festEvent(
+            $event,
+            FestPageActivity::settingsTab('points'),
+            'fest.settings.individual_group_rank_points_seeded',
+            'Loaded Individual 5/3/1 and Group 10/6/2 rank points',
+            $counts,
+        );
+
+        return back()->with('success', 'Individual (5/3/1) and Group (10/6/2) rank points loaded.');
     }
 
     public function storeVolunteer(Request $request, string $tenantId, FestEvent $event)

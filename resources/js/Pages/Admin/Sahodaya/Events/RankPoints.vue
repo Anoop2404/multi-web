@@ -40,6 +40,9 @@
                     <button type="button" class="btn-primary text-xs !py-1.5 !px-4" :disabled="!newTemplateName.trim() || creatingTemplate" @click="createTemplate">
                         {{ creatingTemplate ? 'Creating…' : '+ New Template' }}
                     </button>
+                    <button type="button" class="btn-secondary text-xs !py-1.5 !px-3" :disabled="seedingIndividualGroup" @click="seedIndividualGroup">
+                        {{ seedingIndividualGroup ? 'Loading…' : '⚡ Load Individual 5/3/1 + Group 10/6/2' }}
+                    </button>
                 </div>
             </section>
 
@@ -128,6 +131,9 @@
                         </button>
                         <button type="button" class="btn-secondary text-xs !py-1.5 !px-3" :disabled="seedingConfed" @click="seedConfedKalotsav">
                             {{ seedingConfed ? 'Loading…' : '⚡ Load Kalolsavam Manual Standard' }}
+                        </button>
+                        <button type="button" class="btn-secondary text-xs !py-1.5 !px-3" :disabled="seedingPlacePoints" @click="seedPlacePoints">
+                            {{ seedingPlacePoints ? 'Loading…' : '⚡ Load Place Points (Ind 5/3/1 · Group 10/6/2)' }}
                         </button>
                         <button v-if="isHubWithRegions" type="button" class="btn-secondary text-xs !py-1.5 !px-3"
                                 :disabled="syncingToRegions || !props.pointRules.length" :title="!props.pointRules.length ? 'Add or load points here first' : ''"
@@ -334,6 +340,26 @@ function seedConfedKalotsav() {
     router.post(`${base.value}/point-rules/seed-confed-kalotsav`, {}, {
         preserveScroll: true,
         onFinish: () => { seedingConfed.value = false; },
+    });
+}
+
+const seedingPlacePoints = ref(false);
+
+function seedPlacePoints() {
+    seedingPlacePoints.value = true;
+    router.post(`${base.value}/point-rules/seed-place-points`, {}, {
+        preserveScroll: true,
+        onFinish: () => { seedingPlacePoints.value = false; },
+    });
+}
+
+const seedingIndividualGroup = ref(false);
+
+function seedIndividualGroup() {
+    seedingIndividualGroup.value = true;
+    router.post(`${base.value}/rank-point-templates/seed-individual-group`, {}, {
+        preserveScroll: true,
+        onFinish: () => { seedingIndividualGroup.value = false; },
     });
 }
 

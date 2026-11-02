@@ -102,26 +102,28 @@ class FestGradePointService
         }
 
         $normalizedGrade = $mark->grade ? $this->normalizeGrade($event, $mark->grade) : null;
-        $matchesGrade = fn (FestPointRule $r) => $normalizedGrade !== null
-            ? $r->grade === $normalizedGrade
-            : $r->grade === null;
+
+        // Prefer an exact grade match, then fall back to an "Any Grade" (null) rule.
+        // Sorting matches by id desc is a defensive tiebreaker for legacy duplicates —
+        // storePointRule() upserts on (event_id, grade, position, is_group) going forward.
+        $pickRule = function (Collection $candidates) use ($normalizedGrade): ?FestPointRule {
+            $sorted = $candidates->sortByDesc('id');
+            if ($normalizedGrade !== null) {
+                $exact = $sorted->first(fn (FestPointRule $r) => $r->grade === $normalizedGrade);
+                if ($exact) {
+                    return $exact;
+                }
+            }
+
+            return $sorted->first(fn (FestPointRule $r) => $r->grade === null);
+        };
 
         // Exact match on this grade at this exact position — e.g. "Grade A, 1st place".
-        // Sorting matches by id desc and taking the first is a defensive tiebreaker, not
-        // the real fix: storePointRule() now upserts on (event_id, grade, position,
-        // is_group) so this combination can't be saved twice going forward, but existing
-        // duplicate rows from before that fix (or any other future write path) would
-        // otherwise make this pick an effectively arbitrary row — this at least keeps
-        // that pick consistent across requests instead of drifting between whichever row
-        // happens to come first.
         if ($mark->position) {
-            $rule = $pointRules
+            $rule = $pickRule($pointRules
                 ->filter(fn (FestPointRule $r) => (bool) $r->is_group === $isGroup
                     && $r->position !== null
-                    && (int) $r->position === (int) $mark->position
-                    && $matchesGrade($r))
-                ->sortByDesc('id')
-                ->first();
+                    && (int) $r->position === (int) $mark->position));
 
             if ($rule) {
                 if (($rule->points_table ?? 'custom') === 'athletics_standard') {
@@ -138,12 +140,9 @@ class FestGradePointService
             return 0;
         }
 
-        $anyPositionRule = $pointRules
+        $anyPositionRule = $pickRule($pointRules
             ->filter(fn (FestPointRule $r) => (bool) $r->is_group === $isGroup
-                && $r->position === null
-                && $matchesGrade($r))
-            ->sortByDesc('id')
-            ->first();
+                && $r->position === null));
 
         if ($anyPositionRule) {
             return (int) $anyPositionRule->points;
@@ -194,11 +193,13 @@ class FestGradePointService
             if ($mode === 'group') {
                 return true;
             }
+            // Language fest keeps pairs on the individual scale; everything else
+            // treats pair as group (10/6/2 place points), matching Rank Points seeding.
             if (($policy['preset_key'] ?? '') === 'sahodaya_language_fest') {
                 return false;
             }
 
-            return false;
+            return true;
         }
 
         return true;
