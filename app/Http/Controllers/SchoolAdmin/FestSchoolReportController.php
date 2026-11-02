@@ -309,15 +309,19 @@ class FestSchoolReportController extends SchoolAdminController
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
+        $isSports = $event->event_type === 'sports';
         $analytics = app(\App\Services\Events\FestEventReportAnalyticsService::class, ['event' => $event]);
-        $rows = $this->stripChestNumbers($analytics->studentWiseBrowserRows($this->school->id, $request->input('search'), photoForSchoolAdmin: true));
+        $rows = $analytics->studentWiseBrowserRows($this->school->id, $request->input('search'), photoForSchoolAdmin: true);
+        if (! $isSports) {
+            $rows = $this->stripChestNumbers($rows);
+        }
 
         $base = $this->schoolReportsBase($program, $event);
 
         return $this->inertia('School/Events/ReportStudentWise', [
             'program'  => $program,
             'school'   => $this->school->only('id', 'name'),
-            'event'    => $event->only('id', 'title'),
+            'event'    => $event->only('id', 'title', 'event_type'),
             'rows'     => $rows,
             'pdfUrl'   => "{$base}/student-wise/pdf",
             'xlsUrl'   => "{$base}/student-wise/export",
@@ -564,20 +568,24 @@ class FestSchoolReportController extends SchoolAdminController
     {
         abort_if($event->tenant_id !== $this->school->parent_id, 403);
 
+        $isSports = $event->event_type === 'sports';
         $analytics = app(\App\Services\Events\FestEventReportAnalyticsService::class, ['event' => $event]);
-        $rows = $this->stripChestNumbers($analytics->studentWiseBrowserRows(
+        $rows = $analytics->studentWiseBrowserRows(
             $this->school->id,
             $request->input('search'),
             includePhotoDataUri: true,
             photoForSchoolAdmin: true,
-        ));
+        );
+        if (! $isSports) {
+            $rows = $this->stripChestNumbers($rows);
+        }
 
         $reportService = app(\App\Services\Events\FestReportService::class, ['event' => $event]);
 
         return $reportService->renderPdf('fest.reports.student-wise', [
             'event'        => $event,
             'students'     => $rows,
-            'showChestNo'  => false,
+            'showChestNo'  => $isSports,
             ...$reportService->brandingData(),
         ], \Illuminate\Support\Str::slug($event->title).'-student-wise-report.pdf');
     }
@@ -588,22 +596,34 @@ class FestSchoolReportController extends SchoolAdminController
 
         $analytics = app(\App\Services\Events\FestEventReportAnalyticsService::class, ['event' => $event]);
         $rows = $analytics->studentWiseBrowserRows($this->school->id, $request->input('search'));
+        $isSports = $event->event_type === 'sports';
 
-        return response()->streamDownload(function () use ($event, $rows) {
+        return response()->streamDownload(function () use ($event, $rows, $isSports) {
             $out = fopen('php://output', 'w');
             CsvSafety::fputcsv($out, ['Generated on', now()->format('d M Y, h:i A')]);
             CsvSafety::fputcsv($out, []);
-            CsvSafety::fputcsv($out, ['Reg / Adm No', 'Name', 'Gender', 'Item Count', 'Registered Items', 'Total Score']);
+            $headers = ['Reg / Adm No', 'Name', 'Gender'];
+            if ($isSports) {
+                $headers[] = 'DOB';
+                $headers[] = 'Chest No';
+            }
+            $headers = array_merge($headers, ['Item Count', 'Registered Items', 'Total Score']);
+            CsvSafety::fputcsv($out, $headers);
             foreach ($rows as $row) {
                 $itemTitles = collect($row['items'])->pluck('item_title')->filter()->implode('; ');
-                CsvSafety::fputcsv($out, [
+                $data = [
                     $row['reg_no'] ?? '',
                     $row['name'] ?? '',
                     $row['gender'] ?? '',
-                    $row['item_count'] ?? 0,
-                    $itemTitles,
-                    $row['total_score'] ?? 0,
-                ]);
+                ];
+                if ($isSports) {
+                    $data[] = $row['dob'] ?? '';
+                    $data[] = $row['chest_no'] ?? '';
+                }
+                $data[] = $row['item_count'] ?? 0;
+                $data[] = $itemTitles;
+                $data[] = $row['total_score'] ?? 0;
+                CsvSafety::fputcsv($out, $data);
             }
             fclose($out);
         }, \App\Support\ReportFilename::build('student-wise', $event->title, $event->event_start, [$this->school->name], 'csv'), ['Content-Type' => 'text/csv']);

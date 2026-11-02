@@ -123,6 +123,11 @@
             border-radius: 1.6mm; background: var(--accent); color: #fff;
             font-size: 5.8pt; font-weight: 800; text-transform: uppercase; letter-spacing: .32mm;
         }
+        .participant-chest {
+            margin-top: 1.2mm; width: 100%; text-align: center; padding: 0.6mm 0;
+            border-radius: 1.2mm; background: #eef6ff; border: 0.3mm solid #c8daed;
+            font-size: 6.2pt; font-weight: 800; color: var(--primary);
+        }
 
         .student-details { min-width: 0; }
         .student-name {
@@ -139,6 +144,10 @@
         .meta-grid--3col .meta-box--venue,
         .meta-grid--3col .meta-box--date { grid-column: span 3; }
         .meta-grid--3col .meta-box:not(.meta-box--venue):not(.meta-box--date) { grid-column: span 2; }
+        .meta-grid--4col { grid-template-columns: repeat(12, 1fr); }
+        .meta-grid--4col .meta-box--venue,
+        .meta-grid--4col .meta-box--date { grid-column: span 6; }
+        .meta-grid--4col .meta-box:not(.meta-box--venue):not(.meta-box--date) { grid-column: span 3; }
         .meta-box { min-width: 0; padding: 1.1mm 1.6mm; background: #f2f7fc; border-radius: 1.6mm; }
         .meta-label { display: block; font-size: 5pt; font-weight: 700; text-transform: uppercase; color: #8391a4; margin-bottom: .5mm; }
         .meta-value {
@@ -237,6 +246,11 @@
             margin-top: 1.6mm; text-align: center; padding: 1.1mm 0; border-radius: 1.6mm;
             background: #ec1470; color: #fff; font-size: 5.4pt; font-weight: 800;
             text-transform: uppercase; letter-spacing: 0.24mm;
+        }
+        .pass-card-pdf__chest-label {
+            margin-top: 1.2mm; text-align: center; padding: 0.6mm 0; border-radius: 1.2mm;
+            background: #eef6ff; font-size: 5.6pt; font-weight: 800; color: #073f82;
+            text-transform: uppercase;
         }
         .pass-card-pdf__info-cell { display: table-cell; vertical-align: top; padding: 2.6mm 3.5mm 1.6mm 3.2mm; }
         .pass-card-pdf__name {

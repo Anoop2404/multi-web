@@ -27,7 +27,7 @@ class FestChestNumberService
         }
 
         $event = $participant->registration?->event;
-        if ($event?->chest_reveal_mode === 'stage_entry' && ! $this->isRevealed($participant)) {
+        if ($event?->event_type !== 'sports' && $event?->chest_reveal_mode === 'stage_entry' && ! $this->isRevealed($participant)) {
             return '—';
         }
 

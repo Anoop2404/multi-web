@@ -118,4 +118,46 @@ class FestIdCardPassCardProgramLabelTest extends TestCase
         $this->assertStringContainsString('Under 8', $pdfHtml);
         $this->assertStringNotContainsString('Under VIII', $pdfHtml);
     }
+
+    public function test_pass_card_renders_chest_number_for_sports_event(): void
+    {
+        $card = [
+            'name' => 'Eden Joseph Suneesh',
+            'program_label' => 'Sports Meet',
+            'is_sports' => true,
+            'event_type' => 'sports',
+            'academic_year' => '2026-2027',
+            'sahodaya_name' => 'Wayanad Sahodaya',
+            'category' => 'Under 10',
+            'dob' => '15 Jul 2018',
+            'venue' => 'De Paul Public School Kalpetta',
+            'event_date' => '6th Nov - 7th Oct 2026',
+            'id_label' => 'Fest ID',
+            'id_number' => '6',
+            'chest_number' => '105',
+        ];
+
+        $html = view('fest.id-cards.partials.pass-card', [
+            'card' => $card,
+            'clusterName' => 'Wayanad Sahodaya',
+            'clusterLogoSrc' => null,
+            'eventTitle' => 'Sports Meet 2026-27',
+        ])->render();
+
+        $this->assertStringContainsString('Chest #105', $html);
+        $this->assertStringContainsString('Chest No', $html);
+        $this->assertStringContainsString('105', $html);
+        $this->assertStringContainsString('meta-grid--4col', $html);
+
+        $pdfHtml = view('fest.id-cards.partials.pass-card-pdf', [
+            'card' => $card,
+            'clusterName' => 'Wayanad Sahodaya',
+            'clusterLogoSrc' => null,
+            'eventTitle' => 'Sports Meet 2026-27',
+        ])->render();
+
+        $this->assertStringContainsString('Chest #105', $pdfHtml);
+        $this->assertStringContainsString('Chest No', $pdfHtml);
+        $this->assertStringContainsString('105', $pdfHtml);
+    }
 }

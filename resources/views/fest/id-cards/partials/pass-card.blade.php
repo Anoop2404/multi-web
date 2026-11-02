@@ -31,6 +31,10 @@
         ?? (!empty($card['is_sports']) || ($card['event_type'] ?? null) === 'sports'
             ? 'Sports Meet'
             : (\App\Support\ProgramRouteMap::labelForEventType($card['event_type'] ?? null) ?: 'Kalotsav'));
+    $chestNumber = $card['chest_number'] ?? $card['chest_no'] ?? null;
+    $chestNoDisplay = !empty($chestNumber) ? $chestNumber : null;
+    $hasDob = !empty($card['dob']);
+    $hasChest = !empty($chestNoDisplay);
 @endphp
 <div class="id-card">
     <div class="card-header">
@@ -65,7 +69,9 @@
                 @endif
             </div>
             <div class="participant-label">{{ $roleLabel }}</div>
-            @if(!empty($card['is_sports']) && !empty($card['chest_number']))<div style="font-size:12px;font-weight:700;">Chest #{{ $card['chest_number'] }}</div>@endif
+            @if(!empty($card['is_sports']) && !empty($chestNumber))
+                <div class="participant-chest">Chest #{{ $chestNumber }}</div>
+            @endif
         </div>
 
         <div class="student-details">
@@ -92,7 +98,7 @@
                     </div>
                 </div>
             @else
-                <div class="meta-grid {{ !empty($card['dob']) ? 'meta-grid--3col' : '' }}">
+                <div class="meta-grid {{ ($hasDob && $hasChest) ? 'meta-grid--4col' : (($hasDob || $hasChest) ? 'meta-grid--3col' : '') }}">
                     <div class="meta-box meta-box--venue">
                         <span class="meta-label">Venue</span>
                         <span class="meta-value">{{ $card['venue'] ?? '—' }}</span>
@@ -105,6 +111,12 @@
                         <span class="meta-label">Category</span>
                         <span class="meta-value category-value">{{ $category }}</span>
                     </div>
+                    @if(!empty($chestNoDisplay))
+                    <div class="meta-box">
+                        <span class="meta-label">Chest No</span>
+                        <span class="meta-value category-value">{{ $chestNoDisplay }}</span>
+                    </div>
+                    @endif
                     @if(!empty($card['dob']))
                     <div class="meta-box">
                         <span class="meta-label">DOB</span>

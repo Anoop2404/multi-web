@@ -1233,10 +1233,12 @@ class FestReportService
         $analytics = app(FestEventReportAnalyticsService::class, ['event' => $this->event]);
         $rows = $analytics->studentWiseBrowserRows($schoolId, $search, includePhotoDataUri: true, rank: $rank);
 
+        $isSports = $this->event->event_type === 'sports';
+
         return $this->renderPdf('fest.reports.student-wise', [
             'event' => $this->event,
             'students' => $rows,
-            'showChestNo' => false,
+            'showChestNo' => $isSports,
             // ?hide_marks=1: no Rank / Mark / Grade columns (a plain registered-items list).
             'showMarks' => ! $request->boolean('hide_marks'),
             'bySchool' => $request->boolean('by_school'),
@@ -1249,31 +1251,42 @@ class FestReportService
         $analytics = app(FestEventReportAnalyticsService::class, ['event' => $this->event]);
         $students = $analytics->studentWiseBrowserRows($request->input('school_id'), $request->input('search'), rank: $request->integer('rank') ?: null);
 
+        $isSports = $this->event->event_type === 'sports';
+
         // One row per student × item (not one row per student) so rank/mark/grade — which
         // are per-item — have somewhere to go; the old one-row-per-student shape only had
         // room for a concatenated item-title list.
         $rows = [];
         foreach ($students as $student) {
             foreach ($student['items'] as $item) {
-                $rows[] = [
+                $row = [
                     $student['school_name'],
                     $student['school_code'],
                     $student['reg_no'],
                     $student['name'],
                     $student['gender'],
-                    $item['item_title'],
-                    $item['category_label'],
-                    $item['results_published'] ? $item['position'] : null,
-                    $item['results_published'] ? $item['score'] : null,
-                    $item['results_published'] ? $item['grade'] : ($item['results_published'] === false ? 'Pending' : null),
                 ];
+                if ($isSports) {
+                    $row[] = $student['dob'] ?? '';
+                    $row[] = $item['chest_no'] ?? ($student['chest_no'] ?? '');
+                }
+                $row[] = $item['item_title'];
+                $row[] = $item['category_label'];
+                $row[] = $item['results_published'] ? $item['position'] : null;
+                $row[] = $item['results_published'] ? $item['score'] : null;
+                $row[] = $item['results_published'] ? $item['grade'] : ($item['results_published'] === false ? 'Pending' : null);
+                $rows[] = $row;
             }
         }
 
-        return ExcelExport::download($this->slug().'-student-wise-report', [
-            'School', 'School Code', 'Reg No', 'Student', 'Gender', 'Item', 'Category',
-            'Rank', 'Mark', 'Grade',
-        ], $rows, ExcelExport::generatedOnNote());
+        $headers = ['School', 'School Code', 'Reg No', 'Student', 'Gender'];
+        if ($isSports) {
+            $headers[] = 'DOB';
+            $headers[] = 'Chest No';
+        }
+        $headers = array_merge($headers, ['Item', 'Category', 'Rank', 'Mark', 'Grade']);
+
+        return ExcelExport::download($this->slug().'-student-wise-report', $headers, $rows, ExcelExport::generatedOnNote());
     }
 
     private function registrationListPdf(Request $request): \Symfony\Component\HttpFoundation\Response

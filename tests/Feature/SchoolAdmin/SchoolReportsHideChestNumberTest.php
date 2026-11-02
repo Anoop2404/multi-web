@@ -234,6 +234,24 @@ class SchoolReportsHideChestNumberTest extends TestCase
         $response->assertDontSee(self::CHEST_NO);
     }
 
+    public function test_sports_id_cards_json_includes_chest_number(): void
+    {
+        $f = $this->fixture();
+        $f['event']->update(['event_type' => 'sports']);
+
+        $response = $this->actingAs($f['admin'])->getJson(
+            route('school.sports.reports.id-cards.cards', [
+                'tenantId' => $f['school']->id, 'event' => $f['event']->id, 'scope' => 'event',
+            ]),
+        );
+
+        $response->assertOk();
+        $response->assertSee(self::CHEST_NO);
+        $cards = $response->json('cards');
+        $this->assertNotEmpty($cards);
+        $this->assertEquals((string) self::CHEST_NO, $cards[0]['chest_number'] ?? $cards[0]['chest_no'] ?? null);
+    }
+
     /** See test_student_wise_pdf_renders_successfully()'s docblock — same dompdf caveat. */
     public function test_admit_cards_pdf_renders_successfully(): void
     {
