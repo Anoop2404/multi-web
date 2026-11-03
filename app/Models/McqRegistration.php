@@ -54,6 +54,13 @@ class McqRegistration extends Model
         return $query->where('status', '!=', 'cancelled');
     }
 
+    /** Only candidates with an issued exam register number belong on attendance sheets. */
+    public function scopeWithHallTicketNumber($query)
+    {
+        return $query->whereNotNull('hall_ticket_no')
+            ->whereRaw("TRIM(hall_ticket_no) <> ''");
+    }
+
     public function isApproved(): bool
     {
         return $this->approval_status === 'approved';

@@ -95,6 +95,7 @@ class McqReportController extends SahodayaAdminController
 
         $query = McqRegistration::where('exam_id', $exam->id)
             ->active()
+            ->withHallTicketNumber()
             ->with(['student.schoolClass', 'teacher', 'school']);
 
         $this->applyRegistrationFilters($query, $filters);

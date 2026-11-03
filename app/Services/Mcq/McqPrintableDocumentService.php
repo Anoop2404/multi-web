@@ -21,7 +21,7 @@ class McqPrintableDocumentService
     ): Response {
         @ini_set('memory_limit', '1024M');
         @ini_set('max_execution_time', '300');
-        $rows = $this->registrationRows($exam, schoolId: $schoolId, selectedClass: $selectedClass);
+        $rows = $this->registrationRows($exam, schoolId: $schoolId, selectedClass: $selectedClass, attendanceOnly: true);
         $sahodaya ??= Tenant::find($exam->tenant_id);
         $school = $schoolId ? Tenant::find($schoolId) : null;
 
@@ -56,16 +56,17 @@ class McqPrintableDocumentService
                 ->all();
         }
 
-        $pdf = Pdf::loadView('mcq.attendance-sheet', [
+        $viewData = [
             'exam'          => $exam,
             'school'        => $school,
             'groupedRows'   => $groupedRows,
             'totalCount'    => count($rows),
+            'classCounts'   => array_map('count', $groupedRows),
             'selectedClass' => $selectedClass,
             'orgName'       => $sahodaya?->name ?? 'Sahodaya',
             'logoSrc'       => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
             'generatedAt'   => $this->generatedAt(),
-        ])->setPaper('a4', 'portrait');
+        ];
 
         $suffix = $schoolId ? '-school-'.substr($schoolId, 0, 8) : '';
         if ($selectedClass) {
@@ -73,7 +74,41 @@ class McqPrintableDocumentService
         }
         $filename = $this->slug($exam).'-attendance-sheet'.$suffix.'.pdf';
 
-        return $inline ? $pdf->stream($filename, ['Attachment' => false]) : $pdf->download($filename);
+        // Keep DomPDF's layout tree and embedded-image objects bounded even when
+        // exporting an entire exam class across all schools. Preserve class order,
+        // serial numbers and totals while repeating the heading for each batch.
+        $batches = [];
+        foreach ($groupedRows as $className => $classRows) {
+            foreach (array_chunk($classRows, 40) as $chunk) {
+                $batches[] = [$className => $chunk];
+            }
+        }
+        if ($batches === []) {
+            $batches[] = [];
+        }
+
+        $merged = new \setasign\Fpdi\Fpdi();
+        foreach ($batches as $batch) {
+            $pdf = Pdf::loadView('mcq.attendance-sheet', array_replace($viewData, ['groupedRows' => $batch]))
+                ->setPaper('a4', 'portrait');
+            $bytes = $pdf->output();
+            unset($pdf);
+            gc_collect_cycles();
+
+            $pages = $merged->setSourceFile(\setasign\Fpdi\PdfParser\StreamReader::createByString($bytes));
+            for ($page = 1; $page <= $pages; $page++) {
+                $template = $merged->importPage($page);
+                $size = $merged->getTemplateSize($template);
+                $merged->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                $merged->useTemplate($template);
+            }
+            unset($bytes);
+        }
+
+        return response($merged->Output('S'), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => ($inline ? 'inline' : 'attachment').'; filename="'.$filename.'"',
+        ]);
     }
 
     public function markSheetPdf(McqExam $exam, ?Tenant $sahodaya = null): Response
@@ -419,12 +454,17 @@ class McqPrintableDocumentService
         bool $presentOnly = false,
         bool $withMarks = false,
         ?string $schoolId = null,
-        ?string $selectedClass = null
+        ?string $selectedClass = null,
+        bool $attendanceOnly = false
     ): array {
         $query = McqRegistration::where('exam_id', $exam->id)
             ->with(['student.schoolClass', 'student.tenant', 'teacher', 'school', 'mark'])
             ->orderBy('hall_ticket_no')
             ->orderBy('id');
+
+        if ($attendanceOnly) {
+            $query->active()->withHallTicketNumber();
+        }
 
         if ($schoolId) {
             $query->where('school_id', $schoolId);

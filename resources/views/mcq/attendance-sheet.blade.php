@@ -90,7 +90,7 @@
 
     <div class="title">{{ $exam->title }}@if($exam->code) <span style="font-weight:400;font-size:11px">({{ $exam->code }})</span>@endif</div>
     <div class="meta">
-        {{ $totalCount }} candidate(s) total · {{ count($rows) }} in this class
+        {{ $totalCount }} candidate(s) total · {{ $classCounts[$className] ?? count($rows) }} in this class
         @if(!empty($school)) · {{ $school->name }} @endif
         @if($exam->scheduled_at) · {{ $exam->scheduled_at->format('d M Y · h:i A') }} @endif
         @if($exam->venue) · {{ $exam->venue }} @endif
@@ -98,7 +98,7 @@
 
     <div class="class-banner">
         Class {{ $className }}
-        <span>{{ count($rows) }} candidate(s)</span>
+        <span>{{ $classCounts[$className] ?? count($rows) }} candidate(s)</span>
     </div>
 
     <div class="note">Physical verification sheet — mark attendance in the blank boxes (✓ present / A absent).</div>

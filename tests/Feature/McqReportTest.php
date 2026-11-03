@@ -19,6 +19,89 @@ class McqReportTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_attendance_excludes_unissued_numbers_and_cancelled_registrations(): void
+    {
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'school',
+            'name' => 'Attendance School',
+        ]);
+        $exam = McqExam::create([
+            'tenant_id' => (string) Str::uuid(),
+            'title' => 'Talent Search',
+            'status' => 'published',
+        ]);
+        $class = SchoolClass::create(['tenant_id' => $school->id, 'name' => '7']);
+        foreach ([null, '', '   ', '180567', '180568'] as $index => $number) {
+            $student = Student::create([
+                'tenant_id' => $school->id,
+                'school_class_id' => $class->id,
+                'name' => 'Candidate '.$index,
+                'status' => 'active',
+            ]);
+            McqRegistration::create([
+                'exam_id' => $exam->id,
+                'school_id' => $school->id,
+                'student_id' => $student->id,
+                'hall_ticket_no' => $number,
+                'status' => $index === 4 ? 'cancelled' : 'registered',
+            ]);
+        }
+
+        $reports = app(McqReportService::class);
+        // General registration reports must still show candidates awaiting a number.
+        $this->assertCount(4, $reports->registrationRows($exam));
+        $rows = $reports->registrationRows($exam, $school->id, attendanceOnly: true);
+        $this->assertCount(1, $rows);
+        $this->assertSame('180567', $rows[0]['hall_ticket_no']);
+
+        // Check the PDF dataset before grouping/counting and rendering.
+        $method = new \ReflectionMethod(McqPrintableDocumentService::class, 'registrationRows');
+        $pdfRows = $method->invoke(app(McqPrintableDocumentService::class), $exam, false, false, $school->id, null, true);
+        $this->assertCount(1, $pdfRows);
+        $this->assertSame('180567', $pdfRows[0]['hall_ticket_no']);
+        $this->assertSame(1, $pdfRows[0]['sl']);
+        $response = app(McqPrintableDocumentService::class)->attendanceSheetPdf(
+            $exam, schoolId: $school->id, selectedClass: '7', sahodaya: $school
+        );
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertStringStartsWith('%PDF-', $response->getContent());
+
+        for ($index = 0; $index < 40; $index++) {
+            $student = Student::create([
+                'tenant_id' => $school->id,
+                'school_class_id' => $class->id,
+                'name' => 'Batch Candidate '.$index,
+                'status' => 'active',
+            ]);
+            McqRegistration::create([
+                'exam_id' => $exam->id,
+                'school_id' => $school->id,
+                'student_id' => $student->id,
+                'hall_ticket_no' => (string) (190000 + $index),
+                'status' => 'registered',
+            ]);
+        }
+        $batches = [];
+        \Illuminate\Support\Facades\View::composer('mcq.attendance-sheet', function ($view) use (&$batches) {
+            $batches[] = $view->getData();
+        });
+        $response = app(McqPrintableDocumentService::class)->attendanceSheetPdf(
+            $exam, schoolId: $school->id, selectedClass: '7', inline: true, sahodaya: $school
+        );
+        $this->assertCount(2, $batches);
+        $this->assertCount(40, $batches[0]['groupedRows'][7]);
+        $this->assertCount(1, $batches[1]['groupedRows'][7]);
+        $this->assertSame(41, $batches[1]['groupedRows'][7][0]['sl']);
+        $this->assertSame(41, $batches[1]['classCounts'][7]);
+        $this->assertSame(41, $batches[1]['totalCount']);
+        $parser = new \setasign\Fpdi\Fpdi();
+        $pageCount = $parser->setSourceFile(\setasign\Fpdi\PdfParser\StreamReader::createByString($response->getContent()));
+        $this->assertGreaterThanOrEqual(2, $pageCount);
+        $this->assertStringStartsWith('inline;', $response->headers->get('Content-Disposition'));
+
+    }
+
     public function test_registration_rows_and_pdf_reports_resolve_batch_school_fee_status(): void
     {
         $sahodayaId = (string) Str::uuid();

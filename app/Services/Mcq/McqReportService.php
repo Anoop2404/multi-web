@@ -12,11 +12,15 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class McqReportService
 {
     /** @return list<array<string, mixed>> */
-    public function registrationRows(McqExam $exam, ?string $schoolId = null, ?string $selectedClass = null): array
+    public function registrationRows(McqExam $exam, ?string $schoolId = null, ?string $selectedClass = null, bool $attendanceOnly = false): array
     {
         $query = McqRegistration::where('exam_id', $exam->id)
             ->active()
             ->with(['student.schoolClass', 'teacher', 'school', 'mark', 'feeReceipt']);
+
+        if ($attendanceOnly) {
+            $query->withHallTicketNumber();
+        }
 
         if ($schoolId) {
             $query->where('school_id', $schoolId);
@@ -242,7 +246,7 @@ class McqReportService
 
     public function exportAttendance(McqExam $exam, ?string $schoolId = null, ?string $selectedClass = null): StreamedResponse
     {
-        $rows = $this->registrationRows($exam, $schoolId, $selectedClass);
+        $rows = $this->registrationRows($exam, $schoolId, $selectedClass, attendanceOnly: true);
         $suffix = $schoolId ? '-school-'.substr($schoolId, 0, 8) : '';
         if ($selectedClass) {
             $suffix .= '-class-'.$selectedClass;
