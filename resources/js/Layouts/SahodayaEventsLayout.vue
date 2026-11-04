@@ -255,6 +255,14 @@ const navGroups = computed(() => {
     let groups;
     if (eventContext.value?.id && !isProgramWorkspace.value) {
         groups = eventScopedNav(sid, eventContext.value.id, eventContext.value, programEventsList.value);
+        const registrationsUrl = page.props.eventRegistrationsUrl;
+        if (registrationsUrl) {
+            const oldUrl = `/sahodaya-admin/${sid}/events/${eventContext.value.id}/registrations`;
+            groups = groups.map(group => ({
+                ...group,
+                items: group.items.map(item => item.href === oldUrl ? { ...item, href: registrationsUrl } : item),
+            }));
+        }
     } else if (programContext.value?.slug) {
         groups = programScopedNav(sid, programContext.value.slug, programEventsList.value, navOptions);
     } else {

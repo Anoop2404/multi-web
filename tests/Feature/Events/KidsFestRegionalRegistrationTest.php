@@ -216,11 +216,18 @@ class KidsFestRegionalRegistrationTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page->component('Sahodaya/Events/Registrations', false)
                 ->where('registrationsEventId', $root->id)
+                ->where('eventRegistrationsUrl', $url.'/partition/'.$children[1]->id)
                 ->where('event.id', $children[1]->id)
                 ->where('registrations.data.0.event_id', $children[1]->id)
                 ->has('registrations.data', 1)
                 ->where('pendingMatchingCount', 1)
                 ->has('regionOptions', 1));
+
+        if ($eventType === 'kids_fest') {
+            $feesUrl = '/sahodaya-admin/'.$sahodaya->id.'/events/'.$children[1]->id.'/fees';
+            $this->get($feesUrl)->assertOk()->assertInertia(fn ($page) => $page
+                ->where('eventRegistrationsUrl', $url.'/partition/'.$children[1]->id));
+        }
 
         $this->get($url)->assertOk()->assertInertia(fn ($page) => $page
             ->has('registrations.data', count($children)));

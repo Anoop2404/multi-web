@@ -71,7 +71,7 @@ const tabs = computed(() => {
         { key: 'levels', label: 'Rounds & Levels', icon: '🔀', href: `${base.value}/levels`, permissions: FEST_SETTINGS },
         { key: 'phases', label: 'Phases', icon: '🧭', href: `${base.value}/phases`, permissions: FEST_SETTINGS },
         { key: 'phase-regions', label: 'Region Matrix', icon: '🗺️', href: `${base.value}/phases/regions-matrix`, permissions: FEST_SETTINGS },
-        { key: 'registrations', label: 'Registrations', icon: '📝', href: `${base.value}/registrations`, permissions: FEST_REGISTRATIONS },
+        { key: 'registrations', label: 'Registrations', icon: '📝', href: page.props.eventRegistrationsUrl ?? `${base.value}/registrations`, permissions: FEST_REGISTRATIONS },
         { key: 'fees', label: 'Event Fees', icon: '💳', href: `${base.value}/fees`, permissions: FEST_FINANCE },
         { key: 'food-menu', label: 'Food Menu', icon: '🍱', href: `${base.value}/food-menu`, permissions: FEST_CATERING },
         { key: 'chest-numbers', label: 'Chest Numbers', icon: '🔢', href: `${base.value}/chest-numbers`, permissions: FEST_MANAGE },

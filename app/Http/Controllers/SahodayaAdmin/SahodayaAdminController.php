@@ -433,13 +433,24 @@ abstract class SahodayaAdminController extends Controller
             }
         }
 
-        if (! isset($props['eventHeadNav'])) {
-            $festEvent = $event instanceof FestEvent
-                ? $event
-                : FestEvent::query()->whereKey($eventId)->where('tenant_id', $this->sahodaya->id)->first();
-            if ($festEvent) {
+        $festEvent = $event instanceof FestEvent
+            ? $event
+            : FestEvent::forTenant($this->sahodaya->id)->find($eventId);
+        if ($festEvent) {
+            if (! isset($props['eventHeadNav'])) {
                 $nav = app(\App\Services\Events\FestHeadItemNavigationService::class);
                 $props['eventHeadNav'] = $nav->slimNavigation($nav->navigationForEvent($festEvent));
+            }
+
+            $root = $festEvent->rootEvent();
+            $allowedIds = $this->scopedFestEventIds();
+            $base = "/sahodaya-admin/{$this->sahodaya->id}/events";
+            $props['eventRegistrationsUrl'] = "{$base}/{$festEvent->id}/registrations";
+            if ($root->id !== $festEvent->id
+                && ($allowedIds === null || in_array($root->id, $allowedIds, true))
+                && in_array($festEvent->id, $root->reportableEventIds(), true)
+                && ($festEvent->event_type === 'sports' || in_array($festEvent->id, array_column($this->scopedChildEventOptions($root), 'id'), true))) {
+                $props['eventRegistrationsUrl'] = "{$base}/{$root->id}/registrations/partition/{$festEvent->id}";
             }
         }
 
