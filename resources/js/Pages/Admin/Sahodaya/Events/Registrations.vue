@@ -30,7 +30,7 @@
                 <label class="text-xs font-bold uppercase tracking-wider text-slate-500">{{ event.event_type === 'sports' ? 'Select Sport Event / Region:' : 'Select Phase / Region:' }}</label>
                 <SearchableSelect
                     :model-value="String(event.id)"
-                    @update:model-value="switchSportEvent"
+                    @update:model-value="navigateEvent"
                     :options="childEventOptions"
                     :all-option="false"
                     class="w-64 text-xs font-semibold"
