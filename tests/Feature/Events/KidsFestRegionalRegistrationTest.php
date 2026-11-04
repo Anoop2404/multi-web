@@ -212,7 +212,7 @@ class KidsFestRegionalRegistrationTest extends TestCase
         }
 
         $url = '/sahodaya-admin/'.$sahodaya->id.'/events/'.$root->id.'/registrations';
-        $this->actingAs($admin)->get($url.'?partition_event_id='.$children[1]->id)
+        $this->actingAs($admin)->get($url.'/partition/'.$children[1]->id)
             ->assertOk()
             ->assertInertia(fn ($page) => $page->component('Sahodaya/Events/Registrations', false)
                 ->where('registrationsEventId', $root->id)
@@ -231,14 +231,14 @@ class KidsFestRegionalRegistrationTest extends TestCase
 
         if ($eventType === 'kalolsavam') {
             $phase = $children->last();
-            $this->get($url.'?partition_event_id='.$phase->id)->assertOk()->assertInertia(fn ($page) => $page
+            $this->get($url.'/partition/'.$phase->id)->assertOk()->assertInertia(fn ($page) => $page
                 ->where('event.id', $phase->id)
                 ->has('registrations.data', 1)
                 ->has('regionOptions', 0));
         }
 
         $otherEvent = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Other Kids Fest', 'event_type' => 'kids_fest', 'status' => 'active']);
-        $this->get($url.'?partition_event_id='.$otherEvent->id)->assertNotFound();
+        $this->get($url.'/partition/'.$otherEvent->id)->assertNotFound();
     }
 
     public function test_approved_event_region_move_preserves_the_registration_and_participants(): void

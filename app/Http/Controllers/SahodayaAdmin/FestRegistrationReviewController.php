@@ -42,12 +42,12 @@ class FestRegistrationReviewController extends SahodayaAdminController
 {
     use BuildsItemHeadReportContext;
 
-    public function index(string $tenantId, FestEvent $event, Request $request)
+    public function index(string $tenantId, FestEvent $event, Request $request, ?int $partition = null)
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
         $registrationsEventId = $event->id;
-        $event = $this->selectedRegistrationsEvent($request, $event);
+        $event = $this->selectedRegistrationsEvent($event, $partition ?? $request->integer('partition_event_id'));
 
         $event->load(['items' => fn ($q) => $q->where('is_enabled', true)->orderBy('title')->with('phase:id,source_phase_id')]);
         $event->setRelation('items', FestHeadItemNavigationService::filterToOwnPhase($event->items, $event));
@@ -937,9 +937,8 @@ class FestRegistrationReviewController extends SahodayaAdminController
             ->get(['id', 'region_id']);
     }
 
-    private function selectedRegistrationsEvent(Request $request, FestEvent $event): FestEvent
+    private function selectedRegistrationsEvent(FestEvent $event, int $selectedId): FestEvent
     {
-        $selectedId = $request->integer('partition_event_id');
         if ($selectedId === 0 || $selectedId === (int) $event->id) {
             return $event;
         }
@@ -952,7 +951,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
         return FestEvent::forTenant($event->tenant_id)->findOrFail($selectedId);
     }
 
-    public function printApproved(Request $request, string $tenantId, string $event)
+    public function printApproved(Request $request, string $tenantId, string $event, ?int $partition = null)
     {
         // See BoardResultVerificationController::downloadPdf() — implicit route-model
         // binding was found to unreliably deliver the resolved model to PDF/file-download
@@ -960,7 +959,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
         $event = FestEvent::findOrFail($event);
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
-        $event = $this->selectedRegistrationsEvent($request, $event);
+        $event = $this->selectedRegistrationsEvent($event, $partition ?? $request->integer('partition_event_id'));
 
         $schoolId = $request->input('school_id') ?: null;
         $itemId = $request->integer('item_id') ?: null;

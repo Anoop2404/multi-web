@@ -1582,6 +1582,8 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{event}/registrations/import', [FestRegistrationReviewController::class, 'importForm'])->name('registrations.import-form');
             Route::get('/{event}/registrations', [FestRegistrationReviewController::class, 'index'])->name('registrations.index');
             Route::get('/{event}/registrations/approved-pdf', [FestRegistrationReviewController::class, 'printApproved'])->name('registrations.approved-pdf');
+            Route::get('/{event}/registrations/partition/{partition}', [FestRegistrationReviewController::class, 'index'])->whereNumber('partition')->name('registrations.partition');
+            Route::get('/{event}/registrations/partition/{partition}/approved-pdf', [FestRegistrationReviewController::class, 'printApproved'])->whereNumber('partition')->name('registrations.partition.approved-pdf');
             Route::post('/{event}/registrations/on-behalf', [FestRegistrationReviewController::class, 'storeOnBehalf'])->name('registrations.on-behalf');
             Route::get('/{event}/school-classes/{schoolId}', [FestRegistrationReviewController::class, 'schoolClasses'])->name('registrations.school-classes');
             Route::post('/{event}/quick-store-student', [FestRegistrationReviewController::class, 'quickStoreStudent'])->name('registrations.quick-store-student');

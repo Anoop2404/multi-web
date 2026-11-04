@@ -833,18 +833,16 @@ async function submitQuickAddStudent() {
     }
 }
 
-const registrationsUrl = `/sahodaya-admin/${props.sahodaya.id}/events/${props.registrationsEventId}/registrations`;
-const selectedPartition = String(props.event.id) === String(props.registrationsEventId)
-    ? undefined
-    : props.event.id;
+function registrationsPath(hubId, eventId) {
+    const path = `/sahodaya-admin/${props.sahodaya.id}/events/${hubId}/registrations`;
+    return String(hubId) === String(eventId) ? path : `${path}/partition/${eventId}`;
+}
+
+const registrationsUrl = registrationsPath(props.registrationsEventId, props.event.id);
 
 function navigateEvent(eventId) {
     const hubId = props.childEvents.find(option => option.is_hub)?.id;
-    const pageEventId = hubId ?? eventId;
-    const partitionEventId = String(eventId) === String(pageEventId) ? undefined : eventId;
-    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${pageEventId}/registrations`, {
-        partition_event_id: partitionEventId,
-    });
+    router.get(registrationsPath(hubId ?? eventId, eventId));
 }
 
 const childEventOptions = computed(() => props.childEvents.map(ev => ({
@@ -871,7 +869,6 @@ const approvedPdfUrl = computed(() => {
     const p = new URLSearchParams();
     if (form.school_id) p.set('school_id', form.school_id);
     if (form.item_id) p.set('item_id', form.item_id);
-    if (selectedPartition) p.set('partition_event_id', selectedPartition);
     if (form.search) p.set('search', form.search);
     if (form.region_id) p.set('region_id', form.region_id);
     const query = p.toString();
@@ -881,7 +878,6 @@ const approvedPdfUrl = computed(() => {
 function applyFilters() {
     clearSelection();
     router.get(registrationsUrl, {
-        partition_event_id: selectedPartition,
         search: form.search || undefined,
         school_id: form.school_id || undefined,
         item_id: form.item_id || undefined,
@@ -1202,7 +1198,7 @@ function loadSchoolStudents() {
     onBehalfForm.student_ids = [];
     onBehalfForm.standby_ids = [];
     if (!onBehalfForm.school_id) return;
-    router.get(registrationsUrl, { partition_event_id: selectedPartition, school_id: onBehalfForm.school_id }, {
+    router.get(registrationsUrl, { school_id: onBehalfForm.school_id }, {
         preserveScroll: true,
         preserveState: true,
         only: ['registerStudents', 'registerSchoolId', 'existingSchoolRegistrations'],
