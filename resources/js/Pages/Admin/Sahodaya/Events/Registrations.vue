@@ -55,7 +55,7 @@
                     <SearchableSelect
                         v-model="form.region_id"
                         :options="regionOptions"
-                        all-label="All regions"
+                        all-label="All assigned regions"
                         class="mt-1 w-44"
                         @change="applyFilters"
                     />
@@ -134,7 +134,7 @@
                 <button v-if="selectedIds.length || filterWideMode" type="button" class="btn-ghost text-xs text-gray-500" @click="clearSelection">
                     Clear selection
                 </button>
-                <button v-if="!form.search && pendingMatchingCount > 0 && !filterWideMode"
+                <button v-if="!form.search && !form.region_id && pendingMatchingCount > 0 && !filterWideMode"
                         type="button" class="text-xs font-semibold text-indigo-700 underline underline-offset-2 ml-2"
                         @click="selectAllMatchingFilter">
                     Select all {{ pendingMatchingCount }} pending matching current school/item filter
@@ -618,11 +618,12 @@ const props = defineProps({
     eventItems: { type: Array, default: () => [] },
     classGroupOptions: { type: Array, default: () => [] },
     schoolRegions: { type: Object, default: () => ({}) },
-    filters: { type: Object, default: () => ({ search: '', school_id: '', status: '', region_id: '', class_group: '' }) },
+    filters: { type: Object, default: () => ({ search: '', school_id: '', status: '', class_group: '' }) },
     selectedHeadId: { type: [String, Number], default: null },
     selectedItemId: { type: [Number, String], default: null },
     competitionUrl: { type: String, default: null },
     regionOptions: { type: Array, default: () => [] },
+    registrationsEventId: { type: [Number, String], required: true },
     childEvents: { type: Array, default: () => [] },
 });
 
@@ -832,8 +833,18 @@ async function submitQuickAddStudent() {
     }
 }
 
+const registrationsUrl = `/sahodaya-admin/${props.sahodaya.id}/events/${props.registrationsEventId}/registrations`;
+const selectedPartition = String(props.event.id) === String(props.registrationsEventId)
+    ? undefined
+    : props.event.id;
+
 function navigateEvent(eventId) {
-    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${eventId}/registrations`);
+    const hubId = props.childEvents.find(option => option.is_hub)?.id;
+    const pageEventId = hubId ?? eventId;
+    const partitionEventId = String(eventId) === String(pageEventId) ? undefined : eventId;
+    router.get(`/sahodaya-admin/${props.sahodaya.id}/events/${pageEventId}/registrations`, {
+        partition_event_id: partitionEventId,
+    });
 }
 
 const childEventOptions = computed(() => props.childEvents.map(ev => ({
@@ -850,8 +861,8 @@ const form = reactive({
     item_id: props.selectedItemId ? String(props.selectedItemId) : '',
     status: props.filters?.status ?? '',
     search: props.filters?.search ?? '',
-    region_id: props.filters?.region_id ?? '',
     class_group: props.filters?.class_group ?? '',
+    region_id: props.filters?.region_id ?? '',
 });
 
 const classGroupOptions = computed(() => props.classGroupOptions.map(c => ({ value: c.value, label: c.label })));
@@ -860,20 +871,23 @@ const approvedPdfUrl = computed(() => {
     const p = new URLSearchParams();
     if (form.school_id) p.set('school_id', form.school_id);
     if (form.item_id) p.set('item_id', form.item_id);
-    if (form.region_id) p.set('region_id', form.region_id);
+    if (selectedPartition) p.set('partition_event_id', selectedPartition);
     if (form.search) p.set('search', form.search);
+    if (form.region_id) p.set('region_id', form.region_id);
     const query = p.toString();
-    return `${base}/registrations/approved-pdf${query ? '?' + query : ''}`;
+    return `${registrationsUrl}/approved-pdf${query ? '?' + query : ''}`;
 });
 
 function applyFilters() {
-    router.get(`${base}/registrations`, {
+    clearSelection();
+    router.get(registrationsUrl, {
+        partition_event_id: selectedPartition,
         search: form.search || undefined,
         school_id: form.school_id || undefined,
         item_id: form.item_id || undefined,
         status: form.status || undefined,
-        region_id: form.region_id || undefined,
         class_group: form.class_group || undefined,
+        region_id: form.region_id || undefined,
     }, { preserveScroll: true, preserveState: true, replace: true });
 }
 
@@ -1188,7 +1202,7 @@ function loadSchoolStudents() {
     onBehalfForm.student_ids = [];
     onBehalfForm.standby_ids = [];
     if (!onBehalfForm.school_id) return;
-    router.get(`${base}/registrations`, { school_id: onBehalfForm.school_id }, {
+    router.get(registrationsUrl, { partition_event_id: selectedPartition, school_id: onBehalfForm.school_id }, {
         preserveScroll: true,
         preserveState: true,
         only: ['registerStudents', 'registerSchoolId', 'existingSchoolRegistrations'],

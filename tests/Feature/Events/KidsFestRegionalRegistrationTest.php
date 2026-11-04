@@ -170,6 +170,77 @@ class KidsFestRegionalRegistrationTest extends TestCase
         $this->assertSame($children[1]->id, app(FestSchoolEventRegionService::class)->current($root, $school->id)->id);
     }
 
+    #[\PHPUnit\Framework\Attributes\TestWith(['kids_fest'])]
+    #[\PHPUnit\Framework\Attributes\TestWith(['science_fest'])]
+    #[\PHPUnit\Framework\Attributes\TestWith(['kalolsavam'])]
+    #[\PHPUnit\Framework\Attributes\TestWith(['sports'])]
+    public function test_admin_can_filter_registrations_by_assigned_partition_on_the_hub_url(string $eventType): void
+    {
+        [$sahodaya, $school, $root, $children] = $this->fixture();
+        $root->update(['event_type' => $eventType]);
+        $children->each(fn (FestEvent $child) => $child->update(['event_type' => $eventType]));
+
+        if ($eventType === 'sports') {
+            $discipline = FestEvent::create([
+                'tenant_id' => $sahodaya->id, 'title' => 'Athletics', 'event_type' => 'sports',
+                'parent_event_id' => $root->id, 'status' => 'active',
+            ]);
+            $children->each(fn (FestEvent $child) => $child->update(['parent_event_id' => $discipline->id]));
+        }
+
+        if ($eventType === 'kalolsavam') {
+            $root->update(['workflow_mode' => 'phased_regional_billing']);
+            $children->push(FestEvent::create([
+                'tenant_id' => $sahodaya->id, 'title' => 'Non-regional phase', 'event_type' => 'kalolsavam',
+                'parent_event_id' => $root->id, 'partition_role' => 'phase', 'status' => 'active',
+            ]));
+        }
+
+        $this->seed(RolesAndPermissionsSeeder::class);
+        SahodayaProfile::create(['tenant_id' => $sahodaya->id, 'prefix' => 'KID', 'student_data_mode' => 'counts_only']);
+        $admin = User::factory()->create(['tenant_id' => $sahodaya->id, 'email_verified_at' => now()]);
+        $admin->assignRole('sahodaya_admin');
+
+        foreach ($children as $child) {
+            $item = FestEventItem::create(['event_id' => $child->id, 'title' => 'Song']);
+            FestRegistration::create([
+                'event_id' => $child->id,
+                'item_id' => $item->id,
+                'school_id' => $school->id,
+                'status' => 'submitted',
+            ]);
+        }
+
+        $url = '/sahodaya-admin/'.$sahodaya->id.'/events/'.$root->id.'/registrations';
+        $this->actingAs($admin)->get($url.'?partition_event_id='.$children[1]->id)
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('Sahodaya/Events/Registrations', false)
+                ->where('registrationsEventId', $root->id)
+                ->where('event.id', $children[1]->id)
+                ->where('registrations.data.0.event_id', $children[1]->id)
+                ->has('registrations.data', 1)
+                ->where('pendingMatchingCount', 1)
+                ->has('regionOptions', 1));
+
+        $this->get($url)->assertOk()->assertInertia(fn ($page) => $page
+            ->has('registrations.data', count($children)));
+        $this->get($url.'?region_id='.$children[1]->region_id)->assertOk()->assertInertia(fn ($page) => $page
+            ->has('regionOptions', 2)
+            ->has('registrations.data', 1)
+            ->where('registrations.data.0.event_id', $children[1]->id));
+
+        if ($eventType === 'kalolsavam') {
+            $phase = $children->last();
+            $this->get($url.'?partition_event_id='.$phase->id)->assertOk()->assertInertia(fn ($page) => $page
+                ->where('event.id', $phase->id)
+                ->has('registrations.data', 1)
+                ->has('regionOptions', 0));
+        }
+
+        $otherEvent = FestEvent::create(['tenant_id' => $sahodaya->id, 'title' => 'Other Kids Fest', 'event_type' => 'kids_fest', 'status' => 'active']);
+        $this->get($url.'?partition_event_id='.$otherEvent->id)->assertNotFound();
+    }
+
     public function test_approved_event_region_move_preserves_the_registration_and_participants(): void
     {
         [, $school, $root, $children] = $this->fixture();

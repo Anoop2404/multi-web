@@ -7,7 +7,6 @@ use App\Models\FestEvent;
 use App\Models\FestEventItem;
 use App\Models\FestParticipant;
 use App\Models\FestRegistration;
-use App\Models\Region;
 use App\Models\SchoolClass;
 use App\Models\SchoolRegionAssignment;
 use App\Models\Student;
@@ -47,6 +46,9 @@ class FestRegistrationReviewController extends SahodayaAdminController
     {
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        $registrationsEventId = $event->id;
+        $event = $this->selectedRegistrationsEvent($request, $event);
+
         $event->load(['items' => fn ($q) => $q->where('is_enabled', true)->orderBy('title')->with('phase:id,source_phase_id')]);
         $event->setRelation('items', FestHeadItemNavigationService::filterToOwnPhase($event->items, $event));
 
@@ -55,28 +57,14 @@ class FestRegistrationReviewController extends SahodayaAdminController
         $itemIds = $this->itemIdsForHeadFilter($event, $headId, $itemId);
         $filterSchoolId = $request->input('school_id') ?: null;
         $filterStatus = $request->input('status') ?: null;
-        $filterRegionId = $request->input('region_id') ?: null;
+        $filterRegionId = $request->integer('region_id') ?: null;
+        $regionPartitions = $this->registrationRegionPartitions($event);
+        $regionEventIds = $filterRegionId === null ? null : $regionPartitions->where('region_id', $filterRegionId)->modelKeys();
         $filterClassGroup = $request->input('class_group') ?: null;
 
         if ($filterClassGroup) {
             $classGroupItemIds = $event->items->where('class_group', $filterClassGroup)->pluck('id')->all();
             $itemIds = $itemIds === null ? $classGroupItemIds : array_values(array_intersect($itemIds, $classGroupItemIds));
-        }
-
-        // When a region filter is active, resolve school IDs in that region and
-        // restrict the query to only those schools.
-        $regionSchoolIds = null;
-        if ($filterRegionId) {
-            $year = AcademicYear::forSahodaya($this->sahodaya->id);
-            $regionSchoolIds = SchoolRegionAssignment::forTenant($this->sahodaya->id)
-                ->forYear($year)
-                ->where('region_id', $filterRegionId)
-                ->pluck('school_id')
-                ->all();
-            // Also apply to school_id filter so they work together.
-            if ($filterSchoolId && ! in_array($filterSchoolId, $regionSchoolIds, true)) {
-                $filterSchoolId = null;
-            }
         }
 
         $feeService = app(FestSchoolEventFeeService::class);
@@ -87,7 +75,7 @@ class FestRegistrationReviewController extends SahodayaAdminController
         // constraints (school_id and status were client-side-only filters before, doing
         // nothing to reduce what got fetched) and the result set is paginated.
         // See docs/SCALE_AND_PAGINATION_PLAN.md §2.
-        $scopedQuery = fn () => $this->scopedRegistrationsQuery($event, $itemIds, $filterSchoolId, $request->input('search'), $regionSchoolIds);
+        $scopedQuery = fn () => $this->scopedRegistrationsQuery($event, $itemIds, $filterSchoolId, $request->input('search'), $regionEventIds);
 
         $registrations = $scopedQuery()
             ->when($filterStatus, fn ($q) => $q->where('status', $filterStatus))
@@ -195,7 +183,6 @@ class FestRegistrationReviewController extends SahodayaAdminController
         };
 
         $schoolRegions = [];
-        $regionOptions = collect();
         if (in_array($event->event_type, ['kalolsavam', 'sports', 'english_fest', 'science_fest', 'kids_fest', 'teacher_fest'], true)) {
             $schoolRegions = SchoolRegionAssignment::query()
                 ->where('school_region_assignments.tenant_id', $this->sahodaya->id)
@@ -203,15 +190,9 @@ class FestRegistrationReviewController extends SahodayaAdminController
                 ->join('regions', 'regions.id', '=', 'school_region_assignments.region_id')
                 ->pluck('regions.name', 'school_region_assignments.school_id')
                 ->all();
-
-            $regionOptions = Region::forTenant($this->sahodaya->id)
-                ->active()
-                ->globalOnly()
-                ->orderBy('name')
-                ->get(['id', 'name']);
         }
 
-        $childEvents = $this->scopedChildEventOptions($event);
+        $childEvents = $this->registrationPartitionOptions($event);
 
         return $this->inertia('Sahodaya/Events/Registrations', $this->withEventActivity($event, FestPageActivity::REGISTRATIONS, [
             'event' => $event,
@@ -220,7 +201,8 @@ class FestRegistrationReviewController extends SahodayaAdminController
             'schools' => $schools,
             'schoolNames' => $schoolNames,
             'schoolRegions' => $schoolRegions,
-            'regionOptions' => $regionOptions,
+            'regionOptions' => $regionPartitions->pluck('region')->unique('id')->sortBy('name')->values(),
+            'registrationsEventId' => $registrationsEventId,
             'childEvents' => $childEvents,
             'feeRequired' => $feeService->feeRequired($event),
             'registerStudents' => $registerStudents,
@@ -232,8 +214,8 @@ class FestRegistrationReviewController extends SahodayaAdminController
                 'search' => $request->input('search', ''),
                 'school_id' => $filterSchoolId ?? '',
                 'status' => $filterStatus ?? '',
-                'region_id' => $filterRegionId ?? '',
                 'class_group' => $filterClassGroup ?? '',
+                'region_id' => $filterRegionId ?? '',
             ],
             'selectedHeadId' => $selectedHeadId,
             'selectedItemId' => $itemId,
@@ -271,16 +253,14 @@ class FestRegistrationReviewController extends SahodayaAdminController
 
     /**
      * @param  ?list<int>  $itemIds
-     * @param  ?list<string>  $regionSchoolIds  school IDs scoped to a region filter
      */
-    private function scopedRegistrationsQuery(FestEvent $event, ?array $itemIds, ?string $schoolId, ?string $search, ?array $regionSchoolIds = null)
+    private function scopedRegistrationsQuery(FestEvent $event, ?array $itemIds, ?string $schoolId, ?string $search, ?array $regionEventIds = null)
     {
         $scopedItemIds = $itemIds === null ? null : $event->reportableItemIds($itemIds);
 
-        return FestRegistration::whereIn('event_id', $event->reportableEventIds())
+        return FestRegistration::whereIn('event_id', $regionEventIds ?? $event->reportableEventIds())
             ->when($scopedItemIds !== null, fn ($q) => $q->whereIn('item_id', $scopedItemIds))
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
-            ->when($regionSchoolIds !== null && $schoolId === null, fn ($q) => $q->whereIn('school_id', $regionSchoolIds))
             ->when(filled($search), function ($q) use ($search) {
                 $term = '%'.$search.'%';
                 $q->where(function ($inner) use ($term) {
@@ -911,6 +891,67 @@ class FestRegistrationReviewController extends SahodayaAdminController
             ->with('importErrors', array_slice($result['errors'], 0, 20));
     }
 
+    private function registrationPartitionOptions(FestEvent $event): array
+    {
+        if ($event->event_type !== 'sports') {
+            return $this->scopedChildEventOptions($event);
+        }
+
+        // Sports can place regions under a discipline instead of directly under the season.
+        // Keep the season available when switching from any of those nested partitions.
+        $root = $event->rootEvent();
+        $allowedIds = $this->scopedFestEventIds();
+        $eventIds = $root->reportableEventIds();
+        if ($allowedIds !== null) {
+            $eventIds = array_intersect($eventIds, $allowedIds);
+        }
+
+        return FestEvent::forTenant($event->tenant_id)
+            ->ofType('sports')
+            ->whereIn('id', $eventIds)
+            ->orderBy('sort_order')
+            ->orderBy('title')
+            ->get(['id', 'title', 'parent_event_id'])
+            ->sortBy(fn (FestEvent $option) => $option->id !== $root->id)
+            ->map(fn (FestEvent $option) => [
+                'id' => $option->id,
+                'title' => $option->title,
+                'short_title' => $option->id === $root->id ? 'All Regions (Season Hub)' : $option->title,
+                'parent_event_id' => $option->parent_event_id,
+                'is_hub' => $option->id === $root->id,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function registrationRegionPartitions(FestEvent $event): \Illuminate\Database\Eloquent\Collection
+    {
+        $allowedIds = array_column($this->registrationPartitionOptions($event), 'id');
+
+        return FestEvent::forTenant($event->tenant_id)
+            ->whereIn('id', $event->reportableEventIds())
+            ->whereIn('id', array_merge([$event->id], $allowedIds))
+            ->whereNotNull('region_id')
+            ->whereHas('region')
+            ->with('region:id,name')
+            ->get(['id', 'region_id']);
+    }
+
+    private function selectedRegistrationsEvent(Request $request, FestEvent $event): FestEvent
+    {
+        $selectedId = $request->integer('partition_event_id');
+        if ($selectedId === 0 || $selectedId === (int) $event->id) {
+            return $event;
+        }
+
+        abort_unless(in_array($selectedId, $event->reportableEventIds(), true), 404);
+        abort_unless(collect($this->registrationPartitionOptions($event))->contains(
+            fn (array $option) => (int) $option['id'] === $selectedId
+        ), 404);
+
+        return FestEvent::forTenant($event->tenant_id)->findOrFail($selectedId);
+    }
+
     public function printApproved(Request $request, string $tenantId, string $event)
     {
         // See BoardResultVerificationController::downloadPdf() — implicit route-model
@@ -919,22 +960,15 @@ class FestRegistrationReviewController extends SahodayaAdminController
         $event = FestEvent::findOrFail($event);
         abort_if($event->tenant_id !== $this->sahodaya->id, 403);
 
+        $event = $this->selectedRegistrationsEvent($request, $event);
+
         $schoolId = $request->input('school_id') ?: null;
         $itemId = $request->integer('item_id') ?: null;
         $search = $request->input('search');
-        $filterRegionId = $request->input('region_id') ?: null;
 
-        $regionSchoolIds = null;
-        if ($filterRegionId) {
-            $year = AcademicYear::forSahodaya($this->sahodaya->id);
-            $regionSchoolIds = SchoolRegionAssignment::forTenant($this->sahodaya->id)
-                ->forYear($year)
-                ->where('region_id', $filterRegionId)
-                ->pluck('school_id')
-                ->all();
-        }
-
-        $registrations = $this->scopedRegistrationsQuery($event, $itemId ? [$itemId] : null, $schoolId, $search, $regionSchoolIds)
+        $regionId = $request->integer('region_id');
+        $regionEventIds = $regionId ? $this->registrationRegionPartitions($event)->where('region_id', $regionId)->modelKeys() : null;
+        $registrations = $this->scopedRegistrationsQuery($event, $itemId ? [$itemId] : null, $schoolId, $search, $regionEventIds)
             ->where('status', 'approved')
             ->with(['item', 'participants.student', 'participants.teacher', 'participants.group', 'school'])
             ->latest()
