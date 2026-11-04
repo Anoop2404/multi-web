@@ -211,6 +211,16 @@ class KidsFestRegionalRegistrationTest extends TestCase
             ]);
         }
 
+        if ($eventType === 'kids_fest') {
+            $root->update(['status' => 'draft']);
+            $item = FestEventItem::where('event_id', $children[1]->id)->firstOrFail();
+            $item->update(['class_group' => 'category_1']);
+            app(\App\Services\Audit\PlatformAuditLogger::class)->festEvent(
+                $children[1], \App\Support\FestPageActivity::REGISTRATIONS,
+                'fest.registration.approved', 'Approved registration', ['item_id' => $item->id]
+            );
+        }
+
         $url = '/sahodaya-admin/'.$sahodaya->id.'/events/'.$root->id.'/registrations';
         $this->actingAs($admin)->get($url.'/partition/'.$children[1]->id)
             ->assertOk()
@@ -224,6 +234,10 @@ class KidsFestRegionalRegistrationTest extends TestCase
                 ->has('regionOptions', 1));
 
         if ($eventType === 'kids_fest') {
+            $this->get($url.'/partition/'.$children[1]->id)->assertOk()->assertInertia(fn ($page) => $page
+                ->where('activityLogs.0.description', 'Approved registration')
+                ->where('activityLogs.0.item_category', fn ($category) => is_string($category) && $category !== ''));
+
             $feesUrl = '/sahodaya-admin/'.$sahodaya->id.'/events/'.$children[1]->id.'/fees';
             $this->get($feesUrl)->assertOk()->assertInertia(fn ($page) => $page
                 ->where('eventRegistrationsUrl', $url.'/partition/'.$children[1]->id));

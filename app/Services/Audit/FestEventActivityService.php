@@ -297,7 +297,10 @@ class FestEventActivityService
         $gradePointService = app(FestGradePointService::class);
         $itemResultsService = app(FestItemResultsService::class);
 
-        $mapped = $logs->map(function (AuditLog $log) use ($participantsMap, $marksMap, $itemsMap, $registrationsMap, $registrationMorph, $event, $scoreboards, $gradePointService, $itemResultsService) {
+        // Admin activity can include partitions whose parent is still a draft.
+        $categoryEvent = $event->rootEvent();
+
+        $mapped = $logs->map(function (AuditLog $log) use ($participantsMap, $marksMap, $itemsMap, $registrationsMap, $registrationMorph, $event, $categoryEvent, $scoreboards, $gradePointService, $itemResultsService) {
             $props = $log->properties ?? [];
             $registration = null;
 
@@ -390,7 +393,7 @@ class FestEventActivityService
             $itemModel = $itemId ? $itemsMap->get((int) $itemId) : null;
             $itemTitle = $props['item_title'] ?? $itemModel?->title ?? $participant?->registration?->item?->title ?? $registration?->item?->title;
             $categoryKey = $itemModel?->class_group ?? $itemModel?->age_group;
-            $categoryLabel = $categoryKey ? $scoreboards->categoryLabel($event, $categoryKey) : null;
+            $categoryLabel = $categoryKey ? $scoreboards->categoryLabel($categoryEvent, $categoryKey) : null;
 
             $description = $log->description;
             if (preg_match('/^Fest registration #\d+\s+(submitted|approved|cancelled|updated|rejected)$/i', trim($description))) {
