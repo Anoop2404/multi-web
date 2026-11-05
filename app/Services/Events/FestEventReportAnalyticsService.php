@@ -2081,8 +2081,12 @@ class FestEventReportAnalyticsService
             // substitutes; NULL role counts as a normal entrant.
             ->when($role === 'performer', fn ($q) => $q->where(fn ($r) => $r->whereNull('participant_role')->orWhere('participant_role', '!=', 'standby')))
             ->when($role === 'standby', fn ($q) => $q->where('participant_role', 'standby'))
+            ->whereNull('disqualified_at')
             ->whereHas('registration', function ($q) use ($schoolId, $itemId, $categoryClassGroups) {
-                $q->whereIn('event_id', $this->eventIds())->active();
+                // Competing = still on the item roster. Do not use active() here — that
+                // keeps fee-pipeline statuses and would show students after withdraw/cancel
+                // if any leftover participant rows remain.
+                $q->whereIn('event_id', $this->eventIds())->competing();
                 if ($schoolId) {
                     $q->where('school_id', $schoolId);
                 }

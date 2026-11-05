@@ -163,12 +163,14 @@ class FestParticipationLimitService
 
         $registrations = FestRegistration::whereIn('event_id', $this->scopeEventIds())
             ->when($schoolId, fn ($q) => $q->where('school_id', $schoolId))
-            ->active()
+            // Match item-wise / limit counting: only students still competing on an item.
+            ->competing()
             ->with([
                 'item', 'school:id,name',
                 'participants' => fn ($q) => $q
                 ->where('participant_role', 'performer')
                 ->whereNotNull('student_id')
+                ->whereNull('disqualified_at')
                 ->with(['student:id,name,reg_no,tenant_id,photo,updated_at', 'student.tenant']),
             ])
             ->get();

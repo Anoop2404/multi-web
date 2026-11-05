@@ -394,7 +394,9 @@ class FestSchoolReportController extends SchoolAdminController
         // regardless of phase/region, so there's no authorization boundary to enforce —
         // phase/region are pure display/filter dimensions on the client below.
         $analytics = new FestEventReportAnalyticsService($event);
-        $rows = $this->stripChestNumbers($analytics->itemWiseReportRows($this->school->id, role: $event->event_type === 'sports' ? 'all' : 'performer'));
+        // Performers only — substitutes demoted to standby after removal must not linger
+        // on the school item-wise roster. Sahodaya exports can still pass role=all explicitly.
+        $rows = $this->stripChestNumbers($analytics->itemWiseReportRows($this->school->id, role: 'performer'));
 
         $root = $event->rootEvent();
         // Filter options are derived straight from the rows' own category/category_label

@@ -15,6 +15,14 @@ class FestRegistration extends Model
     /** Registrations that count toward reports and billing (excludes withdrawn/rejected). */
     public const ACTIVE_STATUSES = ['submitted', 'proof_uploaded', 'pending_proof', 'partial', 'approved'];
 
+    /**
+     * Registrations that still count as "on the item roster" for participant reports
+     * (item-wise, student limits, event-athlete item presence). Fee-pipeline statuses
+     * such as proof_uploaded/partial remain in ACTIVE_STATUSES for billing, but a
+     * withdrawn/cancelled student must not linger on roster reports.
+     */
+    public const COMPETING_STATUSES = ['submitted', 'approved'];
+
     protected $fillable = [
         'event_id', 'item_id', 'school_id', 'origin_school_id', 'mode', 'status',
         'fee_receipt_id', 'submitted_at',
@@ -77,5 +85,11 @@ class FestRegistration extends Model
     public function scopeActive($query)
     {
         return $query->whereIn('status', self::ACTIVE_STATUSES);
+    }
+
+    /** Students still competing on an item (excludes withdrawn/rejected and fee-pipeline-only rows). */
+    public function scopeCompeting($query)
+    {
+        return $query->whereIn('status', self::COMPETING_STATUSES);
     }
 }

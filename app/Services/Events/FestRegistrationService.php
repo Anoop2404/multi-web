@@ -409,12 +409,16 @@ class FestRegistrationService
         $schoolId = $registration->school_id;
         $registrationId = $registration->id;
         $participantId = $participant->id;
+        $studentId = $participant->student_id;
         $label = $participant->student?->name ?? $participant->teacher?->name ?? "participant #{$participantId}";
 
-        DB::transaction(function () use ($participant, $event, $schoolId, $registration) {
+        DB::transaction(function () use ($participant, $event, $schoolId, $registration, $studentId) {
             FestMark::where('participant_id', $participant->id)->delete();
             $participant->delete();
             $registration->touch();
+            if ($studentId) {
+                app(FestLevelRegistrationService::class)->deactivateIfNoActiveItems($event, $studentId);
+            }
             app(FestSchoolEventFeeService::class)->recalculate($event, $schoolId);
         });
 
