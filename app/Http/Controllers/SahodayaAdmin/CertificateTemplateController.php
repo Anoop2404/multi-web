@@ -105,6 +105,9 @@ class CertificateTemplateController extends SahodayaAdminController
             // the same way they would for a real student in class 8.
             $sampleClassRoman = self::sampleRomanNumeral(8);
             $sampleCategoryRoman = self::sampleRomanNumeral(1);
+            $isSports = $template->event?->event_type === 'sports';
+            $sampleItemTitle = $isSports ? '100 Metres' : 'Classical Music (Solo)';
+            $sampleCategory = $isSports ? 'Under 14' : 'Category '.$sampleCategoryRoman;
 
             $render = [
                 'template'      => $template,
@@ -119,11 +122,11 @@ class CertificateTemplateController extends SahodayaAdminController
                     'school_name_upper' => strtoupper($sampleSchoolName),
                     'event_title'      => $template->event?->title ?? 'Annual Kalotsav 2026',
                     'event_name'       => $template->event?->title ?? 'Annual Kalotsav 2026',
-                    'item_title'       => 'Classical Music (Solo)',
-                    'item_details'     => 'Classical Music (Solo)',
-                    'category_name'    => 'Category '.$sampleCategoryRoman,
-                    'category_short'   => $sampleCategoryRoman,
-                    'category_roman'   => $sampleCategoryRoman,
+                    'item_title'       => $sampleItemTitle,
+                    'item_details'     => $sampleItemTitle,
+                    'category_name'    => $sampleCategory,
+                    'category_short'   => $isSports ? $sampleCategory : $sampleCategoryRoman,
+                    'category_roman'   => $isSports ? $sampleCategory : $sampleCategoryRoman,
                     'participation_type' => 'Individual',
                     'event_dates'      => $template->event ? trim(($template->event->start_date?->format('d/m/Y') ?? '').' - '.($template->event->end_date?->format('d/m/Y') ?? '')) ?: '12th - 14th October 2026' : '12th - 14th October 2026',
                     'venue'            => $template->event?->venue ?? 'Sample Model School',
