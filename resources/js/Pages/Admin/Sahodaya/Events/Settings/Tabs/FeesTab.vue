@@ -610,7 +610,7 @@
                             <input :id="id" v-model.number="feeSettingsForm.sport_event_fees.school_registration_fee" type="number" min="0" class="field" placeholder="e.g. 4000">
                         </template>
                     </FormField>
-                    <FormField label="Student fee (₹)" hint="Base fee charged once per student registered (leave blank if charging per-item instead).">
+                    <FormField label="Student fee (₹)" hint="Once per student who has at least one item. Items are included (₹0) when Default item fee is blank — athletes pay only this registration fee.">
                         <template #default="{ id }">
                             <input :id="id" v-model.number="feeSettingsForm.sport_event_fees.student_registration_fee" type="number" min="0" class="field" placeholder="—">
                         </template>
@@ -620,7 +620,7 @@
                             <input :id="id" v-model.number="feeSettingsForm.sport_event_fees.team_registration_fee" type="number" min="0" class="field" placeholder="—">
                         </template>
                     </FormField>
-                    <FormField label="Default item fee (₹)" hint="Standard fee charged for each individual item entry (e.g. ₹350 per item).">
+                    <FormField label="Default item fee (₹)" hint="Leave blank when Student fee covers items. Set only if you also charge per item on top of student registration.">
                         <template #default="{ id }">
                             <input :id="id" v-model.number="feeSettingsForm.sport_event_fees.default_item_fee" type="number" min="0" class="field" placeholder="e.g. 350">
                         </template>

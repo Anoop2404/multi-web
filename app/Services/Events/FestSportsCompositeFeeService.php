@@ -60,6 +60,11 @@ class FestSportsCompositeFeeService
         $defaultItemFee = $fees['default_item_fee'] ?? null;
         $extraItemFee = $fees['extra_item_fee'] ?? null;
         $eventTitle = $event->title ?: 'Sport event';
+        // Athletes with items pay the student registration fee only — item lines are
+        // included (₹0) unless an explicit default/extra item rate or per-item override
+        // is configured. Never reuse the student rate as a hidden item fee.
+        $itemsIncludedInStudentReg = $studentRegRate > 0
+            && ($defaultItemFee === null || (float) $defaultItemFee === 0.0);
 
         $registrations = FestRegistration::whereIn('event_id', $event->reportableEventIds())
             ->where('school_id', $schoolId)
@@ -124,17 +129,20 @@ class FestSportsCompositeFeeService
                     $amount = 0.0;
                 } elseif ($itemOverride !== null) {
                     $amount = $itemOverride;
+                } elseif ($itemsIncludedInStudentReg) {
+                    $amount = 0.0;
                 } else {
-                    $amount = (float) ($defaultItemFee ?? $studentRegRate);
+                    $amount = (float) ($defaultItemFee ?? 0);
                     if ($eligible && $individualQuota > 0 && $extraItemFee !== null) {
                         $amount = (float) $extraItemFee;
                     }
                 }
 
                 $itemTitle = $registration->item?->formattedTitle() ?? str_replace('_', ' ', $registration->item->title ?? 'Item');
+                $includedLabel = $itemsIncludedInStudentReg && ! $waived && $itemOverride === null;
                 $lines[] = [
-                    'line_type' => $waived ? 'item_fee_waived' : 'item_fee',
-                    'label' => $itemTitle.($waived ? ' (free quota)' : ''),
+                    'line_type' => ($waived || $includedLabel) ? 'item_fee_waived' : 'item_fee',
+                    'label' => $itemTitle.($waived ? ' (free quota)' : ($includedLabel ? ' (included in student registration)' : '')),
                     'quantity' => 1,
                     'unit_amount' => $amount,
                     'amount' => $amount,
@@ -181,6 +189,11 @@ class FestSportsCompositeFeeService
                 $itemLineLabel = $itemTitle.' — team fee (override)';
                 $quantity = 1;
                 $unitAmount = $itemOverride;
+            } elseif ($itemsIncludedInStudentReg && $teamRegRate == 0) {
+                $amount = 0.0;
+                $itemLineLabel = $itemTitle.' — team fee (included in student registration)';
+                $quantity = 1;
+                $unitAmount = 0.0;
             } elseif (($groupFee = $this->itemFeeResolver->groupItemSurchargeAmount($registration->item, $groupFeeSchedule, $registration)) !== null) {
                 // Phase L: flat event fee + per-participant surcharge, opt-in via
                 // group_item_flat_fee/group_item_per_participant_rate (item override, else
@@ -194,7 +207,7 @@ class FestSportsCompositeFeeService
                 $unitAmount = $performersCount > 0 ? round($groupFee / $performersCount, 2) : $groupFee;
             } else {
                 if ($teamRegRate == 0) {
-                    $itemFee = (float) ($defaultItemFee ?? $studentRegRate);
+                    $itemFee = (float) ($defaultItemFee ?? 0);
                     $amount = $itemFee * $performersCount;
                     $itemLineLabel = $itemTitle." ({$performersCount} × ₹".number_format($itemFee, 0).')';
                     $quantity = $performersCount;
@@ -363,6 +376,8 @@ class FestSportsCompositeFeeService
         $teamRegRate = (float) ($head->team_registration_fee ?? 0);
         $individualQuota = max(0, (int) ($head->included_items_per_student ?? 0));
         $teamQuota = max(0, (int) ($head->included_teams ?? 0));
+        $itemsIncludedInStudentReg = $studentRegRate > 0
+            && ($head->default_item_fee === null || (float) $head->default_item_fee === 0.0);
 
         // Phase L — see the identical comment in calculateForEvent().
         $groupFeeSchedule = $event?->fee_settings ?? [];
@@ -406,17 +421,21 @@ class FestSportsCompositeFeeService
                     $amount = 0.0;
                 } elseif ($itemOverride !== null) {
                     $amount = $itemOverride;
+                } elseif ($itemsIncludedInStudentReg) {
+                    $amount = 0.0;
                 } else {
-                    $amount = (float) ($head->default_item_fee ?? $studentRegRate);
+                    $amount = (float) ($head->default_item_fee ?? 0);
                     if ($eligible && $individualQuota > 0 && $head->extra_item_fee !== null) {
                         // Beyond free quota: prefer explicit extra rate when configured.
                         $amount = (float) $head->extra_item_fee;
                     }
                 }
 
+                $includedLabel = $itemsIncludedInStudentReg && ! $waived && $itemOverride === null;
                 $lines[] = [
-                    'line_type' => $waived ? 'item_fee_waived' : 'item_fee',
-                    'label' => ($registration->item?->formattedTitle() ?? str_replace('_', ' ', $registration->item->title ?? 'Item')).($waived ? ' (free quota)' : ''),
+                    'line_type' => ($waived || $includedLabel) ? 'item_fee_waived' : 'item_fee',
+                    'label' => ($registration->item?->formattedTitle() ?? str_replace('_', ' ', $registration->item->title ?? 'Item'))
+                        .($waived ? ' (free quota)' : ($includedLabel ? ' (included in student registration)' : '')),
                     'quantity' => 1,
                     'unit_amount' => $amount,
                     'amount' => $amount,
@@ -464,6 +483,11 @@ class FestSportsCompositeFeeService
                 $label = $itemTitle.' — team fee (override)';
                 $quantity = 1;
                 $unitAmount = $itemOverride;
+            } elseif ($itemsIncludedInStudentReg && $teamRegRate == 0) {
+                $amount = 0.0;
+                $label = $itemTitle.' — team fee (included in student registration)';
+                $quantity = 1;
+                $unitAmount = 0.0;
             } elseif (($groupFee = $this->itemFeeResolver->groupItemSurchargeAmount($registration->item, $groupFeeSchedule, $registration)) !== null) {
                 // Phase L — see the identical branch in calculateForEvent().
                 $amount = $groupFee;
@@ -472,7 +496,7 @@ class FestSportsCompositeFeeService
                 $unitAmount = $performersCount > 0 ? round($groupFee / $performersCount, 2) : $groupFee;
             } else {
                 if ($teamRegRate == 0) {
-                    $itemFee = (float) ($head->default_item_fee ?? $studentRegRate);
+                    $itemFee = (float) ($head->default_item_fee ?? 0);
                     $amount = $itemFee * $performersCount;
                     $label = $itemTitle." ({$performersCount} × ₹".number_format($itemFee, 0).')';
                     $quantity = $performersCount;

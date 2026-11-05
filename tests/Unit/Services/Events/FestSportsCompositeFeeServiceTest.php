@@ -525,4 +525,34 @@ class FestSportsCompositeFeeServiceTest extends TestCase
         $this->assertSame(0.0, $result['item_fee']);
         $this->assertSame(800.0, array_sum(array_column($result['lines'], 'amount')));
     }
+
+    public function test_athletes_with_items_pay_only_student_registration_when_default_item_fee_is_zero(): void
+    {
+        ['school' => $school, 'event' => $event, 'head' => $head] = $this->sportsContext();
+
+        $event->update([
+            'student_registration_fee' => 200.0,
+            'default_item_fee' => 0.0,
+            'school_registration_fee' => 5000.0,
+            'fee_settings' => [
+                'fee_model' => 'sports_composite',
+                'sports_fees_configured' => true,
+            ],
+        ]);
+
+        $student = $this->makeStudent($school, 'Athlete Only Reg');
+        $itemA = $this->makeItem($event, $head, ['fee_amount' => null, 'title' => '100 M']);
+        $itemB = $this->makeItem($event, $head, ['fee_amount' => null, 'title' => 'Long Jump']);
+        $this->registerStudent($event, $itemA, $school, $student);
+        $this->registerStudent($event, $itemB, $school, $student);
+
+        $result = app(FestSportsCompositeFeeService::class)->calculateForEvent($event->fresh(), $school->id);
+
+        $this->assertSame(1, $result['student_count']);
+        $this->assertSame(200.0, $result['student_reg']);
+        $this->assertSame(0.0, $result['item_fee']);
+        $this->assertSame(0.0, $result['team_fee']);
+        $this->assertSame(5000.0, $result['school_reg']);
+        $this->assertSame(5200.0, array_sum(array_column($result['lines'], 'amount')));
+    }
 }
