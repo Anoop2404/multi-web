@@ -90,7 +90,7 @@
                     <a :href="reportUrl(`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/attendance/sheet.pdf`)" target="_blank" class="btn-secondary text-sm justify-center">Class-wise PDF ↓</a>
                 </div>
                 <button type="button" @click="openPdfPreview(`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}/attendance/sheet.pdf`)" class="btn-secondary text-sm mt-2 w-full justify-center">👁 Preview PDF</button>
-                <Link :href="exportBase + '/absent'" class="btn-secondary text-sm mt-2 inline-block">School-wise absent report →</Link>
+                <Link :href="exportBase + '/absent'" class="btn-secondary text-sm mt-2 inline-block">School / class-wise absent →</Link>
                 <a :href="exportBase + '/absent/export'" class="btn-secondary text-sm mt-2 inline-block">Absent list ↓</a>
                 <a :href="exportBase + '/malpractice/export'" class="btn-secondary text-sm mt-2 inline-block">Malpractice register ↓</a>
             </div>

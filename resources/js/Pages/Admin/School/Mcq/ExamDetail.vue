@@ -787,14 +787,27 @@
                                 <td class="font-mono text-xs">{{ row.hall_ticket_no || '—' }}</td>
                                 <td>{{ studentDisplayName(row.student) }}</td>
                                 <td class="text-xs">{{ row.class_name || row.student?.class_name || '—' }}</td>
-                                <td class="text-center min-w-[9rem]">
-                                    <SearchableSelect
-                                        v-model="row.attendance_status"
-                                        class="min-w-[9rem] text-left"
-                                        :options="attendanceStatusOptions"
-                                        :all-option="false"
-                                        :disabled="!!row.pending_correction_status"
-                                    />
+                                <td class="text-center min-w-[14rem]">
+                                    <div class="inline-flex rounded-lg border border-slate-200 overflow-hidden text-xs font-semibold" role="tablist">
+                                        <button
+                                            v-for="opt in attendanceStatusOptions"
+                                            :key="opt.value"
+                                            type="button"
+                                            role="tab"
+                                            :disabled="!!row.pending_correction_status"
+                                            class="px-2 py-1.5 border-r border-slate-200 last:border-r-0 transition-colors disabled:opacity-50"
+                                            :class="{
+                                                'bg-emerald-600 text-white': row.attendance_status === opt.value && opt.value === 'present',
+                                                'bg-rose-600 text-white': row.attendance_status === opt.value && opt.value === 'absent',
+                                                'bg-amber-600 text-white': row.attendance_status === opt.value && ['malpractice', 'withheld'].includes(opt.value),
+                                                'bg-slate-500 text-white': row.attendance_status === opt.value && opt.value === 'pending',
+                                                'bg-white text-slate-600 hover:bg-slate-50': row.attendance_status !== opt.value,
+                                            }"
+                                            @click="row.attendance_status = opt.value"
+                                        >
+                                            {{ opt.short || opt.label }}
+                                        </button>
+                                    </div>
                                 </td>
                                 <td>
                                     <input v-if="['malpractice','withheld'].includes(row.attendance_status)"
@@ -2334,11 +2347,11 @@ function uploadBatchFee() {
 // --- Attendance ---
 const alertMessage = ref('');
 const attendanceStatusOptions = [
-    { value: 'pending', label: 'Pending' },
-    { value: 'present', label: 'Present' },
-    { value: 'absent', label: 'Absent' },
-    { value: 'malpractice', label: 'Malpractice' },
-    { value: 'withheld', label: 'Withheld' },
+    { value: 'present', label: 'Present', short: 'Present' },
+    { value: 'absent', label: 'Absent', short: 'Absent' },
+    { value: 'malpractice', label: 'Malpractice', short: 'Malprac.' },
+    { value: 'withheld', label: 'Withheld', short: 'Withheld' },
+    { value: 'pending', label: 'Pending', short: '—' },
 ];
 
 function normalizeAttendanceRow(r) {

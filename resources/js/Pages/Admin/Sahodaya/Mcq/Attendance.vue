@@ -30,7 +30,22 @@
             <button v-if="hasFilters" type="button" @click="clearFilters" class="text-sm text-slate-400 hover:underline">Clear</button>
         </div>
 
-        <div class="flex flex-wrap gap-2 mb-4">
+        <div class="flex flex-wrap gap-2 mb-4 items-center">
+            <button
+                v-if="summary?.pending > 0"
+                type="button"
+                class="btn-primary text-sm"
+                :disabled="markingPending"
+                @click="markPendingPresent"
+            >
+                {{ markingPending ? 'Marking…' : `Mark ${hasExportFilters ? 'filtered ' : ''}pending as present (${summary.pending})` }}
+            </button>
+            <a :href="exportUrl(`${examBase}/attendance/absent/export`)" class="btn-secondary text-sm">
+                Absent Excel {{ hasExportFilters ? '(filtered)' : '' }} ↓
+            </a>
+            <a :href="exportUrl(`${examBase}/attendance/absent.pdf`)" class="btn-secondary text-sm" target="_blank">
+                Absent PDF {{ hasExportFilters ? '(filtered)' : '' }} ↓
+            </a>
             <a :href="exportUrl(`${examBase}/attendance/export`)" class="btn-secondary text-sm">Export attendance {{ hasExportFilters ? 'filtered' : '' }} CSV ↓</a>
             <a :href="exportUrl(`${examBase}/attendance/sheet.pdf`)" class="btn-secondary text-sm" target="_blank">Class-wise attendance PDF ↓</a>
             <a :href="`${examBase}/mark-sheet.pdf`" class="btn-secondary text-sm" target="_blank">Mark sheet PDF ↓</a>
@@ -38,7 +53,10 @@
                 <input ref="importFile" type="file" accept=".csv,.txt,.xlsx,.xls" class="text-sm" required>
                 <button type="submit" class="btn-secondary text-sm">Import attendance (CSV/Excel)</button>
             </form>
-            <p class="text-xs text-slate-500 w-full">Columns: hall_ticket_no, class, present|absent|malpractice|withheld, note (note required for malpractice/withheld). Class is required — reg. numbers repeat across classes.</p>
+            <p class="text-xs text-slate-500 w-full">
+                Tap Present / Absent / Malpractice / Withheld to mark and save. Absent Excel/PDF use the school and class filters above.
+                Import columns: hall_ticket_no, class, present|absent|malpractice|withheld, note.
+            </p>
         </div>
         <div v-if="importErrors?.length" class="card mb-4 !border-amber-200 bg-amber-50 text-sm text-amber-900 space-y-1">
             <p class="font-semibold">Import issues ({{ importErrors.length }})</p>
@@ -59,7 +77,6 @@
                             <th>School</th>
                             <th>Attendance</th>
                             <th>Note</th>
-                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -70,21 +87,41 @@
                             <td class="text-xs">{{ r.student?.school_class?.name || '—' }}</td>
                             <td class="text-xs">{{ r.school?.name || '—' }}</td>
                             <td>
-                                <SearchableSelect v-model="forms[r.id].attendance_status"
-                                    :options="[{ value: 'present', label: 'Present' }, { value: 'absent', label: 'Absent' }, { value: 'malpractice', label: 'Malpractice' }, { value: 'withheld', label: 'Withheld' }, { value: 'pending', label: 'Pending' }]"
-                                    :all-option="false" placeholder="Select status"
-                                    :aria-label="`Attendance for ${r.student?.name}`" />
+                                <div class="inline-flex rounded-lg border border-slate-200 overflow-hidden text-xs font-semibold shadow-sm" role="tablist" :aria-label="`Attendance for ${r.student?.name || 'student'}`">
+                                    <button
+                                        v-for="opt in statusTabs"
+                                        :key="opt.value"
+                                        type="button"
+                                        role="tab"
+                                        :aria-selected="forms[r.id].attendance_status === opt.value"
+                                        class="px-2.5 py-1.5 border-r border-slate-200 last:border-r-0 transition-colors disabled:opacity-60"
+                                        :class="tabClass(forms[r.id].attendance_status, opt.value)"
+                                        :disabled="savingId === r.id"
+                                        @click="setStatus(r, opt.value)"
+                                    >
+                                        {{ opt.label }}
+                                    </button>
+                                </div>
                             </td>
                             <td>
-                                <input v-if="['malpractice','withheld'].includes(forms[r.id].attendance_status)"
-                                       v-model="forms[r.id].attendance_note" type="text" class="field text-xs"
-                                       placeholder="Reason (required)" :aria-label="`Note for ${r.student?.name}`">
+                                <div v-if="['malpractice','withheld'].includes(forms[r.id].attendance_status)" class="flex items-center gap-2 min-w-[12rem]">
+                                    <input
+                                        v-model="forms[r.id].attendance_note"
+                                        type="text"
+                                        class="field text-xs"
+                                        placeholder="Reason (required)"
+                                        :aria-label="`Note for ${r.student?.name}`"
+                                        @keydown.enter.prevent="save(r)"
+                                    >
+                                    <button type="button" class="link-brand text-xs whitespace-nowrap" :disabled="savingId === r.id" @click="save(r)">
+                                        Save note
+                                    </button>
+                                </div>
                                 <span v-else class="text-slate-300 text-xs">—</span>
                             </td>
-                            <td><button type="button" @click="save(r)" class="link-brand text-xs">Save</button></td>
                         </tr>
                         <tr v-if="!registrations.data?.length">
-                            <td colspan="8" class="p-6 text-center text-slate-400">No matching registrations.</td>
+                            <td colspan="7" class="p-6 text-center text-slate-400">No matching registrations.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -105,6 +142,7 @@ import PaginationLinks from '@/Components/ui/PaginationLinks.vue';
 import { useDebouncedInertiaFilters } from '@/composables/useDebouncedInertiaFilters.js';
 
 const alertMessage = ref('');
+const savingId = ref(null);
 
 const props = defineProps({
     sahodaya: Object,
@@ -120,6 +158,13 @@ const props = defineProps({
 });
 const importFile = ref(null);
 const page = usePage();
+
+const statusTabs = [
+    { value: 'present', label: 'Present' },
+    { value: 'absent', label: 'Absent' },
+    { value: 'malpractice', label: 'Malpractice' },
+    { value: 'withheld', label: 'Withheld' },
+];
 
 const filterForm = reactive({
     search: props.filters?.search ?? '',
@@ -153,7 +198,16 @@ function exportUrl(baseUrl) {
     return baseUrl + (baseUrl.includes('?') ? '&' : '?') + params.join('&');
 }
 
+function tabClass(current, value) {
+    const active = current === value;
+    if (!active) return 'bg-white text-slate-600 hover:bg-slate-50';
+    if (value === 'present') return 'bg-emerald-600 text-white';
+    if (value === 'absent') return 'bg-rose-600 text-white';
+    return 'bg-amber-600 text-white';
+}
+
 const importErrors = computed(() => page.props.flash?.import_errors ?? []);
+const markingPending = ref(false);
 
 const forms = reactive({});
 function syncForms(registrations) {
@@ -164,18 +218,50 @@ function syncForms(registrations) {
 syncForms(props.registrations);
 watch(() => props.registrations, syncForms);
 
+function markPendingPresent() {
+    if (markingPending.value) return;
+    const scope = hasExportFilters.value
+        ? 'filtered pending students'
+        : 'all pending students for this exam';
+    if (!window.confirm(`Mark ${scope} as Present? Already marked absent / malpractice / withheld rows are left unchanged.`)) {
+        return;
+    }
+    markingPending.value = true;
+    router.post(`${examBase}/attendance/mark-pending-present`, {
+        school_id: filterForm.school_id || null,
+        class: filterForm.class || null,
+    }, {
+        preserveScroll: true,
+        onFinish: () => { markingPending.value = false; },
+    });
+}
+
+function setStatus(r, status) {
+    if (!forms[r.id]) return;
+    forms[r.id].attendance_status = status;
+    if (['malpractice', 'withheld'].includes(status) && !forms[r.id].attendance_note?.trim()) {
+        // Wait for note before posting.
+        return;
+    }
+    save(r);
+}
+
 function save(r) {
     const status = forms[r.id].attendance_status;
-    if (status === 'pending') return;
+    if (!status || status === 'pending') return;
     if (['malpractice', 'withheld'].includes(status) && !forms[r.id].attendance_note?.trim()) {
         alertMessage.value = 'A reason/note is required when marking malpractice or withheld.';
         return;
     }
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/attendance`, {
+    savingId.value = r.id;
+    router.post(`${examBase}/attendance`, {
         registration_id: r.id,
         attendance_status: status,
         attendance_note: forms[r.id].attendance_note || null,
-    }, { preserveScroll: true });
+    }, {
+        preserveScroll: true,
+        onFinish: () => { savingId.value = null; },
+    });
 }
 
 function importAttendance() {
@@ -183,7 +269,7 @@ function importAttendance() {
     if (!file) return;
     const form = new FormData();
     form.append('file', file);
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/attendance/import`, form, {
+    router.post(`${examBase}/attendance/import`, form, {
         preserveScroll: true,
         forceFormData: true,
         onSuccess: () => { if (importFile.value) importFile.value.value = ''; },

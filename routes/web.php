@@ -2042,6 +2042,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{exam}/reports/level2-qualifiers/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportLevel2Qualifiers'])->name('reports.level2-qualifiers.export');
             Route::get('/{exam}/reports/absent/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportAbsent'])->name('reports.absent.export');
             Route::get('/{exam}/reports/absent/school-wise/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportSchoolWiseAbsent'])->name('reports.absent.school-wise.export');
+            Route::get('/{exam}/reports/absent/class-wise/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportClassWiseAbsent'])->name('reports.absent.class-wise.export');
             Route::get('/{exam}/reports/marks-pending/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportMarksPending'])->name('reports.marks-pending.export');
             Route::get('/{exam}/reports/marks-entry-template/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportMarksEntryTemplate'])->name('reports.marks-entry-template.export');
             Route::get('/{exam}/reports/fees-pending/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportPendingFees'])->name('reports.fees-pending.export');
@@ -2055,8 +2056,11 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{exam}/reports/class-wise-counts/pdf', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportClassWiseCountsPdf'])->name('reports.class-wise-counts.pdf');
             Route::get('/{exam}/attendance', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'attendance'])->name('attendance');
             Route::post('/{exam}/attendance', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'storeAttendance'])->name('attendance.store');
+            Route::post('/{exam}/attendance/mark-pending-present', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'markPendingPresent'])->name('attendance.mark-pending-present');
             Route::post('/{exam}/attendance/import', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'importAttendance'])->name('attendance.import');
             Route::get('/{exam}/attendance/export', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'exportAttendance'])->name('attendance.export');
+            Route::get('/{exam}/attendance/absent/export', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'exportAbsent'])->name('attendance.absent.export');
+            Route::get('/{exam}/attendance/absent.pdf', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'absentListPdf'])->name('attendance.absent.pdf');
             Route::get('/{exam}/attendance/sheet.pdf', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'attendanceSheetPdf'])->name('attendance.sheet');
             Route::get('/{exam}/mark-sheet.pdf', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'markSheetPdf'])->name('mark-sheet');
             Route::get('/{exam}/result-sheet.pdf', [\App\Http\Controllers\SahodayaAdmin\McqExamOpsController::class, 'resultSheetPdf'])->name('result-sheet');

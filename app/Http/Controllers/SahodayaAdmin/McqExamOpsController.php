@@ -128,6 +128,36 @@ class McqExamOpsController extends SahodayaAdminController
         return back()->with('success', 'Attendance saved.');
     }
 
+    /** Bulk-mark pending/unmarked registrations as present (respects school/class filters). */
+    public function markPendingPresent(Request $request, string $tenantId, McqExam $exam)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        $filters = $request->validate([
+            'school_id' => 'nullable|string|max:36',
+            'class'     => 'nullable|string|max:60',
+        ]);
+
+        $query = McqRegistration::where('exam_id', $exam->id)
+            ->active()
+            ->where(fn ($q) => $q->whereNull('attendance_status')->orWhere('attendance_status', 'pending'));
+
+        $this->applyRegistrationFilters($query, $filters);
+
+        $updated = $query->update([
+            'attendance_status'    => 'present',
+            'attendance_note'      => null,
+            'attendance_marked_at' => now(),
+            'attendance_marked_by' => $request->user()->id,
+        ]);
+
+        $scope = filled($filters['school_id'] ?? null) || filled($filters['class'] ?? null)
+            ? ' (filtered)'
+            : '';
+
+        return back()->with('success', "Marked {$updated} pending registration(s) as present{$scope}.");
+    }
+
     public function importAttendance(Request $request, string $tenantId, McqExam $exam)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
@@ -160,6 +190,30 @@ class McqExamOpsController extends SahodayaAdminController
             $exam,
             $request->input('school_id'),
             $request->input('class'),
+        );
+    }
+
+    public function exportAbsent(Request $request, string $tenantId, McqExam $exam, \App\Services\Mcq\McqReportService $reports)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        return $reports->exportAbsentList(
+            $exam,
+            $request->input('school_id'),
+            $request->input('class'),
+        );
+    }
+
+    public function absentListPdf(Request $request, string $tenantId, McqExam $exam, \App\Services\Mcq\McqPrintableDocumentService $docs)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        return $docs->absentListPdf(
+            $exam,
+            schoolId: $request->input('school_id'),
+            selectedClass: $request->input('class'),
+            inline: $request->boolean('inline') || $request->query('preview') == '1',
+            sahodaya: $this->sahodaya,
         );
     }
 

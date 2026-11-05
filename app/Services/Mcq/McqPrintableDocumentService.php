@@ -149,6 +149,43 @@ class McqPrintableDocumentService
         return $pdf->download($this->slug($exam).'-result-sheet.pdf');
     }
 
+    public function absentListPdf(
+        McqExam $exam,
+        ?string $schoolId = null,
+        ?string $selectedClass = null,
+        bool $inline = false,
+        ?Tenant $sahodaya = null
+    ): Response {
+        @ini_set('memory_limit', '512M');
+        @ini_set('max_execution_time', '180');
+
+        $rows = app(McqReportService::class)->absentReportRows($exam, $schoolId, $selectedClass);
+        $schoolRows = app(McqReportService::class)->schoolWiseAbsentRows($exam, $schoolId);
+        $classRows = app(McqReportService::class)->classWiseAbsentRows($exam, $schoolId, $selectedClass);
+        $sahodaya ??= Tenant::find($exam->tenant_id);
+        $school = $schoolId ? Tenant::find($schoolId) : null;
+
+        $pdf = Pdf::loadView('mcq.absent-list', [
+            'exam'          => $exam,
+            'school'        => $school,
+            'selectedClass' => $selectedClass,
+            'rows'          => $rows,
+            'schoolRows'    => $schoolRows,
+            'classRows'     => $classRows,
+            'orgName'       => $sahodaya?->name ?? 'Sahodaya',
+            'logoSrc'       => $sahodaya ? TenantBranding::logoEmbedSrc($sahodaya) : null,
+            'generatedAt'   => $this->generatedAt(),
+        ])->setPaper('a4', 'portrait');
+
+        $suffix = $schoolId ? '-school-'.substr($schoolId, 0, 8) : '';
+        if ($selectedClass) {
+            $suffix .= '-class-'.str($selectedClass)->slug()->limit(20, '')->toString();
+        }
+        $filename = $this->slug($exam).'-absent-list'.$suffix.'.pdf';
+
+        return $inline ? $pdf->stream($filename, ['Attachment' => false]) : $pdf->download($filename);
+    }
+
     public function classWiseCountsPdf(
         McqExam $exam,
         ?string $schoolId = null,

@@ -36,31 +36,47 @@
                         <td class="p-3">{{ r.student?.name }}</td>
                         <td class="p-3 text-xs text-gray-500">{{ r.school?.name }}</td>
                         <td class="p-3">
-                            <SearchableSelect
-                                v-model="forms[r.id].attendance_status"
-                                :disabled="!!r.pending_correction_status"
-                                :all-option="false"
-                                :options="[
-                                    { value: 'present', label: 'Present' },
-                                    { value: 'absent', label: 'Absent' },
-                                    { value: 'malpractice', label: 'Malpractice' },
-                                    { value: 'withheld', label: 'Withheld' },
-                                    { value: 'pending', label: 'Pending' },
-                                ]"
-                            />
+                            <div class="inline-flex rounded-lg border border-slate-200 overflow-hidden text-xs font-semibold" role="tablist">
+                                <button
+                                    v-for="opt in statusTabs"
+                                    :key="opt.value"
+                                    type="button"
+                                    role="tab"
+                                    :disabled="!!r.pending_correction_status || savingId === r.id"
+                                    class="px-2.5 py-1.5 border-r border-slate-200 last:border-r-0 transition-colors disabled:opacity-50"
+                                    :class="tabClass(forms[r.id].attendance_status, opt.value)"
+                                    @click="setStatus(r, opt.value)"
+                                >
+                                    {{ opt.label }}
+                                </button>
+                            </div>
                         </td>
                         <td class="p-3">
-                            <input v-if="['malpractice','withheld'].includes(forms[r.id].attendance_status)"
-                                   v-model="forms[r.id].attendance_note" type="text" class="field text-xs"
-                                   :disabled="!!r.pending_correction_status"
-                                   placeholder="Reason (required)">
+                            <div v-if="['malpractice','withheld'].includes(forms[r.id].attendance_status)" class="flex items-center gap-2">
+                                <input
+                                    v-model="forms[r.id].attendance_note"
+                                    type="text"
+                                    class="field text-xs"
+                                    :disabled="!!r.pending_correction_status"
+                                    placeholder="Reason (required)"
+                                    @keydown.enter.prevent="save(r)"
+                                >
+                                <button
+                                    v-if="!r.pending_correction_status"
+                                    type="button"
+                                    class="text-xs font-semibold text-indigo-600"
+                                    :disabled="savingId === r.id"
+                                    @click="save(r)"
+                                >
+                                    Save note
+                                </button>
+                            </div>
                             <span v-else class="text-gray-300 text-xs">—</span>
                         </td>
                         <td class="p-3">
                             <span v-if="r.pending_correction_status" class="text-amber-700 text-xs font-semibold">
                                 Pending approval → {{ r.pending_correction_status }}
                             </span>
-                            <button v-else @click="save(r)" class="text-xs font-semibold text-indigo-600">Save</button>
                         </td>
                     </tr>
                     <tr v-if="!registrations.data?.length">
@@ -80,14 +96,38 @@ import { examPortalNavItems } from '@/support/examPortalNav.js';
 import { computed, reactive, ref } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import InlineAlert from '@/Components/ui/InlineAlert.vue';
-import SearchableSelect from '@/Components/ui/SearchableSelect.vue';
 
 const props = defineProps({ sahodaya: Object, exam: Object, registrations: Object, isTrustedReviewer: { type: Boolean, default: false } });
 const csvFile = ref(null);
 const alertMessage = ref('');
+const savingId = ref(null);
 const forms = reactive({});
+const statusTabs = [
+    { value: 'present', label: 'Present' },
+    { value: 'absent', label: 'Absent' },
+    { value: 'malpractice', label: 'Malpractice' },
+    { value: 'withheld', label: 'Withheld' },
+];
+
 for (const r of props.registrations.data ?? []) {
     forms[r.id] = { attendance_status: r.attendance_status || 'present', attendance_note: r.attendance_note || '' };
+}
+
+function tabClass(current, value) {
+    const active = current === value;
+    if (!active) return 'bg-white text-slate-600 hover:bg-slate-50';
+    if (value === 'present') return 'bg-emerald-600 text-white';
+    if (value === 'absent') return 'bg-rose-600 text-white';
+    return 'bg-amber-600 text-white';
+}
+
+function setStatus(r, status) {
+    if (r.pending_correction_status || !forms[r.id]) return;
+    forms[r.id].attendance_status = status;
+    if (['malpractice', 'withheld'].includes(status) && !forms[r.id].attendance_note?.trim()) {
+        return;
+    }
+    save(r);
 }
 
 function save(r) {
@@ -97,11 +137,15 @@ function save(r) {
         alertMessage.value = 'A reason/note is required when marking malpractice or withheld.';
         return;
     }
+    savingId.value = r.id;
     router.post(`/portal/exam/${props.sahodaya.id}/exams/${props.exam.id}/attendance`, {
         registration_id: r.id,
         attendance_status: status,
         attendance_note: forms[r.id].attendance_note || null,
-    }, { preserveScroll: true });
+    }, {
+        preserveScroll: true,
+        onFinish: () => { savingId.value = null; },
+    });
 }
 
 function importCsv() {

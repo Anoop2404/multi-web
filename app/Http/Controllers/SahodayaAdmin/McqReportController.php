@@ -161,18 +161,29 @@ class McqReportController extends SahodayaAdminController
         ]);
     }
 
-    /** School-wise absent rollup plus the flat absentee list for exam-day follow-up. */
+    /** School-wise + class-wise absent rollup plus the flat absentee list for exam-day follow-up. */
     public function absentReportPage(Request $request, string $tenantId, McqExam $exam, McqReportService $reports)
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
         $filters = $request->validate([
             'school_id' => 'nullable|string|max:36',
+            'class'     => 'nullable|string|max:60',
             'search'    => 'nullable|string|max:100',
         ]);
 
         $schoolId = $filters['school_id'] ?? null;
+        $selectedClass = $filters['class'] ?? null;
         $absentees = collect($reports->absentReportRows($exam, $schoolId));
+
+        if (filled($selectedClass) && strtolower(trim((string) $selectedClass)) !== 'all') {
+            $cleanFilter = strtolower(trim(str_ireplace('class', '', (string) $selectedClass)));
+            $absentees = $absentees->filter(function ($r) use ($cleanFilter) {
+                $cName = strtolower(trim(str_ireplace('class', '', (string) ($r['class_name'] ?? ''))));
+
+                return $cName === $cleanFilter;
+            })->values();
+        }
 
         if (filled($filters['search'] ?? null)) {
             $term = mb_strtolower(trim($filters['search']));
@@ -184,20 +195,24 @@ class McqReportController extends SahodayaAdminController
         }
 
         $schoolRows = $reports->schoolWiseAbsentRows($exam, $schoolId);
+        $classRows = $reports->classWiseAbsentRows($exam, $schoolId, $selectedClass);
 
         return $this->inertia('Sahodaya/Mcq/Reports/AbsentReport', [
             'exam' => array_merge($exam->only('id', 'title', 'exam_level', 'status', 'delivery_mode', 'results_published'), [
                 'is_model_exam' => $exam->isModelExam(),
             ]),
             'schoolRows' => $schoolRows,
+            'classRows'  => $classRows,
             'absentees'  => $absentees->values()->all(),
             'stats'      => [
                 'schools_with_absent' => count($schoolRows),
+                'classes_with_absent' => count($classRows),
                 'absent_total'        => $absentees->count(),
                 'registered_in_scope' => collect($schoolRows)->sum('registered'),
             ],
             'filters'       => $filters,
             'schoolOptions' => $reports->schoolFilterOptions($exam),
+            'classOptions'  => $reports->classFilterOptions($exam),
         ]);
     }
 
@@ -310,7 +325,7 @@ class McqReportController extends SahodayaAdminController
     {
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
-        return $reports->exportAbsentList($exam, $request->input('school_id'));
+        return $reports->exportAbsentList($exam, $request->input('school_id'), $request->input('class'));
     }
 
     public function exportSchoolWiseAbsent(Request $request, string $tenantId, McqExam $exam, McqReportService $reports)
@@ -318,6 +333,13 @@ class McqReportController extends SahodayaAdminController
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
         return $reports->exportSchoolWiseAbsent($exam, $request->input('school_id'));
+    }
+
+    public function exportClassWiseAbsent(Request $request, string $tenantId, McqExam $exam, McqReportService $reports)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        return $reports->exportClassWiseAbsent($exam, $request->input('school_id'), $request->input('class'));
     }
 
     public function exportMarksPending(string $tenantId, McqExam $exam, McqReportService $reports)
