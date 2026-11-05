@@ -754,13 +754,13 @@
                         class="btn-primary text-xs"
                         @click="markPendingPresent"
                     >
-                        Mark {{ attendanceClassFilter ? 'filtered ' : '' }}pending as present ({{ pendingCount }})
+                        Mark {{ (attendanceClassFilter || attendanceStatusFilter) ? 'filtered ' : '' }}pending as present ({{ pendingCount }})
                     </button>
                     <button type="button" class="btn-secondary text-xs" @click="markAll('present')">
-                        Mark {{ attendanceClassFilter ? 'filtered' : 'all' }} present
+                        Mark {{ (attendanceClassFilter || attendanceStatusFilter) ? 'filtered' : 'all' }} present
                     </button>
                     <button type="button" class="btn-secondary text-xs" @click="markAll('absent')">
-                        Mark {{ attendanceClassFilter ? 'filtered' : 'all' }} absent
+                        Mark {{ (attendanceClassFilter || attendanceStatusFilter) ? 'filtered' : 'all' }} absent
                     </button>
                     <button type="button" class="btn-secondary text-xs" @click="markAll('pending')">
                         Reset filtered to pending
@@ -773,10 +773,18 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <SearchableSelect v-model="attendanceClassFilter" class="min-w-[160px]" :options="classNameOptions"
                                           :all-option="true" all-label="All classes" placeholder="All classes" />
+                        <SearchableSelect
+                            v-model="attendanceStatusFilter"
+                            class="min-w-[160px]"
+                            :options="attendanceStatusFilterOptions"
+                            :all-option="true"
+                            all-label="All attendance"
+                            placeholder="All attendance"
+                        />
                         <input v-model="attendanceSearchQuery" type="text" placeholder="Search student or ticket..." class="field text-xs min-w-[220px] bg-slate-50 border-slate-300 py-1.5 rounded-lg" />
-                        <button v-if="attendanceClassFilter || attendanceSearchQuery" type="button"
+                        <button v-if="attendanceClassFilter || attendanceStatusFilter || attendanceSearchQuery" type="button"
                                 class="text-xs text-slate-400 hover:underline"
-                                @click="attendanceClassFilter = ''; attendanceSearchQuery = ''">Clear</button>
+                                @click="attendanceClassFilter = ''; attendanceStatusFilter = ''; attendanceSearchQuery = ''">Clear</button>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
                         <a :href="attendanceExportUrl(reportExports.attendance)" class="btn-secondary text-xs">
@@ -1831,13 +1839,21 @@ const paginatedRegisteredStudents = computed(() => {
     return filteredRegisteredStudents.value.slice(start, start + registeredPageSize.value);
 });
 
-// Attendance tab search, class filter & pagination
+// Attendance tab search, class / status filter & pagination
 const attendanceSearchQuery = ref('');
 const attendanceClassFilter = ref('');
+const attendanceStatusFilter = ref('');
+const attendanceStatusFilterOptions = [
+    { value: 'pending', label: 'Pending' },
+    { value: 'present', label: 'Present' },
+    { value: 'absent', label: 'Absent' },
+    { value: 'malpractice', label: 'Malpractice' },
+    { value: 'withheld', label: 'Withheld' },
+];
 const attendancePage = ref(1);
 const attendancePageSize = ref(50);
 
-watch([attendanceSearchQuery, attendanceClassFilter], () => {
+watch([attendanceSearchQuery, attendanceClassFilter, attendanceStatusFilter], () => {
     attendancePage.value = 1;
 });
 
@@ -1848,6 +1864,13 @@ const filteredAttendanceState = computed(() => {
         list = list.filter((r) => {
             const cls = String(r.class_name || r.student?.class_name || '').toLowerCase().replace(/^class\s*/i, '').trim();
             return cls === clean;
+        });
+    }
+    if (attendanceStatusFilter.value) {
+        const wanted = attendanceStatusFilter.value;
+        list = list.filter((r) => {
+            const status = r.attendance_status || 'pending';
+            return status === wanted;
         });
     }
     if (attendanceSearchQuery.value.trim()) {

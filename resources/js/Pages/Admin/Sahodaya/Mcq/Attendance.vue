@@ -27,6 +27,14 @@
             <input v-model="filterForm.search" type="search" class="field max-w-xs" placeholder="Search ticket, student, or school…">
             <SearchableSelect v-model="filterForm.school_id" :options="schoolOptions" :all-option="true" all-label="All schools" placeholder="All schools" />
             <SearchableSelect v-model="filterForm.class" :options="classOptions.map(c => ({ value: c, label: c }))" :all-option="true" all-label="All classes" placeholder="All classes" />
+            <SearchableSelect
+                v-model="filterForm.attendance_status"
+                class="min-w-[160px]"
+                :options="attendanceStatusFilterOptions"
+                :all-option="true"
+                all-label="All attendance"
+                placeholder="All attendance"
+            />
             <button v-if="hasFilters" type="button" @click="clearFilters" class="text-sm text-slate-400 hover:underline">Clear</button>
         </div>
 
@@ -166,14 +174,23 @@ const statusTabs = [
     { value: 'withheld', label: 'Withheld' },
 ];
 
+const attendanceStatusFilterOptions = [
+    { value: 'pending', label: 'Pending' },
+    { value: 'present', label: 'Present' },
+    { value: 'absent', label: 'Absent' },
+    { value: 'malpractice', label: 'Malpractice' },
+    { value: 'withheld', label: 'Withheld' },
+];
+
 const filterForm = reactive({
     search: props.filters?.search ?? '',
     school_id: props.filters?.school_id ?? null,
     class: props.filters?.class ?? null,
+    attendance_status: props.filters?.attendance_status ?? null,
 });
 
-const hasFilters = computed(() => !!(filterForm.search || filterForm.school_id || filterForm.class));
-const hasExportFilters = computed(() => !!(filterForm.school_id || filterForm.class));
+const hasFilters = computed(() => !!(filterForm.search || filterForm.school_id || filterForm.class || filterForm.attendance_status));
+const hasExportFilters = computed(() => !!(filterForm.school_id || filterForm.class || filterForm.attendance_status));
 const examBase = `/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}`;
 
 function applyFilters() {
@@ -186,14 +203,16 @@ function clearFilters() {
     filterForm.search = '';
     filterForm.school_id = null;
     filterForm.class = null;
+    filterForm.attendance_status = null;
     applyFilters();
 }
 
-/** Pass school/class filters into CSV/PDF downloads (search is list-only). */
+/** Pass school/class/attendance filters into CSV/PDF downloads (search is list-only). */
 function exportUrl(baseUrl) {
     const params = [];
     if (filterForm.school_id) params.push('school_id=' + encodeURIComponent(filterForm.school_id));
     if (filterForm.class) params.push('class=' + encodeURIComponent(filterForm.class));
+    if (filterForm.attendance_status) params.push('attendance_status=' + encodeURIComponent(filterForm.attendance_status));
     if (!params.length) return baseUrl;
     return baseUrl + (baseUrl.includes('?') ? '&' : '?') + params.join('&');
 }

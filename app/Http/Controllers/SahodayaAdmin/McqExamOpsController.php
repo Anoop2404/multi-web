@@ -22,9 +22,10 @@ class McqExamOpsController extends SahodayaAdminController
         abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
 
         $filters = $request->validate([
-            'search'    => 'nullable|string|max:100',
-            'school_id' => 'nullable|string|max:36',
-            'class'     => 'nullable|string|max:60',
+            'search'             => 'nullable|string|max:100',
+            'school_id'          => 'nullable|string|max:36',
+            'class'              => 'nullable|string|max:60',
+            'attendance_status'  => 'nullable|in:pending,present,absent,malpractice,withheld',
         ]);
 
         $query = McqRegistration::where('exam_id', $exam->id)
@@ -75,6 +76,15 @@ class McqExamOpsController extends SahodayaAdminController
         if (! empty($filters['class'])) {
             $class = mb_strtolower(trim((string) $filters['class']));
             $query->whereHas('student.schoolClass', fn ($q) => $q->whereRaw('LOWER(name) = ?', [$class]));
+        }
+
+        if (! empty($filters['attendance_status'])) {
+            $status = $filters['attendance_status'];
+            if ($status === 'pending') {
+                $query->where(fn ($q) => $q->whereNull('attendance_status')->orWhere('attendance_status', 'pending'));
+            } else {
+                $query->where('attendance_status', $status);
+            }
         }
 
         if (! empty($filters['search'])) {
