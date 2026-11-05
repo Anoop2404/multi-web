@@ -1437,6 +1437,13 @@ class FestCertificateService
         return $roman;
     }
 
+    private static function sportsCertificateCategory(string $category): string
+    {
+        return preg_match('/\bunder[\s-]*(\d+)\b/i', $category, $matches)
+            ? 'Under '.$matches[1]
+            : $category;
+    }
+
     /**
      * Human-readable category/type labels for a fest item — certificates show just these
      * two (not gender), each in its own parenthetical: "Item Name (Category 1) (Group)".
@@ -1463,6 +1470,11 @@ class FestCertificateService
         // Classes 3 & 4"); certificates want just the short part, attendance exports want
         // the full thing, hence trimming here rather than upstream in FestClassGroupScheme.
         $category = trim(explode(' — ', $category)[0]);
+        if ($event->event_type === 'sports') {
+            // The sports certificate blank needs only the age, without gender or
+            // eligibility notes (e.g. "Under 14 Boys (Classes 7 & 8)").
+            $category = self::sportsCertificateCategory($category);
+        }
 
         // participant_type has 5 real values, not 3 (see FestTeamSquadRules::ALL_TYPES) —
         // 'pair'/'trio' items were previously falling through to the 'individual' default

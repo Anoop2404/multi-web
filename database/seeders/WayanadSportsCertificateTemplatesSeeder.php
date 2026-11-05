@@ -22,17 +22,29 @@ class WayanadSportsCertificateTemplatesSeeder extends Seeder
             $presets = require resource_path('certificate-templates/wayanad-sports/templates.php');
             $paths = [];
             foreach (['winner' => 'merit', 'participation' => 'participation'] as $type => $asset) {
-                $paths[$type] = "tenants/{$tenant->id}/certificate-backgrounds/wayanad-sports-{$asset}-2026.png";
-                if (! Storage::disk(TenantStorage::uploadDisk())->put($paths[$type], file_get_contents(resource_path("certificate-templates/wayanad-sports/{$asset}.png")), ['visibility' => 'private'])) {
+                $paths[$type] = "tenants/{$tenant->id}/certificate-backgrounds/wayanad-sports-{$asset}-2026-v2.jpg";
+                if (! Storage::disk(TenantStorage::uploadDisk())->put($paths[$type], file_get_contents(resource_path("certificate-templates/wayanad-sports/{$asset}.jpg")), ['visibility' => 'private'])) {
                     throw new \RuntimeException('Failed to store sports certificate artwork.');
                 }
             }
             DB::transaction(function () use ($tenant, $event, $presets, $paths) {
                 foreach ($presets as $type => $preset) {
-                    CertificateTemplate::firstOrCreate([
+                    $template = CertificateTemplate::firstOrCreate([
                         'tenant_id' => $tenant->id, 'event_type' => 'fest', 'event_id' => $event->id,
                         'item_id' => null, 'certificate_type' => $type, 'title' => $preset['title'],
                     ], $preset + ['background_path' => $paths[$type]]);
+                    // Explicit opt-in lets existing installations apply corrected positions
+                    // with the matching landscape artwork while retaining unrelated settings.
+                    if (! $template->wasRecentlyCreated && filter_var(env('WAYANAD_SPORTS_REFRESH_LAYOUT', false), FILTER_VALIDATE_BOOLEAN)) {
+                        $layout = $template->layout_json ?? [];
+                        $layout['custom_fields'] = $preset['layout_json']['custom_fields'];
+                        $layout['orientation'] = 'landscape';
+                        $layout['page'] = $preset['layout_json']['page'];
+                        if ($layout !== $template->layout_json || $template->background_path !== $paths[$type]) {
+                            $template->update(['layout_json' => $layout, 'background_path' => $paths[$type]]);
+                            \App\Support\CertificateStalenessMarker::markStaleForTemplate($template->id);
+                        }
+                    }
                 }
                 $owner = $event->usesPhasedRegionalBilling() ? $event->rootEvent() : $event;
                 $owner->update(['participation_certificate_mode' => 'per_item']);
