@@ -332,10 +332,69 @@ class McqReportService
         );
     }
 
+    /**
+     * Absentees for the exam (hall-ticket holders), optionally scoped to one school.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function absentReportRows(McqExam $exam, ?string $schoolId = null): array
+    {
+        return collect($this->registrationRows($exam, $schoolId, attendanceOnly: true))
+            ->filter(fn ($r) => ($r['attendance_status'] ?? '') === 'absent')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Per-school attendance rollup focused on absentees (hall-ticket holders only).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function schoolWiseAbsentRows(McqExam $exam, ?string $schoolId = null): array
+    {
+        $query = McqRegistration::where('exam_id', $exam->id)
+            ->active()
+            ->withHallTicketNumber()
+            ->with(['school:id,name']);
+
+        if ($schoolId) {
+            $query->where('school_id', $schoolId);
+        }
+
+        return $query->get()
+            ->groupBy('school_id')
+            ->map(function ($group) {
+                $first = $group->first();
+                $registered = $group->count();
+                $present = $group->where('attendance_status', 'present')->count();
+                $absent = $group->where('attendance_status', 'absent')->count();
+                $malpractice = $group->where('attendance_status', 'malpractice')->count();
+                $withheld = $group->where('attendance_status', 'withheld')->count();
+                $pending = $group->filter(
+                    fn (McqRegistration $r) => in_array($r->attendance_status, [null, 'pending'], true)
+                )->count();
+
+                return [
+                    'school_id'   => $first->school_id,
+                    'school_name' => $first->school?->name ?? '—',
+                    'registered'  => $registered,
+                    'present'     => $present,
+                    'absent'      => $absent,
+                    'malpractice' => $malpractice,
+                    'withheld'    => $withheld,
+                    'pending'     => $pending,
+                    'absent_rate' => $registered === 0 ? null : round(($absent / $registered) * 100, 1),
+                ];
+            })
+            ->filter(fn ($row) => ($row['absent'] ?? 0) > 0)
+            ->sortByDesc('absent')
+            ->values()
+            ->all();
+    }
+
     public function exportAbsentList(McqExam $exam, ?string $schoolId = null): StreamedResponse
     {
-        $rows = collect($this->registrationRows($exam, $schoolId))
-            ->filter(fn ($r) => ($r['attendance_status'] ?? '') === 'absent');
+        $rows = collect($this->absentReportRows($exam, $schoolId));
 
         return ExcelExport::download(
             'mcq-absent-'.$exam->id.($schoolId ? '-school' : ''),
@@ -346,6 +405,26 @@ class McqReportService
                 $r['reg_no'],
                 $r['class_name'],
                 $r['school_name'],
+            ]),
+        );
+    }
+
+    public function exportSchoolWiseAbsent(McqExam $exam, ?string $schoolId = null): StreamedResponse
+    {
+        $rows = collect($this->schoolWiseAbsentRows($exam, $schoolId));
+
+        return ExcelExport::download(
+            'mcq-school-wise-absent-'.$exam->id.($schoolId ? '-school' : ''),
+            ['School', 'Registered', 'Present', 'Absent', 'Absent %', 'Malpractice', 'Withheld', 'Pending'],
+            $rows->map(fn ($r) => [
+                $r['school_name'],
+                $r['registered'],
+                $r['present'],
+                $r['absent'],
+                $r['absent_rate'],
+                $r['malpractice'],
+                $r['withheld'],
+                $r['pending'],
             ]),
         );
     }

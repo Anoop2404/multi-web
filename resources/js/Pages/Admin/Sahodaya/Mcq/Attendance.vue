@@ -71,7 +71,7 @@
                             <td class="text-xs">{{ r.school?.name || '—' }}</td>
                             <td>
                                 <SearchableSelect v-model="forms[r.id].attendance_status"
-                                    :options="[{ value: 'pending', label: 'Pending' }, { value: 'present', label: 'Present' }, { value: 'absent', label: 'Absent' }, { value: 'malpractice', label: 'Malpractice' }, { value: 'withheld', label: 'Withheld' }]"
+                                    :options="[{ value: 'present', label: 'Present' }, { value: 'absent', label: 'Absent' }, { value: 'malpractice', label: 'Malpractice' }, { value: 'withheld', label: 'Withheld' }, { value: 'pending', label: 'Pending' }]"
                                     :all-option="false" placeholder="Select status"
                                     :aria-label="`Attendance for ${r.student?.name}`" />
                             </td>
@@ -158,7 +158,7 @@ const importErrors = computed(() => page.props.flash?.import_errors ?? []);
 const forms = reactive({});
 function syncForms(registrations) {
     for (const r of registrations?.data ?? []) {
-        forms[r.id] = { attendance_status: r.attendance_status || 'pending', attendance_note: r.attendance_note || '' };
+        forms[r.id] = { attendance_status: r.attendance_status || 'present', attendance_note: r.attendance_note || '' };
     }
 }
 syncForms(props.registrations);

@@ -378,6 +378,45 @@
             </FormGrid>
             <p v-if="gradeBands?.length" class="text-xs text-slate-500">Active grade bands: {{ gradeBands.map(b => b.label).join(', ') }} — percentage-based, so they apply the same regardless of a class's max marks.</p>
 
+            <div v-if="form.product_mode !== 'sahodaya_model_exam'" class="border border-indigo-100 bg-indigo-50/40 rounded-xl p-4 mt-4 space-y-3">
+                <div class="flex flex-wrap items-center gap-2">
+                    <h3 class="section-title !mb-0">STSE KG school awards</h3>
+                    <span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white text-indigo-800 border border-indigo-100">Setting</span>
+                </div>
+                <p class="text-xs text-slate-600">
+                    When enabled, schools enter LKG/UKG marks and Promote / Submit an exact top cut-off for district recognition.
+                    KG has no Level-2 exam. Rank 1–3 must be unique; ties at the cut-off border block submit.
+                </p>
+                <CheckboxField
+                    v-model="form.school_level_awards_enabled"
+                    label="Enable STSE KG Setting 1 for this exam"
+                    hint="Schools get a Mark entry tab after attendance. Sahodaya can still review scores on Results."
+                />
+                <div v-if="form.school_level_awards_enabled" class="grid sm:grid-cols-2 gap-3 max-w-xl">
+                    <FormField label="Preset">
+                        <template #default="{ id }">
+                            <SearchableSelect
+                                :id="id"
+                                v-model="form.school_level_awards_preset"
+                                :options="[{ value: 'stse_kg_setting_1', label: 'STSE KG Setting 1' }]"
+                                :all-option="false"
+                            />
+                        </template>
+                    </FormField>
+                    <FormField label="District award cut-off (%)" hint="Exact share of present students selected on Promote / Submit.">
+                        <template #default="{ id }">
+                            <input :id="id" v-model.number="form.school_level_awards_cutoff_percent" type="number" min="0" max="100" step="0.1" class="field">
+                        </template>
+                    </FormField>
+                </div>
+                <ul v-if="form.school_level_awards_enabled" class="text-xs text-slate-600 grid sm:grid-cols-2 gap-1.5 list-disc pl-4">
+                    <li>Classes: LKG &amp; UKG only</li>
+                    <li>Unique school ranks 1, 2, 3 (no ties)</li>
+                    <li>Exact {{ form.school_level_awards_cutoff_percent || 15 }}% district quota</li>
+                    <li>Border ties block Promote / Submit</li>
+                </ul>
+            </div>
+
             <div class="border-t border-slate-100 pt-4 mt-2">
                 <McqResultReleaseSettingsForm
                     v-model="releaseSettings"
@@ -581,6 +620,13 @@ const form = useForm({
     certificate_template_id: props.exam.result_release?.certificate_template_id ?? props.exam.certificate_template_id ?? '',
     total_questions: props.exam.total_questions || '',
     class_max_marks: initialClassMaxMarks,
+    school_level_awards_enabled: !!(props.exam.school_level_awards?.enabled),
+    school_level_awards_preset: (props.exam.school_level_awards?.preset === 'mcs_malappuram'
+        ? 'stse_kg_setting_1'
+        : props.exam.school_level_awards?.preset) || 'stse_kg_setting_1',
+    school_level_awards_cutoff_percent: props.exam.school_level_awards?.cutoff_percent
+        ?? props.exam.school_level_awards?.kg?.cutoff_percent
+        ?? 15,
     result_visibility: props.exam.result_release?.result_visibility ?? 'score_grade',
     results_auto_release_at: props.exam.result_release?.results_auto_release_at
         ? String(props.exam.result_release.results_auto_release_at).slice(0, 16)

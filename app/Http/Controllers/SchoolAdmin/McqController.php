@@ -414,6 +414,8 @@ class McqController extends SchoolAdminController
             'toppers'                => $toppers,
             'attendanceRows'         => $attendanceRows,
             'attendanceGate'         => $attendanceGate,
+            'schoolLevelAwards'      => app(\App\Services\Mcq\McqSchoolLevelAwardService::class)
+                ->schoolPayload($exam, $this->school->id),
             'reportExports'          => [
                 'registration'       => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/registration/export",
                 'registrationPdf'    => "/school-admin/{$this->school->id}/mcq/{$exam->id}/reports/registration/pdf",
@@ -617,6 +619,109 @@ class McqController extends SchoolAdminController
         return app(McqRegistrationController::class)->uploadSchoolPayment($request, $tenantId, $exam);
     }
 
+    public function storeMark(Request $request, string $tenantId, McqExam $exam, McqRegistration $registration)
+    {
+        abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+        abort_if($registration->exam_id !== $exam->id, 403);
+        abort_if($registration->school_id !== $this->school->id, 403);
+
+        $registration->loadMissing('student.schoolClass');
+        $className = $registration->student?->schoolClass?->name;
+        $awards = app(\App\Services\Mcq\McqSchoolLevelAwardService::class);
+
+        abort_unless(
+            $awards->schoolCanEnterMarks($exam, $this->school->id, $className),
+            403,
+            'School mark entry is not available (class not in KG award policy, already submitted, or results published).',
+        );
+
+        $data = $request->validate([
+            'score'            => 'required|numeric|min:0',
+            'correct_count'    => 'nullable|integer|min:0',
+            'wrong_count'      => 'nullable|integer|min:0',
+            'unanswered_count' => 'nullable|integer|min:0',
+            'grade'            => 'nullable|string|max:20',
+        ]);
+
+        $this->persistSchoolMark($exam, $registration, $data, $request->user()->id);
+
+        return back()->with('success', 'Mark saved.');
+    }
+
+    public function storeMarksBulk(Request $request, string $tenantId, McqExam $exam)
+    {
+        abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+
+        $data = $request->validate([
+            'marks' => 'required|array|min:1',
+            'marks.*.registration_id' => 'required|integer',
+            'marks.*.score' => 'required|numeric|min:0',
+        ]);
+
+        $awards = app(\App\Services\Mcq\McqSchoolLevelAwardService::class);
+        $regs = McqRegistration::where('exam_id', $exam->id)
+            ->where('school_id', $this->school->id)
+            ->whereIn('id', collect($data['marks'])->pluck('registration_id'))
+            ->with('student.schoolClass')
+            ->get()
+            ->keyBy('id');
+
+        $saved = 0;
+        foreach ($data['marks'] as $row) {
+            $registration = $regs->get((int) $row['registration_id']);
+            if (! $registration) {
+                continue;
+            }
+            $className = $registration->student?->schoolClass?->name;
+            if (! $awards->schoolCanEnterMarks($exam, $this->school->id, $className)) {
+                continue;
+            }
+            $this->persistSchoolMark($exam, $registration, ['score' => $row['score']], $request->user()->id);
+            $saved++;
+        }
+
+        return back()->with('success', "Saved {$saved} mark(s).");
+    }
+
+    /** @param  array<string, mixed>  $data */
+    private function persistSchoolMark(McqExam $exam, McqRegistration $registration, array $data, int $userId): void
+    {
+        $score = (float) $data['score'];
+        $payload = [
+            'score'            => $score,
+            'correct_count'    => (int) ($data['correct_count'] ?? (int) round($score)),
+            'wrong_count'      => (int) ($data['wrong_count'] ?? 0),
+            'unanswered_count' => (int) ($data['unanswered_count'] ?? 0),
+            'grade'            => $data['grade'] ?? null,
+        ];
+
+        app(\App\Services\Mcq\McqMarkSaveService::class)->save($exam, $registration, $payload, $userId);
+
+        app(\App\Services\Audit\PlatformAuditLogger::class)->mcqRegistration(
+            $registration->fresh(['exam']),
+            'mcq.mark.entered.school',
+            "School mark entered for registration #{$registration->id}",
+        );
+    }
+
+    public function promoteSchoolAwards(Request $request, string $tenantId, McqExam $exam)
+    {
+        abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+
+        $data = $request->validate([
+            'class_name' => 'required|string|max:50',
+        ]);
+
+        app(\App\Services\Mcq\McqSchoolLevelAwardService::class)->promote(
+            $exam,
+            $this->school->id,
+            $data['class_name'],
+            $request->user()->id,
+        );
+
+        return back()->with('success', 'Promoted / submitted for district-level award. Marks for this class are now locked.');
+    }
+
     public function storeAttendance(Request $request, string $tenantId, McqExam $exam)
     {
         abort_if($exam->tenant_id !== $this->school->parent_id, 403);
@@ -645,7 +750,11 @@ class McqController extends SchoolAdminController
             }
 
             $status = $row['attendance_status'];
-            if ($status === (string) ($registration->attendance_status ?? 'pending')) {
+            $current = (string) ($registration->attendance_status ?? 'pending');
+            if ($current === '' || $current === 'null') {
+                $current = 'pending';
+            }
+            if ($status === $current) {
                 continue;
             }
 
@@ -663,7 +772,7 @@ class McqController extends SchoolAdminController
             }
 
             $registration->update([
-                'attendance_status'    => $status === 'pending' ? null : $status,
+                'attendance_status'    => $status === 'pending' ? 'pending' : $status,
                 'attendance_note'      => $status === 'pending' ? null : ($row['attendance_note'] ?? null),
                 'attendance_marked_at' => $status === 'pending' ? null : now(),
                 'attendance_marked_by' => $status === 'pending' ? null : $request->user()->id,

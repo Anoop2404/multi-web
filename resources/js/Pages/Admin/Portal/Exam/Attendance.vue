@@ -41,11 +41,11 @@
                                 :disabled="!!r.pending_correction_status"
                                 :all-option="false"
                                 :options="[
-                                    { value: 'pending', label: 'Pending' },
                                     { value: 'present', label: 'Present' },
                                     { value: 'absent', label: 'Absent' },
                                     { value: 'malpractice', label: 'Malpractice' },
                                     { value: 'withheld', label: 'Withheld' },
+                                    { value: 'pending', label: 'Pending' },
                                 ]"
                             />
                         </td>
@@ -87,7 +87,7 @@ const csvFile = ref(null);
 const alertMessage = ref('');
 const forms = reactive({});
 for (const r of props.registrations.data ?? []) {
-    forms[r.id] = { attendance_status: r.attendance_status || 'pending', attendance_note: r.attendance_note || '' };
+    forms[r.id] = { attendance_status: r.attendance_status || 'present', attendance_note: r.attendance_note || '' };
 }
 
 function save(r) {

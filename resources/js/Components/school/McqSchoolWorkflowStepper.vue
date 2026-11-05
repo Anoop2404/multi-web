@@ -34,6 +34,9 @@ const props = defineProps({
     registrationCount: { type: Number, default: 0 },
     schoolFee: { type: Object, default: null },
     ticketsIssuedCount: { type: Number, default: 0 },
+    schoolLevelAwardsEnabled: { type: Boolean, default: false },
+    schoolLevelAwards: { type: Object, default: null },
+    attendancePresentCount: { type: Number, default: 0 },
 });
 
 const base = computed(() => `/school-admin/${props.schoolId}/mcq/${props.examId}`);
@@ -49,6 +52,20 @@ const feeProofUploaded = computed(() =>
 );
 const hasTickets = computed(() => props.ticketsIssuedCount > 0);
 const examOpen = computed(() => props.exam.registration_open !== false && ['published', 'ongoing'].includes(props.exam.status));
+
+const kgClasses = computed(() => props.schoolLevelAwards?.classes || ['LKG', 'UKG']);
+const kgSummaries = computed(() => Object.values(props.schoolLevelAwards?.by_class || {}));
+const kgMarkedComplete = computed(() => {
+    const rows = kgSummaries.value;
+    if (!rows.length) return false;
+    return rows.every((c) => c.present_count > 0 && c.marked_count >= c.present_count);
+});
+const kgSubmittedAll = computed(() => {
+    const rows = kgSummaries.value;
+    if (!rows.length) return false;
+    return rows.every((c) => c.submitted);
+});
+const kgAnyPresent = computed(() => kgSummaries.value.some((c) => (c.present_count || 0) > 0));
 
 const steps = computed(() => {
     const list = [
@@ -102,6 +119,40 @@ const steps = computed(() => {
         },
     ];
 
+    list.push({
+        key: 'attendance',
+        shortLabel: 'Attendance',
+        tab: 'attendance',
+        label: props.attendancePresentCount > 0
+            ? `${props.attendancePresentCount} present`
+            : 'Mark attendance',
+        detail: hasTickets.value
+            ? (props.schoolLevelAwardsEnabled
+                ? 'Mark LKG/UKG candidates Present, save, then open Mark entry.'
+                : 'Mark candidates Present / Absent for exam day.')
+            : 'Attendance opens after hall tickets are issued.',
+        action: 'Attendance',
+        href: `${base.value}/attendance`,
+        done: props.attendancePresentCount > 0 || kgAnyPresent.value,
+    });
+
+    if (props.schoolLevelAwardsEnabled) {
+        list.push({
+            key: 'mark-entry',
+            shortLabel: 'Mark entry',
+            tab: 'mark-entry',
+            label: kgSubmittedAll.value
+                ? 'KG awards submitted'
+                : (kgMarkedComplete.value ? 'Ready to Promote / Submit' : 'Enter KG marks'),
+            detail: kgSubmittedAll.value
+                ? `${kgClasses.value.join(' & ')} district award lists are locked.`
+                : `Enter marks for ${kgClasses.value.join(' / ')}, resolve any ties, then Promote / Submit the top ${props.schoolLevelAwards?.cutoff_percent ?? 15}%.`,
+            action: 'Mark entry',
+            href: `${base.value}/mark-entry`,
+            done: kgSubmittedAll.value,
+        });
+    }
+
     if (props.exam.results_published) {
         list.push({
             key: 'results',
@@ -121,7 +172,9 @@ const steps = computed(() => {
 const currentStep = computed(() => steps.value.find((s) => !s.done) ?? steps.value[steps.value.length - 1]);
 
 const bannerClass = computed(() => {
-    if (currentStep.value.key === 'results' || feeApproved.value) return 'border-l-emerald-500 bg-emerald-50/50';
+    if (currentStep.value.key === 'results' || (currentStep.value.key === 'mark-entry' && kgSubmittedAll.value) || feeApproved.value) {
+        return 'border-l-emerald-500 bg-emerald-50/50';
+    }
     if (currentStep.value.key === 'register' && examOpen.value) return 'border-l-indigo-500 bg-indigo-50/40';
     return 'border-l-indigo-500 bg-indigo-50/40';
 });

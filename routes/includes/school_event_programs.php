@@ -422,9 +422,12 @@ Route::prefix('mcq')->name('mcq.')->group(function () {
     Route::get('/{exam}/reports/fee-due/export', [McqReportController::class, 'exportClassWiseFeeDue'])->name('reports.fee-due.export');
     Route::get('/{exam}/reports/fee-due/pdf', [McqReportController::class, 'exportClassWiseFeeDuePdf'])->name('reports.fee-due.pdf');
     Route::get('/{exam}/eligible-students', [McqController::class, 'eligibleStudents'])->name('eligible-students');
-    Route::get('/{exam}/{tab?}', [McqController::class, 'exam'])->name('exam')->where('tab', 'register|students|hall-tickets|fee|results|toppers|reports|attendance');
+    Route::get('/{exam}/{tab?}', [McqController::class, 'exam'])->name('exam')->where('tab', 'register|students|hall-tickets|fee|results|toppers|reports|attendance|mark-entry');
     Route::post('/{exam}/exam-centre', [McqController::class, 'saveExamCentre'])->name('exam-centre.save');
     Route::post('/{exam}/attendance', [McqController::class, 'storeAttendance'])->name('attendance.store');
+    Route::post('/{exam}/registrations/{registration}/marks', [McqController::class, 'storeMark'])->name('marks.store');
+    Route::post('/{exam}/marks/bulk', [McqController::class, 'storeMarksBulk'])->name('marks.bulk');
+    Route::post('/{exam}/school-level-awards/promote', [McqController::class, 'promoteSchoolAwards'])->name('school-level-awards.promote');
     Route::post('/{exam}/register', [McqController::class, 'register']);
     Route::post('/{exam}/cancel', [McqController::class, 'cancelRegistration'])->name('cancel');
     Route::post('/{exam}/registrations/{registration}/mark-paid', [McqController::class, 'markPaid'])->name('registrations.mark-paid');

@@ -228,12 +228,16 @@ class McqExamOpsController extends SahodayaAdminController
 
         $gradeBands = app(\App\Services\Mcq\McqGradeService::class)->bandsForExam($exam);
 
+        $schoolLevelAwards = \App\Support\Mcq\McqSchoolLevelAwardSettings::forInertia($exam);
+        $awardService = app(\App\Services\Mcq\McqSchoolLevelAwardService::class);
+
         return $this->inertia('Sahodaya/Mcq/Results', [
             'exam' => array_merge($exam->toArray(), [
                 'is_model_exam' => $exam->isModelExam(),
                 'product_mode' => $exam->productMode(),
                 'product_mode_label' => \App\Support\Mcq\McqProductMode::label($exam->productMode()),
                 'result_release' => \App\Support\Mcq\McqResultReleaseSettings::forInertia($exam),
+                'school_level_awards' => $schoolLevelAwards,
             ]),
             'registrations' => $registrations,
             'gradeBands'    => $gradeBands,
@@ -241,6 +245,7 @@ class McqExamOpsController extends SahodayaAdminController
             'filters'       => $filters,
             'schoolOptions' => $reports->schoolFilterOptions($exam),
             'classOptions'  => $reports->classFilterOptions($exam),
+            'schoolLevelAwardSubmissions' => $awardService->submissionOverview($exam),
             'certificateTemplates' => \App\Models\McqCertificateTemplate::where('tenant_id', $this->sahodaya->id)
                 ->where('is_active', true)->orderBy('title')->get(['id', 'title', 'is_default']),
         ]);

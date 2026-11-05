@@ -84,6 +84,7 @@ class McqRegistration extends Model
             'absent'      => 'Absent',
             'malpractice' => 'Malpractice',
             'withheld'    => 'Withheld',
+            'pending'     => 'Pending',
             default       => 'Pending',
         };
     }

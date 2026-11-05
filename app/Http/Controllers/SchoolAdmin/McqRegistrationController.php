@@ -75,6 +75,28 @@ class McqRegistrationController extends SchoolAdminController
 
             $bucket = $myCount > 0 ? 'registered' : (($exam->status === 'completed') ? 'past' : 'available');
 
+            $schoolFee = McqSchoolFee::where('exam_id', $exam->id)
+                ->where('school_id', $this->school->id)
+                ->first();
+
+            $ticketQuery = McqRegistration::where('exam_id', $exam->id)
+                ->where('school_id', $this->school->id)
+                ->active()
+                ->whereNotNull('hall_ticket_no');
+
+            $ticketsIssued = (clone $ticketQuery)->count();
+            $attendancePresent = (clone $ticketQuery)
+                ->where('attendance_status', 'present')
+                ->count();
+
+            $kgEnabled = \App\Support\Mcq\McqSchoolLevelAwardSettings::enabled($exam);
+            $kgSubmitted = false;
+            if ($kgEnabled) {
+                $kgPayload = app(\App\Services\Mcq\McqSchoolLevelAwardService::class)
+                    ->schoolPayload($exam, $this->school->id);
+                $kgSubmitted = collect($kgPayload['by_class'] ?? [])->every(fn ($c) => ! empty($c['submitted']));
+            }
+
             return array_merge($exam->toArray(), [
                 'my_registration_count'   => $myCount,
                 'eligible_count'          => $eligibleIds->count(),
@@ -97,6 +119,11 @@ class McqRegistrationController extends SchoolAdminController
                 'scheduled_at_label'      => $exam->scheduled_at?->format('j M Y, g:i A') ?? null,
                 'registration_open'       => in_array($exam->status, ['published', 'ongoing'], true),
                 'delivery_mode_label'     => ($exam->delivery_mode ?? 'offline') === 'online' ? 'Online' : 'Offline',
+                'school_fee_status'       => $schoolFee?->status,
+                'tickets_issued_count'    => $ticketsIssued,
+                'attendance_present_count' => $attendancePresent,
+                'school_level_awards_enabled' => $kgEnabled,
+                'school_level_awards_submitted' => $kgSubmitted,
             ]);
         })
             ->filter(fn (array $e) => $e['bucket'] !== 'past' || $e['my_registration_count'] > 0)

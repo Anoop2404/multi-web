@@ -16,9 +16,11 @@ class McqAttendanceCorrectionService
      * Whether a direct attendance overwrite is still allowed for this registration,
      * or whether the change must go through the correction-approval workflow.
      *
-     * Direct edits are only allowed for a registration's first-ever attendance mark
-     * (still null/pending) and only while the exam's results are not yet published.
-     * Anything after that — from non-Sahodaya-admin callers — must be requested.
+     * Direct edits are allowed until attendance has been formally marked
+     * (`attendance_marked_at` set) and only while results are not yet published.
+     * Default "present" (no marked_at) still counts as unmarked so schools can
+     * flip absentees freely on exam day. Anything after the first formal mark —
+     * from non-Sahodaya-admin callers — must be requested.
      */
     public function requiresApproval(McqRegistration $registration): bool
     {
@@ -28,7 +30,7 @@ class McqAttendanceCorrectionService
             return true;
         }
 
-        return ! in_array($registration->attendance_status, [null, 'pending'], true);
+        return $registration->attendance_marked_at !== null;
     }
 
     /** @return array{applied: bool, request: ?McqAttendanceCorrectionRequest} */

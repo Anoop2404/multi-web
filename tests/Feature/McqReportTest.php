@@ -177,6 +177,97 @@ class McqReportTest extends TestCase
         $this->assertSame(200, $response->getStatusCode());
     }
 
+    public function test_new_registration_defaults_attendance_to_pending(): void
+    {
+        $school = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'school',
+            'name' => 'Default Pending School',
+        ]);
+        $exam = McqExam::create([
+            'tenant_id' => (string) Str::uuid(),
+            'title' => 'Default Pending Exam',
+            'status' => 'published',
+        ]);
+        $class = SchoolClass::create(['tenant_id' => $school->id, 'name' => '8']);
+        $student = Student::create([
+            'tenant_id' => $school->id,
+            'school_class_id' => $class->id,
+            'name' => 'Default Candidate',
+            'status' => 'active',
+        ]);
+
+        $registration = McqRegistration::create([
+            'exam_id' => $exam->id,
+            'school_id' => $school->id,
+            'student_id' => $student->id,
+            'status' => 'registered',
+        ]);
+
+        $this->assertSame('pending', $registration->fresh()->attendance_status);
+        $this->assertNull($registration->fresh()->attendance_marked_at);
+        $this->assertFalse(app(\App\Services\Mcq\McqAttendanceCorrectionService::class)->requiresApproval($registration->fresh()));
+    }
+
+    public function test_school_wise_absent_report_groups_absentees_by_school(): void
+    {
+        $sahodayaId = (string) Str::uuid();
+        $schoolA = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'school',
+            'name' => 'Alpha School',
+            'parent_id' => $sahodayaId,
+        ]);
+        $schoolB = Tenant::create([
+            'id' => (string) Str::uuid(),
+            'type' => 'school',
+            'name' => 'Beta School',
+            'parent_id' => $sahodayaId,
+        ]);
+        $exam = McqExam::create([
+            'tenant_id' => $sahodayaId,
+            'title' => 'Absent Report Exam',
+            'status' => 'published',
+        ]);
+
+        foreach ([[$schoolA, 'A1', 'absent'], [$schoolA, 'A2', 'present'], [$schoolB, 'B1', 'absent'], [$schoolB, 'B2', 'absent']] as [$school, $ticket, $status]) {
+            $class = SchoolClass::firstOrCreate(
+                ['tenant_id' => $school->id, 'name' => '9'],
+                ['is_active' => true],
+            );
+            $student = Student::create([
+                'tenant_id' => $school->id,
+                'school_class_id' => $class->id,
+                'name' => "Student {$ticket}",
+                'status' => 'active',
+            ]);
+            McqRegistration::create([
+                'exam_id' => $exam->id,
+                'school_id' => $school->id,
+                'student_id' => $student->id,
+                'hall_ticket_no' => $ticket,
+                'status' => 'registered',
+                'attendance_status' => $status,
+                'attendance_marked_at' => now(),
+            ]);
+        }
+
+        $reports = app(McqReportService::class);
+        $schoolRows = $reports->schoolWiseAbsentRows($exam);
+        $this->assertCount(2, $schoolRows);
+        $this->assertSame('Beta School', $schoolRows[0]['school_name']);
+        $this->assertSame(2, $schoolRows[0]['absent']);
+        $this->assertSame('Alpha School', $schoolRows[1]['school_name']);
+        $this->assertSame(1, $schoolRows[1]['absent']);
+
+        $absentees = $reports->absentReportRows($exam);
+        $this->assertCount(3, $absentees);
+
+        $scoped = $reports->schoolWiseAbsentRows($exam, $schoolA->id);
+        $this->assertCount(1, $scoped);
+        $this->assertSame(1, $scoped[0]['absent']);
+    }
+
     public function test_reports_include_withdrawn_student_names_and_classes_without_blank_rows(): void
     {
         $sahodayaId = (string) Str::uuid();

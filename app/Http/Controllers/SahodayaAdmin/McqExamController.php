@@ -223,6 +223,7 @@ class McqExamController extends SahodayaAdminController
             'proctor_mode' => $exam->proctorMode(),
             'proctor_max_tab_violations' => $exam->proctorMaxTabViolations(),
             'result_release' => \App\Support\Mcq\McqResultReleaseSettings::forInertia($exam),
+            'school_level_awards' => \App\Support\Mcq\McqSchoolLevelAwardSettings::forInertia($exam),
         ]);
 
         $pendingPaymentApprovals = $schoolFees->filter(
@@ -336,6 +337,9 @@ class McqExamController extends SahodayaAdminController
             'hall_ticket_template_id' => 'nullable|integer|exists:mcq_hall_ticket_templates,id',
             'certificate_template_id' => 'nullable|integer|exists:mcq_certificate_templates,id',
             'student_verification_mode' => 'nullable|in:inherit,required,optional',
+            'school_level_awards_enabled' => 'nullable|boolean',
+            'school_level_awards_preset' => 'nullable|in:stse_kg_setting_1,mcs_malappuram',
+            'school_level_awards_cutoff_percent' => 'nullable|numeric|min:0|max:100',
             ...\App\Support\Mcq\McqResultReleaseSettings::validationRules(),
         ]);
 
@@ -498,11 +502,14 @@ class McqExamController extends SahodayaAdminController
         $settings = $data['settings_json'] ?? ($exam->settings_json ?? []);
         $settings['result_release'] = $releasePatch['result_release'];
         $settings['certificates'] = $releasePatch['certificates'];
+        $settings['school_level_awards'] = \App\Support\Mcq\McqSchoolLevelAwardSettings::normalizeInput($data, $exam);
         $data['settings_json'] = $settings;
         unset(
             $data['result_visibility'], $data['results_auto_release_at'],
             $data['certificates_enabled'], $data['certificates_auto_issue'],
             $data['certificate_eligibility'], $data['certificate_eligible_grades'],
+            $data['school_level_awards_enabled'], $data['school_level_awards_preset'],
+            $data['school_level_awards_cutoff_percent'],
         );
 
         $previousStatus = $exam->status;
@@ -579,6 +586,25 @@ class McqExamController extends SahodayaAdminController
         $publisher->unpublish($exam, "{$label} by {$request->user()?->name}");
 
         return back()->with('success', 'Results hidden. Marks can now be edited; publish again when corrections are complete.');
+    }
+
+    public function unlockSchoolLevelAwards(Request $request, string $tenantId, McqExam $exam)
+    {
+        abort_if($exam->tenant_id !== $this->sahodaya->id, 403);
+
+        $data = $request->validate([
+            'school_id' => 'required|string',
+            'class_name' => 'required|string|max:50',
+        ]);
+
+        app(\App\Services\Mcq\McqSchoolLevelAwardService::class)->unlock(
+            $exam,
+            $data['school_id'],
+            $data['class_name'],
+            $request->user()->id,
+        );
+
+        return back()->with('success', 'School-level award submission unlocked. The school can re-edit marks and promote again.');
     }
 
     public function storeMark(Request $request, string $tenantId, McqExam $exam, McqRegistration $registration)

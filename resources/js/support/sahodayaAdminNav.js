@@ -382,7 +382,10 @@ export function sahodayaMcqExamScopedNav(sahodayaId, examId, options = {}) {
         items.push({ label: 'Fee summary report', href: `${examBase}/reports/fees`, icon: 'credit-card' });
     }
 
-    items.push({ label: 'Attendance sheet report', href: `${examBase}/reports/attendance`, icon: 'users' });
+    items.push(
+        { label: 'Attendance sheet report', href: `${examBase}/reports/attendance`, icon: 'users' },
+        { label: 'School-wise absent report', href: `${examBase}/reports/absent`, icon: 'users' },
+    );
 
     if (online) {
         if (usesEngine === true) {

@@ -21,6 +21,7 @@
                 <a :href="reportUrl(excelBase)" class="btn-secondary text-sm">Excel ↓</a>
                 <a :href="reportUrl(pdfBase)" target="_blank" class="btn-secondary text-sm">Class-wise PDF ↓</a>
                 <button type="button" @click="openPdfPreview(pdfBase)" class="btn-secondary text-sm">👁 Preview PDF</button>
+                <Link :href="`${examBase}/reports/absent`" class="btn-secondary text-sm">School-wise absent →</Link>
                 <a :href="reportUrl(absentBase)" class="btn-secondary text-sm">Absent list ↓</a>
                 <a :href="reportUrl(malpracticeBase)" class="btn-secondary text-sm">Malpractice register ↓</a>
             </div>
@@ -46,7 +47,7 @@
                             <td class="font-bold text-slate-900">{{ r.student?.name || r.teacher?.name || r.participant_name || '—' }}</td>
                             <td class="text-xs">{{ r.student?.school_class?.name || '—' }}</td>
                             <td class="text-xs">{{ r.school?.name || '—' }}</td>
-                            <td class="text-xs capitalize">{{ r.attendance_status || 'pending' }}</td>
+                            <td class="text-xs capitalize">{{ r.attendance_status || 'present' }}</td>
                         </tr>
                         <tr v-if="!registrations.data?.length">
                             <td colspan="6" class="p-6 text-center text-slate-400">No matching registrations.</td>

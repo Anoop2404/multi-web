@@ -18,6 +18,46 @@
         <McqExamSubNav :sahodaya-id="sahodaya.id" :exam-id="exam.id" :delivery-mode="exam.delivery_mode || 'offline'"
                        :results-published="!!exam.results_published" :is-model-exam="!!exam.is_model_exam" active="results" />
 
+        <div v-if="exam.school_level_awards?.enabled" class="card mb-6 !border-indigo-200 !bg-indigo-50/50 space-y-3">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <p class="text-sm font-semibold text-indigo-950">STSE KG Setting 1 is on</p>
+                    <p class="text-xs text-indigo-900/80 mt-1">
+                        Schools enter LKG/UKG marks and Promote / Submit the top {{ exam.school_level_awards.cutoff_percent }}% for district awards.
+                        Use this page to monitor or correct scores. Unlock a class below if a school needs to re-edit after submit.
+                    </p>
+                </div>
+                <a :href="`/sahodaya-admin/${sahodaya.id}/mcq-exams/${exam.id}`" class="btn-secondary text-xs shrink-0">Exam settings</a>
+            </div>
+            <div v-if="schoolLevelAwardSubmissions?.length" class="overflow-x-auto rounded-lg border border-indigo-100 bg-white">
+                <table class="data-table text-xs">
+                    <thead>
+                        <tr>
+                            <th>School</th>
+                            <th>Class</th>
+                            <th>Quota</th>
+                            <th>Awarded</th>
+                            <th>Submitted</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="row in schoolLevelAwardSubmissions" :key="`${row.school_id}-${row.class_name}`">
+                            <td class="font-medium text-slate-900">{{ row.school_name }}</td>
+                            <td>{{ row.class_name }}</td>
+                            <td>{{ row.quota }}</td>
+                            <td>{{ row.awarded_count }}</td>
+                            <td>{{ row.submitted_at ? String(row.submitted_at).replace('T', ' ').slice(0, 16) : '—' }}</td>
+                            <td>
+                                <button type="button" class="text-indigo-700 font-semibold" @click="unlockSchoolAward(row)">Unlock</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p v-else class="text-xs text-indigo-900/70">No school has submitted a KG award list yet.</p>
+        </div>
+
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div class="card card--muted !py-4 text-center">
                 <p class="text-xl font-bold">{{ counts.total }}</p>
@@ -89,7 +129,14 @@
             <div class="p-4 border-b border-slate-100 flex flex-wrap gap-3 items-center justify-between">
                 <div>
                     <h3 class="section-title !mb-0">Mark entry</h3>
-                    <p class="section-desc">Offline scores after attendance is marked ({{ registrations.total }} candidate(s)).</p>
+                    <p class="section-desc">
+                        <template v-if="exam.school_level_awards?.enabled">
+                            Monitor / correct offline scores. For LKG &amp; UKG, schools normally enter marks on their Mark entry tab ({{ registrations.total }} shown).
+                        </template>
+                        <template v-else>
+                            Offline scores after attendance is marked ({{ registrations.total }} candidate(s)).
+                        </template>
+                    </p>
                 </div>
                 <div class="flex flex-wrap gap-2 items-center">
                     <input v-model="filterForm.search" type="search" class="field max-w-xs text-xs" placeholder="Search name, adm no, ticket…">
@@ -187,6 +234,7 @@ const props = defineProps({
     filters: { type: Object, default: () => ({}) },
     schoolOptions: { type: Array, default: () => [] },
     classOptions: { type: Array, default: () => [] },
+    schoolLevelAwardSubmissions: { type: Array, default: () => [] },
 });
 
 const { confirm, prompt } = useConfirm();
@@ -248,6 +296,17 @@ const visibilityLabel = computed(() => {
 
 function canEnterMarks(r) {
     return r.attendance_status === 'present' && !props.exam.results_published;
+}
+
+async function unlockSchoolAward(row) {
+    if (!(await confirm({
+        message: `Unlock ${row.school_name} — Class ${row.class_name}? The school can re-edit marks and Promote / Submit again.`,
+        destructive: true,
+    }))) return;
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/mcq-exams/${props.exam.id}/school-level-awards/unlock`, {
+        school_id: row.school_id,
+        class_name: row.class_name,
+    }, { preserveScroll: true });
 }
 
 function importMarks() {

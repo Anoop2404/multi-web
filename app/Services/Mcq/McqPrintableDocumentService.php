@@ -221,7 +221,7 @@ class McqPrintableDocumentService
                 'class_name'       => $className,
                 'school_name'      => $reg->school?->name ?: '—',
                 'approval_status'  => ucfirst(str_replace('_', ' ', $reg->approval_status ?? 'pending')),
-                'attendance_status'=> ucfirst($reg->attendance_status ?? 'pending'),
+                'attendance_status'=> ucfirst($reg->attendance_status ?: 'pending'),
             ];
         }
 

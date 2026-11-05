@@ -34,12 +34,17 @@ class McqMarkSaveService
             ]);
         }
 
+        app(McqSchoolLevelAwardService::class)->assertMarkEditable($exam, $registration);
+
         $correct = (int) ($data['correct_count'] ?? 0);
         $wrong = (int) ($data['wrong_count'] ?? 0);
         $unanswered = (int) ($data['unanswered_count'] ?? 0);
         $score = (float) ($data['score'] ?? $correct);
         $total = $correct + $wrong + $unanswered;
-        $denominator = max($exam->total_questions ?: $total, 1);
+        $registration->loadMissing('student.schoolClass');
+        $classBucket = $registration->student?->schoolClass?->name;
+        $classTotal = (int) $exam->totalQuestionsForClass($classBucket);
+        $denominator = max($classTotal ?: ($exam->total_questions ?: $total), 1);
         // Offline mark entry records the final score without exposing the
         // online-only correct/wrong/unanswered counters in the admin UI.
         $percentage = round(($score / $denominator) * 100, 2);

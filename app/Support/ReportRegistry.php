@@ -393,7 +393,7 @@ class ReportRegistry
             self::row('RPT-MCQ-007', 'Result sheet tier-wise', 'mcq', 'retain', "{$base}/mcq-exams"),
             self::row('RPT-MCQ-008', 'Rank list', 'mcq', 'retain', "{$base}/mcq-exams"),
             self::row('RPT-MCQ-009', 'Question analysis', 'mcq', 'new'),
-            self::row('RPT-MCQ-010', 'Absent/incomplete attempts', 'mcq', 'retain', "{$base}/mcq-exams"),
+            self::row('RPT-MCQ-010', 'Absent/incomplete attempts', 'mcq', 'retain', "{$base}/mcq-exams", 'Open exam → Reports → School-wise absent'),
             self::row('RPT-MCQ-011', 'School performance summary', 'mcq', 'new', self::runnerHref($base, 'RPT-MCQ-011'), null, true),
             self::row('RPT-MCQ-012', 'Tier cutoff marks', 'mcq', 'new', "{$base}/mcq-exams"),
             self::row('RPT-MCQ-013', 'Exam IP audit', 'mcq', 'new', self::runnerHref($base, 'RPT-MCQ-013'), null, true),

@@ -2019,6 +2019,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{exam}/paper-library/banks/{bank}', [\App\Http\Controllers\SahodayaAdmin\McqPaperTemplateController::class, 'bank'])->name('paper-library.bank');
             Route::post('/{exam}/publish-results', [McqExamController::class, 'publishResults'])->name('results.publish');
             Route::post('/{exam}/unpublish-results', [McqExamController::class, 'unpublishResults'])->name('results.unpublish');
+            Route::post('/{exam}/school-level-awards/unlock', [McqExamController::class, 'unlockSchoolLevelAwards'])->name('school-level-awards.unlock');
             Route::get('/{exam}/leaderboard', [McqExamController::class, 'leaderboard'])->name('leaderboard');
             Route::get('/{exam}/leaderboard/export', [McqExamController::class, 'exportLeaderboard'])->name('leaderboard.export');
             Route::post('/{exam}/school-fees/{schoolFee}/approve', [McqExamController::class, 'approveSchoolFee'])->name('school-fees.approve');
@@ -2032,6 +2033,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{exam}/reports/attendance', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'attendanceSheetPage'])->name('reports.attendance');
             Route::get('/{exam}/reports/fees', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'feeSummaryPage'])->name('reports.fees');
             Route::get('/{exam}/reports/class-wise-counts', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'classWiseCountsPage'])->name('reports.class-wise-counts');
+            Route::get('/{exam}/reports/absent', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'absentReportPage'])->name('reports.absent');
             Route::get('/{exam}/reports/registration/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportRegistration'])->name('reports.registration.export');
             Route::get('/{exam}/reports/registration/pdf', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportRegistrationPdf'])->name('reports.registration.pdf');
             Route::get('/{exam}/reports/fees/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportFees'])->name('reports.fees.export');
@@ -2039,6 +2041,7 @@ Route::prefix('sahodaya-admin/{tenantId}')
             Route::get('/{exam}/reports/toppers/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportToppers'])->name('reports.toppers.export');
             Route::get('/{exam}/reports/level2-qualifiers/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportLevel2Qualifiers'])->name('reports.level2-qualifiers.export');
             Route::get('/{exam}/reports/absent/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportAbsent'])->name('reports.absent.export');
+            Route::get('/{exam}/reports/absent/school-wise/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportSchoolWiseAbsent'])->name('reports.absent.school-wise.export');
             Route::get('/{exam}/reports/marks-pending/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportMarksPending'])->name('reports.marks-pending.export');
             Route::get('/{exam}/reports/marks-entry-template/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportMarksEntryTemplate'])->name('reports.marks-entry-template.export');
             Route::get('/{exam}/reports/fees-pending/export', [\App\Http\Controllers\SahodayaAdmin\McqReportController::class, 'exportPendingFees'])->name('reports.fees-pending.export');

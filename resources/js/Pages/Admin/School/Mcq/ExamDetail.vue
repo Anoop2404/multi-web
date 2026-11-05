@@ -7,6 +7,8 @@
         </PageHeader>
 
         <InlineAlert :message="alertMessage" type="error" @dismiss="alertMessage = ''" />
+        <div v-if="flashSuccess" class="notice-banner notice-banner--success text-sm mb-4">{{ flashSuccess }}</div>
+        <div v-if="flashError || promoteError" class="notice-banner notice-banner--error text-sm mb-4">{{ flashError || promoteError }}</div>
 
         <div v-if="exam.level_label || exam.series_title" class="flex flex-wrap gap-2 mb-4">
             <span v-if="exam.level_label" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-800">{{ exam.level_label }}</span>
@@ -16,7 +18,7 @@
             <span v-if="exam.series_title" class="text-xs text-slate-500">{{ exam.series_title }}</span>
         </div>
 
-        <SchoolMcqSubNav :school-id="school.id" :exam-id="exam.id" :active="tab" :results-published="exam.results_published" :uses-engine="!!exam.uses_engine" />
+        <SchoolMcqSubNav :school-id="school.id" :exam-id="exam.id" :active="tab" :results-published="exam.results_published" :school-level-awards-enabled="!!schoolLevelAwards?.enabled" />
 
         <McqSchoolWorkflowStepper
             :school-id="school.id"
@@ -26,6 +28,9 @@
             :registration-count="registerStats.registered ?? registrations.length"
             :school-fee="schoolFee"
             :tickets-issued-count="ticketsIssuedCount"
+            :school-level-awards-enabled="!!schoolLevelAwards?.enabled"
+            :school-level-awards="schoolLevelAwards"
+            :attendance-present-count="attendanceGate?.present ?? 0"
         />
 
         <!-- Register tab -->
@@ -355,7 +360,7 @@
                     <h3 class="section-title !mb-0">Registered students</h3>
                     <p class="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-1.5">
                         <span>{{ filteredRegisteredStudents.length }} student(s) registered for this exam</span> ·
-                        <span class="text-emerald-600 font-semibold">{{ schoolPaidCount }} marked paid</span> ·
+                        <span class="text-emerald-600 font-semibold">{{ schoolPaidCount }} school-collection marked</span> ·
                         <span class="text-amber-600 font-semibold">{{ schoolUnpaidCount }} unmarked</span>
                         <span v-if="isBatchFeeSettled" class="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 ml-1">
                             ✓ Sahodaya batch fee settled
@@ -368,16 +373,25 @@
                 <div class="flex flex-wrap items-center gap-2">
                     <SearchableSelect v-model="registeredClassFilter" :options="classIdOptions" :all-option="true" all-label="All classes" />
                     <SearchableSelect v-model="registeredPaymentFilter"
-                                      :options="[{ value: 'paid', label: 'Paid' }, { value: 'unpaid', label: 'Unpaid' }]"
-                                      :all-option="true" all-label="All payment status" />
+                                      :options="[{ value: 'paid', label: 'School collection: paid' }, { value: 'unpaid', label: 'School collection: unpaid' }]"
+                                      :all-option="true" all-label="All school collection" />
                     <SearchableSelect v-model="registeredDuplicateFilter"
-                                      :options="[{ value: 'duplicates', label: '⚠️ Duplicates only' }]"
+                                      :options="[{ value: 'duplicates', label: 'Duplicates only' }]"
                                       :all-option="true" all-label="All candidates" />
                     <input v-model="registeredSearchQuery" type="text" placeholder="Search name, adm no, hall ticket..." class="field text-xs min-w-[200px] bg-slate-50 border-slate-300 py-2 rounded-lg" />
+                    <a v-if="credentialsExportUrl" :href="credentialsExportUrl" class="btn-secondary text-xs">Export credentials ↓</a>
+                    <button
+                        v-if="unpaidFilteredCount > 0"
+                        type="button"
+                        class="btn-secondary text-xs"
+                        @click="bulkMarkPaidFiltered"
+                    >
+                        Mark filtered unpaid ({{ unpaidFilteredCount }})
+                    </button>
                 </div>
             </div>
             <p class="text-xs text-slate-500 -mt-1">
-                "Mark paid" is a school-side checklist only, for cross-verifying your physical/offline collection against this roster — it does not affect Sahodaya fee approval.
+                “School collection” is your internal checklist for cash/UPI collected at school. It does <strong>not</strong> replace Sahodaya batch fee approval on the Fee tab.
             </p>
             <div class="overflow-x-auto">
                 <table class="data-table w-full">
@@ -435,28 +449,35 @@
 
         <!-- Hall tickets tab -->
         <div v-else-if="tab === 'hall-tickets'" class="space-y-4">
-            <form v-if="!$page.props.isStaff" @submit.prevent="saveExamCentre" class="card space-y-3">
-                <h3 class="font-semibold">Examination date and centre</h3>
-                <p class="text-sm">Date set by Sahodaya: <strong>{{ exam.scheduled_at_label || 'To be announced' }}</strong></p>
-                <p class="text-sm">Sahodaya centre: {{ exam.venue || 'To be announced' }}</p>
-                <label class="block text-sm font-semibold" for="school-exam-centre">School examination centre</label>
-                <textarea id="school-exam-centre" v-model="centreForm.exam_centre" class="field" rows="2" maxlength="500" placeholder="Leave empty to use the Sahodaya centre"></textarea>
-                <p class="text-xs text-slate-500">Applies only to this school's students for this exam. Leave blank to use the centre supplied by Sahodaya.</p>
-                <p v-if="centreForm.errors.exam_centre" class="text-sm text-red-600">{{ centreForm.errors.exam_centre }}</p>
-                <p class="text-sm">Centre on cards: <strong>{{ effectiveExamCentre || 'To be announced' }}</strong></p>
-                <button type="submit" class="btn-primary" :disabled="centreForm.processing">Save centre</button>
-            </form>
+            <div class="card p-4 space-y-3">
+                <h3 class="section-title !mb-0">Hall ticket checklist</h3>
+                <ul class="text-sm space-y-2">
+                    <li class="flex items-start gap-2">
+                        <span :class="isBatchFeeSettled ? 'text-emerald-600' : 'text-slate-400'">{{ isBatchFeeSettled ? '✓' : '○' }}</span>
+                        <span>Sahodaya batch fee {{ isBatchFeeSettled ? 'settled' : 'pending' }}
+                            <Link v-if="!isBatchFeeSettled" :href="`${base}/fee`" class="link-brand text-xs font-semibold ml-1">Fee & payment →</Link>
+                        </span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span :class="hallTicketsPublished ? 'text-emerald-600' : 'text-slate-400'">{{ hallTicketsPublished ? '✓' : '○' }}</span>
+                        <span>Sahodaya published hall tickets {{ hallTicketsPublished ? '' : '(not released yet)' }}</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span :class="!downloadGate?.blocked ? 'text-emerald-600' : 'text-slate-400'">{{ !downloadGate?.blocked ? '✓' : '○' }}</span>
+                        <span>Document download {{ downloadGate?.blocked ? 'locked' : 'unlocked' }}</span>
+                    </li>
+                </ul>
+            </div>
+
             <div v-if="!hallTicketsPublished" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 <p class="font-semibold">Hall tickets have not been released yet</p>
                 <p class="text-xs mt-1">
-                    Reg. numbers are assigned automatically as Sahodaya approves registrations, but they only become visible here —
-                    and to teachers/students in their own portals — once Sahodaya publishes hall tickets for this exam. Check back
-                    closer to the exam date.
+                    Reg. numbers become visible here once Sahodaya publishes hall tickets for this exam.
                 </p>
             </div>
             <template v-else>
                 <div v-if="downloadGate?.blocked" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                    <p class="font-semibold">Payment pending</p>
+                    <p class="font-semibold">Download locked</p>
                     <p class="text-xs mt-1">{{ downloadGate.reason }}</p>
                     <Link v-if="downloadGate.links?.payments" :href="downloadGate.links.payments" class="link-brand text-xs font-semibold mt-2 inline-block">Go to payments →</Link>
                 </div>
@@ -466,26 +487,55 @@
                         <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Tickets issued</p>
                     </div>
                     <div class="card card--muted !py-3 text-center">
-                        <p class="text-lg font-bold">{{ registrations.length - ticketsIssuedCount }}</p>
+                        <p class="text-lg font-bold">{{ Math.max(0, registrations.length - ticketsIssuedCount) }}</p>
                         <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Pending issue</p>
                     </div>
                     <div class="card card--muted !py-3 text-center lg:col-span-1 col-span-2">
-                        <p class="text-sm font-semibold capitalize">{{ schoolFee?.status?.replace('_', ' ') || 'No fee batch' }}</p>
+                        <p class="text-sm font-semibold">{{ feeStatusLabel(schoolFee?.status) }}</p>
                         <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Fee status</p>
                     </div>
                 </div>
                 <div class="card p-4 space-y-3">
-                    <p class="text-sm text-slate-700">
-                        Hall tickets are available after membership and exam fees are paid and verified.
-                    </p>
                     <div class="flex flex-wrap gap-2">
                         <a v-if="ticketsIssuedCount && canDownloadDocuments" :href="pdfUrl" target="_blank" class="btn-primary text-sm">Download hall tickets PDF</a>
                         <Link v-if="schoolFee?.status !== 'approved'" :href="`${base}/fee`" class="btn-secondary text-sm">Check fee status</Link>
+                        <Link :href="`${base}/attendance`" class="btn-secondary text-sm">Continue to Attendance →</Link>
                     </div>
-                    <p v-if="!ticketsIssuedCount && !downloadGate?.blocked" class="text-sm text-amber-700">No hall tickets yet — register students and complete fee payment.</p>
-                    <p v-else-if="!canDownloadDocuments" class="text-sm text-amber-700">Hall ticket download is locked until fees are cleared.</p>
+                </div>
+                <div v-if="ticketsIssuedCount" class="card card--flush overflow-hidden">
+                    <div class="p-4 border-b border-slate-100">
+                        <h3 class="section-title !mb-0">Ticket roster</h3>
+                        <p class="text-xs text-slate-500 mt-1">On-screen list before downloading the PDF.</p>
+                    </div>
+                    <div class="overflow-x-auto p-4">
+                        <table class="data-table w-full">
+                            <thead><tr><th>#</th><th>Student</th><th>Class</th><th>Reg. no.</th><th>Seat</th></tr></thead>
+                            <tbody>
+                                <tr v-for="(r, i) in registrations.filter(x => x.hall_ticket_no).slice(0, 100)" :key="r.id">
+                                    <td class="text-xs text-slate-400">{{ i + 1 }}</td>
+                                    <td class="font-medium">{{ r.participant_name || studentDisplayName(r.student) }}</td>
+                                    <td class="text-xs">{{ r.student?.class_name || '—' }}</td>
+                                    <td class="font-mono text-xs">{{ r.hall_ticket_no }}</td>
+                                    <td>{{ r.seat_no || '—' }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </template>
+
+            <details v-if="!$page.props.isStaff" class="card p-4">
+                <summary class="font-semibold cursor-pointer">Examination centre (optional)</summary>
+                <form @submit.prevent="saveExamCentre" class="space-y-3 mt-3">
+                    <p class="text-sm">Date set by Sahodaya: <strong>{{ exam.scheduled_at_label || 'To be announced' }}</strong></p>
+                    <p class="text-sm">Sahodaya centre: {{ exam.venue || 'To be announced' }}</p>
+                    <label class="block text-sm font-semibold" for="school-exam-centre">School examination centre</label>
+                    <textarea id="school-exam-centre" v-model="centreForm.exam_centre" class="field" rows="2" maxlength="500" placeholder="Leave empty to use the Sahodaya centre"></textarea>
+                    <p class="text-xs text-slate-500">Applies only to this school's students for this exam.</p>
+                    <p class="text-sm">Centre on cards: <strong>{{ effectiveExamCentre || 'To be announced' }}</strong></p>
+                    <button type="submit" class="btn-primary" :disabled="centreForm.processing">Save centre</button>
+                </form>
+            </details>
         </div>
 
         <!-- Fee tab -->
@@ -569,10 +619,14 @@
                         <p class="text-[10px] uppercase tracking-wide text-amber-600">Due</p>
                     </div>
                     <div class="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2 text-center">
-                        <p class="text-sm font-bold capitalize">{{ (schoolFee.status || '').replace('_', ' ') }}</p>
+                        <p class="text-sm font-bold">{{ feeStatusLabel(schoolFee.status) }}</p>
                         <p class="text-[10px] uppercase tracking-wide text-slate-500">Status</p>
                     </div>
                 </div>
+                <p v-if="schoolFee?.status === 'approved' || isBatchFeeSettled" class="text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+                    Fee settled. Next:
+                    <Link :href="`${base}/hall-tickets`" class="link-brand font-semibold">Hall tickets →</Link>
+                </p>
                 <p v-if="!examHasFee && registrations.length" class="text-sm text-sky-800 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2">
                     Batch fee total will be calculated when Sahodaya sets the per-student exam fee.
                 </p>
@@ -583,7 +637,7 @@
                         <span v-if="claimableBalance > 0">You can still submit proof for the remaining {{ formatRupee(claimableBalance) }} below.</span>
                     </p>
                     <form v-if="claimableBalance > 0"
-                          @submit.prevent="uploadBatchFee" class="flex flex-wrap gap-2 items-end border-t border-slate-100 pt-4">
+                          @submit.prevent="uploadBatchFee" class="sticky top-2 z-10 bg-white/95 backdrop-blur flex flex-wrap gap-2 items-end border border-indigo-100 rounded-xl p-3 shadow-sm">
                         <div>
                             <label class="text-xs font-semibold text-slate-600 block mb-1">Payment proof</label>
                             <input ref="proofInput" type="file" accept=".pdf,.jpg,.jpeg,.png" multiple class="text-sm" required>
@@ -686,6 +740,13 @@
                         <p class="text-[10px] uppercase tracking-wide text-slate-500 mt-1">Pending</p>
                     </div>
                 </div>
+                <div v-if="schoolLevelAwards?.enabled" class="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-950">
+                    <p class="font-semibold">STSE KG Setting 1</p>
+                    <p class="text-xs mt-1 text-indigo-900/80">
+                        Explicitly mark LKG/UKG candidates <strong>Present</strong>, click Save attendance, then continue to Mark entry.
+                        Pending students are not treated as present.
+                    </p>
+                </div>
                 <div class="flex flex-wrap gap-2 items-center justify-between">
                     <div class="flex items-center gap-2">
                         <button type="button" class="btn-secondary text-xs" @click="markAll('present')">
@@ -693,6 +754,9 @@
                         </button>
                         <button type="button" class="btn-secondary text-xs" @click="markAll('absent')">
                             Mark {{ attendanceClassFilter ? 'filtered' : 'all' }} absent
+                        </button>
+                        <button type="button" class="btn-secondary text-xs" @click="markAll('pending')">
+                            Reset filtered to pending
                         </button>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
@@ -723,24 +787,14 @@
                                 <td class="font-mono text-xs">{{ row.hall_ticket_no || '—' }}</td>
                                 <td>{{ studentDisplayName(row.student) }}</td>
                                 <td class="text-xs">{{ row.class_name || row.student?.class_name || '—' }}</td>
-                                <td class="text-center">
-                                    <div class="inline-flex rounded-lg border border-slate-200 overflow-hidden text-xs">
-                                        <button type="button" class="px-3 py-1" :disabled="!!row.pending_correction_status"
-                                                :class="row.attendance_status === 'present' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600'"
-                                                @click="row.attendance_status = 'present'">Present</button>
-                                        <button type="button" class="px-3 py-1 border-l border-slate-200" :disabled="!!row.pending_correction_status"
-                                                :class="row.attendance_status === 'absent' ? 'bg-rose-600 text-white' : 'bg-white text-slate-600'"
-                                                @click="row.attendance_status = 'absent'">Absent</button>
-                                        <button type="button" class="px-3 py-1 border-l border-slate-200" :disabled="!!row.pending_correction_status"
-                                                :class="row.attendance_status === 'malpractice' ? 'bg-amber-600 text-white' : 'bg-white text-slate-600'"
-                                                @click="row.attendance_status = 'malpractice'">Malpractice</button>
-                                        <button type="button" class="px-3 py-1 border-l border-slate-200" :disabled="!!row.pending_correction_status"
-                                                :class="row.attendance_status === 'withheld' ? 'bg-amber-600 text-white' : 'bg-white text-slate-600'"
-                                                @click="row.attendance_status = 'withheld'">Withheld</button>
-                                        <button type="button" class="px-3 py-1 border-l border-slate-200" :disabled="!!row.pending_correction_status"
-                                                :class="(!row.attendance_status || row.attendance_status === 'pending') ? 'bg-slate-500 text-white' : 'bg-white text-slate-600'"
-                                                @click="row.attendance_status = 'pending'">—</button>
-                                    </div>
+                                <td class="text-center min-w-[9rem]">
+                                    <SearchableSelect
+                                        v-model="row.attendance_status"
+                                        class="min-w-[9rem] text-left"
+                                        :options="attendanceStatusOptions"
+                                        :all-option="false"
+                                        :disabled="!!row.pending_correction_status"
+                                    />
                                 </td>
                                 <td>
                                     <input v-if="['malpractice','withheld'].includes(row.attendance_status)"
@@ -769,8 +823,180 @@
                         </div>
                     </div>
                 </div>
-                <div class="sticky bottom-4 flex justify-end">
+                <div class="sticky bottom-4 flex flex-wrap justify-end gap-2">
+                    <Link
+                        v-if="schoolLevelAwards?.enabled"
+                        :href="`/school-admin/${school.id}/mcq/${exam.id}/mark-entry`"
+                        class="btn-secondary"
+                    >
+                        Continue to Mark entry →
+                    </Link>
                     <button type="button" class="btn-primary" @click="saveAttendance">Save attendance</button>
+                </div>
+            </template>
+        </div>
+
+        <!-- Mark entry tab (STSE KG Setting 1 school-level awards) -->
+        <div v-else-if="tab === 'mark-entry'" class="space-y-4">
+            <div v-if="!schoolLevelAwards?.enabled" class="card p-6 text-center">
+                <EmptyState title="Mark entry not enabled"
+                            description="Sahodaya has not enabled STSE KG Setting 1 for this exam."
+                            icon="📝" class="py-6" />
+            </div>
+            <template v-else>
+                <div class="card p-4 space-y-3">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="max-w-3xl">
+                            <div class="flex flex-wrap items-center gap-2 mb-1">
+                                <h3 class="section-title !mb-0">KG mark entry</h3>
+                                <span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-800">STSE KG Setting 1</span>
+                            </div>
+                            <p class="text-xs text-slate-600">
+                                Enter scores for present students. Then Promote / Submit exactly the top
+                                {{ schoolLevelAwards.cutoff_percent }}% for district recognition
+                                (includes school ranks 1–3). Ties in ranks 1–3 or at the cut-off border block submit —
+                                adjust marks after re-valuation, then try again.
+                            </p>
+                        </div>
+                        <Link :href="`/school-admin/${school.id}/mcq/${exam.id}/attendance`" class="btn-secondary text-sm shrink-0">
+                            ← Attendance
+                        </Link>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            v-for="className in schoolLevelAwards.classes"
+                            :key="className"
+                            type="button"
+                            class="text-xs font-semibold px-3 py-1.5 rounded-lg border transition"
+                            :class="activeMarkClass === className
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-300'"
+                            @click="activeMarkClass = className"
+                        >
+                            {{ className }}
+                            <span class="opacity-80 font-normal">
+                                · {{ classSummary(className).marked_count }}/{{ classSummary(className).present_count }}
+                            </span>
+                            <span v-if="classSummary(className).submitted" class="ml-1">✓</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div v-if="activeMarkClass" class="card card--flush overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h4 class="font-bold text-slate-900">Class {{ activeMarkClass }}</h4>
+                            <p class="text-xs text-slate-500 mt-1">
+                                Present {{ activeClassSummary.present_count }} ·
+                                Marked {{ activeClassSummary.marked_count }} ·
+                                District quota {{ activeClassSummary.quota }}
+                                <span v-if="activeClassSummary.submitted" class="text-emerald-700 font-semibold"> · Submitted & locked</span>
+                            </p>
+                            <p v-if="activeClassSummary.present_count === 0" class="text-xs text-amber-700 mt-2">
+                                No present students yet. Mark attendance first, then return here.
+                            </p>
+                            <p v-else-if="activeClassSummary.marked_count < activeClassSummary.present_count" class="text-xs text-amber-700 mt-2">
+                                Enter marks for all present students before Promote / Submit
+                                ({{ activeClassSummary.present_count - activeClassSummary.marked_count }} remaining).
+                            </p>
+                            <p v-else-if="activeClassSummary.validation?.errors?.length" class="text-xs text-rose-700 mt-2 font-medium">
+                                {{ activeClassSummary.validation.errors[0] }}
+                            </p>
+                            <p v-else-if="activeClassSummary.can_promote" class="text-xs text-emerald-700 mt-2">
+                                Ready to Promote / Submit — ranks 1–3 are unique and the {{ schoolLevelAwards.cutoff_percent }}% cut-off is clear.
+                            </p>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button
+                                v-if="activeClassSummary.can_edit"
+                                type="button"
+                                class="btn-secondary text-sm"
+                                :disabled="!dirtyMarkCount"
+                                @click="saveAllMarks(activeMarkClass)"
+                            >
+                                Save all{{ dirtyMarkCount ? ` (${dirtyMarkCount})` : '' }}
+                            </button>
+                            <button
+                                v-if="!activeClassSummary.submitted"
+                                type="button"
+                                class="btn-primary text-sm"
+                                :disabled="!activeClassSummary.can_promote"
+                                :title="activeClassSummary.can_promote ? 'Lock district award list for this class' : 'Resolve marks / ties first'"
+                                @click="promoteClass(activeMarkClass)"
+                            >
+                                Promote / Submit
+                            </button>
+                            <span v-else class="text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                Submitted
+                            </span>
+                        </div>
+                    </div>
+                    <div v-if="tiedStudents(activeMarkClass).length" class="mx-4 mb-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900">
+                        <p class="font-semibold">Ties to resolve</p>
+                        <p class="mt-1">{{ tiedStudents(activeMarkClass).map(t => `${t.student_name} (${t.score})`).join(' · ') }}</p>
+                    </div>
+                    <div class="overflow-x-auto p-4">
+                        <table class="data-table w-full">
+                            <thead>
+                                <tr>
+                                    <th class="w-12">Rank</th>
+                                    <th>Student</th>
+                                    <th>Reg. no.</th>
+                                    <th>Score{{ activeMaxMarks ? ` / ${activeMaxMarks}` : '' }}</th>
+                                    <th>Award preview</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr
+                                    v-for="row in activeClassSummary.rows"
+                                    :key="row.registration_id"
+                                    :class="rowInQuota(activeMarkClass, row) ? 'bg-emerald-50/50' : ''"
+                                >
+                                    <td class="font-semibold text-indigo-700">{{ row.school_rank ?? '—' }}</td>
+                                    <td class="font-bold text-slate-900">{{ row.student_name || '—' }}</td>
+                                    <td class="text-xs font-mono">{{ row.hall_ticket_no || '—' }}</td>
+                                    <td>
+                                        <input
+                                            v-model="markForms[row.registration_id]"
+                                            type="number"
+                                            min="0"
+                                            :max="activeMaxMarks || undefined"
+                                            step="0.01"
+                                            class="field w-24 text-sm"
+                                            :placeholder="activeMaxMarks ? `0–${activeMaxMarks}` : 'Score'"
+                                            :disabled="!activeClassSummary.can_edit"
+                                            @keydown.enter.prevent="saveMark(row.registration_id)"
+                                        >
+                                    </td>
+                                    <td class="text-xs">
+                                        <span v-if="isAwarded(activeMarkClass, row.registration_id)" class="text-emerald-700 font-semibold">District ✓</span>
+                                        <span v-else-if="rowInQuota(activeMarkClass, row)" class="text-emerald-700">District (preview)</span>
+                                        <span v-else-if="row.school_rank && row.school_rank <= 3" class="text-slate-600">School {{ row.school_rank }}</span>
+                                        <span v-else class="text-slate-300">—</span>
+                                    </td>
+                                    <td>
+                                        <button
+                                            v-if="activeClassSummary.can_edit"
+                                            type="button"
+                                            class="text-xs font-semibold text-indigo-600"
+                                            @click="saveMark(row.registration_id)"
+                                        >
+                                            Save
+                                        </button>
+                                        <span v-else class="text-xs text-slate-400">Locked</span>
+                                    </td>
+                                </tr>
+                                <tr v-if="!(activeClassSummary.rows || []).length">
+                                    <td colspan="6" class="p-6 text-center text-slate-400">
+                                        No present students in this class yet.
+                                        <Link :href="`/school-admin/${school.id}/mcq/${exam.id}/attendance`" class="link-brand ml-1">Mark attendance →</Link>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </template>
         </div>
@@ -782,14 +1008,19 @@
                     <h3 class="section-title !mb-0">Exam results</h3>
                     <p class="text-xs text-slate-500 mt-1">Published by Sahodaya for your registered students.</p>
                 </div>
-                <input v-model="resultsSearchQuery" type="text" placeholder="Search student name..." class="field text-xs min-w-[220px] bg-slate-50 border-slate-300 py-1.5 rounded-lg" />
+                <div class="flex flex-wrap items-center gap-2">
+                    <SearchableSelect v-model="resultsClassFilter" class="min-w-[160px]" :options="classNameOptions" :all-option="true" all-label="All classes" />
+                    <input v-model="resultsSearchQuery" type="text" placeholder="Search student name..." class="field text-xs min-w-[200px] bg-slate-50 border-slate-300 py-1.5 rounded-lg" />
+                    <Link :href="`${base}/toppers`" class="btn-secondary text-xs">Toppers →</Link>
+                </div>
             </div>
             <table class="data-table w-full">
-                <thead><tr><th class="w-12">#</th><th>Student</th><th>Score</th><th>Rank</th><th>Grade</th></tr></thead>
+                <thead><tr><th class="w-12">#</th><th>Student</th><th>Class</th><th>Score</th><th>Rank</th><th>Grade</th></tr></thead>
                 <tbody>
                     <tr v-for="(r, i) in paginatedResults" :key="r.id">
                         <td class="text-xs font-bold text-slate-400">{{ (resultsPage - 1) * resultsPageSize + i + 1 }}</td>
                         <td class="font-bold text-slate-900">{{ r.participant_name || (r.student ? studentDisplayName(r.student) : (r.teacher?.name ?? '—')) }}</td>
+                        <td class="text-xs">{{ r.student?.class_name || '—' }}</td>
                         <td>{{ r.mark?.score ?? '—' }}</td>
                         <td>{{ r.mark?.rank ?? '—' }}</td>
                         <td>{{ r.mark?.grade ?? '—' }}</td>
@@ -804,14 +1035,17 @@
                     <button type="button" class="btn-secondary text-xs px-3 py-1" :disabled="resultsPage >= totalResultsPages" @click="resultsPage++">Next →</button>
                 </div>
             </div>
-            <EmptyState v-if="!filteredResults.length" title="No results found" description="No matching registered students for this exam." icon="📊" class="py-8" />
+            <EmptyState v-if="!filteredResults.length" title="No results found" description="Try another class filter, or wait until Sahodaya publishes marks." icon="📊" class="py-8" />
         </div>
 
         <!-- Toppers tab -->
         <div v-else-if="tab === 'toppers'" class="card card--flush overflow-hidden p-4 space-y-4">
-            <div class="p-2 border-b border-slate-100">
-                <h3 class="section-title !mb-0">School toppers</h3>
-                <p class="text-xs text-slate-500 mt-1">Top performers from your school in this exam.</p>
+            <div class="p-2 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h3 class="section-title !mb-0">School toppers</h3>
+                    <p class="text-xs text-slate-500 mt-1">Top performers from your school in this exam.</p>
+                </div>
+                <a v-if="reportExports.toppers" :href="reportExports.toppers" class="btn-secondary text-xs">Export Excel ↓</a>
             </div>
             <table class="data-table w-full">
                 <thead><tr><th class="w-12">#</th><th>Rank</th><th>Student</th><th>Class</th><th>Score</th><th>Grade</th></tr></thead>
@@ -831,40 +1065,28 @@
 
         <!-- Reports tab -->
         <div v-else-if="tab === 'reports'" class="space-y-6">
-            <!-- Hero Executive Header Banner -->
-            <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 shadow-xl border border-slate-800">
-                <div class="absolute -right-10 -bottom-10 w-72 h-72 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
-                <div class="absolute -left-10 -top-10 w-60 h-60 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
-
-                <div class="relative z-10 flex flex-wrap items-center justify-between gap-6">
-                    <div class="space-y-1.5 max-w-xl">
-                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-xs font-semibold uppercase tracking-wider">
-                            <span>📊 Official Exam Reports</span>
-                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
-                        </div>
-                        <h2 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Reports & Analytics Command Center</h2>
-                        <p class="text-sm text-slate-300">Generate, preview, and export official PDF/Excel reports, hall ticket rosters, attendance sheets, and class-wise fee summaries for {{ school?.name || 'your school' }}.</p>
+            <div class="card p-4">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <h2 class="section-title !mb-0">Reports & exports</h2>
+                        <p class="text-xs text-slate-500 mt-1">Download registration, attendance, fee, and class-count reports for this exam.</p>
                     </div>
-
-                    <!-- 4 Live Executive Quick Metrics -->
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto">
-                        <div class="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-3.5 text-center">
-                            <span class="text-xs text-slate-400 font-medium block">Total Candidates</span>
-                            <span class="text-xl font-black text-white font-mono">{{ reportRows.length }}</span>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 min-w-[16rem]">
+                        <div class="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2 text-center">
+                            <p class="text-lg font-bold text-slate-900">{{ reportRows.length }}</p>
+                            <p class="text-[10px] uppercase tracking-wide text-slate-500">Candidates</p>
                         </div>
-                        <div class="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-3.5 text-center">
-                            <span class="text-xs text-slate-400 font-medium block">Active Classes</span>
-                            <span class="text-xl font-black text-indigo-300 font-mono">{{ classOptions.length }}</span>
+                        <div class="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2 text-center">
+                            <p class="text-lg font-bold text-indigo-700">{{ reportExamClassCount }}</p>
+                            <p class="text-[10px] uppercase tracking-wide text-slate-500">Exam classes</p>
                         </div>
-                        <div class="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-3.5 text-center">
-                            <span class="text-xs text-slate-400 font-medium block">Total Fee Value</span>
-                            <span class="text-xl font-black text-emerald-400 font-mono">₹{{ Number(feeDueMatrix.grand_total_fee || 0).toLocaleString() }}</span>
+                        <div class="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2 text-center">
+                            <p class="text-lg font-bold text-emerald-700">₹{{ Number(feeDueMatrix.grand_total_fee || 0).toLocaleString() }}</p>
+                            <p class="text-[10px] uppercase tracking-wide text-slate-500">Fee total</p>
                         </div>
-                        <div class="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-3.5 text-center">
-                            <span class="text-xs text-slate-400 font-medium block">Pending Fee Due</span>
-                            <span class="text-xl font-black font-mono" :class="Number(feeDueMatrix.grand_due || 0) > 0 ? 'text-amber-400' : 'text-slate-300'">
-                                ₹{{ Number(feeDueMatrix.grand_due || 0).toLocaleString() }}
-                            </span>
+                        <div class="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2 text-center">
+                            <p class="text-lg font-bold" :class="Number(feeDueMatrix.grand_due || 0) > 0 ? 'text-amber-700' : 'text-slate-500'">₹{{ Number(feeDueMatrix.grand_due || 0).toLocaleString() }}</p>
+                            <p class="text-[10px] uppercase tracking-wide text-slate-500">Fee due</p>
                         </div>
                     </div>
                 </div>
@@ -929,7 +1151,7 @@
                                     👁 Preview PDF
                                 </button>
                                 <button type="button" @click="setReportPreview('registration')" class="btn-secondary text-xs justify-center py-2 text-slate-700 hover:bg-slate-100 font-semibold" :class="{'!bg-slate-900 !text-white': activeReportPreviewTab === 'registration'}">
-                                    🔍 Live Data
+                                    View table
                                 </button>
                             </div>
                         </div>
@@ -965,7 +1187,7 @@
                                     👁 Preview PDF
                                 </button>
                                 <button type="button" @click="setReportPreview('attendance')" class="btn-secondary text-xs justify-center py-2 text-slate-700 hover:bg-slate-100 font-semibold" :class="{'!bg-slate-900 !text-white': activeReportPreviewTab === 'attendance'}">
-                                    🔍 Live Data
+                                    View table
                                 </button>
                             </div>
                         </div>
@@ -1001,7 +1223,7 @@
                                     👁 Preview PDF
                                 </button>
                                 <button type="button" @click="setReportPreview('counts')" class="btn-secondary text-xs justify-center py-2 text-slate-700 hover:bg-slate-100 font-semibold" :class="{'!bg-slate-900 !text-white': activeReportPreviewTab === 'counts'}">
-                                    🔍 Live Data
+                                    View table
                                 </button>
                             </div>
                         </div>
@@ -1037,7 +1259,7 @@
                                     👁 Preview PDF
                                 </button>
                                 <button type="button" @click="setReportPreview('feeDue')" class="btn-secondary text-xs justify-center py-2 text-slate-700 hover:bg-slate-100 font-semibold" :class="{'!bg-slate-900 !text-white': activeReportPreviewTab === 'feeDue'}">
-                                    🔍 Live Data
+                                    View table
                                 </button>
                             </div>
                         </div>
@@ -1045,43 +1267,36 @@
                 </div>
             </div>
 
-            <!-- Report Live Interactive Data Preview Container -->
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
-                <!-- Preview Header & Tab Selector Bar -->
-                <div class="p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-wrap items-center justify-between gap-4">
-                    <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-lg bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-lg">
-                            📊
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-white text-base">Live Interactive Data Preview</h3>
-                            <p class="text-xs text-indigo-200">
-                                {{ school?.name }} · <span v-if="reportClassFilter" class="font-bold text-white">Class {{ reportClassFilter }}</span><span v-else>All Classes</span>
-                            </p>
-                        </div>
+            <!-- Report data preview -->
+            <div class="card card--flush overflow-hidden">
+                <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4 bg-slate-50/80">
+                    <div>
+                        <h3 class="section-title !mb-0">Report preview</h3>
+                        <p class="text-xs text-slate-500 mt-1">
+                            {{ school?.name }} · <span v-if="reportClassFilter" class="font-semibold text-slate-700">Class {{ reportClassFilter }}</span><span v-else>All classes</span>
+                        </p>
                     </div>
 
-                    <!-- Switcher Tabs -->
-                    <div class="inline-flex rounded-xl bg-slate-800/80 p-1.5 text-xs font-semibold border border-slate-700">
-                        <button type="button" class="px-3.5 py-1.5 rounded-lg transition-all"
-                                :class="activeReportPreviewTab === 'registration' ? 'bg-indigo-600 text-white shadow-md font-bold' : 'text-slate-300 hover:text-white'"
+                    <div class="inline-flex flex-wrap rounded-lg bg-white p-1 text-xs font-semibold border border-slate-200">
+                        <button type="button" class="px-3 py-1.5 rounded-md transition-all"
+                                :class="activeReportPreviewTab === 'registration' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-600 hover:bg-slate-50'"
                                 @click="activeReportPreviewTab = 'registration'">
-                            Registration Register ({{ filteredReportRows.length }})
+                            Registration ({{ filteredReportRows.length }})
                         </button>
-                        <button type="button" class="px-3.5 py-1.5 rounded-lg transition-all"
-                                :class="activeReportPreviewTab === 'attendance' ? 'bg-indigo-600 text-white shadow-md font-bold' : 'text-slate-300 hover:text-white'"
+                        <button type="button" class="px-3 py-1.5 rounded-md transition-all"
+                                :class="activeReportPreviewTab === 'attendance' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-600 hover:bg-slate-50'"
                                 @click="activeReportPreviewTab = 'attendance'">
-                            Attendance Sheet
+                            Attendance
                         </button>
-                        <button type="button" class="px-3.5 py-1.5 rounded-lg transition-all"
-                                :class="activeReportPreviewTab === 'counts' ? 'bg-indigo-600 text-white shadow-md font-bold' : 'text-slate-300 hover:text-white'"
+                        <button type="button" class="px-3 py-1.5 rounded-md transition-all"
+                                :class="activeReportPreviewTab === 'counts' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-600 hover:bg-slate-50'"
                                 @click="activeReportPreviewTab = 'counts'">
-                            Class-wise Counts
+                            Class counts
                         </button>
-                        <button type="button" class="px-3.5 py-1.5 rounded-lg transition-all"
-                                :class="activeReportPreviewTab === 'feeDue' ? 'bg-indigo-600 text-white shadow-md font-bold' : 'text-slate-300 hover:text-white'"
+                        <button type="button" class="px-3 py-1.5 rounded-md transition-all"
+                                :class="activeReportPreviewTab === 'feeDue' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-600 hover:bg-slate-50'"
                                 @click="activeReportPreviewTab = 'feeDue'">
-                            Class-wise Fee Due
+                            Fee due
                         </button>
                     </div>
                 </div>
@@ -1324,10 +1539,115 @@ const props = defineProps({
     toppers: { type: Array, default: () => [] },
     attendanceRows: { type: Array, default: () => [] },
     attendanceGate: { type: Object, default: () => ({ can_mark: false }) },
+    schoolLevelAwards: { type: Object, default: () => ({ enabled: false, classes: [], by_class: {} }) },
     reportExports: { type: Object, default: () => ({}) },
     lazyLoadStudents: { type: Boolean, default: false },
     studentCount: { type: Number, default: 0 },
 });
+
+const markForms = ref({});
+const activeMarkClass = ref(props.schoolLevelAwards?.classes?.[0] || 'LKG');
+
+function syncMarkForms() {
+    const forms = {};
+    for (const className of props.schoolLevelAwards?.classes || []) {
+        for (const row of props.schoolLevelAwards?.by_class?.[className]?.rows || []) {
+            // Keep blank until a score is entered — do not pretend unmarked = 0.
+            forms[row.registration_id] = row.score === null || row.score === undefined ? '' : row.score;
+        }
+    }
+    markForms.value = forms;
+    if (!props.schoolLevelAwards?.classes?.includes(activeMarkClass.value)) {
+        activeMarkClass.value = props.schoolLevelAwards?.classes?.[0] || 'LKG';
+    }
+}
+syncMarkForms();
+watch(() => props.schoolLevelAwards, () => syncMarkForms(), { deep: true });
+
+function classSummary(className) {
+    return props.schoolLevelAwards?.by_class?.[className] || {
+        present_count: 0, marked_count: 0, quota: 0, rows: [], validation: { errors: [] },
+        can_edit: false, can_promote: false, submitted: false, awarded_registration_ids: [],
+    };
+}
+
+const activeClassSummary = computed(() => classSummary(activeMarkClass.value));
+const activeMaxMarks = computed(() => Number(props.schoolLevelAwards?.class_max_marks?.[activeMarkClass.value] || 0) || null);
+
+const dirtyMarkCount = computed(() => {
+    const rows = activeClassSummary.value.rows || [];
+    return rows.filter((row) => {
+        const current = markForms.value[row.registration_id];
+        if (current === '' || current === null || current === undefined) {
+            return row.score !== null && row.score !== undefined;
+        }
+        return Number(current) !== Number(row.score ?? NaN);
+    }).length;
+});
+
+function isAwarded(className, registrationId) {
+    const ids = classSummary(className).awarded_registration_ids || [];
+    return ids.map(Number).includes(Number(registrationId));
+}
+
+function rowInQuota(className, row) {
+    if (isAwarded(className, row.registration_id)) return true;
+    const summary = classSummary(className);
+    if (!row.school_rank || !summary.quota) return false;
+    if (summary.marked_count < summary.present_count) return false;
+    return row.school_rank <= summary.quota && !summary.validation?.has_cutoff_ties && !summary.validation?.has_rank_ties;
+}
+
+function tiedStudents(className) {
+    const summary = classSummary(className);
+    if (!summary.validation?.has_rank_ties && !summary.validation?.has_cutoff_ties) return [];
+    const rows = summary.rows || [];
+    const byScore = {};
+    for (const row of rows) {
+        if (row.score === null || row.score === undefined) continue;
+        const key = String(row.score);
+        byScore[key] = byScore[key] || [];
+        byScore[key].push(row);
+    }
+    return Object.values(byScore).filter((group) => group.length > 1).flat();
+}
+
+function saveMark(registrationId) {
+    const raw = markForms.value[registrationId];
+    if (raw === '' || raw === null || raw === undefined) {
+        alertMessage.value = 'Enter a score before saving.';
+        return;
+    }
+    router.post(`/school-admin/${props.school.id}/mcq/${props.exam.id}/registrations/${registrationId}/marks`, {
+        score: Number(raw),
+    }, { preserveScroll: true });
+}
+
+function saveAllMarks(className) {
+    const rows = classSummary(className).rows || [];
+    const marks = rows
+        .map((row) => {
+            const raw = markForms.value[row.registration_id];
+            if (raw === '' || raw === null || raw === undefined) return null;
+            return { registration_id: row.registration_id, score: Number(raw) };
+        })
+        .filter(Boolean);
+    if (!marks.length) {
+        alertMessage.value = 'Enter at least one score before Save all.';
+        return;
+    }
+    router.post(`/school-admin/${props.school.id}/mcq/${props.exam.id}/marks/bulk`, { marks }, { preserveScroll: true });
+}
+
+async function promoteClass(className) {
+    if (!(await confirm({
+        message: `Promote / Submit Class ${className}? This locks marks and nominates the exact top ${props.schoolLevelAwards?.cutoff_percent ?? 15}% for district awards.`,
+        destructive: false,
+    }))) return;
+    router.post(`/school-admin/${props.school.id}/mcq/${props.exam.id}/school-level-awards/promote`, {
+        class_name: className,
+    }, { preserveScroll: true });
+}
 
 // Option lists for the SearchableSelect class filters (values kept as strings to match
 // the equality checks against student.school_class_id elsewhere in this component).
@@ -1368,6 +1688,15 @@ const filteredReportRows = computed(() => {
         );
     }
     return rows;
+});
+
+const reportExamClassCount = computed(() => {
+    const names = new Set(
+        (props.reportRows || [])
+            .map((r) => String(r.class_name || '').trim())
+            .filter(Boolean),
+    );
+    return names.size || (props.classOptions || []).length;
 });
 
 const totalReportPages = computed(() => Math.ceil(filteredReportRows.value.length / reportPageSize.value) || 1);
@@ -1484,15 +1813,23 @@ const paginatedAttendanceState = computed(() => {
 
 // Results tab search & pagination
 const resultsSearchQuery = ref('');
+const resultsClassFilter = ref('');
 const resultsPage = ref(1);
 const resultsPageSize = ref(50);
 
-watch(resultsSearchQuery, () => {
+watch([resultsSearchQuery, resultsClassFilter], () => {
     resultsPage.value = 1;
 });
 
 const filteredResults = computed(() => {
     let list = props.registrations || [];
+    if (resultsClassFilter.value) {
+        const clean = String(resultsClassFilter.value).toLowerCase().replace('class', '').trim();
+        list = list.filter((r) => {
+            const cName = String(r.student?.class_name || '').toLowerCase().replace('class', '').trim();
+            return cName === clean;
+        });
+    }
     if (resultsSearchQuery.value.trim()) {
         const q = resultsSearchQuery.value.trim().toLowerCase();
         list = list.filter(r => {
@@ -1540,6 +1877,16 @@ function openPdfPreview(baseUrl) {
 
 const page = usePage();
 const newCredentials = computed(() => page.props.flash?.mcqNewCredentials ?? []);
+const flashSuccess = computed(() => page.props.flash?.success || '');
+const flashError = computed(() => page.props.flash?.error || '');
+const promoteError = computed(() => {
+    const errors = page.props.errors || {};
+    const promote = errors.promote;
+    const marks = errors.marks;
+    if (Array.isArray(promote)) return promote[0] || '';
+    if (Array.isArray(marks)) return marks[0] || '';
+    return promote || marks || '';
+});
 
 const classFilter = ref('');
 const studentSearch = ref('');
@@ -1942,6 +2289,28 @@ function unmarkPaid(registration) {
     router.post(`${base.value}/registrations/${registration.id}/unmark-paid`, {}, { preserveScroll: true });
 }
 
+const unpaidFilteredCount = computed(() =>
+    filteredRegisteredStudents.value.filter((r) => !r.school_paid).length,
+);
+
+function bulkMarkPaidFiltered() {
+    const ids = filteredRegisteredStudents.value.filter((r) => !r.school_paid).map((r) => r.id);
+    if (!ids.length) return;
+    router.post(`${base.value}/registrations/mark-paid-bulk`, { registration_ids: ids }, { preserveScroll: true });
+}
+
+function feeStatusLabel(status) {
+    const map = {
+        pending: 'Pending payment',
+        proof_uploaded: 'Proof under review',
+        approved: 'Approved',
+        rejected: 'Rejected',
+        waived: 'Waived',
+        partial: 'Partially paid',
+    };
+    return map[status] || String(status || 'Not calculated').replace(/_/g, ' ');
+}
+
 function uploadBatchFee() {
     // Up to 5 images for one payment — see docs/FLOW_GAP_FIX_PLAN.md multi-image
     // upload feature.
@@ -1964,7 +2333,26 @@ function uploadBatchFee() {
 
 // --- Attendance ---
 const alertMessage = ref('');
-const attendanceState = ref(props.attendanceRows.map(r => ({ ...r, attendance_status: r.attendance_status || 'pending', attendance_note: r.attendance_note || '' })));
+const attendanceStatusOptions = [
+    { value: 'pending', label: 'Pending' },
+    { value: 'present', label: 'Present' },
+    { value: 'absent', label: 'Absent' },
+    { value: 'malpractice', label: 'Malpractice' },
+    { value: 'withheld', label: 'Withheld' },
+];
+
+function normalizeAttendanceRow(r) {
+    const status = r.attendance_status && r.attendance_status !== 'pending'
+        ? r.attendance_status
+        : 'pending';
+    return { ...r, attendance_status: status, attendance_note: r.attendance_note || '' };
+}
+
+const attendanceState = ref((props.attendanceRows || []).map(normalizeAttendanceRow));
+watch(() => props.attendanceRows, (rows) => {
+    attendanceState.value = (rows || []).map(normalizeAttendanceRow);
+}, { deep: true });
+
 const presentCount = computed(() => filteredAttendanceState.value.filter(r => r.attendance_status === 'present').length);
 const absentCount = computed(() => filteredAttendanceState.value.filter(r => r.attendance_status === 'absent').length);
 const malpracticeCount = computed(() => filteredAttendanceState.value.filter(r => r.attendance_status === 'malpractice').length);
@@ -1972,7 +2360,9 @@ const withheldCount = computed(() => filteredAttendanceState.value.filter(r => r
 const pendingCount = computed(() => filteredAttendanceState.value.filter(r => !r.attendance_status || r.attendance_status === 'pending').length);
 
 function markAll(status) {
-    filteredAttendanceState.value.forEach(r => { if (!r.pending_correction_status) r.attendance_status = status; });
+    filteredAttendanceState.value.forEach((r) => {
+        if (!r.pending_correction_status) r.attendance_status = status;
+    });
 }
 
 function saveAttendance() {
