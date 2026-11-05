@@ -416,6 +416,9 @@ Route::prefix('mcq')->name('mcq.')->group(function () {
     Route::get('/{exam}/reports/registration/pdf', [McqReportController::class, 'exportRegistrationPdf'])->name('reports.registration.pdf');
     Route::get('/{exam}/reports/attendance/export', [McqReportController::class, 'exportAttendance'])->name('reports.attendance.export');
     Route::get('/{exam}/reports/attendance/pdf', [McqReportController::class, 'exportAttendancePdf'])->name('reports.attendance.pdf');
+    Route::get('/{exam}/reports/absent/export', [McqReportController::class, 'exportAbsent'])->name('reports.absent.export');
+    Route::get('/{exam}/reports/absent/pdf', [McqReportController::class, 'exportAbsentPdf'])->name('reports.absent.pdf');
+    Route::get('/{exam}/reports/absent/class-wise/export', [McqReportController::class, 'exportClassWiseAbsent'])->name('reports.absent.class-wise.export');
     Route::get('/{exam}/reports/toppers/export', [McqReportController::class, 'exportToppers'])->name('reports.toppers.export');
     Route::get('/{exam}/reports/class-wise-counts/export', [McqReportController::class, 'exportClassWiseCounts'])->name('reports.class-wise-counts.export');
     Route::get('/{exam}/reports/class-wise-counts/pdf', [McqReportController::class, 'exportClassWiseCountsPdf'])->name('reports.class-wise-counts.pdf');

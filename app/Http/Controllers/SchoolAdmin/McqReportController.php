@@ -43,6 +43,37 @@ class McqReportController extends SchoolAdminController
         return $printable->attendanceSheetPdf($exam, $this->school->id, $selectedClass, $inline);
     }
 
+    public function exportAbsent(Request $request, string $tenantId, McqExam $exam, McqReportService $reports)
+    {
+        abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+        $selectedClass = $request->input('class') ?: $request->input('class_name');
+
+        return $reports->exportAbsentList($exam, $this->school->id, $selectedClass);
+    }
+
+    public function exportAbsentPdf(Request $request, string $tenantId, McqExam $exam, McqPrintableDocumentService $printable)
+    {
+        abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+        $inline = $request->boolean('inline') || $request->query('inline') == '1' || $request->query('preview') == '1';
+        $selectedClass = $request->input('class') ?: $request->input('class_name');
+
+        return $printable->absentListPdf(
+            $exam,
+            schoolId: $this->school->id,
+            selectedClass: $selectedClass,
+            inline: $inline,
+            sahodaya: $this->school->parent,
+        );
+    }
+
+    public function exportClassWiseAbsent(Request $request, string $tenantId, McqExam $exam, McqReportService $reports)
+    {
+        abort_if($exam->tenant_id !== $this->school->parent_id, 403);
+        $selectedClass = $request->input('class') ?: $request->input('class_name');
+
+        return $reports->exportClassWiseAbsent($exam, $this->school->id, $selectedClass);
+    }
+
     public function exportToppers(string $tenantId, McqExam $exam, McqReportService $reports)
     {
         abort_if($exam->tenant_id !== $this->school->parent_id, 403);

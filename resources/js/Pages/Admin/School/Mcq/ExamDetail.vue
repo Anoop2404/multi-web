@@ -747,18 +747,29 @@
                         Pending students are not treated as present.
                     </p>
                 </div>
+                <div class="flex flex-wrap gap-2 items-center">
+                    <button
+                        v-if="pendingCount > 0"
+                        type="button"
+                        class="btn-primary text-xs"
+                        @click="markPendingPresent"
+                    >
+                        Mark {{ attendanceClassFilter ? 'filtered ' : '' }}pending as present ({{ pendingCount }})
+                    </button>
+                    <button type="button" class="btn-secondary text-xs" @click="markAll('present')">
+                        Mark {{ attendanceClassFilter ? 'filtered' : 'all' }} present
+                    </button>
+                    <button type="button" class="btn-secondary text-xs" @click="markAll('absent')">
+                        Mark {{ attendanceClassFilter ? 'filtered' : 'all' }} absent
+                    </button>
+                    <button type="button" class="btn-secondary text-xs" @click="markAll('pending')">
+                        Reset filtered to pending
+                    </button>
+                </div>
+                <p v-if="pendingCount > 0" class="text-xs text-slate-500">
+                    Tip: click <strong>Mark pending as present</strong>, flip only true absentees to Absent, then click <strong>Save attendance</strong> at the bottom.
+                </p>
                 <div class="flex flex-wrap gap-2 items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <button type="button" class="btn-secondary text-xs" @click="markAll('present')">
-                            Mark {{ attendanceClassFilter ? 'filtered' : 'all' }} present
-                        </button>
-                        <button type="button" class="btn-secondary text-xs" @click="markAll('absent')">
-                            Mark {{ attendanceClassFilter ? 'filtered' : 'all' }} absent
-                        </button>
-                        <button type="button" class="btn-secondary text-xs" @click="markAll('pending')">
-                            Reset filtered to pending
-                        </button>
-                    </div>
                     <div class="flex flex-wrap items-center gap-2">
                         <SearchableSelect v-model="attendanceClassFilter" class="min-w-[160px]" :options="classNameOptions"
                                           :all-option="true" all-label="All classes" placeholder="All classes" />
@@ -766,12 +777,24 @@
                         <button v-if="attendanceClassFilter || attendanceSearchQuery" type="button"
                                 class="text-xs text-slate-400 hover:underline"
                                 @click="attendanceClassFilter = ''; attendanceSearchQuery = ''">Clear</button>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
                         <a :href="attendanceExportUrl(reportExports.attendance)" class="btn-secondary text-xs">
-                            Export attendance{{ attendanceClassFilter ? ' (filtered)' : '' }} CSV ↓
+                            Attendance CSV{{ attendanceClassFilter ? ' (class)' : '' }} ↓
                         </a>
                         <a v-if="reportExports.attendancePdf" :href="attendanceExportUrl(reportExports.attendancePdf)"
                            target="_blank" class="btn-secondary text-xs">
-                            Class-wise attendance PDF ↓
+                            Attendance PDF ↓
+                        </a>
+                        <a v-if="reportExports.absent" :href="attendanceExportUrl(reportExports.absent)" class="btn-secondary text-xs">
+                            Absent list{{ attendanceClassFilter ? ' (class)' : ' (all)' }} Excel ↓
+                        </a>
+                        <a v-if="reportExports.absentPdf" :href="attendanceExportUrl(reportExports.absentPdf)"
+                           target="_blank" class="btn-secondary text-xs">
+                            Absent PDF{{ attendanceClassFilter ? ' (class)' : ' (all)' }} ↓
+                        </a>
+                        <a v-if="reportExports.absentClassWise" :href="attendanceExportUrl(reportExports.absentClassWise)" class="btn-secondary text-xs">
+                            Class-wise absent Excel ↓
                         </a>
                     </div>
                 </div>
@@ -1207,7 +1230,37 @@
                     </div>
                 </div>
 
-                <!-- 3. Class-Wise Count Matrix Card -->
+                <!-- 3. Absent report card -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between overflow-hidden relative group">
+                    <div class="h-1.5 bg-gradient-to-r from-rose-500 to-red-600"></div>
+                    <div class="p-5 flex-1 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl shadow-sm">
+                                    ✕
+                                </div>
+                                <span class="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 uppercase tracking-wider">PDF & Excel</span>
+                            </div>
+                            <h3 class="font-bold text-slate-900 text-base mb-1 group-hover:text-rose-600 transition-colors">Absent report</h3>
+                            <p class="text-xs text-slate-500 leading-relaxed">Absentee list for your school (all classes or one class via the filter above), plus class-wise absent counts Excel.</p>
+                        </div>
+                        <div class="space-y-2 mt-6 pt-4 border-t border-slate-100">
+                            <div class="grid grid-cols-2 gap-2">
+                                <a v-if="reportExports.absent" :href="reportUrlWithClass(reportExports.absent)" class="btn-secondary text-xs justify-center py-2 bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 font-semibold">
+                                    Absent Excel ↓
+                                </a>
+                                <a v-if="reportExports.absentPdf" :href="reportUrlWithClass(reportExports.absentPdf)" target="_blank" class="btn-secondary text-xs justify-center py-2 bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 font-semibold">
+                                    Absent PDF ↓
+                                </a>
+                            </div>
+                            <a v-if="reportExports.absentClassWise" :href="reportUrlWithClass(reportExports.absentClassWise)" class="btn-secondary text-xs justify-center py-2 w-full bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 font-semibold">
+                                Class-wise absent Excel ↓
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Class-Wise Count Matrix Card -->
                 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between overflow-hidden relative group"
                      :class="{'ring-2 ring-purple-600 bg-purple-50/10': activeReportPreviewTab === 'counts'}">
                     <div class="h-1.5 bg-gradient-to-r from-purple-500 to-violet-600"></div>
@@ -2375,6 +2428,16 @@ const pendingCount = computed(() => filteredAttendanceState.value.filter(r => !r
 function markAll(status) {
     filteredAttendanceState.value.forEach((r) => {
         if (!r.pending_correction_status) r.attendance_status = status;
+    });
+}
+
+/** Only flip pending/unmarked rows to present — leave already-marked absent/malpractice/withheld alone. */
+function markPendingPresent() {
+    filteredAttendanceState.value.forEach((r) => {
+        if (r.pending_correction_status) return;
+        if (!r.attendance_status || r.attendance_status === 'pending') {
+            r.attendance_status = 'present';
+        }
     });
 }
 
