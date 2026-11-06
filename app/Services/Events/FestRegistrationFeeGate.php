@@ -23,7 +23,7 @@ class FestRegistrationFeeGate
 
         $schedule = $this->feeService->resolveSchedule($event);
 
-        return (bool) ($schedule['require_fee_before_registration'] ?? ($event->event_type === 'sports'));
+        return (bool) ($schedule['require_fee_before_registration'] ?? false);
     }
 
     public function isSchoolFeeCleared(FestEvent $event, string $schoolId): bool

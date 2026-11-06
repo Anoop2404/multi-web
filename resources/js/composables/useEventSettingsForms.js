@@ -274,7 +274,7 @@ export function useEventSettingsForms(props) {
         default_item_fee: existingFeeSettings.default_item_fee ?? schedule.default_item_fee ?? '',
         require_fee_before_registration: existingFeeSettings.require_fee_before_registration
             ?? schedule.require_fee_before_registration
-            ?? (props.event?.event_type === 'sports'),
+            ?? false,
         require_verified_students: existingFeeSettings.require_verified_students
             ?? schedule.require_verified_students
             ?? false,
