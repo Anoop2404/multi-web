@@ -150,6 +150,7 @@ export function schoolEventScopedNav(schoolId, programSlug, event, options = {})
         { label: 'Student report', href: `${reportsBase}/student-report`, icon: 'users' },
         { label: 'Item-wise report', href: `${reportsBase}/item-wise`, icon: 'list' },
         { label: 'Registration list', href: `${reportsBase}/registration-register`, icon: 'list' },
+        { label: 'Attendance sheet', href: `${reportsBase}/attendance`, icon: 'user-check' },
         { label: 'Team Managers', href: `${reportsBase}/export/team-managers-pdf?preview=1`, icon: 'user-check', target: '_blank' },
         { label: 'Item counts', href: `${reportsBase}/item-counts`, icon: 'bar-chart' },
         { label: 'Item schedule', href: `${reportsBase}/item-schedule`, icon: 'calendar' },

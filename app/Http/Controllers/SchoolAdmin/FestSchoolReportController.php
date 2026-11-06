@@ -1837,6 +1837,15 @@ class FestSchoolReportController extends SchoolAdminController
 
         $request->merge(['school_id' => $this->school->id]);
 
+        if ($event->event_type === 'sports') {
+            // Reuse the item/team attendance layout, scoped to this school. It has
+            // attendance and signature spaces without evaluation marks.
+            app(FestItemHeadService::class)->syncEventHeads($event);
+            $request->merge(['blank_chest' => true, 'audience' => 'staff']);
+
+            return (new FestReportService($event))->export('attendance-sheet', $request);
+        }
+
         return (new FestReportService($event))->export('attendance-sheet-school', $request);
     }
 
