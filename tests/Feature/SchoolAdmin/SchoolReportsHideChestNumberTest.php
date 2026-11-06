@@ -117,6 +117,32 @@ class SchoolReportsHideChestNumberTest extends TestCase
      * that visibility fix. The chest-number removal itself is verified by code review of
      * the stripped row data (stripChestNumbers()) and the 'showChestNo' blade guard.
      */
+    public function test_sports_student_wise_pdf_preview_is_inline(): void
+    {
+        $f = $this->fixture();
+        $f['event']->update(['event_type' => 'sports']);
+
+        $response = $this->actingAs($f['admin'])->get(
+            route('school.sports.reports.student-wise.pdf', ['tenantId' => $f['school']->id, 'event' => $f['event']->id]).'?inline=1',
+        );
+
+        $response->assertOk();
+        $this->assertStringStartsWith('inline;', $response->headers->get('Content-Disposition'));
+    }
+
+    public function test_sports_student_wise_export_omits_total_score(): void
+    {
+        $f = $this->fixture();
+        $f['event']->update(['event_type' => 'sports']);
+
+        $response = $this->actingAs($f['admin'])->get(
+            route('school.sports.reports.student-wise.export', ['tenantId' => $f['school']->id, 'event' => $f['event']->id]),
+        );
+
+        $response->assertOk();
+        $this->assertStringNotContainsString('Total Score', $response->streamedContent());
+    }
+
     public function test_student_wise_pdf_renders_successfully(): void
     {
         $f = $this->fixture();

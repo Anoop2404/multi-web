@@ -3,7 +3,7 @@
         <PageHeader
             :title="`Student-wise — ${event.title}`"
             :eyebrow="programLabel"
-            description="Per-student registrations and scores for this event."
+            :description="showMarks ? 'Per-student registrations and scores for this event.' : 'Per-student registrations for this event.'"
         >
             <template #actions>
                 <Link :href="`${programBase}/reports/${event.id}`" class="btn-secondary text-sm">← Reports</Link>
@@ -66,7 +66,7 @@
                         <span class="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100">
                             {{ st.item_count }} {{ st.item_count === 1 ? 'item' : 'items' }} registered
                         </span>
-                        <span v-if="st.total_score > 0" class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
+                        <span v-if="showMarks && st.total_score > 0" class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
                             Total score: {{ st.total_score }}
                         </span>
                     </div>
@@ -83,8 +83,8 @@
                                 <th v-if="event?.event_type === 'sports'" class="text-center">Chest No</th>
                                 <th class="text-center">Stage / Type</th>
                                 <th class="text-center">Status</th>
-                                <th class="text-center">Grade / Rank</th>
-                                <th class="text-right pr-4">Score</th>
+                                <th v-if="showMarks" class="text-center">Grade / Rank</th>
+                                <th v-if="showMarks" class="text-right pr-4">Score</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -110,13 +110,13 @@
                                         {{ item.status || '—' }}
                                     </span>
                                 </td>
-                                <td class="text-center text-slate-700 font-medium">
+                                <td v-if="showMarks" class="text-center text-slate-700 font-medium">
                                     <span v-if="item.position" class="font-bold text-indigo-600">Rank #{{ item.position }}</span>
                                     <span v-if="item.position && item.grade"> · </span>
                                     <span v-if="item.grade" class="font-semibold text-emerald-600">{{ item.grade }} Grade</span>
                                     <span v-if="!item.position && !item.grade">—</span>
                                 </td>
-                                <td class="text-right pr-4 font-mono font-semibold text-slate-900">
+                                <td v-if="showMarks" class="text-right pr-4 font-mono font-semibold text-slate-900">
                                     {{ item.score ?? '—' }}
                                 </td>
                             </tr>
@@ -154,6 +154,7 @@ const props = defineProps({
 });
 
 const { programLabel, programBase } = useSchoolProgramContext(props);
+const showMarks = computed(() => props.event?.event_type !== 'sports');
 const searchQuery = ref('');
 const classFilter = ref(null);
 

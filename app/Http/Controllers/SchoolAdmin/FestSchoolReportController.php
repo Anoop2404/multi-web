@@ -584,10 +584,14 @@ class FestSchoolReportController extends SchoolAdminController
 
         $reportService = app(\App\Services\Events\FestReportService::class, ['event' => $event]);
 
+        $reportService->preview = ! $request->boolean('download')
+            && ($request->boolean('inline') || $request->boolean('preview'));
+
         return $reportService->renderPdf('fest.reports.student-wise', [
             'event'        => $event,
             'students'     => $rows,
             'showChestNo'  => $isSports,
+            'showMarks'    => ! $isSports,
             ...$reportService->brandingData(),
         ], \Illuminate\Support\Str::slug($event->title).'-student-wise-report.pdf');
     }
@@ -609,7 +613,10 @@ class FestSchoolReportController extends SchoolAdminController
                 $headers[] = 'DOB';
                 $headers[] = 'Chest No';
             }
-            $headers = array_merge($headers, ['Item Count', 'Registered Items', 'Total Score']);
+            $headers = array_merge($headers, ['Item Count', 'Registered Items']);
+            if (! $isSports) {
+                $headers[] = 'Total Score';
+            }
             CsvSafety::fputcsv($out, $headers);
             foreach ($rows as $row) {
                 $itemTitles = collect($row['items'])->pluck('item_title')->filter()->implode('; ');
@@ -624,7 +631,9 @@ class FestSchoolReportController extends SchoolAdminController
                 }
                 $data[] = $row['item_count'] ?? 0;
                 $data[] = $itemTitles;
-                $data[] = $row['total_score'] ?? 0;
+                if (! $isSports) {
+                    $data[] = $row['total_score'] ?? 0;
+                }
                 CsvSafety::fputcsv($out, $data);
             }
             fclose($out);
