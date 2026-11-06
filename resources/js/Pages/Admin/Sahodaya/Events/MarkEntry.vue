@@ -197,8 +197,8 @@
                         <span class="px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold text-[11px]">
                             {{ section.rows.length }} participant(s)
                         </span>
-                        <span v-if="directionLabel(section.item)" class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-semibold">
-                            {{ directionLabel(section.item) }}
+                        <span v-if="directionLabel(measurementItem(section.item))" class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-semibold">
+                            {{ directionLabel(measurementItem(section.item)) }}
                         </span>
                     </div>
 
@@ -214,6 +214,17 @@
                                 Apply
                             </button>
                         </div>
+
+                        <label v-if="isSports && section.item?.id && !rankEntryOnly(section.item)" class="flex items-center gap-1.5 shrink-0">
+                            <span class="text-slate-500 font-medium whitespace-nowrap">Rank by:</span>
+                            <select :value="getAutoRankBasis(section.item)"
+                                    :disabled="itemLocked"
+                                    class="field !py-1 !px-2 !text-xs"
+                                    @change="autoRankBasis[section.item.id] = $event.target.value">
+                                <option value="time">Time (lowest first)</option>
+                                <option value="distance">Length / Distance (highest first)</option>
+                            </select>
+                        </label>
 
                         <button v-if="section.item?.id && !rankEntryOnly(section.item)" type="button" class="btn-secondary text-xs !py-1 !px-2.5 shrink-0 whitespace-nowrap" :disabled="itemLocked" @click="autoRankAndGrade(section)">
                             {{ isSports ? 'Auto-rank saved results' : 'Auto-rank & Grade' }}
@@ -235,7 +246,7 @@
                                 <th class="px-2.5 py-3 min-w-[5.5rem] w-24">Order <span class="block normal-case font-normal tracking-normal">Saves automatically</span></th>
                                 <th class="px-2.5 py-3 min-w-[5.5rem] w-24">Fest ID</th>
                                 <th class="px-2.5 py-3 min-w-[10rem] w-40">Attendance</th>
-                                <th v-if="showMeasurement(section.item)" class="px-2.5 py-3 min-w-[7.5rem] w-32">{{ measurementUnitHint(section.item) === 'm' ? 'Distance (m)' : 'Time / Distance' }}</th>
+                                <th v-if="showMeasurement(section.item)" class="px-2.5 py-3 min-w-[7.5rem] w-32">{{ isSports ? (getAutoRankBasis(section.item) === 'distance' ? 'Length / Distance (m)' : 'Time (s or min:s)') : 'Time / Distance' }}</th>
                                 <th v-if="showRankColumn(section.item)" class="px-2.5 py-3 min-w-[6.5rem] w-28">Rank</th>
                                 <template v-if="hasJudgePanel && !isSports && !rankEntryOnly(section.item)">
                                     <th v-for="j in judgeNumbers" :key="j" class="px-2.5 py-3 min-w-[5.5rem] w-24 text-center">
@@ -316,7 +327,7 @@
                                                :disabled="isAbsent(participant, item) || itemLocked">
                                         <input v-model="markForms[participant.id].measurement_unit"
                                                class="field text-sm w-14 !py-1.5 !px-1.5"
-                                               :placeholder="measurementUnitHint(section.item)"
+                                               :placeholder="measurementUnitHint(measurementItem(section.item))"
                                                :disabled="isAbsent(participant, item) || itemLocked">
                                     </div>
                                 </td>
@@ -1061,8 +1072,20 @@ function autoRankSection(section) {
     }
 }
 
+const autoRankBasis = reactive({});
+
+function getAutoRankBasis(item) {
+    return autoRankBasis[item.id] ?? (item.result_method === 'distance' || item.ranking_direction === 'desc' ? 'distance' : 'time');
+}
+
+function measurementItem(item) {
+    if (!isSports.value || rankEntryOnly(item)) return item;
+    const basis = getAutoRankBasis(item);
+    return { ...item, result_method: basis, ranking_direction: basis === 'time' ? 'asc' : 'desc' };
+}
+
 function autoRank(item) {
-    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${item.id}/auto-rank`, {}, { preserveScroll: true, preserveState: false });
+    router.post(`/sahodaya-admin/${props.sahodaya.id}/events/${props.event.id}/items/${item.id}/auto-rank`, { rank_basis: getAutoRankBasis(item) }, { preserveScroll: true, preserveState: false });
 }
 
 function clearAllMarks(section) {

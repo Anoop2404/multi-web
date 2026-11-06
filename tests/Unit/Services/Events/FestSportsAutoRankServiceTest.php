@@ -117,6 +117,35 @@ class FestSportsAutoRankServiceTest extends TestCase
         $this->assertSame(2, $m3->fresh()->position, 'Dense ranking applies to measurement-based ranking too.');
     }
 
+    public function test_explicit_basis_changes_ranking_direction_and_is_remembered(): void
+    {
+        [$event, $item, $school] = $this->makeEventAndItem('sports');
+        $item->update(['result_method' => 'time', 'ranking_direction' => 'asc']);
+        $short = $this->markWithMeasurement($event, $item, $school, '7.45');
+        $middle = $this->markWithMeasurement($event, $item, $school, '8.75');
+        $long = $this->markWithMeasurement($event, $item, $school, '10.45');
+        $ranker = app(FestSportsAutoRankService::class);
+
+        $ranker->rankItem($event, $item, 'distance');
+
+        $this->assertSame(1, $long->fresh()->position);
+        $this->assertSame(2, $middle->fresh()->position);
+        $this->assertSame(3, $short->fresh()->position);
+        $this->assertSame('distance', $item->fresh()->result_method);
+        $this->assertSame('desc', $item->fresh()->ranking_direction);
+
+        $ranker->rankItem($event, $item->fresh());
+        $this->assertSame(1, $long->fresh()->position);
+
+        $ranker->rankItem($event, $item->fresh(), 'time');
+
+        $this->assertSame(1, $short->fresh()->position);
+        $this->assertSame(2, $middle->fresh()->position);
+        $this->assertSame(3, $long->fresh()->position);
+        $this->assertSame('time', $item->fresh()->result_method);
+        $this->assertSame('asc', $item->fresh()->ranking_direction);
+    }
+
     public function test_prefers_measurement_over_score_when_both_present(): void
     {
         [$event, $item, $school] = $this->makeEventAndItem('sports');
