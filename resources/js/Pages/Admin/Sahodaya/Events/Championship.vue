@@ -166,93 +166,24 @@
                         <span class="text-[10px] text-slate-400 font-mono">Category</span>
                     </div>
 
-                    <!-- Gender-split mode: Boy Champion / Girl Champion -->
-                    <template v-if="championshipConfig.group_by_gender">
-                        <div class="mb-3">
-                            <div class="text-[10px] font-bold text-indigo-700 uppercase tracking-wide flex items-center gap-1 mb-1">
-                                <span>★</span> {{ championshipConfig.male_title }} (Boys)
-                            </div>
-                            <div v-if="cat.male_champion" class="flex items-center gap-2 cursor-pointer group" @click="viewStudentBreakdown(cat.male_champion.student.id)">
-                                <div class="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-200 flex items-center justify-center font-bold text-xs text-indigo-800 shrink-0">
-                                    {{ cat.male_champion.student.name.charAt(0) }}
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                    <div class="font-bold text-xs text-slate-800 truncate group-hover:text-indigo-600 transition-colors">
-                                        {{ cat.male_champion.student.name }}
-                                    </div>
-                                    <div class="text-[10px] text-slate-400 truncate">{{ cat.male_champion.school }}</div>
-                                </div>
-                                <div class="text-right shrink-0">
-                                    <span class="font-bold font-mono text-xs text-slate-900">{{ cat.male_champion.points }} pts</span>
-                                </div>
-                            </div>
-                            <div v-else class="text-[11px] text-slate-400 italic">Pending marks</div>
-                        </div>
-
-                        <div>
-                            <div class="text-[10px] font-bold text-rose-700 uppercase tracking-wide flex items-center gap-1 mb-1">
-                                <span>★</span> {{ championshipConfig.female_title }} (Girls)
-                            </div>
-                            <div v-if="cat.female_champion" class="flex items-center gap-2 cursor-pointer group" @click="viewStudentBreakdown(cat.female_champion.student.id)">
-                                <div class="w-8 h-8 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center font-bold text-xs text-rose-800 shrink-0">
-                                    {{ cat.female_champion.student.name.charAt(0) }}
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                    <div class="font-bold text-xs text-slate-800 truncate group-hover:text-rose-600 transition-colors">
-                                        {{ cat.female_champion.student.name }}
-                                    </div>
-                                    <div class="text-[10px] text-slate-400 truncate">{{ cat.female_champion.school }}</div>
-                                </div>
-                                <div class="text-right shrink-0">
-                                    <span class="font-bold font-mono text-xs text-slate-900">{{ cat.female_champion.points }} pts</span>
-                                </div>
-                            </div>
-                            <div v-else class="text-[11px] text-slate-400 italic">Pending marks</div>
-                        </div>
-                    </template>
-
-                    <!-- Genderless mode: single unified champion -->
-                    <template v-else>
-                        <div v-if="cat.champion" class="flex items-center gap-2 cursor-pointer group" @click="viewStudentBreakdown(cat.champion.student.id)">
-                            <div class="w-8 h-8 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center font-bold text-xs text-amber-800 shrink-0">
-                                {{ cat.champion.student.name.charAt(0) }}
-                            </div>
-                            <div class="min-w-0 flex-1">
-                                <div class="font-bold text-xs text-slate-800 truncate group-hover:text-amber-600 transition-colors">
-                                    {{ cat.champion.student.name }}
-                                </div>
-                                <div class="text-[10px] text-slate-400 truncate">{{ cat.champion.school }}</div>
-                            </div>
-                            <div class="text-right shrink-0">
-                                <span class="font-bold font-mono text-xs text-slate-900">{{ cat.champion.points }} pts</span>
-                            </div>
-                        </div>
-                        <div v-else-if="cat.male_champion" class="flex items-center gap-2">
-                            <div class="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-200 flex items-center justify-center font-bold text-xs text-indigo-800 shrink-0">
-                                {{ cat.male_champion.student.name.charAt(0) }}
-                            </div>
-                            <div class="min-w-0 flex-1">
-                                <div class="font-bold text-xs text-slate-800 truncate">{{ cat.male_champion.student.name }}</div>
-                                <div class="text-[10px] text-slate-400 truncate">{{ cat.male_champion.school }}</div>
-                            </div>
-                            <div class="text-right shrink-0">
-                                <span class="font-bold font-mono text-xs text-slate-900">{{ cat.male_champion.points }} pts</span>
-                            </div>
-                        </div>
-                        <div v-else class="text-[11px] text-slate-400 italic">Pending marks</div>
-
-                        <div v-if="cat.runner_up" class="mt-2 flex items-center gap-2">
-                            <div class="w-6 h-6 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-[10px] text-slate-600 shrink-0">
-                                {{ cat.runner_up.student.name.charAt(0) }}
-                            </div>
-                            <div class="min-w-0 flex-1">
-                                <div class="font-bold text-[11px] text-slate-600 truncate">{{ cat.runner_up.student.name }}</div>
-                            </div>
-                            <div class="text-right shrink-0">
-                                <span class="font-mono text-[11px] text-slate-600">{{ cat.runner_up.points }} pts</span>
-                            </div>
-                        </div>
-                    </template>
+                    <div v-for="division in podiumDivisions" :key="division.key" class="mt-3">
+                        <h4 class="text-[10px] font-bold uppercase tracking-wide" :class="division.color">
+                            {{ division.label }} · Top 3 ranks
+                        </h4>
+                        <button v-for="row in categoryPodiums.get(cat.category)?.get(division.key)" :key="row.student.id"
+                                type="button" class="w-full flex items-center gap-2 border-b border-slate-100 py-2 text-left last:border-b-0 hover:bg-slate-50"
+                                @click="viewStudentBreakdown(row.student.id)">
+                            <span class="w-8 shrink-0 rounded-full bg-slate-100 py-1 text-center text-xs font-bold" :class="division.color">#{{ row.rank }}</span>
+                            <span class="min-w-0 flex-1">
+                                <span class="block text-xs font-bold text-slate-800">{{ row.student.name }}</span>
+                                <span class="block text-[10px] text-slate-500">{{ row.school }}</span>
+                            </span>
+                            <span class="shrink-0 font-mono text-xs font-bold">{{ row.points }} pts</span>
+                        </button>
+                        <p v-if="!categoryPodiums.get(cat.category)?.get(division.key)?.length" class="mt-1 text-[11px] text-slate-500">
+                            No ranked results yet
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -860,6 +791,27 @@ const filteredLeaderboard = computed(() => {
     }
     return list;
 });
+const podiumDivisions = computed(() => props.championshipConfig.group_by_gender
+    ? [
+        { key: 'male', label: 'Boys', color: 'text-indigo-700' },
+        { key: 'female', label: 'Girls', color: 'text-rose-700' },
+    ]
+    : [{ key: 'combined', label: 'Combined', color: 'text-amber-700' }]);
+
+const categoryPodiums = computed(() => {
+    const categories = new Map();
+    for (const row of props.leaderboard) {
+        if (row.points <= 0 || row.rank < 1 || row.rank > 3) continue;
+
+        const division = props.championshipConfig.group_by_gender ? row.gender : 'combined';
+        if (!categories.has(row.category)) categories.set(row.category, new Map());
+        const groups = categories.get(row.category);
+        if (!groups.has(division)) groups.set(division, []);
+        groups.get(division).push(row);
+    }
+    return categories;
+});
+
 const previewCategories = computed(() => {
     const groups = new Map();
     for (const row of filteredLeaderboard.value) {
