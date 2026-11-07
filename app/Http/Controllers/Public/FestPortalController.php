@@ -443,12 +443,7 @@ class FestPortalController extends Controller
                 ])
             : collect();
 
-        // FestIndividualChampionshipPoint.category is always one of the fixed lp/up/hs/
-        // hss/open keys, regardless of event_type — canonicalLabels() resolves each back
-        // to this Sahodaya's own configured category name (e.g. "Category 3 — Classes 8,
-        // 9 & 10"), the same names the rest of the portal already shows, with a generic
-        // fallback for any key the scheme has no match for.
-        $championshipCategoryLabels = FestClassGroupScheme::canonicalLabels(null, $championshipRoot);
+        $championshipCategoryLabels = $this->individualChampionship->categoryLabels($championshipRoot);
         $championship = $championshipRows
             ->map(function (array $row) use ($championshipCategoryLabels, $championshipRefs, $event) {
                 $link = $championshipRefs[$row['student']['id']] ?? null;

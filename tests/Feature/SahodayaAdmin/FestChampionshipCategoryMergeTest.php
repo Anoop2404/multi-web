@@ -79,6 +79,22 @@ class FestChampionshipCategoryMergeTest extends TestCase
         $this->assertSame(['hs' => 'open'], $event->fresh()->aggregation_config['championship_category_map']);
     }
 
+    public function test_sports_individual_champions_use_the_items_age_group(): void
+    {
+        ['event' => $event, 'student' => $student] = $this->makeFixture('open');
+        $event->update(['event_type' => 'sports']);
+        $event->items()->update(['age_group' => 'u14']);
+
+        $service = app(\App\Services\Events\FestIndividualChampionshipService::class);
+        $leaderboard = $service->leaderboardForEvent($event);
+        $this->assertSame('u14', $leaderboard->first()['category']);
+        $this->assertSame(1, $leaderboard->first()['rank']);
+
+        $summary = $service->championsSummary($event, false, $leaderboard);
+        $this->assertSame('Under 14', $summary['category_champions'][0]['category_label']);
+        $this->assertSame($student->id, $summary['overall_male_champion']['student']['id']);
+    }
+
     public function test_school_gender_categories_default_to_combined_and_save_event_age_groups(): void
     {
         ['event' => $event, 'admin' => $admin, 'sahodaya' => $sahodaya] = $this->makeFixture();

@@ -412,7 +412,7 @@
                     <h3 class="section-title !mb-0">Category merge rules</h3>
                     <p class="section-desc mt-0.5">
                         Tally two or more categories together as one bucket instead of scoring them separately — e.g. merge "Category 3" into "Open".
-                        Applies to this school/team overall scoreboard for any target category; the individual leaderboard above only honors a merge whose target is LP, UP, HS, HSS, or Open.
+                        Sports age-group merges also apply to individual standings. For other events, individual standings support LP, UP, HS, HSS, and Open as merge targets.
                     </p>
                 </div>
                 <button type="button" class="btn-secondary text-xs whitespace-nowrap" @click="addingMergeRule = !addingMergeRule">
@@ -542,7 +542,7 @@
                         <th class="p-3 text-right">Overall rank</th>
                     </tr></thead>
                     <tbody>
-                        <tr v-for="row in filteredLeaderboard" :key="row.student.id"
+                        <tr v-for="row in filteredLeaderboard" :key="`${row.student.id}|${row.category}`"
                             class="border-t hover:bg-slate-50 cursor-pointer transition-colors"
                             @click="viewStudentBreakdown(row.student.id)">
                             <td class="p-3 font-bold">

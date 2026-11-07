@@ -10,6 +10,7 @@ use App\Models\Student;
 use App\Models\Tenant;
 use App\Support\FestCategoryMerge;
 use App\Support\FestClassGroupScheme;
+use App\Support\FestSportsAgeGroup;
 use App\Support\FestTeamSquadRules;
 use Illuminate\Support\Collection;
 
@@ -131,18 +132,18 @@ class FestIndividualChampionshipService
                 });
         });
 
-        $overallRankByStudent = $allRows->values()->mapWithKeys(fn ($row, int $index) => [$row->student_id => $index + 1]);
+        $overallRanks = $allRows->values()->mapWithKeys(fn ($row, int $index) => [$row->student_id.'|'.$row->category => $index + 1]);
         $schoolNames = Tenant::query()
             ->whereIn('id', $allRows->pluck('student.tenant_id')->filter()->unique())
             ->get(['id', 'name', 'type'])
             ->mapWithKeys(fn (Tenant $school) => [$school->id => $school->name]);
 
-        return $rankedByCategory->map(function (array $pair) use ($overallRankByStudent, $schoolNames, $directPhotoUrls) {
+        return $rankedByCategory->map(function (array $pair) use ($overallRanks, $schoolNames, $directPhotoUrls) {
             [$row, $rank] = $pair;
 
             return [
                 'rank'         => $rank,
-                'overall_rank' => $overallRankByStudent[$row->student_id] ?? null,
+                'overall_rank' => $overallRanks[$row->student_id.'|'.$row->category] ?? null,
                 'points'       => $row->points,
                 'firsts'       => $row->firsts ?? 0,
                 'group_points' => $row->group_points,
@@ -168,6 +169,15 @@ class FestIndividualChampionshipService
         ])->values();
     }
 
+    public function categoryLabels(FestEvent $event): array
+    {
+        $root = $event->rootEvent();
+
+        return $root->event_type === 'sports'
+            ? FestSportsAgeGroup::labels($root->tenant_id)
+            : FestClassGroupScheme::canonicalLabels(null, $root);
+    }
+
     /**
      * Crowned champions summary per category and overall.
      *
@@ -177,8 +187,7 @@ class FestIndividualChampionshipService
     {
         $config = $this->getConfig($event);
         $leaderboard ??= $this->leaderboardForEvent($event, $directPhotoUrls);
-        $root = $event->rootEvent();
-        $canonicalLabels = FestClassGroupScheme::canonicalLabels(null, $root);
+        $categoryLabels = $this->categoryLabels($event);
         $groupByGender = ($config['group_by_gender'] ?? true) !== false;
 
         $categories = $leaderboard->pluck('category')->unique()->values();
@@ -193,7 +202,7 @@ class FestIndividualChampionshipService
 
                 $categoryChampions[] = [
                     'category' => $catKey,
-                    'category_label' => $canonicalLabels[$catKey] ?? strtoupper($catKey),
+                    'category_label' => $categoryLabels[$catKey] ?? strtoupper($catKey),
                     'male_champion' => $boys->firstWhere('rank', 1) ? $boys->firstWhere('rank', 1) + ['title' => $config['male_title']] : null,
                     'male_runner_up' => $boys->firstWhere('rank', 2) ? $boys->firstWhere('rank', 2) + ['title' => $config['runner_up_title']] : null,
                     'female_champion' => $girls->firstWhere('rank', 1) ? $girls->firstWhere('rank', 1) + ['title' => $config['female_title']] : null,
@@ -203,7 +212,7 @@ class FestIndividualChampionshipService
                 $top = $catRows->sortBy('rank')->values();
                 $categoryChampions[] = [
                     'category' => $catKey,
-                    'category_label' => $canonicalLabels[$catKey] ?? strtoupper($catKey),
+                    'category_label' => $categoryLabels[$catKey] ?? strtoupper($catKey),
                     'champion' => $top->first() ? $top->first() + ['title' => $config['male_title']] : null,
                     'runner_up' => $top->firstWhere('rank', 2) ? $top->firstWhere('rank', 2) + ['title' => $config['runner_up_title']] : null,
                 ];
@@ -370,9 +379,13 @@ class FestIndividualChampionshipService
             return collect();
         }
 
+        $sports = $leaves->first()->rootEvent()->event_type === 'sports';
+
         return $leaves
             ->flatMap(fn (FestEvent $leaf) => $this->pointsForEvent($leaf))
-            ->groupBy('student_id')
+            ->groupBy(fn ($row) => $sports
+                ? $row->student_id.'|'.$row->category
+                : $row->student_id)
             ->map(function (Collection $studentRows) {
                 $first = $studentRows->first();
 
@@ -397,7 +410,9 @@ class FestIndividualChampionshipService
     public function pointsForEvent(FestEvent $event, array $options = []): Collection
     {
         $config = array_merge($this->getConfig($event), $options);
-        $categoryMap = FestCategoryMerge::map($event->rootEvent());
+        $root = $event->rootEvent();
+        $sports = $root->event_type === 'sports';
+        $categoryMap = FestCategoryMerge::map($root);
         $maxCounting = $config['max_counting_items'];
         $multiMode = $config['multi_person_mode'];
         $groupWeight = $config['group_weight_percent'];
@@ -408,7 +423,7 @@ class FestIndividualChampionshipService
         FestMark::currentPerformers()->where('event_id', $event->id)
             ->whereHas('item', fn ($q) => $q->whereNotNull('results_published_at')->where('results_hidden', false))
             ->with(['item', 'participant.student', 'participant.registration.item'])
-            ->each(function (FestMark $mark) use ($event, $categoryMap, $excludedCategories, &$studentItems) {
+            ->each(function (FestMark $mark) use ($event, $root, $sports, $categoryMap, $excludedCategories, &$studentItems) {
                 $student = $mark->participant?->student;
                 if (! $student) {
                     return;
@@ -433,6 +448,11 @@ class FestIndividualChampionshipService
                 $merged = $categoryMap[$rawClassGroup] ?? $categoryMap[$canonicalCategory] ?? $canonicalCategory;
                 $category = in_array($merged, self::INDIVIDUAL_CATEGORY_KEYS, true) ? $merged : $canonicalCategory;
 
+                if ($sports) {
+                    $ageGroup = $item->age_group ?: (FestSportsAgeGroup::fromClassGroup($canonicalCategory, $root->tenant_id) ?? 'open');
+                    $category = $categoryMap[$ageGroup] ?? $ageGroup;
+                }
+
                 $gender = match ($student->gender) {
                     'male'   => 'male',
                     'female' => 'female',
@@ -445,17 +465,18 @@ class FestIndividualChampionshipService
                 $points = $this->gradePoints->pointsForMark($event, $mark);
                 $isMulti = FestTeamSquadRules::isMultiPerson($item->participant_type);
 
-                $studentItems[$student->id]['student'] = $student;
+                $bucket = $sports ? $student->id.'|'.$category : $student->id;
+                $studentItems[$bucket]['student'] = $student;
                 // Open group items must not move an individual competitor out of
                 // their own class category merely because that mark was read last.
-                $existing = $studentItems[$student->id] ?? [];
+                $existing = $studentItems[$bucket] ?? [];
                 if (! isset($existing['category']) || (! $isMulti &&
                     (($existing['category_from_group'] ?? false) || $existing['category'] === 'open'))) {
-                    $studentItems[$student->id]['category'] = $category;
-                    $studentItems[$student->id]['category_from_group'] = $isMulti;
+                    $studentItems[$bucket]['category'] = $category;
+                    $studentItems[$bucket]['category_from_group'] = $isMulti;
                 }
-                $studentItems[$student->id]['gender'] = $gender;
-                $studentItems[$student->id]['marks'][] = [
+                $studentItems[$bucket]['gender'] = $gender;
+                $studentItems[$bucket]['marks'][] = [
                     'mark' => $mark,
                     'points' => $points,
                     'is_multi' => $isMulti,
@@ -465,7 +486,7 @@ class FestIndividualChampionshipService
 
         $aggregated = [];
 
-        foreach ($studentItems as $studentId => $data) {
+        foreach ($studentItems as $data) {
             $student = $data['student'];
             $category = $data['category'];
             $gender = $data['gender'];

@@ -38,7 +38,7 @@ class FestChampionshipController extends SahodayaAdminController
             'championsSummary'           => $championsSummary,
             'championshipConfig'         => $championship->getConfig($event),
             'categoryOptions'            => collect($categoryLabels)->map(fn ($label, $key) => ['value' => $key, 'label' => $label])->values(),
-            'championshipCategoryLabels' => FestClassGroupScheme::canonicalLabels(null, $root),
+            'championshipCategoryLabels' => $championship->categoryLabels($root),
             'categoryMergeGroups'        => $this->mergeGroupsForDisplay($categoryMap),
             'schoolOverallGroups' => \App\Support\FestSchoolOverallGroups::groups($root),
             'categoryDisplaySort' => $root->aggregation_config['category_display_sort'] ?? 'natural',
@@ -68,7 +68,7 @@ class FestChampionshipController extends SahodayaAdminController
             && (! $request->boolean('top_three', true) || $r['rank'] <= 3)
             && (! $request->filled('category') || strtolower($r['category']) === strtolower($request->query('category')))
             && (! $request->filled('gender') || strtolower($r['gender'] ?? '') === strtolower($request->query('gender'))));
-        $labels = FestClassGroupScheme::canonicalLabels(null, $event->rootEvent());
+        $labels = $championship->categoryLabels($event);
         return \App\Support\PdfGenerator::fromView('fest.reports.individual-championship', [
             'event' => $event, 'orgName' => $this->sahodaya->name, 'rows' => $rows,
             'labels' => $labels, 'preview' => $preview,
@@ -93,7 +93,7 @@ class FestChampionshipController extends SahodayaAdminController
             'disabled'                 => 'nullable|boolean',
             'group_by_gender'          => 'nullable|boolean',
             'excluded_individual_categories' => 'nullable|array',
-            'excluded_individual_categories.*' => 'string|in:lp,up,hs,hss,open',
+            'excluded_individual_categories.*' => ['string', \Illuminate\Validation\Rule::in(array_keys($championship->categoryLabels($event)))],
         ]);
 
         $root = $event->rootEvent();
